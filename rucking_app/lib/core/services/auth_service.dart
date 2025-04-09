@@ -53,7 +53,7 @@ class AuthServiceImpl implements AuthService {
   Future<User> signIn(String email, String password) async {
     try {
       final response = await _apiClient.post(
-        '/api/auth/login',
+        '/auth/login',
         {
           'email': email,
           'password': password,
@@ -91,7 +91,7 @@ class AuthServiceImpl implements AuthService {
   }) async {
     try {
       final response = await _apiClient.post(
-        '/api/users/register',
+        '/users/register',
         {
           'name': name,
           'display_name': displayName,
@@ -142,7 +142,7 @@ class AuthServiceImpl implements AuthService {
       if (userData == null) return null;
       
       // Get fresh user data from API
-      final response = await _apiClient.get('/api/users/profile');
+      final response = await _apiClient.get('/users/profile');
       final user = User.fromJson(response);
       
       // Update stored user data
@@ -178,7 +178,7 @@ class AuthServiceImpl implements AuthService {
     
     try {
       // Try to get the user profile
-      final response = await _apiClient.get('/api/users/profile');
+      final response = await _apiClient.get('/users/profile');
       return response != null;
     } catch (e) {
       if (e is UnauthorizedException) {
@@ -213,7 +213,7 @@ class AuthServiceImpl implements AuthService {
       if (heightCm != null) data['height_cm'] = heightCm;
       
       final response = await _apiClient.put(
-        '/api/users/profile',
+        '/users/profile',
         data,
       );
       

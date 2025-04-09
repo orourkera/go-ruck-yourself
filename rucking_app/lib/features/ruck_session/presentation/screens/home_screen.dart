@@ -97,7 +97,7 @@ class _HomeTabState extends State<_HomeTab> {
   /// Fetches recent sessions from the API
   Future<void> _fetchRecentSessions() async {
     try {
-      final response = await _apiClient.get('/api/rucks?limit=3');
+      final response = await _apiClient.get('/rucks?limit=3');
       
       setState(() {
         if (response == null) {
@@ -106,8 +106,13 @@ class _HomeTabState extends State<_HomeTab> {
           _recentSessions = response;
         } else if (response is Map && response.containsKey('data') && response['data'] is List) {
           _recentSessions = response['data'] as List;
+        } else if (response is Map) {
+          // Handle other map responses, but don't try to use as a List
+          _recentSessions = [];
+          debugPrint('Unexpected response format: $response');
         } else {
           _recentSessions = [];
+          debugPrint('Unknown response type: ${response.runtimeType}');
         }
         _isLoading = false;
       });

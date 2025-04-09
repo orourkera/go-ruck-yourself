@@ -31,22 +31,22 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
   Future<void> _fetchSessions() async {
     try {
       // Build endpoint based on active filter
-      String endpoint = '/api/rucks';
+      String endpoint = '/rucks';
       
       if (_activeFilter == 'This Week') {
         final now = DateTime.now();
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
         final startDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-        endpoint = '/api/rucks?start_date=${startDate.toIso8601String()}';
+        endpoint = '/rucks?start_date=${startDate.toIso8601String()}';
       } else if (_activeFilter == 'This Month') {
         final now = DateTime.now();
         final startOfMonth = DateTime(now.year, now.month, 1);
-        endpoint = '/api/rucks?start_date=${startOfMonth.toIso8601String()}';
+        endpoint = '/rucks?start_date=${startOfMonth.toIso8601String()}';
       } else if (_activeFilter == 'Last Month') {
         final now = DateTime.now();
         final startOfLastMonth = DateTime(now.year, now.month - 1, 1);
         final endOfLastMonth = DateTime(now.year, now.month, 0);
-        endpoint = '/api/rucks?start_date=${startOfLastMonth.toIso8601String()}&end_date=${endOfLastMonth.toIso8601String()}';
+        endpoint = '/rucks?start_date=${startOfLastMonth.toIso8601String()}&end_date=${endOfLastMonth.toIso8601String()}';
       }
       
       final response = await _apiClient.get(endpoint);
@@ -58,8 +58,13 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
           _sessions = response;
         } else if (response is Map && response.containsKey('data') && response['data'] is List) {
           _sessions = response['data'] as List;
+        } else if (response is Map) {
+          // Handle other map responses, but don't try to use as a List
+          _sessions = [];
+          debugPrint('Unexpected response format: $response');
         } else {
           _sessions = [];
+          debugPrint('Unknown response type: ${response.runtimeType}');
         }
         _isLoading = false;
       });

@@ -77,6 +77,7 @@ class User extends Equatable {
   factory User.fromJson(Map<String, dynamic> json) {
     String name = "User";
     String displayName = "";
+    String email = "";
     
     if (json.containsKey('username') && json['username'] != null) {
       name = json['username'] as String;
@@ -90,9 +91,20 @@ class User extends Equatable {
       displayName = name;
     }
     
+    if (json.containsKey('email') && json['email'] != null) {
+      email = json['email'] as String;
+    }
+
+    // Safely convert the ID to a string regardless of its original type
+    String userId = "";
+    var rawId = json['id'] ?? json['user_id'];
+    if (rawId != null) {
+      userId = rawId.toString();
+    }
+    
     return User(
-      userId: (json['id'] ?? json['user_id']).toString(),
-      email: json['email'] as String,
+      userId: userId,
+      email: email,
       name: name,
       displayName: displayName,
       weightKg: json['weight_kg'] != null ? (json['weight_kg'] as num).toDouble() : null,
@@ -156,9 +168,9 @@ class UserStats extends Equatable {
   /// Factory constructor for creating UserStats from JSON
   factory UserStats.fromJson(Map<String, dynamic> json) {
     return UserStats(
-      totalRucks: json['total_rucks'] as int,
-      totalDistanceKm: (json['total_distance_km'] as num).toDouble(),
-      totalCalories: json['total_calories'] as int,
+      totalRucks: json['total_rucks'] != null ? (json['total_rucks'] as num).toInt() : 0,
+      totalDistanceKm: json['total_distance_km'] != null ? (json['total_distance_km'] as num).toDouble() : 0.0,
+      totalCalories: json['total_calories'] != null ? (json['total_calories'] as num).toInt() : 0,
       thisMonth: json['this_month'] != null 
           ? MonthlyStats.fromJson(json['this_month'] as Map<String, dynamic>) 
           : null,
@@ -203,9 +215,9 @@ class MonthlyStats extends Equatable {
   /// Factory constructor for creating MonthlyStats from JSON
   factory MonthlyStats.fromJson(Map<String, dynamic> json) {
     return MonthlyStats(
-      rucks: json['rucks'] as int,
-      distanceKm: (json['distance_km'] as num).toDouble(),
-      calories: json['calories'] as int,
+      rucks: json['rucks'] != null ? (json['rucks'] as num).toInt() : 0,
+      distanceKm: json['distance_km'] != null ? (json['distance_km'] as num).toDouble() : 0.0,
+      calories: json['calories'] != null ? (json['calories'] as num).toInt() : 0,
     );
   }
   
