@@ -59,9 +59,23 @@ class ApiClient {
         options: options,
       );
       
+      // Log the response for debugging
+      print('API GET $endpoint - Response: ${response.statusCode}');
+      print('Response data type: ${response.data.runtimeType}');
+      if (response.data is Map) {
+        print('Response keys: ${(response.data as Map).keys.toList()}');
+      }
+      
       return response.data;
     } catch (e) {
       print('API GET Error: $e');
+      if (e is DioException) {
+        // Add detailed error information
+        print('Status code: ${e.response?.statusCode}, URL: ${e.requestOptions.path}');
+        print('Response data: ${e.response?.data}');
+      }
+      
+      // Throw a properly handled error
       throw _handleError(e);
     }
   }
