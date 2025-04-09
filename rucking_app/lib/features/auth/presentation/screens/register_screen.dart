@@ -81,12 +81,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
-        } else if (state is AuthError) {
-          // Show error message if registration fails
+        } else if (state is AuthUserAlreadyExists) {
+          // Show special error message with sign-in link
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.message),
+              content: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: Text(state.message)),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Go back to login screen
+                    },
+                    child: Text(
+                      'Sign In',
+                      style: TextStyle(
+                        color: Colors.white, 
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppColors.warning,
+              duration: const Duration(seconds: 10),
+            ),
+          );
+        } else if (state is AuthError) {
+          // Show error message if registration fails
+          String errorMessage = state.message;
+          
+          // Make error message more user-friendly
+          if (errorMessage.contains('404')) {
+            errorMessage = 'Server connection error: The backend server might not be running or the endpoint does not exist.';
+          } else if (errorMessage.contains('Connection')) {
+            errorMessage = 'Cannot connect to the server. Please check your internet connection.';
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
               backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 5),
             ),
           );
         }
@@ -104,150 +141,164 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Name field
-                  CustomTextField(
-                    controller: _nameController,
-                    label: 'Full Name',
-                    hint: 'Enter your full name',
-                    keyboardType: TextInputType.name,
-                    prefixIcon: Icons.person_outline,
-                    textCapitalization: TextCapitalization.words,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Email field
-                  CustomTextField(
-                    controller: _emailController,
-                    label: 'Email',
-                    hint: 'Enter your email',
-                    keyboardType: TextInputType.emailAddress,
-                    prefixIcon: Icons.email_outlined,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Password field
-                  CustomTextField(
-                    controller: _passwordController,
-                    label: 'Password',
-                    hint: 'Enter your password',
-                    obscureText: !_isPasswordVisible,
-                    prefixIcon: Icons.lock_outline,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordVisible
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        color: AppColors.grey,
+          bottom: true, // Ensure bottom safe area is respected
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 20), // Extra bottom padding
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Name field
+                          CustomTextField(
+                            controller: _nameController,
+                            label: 'Full Name',
+                            hint: 'Enter your full name',
+                            keyboardType: TextInputType.name,
+                            prefixIcon: Icons.person_outline,
+                            textCapitalization: TextCapitalization.words,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your name';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Email field
+                          CustomTextField(
+                            controller: _emailController,
+                            label: 'Email',
+                            hint: 'Enter your email',
+                            keyboardType: TextInputType.emailAddress,
+                            prefixIcon: Icons.email_outlined,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Password field
+                          CustomTextField(
+                            controller: _passwordController,
+                            label: 'Password',
+                            hint: 'Enter your password',
+                            obscureText: !_isPasswordVisible,
+                            prefixIcon: Icons.lock_outline,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordVisible
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: AppColors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter a password';
+                              }
+                              if (value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Confirm password field
+                          CustomTextField(
+                            controller: _confirmPasswordController,
+                            label: 'Confirm Password',
+                            hint: 'Confirm your password',
+                            obscureText: !_isConfirmPasswordVisible,
+                            prefixIcon: Icons.lock_outline,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isConfirmPasswordVisible
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: AppColors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                                });
+                              },
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please confirm your password';
+                              }
+                              if (value != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Optional information section
+                          Text(
+                            'Optional Information',
+                            style: AppTextStyles.subtitle1.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Weight field
+                          CustomTextField(
+                            controller: _weightController,
+                            label: 'Weight (kg)',
+                            hint: 'Enter your weight in kg',
+                            keyboardType: TextInputType.number,
+                            prefixIcon: Icons.monitor_weight_outlined,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Height field
+                          CustomTextField(
+                            controller: _heightController,
+                            label: 'Height (cm)',
+                            hint: 'Enter your height in cm',
+                            keyboardType: TextInputType.number,
+                            prefixIcon: Icons.height_outlined,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                            ],
+                          ),
+                          const SizedBox(height: 30),
+                        ],
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a password';
-                      }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Confirm password field
-                  CustomTextField(
-                    controller: _confirmPasswordController,
-                    label: 'Confirm Password',
-                    hint: 'Confirm your password',
-                    obscureText: !_isConfirmPasswordVisible,
-                    prefixIcon: Icons.lock_outline,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isConfirmPasswordVisible
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        color: AppColors.grey,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
-                        });
-                      },
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please confirm your password';
-                      }
-                      if (value != _passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Optional information section
-                  Text(
-                    'Optional Information',
-                    style: AppTextStyles.subtitle1.copyWith(
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  
-                  // Weight field
-                  CustomTextField(
-                    controller: _weightController,
-                    label: 'Weight (kg)',
-                    hint: 'Enter your weight in kg',
-                    keyboardType: TextInputType.number,
-                    prefixIcon: Icons.monitor_weight_outlined,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Height field
-                  CustomTextField(
-                    controller: _heightController,
-                    label: 'Height (cm)',
-                    hint: 'Enter your height in cm',
-                    keyboardType: TextInputType.number,
-                    prefixIcon: Icons.height_outlined,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Terms and conditions checkbox
-                  Row(
+                ),
+                
+                // Terms and conditions checkbox - moved outside of scroll view
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Row(
                     children: [
                       Checkbox(
                         value: _acceptTerms,
@@ -266,10 +317,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
-                  
-                  // Register button
-                  BlocBuilder<AuthBloc, AuthState>(
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Button placed at the bottom outside of the scroll view
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                  child: BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
                       return CustomButton(
                         text: 'Create Account',
@@ -278,9 +333,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       );
                     },
                   ),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

@@ -1,4 +1,4 @@
-/// Base exception for all API related errors
+/// Base API exception
 class ApiException implements Exception {
   final String message;
   
@@ -8,20 +8,20 @@ class ApiException implements Exception {
   String toString() => 'ApiException: $message';
 }
 
-/// Exception for network connectivity issues
-class NetworkException extends ApiException {
-  NetworkException(String message) : super(message);
-  
-  @override
-  String toString() => 'NetworkException: $message';
-}
-
 /// Exception for timeout errors
 class TimeoutException extends ApiException {
   TimeoutException(String message) : super(message);
   
   @override
   String toString() => 'TimeoutException: $message';
+}
+
+/// Exception for network/connection errors
+class NetworkException extends ApiException {
+  NetworkException(String message) : super(message);
+  
+  @override
+  String toString() => 'NetworkException: $message';
 }
 
 /// Exception for 400 Bad Request errors
@@ -56,18 +56,18 @@ class NotFoundException extends ApiException {
   String toString() => 'NotFoundException: $message';
 }
 
-/// Exception for 500, 502, 503 Server errors
+/// Exception for 409 Conflict errors
+class ConflictException extends ApiException {
+  ConflictException(String message) : super(message);
+  
+  @override
+  String toString() => 'ConflictException: $message';
+}
+
+/// Exception for 500 Server errors
 class ServerException extends ApiException {
   ServerException(String message) : super(message);
   
   @override
   String toString() => 'ServerException: $message';
-}
-
-/// Exception for cancelled requests
-class RequestCancelledException extends ApiException {
-  RequestCancelledException(String message) : super(message);
-  
-  @override
-  String toString() => 'RequestCancelledException: $message';
 } 

@@ -115,6 +115,8 @@ class ApiClient {
               return ForbiddenException(data?['message'] ?? 'Forbidden');
             case 404:
               return NotFoundException(data?['message'] ?? 'Not found');
+            case 409:
+              return ConflictException(data?['message'] ?? 'Resource already exists');
             case 500:
             case 502:
             case 503:

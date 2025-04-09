@@ -35,4 +35,14 @@ class AuthError extends AuthState {
   
   @override
   List<Object> get props => [message];
+}
+
+/// Error state for when a user tries to register with an email that already exists
+class AuthUserAlreadyExists extends AuthState {
+  final String message;
+  
+  const AuthUserAlreadyExists(this.message);
+  
+  @override
+  List<Object> get props => [message];
 } 

@@ -185,7 +185,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   Future<void> _sendLocationUpdate(LocationPoint point) async {
     try {
       final response = await _apiClient.post(
-        '/rucks/${widget.ruckId}/location',
+        '/api/rucks/${widget.ruckId}/location',
         {
           'latitude': point.latitude,
           'longitude': point.longitude,
@@ -219,7 +219,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   /// Start session on the backend
   Future<void> _startSession() async {
     try {
-      await _apiClient.post('/rucks/${widget.ruckId}/start', {});
+      await _apiClient.post('/api/rucks/${widget.ruckId}/start', {});
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to start session: $e'))
@@ -247,7 +247,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _initLocationTracking();
         
         // Notify API
-        _apiClient.post('/rucks/${widget.ruckId}/resume', {})
+        _apiClient.post('/api/rucks/${widget.ruckId}/resume', {})
             .catchError((e) => print('Failed to resume session: $e'));
       } else {
         _stopwatch.stop();
@@ -257,7 +257,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _locationSubscription?.pause();
         
         // Notify API
-        _apiClient.post('/rucks/${widget.ruckId}/pause', {})
+        _apiClient.post('/api/rucks/${widget.ruckId}/pause', {})
             .catchError((e) => print('Failed to pause session: $e'));
       }
     });
@@ -271,7 +271,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     
     try {
       // Complete session on backend
-      await _apiClient.post('/rucks/${widget.ruckId}/complete', {
+      await _apiClient.post('/api/rucks/${widget.ruckId}/complete', {
         'notes': widget.notes,
       });
       

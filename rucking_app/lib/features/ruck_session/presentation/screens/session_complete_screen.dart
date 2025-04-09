@@ -106,7 +106,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     
     try {
       // Update session with rating, exertion, notes, tags
-      await _apiClient.post('/rucks/${widget.ruckId}/complete', {
+      await _apiClient.post('/api/rucks/${widget.ruckId}/complete', {
         'rating': _rating,
         'perceived_exertion': _perceivedExertion,
         'notes': _notes,

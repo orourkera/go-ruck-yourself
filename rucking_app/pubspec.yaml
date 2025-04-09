@@ -67,6 +67,15 @@ dev_dependencies:
   flutter_lints: ^2.0.2
   build_runner: ^2.4.15
   mockito: ^5.4.2
+  flutter_launcher_icons: ^0.13.1
+
+# Configuration for flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/go ruck yourself.png"
+  adaptive_icon_background: "#CC6A2A" # Brownish-orange from our theme
+  adaptive_icon_foreground: "assets/images/go ruck yourself.png"
 
 flutter:
   uses-material-design: true
@@ -82,4 +91,14 @@ flutter:
         - asset: assets/fonts/Roboto-Medium.ttf
           weight: 500
         - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+    - family: Bangers
+      fonts:
+        - asset: assets/fonts/Bangers-Regular.ttf
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.otf
+        - asset: assets/fonts/Inter-Medium.otf
+          weight: 500
+        - asset: assets/fonts/Inter-Bold.otf
           weight: 700 

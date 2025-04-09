@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 
-/// App color palette
+/// App color palette with rustic theme
 class AppColors {
-  // Primary colors
-  static final Color primary = Color(0xFF1E6E42); // Deep Green
-  static final Color primaryLight = Color(0xFF5A9C7A);
-  static final Color primaryDark = Color(0xFF004D28);
+  // Primary colors - Brownish-orange
+  static final Color primary = Color(0xFFCC6A2A); 
+  static final Color primaryLight = Color(0xFFE09355);
+  static final Color primaryDark = Color(0xFFA04F18);
   
-  // Secondary colors
-  static final Color secondary = Color(0xFF4CAF50); // Green
-  static final Color secondaryLight = Color(0xFF80E27E);
-  static final Color secondaryDark = Color(0xFF087F23);
-  static final Color secondaryDarkest = Color(0xFF005100);
+  // Secondary colors - Olive green
+  static final Color secondary = Color(0xFF728C69); 
+  static final Color secondaryLight = Color(0xFF94A98C);
+  static final Color secondaryDark = Color(0xFF546A4A);
+  static final Color secondaryDarkest = Color(0xFF3A4A33);
   
-  // Accent colors
-  static final Color accent = Color(0xFFFF6D00); // Orange
-  static final Color accentLight = Color(0xFFFF9E40);
-  static final Color accentDark = Color(0xFFC43C00);
+  // Accent colors (earthy red)
+  static final Color accent = Color(0xFFB84934); 
+  static final Color accentLight = Color(0xFFD67D6D);
+  static final Color accentDark = Color(0xFF9A311E);
   
   // Neutral colors
   static final Color white = Color(0xFFFFFFFF);
@@ -25,45 +25,48 @@ class AppColors {
   static final Color greyLight = Color(0xFFE0E0E0);
   static final Color greyDark = Color(0xFF616161);
   
+  // Brown color
+  static final Color brown = Color(0xFF4B3621);
+  
   // Background colors
-  static final Color backgroundLight = Color(0xFFF5F5F5);
-  static final Color backgroundDark = Color(0xFF121212);
+  static final Color backgroundLight = Color(0xFFF4F1EA); // Light beige
+  static final Color backgroundDark = Color(0xFF2C2418); // Dark brown
   
   // Surface colors
-  static final Color surfaceLight = Color(0xFFFFFFFF);
-  static final Color surfaceDark = Color(0xFF1E1E1E);
+  static final Color surfaceLight = Color(0xFFFAF7F2); // Lighter beige
+  static final Color surfaceDark = Color(0xFF352D1F); // Dark brown
   
   // Text colors
-  static final Color textDark = Color(0xFF212121);
-  static final Color textDarkSecondary = Color(0xFF757575);
-  static final Color textLight = Color(0xFFFAFAFA);
-  static final Color textLightSecondary = Color(0xFFE0E0E0);
+  static final Color textDark = Color(0xFF1F1F1F);
+  static final Color textDarkSecondary = Color(0xFF4B3621); // Brown
+  static final Color textLight = Color(0xFFF4F1EA); // Light beige
+  static final Color textLightSecondary = Color(0xFFE0DAD0); // Light beige secondary
   
   // Status colors
-  static final Color success = Color(0xFF4CAF50); // Green
-  static final Color error = Color(0xFFE53935); // Red
-  static final Color errorDark = Color(0xFFEF5350);
-  static final Color warning = Color(0xFFFFA000); // Amber
-  static final Color info = Color(0xFF2196F3); // Blue
+  static final Color success = Color(0xFF728C69); // Olive green
+  static final Color error = Color(0xFFB84934); // Earthy red
+  static final Color errorDark = Color(0xFF9A311E);
+  static final Color warning = Color(0xFFE09355); // Light orange
+  static final Color info = Color(0xFF546A4A); // Dark olive
   
   // Divider colors
-  static final Color dividerLight = Color(0xFFE0E0E0);
-  static final Color dividerDark = Color(0xFF424242);
+  static final Color dividerLight = Color(0xFFE0DAD0);
+  static final Color dividerDark = Color(0xFF4B3621);
   
   // Gradient colors
   static final List<Color> primaryGradient = [
-    Color(0xFF1E6E42), // Deep Green
-    Color(0xFF4CAF50), // Green
+    Color(0xFFCC6A2A), // Brownish-orange
+    Color(0xFFE09355), // Light orange
   ];
   
   static final List<Color> secondaryGradient = [
-    Color(0xFF4CAF50), // Green
-    Color(0xFF8BC34A), // Light Green
+    Color(0xFF728C69), // Olive green
+    Color(0xFF94A98C), // Light olive
   ];
   
   static final List<Color> accentGradient = [
-    Color(0xFFFF6D00), // Orange
-    Color(0xFFFF9E40), // Light Orange
+    Color(0xFFB84934), // Earthy red
+    Color(0xFFD67D6D), // Light red
   ];
   
   // Private constructor to prevent instantiation

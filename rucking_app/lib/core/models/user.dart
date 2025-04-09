@@ -63,10 +63,17 @@ class User extends Equatable {
   
   /// Factory constructor for creating a User from JSON
   factory User.fromJson(Map<String, dynamic> json) {
+    String name = "User";
+    if (json.containsKey('username') && json['username'] != null) {
+      name = json['username'] as String;
+    } else if (json.containsKey('name') && json['name'] != null) {
+      name = json['name'] as String;
+    }
+    
     return User(
-      userId: json['user_id'] as String,
+      userId: (json['id'] ?? json['user_id']).toString(),
       email: json['email'] as String,
-      name: json['name'] as String,
+      name: name,
       weightKg: json['weight_kg'] != null ? (json['weight_kg'] as num).toDouble() : null,
       heightCm: json['height_cm'] != null ? (json['height_cm'] as num).toDouble() : null,
       dateOfBirth: json['date_of_birth'] as String?,

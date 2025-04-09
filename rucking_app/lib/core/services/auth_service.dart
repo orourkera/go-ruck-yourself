@@ -97,8 +97,20 @@ class AuthServiceImpl implements AuthService {
         },
       );
       
-      // After registration, login automatically
-      return await signIn(email, password);
+      // Process the response directly
+      final token = response['token'] as String;
+      final userData = response['user'] as Map<String, dynamic>;
+      final user = User.fromJson(userData);
+      
+      // Store token and user data
+      await _storageService.setSecureString(AppConfig.tokenKey, token);
+      await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
+      await _storageService.setString(AppConfig.userIdKey, user.userId);
+      
+      // Set token in API client
+      _apiClient.setAuthToken(token);
+      
+      return user;
     } catch (e) {
       throw _handleAuthError(e);
     }
@@ -148,15 +160,30 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<bool> isAuthenticated() async {
-    // For development without backend
-    if ((await _apiClient.get('/users/profile')) != null) {
-      // Save mock token for consistency
-      await _storageService.setSecureString(AppConfig.tokenKey, 'mock_token_123456');
-      return true;
+    // First check if we have a token stored
+    final token = await _storageService.getSecureString(AppConfig.tokenKey);
+    if (token == null) {
+      return false; // No token means not authenticated
     }
     
-    final token = await _storageService.getSecureString(AppConfig.tokenKey);
-    return token != null;
+    // Set the token for API requests
+    _apiClient.setAuthToken(token);
+    
+    try {
+      // Try to get the user profile
+      final response = await _apiClient.get('/users/profile');
+      return response != null;
+    } catch (e) {
+      if (e is UnauthorizedException) {
+        // Token is invalid or expired
+        await signOut();
+        return false;
+      }
+      
+      // For network errors, check if we have a stored user
+      final userData = await _storageService.getObject(AppConfig.userProfileKey);
+      return userData != null;
+    }
   }
   
   @override
@@ -177,7 +204,7 @@ class AuthServiceImpl implements AuthService {
       if (heightCm != null) data['height_cm'] = heightCm;
       
       final response = await _apiClient.put(
-        '/users/profile',
+        '/api/users/profile',
         data,
       );
       

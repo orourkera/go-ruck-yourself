@@ -81,7 +81,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       emit(Authenticated(user));
     } catch (e) {
-      emit(AuthError('Registration failed: $e'));
+      if (e.toString().contains('ConflictException') || e.toString().contains('already exists')) {
+        emit(AuthUserAlreadyExists('An account with this email already exists. Please sign in instead.'));
+      } else {
+        emit(AuthError('Registration failed: $e'));
+      }
     }
   }
 

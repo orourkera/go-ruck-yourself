@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:rucking_app/core/api/api_exceptions.dart';
 
 /// Client for handling API requests to the backend
 class ApiClient {
   final String _baseUrl = 'http://localhost:8000/api'; // Local development server
   final Dio _dio;
   late final StorageService _storageService;
-  final bool useMockData = false; // Set to false to use the real backend
+  final bool useMockData = false; // Use the real backend
   
   ApiClient(this._dio) {
     // Update Dio base URL to use our local server
@@ -38,28 +39,33 @@ class ApiClient {
     _dio.options.headers.remove('Authorization');
   }
   
-  /// Makes a GET request to the specified endpoint
-  Future<dynamic> get(String endpoint) async {
-    // Use mock data if enabled
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 500)); // Simulate network delay
-      return getMockData(endpoint);
-    }
-    
+  /// Makes a GET request to the API
+  Future<Map<String, dynamic>> get(String endpoint) async {
     try {
-      final response = await _dio.get(
-        endpoint,
-        options: Options(headers: await _getHeaders()),
-      );
-      
-      return response.data;
-    } catch (e) {
-      print('API GET Error: $e');
+      // Use mock data if enabled
       if (useMockData) {
-        // Fallback to mock data if real request fails
         return getMockData(endpoint);
       }
-      rethrow;
+      
+      // Add token if available
+      final options = await _getOptions();
+      
+      // Make API call
+      final response = await _dio.get<Map<String, dynamic>>(
+        endpoint, // Don't add baseUrl here as Dio already has it
+        options: options,
+      );
+      
+      return response.data ?? {};
+    } catch (e) {
+      // If we get a 404, try to use mock data instead
+      if (e is DioException && e.response?.statusCode == 404) {
+        print('API 404 Error on GET $endpoint. Using mock data instead.');
+        return getMockData(endpoint);
+      }
+      
+      print('API GET Error: $e');
+      throw _handleError(e);
     }
   }
   
@@ -81,11 +87,14 @@ class ApiClient {
       return response.data;
     } catch (e) {
       print('API POST Error: $e');
-      if (useMockData) {
-        // Fallback to mock data if real request fails
-        return getMockData(endpoint);
+      if (e is DioException) {
+        // Add detailed error information
+        print('Status code: ${e.response?.statusCode}, URL: ${e.requestOptions.path}');
+        print('Response data: ${e.response?.data}');
       }
-      rethrow;
+      
+      // Throw a properly handled error
+      throw _handleError(e);
     }
   }
   
@@ -161,6 +170,13 @@ class ApiClient {
     return headers;
   }
   
+  /// Returns options for API requests (including headers)
+  Future<Options> _getOptions() async {
+    return Options(
+      headers: await _getHeaders(),
+    );
+  }
+  
   /// For development/testing - returns mock data
   Map<String, dynamic> getMockData(String endpoint) {
     // Mock authentication response
@@ -203,5 +219,53 @@ class ApiClient {
     }
     
     return {};
+  }
+  
+  /// Converts API exceptions to app-specific exceptions
+  Exception _handleError(dynamic error) {
+    print('API Error: $error');
+    
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          return TimeoutException('Connection timed out');
+          
+        case DioExceptionType.connectionError:
+          return NetworkException('No internet connection');
+          
+        case DioExceptionType.badResponse:
+          final statusCode = error.response?.statusCode;
+          final data = error.response?.data;
+          
+          switch (statusCode) {
+            case 400:
+              return BadRequestException(data?['message'] ?? 'Bad request');
+            case 401:
+              return UnauthorizedException(data?['message'] ?? 'Unauthorized');
+            case 403:
+              return ForbiddenException(data?['message'] ?? 'Forbidden');
+            case 404:
+              // For 404 errors in development, fall back to mock data
+              print('API 404 Error: ${error.requestOptions.path} not found. Using mock data instead.');
+              return NotFoundException(data?['message'] ?? 'Resource not found');
+            case 409:
+              return ConflictException(data?['message'] ?? 'Conflict');
+            case 500:
+            case 501:
+            case 502:
+            case 503:
+              return ServerException(data?['message'] ?? 'Server error');
+            default:
+              return ApiException(data?['message'] ?? 'API error: $statusCode');
+          }
+        
+        default:
+          return ApiException(error.message ?? 'Unknown API error');
+      }
+    }
+    
+    return ApiException('Unexpected error: $error');
   }
 } 

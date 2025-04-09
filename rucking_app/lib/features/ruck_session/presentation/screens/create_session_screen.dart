@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -25,6 +27,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   double _ruckWeight = AppConfig.defaultRuckWeight;
   int _plannedDuration = 60; // Default 60 minutes
   
+  // Add loading state variable
+  bool _isCreating = false;
+
   @override
   void initState() {
     super.initState();
@@ -42,23 +47,55 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   }
 
   /// Creates and starts a new ruck session
-  void _createSession() {
+  void _createSession() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Actually create session in the backend
+      try {
+        // Show loading indicator
+        setState(() {
+          _isCreating = true;
+        });
 
-      // For now, navigate to active session screen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ActiveSessionScreen(
-            ruckId: 'temp_session_${DateTime.now().millisecondsSinceEpoch}', // Generate a temporary ID
-            ruckWeight: double.parse(_ruckWeightController.text),
-            plannedDuration: int.parse(_durationController
-                .text.isEmpty ? '0' : _durationController.text),
-            notes: _notesController.text,
+        // Create session in the backend
+        final apiClient = GetIt.instance<ApiClient>();
+        final response = await apiClient.post('/api/rucks', {
+          'ruck_weight_kg': double.parse(_ruckWeightController.text),
+          'planned_duration_minutes': _durationController.text.isEmpty ? 
+              null : int.parse(_durationController.text),
+          'notes': _notesController.text.isEmpty ? null : _notesController.text,
+        });
+
+        if (!mounted) return;
+        
+        // Extract ruck ID from response
+        final ruckId = response['ruck_id'].toString();
+        
+        // Navigate to active session screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ActiveSessionScreen(
+              ruckId: ruckId,
+              ruckWeight: double.parse(_ruckWeightController.text),
+              plannedDuration: int.parse(_durationController
+                  .text.isEmpty ? '0' : _durationController.text),
+              notes: _notesController.text,
+            ),
           ),
-        ),
-      );
+        );
+      } catch (e) {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to create session: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          setState(() {
+            _isCreating = false;
+          });
+        }
+      }
     }
   }
 
@@ -192,6 +229,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 text: 'Start Session',
                 icon: Icons.play_arrow,
                 onPressed: _createSession,
+                isLoading: _isCreating,
               ),
             ],
           ),
