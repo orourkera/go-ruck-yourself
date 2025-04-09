@@ -97,23 +97,53 @@ class _HomeTabState extends State<_HomeTab> {
   /// Fetches recent sessions from the API
   Future<void> _fetchRecentSessions() async {
     try {
+      debugPrint('Fetching recent sessions from /rucks?limit=3');
       final response = await _apiClient.get('/rucks?limit=3');
       
-      setState(() {
-        if (response == null) {
-          _recentSessions = [];
-        } else if (response is List) {
-          _recentSessions = response;
-        } else if (response is Map && response.containsKey('data') && response['data'] is List) {
-          _recentSessions = response['data'] as List;
-        } else if (response is Map) {
-          // Handle other map responses, but don't try to use as a List
-          _recentSessions = [];
-          debugPrint('Unexpected response format: $response');
-        } else {
-          _recentSessions = [];
-          debugPrint('Unknown response type: ${response.runtimeType}');
+      debugPrint('Response type: ${response.runtimeType}');
+      if (response is Map) {
+        debugPrint('Response keys: ${response.keys.toList()}');
+      }
+      
+      List<dynamic> processedSessions = [];
+      
+      if (response == null) {
+        debugPrint('Response is null');
+        processedSessions = [];
+      } else if (response is List) {
+        debugPrint('Response is a List with ${response.length} items');
+        processedSessions = response;
+      } else if (response is Map && response.containsKey('data') && response['data'] is List) {
+        debugPrint('Response is a Map with "data" key containing a List of ${(response['data'] as List).length} items');
+        processedSessions = response['data'] as List;
+      } else if (response is Map && response.containsKey('sessions') && response['sessions'] is List) {
+        debugPrint('Response is a Map with "sessions" key containing a List of ${(response['sessions'] as List).length} items');
+        processedSessions = response['sessions'] as List;
+      } else if (response is Map && response.containsKey('items') && response['items'] is List) {
+        debugPrint('Response is a Map with "items" key containing a List of ${(response['items'] as List).length} items');
+        processedSessions = response['items'] as List;
+      } else if (response is Map && response.containsKey('results') && response['results'] is List) {
+        debugPrint('Response is a Map with "results" key containing a List of ${(response['results'] as List).length} items');
+        processedSessions = response['results'] as List;
+      } else if (response is Map) {
+        // Last resort: check for the first key that contains a List
+        for (var key in response.keys) {
+          if (response[key] is List) {
+            debugPrint('Found List under key "$key" with ${(response[key] as List).length} items');
+            processedSessions = response[key] as List;
+            break;
+          }
         }
+        
+        if (processedSessions.isEmpty) {
+          debugPrint('Unexpected response format: $response');
+        }
+      } else {
+        debugPrint('Unknown response type: ${response.runtimeType}');
+      }
+      
+      setState(() {
+        _recentSessions = processedSessions;
         _isLoading = false;
       });
     } catch (e) {

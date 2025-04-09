@@ -52,19 +52,52 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   Future<void> _loadLastSessionData() async {
     try {
       final apiClient = GetIt.instance<ApiClient>();
+      debugPrint('Loading last session data from /rucks?limit=1');
       final response = await apiClient.get('/rucks?limit=1');
+      
+      debugPrint('Response type: ${response.runtimeType}');
+      if (response is Map) {
+        debugPrint('Response keys: ${response.keys.toList()}');
+      }
       
       List<dynamic> sessions = [];
       
       if (response == null) {
-        // No data
+        debugPrint('Response is null');
       } else if (response is List) {
+        debugPrint('Response is a List with ${response.length} items');
         sessions = response;
       } else if (response is Map && response.containsKey('data') && response['data'] is List) {
+        debugPrint('Response is a Map with "data" key containing a List of ${(response['data'] as List).length} items');
         sessions = response['data'] as List;
+      } else if (response is Map && response.containsKey('sessions') && response['sessions'] is List) {
+        debugPrint('Response is a Map with "sessions" key containing a List of ${(response['sessions'] as List).length} items');
+        sessions = response['sessions'] as List;
+      } else if (response is Map && response.containsKey('items') && response['items'] is List) {
+        debugPrint('Response is a Map with "items" key containing a List of ${(response['items'] as List).length} items');
+        sessions = response['items'] as List;
+      } else if (response is Map && response.containsKey('results') && response['results'] is List) {
+        debugPrint('Response is a Map with "results" key containing a List of ${(response['results'] as List).length} items');
+        sessions = response['results'] as List;
+      } else if (response is Map) {
+        // Last resort: check for the first key that contains a List
+        for (var key in response.keys) {
+          if (response[key] is List) {
+            debugPrint('Found List under key "$key" with ${(response[key] as List).length} items');
+            sessions = response[key] as List;
+            break;
+          }
+        }
+        
+        if (sessions.isEmpty) {
+          debugPrint('Unexpected response format: $response');
+        }
+      } else {
+        debugPrint('Unknown response type: ${response.runtimeType}');
       }
       
       if (sessions.isNotEmpty) {
+        debugPrint('Found ${sessions.length} sessions, using first one');
         final lastSession = sessions[0];
         final lastWeight = lastSession['weight_kg'];
         
@@ -77,6 +110,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             }
           });
         }
+      } else {
+        debugPrint('No sessions found');
       }
       
       // Hide loading indicator
