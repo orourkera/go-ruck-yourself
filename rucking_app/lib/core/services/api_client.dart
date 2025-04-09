@@ -7,7 +7,7 @@ class ApiClient {
   final String _baseUrl = 'http://localhost:8000/api'; // Local development server
   final Dio _dio;
   late final StorageService _storageService;
-  final bool useMockData = true; // Set to true to use mock data instead of the real backend
+  final bool useMockData = false; // Set to false to use the real backend
   
   ApiClient(this._dio) {
     // Update Dio base URL to use our local server

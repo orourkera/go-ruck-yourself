@@ -3,12 +3,22 @@ from marshmallow import Schema, fields, validate
 class UserSchema(Schema):
     """Schema for validating user data"""
     id = fields.Int(dump_only=True)
-    username = fields.Str(required=True, validate=validate.Length(min=3, max=64))
+    username = fields.Str(validate=validate.Length(min=3, max=64))  # Not required for registration
     email = fields.Email(required=True)
     password = fields.Str(load_only=True, validate=validate.Length(min=8))
     weight_kg = fields.Float(validate=validate.Range(min=20, max=500))
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
+
+class LoginSchema(Schema):
+    """Schema for validating login data"""
+    email = fields.Email(required=True)
+    password = fields.Str(required=True, validate=validate.Length(min=1))
+
+class AuthResponseSchema(Schema):
+    """Schema for auth response data"""
+    token = fields.Str(required=True)
+    user = fields.Nested(UserSchema, required=True)
 
 class SessionSchema(Schema):
     """Schema for validating rucking session data"""

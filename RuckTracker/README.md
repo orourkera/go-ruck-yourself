@@ -5,6 +5,7 @@ A Flask-based RESTful API backend for a rucking app that provides endpoints for 
 ## Features
 
 - **User Management**: Create and manage user accounts with profile data and authentication
+- **JWT Authentication**: Secure authentication system using JSON Web Tokens
 - **Workout Tracking**: Track rucking sessions with location, distance, elevation, and performance metrics
 - **Statistics & Analysis**: View comprehensive statistics and progress over time (weekly, monthly, yearly)
 - **Session Reviews**: Rate and review completed sessions with notes for future reference
@@ -12,6 +13,12 @@ A Flask-based RESTful API backend for a rucking app that provides endpoints for 
 - **Apple Health Integration**: Sync workout data with Apple Health for a comprehensive fitness overview
 
 ## API Endpoints
+
+### Authentication
+- `POST /api/auth/login` - Login with email and password
+- `POST /api/users/register` - Register a new user
+- `GET /api/users/profile` - Get the current user's profile (authenticated)
+- `PUT /api/users/profile` - Update the current user's profile (authenticated)
 
 ### User Management
 - `GET /api/users` - List all users
@@ -44,33 +51,42 @@ A Flask-based RESTful API backend for a rucking app that provides endpoints for 
 ## Getting Started
 
 ### Prerequisites
-- Python 3.7+
+- Python 3.11+
 - Flask
 - SQLAlchemy
-- PostgreSQL (recommended for production)
+- SQLite (local development) or PostgreSQL (production)
+- PyJWT for authentication
 
 ### Installation
 
 1. Clone the repository
    ```
-   git clone https://github.com/orourkera/rucking.git
-   cd rucking
+   git clone https://github.com/orourkera/go-ruck-yourself.git
+   cd RuckTracker
    ```
 
-2. Install dependencies
+2. Create and activate a virtual environment
+   ```
+   python3.11 -m venv venv311
+   source venv311/bin/activate
+   ```
+
+3. Install dependencies
    ```
    pip install -r requirements.txt
+   pip install pyjwt
    ```
 
-3. Set environment variables
+4. Set environment variables (optional)
    ```
-   export DATABASE_URL=<your-database-connection-string>
-   export SESSION_SECRET=<your-secret-key>
+   export DATABASE_URL=<your-database-connection-string>  # Defaults to SQLite
+   export SESSION_SECRET=<your-secret-key>                # For session management
+   export JWT_SECRET_KEY=<your-jwt-secret>                # For JWT authentication
    ```
 
-4. Run the server
+5. Run the server
    ```
-   gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
+   python main.py
    ```
 
 ## Project Structure
@@ -79,8 +95,11 @@ A Flask-based RESTful API backend for a rucking app that provides endpoints for 
 ├── api                     # API resources and schemas
 │   ├── __init__.py
 │   ├── apple_health.py     # Apple Health integration endpoints
+│   ├── auth.py             # Authentication endpoints
 │   ├── resources.py        # RESTful API resources
 │   └── schemas.py          # Data validation schemas
+├── data                    # SQLite database directory
+│   └── rucktracker.db      # SQLite database file
 ├── templates               # HTML templates
 │   └── index.html          # API documentation page
 ├── utils                   # Utility functions
@@ -93,10 +112,19 @@ A Flask-based RESTful API backend for a rucking app that provides endpoints for 
 └── README.md
 ```
 
+## Authentication
+
+The API uses JWT (JSON Web Token) authentication. To access protected endpoints:
+
+1. Register a user or login to get a token
+2. Include the token in the Authorization header of your requests:
+   ```
+   Authorization: Bearer your-token-here
+   ```
+
 ## Future Plans
 
 - Create a Flutter frontend to submit to mobile app stores
-- Add user authentication with JWT
 - Implement real-time location tracking
 - Add more detailed metrics and analytics
 - Enhance Apple Health integration capabilities

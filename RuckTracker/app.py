@@ -72,6 +72,14 @@ with app.app_context():
         from api.apple_health import (
             AppleHealthSyncResource, AppleHealthIntegrationStatusResource
         )
+        from api.auth import (
+            LoginResource, RegisterResource, UserProfileResource
+        )
+        
+        # Auth endpoints
+        api.add_resource(LoginResource, '/api/auth/login')
+        api.add_resource(RegisterResource, '/api/users/register')
+        api.add_resource(UserProfileResource, '/api/users/profile')
         
         # User endpoints
         api.add_resource(UserResource, '/api/users/<int:user_id>')
