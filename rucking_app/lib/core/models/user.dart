@@ -8,8 +8,11 @@ class User extends Equatable {
   /// User's email address
   final String email;
   
-  /// User's display name
+  /// User's name
   final String name;
+  
+  /// User's display name
+  final String displayName;
   
   /// User's weight in kilograms
   final double? weightKg;
@@ -23,6 +26,9 @@ class User extends Equatable {
   /// User's account creation date
   final String? createdAt;
   
+  /// Whether the user prefers metric units
+  final bool preferMetric;
+  
   /// User stats information
   final UserStats? stats;
   
@@ -31,10 +37,12 @@ class User extends Equatable {
     required this.userId,
     required this.email,
     required this.name,
+    required this.displayName,
     this.weightKg,
     this.heightCm,
     this.dateOfBirth,
     this.createdAt,
+    this.preferMetric = false,
     this.stats,
   });
   
@@ -43,20 +51,24 @@ class User extends Equatable {
     String? userId,
     String? email,
     String? name,
+    String? displayName,
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
     String? createdAt,
+    bool? preferMetric,
     UserStats? stats,
   }) {
     return User(
       userId: userId ?? this.userId,
       email: email ?? this.email,
       name: name ?? this.name,
+      displayName: displayName ?? this.displayName,
       weightKg: weightKg ?? this.weightKg,
       heightCm: heightCm ?? this.heightCm,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       createdAt: createdAt ?? this.createdAt,
+      preferMetric: preferMetric ?? this.preferMetric,
       stats: stats ?? this.stats,
     );
   }
@@ -64,20 +76,30 @@ class User extends Equatable {
   /// Factory constructor for creating a User from JSON
   factory User.fromJson(Map<String, dynamic> json) {
     String name = "User";
+    String displayName = "";
+    
     if (json.containsKey('username') && json['username'] != null) {
       name = json['username'] as String;
     } else if (json.containsKey('name') && json['name'] != null) {
       name = json['name'] as String;
     }
     
+    if (json.containsKey('display_name') && json['display_name'] != null) {
+      displayName = json['display_name'] as String;
+    } else {
+      displayName = name;
+    }
+    
     return User(
       userId: (json['id'] ?? json['user_id']).toString(),
       email: json['email'] as String,
       name: name,
+      displayName: displayName,
       weightKg: json['weight_kg'] != null ? (json['weight_kg'] as num).toDouble() : null,
       heightCm: json['height_cm'] != null ? (json['height_cm'] as num).toDouble() : null,
       dateOfBirth: json['date_of_birth'] as String?,
       createdAt: json['created_at'] as String?,
+      preferMetric: json['prefer_metric'] as bool? ?? false,
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
@@ -90,6 +112,8 @@ class User extends Equatable {
       'user_id': userId,
       'email': email,
       'name': name,
+      'display_name': displayName,
+      'prefer_metric': preferMetric,
     };
     
     if (weightKg != null) result['weight_kg'] = weightKg;
@@ -103,7 +127,7 @@ class User extends Equatable {
   
   @override
   List<Object?> get props => [
-    userId, email, name, weightKg, heightCm, dateOfBirth, createdAt, stats
+    userId, email, name, displayName, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, stats
   ];
 }
 

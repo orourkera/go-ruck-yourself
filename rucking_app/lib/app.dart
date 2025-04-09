@@ -18,7 +18,7 @@ class RuckingApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Rucking App',
+        title: 'GRY',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,

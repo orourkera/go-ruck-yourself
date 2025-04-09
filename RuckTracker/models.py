@@ -1,5 +1,5 @@
 from datetime import datetime
-from app import db
+from database import db
 from flask_login import UserMixin
 
 
@@ -10,6 +10,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
     weight_kg = db.Column(db.Float, nullable=True)  # User's weight in kg
+    height_cm = db.Column(db.Float, nullable=True)  # User's height in cm
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -23,6 +24,7 @@ class User(UserMixin, db.Model):
             'username': self.username,
             'email': self.email,
             'weight_kg': self.weight_kg,
+            'height_cm': self.height_cm,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -33,24 +35,28 @@ class RuckSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     ruck_weight_kg = db.Column(db.Float, nullable=False)  # Weight of the ruck in kg
-    
-    # Session time tracking
-    start_time = db.Column(db.DateTime, nullable=True)
-    end_time = db.Column(db.DateTime, nullable=True)
-    duration_seconds = db.Column(db.Integer, nullable=True)  # Total duration in seconds
-    paused_duration_seconds = db.Column(db.Integer, default=0)  # Time spent paused
+    user_weight_kg = db.Column(db.Float, nullable=True)  # User's weight in kg
+    planned_duration_minutes = db.Column(db.Integer, nullable=True)  # Planned duration
+    notes = db.Column(db.Text, nullable=True)  # Session notes
     
     # Session status
-    status = db.Column(db.String(20), default='created')  # created, active, paused, completed
+    status = db.Column(db.String(20), default='created')  # created, in_progress, paused, completed
+    
+    # Session time tracking
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime, nullable=True)
+    paused_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
     
     # Session statistics
     distance_km = db.Column(db.Float, default=0.0)  # Total distance in kilometers
-    elevation_gain_m = db.Column(db.Float, default=0.0)  # Total elevation gain in meters
-    elevation_loss_m = db.Column(db.Float, default=0.0)  # Total elevation loss in meters
+    elevation_gain_meters = db.Column(db.Float, default=0.0)  # Total elevation gain in meters
+    elevation_loss_meters = db.Column(db.Float, default=0.0)  # Total elevation loss in meters
     calories_burned = db.Column(db.Float, default=0.0)  # Estimated calories burned
+    duration_seconds = db.Column(db.Integer, default=0)  # Total duration in seconds
+    average_pace_min_km = db.Column(db.Float, default=0.0)  # Average pace in min/km
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationship with location data points
@@ -62,20 +68,25 @@ class RuckSession(db.Model):
     def to_dict(self, include_points=False):
         """Convert session data to dictionary for API responses"""
         result = {
-            'id': self.id,
+            'ruck_id': self.id,
             'user_id': self.user_id,
-            'ruck_weight_kg': self.ruck_weight_kg,
-            'start_time': self.start_time.isoformat() if self.start_time else None,
-            'end_time': self.end_time.isoformat() if self.end_time else None,
-            'duration_seconds': self.duration_seconds,
-            'paused_duration_seconds': self.paused_duration_seconds,
             'status': self.status,
-            'distance_km': self.distance_km,
-            'elevation_gain_m': self.elevation_gain_m,
-            'elevation_loss_m': self.elevation_loss_m,
-            'calories_burned': self.calories_burned,
+            'ruck_weight_kg': self.ruck_weight_kg,
+            'user_weight_kg': self.user_weight_kg,
+            'planned_duration_minutes': self.planned_duration_minutes,
+            'notes': self.notes,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'paused_at': self.paused_at.isoformat() if self.paused_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'stats': {
+                'distance_km': self.distance_km or 0.0,
+                'elevation_gain_meters': self.elevation_gain_meters or 0.0,
+                'elevation_loss_meters': self.elevation_loss_meters or 0.0,
+                'calories_burned': self.calories_burned or 0.0,
+                'duration_seconds': self.duration_seconds or 0,
+                'average_pace_min_km': self.average_pace_min_km or 0.0,
+            } if any([self.distance_km, self.duration_seconds]) else None,
             'review': self.review.to_dict() if self.review else None
         }
         
@@ -117,7 +128,9 @@ class SessionReview(db.Model):
     
     # Review data
     rating = db.Column(db.Integer, nullable=False)  # 1-5 star rating
+    perceived_exertion = db.Column(db.Integer, nullable=True)  # 1-10 perceived exertion
     notes = db.Column(db.Text, nullable=True)  # User notes about the session
+    tags = db.Column(db.JSON, nullable=True)  # Tags as a JSON array of strings
     
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -132,7 +145,9 @@ class SessionReview(db.Model):
             'id': self.id,
             'session_id': self.session_id,
             'rating': self.rating,
+            'perceived_exertion': self.perceived_exertion,
             'notes': self.notes,
+            'tags': self.tags or [],
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

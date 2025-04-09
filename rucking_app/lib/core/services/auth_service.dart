@@ -11,9 +11,11 @@ abstract class AuthService {
   
   /// Register a new user
   Future<User> register({
+    required String displayName,
     required String name,
     required String email,
     required String password,
+    required bool preferMetric,
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
@@ -33,6 +35,7 @@ abstract class AuthService {
   
   /// Update the user profile
   Future<User> updateProfile({
+    String? displayName,
     String? name,
     double? weightKg,
     double? heightCm,
@@ -50,7 +53,7 @@ class AuthServiceImpl implements AuthService {
   Future<User> signIn(String email, String password) async {
     try {
       final response = await _apiClient.post(
-        '/auth/login',
+        '/api/auth/login',
         {
           'email': email,
           'password': password,
@@ -77,20 +80,24 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User> register({
+    required String displayName,
     required String name,
     required String email,
     required String password,
+    required bool preferMetric,
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
   }) async {
     try {
       final response = await _apiClient.post(
-        '/users/register',
+        '/api/users/register',
         {
           'name': name,
+          'display_name': displayName,
           'email': email,
           'password': password,
+          'prefer_metric': preferMetric,
           if (weightKg != null) 'weight_kg': weightKg,
           if (heightCm != null) 'height_cm': heightCm,
           if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
@@ -135,7 +142,7 @@ class AuthServiceImpl implements AuthService {
       if (userData == null) return null;
       
       // Get fresh user data from API
-      final response = await _apiClient.get('/users/profile');
+      final response = await _apiClient.get('/api/users/profile');
       final user = User.fromJson(response);
       
       // Update stored user data
@@ -171,7 +178,7 @@ class AuthServiceImpl implements AuthService {
     
     try {
       // Try to get the user profile
-      final response = await _apiClient.get('/users/profile');
+      final response = await _apiClient.get('/api/users/profile');
       return response != null;
     } catch (e) {
       if (e is UnauthorizedException) {
@@ -193,12 +200,14 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User> updateProfile({
+    String? displayName,
     String? name,
     double? weightKg,
     double? heightCm,
   }) async {
     try {
       final data = <String, dynamic>{};
+      if (displayName != null) data['display_name'] = displayName;
       if (name != null) data['name'] = name;
       if (weightKg != null) data['weight_kg'] = weightKg;
       if (heightCm != null) data['height_cm'] = heightCm;

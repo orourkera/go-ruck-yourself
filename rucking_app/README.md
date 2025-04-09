@@ -1,10 +1,10 @@
-# Rucking App
+# GRY - Go Ruck Yourself
 
 A mobile application for tracking rucking workouts, built with Flutter.
 
 ## Overview
 
-The Rucking App helps users track their rucking sessions, including distance, pace, calories burned, and elevation changes. Users can create, start, pause, and complete rucking sessions, as well as view their historical data and statistics.
+GRY (Go Ruck Yourself) helps users track their rucking sessions, including distance, pace, calories burned, and elevation changes. Users can create, start, pause, and complete rucking sessions, as well as view their historical data and statistics.
 
 ## Features
 

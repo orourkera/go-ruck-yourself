@@ -8,7 +8,7 @@ class CustomButton extends StatelessWidget {
   final String text;
   
   /// Called when button is pressed
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   
   /// Whether the button should display a loading indicator
   final bool isLoading;

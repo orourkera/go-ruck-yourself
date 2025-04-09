@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
@@ -14,11 +15,13 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:get_it/get_it.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Screen for tracking an active ruck session
 class ActiveSessionScreen extends StatefulWidget {
   final String ruckId;
   final double ruckWeight;
+  final double userWeight;
   final int? plannedDuration;
   final String? notes;
 
@@ -26,6 +29,7 @@ class ActiveSessionScreen extends StatefulWidget {
     Key? key,
     required this.ruckId,
     required this.ruckWeight,
+    required this.userWeight,
     this.plannedDuration,
     this.notes,
   }) : super(key: key);
@@ -143,7 +147,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     }
   }
   
-  /// Calculate session statistics based on location data
+  /// Calculate new stats based on new location point
   void _calculateStats(LocationPoint newPoint) {
     if (_locationPoints.length < 2) return;
     
@@ -173,11 +177,23 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       _elevationGain += elevationGainIncrement;
       _elevationLoss += elevationLossIncrement;
       
+      // Get weight in kg for calculations - convert from lbs if needed
+      final authState = context.read<AuthBloc>().state;
+      bool preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
+      double ruckWeightKg = preferMetric 
+          ? widget.ruckWeight 
+          : widget.ruckWeight / 2.20462; // Convert lbs to kg
+          
+      // Convert user weight to kg if needed
+      double userWeightKg = preferMetric
+          ? widget.userWeight
+          : widget.userWeight / 2.20462; // Convert lbs to kg
+      
       // Estimate calories burned based on weight, distance, and elevation
-      // This is a simplified formula - real apps would use more accurate models
+      // This is a more accurate formula using actual body weight
       _caloriesBurned = (_distance * 
-          (widget.ruckWeight * 0.1 + 60) / 10) + 
-          (_elevationGain * 0.05 * (widget.ruckWeight + 60));
+          (ruckWeightKg * 0.1 + userWeightKg) / 10) + 
+          (_elevationGain * 0.05 * (ruckWeightKg + userWeightKg));
     });
   }
   
@@ -185,7 +201,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   Future<void> _sendLocationUpdate(LocationPoint point) async {
     try {
       final response = await _apiClient.post(
-        '/api/rucks/${widget.ruckId}/location',
+        '/rucks/${widget.ruckId}/location',
         {
           'latitude': point.latitude,
           'longitude': point.longitude,
@@ -219,11 +235,32 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   /// Start session on the backend
   Future<void> _startSession() async {
     try {
-      await _apiClient.post('/api/rucks/${widget.ruckId}/start', {});
+      await _apiClient.post('/rucks/${widget.ruckId}/start', {});
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to start session: $e'))
-      );
+      print('Failed to start session: $e');
+      
+      // Handle unauthorized errors specifically
+      if (e is UnauthorizedException) {
+        // More specific error message for auth issues
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('You must be logged in to track sessions. Please log in.'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Close',
+              onPressed: () {
+                Navigator.of(context).pop(); // Go back to previous screen
+              },
+            ),
+          )
+        );
+      } else {
+        // Generic error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start session: $e'))
+        );
+      }
     }
   }
   
@@ -247,7 +284,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _initLocationTracking();
         
         // Notify API
-        _apiClient.post('/api/rucks/${widget.ruckId}/resume', {})
+        _apiClient.post('/rucks/${widget.ruckId}/resume', {})
             .catchError((e) => print('Failed to resume session: $e'));
       } else {
         _stopwatch.stop();
@@ -257,7 +294,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _locationSubscription?.pause();
         
         // Notify API
-        _apiClient.post('/api/rucks/${widget.ruckId}/pause', {})
+        _apiClient.post('/rucks/${widget.ruckId}/pause', {})
             .catchError((e) => print('Failed to pause session: $e'));
       }
     });
@@ -271,7 +308,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     
     try {
       // Complete session on backend
-      await _apiClient.post('/api/rucks/${widget.ruckId}/complete', {
+      await _apiClient.post('/rucks/${widget.ruckId}/complete', {
         'notes': widget.notes,
       });
       
@@ -337,110 +374,193 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
 
   @override
   Widget build(BuildContext context) {
+    // Get user's unit preference
+    final authState = context.read<AuthBloc>().state;
+    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
+    
+    // Format ruck weight based on user preference
+    final String weightDisplay = preferMetric 
+        ? '${widget.ruckWeight.toStringAsFixed(1)} kg'
+        : '${widget.ruckWeight.toStringAsFixed(1)} lbs';
+    
+    // Format distance based on user preference
+    final String distanceDisplay = preferMetric
+        ? '${_distance.toStringAsFixed(2)} km'
+        : '${(_distance * 0.621371).toStringAsFixed(2)} mi';
+    
+    // Format pace based on user preference
+    final String paceDisplay = preferMetric
+        ? '${_pace.toStringAsFixed(2)} min/km'
+        : '${(_pace / 0.621371).toStringAsFixed(2)} min/mi';
+        
+    // Format elevation gain based on user preference
+    final String elevationGainDisplay = preferMetric
+        ? '+${_elevationGain.toStringAsFixed(1)} m'
+        : '+${(_elevationGain * 3.28084).toStringAsFixed(1)} ft';
+        
+    // Format elevation loss based on user preference
+    final String elevationLossDisplay = preferMetric
+        ? '-${_elevationLoss.toStringAsFixed(1)} m'
+        : '-${(_elevationLoss * 3.28084).toStringAsFixed(1)} ft';
+    
     return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        title: const Text('Active Session'),
+        title: const Text('ACTIVE SESSION'),
         centerTitle: true,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
+        elevation: 0,
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Timer display
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              color: AppColors.primary.withOpacity(0.1),
-              child: Center(
-                child: Column(
-                  children: [
-                    Text(
-                      _formatDuration(_elapsed),
-                      style: AppTextStyles.headline3.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Ruck weight: ${widget.ruckWeight} kg',
-                      style: AppTextStyles.body1,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            // Stats grid
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                padding: const EdgeInsets.all(16),
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.5,
-                children: [
-                  StatCard(
-                    title: 'Distance',
-                    value: '${_distance.toStringAsFixed(2)} km',
-                    icon: Icons.straighten,
+      body: Column(
+        children: [
+          // Timer display
+          Container(
+            color: AppColors.backgroundLight,
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Column(
+              children: [
+                // Time display
+                Text(
+                  _formatDuration(_elapsed),
+                  style: AppTextStyles.headline3.copyWith(
                     color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
                   ),
-                  StatCard(
-                    title: 'Pace',
-                    value: '${_pace.toStringAsFixed(2)} min/km',
-                    icon: Icons.speed,
-                    color: AppColors.secondary,
+                ),
+                const SizedBox(height: 8),
+                // Weight display 
+                Text(
+                  'Ruck weight: $weightDisplay',
+                  style: AppTextStyles.subtitle1.copyWith(
+                    color: AppColors.textDarkSecondary,
                   ),
-                  StatCard(
-                    title: 'Calories',
-                    value: '${_caloriesBurned.round()}',
-                    icon: Icons.local_fire_department,
-                    color: Colors.orange,
-                  ),
-                  StatCard(
-                    title: 'Elevation',
-                    value: '+${_elevationGain.toStringAsFixed(1)} m',
-                    secondaryValue: '-${_elevationLoss.toStringAsFixed(1)} m',
-                    icon: Icons.terrain,
-                    color: Colors.green,
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            
-            // Controls
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          ),
+          
+          // Stats grid
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  // Pause/Resume button
-                  CustomButton(
-                    onPressed: _togglePause,
-                    text: _isPaused ? 'Resume' : 'Pause',
-                    icon: _isPaused ? Icons.play_arrow : Icons.pause,
-                    color: _isPaused 
-                        ? Colors.green 
-                        : AppColors.primary,
-                    isLoading: false,
-                    width: 150,
+                  // First row of stats
+                  Expanded(
+                    child: Row(
+                      children: [
+                        // Distance card
+                        Expanded(
+                          child: StatCard(
+                            title: 'Distance',
+                            value: distanceDisplay,
+                            icon: Icons.straighten,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Pace card
+                        Expanded(
+                          child: StatCard(
+                            title: 'Pace',
+                            value: paceDisplay,
+                            icon: Icons.speed,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   
-                  // End session button
-                  CustomButton(
-                    onPressed: _isEnding ? (){} : _showEndConfirmationDialog,
-                    text: 'End Session',
-                    icon: Icons.stop,
-                    color: Colors.red,
-                    isLoading: _isEnding,
-                    width: 150,
+                  const SizedBox(height: 16),
+                  
+                  // Second row of stats
+                  Expanded(
+                    child: Row(
+                      children: [
+                        // Calories card
+                        Expanded(
+                          child: StatCard(
+                            title: 'Calories',
+                            value: _caloriesBurned.toInt().toString(),
+                            icon: Icons.local_fire_department,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Elevation card
+                        Expanded(
+                          child: StatCard(
+                            title: 'Elevation',
+                            value: elevationGainDisplay,
+                            secondaryValue: elevationLossDisplay,
+                            icon: Icons.terrain,
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          
+          // Controls section
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Pause/Resume Button
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _togglePause,
+                    icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
+                    label: Text(
+                      _isPaused ? 'RESUME' : 'PAUSE',
+                      style: AppTextStyles.button.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // End session button
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isEnding ? null : _showEndConfirmationDialog,
+                    icon: const Icon(Icons.stop),
+                    label: const Text(
+                      'END SESSION',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

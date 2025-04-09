@@ -21,6 +21,17 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Split value into numeric part and unit part
+    String numericPart = value;
+    String unitPart = '';
+    
+    // Look for common patterns like '10 km', '5:30', '+10.5 m'
+    final spaceIndex = value.indexOf(' ');
+    if (spaceIndex > 0) {
+      numericPart = value.substring(0, spaceIndex);
+      unitPart = value.substring(spaceIndex);
+    }
+    
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -30,7 +41,6 @@ class StatCard extends StatelessWidget {
         padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // Title and icon
             Row(
@@ -50,24 +60,40 @@ class StatCard extends StatelessWidget {
               ],
             ),
             
-            // Value
-            Padding(
-              padding: const EdgeInsets.only(top: 4.0),
-              child: Text(
-                value,
-                style: AppTextStyles.headline6.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+            // Main content area with value
+            Expanded(
+              child: Center(
+                child: Text(
+                  numericPart,
+                  style: AppTextStyles.headline4.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ),
             
-            // Secondary value (if provided)
-            if (secondaryValue != null)
+            // Unit part at the bottom
+            if (unitPart.isNotEmpty)
               Text(
-                secondaryValue!,
+                unitPart,
                 style: AppTextStyles.body2.copyWith(
                   color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            
+            // Secondary value (if provided)
+            if (secondaryValue != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  secondaryValue!,
+                  style: AppTextStyles.body2.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ),
           ],

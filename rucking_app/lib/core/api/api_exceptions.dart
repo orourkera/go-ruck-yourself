@@ -70,4 +70,12 @@ class ServerException extends ApiException {
   
   @override
   String toString() => 'ServerException: $message';
+}
+
+/// Exception for cancelled requests
+class RequestCancelledException extends ApiException {
+  RequestCancelledException(String message) : super(message);
+  
+  @override
+  String toString() => 'RequestCancelledException: $message';
 } 

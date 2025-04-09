@@ -23,10 +23,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _weightController = TextEditingController();
-  final _heightController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _acceptTerms = false;
+  bool _preferMetric = false; // Default to standard instead of metric
 
   @override
   void dispose() {
@@ -35,7 +35,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _weightController.dispose();
-    _heightController.dispose();
     super.dispose();
   }
 
@@ -55,18 +54,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       double? weight = _weightController.text.isEmpty
           ? null
           : double.tryParse(_weightController.text);
-          
-      double? height = _heightController.text.isEmpty
-          ? null
-          : double.tryParse(_heightController.text);
 
       context.read<AuthBloc>().add(
         AuthRegisterRequested(
-          name: _nameController.text.trim(),
+          displayName: _nameController.text.trim(),
+          name: _nameController.text.trim(), // Using same value for backend compatibility
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           weightKg: weight,
-          heightCm: height,
+          preferMetric: _preferMetric,
         ),
       );
     }
@@ -158,8 +154,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           // Name field
                           CustomTextField(
                             controller: _nameController,
-                            label: 'Full Name',
-                            hint: 'Enter your full name',
+                            label: 'What should we call you, rucker?',
+                            hint: 'Enter your name',
                             keyboardType: TextInputType.name,
                             prefixIcon: Icons.person_outline,
                             textCapitalization: TextCapitalization.words,
@@ -267,8 +263,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           // Weight field
                           CustomTextField(
                             controller: _weightController,
-                            label: 'Weight (kg)',
-                            hint: 'Enter your weight in kg',
+                            label: _preferMetric ? 'Weight (kg)' : 'Weight (lbs)',
+                            hint: _preferMetric ? 'Enter your weight in kg' : 'Enter your weight in lbs',
                             keyboardType: TextInputType.number,
                             prefixIcon: Icons.monitor_weight_outlined,
                             inputFormatters: [
@@ -277,15 +273,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           const SizedBox(height: 20),
                           
-                          // Height field
-                          CustomTextField(
-                            controller: _heightController,
-                            label: 'Height (cm)',
-                            hint: 'Enter your height in cm',
-                            keyboardType: TextInputType.number,
-                            prefixIcon: Icons.height_outlined,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                          // Unit preference
+                          Row(
+                            children: [
+                              Text(
+                                'Measurement units:',
+                                style: AppTextStyles.subtitle1,
+                              ),
+                              const Spacer(),
+                              Text(
+                                'Standard',
+                                style: AppTextStyles.body2.copyWith(
+                                  color: !_preferMetric ? AppColors.primary : AppColors.grey,
+                                ),
+                              ),
+                              Switch(
+                                value: _preferMetric,
+                                activeColor: AppColors.primary,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _preferMetric = value;
+                                  });
+                                },
+                              ),
+                              Text(
+                                'Metric',
+                                style: AppTextStyles.body2.copyWith(
+                                  color: _preferMetric ? AppColors.primary : AppColors.grey,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 30),

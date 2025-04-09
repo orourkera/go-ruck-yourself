@@ -74,18 +74,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   
                   // App logo
                   Center(
-                    child: Icon(
-                      Icons.directions_walk,
-                      size: 80,
-                      color: AppColors.primary,
+                    child: Image.asset(
+                      'assets/images/go ruck yourself.png',
+                      width: 150,
+                      height: 150,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 24),
                   
                   // Title
                   Text(
-                    'Welcome Back',
-                    style: AppTextStyles.headline5,
+                    'WELCOME BACK',
+                    style: TextStyle(
+                      fontFamily: 'Bangers',
+                      fontSize: 32,
+                      letterSpacing: 1.5,
+                      color: Color(0xFFCC6A2A), // Brownish-orange (secondary)
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
@@ -190,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
                       return CustomButton(
-                        text: 'Login',
+                        text: 'LOGIN',
                         isLoading: state is AuthLoading,
                         onPressed: _login,
                       );
@@ -216,9 +222,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                         child: Text(
                           'Sign Up',
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            fontFamily: 'Bangers',
+                            fontSize: 16,
+                            letterSpacing: 1.0,
+                            color: AppColors.accent,
                           ),
                         ),
                       ),
