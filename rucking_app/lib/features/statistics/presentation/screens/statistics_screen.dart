@@ -43,7 +43,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   Future<void> _fetchStatistics() async {
     try {
       // Fetch weekly stats
-      final weeklyResponse = await _apiClient.get('/api/statistics/weekly');
+      final weeklyResponse = await _apiClient.get('/statistics/weekly');
       
       // Process weekly stats
       Map<String, dynamic> weeklyStats = {};
@@ -62,7 +62,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       });
       
       // Fetch monthly stats
-      final monthlyResponse = await _apiClient.get('/api/statistics/monthly');
+      final monthlyResponse = await _apiClient.get('/statistics/monthly');
       
       // Process monthly stats
       Map<String, dynamic> monthlyStats = {};
@@ -75,13 +75,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
         }
       }
       
+      // Update state with monthly stats
       setState(() {
         _monthlyStats = monthlyStats;
         _isLoadingMonthly = false;
       });
       
       // Fetch yearly stats
-      final yearlyResponse = await _apiClient.get('/api/statistics/yearly');
+      final yearlyResponse = await _apiClient.get('/statistics/yearly');
       
       // Process yearly stats
       Map<String, dynamic> yearlyStats = {};
@@ -94,18 +95,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
         }
       }
       
+      // Update state with yearly stats
       setState(() {
         _yearlyStats = yearlyStats;
         _isLoadingYearly = false;
       });
+      
     } catch (e) {
       debugPrint('Error fetching statistics: $e');
       setState(() {
-        _weeklyStats = {};
         _isLoadingWeekly = false;
-        _monthlyStats = {};
         _isLoadingMonthly = false;
-        _yearlyStats = {};
         _isLoadingYearly = false;
       });
     }

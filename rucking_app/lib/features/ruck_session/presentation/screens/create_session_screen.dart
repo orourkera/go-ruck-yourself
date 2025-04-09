@@ -52,7 +52,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   Future<void> _loadLastSessionData() async {
     try {
       final apiClient = GetIt.instance<ApiClient>();
-      final response = await apiClient.get('/api/rucks?limit=1');
+      final response = await apiClient.get('/rucks?limit=1');
       
       List<dynamic> sessions = [];
       
@@ -165,7 +165,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
         // Create session in the backend
         final apiClient = GetIt.instance<ApiClient>();
-        final response = await apiClient.post('/api/rucks', requestData);
+        final response = await apiClient.post('/rucks', requestData);
 
         if (!mounted) return;
         

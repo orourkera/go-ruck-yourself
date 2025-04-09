@@ -178,24 +178,33 @@ class ApiClient {
           final statusCode = error.response?.statusCode;
           final data = error.response?.data;
           
+          // Check if the response is HTML (typically means wrong API URL)
+          if (data is String && data.contains('<!doctype html>')) {
+            final url = error.requestOptions.uri.toString();
+            print('WARNING: Received HTML response for $url. Verify your API endpoint is correct!');
+            if (statusCode == 404) {
+              return NotFoundException('API endpoint not found. Check that your server is running and the URL is correct.');
+            }
+          }
+          
           switch (statusCode) {
             case 400:
-              return BadRequestException(data?['message'] ?? 'Bad request');
+              return BadRequestException(data is Map ? data['message'] ?? 'Bad request' : 'Bad request');
             case 401:
-              return UnauthorizedException(data?['message'] ?? 'Unauthorized');
+              return UnauthorizedException(data is Map ? data['message'] ?? 'Unauthorized' : 'Unauthorized');
             case 403:
-              return ForbiddenException(data?['message'] ?? 'Forbidden');
+              return ForbiddenException(data is Map ? data['message'] ?? 'Forbidden' : 'Forbidden');
             case 404:
-              return NotFoundException(data?['message'] ?? 'Resource not found');
+              return NotFoundException(data is Map ? data['message'] ?? 'Resource not found' : 'Resource not found');
             case 409:
-              return ConflictException(data?['message'] ?? 'Conflict');
+              return ConflictException(data is Map ? data['message'] ?? 'Conflict' : 'Conflict');
             case 500:
             case 501:
             case 502:
             case 503:
-              return ServerException(data?['message'] ?? 'Server error');
+              return ServerException(data is Map ? data['message'] ?? 'Server error' : 'Server error');
             default:
-              return ApiException(data?['message'] ?? 'API error: $statusCode');
+              return ApiException(data is Map ? data['message'] ?? 'API error: $statusCode' : 'API error: $statusCode');
           }
         
         default:
