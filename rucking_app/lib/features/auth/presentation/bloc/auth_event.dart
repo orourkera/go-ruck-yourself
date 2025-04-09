@@ -27,24 +27,28 @@ class AuthLoginRequested extends AuthEvent {
 
 /// Event to request user registration
 class AuthRegisterRequested extends AuthEvent {
+  final String displayName;
   final String name;
   final String email;
   final String password;
   final double? weightKg;
   final double? heightCm;
   final String? dateOfBirth;
+  final bool preferMetric;
 
   const AuthRegisterRequested({
+    required this.displayName,
     required this.name,
     required this.email,
     required this.password,
     this.weightKg,
     this.heightCm,
     this.dateOfBirth,
+    required this.preferMetric,
   });
 
   @override
-  List<Object?> get props => [name, email, password, weightKg, heightCm, dateOfBirth];
+  List<Object?> get props => [displayName, name, email, password, weightKg, heightCm, dateOfBirth, preferMetric];
 }
 
 /// Event to request user logout
@@ -52,16 +56,18 @@ class AuthLogoutRequested extends AuthEvent {}
 
 /// Event to request profile update
 class AuthProfileUpdateRequested extends AuthEvent {
+  final String? displayName;
   final String? name;
   final double? weightKg;
   final double? heightCm;
 
   const AuthProfileUpdateRequested({
+    this.displayName,
     this.name,
     this.weightKg,
     this.heightCm,
   });
 
   @override
-  List<Object?> get props => [name, weightKg, heightCm];
+  List<Object?> get props => [displayName, name, weightKg, heightCm];
 } 

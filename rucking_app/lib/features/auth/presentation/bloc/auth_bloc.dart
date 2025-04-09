@@ -71,9 +71,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     
     try {
       final user = await _authRepository.register(
+        displayName: event.displayName,
         name: event.name,
         email: event.email,
         password: event.password,
+        preferMetric: event.preferMetric,
         weightKg: event.weightKg,
         heightCm: event.heightCm,
         dateOfBirth: event.dateOfBirth,
@@ -116,6 +118,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       try {
         final updatedUser = await _authRepository.updateProfile(
+          displayName: event.displayName,
           name: event.name,
           weightKg: event.weightKg,
           heightCm: event.heightCm,

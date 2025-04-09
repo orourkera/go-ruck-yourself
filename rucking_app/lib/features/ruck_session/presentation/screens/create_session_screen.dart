@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -19,27 +21,99 @@ class CreateSessionScreen extends StatefulWidget {
 
 class _CreateSessionScreenState extends State<CreateSessionScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _ruckWeightController = TextEditingController();
   final _userWeightController = TextEditingController();
   final _durationController = TextEditingController();
   final _notesController = TextEditingController();
 
   double _ruckWeight = AppConfig.defaultRuckWeight;
   int _plannedDuration = 60; // Default 60 minutes
+  bool _preferMetric = false; // Default to standard
   
   // Add loading state variable
   bool _isCreating = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _ruckWeightController.text = _ruckWeight.toString();
     _durationController.text = _plannedDuration.toString();
+    
+    // Get user's unit preference and load last session data
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      _preferMetric = authState.user.preferMetric;
+      _loadLastSessionData();
+    } else {
+      _isLoading = false;
+    }
+  }
+
+  /// Load the last session data
+  Future<void> _loadLastSessionData() async {
+    try {
+      final apiClient = GetIt.instance<ApiClient>();
+      final response = await apiClient.get('/api/rucks?limit=1');
+      
+      List<dynamic> sessions = [];
+      
+      if (response == null) {
+        // No data
+      } else if (response is List) {
+        sessions = response;
+      } else if (response is Map && response.containsKey('data') && response['data'] is List) {
+        sessions = response['data'] as List;
+      }
+      
+      if (sessions.isNotEmpty) {
+        final lastSession = sessions[0];
+        final lastWeight = lastSession['weight_kg'];
+        
+        if (lastWeight != null) {
+          setState(() {
+            _ruckWeight = lastWeight.toDouble();
+            // Convert to lbs if user preference is not metric
+            if (!_preferMetric) {
+              _ruckWeight = _ruckWeight * 2.20462;
+            }
+          });
+        }
+      }
+      
+      // Hide loading indicator
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      // Ignore errors when loading last session data
+      debugPrint('Error loading last session data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  
+  /// Snaps the current weight to the nearest predefined weight option
+  void _snapToNearestWeight() {
+    final weightOptions = _preferMetric 
+        ? [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0]
+        : [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0];
+    
+    double closestWeight = weightOptions.first;
+    double smallestDifference = (_ruckWeight - closestWeight).abs();
+    
+    for (double weight in weightOptions) {
+      double difference = (_ruckWeight - weight).abs();
+      if (difference < smallestDifference) {
+        smallestDifference = difference;
+        closestWeight = weight;
+      }
+    }
+    
+    _ruckWeight = closestWeight;
   }
 
   @override
   void dispose() {
-    _ruckWeightController.dispose();
     _userWeightController.dispose();
     _durationController.dispose();
     _notesController.dispose();
@@ -49,25 +123,59 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   /// Creates and starts a new ruck session
   void _createSession() async {
     if (_formKey.currentState!.validate()) {
+      // First check if user is authenticated
+      final authState = context.read<AuthBloc>().state;
+      if (authState is! Authenticated) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('You must be logged in to create a session'),
+            backgroundColor: AppColors.error,
+            action: SnackBarAction(
+              label: 'Log In',
+              onPressed: () {
+                // Navigate to login screen
+                Navigator.of(context).pushNamed('/login');
+              },
+            ),
+          ),
+        );
+        return;
+      }
+      
       try {
         // Show loading indicator
         setState(() {
           _isCreating = true;
         });
 
+        // Convert weight to kg if user is using imperial units
+        double ruckWeightKg = _preferMetric ? _ruckWeight : _ruckWeight / 2.20462;
+
+        // Prepare request data
+        Map<String, dynamic> requestData = {
+          'weight_kg': ruckWeightKg,
+          'notes': _notesController.text.isEmpty ? '' : _notesController.text,
+        };
+        
+        // Add user's weight (now required)
+        double userWeightKg = _preferMetric 
+            ? double.parse(_userWeightController.text) 
+            : double.parse(_userWeightController.text) / 2.20462; // Convert lbs to kg
+        requestData['user_weight_kg'] = userWeightKg;
+
         // Create session in the backend
         final apiClient = GetIt.instance<ApiClient>();
-        final response = await apiClient.post('/api/rucks', {
-          'ruck_weight_kg': double.parse(_ruckWeightController.text),
-          'planned_duration_minutes': _durationController.text.isEmpty ? 
-              null : int.parse(_durationController.text),
-          'notes': _notesController.text.isEmpty ? null : _notesController.text,
-        });
+        final response = await apiClient.post('/api/rucks', requestData);
 
         if (!mounted) return;
         
+        // Check if response has session_id
+        if (response == null || !response.containsKey('session_id')) {
+          throw Exception('Invalid response from server, missing session_id');
+        }
+        
         // Extract ruck ID from response
-        final ruckId = response['ruck_id'].toString();
+        final ruckId = response['session_id'].toString();
         
         // Navigate to active session screen
         Navigator.pushReplacement(
@@ -75,9 +183,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           MaterialPageRoute(
             builder: (context) => ActiveSessionScreen(
               ruckId: ruckId,
-              ruckWeight: double.parse(_ruckWeightController.text),
-              plannedDuration: int.parse(_durationController
-                  .text.isEmpty ? '0' : _durationController.text),
+              ruckWeight: _ruckWeight,
+              userWeight: double.parse(_userWeightController.text),
+              plannedDuration: _durationController.text.isEmpty ? 
+                  0 : int.parse(_durationController.text),
               notes: _notesController.text,
             ),
           ),
@@ -101,6 +210,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final weightUnit = _preferMetric ? 'kg' : 'lbs';
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Ruck Session'),
@@ -120,35 +231,50 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
               ),
               const SizedBox(height: 24),
               
-              // Ruck weight field
-              CustomTextField(
-                controller: _ruckWeightController,
-                label: 'Ruck Weight (kg)',
-                hint: 'Enter your ruck weight',
-                keyboardType: TextInputType.number,
-                prefixIcon: Icons.fitness_center,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your ruck weight';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  if (double.parse(value) <= 0) {
-                    return 'Weight must be greater than 0';
-                  }
-                  return null;
-                },
+              // Quick ruck weight selection
+              Text(
+                'Ruck Weight ($weightUnit)',
+                style: AppTextStyles.subtitle1.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
+              Text(
+                'Weight is used to calculate calories burned during your ruck',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textDarkSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 50,
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: _preferMetric 
+                          ? [5, 10, 15, 20, 25, 30, 35, 40].map((weight) => 
+                              Padding(
+                                padding: const EdgeInsets.only(right: 12),
+                                child: _buildWeightChip(weight.toDouble()),
+                              )
+                            ).toList()
+                          : [10, 20, 30, 40, 50, 60, 70, 80].map((weight) => 
+                              Padding(
+                                padding: const EdgeInsets.only(right: 12),
+                                child: _buildWeightChip(weight.toDouble()),
+                              )
+                            ).toList(),
+                      ),
+              ),
+              const SizedBox(height: 32),
               
               // User weight field (optional)
               CustomTextField(
                 controller: _userWeightController,
-                label: 'Your Weight (kg) - Optional',
+                label: 'Your Weight ($weightUnit)',
                 hint: 'Enter your weight',
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.monitor_weight_outlined,
@@ -156,13 +282,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
                 ],
                 validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    if (double.tryParse(value) == null) {
-                      return 'Please enter a valid number';
-                    }
-                    if (double.parse(value) <= 0) {
-                      return 'Weight must be greater than 0';
-                    }
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your weight';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Please enter a valid number';
+                  }
+                  if (double.parse(value) <= 0) {
+                    return 'Weight must be greater than 0';
                   }
                   return null;
                 },
@@ -204,32 +331,28 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
               ),
               const SizedBox(height: 32),
               
-              // Quick ruck weight presets
-              Text(
-                'Quick Ruck Weight',
-                style: AppTextStyles.subtitle1.copyWith(
-                  fontWeight: FontWeight.bold,
+              // Start session button - orange and full width
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.play_arrow),
+                  label: Text(
+                    'START SESSION', 
+                    style: AppTextStyles.button.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    )
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: _isCreating ? null : _createSession,
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildWeightChip(5),
-                  _buildWeightChip(10),
-                  _buildWeightChip(15),
-                  _buildWeightChip(20),
-                  _buildWeightChip(25),
-                ],
-              ),
-              const SizedBox(height: 32),
-              
-              // Start session button
-              CustomButton(
-                text: 'Start Session',
-                icon: Icons.play_arrow,
-                onPressed: _createSession,
-                isLoading: _isCreating,
               ),
             ],
           ),
@@ -240,29 +363,29 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
   /// Builds a chip for quick ruck weight selection
   Widget _buildWeightChip(double weight) {
-    final isSelected = _ruckWeightController.text == weight.toString();
+    final isSelected = _ruckWeight == weight;
+    final weightUnit = _preferMetric ? 'kg' : 'lbs';
     
     return GestureDetector(
       onTap: () {
         setState(() {
-          _ruckWeightController.text = weight.toString();
+          _ruckWeight = weight;
         });
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(30),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.grey,
             width: 1,
           ),
         ),
         child: Text(
-          '${weight.toInt()} kg',
-          style: AppTextStyles.body2.copyWith(
+          '${weight.toInt()} $weightUnit',
+          style: AppTextStyles.button.copyWith(
             color: isSelected ? Colors.white : AppColors.textDark,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ),

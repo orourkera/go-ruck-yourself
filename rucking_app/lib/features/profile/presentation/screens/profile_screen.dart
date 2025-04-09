@@ -26,6 +26,12 @@ class ProfileScreen extends StatelessWidget {
         if (state is Authenticated) {
           final user = state.user;
           
+          // Safely get initials, checking for null or empty values
+          String initials = '';
+          if (user.name.isNotEmpty) {
+            initials = _getInitials(user.name);
+          }
+          
           return Scaffold(
             appBar: AppBar(
               title: const Text('Profile'),
@@ -54,7 +60,7 @@ class ProfileScreen extends StatelessWidget {
                     radius: 60,
                     backgroundColor: AppColors.primary,
                     child: Text(
-                      _getInitials(user.name),
+                      initials,
                       style: AppTextStyles.headline4.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -235,9 +241,13 @@ class ProfileScreen extends StatelessWidget {
           );
         }
         
-        // Loading or error state
-        return const Scaffold(
-          body: Center(
+        // Loading, error, or initial state
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Profile'),
+            centerTitle: true,
+          ),
+          body: const Center(
             child: CircularProgressIndicator(),
           ),
         );
@@ -418,12 +428,14 @@ class ProfileScreen extends StatelessWidget {
 
   /// Gets the initials from a name
   String _getInitials(String name) {
+    if (name.isEmpty) return '';
+    
     List<String> nameParts = name.split(' ');
     String initials = '';
     
-    if (nameParts.length > 1) {
+    if (nameParts.length > 1 && nameParts[0].isNotEmpty && nameParts[1].isNotEmpty) {
       initials = nameParts[0][0] + nameParts[1][0];
-    } else if (nameParts.isNotEmpty) {
+    } else if (nameParts.isNotEmpty && nameParts[0].isNotEmpty) {
       initials = nameParts[0][0];
     }
     

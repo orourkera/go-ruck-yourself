@@ -9,6 +9,9 @@ import 'package:rucking_app/features/statistics/presentation/screens/statistics_
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
+import 'package:get_it/get_it.dart';
+import 'package:intl/intl.dart';
+import 'package:rucking_app/core/services/api_client.dart';
 
 /// Main home screen that serves as the central hub of the app
 class HomeScreen extends StatefulWidget {
@@ -79,6 +82,44 @@ class _HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<_HomeTab> {
+  // Add API client and state variables
+  late final ApiClient _apiClient;
+  bool _isLoading = true;
+  List<dynamic> _recentSessions = [];
+  
+  @override
+  void initState() {
+    super.initState();
+    _apiClient = GetIt.instance<ApiClient>();
+    _fetchRecentSessions();
+  }
+  
+  /// Fetches recent sessions from the API
+  Future<void> _fetchRecentSessions() async {
+    try {
+      final response = await _apiClient.get('/api/rucks?limit=3');
+      
+      setState(() {
+        if (response == null) {
+          _recentSessions = [];
+        } else if (response is List) {
+          _recentSessions = response;
+        } else if (response is Map && response.containsKey('data') && response['data'] is List) {
+          _recentSessions = response['data'] as List;
+        } else {
+          _recentSessions = [];
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching recent sessions: $e');
+      setState(() {
+        _recentSessions = [];
+        _isLoading = false;
+      });
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
@@ -102,36 +143,26 @@ class _HomeTabState extends State<_HomeTab> {
                   builder: (context, state) {
                     String userName = 'Rucker';
                     if (state is Authenticated) {
-                      userName = state.user.name.split(' ')[0];
+                      // Use the display name from user model
+                      if (state.user.displayName.isNotEmpty) {
+                        userName = state.user.displayName.split(' ')[0];
+                      }
                     }
                     
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome back,',
-                              style: AppTextStyles.body1.copyWith(
-                                color: AppColors.textDarkSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              userName,
-                              style: AppTextStyles.headline5.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'Welcome back,',
+                          style: AppTextStyles.body1.copyWith(
+                            color: AppColors.textDarkSecondary,
+                          ),
                         ),
-                        CircleAvatar(
-                          backgroundColor: AppColors.primary,
-                          radius: 24,
-                          child: const Icon(
-                            Icons.person,
-                            color: Colors.white,
+                        const SizedBox(height: 4),
+                        Text(
+                          userName,
+                          style: AppTextStyles.headline5.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -141,58 +172,93 @@ class _HomeTabState extends State<_HomeTab> {
                 const SizedBox(height: 32),
                 
                 // Quick stats section
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: AppColors.primaryGradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'This Month',
-                        style: AppTextStyles.subtitle1.copyWith(
-                          color: Colors.white.withOpacity(0.8),
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    // Extract month stats from user data if available
+                    String rucks = '0';
+                    String distance = '0.0';
+                    String calories = '0';
+                    
+                    if (state is Authenticated && state.user.stats?.thisMonth != null) {
+                      final monthStats = state.user.stats!.thisMonth!;
+                      rucks = monthStats.rucks.toString();
+                      distance = state.user.preferMetric 
+                          ? '${monthStats.distanceKm.toStringAsFixed(1)} km'
+                          : '${(monthStats.distanceKm * 0.621371).toStringAsFixed(1)} mi';
+                      calories = monthStats.calories.toString();
+                    }
+                    
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: AppColors.primaryGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatItem('Rucks', '5', Icons.directions_walk),
-                          _buildStatItem('Distance', '32.4 km', Icons.straighten),
-                          _buildStatItem('Calories', '1540', Icons.local_fire_department),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-                
-                // Create session button
-                CustomButton(
-                  text: 'Start New Ruck',
-                  icon: Icons.add,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CreateSessionScreen(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'This Month',
+                            style: AppTextStyles.subtitle1.copyWith(
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStatItem('Rucks', rucks, Icons.directions_walk),
+                              _buildStatItem('Distance', distance, Icons.straighten),
+                              _buildStatItem('Calories', calories, Icons.local_fire_department),
+                            ],
+                          ),
+                        ],
                       ),
                     );
                   },
+                ),
+                const SizedBox(height: 32),
+                
+                // Create session button - full width and orange
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: Text(
+                      'START NEW RUCK', 
+                      style: AppTextStyles.button.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      )
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CreateSessionScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 32),
                 
@@ -203,27 +269,133 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
                 const SizedBox(height: 16),
                 
-                // Test data for recent sessions
-                _buildRecentSessionCard(
-                  date: 'April 5, 2025',
-                  distance: '5.2 km',
-                  duration: '1h 10m',
-                  calories: '650',
-                ),
-                const SizedBox(height: 16),
-                _buildRecentSessionCard(
-                  date: 'April 2, 2025',
-                  distance: '4.8 km',
-                  duration: '1h 05m',
-                  calories: '610',
-                ),
-                const SizedBox(height: 16),
-                _buildRecentSessionCard(
-                  date: 'March 29, 2025',
-                  distance: '6.5 km',
-                  duration: '1h 30m',
-                  calories: '820',
-                ),
+                // Show loading indicator or sessions list
+                _isLoading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 30),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : _recentSessions.isEmpty
+                  ? // Placeholder for when there are no recent sessions
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 30),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.history_outlined,
+                              size: 48,
+                              color: AppColors.grey,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No recent sessions',
+                              style: AppTextStyles.body1.copyWith(
+                                color: AppColors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Your completed sessions will appear here',
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.greyDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : // List of recent sessions
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _recentSessions.length,
+                      itemBuilder: (context, index) {
+                        final session = _recentSessions[index];
+                        
+                        // Get session date
+                        final dateString = session['created_at'] ?? '';
+                        final date = DateTime.tryParse(dateString) ?? DateTime.now();
+                        final formattedDate = DateFormat('MMM d, yyyy').format(date);
+                        
+                        // Get session duration
+                        final durationSecs = session['duration_seconds'] ?? 0;
+                        final duration = Duration(seconds: durationSecs);
+                        final hours = duration.inHours;
+                        final minutes = duration.inMinutes % 60;
+                        final durationText = hours > 0 
+                            ? '${hours}h ${minutes}m' 
+                            : '${minutes}m';
+                        
+                        // Get distance based on user preference
+                        final distanceKm = session['distance_km'] ?? 0.0;
+                        bool preferMetric = true;
+                        final authState = context.read<AuthBloc>().state;
+                        if (authState is Authenticated) {
+                          preferMetric = authState.user.preferMetric;
+                        }
+                        
+                        final distanceValue = preferMetric 
+                            ? distanceKm.toStringAsFixed(1) 
+                            : (distanceKm * 0.621371).toStringAsFixed(1);
+                        final distanceUnit = preferMetric ? 'km' : 'mi';
+                        
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: InkWell(
+                            onTap: () {
+                              // TODO: Navigate to session details
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        formattedDate,
+                                        style: AppTextStyles.subtitle1.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        durationText,
+                                        style: AppTextStyles.body2.copyWith(
+                                          color: AppColors.textDarkSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      _buildSessionStat(
+                                        Icons.straighten, 
+                                        '$distanceValue $distanceUnit'
+                                      ),
+                                      const SizedBox(width: 16),
+                                      _buildSessionStat(
+                                        Icons.local_fire_department, 
+                                        '${session['calories_burned']?.toString() ?? '0'} cal'
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                 
                 // View all button
                 const SizedBox(height: 16),
@@ -247,18 +419,6 @@ class _HomeTabState extends State<_HomeTab> {
               ],
             ),
           ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const CreateSessionScreen(),
-              ),
-            );
-          },
-          backgroundColor: AppColors.primary,
-          child: const Icon(Icons.add),
         ),
       ),
     );
@@ -292,76 +452,7 @@ class _HomeTabState extends State<_HomeTab> {
     );
   }
 
-  /// Builds a card for displaying a recent ruck session
-  Widget _buildRecentSessionCard({
-    required String date,
-    required String distance,
-    required String duration,
-    required String calories,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Session icon
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.directions_walk,
-                color: AppColors.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            
-            // Session details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    date,
-                    style: AppTextStyles.subtitle2.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      _buildSessionStat(Icons.straighten, distance),
-                      const SizedBox(width: 16),
-                      _buildSessionStat(Icons.timer, duration),
-                      const SizedBox(width: 16),
-                      _buildSessionStat(Icons.local_fire_department, calories),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            // View details button
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              onPressed: () {
-                // TODO: Navigate to session details screen
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds a stat item for the session card
+  /// Builds a session stat item
   Widget _buildSessionStat(IconData icon, String value) {
     return Row(
       children: [

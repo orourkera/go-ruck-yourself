@@ -313,12 +313,16 @@ class SessionReviewResource(Resource):
             review = session.review
             review.rating = data['rating']
             review.notes = data.get('notes', '')
+            review.perceived_exertion = data.get('perceived_exertion')
+            review.tags = data.get('tags', [])
         else:
             # Create new review
             review = SessionReview(
                 session_id=session_id,
                 rating=data['rating'],
-                notes=data.get('notes', '')
+                notes=data.get('notes', ''),
+                perceived_exertion=data.get('perceived_exertion'),
+                tags=data.get('tags', [])
             )
             db.session.add(review)
         

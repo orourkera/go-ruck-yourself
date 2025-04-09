@@ -57,7 +57,7 @@ Future<void> setupServiceLocator() async {
 Dio _configureDio() {
   final Dio dio = Dio(
     BaseOptions(
-      baseUrl: AppConfig.apiBaseUrl,
+      baseUrl: 'http://localhost:8000/api', // Use localhost for development
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {'Content-Type': 'application/json'},

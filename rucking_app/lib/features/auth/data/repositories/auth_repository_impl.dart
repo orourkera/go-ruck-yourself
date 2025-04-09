@@ -18,17 +18,21 @@ class AuthRepositoryImpl implements AuthRepository {
   
   @override
   Future<User> register({
+    required String displayName,
     required String name,
     required String email,
     required String password,
+    required bool preferMetric,
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
   }) async {
     return await _authService.register(
+      displayName: displayName,
       name: name,
       email: email,
       password: password,
+      preferMetric: preferMetric,
       weightKg: weightKg,
       heightCm: heightCm,
       dateOfBirth: dateOfBirth,
@@ -52,11 +56,13 @@ class AuthRepositoryImpl implements AuthRepository {
   
   @override
   Future<User> updateProfile({
+    String? displayName,
     String? name,
     double? weightKg,
     double? heightCm,
   }) async {
     return await _authService.updateProfile(
+      displayName: displayName,
       name: name,
       weightKg: weightKg,
       heightCm: heightCm,

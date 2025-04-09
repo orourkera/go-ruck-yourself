@@ -5,7 +5,7 @@ class AppConfig {
   static const int apiTimeout = 30; // seconds
   
   // App information
-  static const String appName = 'Rucking App';
+  static const String appName = 'GRY';
   static const String appVersion = '1.0.0';
   
   // Storage keys

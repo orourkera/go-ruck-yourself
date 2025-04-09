@@ -99,34 +99,35 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   }
   
   /// Save session details to the backend and navigate to home
-  Future<void> _saveAndContinue() async {
+  void _saveAndContinue() {
     setState(() {
       _isSaving = true;
     });
     
-    try {
-      // Update session with rating, exertion, notes, tags
-      await _apiClient.post('/api/rucks/${widget.ruckId}/complete', {
-        'rating': _rating,
-        'perceived_exertion': _perceivedExertion,
-        'notes': _notes,
-        'tags': _selectedTags,
-      });
-      
+    // Use then/catchError instead of async/await
+    _apiClient.post('/rucks/${widget.ruckId}/review', {
+      'rating': _rating,
+      'perceived_exertion': _perceivedExertion,
+      'notes': _notesController.text,
+      'tags': _selectedTags,
+    }).then((_) {
       if (mounted) {
+        // Navigate to home screen and clear the stack
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const HomeScreen()),
           (route) => false,
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save session: $e')),
-      );
-      setState(() {
-        _isSaving = false;
-      });
-    }
+    }).catchError((e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save session: $e')),
+        );
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    });
   }
 
   /// Populate stats from widget parameters
@@ -329,7 +330,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 // Save button
                 Center(
                   child: CustomButton(
-                    onPressed: _isSaving ? _saveAndContinue : () {},
+                    onPressed: () {
+                      if (!_isSaving) {
+                        _saveAndContinue();
+                      }
+                    },
                     text: 'Save and Continue',
                     icon: Icons.save,
                     color: AppColors.primary,

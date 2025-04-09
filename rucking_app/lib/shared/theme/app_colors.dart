@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 
 /// App color palette with rustic theme
 class AppColors {
-  // Primary colors - Brownish-orange
-  static final Color primary = Color(0xFFCC6A2A); 
-  static final Color primaryLight = Color(0xFFE09355);
-  static final Color primaryDark = Color(0xFFA04F18);
+  // Primary colors - Olive green
+  static final Color primary = Color(0xFF728C69); 
+  static final Color primaryLight = Color(0xFF94A98C);
+  static final Color primaryDark = Color(0xFF546A4A);
   
-  // Secondary colors - Olive green
-  static final Color secondary = Color(0xFF728C69); 
-  static final Color secondaryLight = Color(0xFF94A98C);
-  static final Color secondaryDark = Color(0xFF546A4A);
-  static final Color secondaryDarkest = Color(0xFF3A4A33);
+  // Secondary colors - Brownish-orange
+  static final Color secondary = Color(0xFFCC6A2A); 
+  static final Color secondaryLight = Color(0xFFE09355);
+  static final Color secondaryDark = Color(0xFFA04F18);
+  static final Color secondaryDarkest = Color(0xFF7A3B14);
   
   // Accent colors (earthy red)
   static final Color accent = Color(0xFFB84934); 
@@ -55,13 +55,13 @@ class AppColors {
   
   // Gradient colors
   static final List<Color> primaryGradient = [
-    Color(0xFFCC6A2A), // Brownish-orange
-    Color(0xFFE09355), // Light orange
+    Color(0xFF728C69), // Olive green
+    Color(0xFF546A4A), // Dark olive
   ];
   
   static final List<Color> secondaryGradient = [
-    Color(0xFF728C69), // Olive green
-    Color(0xFF94A98C), // Light olive
+    Color(0xFFCC6A2A), // Brownish-orange
+    Color(0xFFE09355), // Light orange
   ];
   
   static final List<Color> accentGradient = [

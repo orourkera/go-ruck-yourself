@@ -1,0 +1,2 @@
+Do not create mock data. Do not fall back to development mode. Do not do any kinds of workarounds or simplications.
+Always check for existing files and code before creating any new files or code.
