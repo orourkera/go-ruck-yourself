@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rucking App API</title>
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <style>
+        .api-section {
+            margin-bottom: 2rem;
+        }
+        .endpoint {
+            border-left: 3px solid var(--bs-primary);
+            padding-left: 1rem;
+            margin-bottom: 1rem;
+        }
+        .method {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+        }
+        .get {
+            background-color: var(--bs-info);
+            color: var(--bs-dark);
+        }
+        .post {
+            background-color: var(--bs-success);
+            color: var(--bs-dark);
+        }
+        .put {
+            background-color: var(--bs-warning);
+            color: var(--bs-dark);
+        }
+        .delete {
+            background-color: var(--bs-danger);
+            color: var(--bs-light);
+        }
+    </style>
+</head>
+<body>
+    <div class="container my-5">
+        <header class="mb-5">
+            <h1 class="display-4">Rucking App API</h1>
+            <p class="lead">A RESTful API backend for a rucking app that allows tracking, analyzing, and storing workout data.</p>
+            <div class="mt-4">
+                <span class="badge bg-success">API Running</span>
+                <span class="badge bg-info ms-2">Version 1.0</span>
+            </div>
+        </header>
+
+        <section class="mb-5">
+            <h2>Features</h2>
+            <div class="row mt-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">User Management</h5>
+                            <p class="card-text">Create and manage user accounts with profile data and authentication.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Workout Tracking</h5>
+                            <p class="card-text">Track rucking sessions with location, distance, elevation, and performance metrics.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Statistics & Analysis</h5>
+                            <p class="card-text">View comprehensive statistics and progress over time (weekly, monthly, yearly).</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Session Reviews</h5>
+                            <p class="card-text">Rate and review completed sessions with notes for future reference.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Calorie Calculations</h5>
+                            <p class="card-text">Calculate calories burned based on user weight, ruck weight, distance, and elevation.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Apple Health Integration</h5>
+                            <p class="card-text">Sync workout data with Apple Health for a comprehensive fitness overview.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>API Documentation</h2>
+            <p>The following endpoints are available for use:</p>
+
+            <div class="api-section">
+                <h3>User Management</h3>
+                <div class="endpoint">
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/users</code>
+                        <small class="text-muted">List all users</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method post">POST</span>
+                        <code>/api/users</code>
+                        <small class="text-muted">Create a new user</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/users/{id}</code>
+                        <small class="text-muted">Get a specific user</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method put">PUT</span>
+                        <code>/api/users/{id}</code>
+                        <small class="text-muted">Update a user</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method delete">DELETE</span>
+                        <code>/api/users/{id}</code>
+                        <small class="text-muted">Delete a user</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>Session Management</h3>
+                <div class="endpoint">
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/sessions</code>
+                        <small class="text-muted">List all sessions for a user</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method post">POST</span>
+                        <code>/api/sessions</code>
+                        <small class="text-muted">Create a new session</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/sessions/{id}</code>
+                        <small class="text-muted">Get a specific session</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method put">PUT</span>
+                        <code>/api/sessions/{id}</code>
+                        <small class="text-muted">Update a session</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method delete">DELETE</span>
+                        <code>/api/sessions/{id}</code>
+                        <small class="text-muted">Delete a session</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method post">POST</span>
+                        <code>/api/sessions/{id}/statistics</code>
+                        <small class="text-muted">Add location data and update statistics</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/sessions/{id}/review</code>
+                        <small class="text-muted">Get session review</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method post">POST</span>
+                        <code>/api/sessions/{id}/review</code>
+                        <small class="text-muted">Add/update session review</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>Statistics</h3>
+                <div class="endpoint">
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/statistics/weekly</code>
+                        <small class="text-muted">Get weekly statistics</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/statistics/monthly</code>
+                        <small class="text-muted">Get monthly statistics</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/statistics/yearly</code>
+                        <small class="text-muted">Get yearly statistics</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="api-section">
+                <h3>Apple Health Integration</h3>
+                <div class="endpoint">
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/users/{id}/apple-health/status</code>
+                        <small class="text-muted">Get Apple Health integration status</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method put">PUT</span>
+                        <code>/api/users/{id}/apple-health/status</code>
+                        <small class="text-muted">Update Apple Health integration settings</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method get">GET</span>
+                        <code>/api/users/{id}/apple-health/sync</code>
+                        <small class="text-muted">Export workout data in Apple Health format</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="method post">POST</span>
+                        <code>/api/users/{id}/apple-health/sync</code>
+                        <small class="text-muted">Import workout data from Apple Health</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer class="bg-dark py-4 mt-5">
+        <div class="container text-center">
+            <p class="text-muted mb-0">Rucking App API &copy; 2025</p>
+        </div>
+    </footer>
+</body>
+</html>
