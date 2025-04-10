@@ -88,7 +88,7 @@ class TermsOfServiceScreen extends StatelessWidget {
             ),
             _buildSection(
               '10. Modifications to Terms',
-              'We may update these Terms occasionally. We'll notify you of any material changes, and your continued use of the App after such changes constitutes your acceptance of the updated Terms.',
+              'We may update these Terms occasionally. We\'ll notify you of any material changes, and your continued use of the App after such changes constitutes your acceptance of the updated Terms.',
               context,
             ),
             _buildSection(

@@ -77,13 +77,13 @@ class PrivacyPolicyScreen extends StatelessWidget {
               context,
             ),
              _buildSection(
-              '8. Children's Privacy',
+              '8. Children\'s Privacy',
               'Go Ruck Yourself is not intended for children under 13. We do not knowingly collect data from anyone under this age. If we discover such data has been collected, it will be deleted immediately.',
               context,
             ),
              _buildSection(
               '9. Changes to This Policy',
-              'We may update this Privacy Policy as our app evolves or to comply with legal requirements. If major changes are made, we'll notify you via email or in-app notification.',
+              'We may update this Privacy Policy as our app evolves or to comply with legal requirements. If major changes are made, we\'ll notify you via email or in-app notification.',
               context,
             ),
              _buildSection(
