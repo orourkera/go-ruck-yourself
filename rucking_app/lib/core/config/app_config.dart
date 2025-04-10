@@ -1,7 +1,7 @@
 /// Application configuration constants
 class AppConfig {
   // API configuration
-  static const String apiBaseUrl = 'http://localhost:8000';
+  static const String apiBaseUrl = 'https://www.getrucky.com';
   static const int apiTimeout = 30; // seconds
   
   // App information

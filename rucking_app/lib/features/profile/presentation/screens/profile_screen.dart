@@ -3,13 +3,32 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/edit_profile_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/privacy_policy_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/terms_of_service_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 
 /// Screen for displaying and managing user profile
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String? _selectedUnit;
+
+  // Constants for conversion
+  static const double kgToLbs = 2.20462;
+  static const double cmToInches = 0.393701;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize _selectedUnit based on current state when widget builds
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,11 +45,39 @@ class ProfileScreen extends StatelessWidget {
         if (state is Authenticated) {
           final user = state.user;
           
+          // Initialize dropdown value if not already set
+          // Do this within build or didChangeDependencies for safety with Bloc state
+          _selectedUnit ??= user.preferMetric ? 'Metric' : 'Imperial';
+          
           // Safely get initials, checking for null or empty values
           String initials = '';
           if (user.name.isNotEmpty) {
             initials = _getInitials(user.name);
           }
+          
+          // --- Calculate Display Values ---
+          String weightDisplay = 'Not set';
+          if (user.weightKg != null) {
+            if (user.preferMetric) {
+              weightDisplay = '${user.weightKg!.toStringAsFixed(1)} kg';
+            } else {
+              final lbs = user.weightKg! * kgToLbs;
+              weightDisplay = '${lbs.toStringAsFixed(1)} lbs';
+            }
+          }
+
+          String heightDisplay = 'Not set';
+          if (user.heightCm != null) {
+            if (user.preferMetric) {
+              heightDisplay = '${user.heightCm!.toStringAsFixed(1)} cm';
+            } else {
+              final totalInches = user.heightCm! * cmToInches;
+              final feet = (totalInches / 12).floor();
+              final inches = (totalInches % 12).round(); // Round remaining inches
+              heightDisplay = '$feet\' $inches"'; // Format as 5' 11"
+            }
+          }
+          // --- End Calculate Display Values ---
           
           return Scaffold(
             appBar: AppBar(
@@ -43,7 +90,11 @@ class ProfileScreen extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EditProfileScreen(user: user),
+                        builder: (context) => EditProfileScreen(
+                          user: user, 
+                          // Pass the preference
+                          preferMetric: user.preferMetric, 
+                        ),
                       ),
                     );
                   },
@@ -55,19 +106,6 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Profile header
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: AppColors.primary,
-                    child: Text(
-                      initials,
-                      style: AppTextStyles.headline4.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Text(
                     user.name,
                     style: AppTextStyles.headline5.copyWith(
@@ -96,17 +134,13 @@ class ProfileScreen extends StatelessWidget {
                       _buildInfoItem(
                         icon: Icons.monitor_weight_outlined,
                         label: 'Weight',
-                        value: user.weightKg != null
-                            ? '${user.weightKg} kg'
-                            : 'Not set',
+                        value: weightDisplay,
                       ),
                       const Divider(),
                       _buildInfoItem(
                         icon: Icons.height_outlined,
                         label: 'Height',
-                        value: user.heightCm != null
-                            ? '${user.heightCm} cm'
-                            : 'Not set',
+                        value: heightDisplay,
                       ),
                     ],
                   ),
@@ -117,34 +151,10 @@ class ProfileScreen extends StatelessWidget {
                     title: 'App Settings',
                     children: [
                       _buildSettingItem(
-                        icon: Icons.dark_mode_outlined,
-                        label: 'Dark Mode',
-                        trailing: Switch(
-                          value: false, // TODO: Implement theme switching
-                          onChanged: (value) {
-                            // TODO: Implement theme switching
-                          },
-                          activeColor: AppColors.primary,
-                        ),
-                      ),
-                      const Divider(),
-                      _buildSettingItem(
-                        icon: Icons.notifications_outlined,
-                        label: 'Notifications',
-                        trailing: Switch(
-                          value: true, // TODO: Implement notifications
-                          onChanged: (value) {
-                            // TODO: Implement notifications
-                          },
-                          activeColor: AppColors.primary,
-                        ),
-                      ),
-                      const Divider(),
-                      _buildSettingItem(
                         icon: Icons.language_outlined,
                         label: 'Units',
                         trailing: DropdownButton<String>(
-                          value: 'Metric',
+                          value: _selectedUnit,
                           underline: const SizedBox(),
                           items: ['Metric', 'Imperial']
                               .map((String value) {
@@ -155,27 +165,21 @@ class ProfileScreen extends StatelessWidget {
                               })
                               .toList(),
                           onChanged: (String? newValue) {
-                            // TODO: Implement unit switching
+                            if (newValue != null && newValue != _selectedUnit) {
+                              setState(() {
+                                _selectedUnit = newValue;
+                              });
+                              // Dispatch update event
+                              bool newPreferMetric = newValue == 'Metric';
+                              context.read<AuthBloc>().add(AuthProfileUpdateRequested(
+                                preferMetric: newPreferMetric, 
+                                // Pass other fields as null if only updating units
+                                name: null, 
+                                weightKg: null, 
+                                heightCm: null,
+                              ));
+                            }
                           },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Health integration section
-                  _buildSection(
-                    title: 'Health Integration',
-                    children: [
-                      _buildSettingItem(
-                        icon: Icons.favorite_outline,
-                        label: 'Apple Health',
-                        trailing: Switch(
-                          value: true, // TODO: Implement Apple Health integration
-                          onChanged: (value) {
-                            // TODO: Implement Apple Health integration
-                          },
-                          activeColor: AppColors.primary,
                         ),
                       ),
                     ],
@@ -198,7 +202,10 @@ class ProfileScreen extends StatelessWidget {
                         icon: Icons.privacy_tip_outlined,
                         label: 'Privacy Policy',
                         onTap: () {
-                          // TODO: Open privacy policy
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                          );
                         },
                       ),
                       const Divider(),
@@ -206,7 +213,10 @@ class ProfileScreen extends StatelessWidget {
                         icon: Icons.description_outlined,
                         label: 'Terms of Service',
                         onTap: () {
-                          // TODO: Open terms of service
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const TermsOfServiceScreen()),
+                          );
                         },
                       ),
                     ],

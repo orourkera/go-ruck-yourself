@@ -234,8 +234,9 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                       // Get calories directly from session map
                       final calories = session['calories_burned']?.toString() ?? '0';
                       
-                      // Get weight directly from session map
-                      final weight = session['ruck_weight_kg'] ?? 0;
+                      // Get weight and round it
+                      final weightValue = session['ruck_weight_kg'] as num? ?? 0;
+                      final formattedWeight = weightValue.round(); // Round to nearest integer
                       
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -292,7 +293,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                                       child: _buildSessionStat(
                                         Icons.fitness_center,
                                         'Weight',
-                                        '$weight kg',
+                                        '$formattedWeight kg', // Use rounded value
                                       ),
                                     ),
                                   ],

@@ -53,11 +53,13 @@ class AuthRepositoryImpl implements AuthRepository {
     String? name,
     double? weightKg,
     double? heightCm,
+    bool? preferMetric,
   }) async {
     return await _authService.updateProfile(
       name: name,
       weightKg: weightKg,
       heightCm: heightCm,
+      preferMetric: preferMetric,
     );
   }
 } 
