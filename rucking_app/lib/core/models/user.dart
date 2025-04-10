@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 
 /// User model representing a user of the app
 class User extends Equatable {
@@ -36,13 +37,13 @@ class User extends Equatable {
   const User({
     required this.userId,
     required this.email,
-    required this.name,
-    required this.displayName,
+    this.name = '',
+    this.displayName = '',
     this.weightKg,
     this.heightCm,
     this.dateOfBirth,
     this.createdAt,
-    this.preferMetric = false,
+    this.preferMetric = true,
     this.stats,
   });
   
@@ -74,67 +75,77 @@ class User extends Equatable {
   }
   
   /// Factory constructor for creating a User from JSON
+  /// Handles data potentially coming from Auth response OR Profile response
   factory User.fromJson(Map<String, dynamic> json) {
-    String name = "User";
-    String displayName = "";
-    String email = "";
+    // --- Add Logging ---
+    debugPrint('User.fromJson received JSON: $json');
+    // --- End Logging ---
     
-    if (json.containsKey('username') && json['username'] != null) {
-      name = json['username'] as String;
-    } else if (json.containsKey('name') && json['name'] != null) {
-      name = json['name'] as String;
-    }
-    
-    if (json.containsKey('display_name') && json['display_name'] != null) {
-      displayName = json['display_name'] as String;
-    } else {
-      displayName = name;
-    }
-    
-    if (json.containsKey('email') && json['email'] != null) {
-      email = json['email'] as String;
-    }
-
-    // Safely convert the ID to a string regardless of its original type
-    String userId = "";
+    String id = "";
     var rawId = json['id'] ?? json['user_id'];
     if (rawId != null) {
-      userId = rawId.toString();
+      id = rawId.toString();
     }
     
-    return User(
-      userId: userId,
+    String email = json['email'] as String? ?? '';
+    
+    // Name: Prioritize 'name' field, fallback to splitting email
+    String name = json['name'] as String? ?? '';
+    if (name.isEmpty && email.contains('@')) {
+        name = email.split('@')[0]; // Basic fallback
+    }
+    
+    // DisplayName: Prioritize 'displayName', fallback to 'name', fallback to basic name
+    String displayName = json['displayName'] as String? ?? json['display_name'] as String? ?? name;
+    if (displayName.isEmpty) {
+         displayName = name; // Ensure it's not empty if name wasn't
+    }
+    
+    // Helper to safely parse numbers (copied from ruck_session)
+    num? safeParseNum(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value;
+      if (value is String) return num.tryParse(value);
+      return null;
+    }
+
+    final user = User(
+      userId: id,
       email: email,
       name: name,
       displayName: displayName,
-      weightKg: json['weight_kg'] != null ? (json['weight_kg'] as num).toDouble() : null,
-      heightCm: json['height_cm'] != null ? (json['height_cm'] as num).toDouble() : null,
+      // Profile fields might be missing initially
+      weightKg: safeParseNum(json['weight_kg'])?.toDouble(),
+      heightCm: safeParseNum(json['height_cm'])?.toDouble(),
       dateOfBirth: json['date_of_birth'] as String?,
       createdAt: json['created_at'] as String?,
-      preferMetric: json['prefer_metric'] as bool? ?? false,
+      preferMetric: json['preferMetric'] as bool? ?? json['"preferMetric"'] as bool? ?? true, // Handle quoted key, default true
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
     );
+    
+    // --- Add Logging ---
+    debugPrint('User.fromJson created User object: ${user.toJson()}');
+    // --- End Logging ---
+    return user;
   }
   
   /// Convert user to JSON
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> result = {
-      'user_id': userId,
+    final Map<String, dynamic> data = {
+      'id': userId,
       'email': email,
       'name': name,
-      'display_name': displayName,
-      'prefer_metric': preferMetric,
+      'displayName': displayName,
+      'preferMetric': preferMetric,
     };
-    
-    if (weightKg != null) result['weight_kg'] = weightKg;
-    if (heightCm != null) result['height_cm'] = heightCm;
-    if (dateOfBirth != null) result['date_of_birth'] = dateOfBirth;
-    if (createdAt != null) result['created_at'] = createdAt;
-    if (stats != null) result['stats'] = stats!.toJson();
-    
-    return result;
+    if (weightKg != null) data['weight_kg'] = weightKg;
+    if (heightCm != null) data['height_cm'] = heightCm;
+    if (dateOfBirth != null) data['date_of_birth'] = dateOfBirth;
+    if (createdAt != null) data['created_at'] = createdAt;
+    if (stats != null) data['stats'] = stats!.toJson();
+    return data;
   }
   
   @override

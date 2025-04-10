@@ -302,41 +302,35 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   /// Ends the current session
   Future<void> _endSession() async {
+    // Stop timers and tracking immediately
+    _timer.cancel();
+    _stopwatch.stop();
+    _locationSubscription?.cancel();
+    
     setState(() {
-      _isEnding = true;
+      _isEnding = true; // Keep UI disabled while navigating
     });
     
-    try {
-      // Complete session on backend
-      await _apiClient.post('/rucks/${widget.ruckId}/complete', {
-        'notes': widget.notes,
-      });
-      
-      // Navigate to completion screen
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SessionCompleteScreen(
-              ruckId: widget.ruckId,
-              duration: _elapsed,
-              distance: _distance,
-              caloriesBurned: _caloriesBurned.round(),
-              elevationGain: _elevationGain,
-              elevationLoss: _elevationLoss,
-              ruckWeight: widget.ruckWeight,
-            ),
+    // Navigate to completion screen, passing final calculated stats
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SessionCompleteScreen(
+            ruckId: widget.ruckId,
+            duration: _elapsed, // Pass final elapsed time
+            distance: _distance, // Pass final calculated distance
+            caloriesBurned: _caloriesBurned.round(), // Pass final calculated calories
+            elevationGain: _elevationGain,
+            elevationLoss: _elevationLoss,
+            ruckWeight: widget.ruckWeight,
+            // Pass initial notes if available, SessionCompleteScreen allows editing
+            initialNotes: widget.notes, 
           ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _isEnding = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to end session: $e'))
+        ),
       );
-    }
+    } 
+    // No need for try-catch or setting _isEnding=false if only navigating
   }
   
   /// Shows a confirmation dialog for ending the session

@@ -10,7 +10,6 @@ abstract class AuthRepository {
   
   /// Register a new user
   Future<User> register({
-    required String displayName,
     required String name,
     required String email,
     required String password,
@@ -31,7 +30,6 @@ abstract class AuthRepository {
   
   /// Update user profile
   Future<User> updateProfile({
-    String? displayName,
     String? name,
     double? weightKg,
     double? heightCm,

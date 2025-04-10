@@ -3,6 +3,7 @@ import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:flutter/foundation.dart';
 
 /// Interface for authentication operations
 abstract class AuthService {
@@ -11,11 +12,9 @@ abstract class AuthService {
   
   /// Register a new user
   Future<User> register({
-    required String displayName,
     required String name,
     required String email,
     required String password,
-    required bool preferMetric,
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
@@ -35,7 +34,6 @@ abstract class AuthService {
   
   /// Update the user profile
   Future<User> updateProfile({
-    String? displayName,
     String? name,
     double? weightKg,
     double? heightCm,
@@ -51,6 +49,7 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User> signIn(String email, String password) async {
+    debugPrint('AuthService: Attempting signIn for $email');
     try {
       final response = await _apiClient.post(
         '/auth/login',
@@ -59,6 +58,8 @@ class AuthServiceImpl implements AuthService {
           'password': password,
         },
       );
+      
+      debugPrint('AuthService: Received signIn response: $response');
       
       final token = response['token'] as String;
       final userData = response['user'] as Map<String, dynamic>;
@@ -80,24 +81,21 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User> register({
-    required String displayName,
     required String name,
     required String email,
     required String password,
-    required bool preferMetric,
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
   }) async {
+    debugPrint('AuthService: Attempting register for $email');
     try {
       final response = await _apiClient.post(
         '/users/register',
         {
           'name': name,
-          'display_name': displayName,
           'email': email,
           'password': password,
-          'prefer_metric': preferMetric,
           if (weightKg != null) 'weight_kg': weightKg,
           if (heightCm != null) 'height_cm': heightCm,
           if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
@@ -136,29 +134,45 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User?> getCurrentUser() async {
+    debugPrint('AuthService: Attempting getCurrentUser');
     try {
-      // Check if we have a stored user
-      final userData = await _storageService.getObject(AppConfig.userProfileKey);
-      if (userData == null) return null;
+      // Check if we have a stored user first (can be stale)
+      final storedUserData = await _storageService.getObject(AppConfig.userProfileKey);
+      User? storedUser = storedUserData != null ? User.fromJson(storedUserData) : null;
+      debugPrint('AuthService: Found stored user data?: ${storedUser != null}');
       
       // Get fresh user data from API
+      debugPrint('AuthService: Calling GET /users/profile');
       final response = await _apiClient.get('/users/profile');
+      
+      // --- Add Logging --- 
+      debugPrint('AuthService: Received profile response: $response');
+      if (response is! Map<String, dynamic>) {
+          debugPrint('AuthService: Error - Profile response is not a Map!');
+          // Return stored user or null if fetch failed badly
+          return storedUser; 
+      }
+      // --- End Logging ---
+      
       final user = User.fromJson(response);
+      debugPrint('AuthService: Parsed fresh User from profile: ${user.toJson()}');
       
       // Update stored user data
       await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
       
       return user;
     } catch (e) {
+      debugPrint('AuthService: getCurrentUser error: $e'); // Log error
       if (e is UnauthorizedException) {
         await signOut();
         return null;
       }
       
-      // If there's a network error, return the stored user
-      final userData = await _storageService.getObject(AppConfig.userProfileKey);
-      if (userData != null) {
-        return User.fromJson(userData);
+      // If there's a network error, return the stored user if available
+      final storedUserData = await _storageService.getObject(AppConfig.userProfileKey);
+      if (storedUserData != null) {
+        debugPrint('AuthService: Returning stored user due to network error');
+        return User.fromJson(storedUserData);
       }
       
       return null;
@@ -167,6 +181,7 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<bool> isAuthenticated() async {
+    debugPrint('AuthService: Checking isAuthenticated');
     // First check if we have a token stored
     final token = await _storageService.getSecureString(AppConfig.tokenKey);
     if (token == null) {
@@ -200,14 +215,13 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User> updateProfile({
-    String? displayName,
     String? name,
     double? weightKg,
     double? heightCm,
   }) async {
+    debugPrint('AuthService: Attempting updateProfile');
     try {
       final data = <String, dynamic>{};
-      if (displayName != null) data['display_name'] = displayName;
       if (name != null) data['name'] = name;
       if (weightKg != null) data['weight_kg'] = weightKg;
       if (heightCm != null) data['height_cm'] = heightCm;

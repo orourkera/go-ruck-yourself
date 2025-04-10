@@ -73,8 +73,26 @@ class RuckSession extends Equatable {
   /// When the session was completed
   final String? completedAt;
   
-  /// Session statistics
-  final RuckSessionStats? stats;
+  /// Total distance in kilometers
+  final double? distanceKm;
+  
+  /// Total elevation gain in meters
+  final double? elevationGainMeters;
+  
+  /// Total elevation loss in meters
+  final double? elevationLossMeters;
+  
+  /// Estimated calories burned
+  final double? caloriesBurned;
+  
+  /// Duration in seconds
+  final int? durationSeconds;
+  
+  /// Average pace in minutes per kilometer
+  final double? averagePaceMinKm;
+  
+  /// URL for route map (may be null)
+  final String? routeMapUrl;
   
   /// Route waypoints (may be null)
   final List<LocationPoint>? waypoints;
@@ -98,11 +116,34 @@ class RuckSession extends Equatable {
     this.startedAt,
     this.pausedAt,
     this.completedAt,
-    this.stats,
+    this.distanceKm,
+    this.elevationGainMeters,
+    this.elevationLossMeters,
+    this.caloriesBurned,
+    this.durationSeconds,
+    this.averagePaceMinKm,
+    this.routeMapUrl,
     this.waypoints,
     this.review,
     this.tags = const <String>[],
   });
+  
+  /// Formatted duration as HH:MM:SS
+  String get formattedDuration {
+    final secs = durationSeconds ?? 0;
+    final hours = secs ~/ 3600;
+    final minutes = (secs % 3600) ~/ 60;
+    final seconds = secs % 60;
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  
+  /// Formatted pace as MM:SS per km
+  String get formattedPace {
+    final pace = averagePaceMinKm ?? 0.0;
+    final totalMinutes = pace.floor();
+    final seconds = ((pace - totalMinutes) * 60).round();
+    return '${totalMinutes.toString()}:${seconds.toString().padLeft(2, '0')}';
+  }
   
   /// Creates a copy with the given fields replaced with new values
   RuckSession copyWith({
@@ -117,7 +158,13 @@ class RuckSession extends Equatable {
     String? startedAt,
     String? pausedAt,
     String? completedAt,
-    RuckSessionStats? stats,
+    double? distanceKm,
+    double? elevationGainMeters,
+    double? elevationLossMeters,
+    double? caloriesBurned,
+    int? durationSeconds,
+    double? averagePaceMinKm,
+    String? routeMapUrl,
     List<LocationPoint>? waypoints,
     SessionReview? review,
     List<String>? tags,
@@ -134,7 +181,13 @@ class RuckSession extends Equatable {
       startedAt: startedAt ?? this.startedAt,
       pausedAt: pausedAt ?? this.pausedAt,
       completedAt: completedAt ?? this.completedAt,
-      stats: stats ?? this.stats,
+      distanceKm: distanceKm ?? this.distanceKm,
+      elevationGainMeters: elevationGainMeters ?? this.elevationGainMeters,
+      elevationLossMeters: elevationLossMeters ?? this.elevationLossMeters,
+      caloriesBurned: caloriesBurned ?? this.caloriesBurned,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      averagePaceMinKm: averagePaceMinKm ?? this.averagePaceMinKm,
+      routeMapUrl: routeMapUrl ?? this.routeMapUrl,
       waypoints: waypoints ?? this.waypoints,
       review: review ?? this.review,
       tags: tags ?? this.tags,
@@ -143,24 +196,34 @@ class RuckSession extends Equatable {
   
   /// Factory constructor for creating a RuckSession from JSON
   factory RuckSession.fromJson(Map<String, dynamic> json) {
+    // Helper to safely parse numbers
+    num? safeParseNum(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value;
+      if (value is String) return num.tryParse(value);
+      return null;
+    }
+    
     return RuckSession(
-      ruckId: json['ruck_id'] as String?,
+      ruckId: json['id'] as String? ?? json['ruck_id'] as String?, // Allow both 'id' and 'ruck_id'
       userId: json['user_id'] as String,
       status: RuckSessionStatus.fromString(json['status'] as String),
-      ruckWeightKg: (json['ruck_weight_kg'] as num).toDouble(),
-      userWeightKg: json['user_weight_kg'] != null 
-          ? (json['user_weight_kg'] as num).toDouble() 
-          : null,
-      plannedDurationMinutes: json['planned_duration_minutes'] as int?,
+      ruckWeightKg: (safeParseNum(json['ruck_weight_kg']) ?? 0).toDouble(),
+      userWeightKg: safeParseNum(json['user_weight_kg'])?.toDouble(),
+      plannedDurationMinutes: safeParseNum(json['planned_duration_minutes'])?.toInt(),
       notes: json['notes'] as String?,
       createdAt: json['created_at'] as String?,
       startedAt: json['started_at'] as String?,
       pausedAt: json['paused_at'] as String?,
       completedAt: json['completed_at'] as String?,
-      stats: json['stats'] != null 
-          ? RuckSessionStats.fromJson(json['stats'] as Map<String, dynamic>) 
-          : null,
-      waypoints: json['waypoints'] != null 
+      distanceKm: safeParseNum(json['distance_km'])?.toDouble(),
+      elevationGainMeters: safeParseNum(json['elevation_gain_meters'])?.toDouble(),
+      elevationLossMeters: safeParseNum(json['elevation_loss_meters'])?.toDouble(),
+      caloriesBurned: safeParseNum(json['calories_burned'])?.toDouble(),
+      durationSeconds: safeParseNum(json['duration_seconds'])?.toInt(),
+      averagePaceMinKm: safeParseNum(json['average_pace_min_km'])?.toDouble(),
+      routeMapUrl: json['route_map_url'] as String?,
+      waypoints: json['waypoints'] != null && json['waypoints'] is List
           ? (json['waypoints'] as List<dynamic>)
               .map((e) => LocationPoint.fromJson(e as Map<String, dynamic>))
               .toList() 
@@ -168,7 +231,7 @@ class RuckSession extends Equatable {
       review: json['review'] != null 
           ? SessionReview.fromJson(json['review'] as Map<String, dynamic>) 
           : null,
-      tags: json['tags'] != null 
+      tags: json['tags'] != null && json['tags'] is List 
           ? (json['tags'] as List<dynamic>).map((e) => e as String).toList() 
           : const <String>[],
     );
@@ -182,7 +245,7 @@ class RuckSession extends Equatable {
       'ruck_weight_kg': ruckWeightKg,
     };
     
-    if (ruckId != null) result['ruck_id'] = ruckId;
+    if (ruckId != null) result['id'] = ruckId; // Use 'id' for consistency
     if (userWeightKg != null) result['user_weight_kg'] = userWeightKg;
     if (plannedDurationMinutes != null) result['planned_duration_minutes'] = plannedDurationMinutes;
     if (notes != null) result['notes'] = notes;
@@ -190,7 +253,13 @@ class RuckSession extends Equatable {
     if (startedAt != null) result['started_at'] = startedAt;
     if (pausedAt != null) result['paused_at'] = pausedAt;
     if (completedAt != null) result['completed_at'] = completedAt;
-    if (stats != null) result['stats'] = stats!.toJson();
+    if (distanceKm != null) result['distance_km'] = distanceKm;
+    if (elevationGainMeters != null) result['elevation_gain_meters'] = elevationGainMeters;
+    if (elevationLossMeters != null) result['elevation_loss_meters'] = elevationLossMeters;
+    if (caloriesBurned != null) result['calories_burned'] = caloriesBurned;
+    if (durationSeconds != null) result['duration_seconds'] = durationSeconds;
+    if (averagePaceMinKm != null) result['average_pace_min_km'] = averagePaceMinKm;
+    if (routeMapUrl != null) result['route_map_url'] = routeMapUrl;
     if (waypoints != null) result['waypoints'] = waypoints!.map((e) => e.toJson()).toList();
     if (review != null) result['review'] = review!.toJson();
     if (tags.isNotEmpty) result['tags'] = tags;
@@ -201,91 +270,9 @@ class RuckSession extends Equatable {
   @override
   List<Object?> get props => [
     ruckId, userId, status, ruckWeightKg, userWeightKg, plannedDurationMinutes,
-    notes, createdAt, startedAt, pausedAt, completedAt, stats, waypoints, review, tags
-  ];
-}
-
-/// Statistics for a ruck session
-class RuckSessionStats extends Equatable {
-  /// Total distance in kilometers
-  final double distanceKm;
-  
-  /// Total elevation gain in meters
-  final double elevationGainMeters;
-  
-  /// Total elevation loss in meters
-  final double elevationLossMeters;
-  
-  /// Estimated calories burned
-  final double caloriesBurned;
-  
-  /// Duration in seconds
-  final int durationSeconds;
-  
-  /// Average pace in minutes per kilometer
-  final double averagePaceMinKm;
-  
-  /// URL for route map (may be null)
-  final String? routeMapUrl;
-  
-  /// Creates a new ruck session stats instance
-  const RuckSessionStats({
-    required this.distanceKm,
-    required this.elevationGainMeters,
-    required this.elevationLossMeters,
-    required this.caloriesBurned,
-    required this.durationSeconds,
-    required this.averagePaceMinKm,
-    this.routeMapUrl,
-  });
-  
-  /// Formatted duration as HH:MM:SS
-  String get formattedDuration {
-    final hours = durationSeconds ~/ 3600;
-    final minutes = (durationSeconds % 3600) ~/ 60;
-    final seconds = durationSeconds % 60;
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-  
-  /// Formatted pace as MM:SS per km
-  String get formattedPace {
-    final totalMinutes = averagePaceMinKm.floor();
-    final seconds = ((averagePaceMinKm - totalMinutes) * 60).round();
-    return '${totalMinutes.toString()}:${seconds.toString().padLeft(2, '0')}';
-  }
-  
-  /// Factory constructor for creating RuckSessionStats from JSON
-  factory RuckSessionStats.fromJson(Map<String, dynamic> json) {
-    return RuckSessionStats(
-      distanceKm: (json['distance_km'] as num).toDouble(),
-      elevationGainMeters: (json['elevation_gain_meters'] as num).toDouble(),
-      elevationLossMeters: (json['elevation_loss_meters'] as num).toDouble(),
-      caloriesBurned: (json['calories_burned'] as num).toDouble(),
-      durationSeconds: json['duration_seconds'] as int,
-      averagePaceMinKm: (json['average_pace_min_km'] as num).toDouble(),
-      routeMapUrl: json['route_map_url'] as String?,
-    );
-  }
-  
-  /// Convert ruck session stats to JSON
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> result = {
-      'distance_km': distanceKm,
-      'elevation_gain_meters': elevationGainMeters,
-      'elevation_loss_meters': elevationLossMeters,
-      'calories_burned': caloriesBurned,
-      'duration_seconds': durationSeconds,
-      'average_pace_min_km': averagePaceMinKm,
-    };
-    
-    if (routeMapUrl != null) result['route_map_url'] = routeMapUrl;
-    
-    return result;
-  }
-  
-  @override
-  List<Object?> get props => [
-    distanceKm, elevationGainMeters, elevationLossMeters, 
-    caloriesBurned, durationSeconds, averagePaceMinKm, routeMapUrl
+    notes, createdAt, startedAt, pausedAt, completedAt, 
+    distanceKm, elevationGainMeters, elevationLossMeters, caloriesBurned, 
+    durationSeconds, averagePaceMinKm, routeMapUrl,
+    waypoints, review, tags
   ];
 } 

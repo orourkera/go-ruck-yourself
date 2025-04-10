@@ -51,12 +51,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     
     try {
-      final user = await _authRepository.login(
+      // First, perform the login
+      final loginUser = await _authRepository.login(
         email: event.email,
         password: event.password,
       );
       
-      emit(Authenticated(user));
+      // After successful login, fetch the full user profile
+      // This ensures we have profile data like name, weight, etc.
+      final fullUser = await _authRepository.getCurrentUser();
+      
+      if (fullUser != null) {
+         emit(Authenticated(fullUser));
+      } else {
+         // Should not happen if login succeeded, but handle defensively
+         // Maybe emit Authenticated with just loginUser? Or an error?
+         // For now, emit Authenticated with potentially incomplete loginUser data
+         emit(Authenticated(loginUser)); 
+         emit(AuthError('Login succeeded but failed to fetch full user profile afterward.'));
+      }
+
     } catch (e) {
       emit(AuthError('Login failed: $e'));
     }
@@ -71,7 +85,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     
     try {
       final user = await _authRepository.register(
-        displayName: event.displayName,
         name: event.name,
         email: event.email,
         password: event.password,
@@ -118,7 +131,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       try {
         final updatedUser = await _authRepository.updateProfile(
-          displayName: event.displayName,
           name: event.name,
           weightKg: event.weightKg,
           heightCm: event.heightCm,

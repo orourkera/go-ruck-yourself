@@ -1,6 +1,8 @@
 import os
 import logging
 import sys
+import json
+from datetime import datetime
 
 from flask import Flask, render_template, Blueprint, g, jsonify, request
 from flask_restful import Api
@@ -23,10 +25,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info("Starting RuckTracker API server...")
 
+# Custom JSON encoder to handle datetime objects
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
 # Create Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 
 # Enable CORS
 CORS(app)
@@ -121,8 +131,7 @@ try:
         RuckSessionResumeResource,
         RuckSessionCompleteResource,
         RuckSessionLocationResource,
-        RuckSessionDetailResource,
-        RuckSessionReviewResource
+        # RuckSessionDetailResource # Commented out - not found in api.ruck.py
     )
     
     from api.auth import (
@@ -133,30 +142,40 @@ try:
         UserProfileResource
     )
     
-    # Auth endpoints - maintain both old and new paths for compatibility
-    api.add_resource(SignUpResource, '/api/auth/signup', '/auth/signup', '/api/users/register', '/users/register')
-    api.add_resource(SignInResource, '/api/auth/signin', '/auth/signin', '/api/auth/login', '/auth/login')
-    api.add_resource(SignOutResource, '/api/auth/signout', '/auth/signout')
-    api.add_resource(RefreshTokenResource, '/api/auth/refresh', '/auth/refresh')
-    api.add_resource(UserProfileResource, '/api/auth/profile', '/auth/profile', '/api/users/profile', '/users/profile')
+    from api.stats import ( # Import new stats resources
+        WeeklyStatsResource,
+        MonthlyStatsResource,
+        YearlyStatsResource
+    )
     
-    # Ruck session endpoints
-    api.add_resource(RuckSessionListResource, '/api/rucks', '/rucks')
-    api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>', '/rucks/<string:ruck_id>')
-    api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start', '/rucks/<string:ruck_id>/start')
-    api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause', '/rucks/<string:ruck_id>/pause')
-    api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume', '/rucks/<string:ruck_id>/resume')
-    api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete', '/rucks/<string:ruck_id>/complete')
-    api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location', '/rucks/<string:ruck_id>/location')
-    api.add_resource(RuckSessionReviewResource, '/api/rucks/<string:ruck_id>/review', '/rucks/<string:ruck_id>/review')
-    api.add_resource(RuckSessionDetailResource, '/api/ruck-details/<string:session_id>', '/ruck-details/<string:session_id>')
+    # Auth endpoints (prefixed with /api)
+    api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
+    api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login') # Keep /api/auth/login
+    api.add_resource(SignOutResource, '/api/auth/signout')
+    api.add_resource(RefreshTokenResource, '/api/auth/refresh')
+    api.add_resource(UserProfileResource, '/api/users/profile') # Should be /api/users/profile
     
-    # Add route for homepage
+    # Ruck session endpoints (prefixed with /api)
+    api.add_resource(RuckSessionListResource, '/api/rucks')
+    api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
+    api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
+    api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
+    api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
+    api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete')
+    api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
+    # api.add_resource(RuckSessionDetailResource, '/api/ruck-details/<string:session_id>') # Commented out
+    
+    # Statistics endpoints (prefixed with /api)
+    api.add_resource(WeeklyStatsResource, '/api/statistics/weekly')
+    api.add_resource(MonthlyStatsResource, '/api/statistics/monthly')
+    api.add_resource(YearlyStatsResource, '/api/statistics/yearly')
+    
+    # Add route for homepage (remains unprefixed)
     @app.route('/')
     def index():
         return render_template('index.html')
     
-    # Add route for health check
+    # Add route for health check (remains unprefixed)
     @app.route('/health')
     def health():
         return jsonify({
@@ -170,5 +189,5 @@ except Exception as e:
     raise
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8000))
     app.run(host='0.0.0.0', port=port, debug=True)

@@ -1,8 +1,9 @@
-import logging
-from flask import request, jsonify, g
+from flask import request, g
 from flask_restful import Resource
-import datetime
-import os
+import uuid
+from datetime import datetime, timedelta
+import sys
+import logging
 
 from supabase_client import supabase
 
@@ -10,304 +11,222 @@ logger = logging.getLogger(__name__)
 
 class SignUpResource(Resource):
     def post(self):
-        """Register a new user with Supabase Auth"""
+        """Register a new user and create their profile"""
         try:
             data = request.get_json()
+            email = data.get('email')
+            password = data.get('password')
             
-            # Validate required fields
-            if not data.get('email') or not data.get('password'):
+            if not email or not password:
                 return {'message': 'Email and password are required'}, 400
                 
-            # Register user with Supabase Auth
-            response = supabase.auth.sign_up({
-                'email': data.get('email'),
-                'password': data.get('password'),
-                'options': {
-                    'data': {
-                        'full_name': data.get('name', ''),
-                        'display_name': data.get('display_name', data.get('name', '')),
-                        'username': data.get('username', '')
-                    }
-                }
+            # Create user in Supabase Auth
+            auth_response = supabase.auth.sign_up({
+                "email": email,
+                "password": password,
+                # Note: Supabase Auth sign_up doesn't take arbitrary options like name here
             })
             
-            # Create profile record in the profiles table
-            if response.user:
-                # Create a profile in the profiles table
+            if auth_response.user:
+                # Create profile in the public.profiles table
                 profile_data = {
-                    'id': response.user.id,
-                    'username': data.get('username', response.user.email.split('@')[0]),
-                    'display_name': data.get('display_name', data.get('name', '')),
-                    'full_name': data.get('name', ''),
-                    'avatar_url': '',
+                    'id': auth_response.user.id, # Link to auth.users
+                    'name': data.get('name'),
                     'weight_kg': data.get('weight_kg'),
-                    'prefer_metric': data.get('prefer_metric', False)
+                    'height_cm': data.get('height_cm'),
+                    'preferMetric': data.get('preferMetric', True) # Use plain key
                 }
+                # Clean data - remove None values before insert
+                profile_data_clean = {k: v for k, v in profile_data.items() if v is not None}
                 
-                try:
-                    # Now that we have the user, we can create the profile
-                    supabase.from_('profiles').insert(profile_data).execute()
-                except Exception as profile_error:
-                    logger.error(f"Error creating profile: {str(profile_error)}")
-                    # Continue with signup even if profile creation fails
+                logger.debug(f"Inserting into profiles: {profile_data_clean}")
+                profile_response = supabase.table('profiles').insert(profile_data_clean).execute()
                 
-                # Format response to match the expected format from the original API
-                user_dict = {
-                    'id': response.user.id,
-                    'email': response.user.email,
-                    'username': data.get('username', response.user.email.split('@')[0]),
-                    'display_name': data.get('display_name', data.get('name', '')),
-                    'weight_kg': data.get('weight_kg'),
-                    'prefer_metric': data.get('prefer_metric', False)
-                }
+                # Check for errors during profile insertion
+                if profile_response.data is None and hasattr(profile_response, 'error'):
+                     logger.error(f"Error inserting profile: {profile_response.error}")
+                     # Decide how to handle: maybe delete the auth user? Or just return error?
+                     # For now, return error and leave the auth user
+                     return {'message': f'User created in auth, but failed to create profile: {profile_response.error.message}'}, 500
                 
-                # Get the token
-                token = response.session.access_token if response.session else ""
+                # Convert user model to a JSON-serializable dictionary
+                user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else None
+                
+                # Optionally merge profile data into response if needed by client immediately
+                if user_response_data and profile_response.data:
+                    # Add profile fields to the user dict sent back
+                    # Be careful not to overwrite fields from auth like 'id', 'email', 'created_at'
+                    profile_details = profile_response.data[0]
+                    user_response_data['name'] = profile_details.get('name')
+                    user_response_data['weight_kg'] = profile_details.get('weight_kg')
+                    user_response_data['height_cm'] = profile_details.get('height_cm')
+                    user_response_data['preferMetric'] = profile_details.get('preferMetric')
                 
                 return {
-                    'token': token,
-                    'user': user_dict
+                    'message': 'User registered successfully',
+                    'token': auth_response.session.access_token if auth_response.session else None,
+                    'user': user_response_data
                 }, 201
-            
-            # Fallback to the original format
-            return {
-                'user': response.user.model_dump() if response.user else None,
-                'session': response.session.model_dump() if response.session else None
-            }, 201
+            else:
+                # Handle case where auth_response.user is None (e.g., email already exists)
+                error_message = "Failed to register user"
+                if hasattr(auth_response, 'error') and auth_response.error:
+                     error_message += f": {auth_response.error.message}"
+                elif hasattr(auth_response, 'message') and auth_response.message: # Sometimes error is in message
+                     error_message += f": {auth_response.message}"
+                logger.warning(error_message)
+                # Return 409 Conflict if email likely exists
+                status_code = 409 if "user already exists" in error_message.lower() else 400
+                return {'message': error_message}, status_code
+                
         except Exception as e:
-            logger.error(f"Error during signup: {str(e)}")
-            return {'message': f'Error during signup: {str(e)}', 'error_type': type(e).__name__}, 500
+            logger.error(f"Error during signup: {str(e)}", exc_info=True)
+            return {'message': f'Error during signup: {str(e)}'}, 500
 
 class SignInResource(Resource):
     def post(self):
-        """Sign in an existing user with Supabase Auth"""
+        """Sign in a user"""
+        print("--- SignInResource POST method entered ---", file=sys.stderr)
         try:
             data = request.get_json()
+            email = data.get('email')
+            password = data.get('password')
             
-            # Validate required fields
-            if not data.get('email') or not data.get('password'):
+            if not email or not password:
                 return {'message': 'Email and password are required'}, 400
                 
-            # Authenticate user with Supabase
-            response = supabase.auth.sign_in_with_password({
-                'email': data.get('email'),
-                'password': data.get('password')
+            # Sign in with Supabase
+            auth_response = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password,
             })
             
-            if response.user:
-                try:
-                    # Check if profile exists and create it if it doesn't
-                    profile_response = supabase.table('profiles').select('*').eq('id', response.user.id).execute()
-                    
-                    if not profile_response.data:
-                        # Profile doesn't exist, try to create it
-                        profile_data = {
-                            'id': response.user.id,
-                            'username': response.user.user_metadata.get('username', response.user.email.split('@')[0]),
-                            'full_name': response.user.user_metadata.get('full_name', ''),
-                            'avatar_url': response.user.user_metadata.get('avatar_url', '')
-                        }
-                        
-                        # Now that we're authenticated, we can create the profile
-                        supabase.table('profiles').insert(profile_data).execute()
-                        profile_response = supabase.table('profiles').select('*').eq('id', response.user.id).execute()
-                except Exception as profile_error:
-                    logger.error(f"Error checking/creating profile: {str(profile_error)}")
-                    # Continue with login even if profile creation fails
-                    profile_response = None
-                
-                # Get the user's metadata
-                user_metadata = response.user.user_metadata
-                display_name = user_metadata.get('display_name', '')
-                
-                # If no display_name in metadata, try to get it from the profile
-                if not display_name and profile_response and profile_response.data:
-                    display_name = profile_response.data[0].get('display_name', '')
-                
-                # Only as a last resort, use the email
-                if not display_name:
-                    display_name = response.user.email.split('@')[0]
-                
-                # Format response to match the expected format from the original API
-                user_dict = {
-                    'id': response.user.id,
-                    'email': response.user.email,
-                    'username': profile_response.data[0].get('username') if profile_response and profile_response.data else response.user.email.split('@')[0],
-                    'display_name': display_name,
-                    'weight_kg': profile_response.data[0].get('weight_kg') if profile_response and profile_response.data else None,
-                    'prefer_metric': profile_response.data[0].get('prefer_metric', False) if profile_response and profile_response.data else False
-                }
-                
-                # Get the token
-                token = response.session.access_token if response.session else ""
+            if auth_response.user:
+                # Convert user model to a JSON-serializable dictionary
+                user_data = auth_response.user.model_dump(mode='json')
+                logger.debug(f"Returning user data: {user_data}")
                 
                 return {
-                    'token': token,
-                    'user': user_dict
+                    'token': auth_response.session.access_token if auth_response.session else None,
+                    'refresh_token': auth_response.session.refresh_token if auth_response.session else None,
+                    'user': user_data
                 }, 200
-            
-            # Fallback to the original format
-            return {
-                'user': response.user.model_dump() if response.user else None,
-                'session': response.session.model_dump() if response.session else None
-            }, 200
+            else:
+                logger.warning("Sign in failed: Invalid credentials")
+                return {'message': 'Invalid credentials'}, 401
+                
         except Exception as e:
-            logger.error(f"Error during signin: {str(e)}")
-            return {'message': f'Error during signin: {str(e)}', 'error_type': type(e).__name__}, 401
+            logger.error(f"Error during signin: {str(e)}", exc_info=True)
+            return {'message': f'Error during signin: {str(e)}'}, 500
 
 class SignOutResource(Resource):
     def post(self):
-        """Sign out the current user"""
+        """Sign out a user"""
         try:
-            # The JWT is automatically used because it's in the auth header
+            # Sign out with Supabase
             supabase.auth.sign_out()
-            return {'message': 'Successfully signed out'}, 200
+            return {'message': 'User signed out successfully'}, 200
         except Exception as e:
-            logger.error(f"Error during signout: {str(e)}")
-            return {'message': f'Error during signout: {str(e)}', 'error_type': type(e).__name__}, 500
+            return {'message': f'Error during signout: {str(e)}'}, 500
 
 class RefreshTokenResource(Resource):
     def post(self):
-        """Refresh the authentication token"""
+        """Refresh an authentication token"""
         try:
-            # The refresh token is automatically used because it's in the auth header
-            response = supabase.auth.refresh_session()
+            data = request.get_json()
+            refresh_token = data.get('refresh_token')
             
-            return {
-                'token': response.session.access_token if response.session else None
-            }, 200
+            if not refresh_token:
+                return {'message': 'Refresh token is required'}, 400
+                
+            # Refresh token with Supabase
+            auth_response = supabase.auth.refresh_session(refresh_token)
+            
+            if auth_response.session:
+                # Convert user model to a JSON-serializable dictionary
+                user_data = auth_response.user.model_dump(mode='json') if auth_response.user else None
+                
+                return {
+                    'token': auth_response.session.access_token,
+                    'refresh_token': auth_response.session.refresh_token,
+                    'user': user_data
+                }, 200
+            else:
+                return {'message': 'Invalid refresh token'}, 401
+                
         except Exception as e:
-            logger.error(f"Error refreshing token: {str(e)}")
-            return {'message': f'Error refreshing token: {str(e)}', 'error_type': type(e).__name__}, 401
+            return {'message': f'Error refreshing token: {str(e)}'}, 500
 
 class UserProfileResource(Resource):
     def get(self):
-        """Get current user profile"""
+        """Get the current user's profile from the profiles table"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
                 
-            # Get profile data from the profiles table
-            profile_response = supabase.table('profiles').select('*').eq('id', g.user.id).single().execute()
-            
-            # Get the user's metadata
-            user_metadata = g.user.user_metadata or {}
-            display_name = user_metadata.get('display_name', '')
-            
-            # If no display_name in metadata, try to get it from the profile
-            if not display_name and profile_response and profile_response.data:
-                display_name = profile_response.data.get('display_name', '')
-            
-            # Only as a last resort, use the email
-            if not display_name:
-                display_name = g.user.email.split('@')[0]
-            
-            # Get ruck sessions for the user to calculate statistics
-            sessions_response = supabase.table('ruck_sessions').select('*').eq('user_id', g.user.id).execute()
-            
-            # Calculate statistics
-            total_rucks = len(sessions_response.data) if sessions_response.data else 0
-            total_distance_km = sum(session.get('distance_km', 0) for session in sessions_response.data) if sessions_response.data else 0
-            total_calories = sum(session.get('calories_burned', 0) for session in sessions_response.data) if sessions_response.data else 0
-            
-            # Calculate this month's statistics
-            now = datetime.datetime.now()
-            start_of_month = datetime.datetime(now.year, now.month, 1).isoformat()
-            
-            this_month_sessions = [
-                session for session in sessions_response.data
-                if session.get('created_at') and session.get('created_at') >= start_of_month
-            ] if sessions_response.data else []
-            
-            this_month_rucks = len(this_month_sessions)
-            this_month_distance = sum(session.get('distance_km', 0) for session in this_month_sessions)
-            this_month_calories = sum(session.get('calories_burned', 0) for session in this_month_sessions)
-            
-            # Format the response to match the expected format from the original API
-            user_dict = {
-                'id': g.user.id,
-                'email': g.user.email,
-                'username': profile_response.data.get('username') if profile_response.data else '',
-                'display_name': display_name,
-                'full_name': profile_response.data.get('full_name') if profile_response.data else '',
-                'avatar_url': profile_response.data.get('avatar_url') if profile_response.data else '',
-                'weight_kg': profile_response.data.get('weight_kg') if profile_response.data else None,
-                'height_cm': profile_response.data.get('height_cm') if profile_response.data else None,
-                'prefer_metric': profile_response.data.get('prefer_metric', False) if profile_response.data else False,
-                'stats': {
-                    'total_rucks': total_rucks,
-                    'total_distance_km': float(total_distance_km),
-                    'total_calories': total_calories,
-                    'this_month': {
-                        'rucks': this_month_rucks,
-                        'distance_km': float(this_month_distance),
-                        'calories': this_month_calories
-                    }
-                }
-            }
-            
-            return user_dict, 200
+            logger.debug(f"Fetching profile for user ID: {g.user.id}")
+            response = supabase.table('profiles') \
+                .select('*') \
+                .eq('id', g.user.id) \
+                .single() \
+                .execute()
+                
+            if response.data:
+                logger.debug(f"Profile data found: {response.data}")
+                return response.data, 200
+            else:
+                logger.warning(f"User profile not found in profiles table for ID: {g.user.id}")
+                # Check if maybe the auth user exists but profile wasn't created
+                return {'message': 'User profile not found'}, 404
+                
         except Exception as e:
-            logger.error(f"Error getting user profile: {str(e)}")
-            return {'message': f'Error getting user profile: {str(e)}', 'error_type': type(e).__name__}, 500
+            logger.error(f"Error retrieving user profile: {str(e)}", exc_info=True)
+            return {'message': f'Error retrieving user profile: {str(e)}'}, 500
             
     def put(self):
-        """Update current user profile"""
+        """Update the current user's profile in the profiles table"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
                 
             data = request.get_json()
-            
-            # Update profile data
+            if not data:
+                 return {'message': 'No update data provided'}, 400
+                 
             update_data = {
-                'username': data.get('username'),
-                'full_name': data.get('full_name'),
-                'display_name': data.get('display_name'),
-                'avatar_url': data.get('avatar_url'),
-                'weight_kg': data.get('weight_kg'),
-                'prefer_metric': data.get('prefer_metric')
+                # updated_at is handled by the trigger
             }
             
-            # Remove None values
-            update_data = {k: v for k, v in update_data.items() if v is not None}
+            # Add fields that can be updated
+            allowed_fields = ['name', 'weight_kg', 'height_cm', 'preferMetric']
+            for field in allowed_fields:
+                if field in data:
+                    update_data[field] = data[field]
             
-            # Update profile in database
-            response = supabase.table('profiles').update(update_data).eq('id', g.user.id).execute()
-            
-            # Try to update user metadata if display_name is provided
-            if 'display_name' in data and data['display_name'] is not None:
-                try:
-                    # Update user metadata in auth
-                    supabase.auth.admin.update_user_by_id(
-                        g.user.id,
-                        {'user_metadata': {'display_name': data['display_name']}}
-                    )
-                except Exception as metadata_error:
-                    logger.error(f"Error updating user metadata: {str(metadata_error)}")
-                    # Continue even if metadata update fails
-            
-            # Get the updated user's metadata
-            user_metadata = g.user.user_metadata or {}
-            display_name = data.get('display_name') or user_metadata.get('display_name', '')
-            
-            # If still no display_name, try to get it from the updated profile
-            if not display_name and response.data:
-                display_name = response.data[0].get('display_name', '')
-            
-            # Format the response to match the expected format from the original API
-            user_dict = {
-                'id': g.user.id,
-                'email': g.user.email,
-                'username': response.data[0].get('username') if response.data else data.get('username'),
-                'display_name': display_name,
-                'full_name': response.data[0].get('full_name') if response.data else data.get('full_name'),
-                'avatar_url': response.data[0].get('avatar_url') if response.data else data.get('avatar_url'),
-                'weight_kg': response.data[0].get('weight_kg') if response.data else data.get('weight_kg'),
-                'prefer_metric': response.data[0].get('prefer_metric', False) if response.data else data.get('prefer_metric', False)
-            }
-            
-            return user_dict, 200
+            if not update_data:
+                 return {'message': 'No valid fields provided for update'}, 400
+
+            logger.debug(f"Updating profile for user ID {g.user.id} with: {update_data}")
+            response = supabase.table('profiles') \
+                .update(update_data) \
+                .eq('id', g.user.id) \
+                .execute()
+                
+            if response.data:
+                logger.debug(f"Profile updated successfully: {response.data[0]}")
+                return response.data[0], 200
+            else:
+                # Check if the profile row actually existed
+                check_exists = supabase.table('profiles').select('id').eq('id', g.user.id).maybe_single().execute()
+                if check_exists.data is None:
+                     logger.warning(f"Attempted to update non-existent profile for ID: {g.user.id}")
+                     return {'message': 'User profile not found'}, 404
+                else:
+                     logger.error(f"Profile update failed for ID {g.user.id}, but row exists. Response: {getattr(response, 'error', 'Unknown error')}")
+                     error_detail = getattr(response, 'error', None)
+                     error_msg = error_detail.message if error_detail else 'Update failed'
+                     return {'message': f'Profile update failed: {error_msg}'}, 500
+                
         except Exception as e:
-            logger.error(f"Error updating user profile: {str(e)}")
-            return {'message': f'Error updating user profile: {str(e)}', 'error_type': type(e).__name__}, 500 
+            logger.error(f"Error updating user profile: {str(e)}", exc_info=True)
+            return {'message': f'Error updating user profile: {str(e)}'}, 500 

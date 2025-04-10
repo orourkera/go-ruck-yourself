@@ -158,7 +158,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   /// Creates and starts a new ruck session
   void _createSession() async {
     if (_formKey.currentState!.validate()) {
-      // First check if user is authenticated
       final authState = context.read<AuthBloc>().state;
       if (authState is! Authenticated) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -177,47 +176,72 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         return;
       }
       
-      try {
-        // Show loading indicator
-        setState(() {
-          _isCreating = true;
-        });
+      // Set loading state immediately
+      setState(() {
+        _isCreating = true;
+      });
 
+      String? ruckId;
+      try {
         // Convert weight to kg if user is using imperial units
         double ruckWeightKg = _preferMetric ? _ruckWeight : _ruckWeight / 2.20462;
 
-        // Prepare request data
-        Map<String, dynamic> requestData = {
-          'weight_kg': ruckWeightKg,
-          'notes': _notesController.text.isEmpty ? '' : _notesController.text,
+        // Prepare request data for creation
+        Map<String, dynamic> createRequestData = {
+          'ruck_weight_kg': ruckWeightKg,
+          'notes': _notesController.text.isEmpty ? null : _notesController.text, // Send null if empty
         };
         
-        // Add user's weight (now required)
+        // Add user's weight (required)
+        final userWeightRaw = _userWeightController.text;
+        if (userWeightRaw.isEmpty) {
+            throw Exception('User weight is required'); // Or handle validation earlier
+        }
         double userWeightKg = _preferMetric 
-            ? double.parse(_userWeightController.text) 
-            : double.parse(_userWeightController.text) / 2.20462; // Convert lbs to kg
-        requestData['user_weight_kg'] = userWeightKg;
+            ? double.parse(userWeightRaw) 
+            : double.parse(userWeightRaw) / 2.20462; // Convert lbs to kg
+        createRequestData['user_weight_kg'] = userWeightKg;
 
-        // Create session in the backend
+        // ---- Step 1: Create session in the backend ----
+        debugPrint('Creating session via POST /rucks...');
         final apiClient = GetIt.instance<ApiClient>();
-        final response = await apiClient.post('/rucks', requestData);
+        final createResponse = await apiClient.post('/rucks', createRequestData);
 
         if (!mounted) return;
         
-        // Check if response has session_id
-        if (response == null || !response.containsKey('session_id')) {
-          throw Exception('Invalid response from server, missing session_id');
+        // Check if response has the correct ID key
+        if (createResponse == null || createResponse['id'] == null) {
+          debugPrint('Invalid response from POST /rucks: $createResponse');
+          throw Exception('Invalid response from server when creating session');
         }
         
         // Extract ruck ID from response
-        final ruckId = response['session_id'].toString();
+        ruckId = createResponse['id'].toString();
+        debugPrint('Session created successfully with ID: $ruckId');
+
+        // ---- Step 2: Start the created session ----
+        final startEndpoint = '/rucks/$ruckId/start';
+        debugPrint('Starting session via POST $startEndpoint...');
+        final startResponse = await apiClient.post(startEndpoint, {}); // No body needed for start
         
-        // Navigate to active session screen
+        if (!mounted) return;
+        
+        // Minimal check for start response (can be more robust)
+        if (startResponse == null || !(startResponse is Map && startResponse.containsKey('message'))) {
+             debugPrint('Invalid response from POST $startEndpoint: $startResponse');
+             // Decide if we should throw or just log a warning
+             // throw Exception('Failed to confirm session start on server.');
+             print("Warning: Could not confirm session start on server, but proceeding.");
+        }
+        
+        debugPrint('Session started successfully on backend.');
+        
+        // ---- Step 3: Navigate to active session screen ----
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => ActiveSessionScreen(
-              ruckId: ruckId,
+              ruckId: ruckId!, // Now we know ruckId is not null here
               ruckWeight: _ruckWeight,
               userWeight: double.parse(_userWeightController.text),
               plannedDuration: _durationController.text.isEmpty ? 
@@ -227,19 +251,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           ),
         );
       } catch (e) {
-        // Show error message
+        debugPrint('Error during session creation/start: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to create session: $e'),
+              content: Text('Failed to create/start session: $e'),
               backgroundColor: AppColors.error,
             ),
           );
+          // Only set creating to false on error, success leads to navigation
           setState(() {
             _isCreating = false;
           });
         }
-      }
+      } 
     }
   }
 
