@@ -204,13 +204,19 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                     itemBuilder: (context, index) {
                       final session = _sessions[index];
                       
+                      // Ensure session is a Map
+                      if (session is! Map<String, dynamic>) {
+                        debugPrint('Skipping invalid session data: $session');
+                        return const SizedBox.shrink(); // Skip non-map items
+                      }
+                      
                       // Format date
-                      final dateString = session['created_at'] ?? '';
+                      final dateString = session['created_at'] as String? ?? '';
                       final date = DateTime.tryParse(dateString) ?? DateTime.now();
                       final formattedDate = DateFormat('MMMM d, yyyy • h:mm a').format(date);
                       
-                      // Get duration
-                      final durationSecs = session['duration_seconds'] ?? 0;
+                      // Get duration directly from session map
+                      final durationSecs = session['duration_seconds'] as int? ?? 0;
                       final duration = Duration(seconds: durationSecs);
                       final hours = duration.inHours;
                       final minutes = duration.inMinutes % 60;
@@ -218,12 +224,18 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                           ? '${hours}h ${minutes}m' 
                           : '${minutes}m';
                       
-                      // Get distance
-                      final distanceKm = session['distance_km'] ?? 0.0;
+                      // Get distance directly from session map
+                      final distanceKm = session['distance_km'] as double? ?? 0.0;
                       final distanceValue = preferMetric 
                           ? distanceKm.toStringAsFixed(2) 
                           : (distanceKm * 0.621371).toStringAsFixed(2);
                       final distanceUnit = preferMetric ? 'km' : 'mi';
+                      
+                      // Get calories directly from session map
+                      final calories = session['calories_burned']?.toString() ?? '0';
+                      
+                      // Get weight directly from session map
+                      final weight = session['ruck_weight_kg'] ?? 0;
                       
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -273,14 +285,14 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                                       child: _buildSessionStat(
                                         Icons.local_fire_department,
                                         'Calories',
-                                        '${session['calories_burned'] ?? 0}',
+                                        calories,
                                       ),
                                     ),
                                     Expanded(
                                       child: _buildSessionStat(
                                         Icons.fitness_center,
                                         'Weight',
-                                        '${session['ruck_weight_kg'] ?? 0} kg',
+                                        '$weight kg',
                                       ),
                                     ),
                                   ],

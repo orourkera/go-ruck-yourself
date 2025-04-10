@@ -19,6 +19,7 @@ class SessionCompleteScreen extends StatefulWidget {
   final double elevationGain;
   final double elevationLoss;
   final double ruckWeight;
+  final String? initialNotes;
 
   const SessionCompleteScreen({
     Key? key,
@@ -29,6 +30,7 @@ class SessionCompleteScreen extends StatefulWidget {
     required this.elevationGain,
     required this.elevationLoss,
     required this.ruckWeight,
+    this.initialNotes,
   }) : super(key: key);
 
   @override
@@ -62,8 +64,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // Initialize API client
     _apiClient = GetIt.instance<ApiClient>();
     
+    // Initialize notes controller with initial notes if provided
+    _notesController.text = widget.initialNotes ?? '';
+    
     // Populate stats
-    _populateStats();
+    // _populateStats(); // This method was empty anyway
   }
   
   /// Format duration as HH:MM:SS
@@ -98,30 +103,42 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     });
   }
   
-  /// Save session details to the backend and navigate to home
+  /// Saves the session review/notes and navigates home
   void _saveAndContinue() {
     setState(() {
       _isSaving = true;
     });
     
+    // Prepare data for the /complete endpoint
+    // Currently, only 'notes' is explicitly handled by the backend
+    final Map<String, dynamic> completionData = {
+      'notes': _notesController.text, 
+      // Add other data if the backend is updated to handle them:
+      // 'final_rating': _rating, 
+      // 'final_perceived_exertion': _perceivedExertion,
+      // 'final_tags': _selectedTags,
+    };
+
     // Use then/catchError instead of async/await
-    _apiClient.post('/rucks/${widget.ruckId}/review', {
-      'rating': _rating,
-      'perceived_exertion': _perceivedExertion,
-      'notes': _notesController.text,
-      'tags': _selectedTags,
-    }).then((_) {
-      if (mounted) {
-        // Navigate to home screen and clear the stack
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
-      }
+    _apiClient.post('/rucks/${widget.ruckId}/complete', completionData)
+      .then((response) {
+        // Log success or response details if needed
+        debugPrint("Session completed successfully: $response");
+        if (mounted) {
+          // Navigate to home screen and clear the stack
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+          );
+        }
     }).catchError((e) {
+      debugPrint("Error completing session: $e"); // Log the error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save session: $e')),
+          SnackBar(
+            content: Text('Failed to complete session: $e'),
+            backgroundColor: AppColors.error, // Use error color
+          ),
         );
         setState(() {
           _isSaving = false;

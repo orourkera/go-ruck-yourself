@@ -1,7 +1,7 @@
 /// Application configuration constants
 class AppConfig {
   // API configuration
-  static const String apiBaseUrl = 'https://api.ruckingapp.com/v1';
+  static const String apiBaseUrl = 'http://localhost:8000';
   static const int apiTimeout = 30; // seconds
   
   // App information

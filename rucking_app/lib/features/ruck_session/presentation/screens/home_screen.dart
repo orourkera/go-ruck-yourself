@@ -82,77 +82,86 @@ class _HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<_HomeTab> {
-  // Add API client and state variables
   late final ApiClient _apiClient;
   bool _isLoading = true;
   List<dynamic> _recentSessions = [];
+  Map<String, dynamic> _monthlySummaryStats = {};
   
   @override
   void initState() {
     super.initState();
     _apiClient = GetIt.instance<ApiClient>();
-    _fetchRecentSessions();
+    _fetchData();
   }
   
-  /// Fetches recent sessions from the API
-  Future<void> _fetchRecentSessions() async {
+  /// Fetches both recent sessions and monthly stats
+  Future<void> _fetchData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
     try {
+      // Fetch recent sessions
       debugPrint('Fetching recent sessions from /rucks?limit=3');
-      final response = await _apiClient.get('/rucks?limit=3');
-      
-      debugPrint('Response type: ${response.runtimeType}');
-      if (response is Map) {
-        debugPrint('Response keys: ${response.keys.toList()}');
+      final sessionsResponse = await _apiClient.get('/rucks?limit=3');
+      List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
+
+      // Fetch monthly stats
+      debugPrint('Fetching monthly stats from /statistics/monthly');
+      final statsResponse = await _apiClient.get('/statistics/monthly');
+      Map<String, dynamic> processedStats = {};
+      if (statsResponse is Map && statsResponse.containsKey('data') && statsResponse['data'] is Map) {
+          processedStats = statsResponse['data'] as Map<String, dynamic>;
+          debugPrint('Monthly stats fetched: $processedStats');
+      } else {
+          debugPrint('Unexpected monthly stats format: $statsResponse');
       }
-      
-      List<dynamic> processedSessions = [];
-      
-      if (response == null) {
-        debugPrint('Response is null');
-        processedSessions = [];
-      } else if (response is List) {
-        debugPrint('Response is a List with ${response.length} items');
-        processedSessions = response;
-      } else if (response is Map && response.containsKey('data') && response['data'] is List) {
-        debugPrint('Response is a Map with "data" key containing a List of ${(response['data'] as List).length} items');
-        processedSessions = response['data'] as List;
-      } else if (response is Map && response.containsKey('sessions') && response['sessions'] is List) {
-        debugPrint('Response is a Map with "sessions" key containing a List of ${(response['sessions'] as List).length} items');
-        processedSessions = response['sessions'] as List;
-      } else if (response is Map && response.containsKey('items') && response['items'] is List) {
-        debugPrint('Response is a Map with "items" key containing a List of ${(response['items'] as List).length} items');
-        processedSessions = response['items'] as List;
-      } else if (response is Map && response.containsKey('results') && response['results'] is List) {
-        debugPrint('Response is a Map with "results" key containing a List of ${(response['results'] as List).length} items');
-        processedSessions = response['results'] as List;
-      } else if (response is Map) {
-        // Last resort: check for the first key that contains a List
+
+      if (mounted) {
+        setState(() {
+          _recentSessions = processedSessions;
+          _monthlySummaryStats = processedStats;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching home screen data: $e');
+      if (mounted) {
+        setState(() {
+          _recentSessions = [];
+          _monthlySummaryStats = {};
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Helper function to process session response
+  List<dynamic> _processSessionResponse(dynamic response) {
+    List<dynamic> processedSessions = [];
+    if (response == null) {
+      debugPrint('Session response is null');
+    } else if (response is List) {
+      processedSessions = response;
+    } else if (response is Map && response.containsKey('data') && response['data'] is List) {
+      processedSessions = response['data'] as List;
+    } else if (response is Map && response.containsKey('sessions') && response['sessions'] is List) {
+      processedSessions = response['sessions'] as List;
+    } else if (response is Map && response.containsKey('items') && response['items'] is List) {
+      processedSessions = response['items'] as List;
+    } else if (response is Map && response.containsKey('results') && response['results'] is List) {
+      processedSessions = response['results'] as List;
+    } else if (response is Map) { 
         for (var key in response.keys) {
           if (response[key] is List) {
-            debugPrint('Found List under key "$key" with ${(response[key] as List).length} items');
             processedSessions = response[key] as List;
             break;
           }
         }
-        
-        if (processedSessions.isEmpty) {
-          debugPrint('Unexpected response format: $response');
-        }
-      } else {
-        debugPrint('Unknown response type: ${response.runtimeType}');
-      }
-      
-      setState(() {
-        _recentSessions = processedSessions;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error fetching recent sessions: $e');
-      setState(() {
-        _recentSessions = [];
-        _isLoading = false;
-      });
-    }
+     }
+     
+    debugPrint('Processed ${processedSessions.length} sessions');
+    return processedSessions;
   }
   
   @override
@@ -160,7 +169,6 @@ class _HomeTabState extends State<_HomeTab> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Unauthenticated) {
-          // Navigate to login screen if logged out
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
           );
@@ -176,13 +184,29 @@ class _HomeTabState extends State<_HomeTab> {
                 // Header with user greeting
                 BlocBuilder<AuthBloc, AuthState>(
                   builder: (context, state) {
-                    String userName = 'Rucker';
+                    String userName = 'Rucker'; // Default
                     if (state is Authenticated) {
+                      // --- Add Logging ---
+                      debugPrint('HomeTab: AuthState is Authenticated. User data: ${state.user.toJson()}');
+                      // --- End Logging ---
+                      
                       // Use the display name from user model
                       if (state.user.displayName.isNotEmpty) {
                         userName = state.user.displayName.split(' ')[0];
+                      } else if (state.user.name.isNotEmpty) { // Fallback to name
+                         userName = state.user.name.split(' ')[0];
+                      } else { // Fallback if both are empty
+                         userName = 'Rucker'; // Or maybe state.user.email?
                       }
+                    } else {
+                       // --- Add Logging ---
+                       debugPrint('HomeTab: AuthState is NOT Authenticated ($state)');
+                       // --- End Logging ---
                     }
+                    
+                    // --- Add Logging ---
+                    debugPrint('HomeTab: Setting userName to: $userName');
+                    // --- End Logging ---
                     
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,62 +230,62 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
                 const SizedBox(height: 32),
                 
-                // Quick stats section
-                BlocBuilder<AuthBloc, AuthState>(
-                  builder: (context, state) {
-                    // Extract month stats from user data if available
-                    String rucks = '0';
-                    String distance = '0.0';
-                    String calories = '0';
-                    
-                    if (state is Authenticated && state.user.stats?.thisMonth != null) {
-                      final monthStats = state.user.stats!.thisMonth!;
-                      rucks = monthStats.rucks.toString();
-                      distance = state.user.preferMetric 
-                          ? '${monthStats.distanceKm.toStringAsFixed(1)} km'
-                          : '${(monthStats.distanceKm * 0.621371).toStringAsFixed(1)} mi';
-                      calories = monthStats.calories.toString();
-                    }
-                    
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: AppColors.primaryGradient,
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                // Quick stats section (USE _monthlySummaryStats)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: AppColors.primaryGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _monthlySummaryStats['date_range'] ?? 'This Month',
+                        style: AppTextStyles.subtitle1.copyWith(
+                          color: Colors.white.withOpacity(0.8),
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'This Month',
-                            style: AppTextStyles.subtitle1.copyWith(
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _buildStatItem('Rucks', rucks, Icons.directions_walk),
-                              _buildStatItem('Distance', distance, Icons.straighten),
-                              _buildStatItem('Calories', calories, Icons.local_fire_department),
-                            ],
-                          ),
-                        ],
+                      const SizedBox(height: 16),
+                      Builder( // Use Builder to get context with AuthBloc state
+                         builder: (innerContext) {
+                           bool preferMetric = true;
+                           final authState = innerContext.read<AuthBloc>().state;
+                           if (authState is Authenticated) {
+                             preferMetric = authState.user.preferMetric;
+                           }
+                           
+                           // Use data from _monthlySummaryStats
+                           final rucks = _monthlySummaryStats['total_sessions']?.toString() ?? '0';
+                           final distanceKm = (_monthlySummaryStats['total_distance_km'] ?? 0.0).toDouble();
+                           final distance = preferMetric 
+                               ? '${distanceKm.toStringAsFixed(1)} km'
+                               : '${(distanceKm * 0.621371).toStringAsFixed(1)} mi';
+                           final calories = _monthlySummaryStats['total_calories']?.toString() ?? '0';
+                            
+                           return Row(
+                             mainAxisAlignment: MainAxisAlignment.spaceAround,
+                             children: [
+                               _buildStatItem('Rucks', rucks, Icons.directions_walk),
+                               _buildStatItem('Distance', distance, Icons.straighten),
+                               _buildStatItem('Calories', calories, Icons.local_fire_department),
+                             ],
+                           );
+                         }
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 32),
                 
@@ -350,13 +374,19 @@ class _HomeTabState extends State<_HomeTab> {
                       itemBuilder: (context, index) {
                         final session = _recentSessions[index];
                         
+                        // Ensure session is a Map
+                        if (session is! Map<String, dynamic>) {
+                          debugPrint('Skipping invalid session data: $session');
+                          return const SizedBox.shrink(); // Skip non-map items
+                        }
+                        
                         // Get session date
-                        final dateString = session['created_at'] ?? '';
+                        final dateString = session['created_at'] as String? ?? '';
                         final date = DateTime.tryParse(dateString) ?? DateTime.now();
                         final formattedDate = DateFormat('MMM d, yyyy').format(date);
                         
-                        // Get session duration
-                        final durationSecs = session['duration_seconds'] ?? 0;
+                        // Get session duration directly from session map
+                        final durationSecs = session['duration_seconds'] as int? ?? 0;
                         final duration = Duration(seconds: durationSecs);
                         final hours = duration.inHours;
                         final minutes = duration.inMinutes % 60;
@@ -364,8 +394,8 @@ class _HomeTabState extends State<_HomeTab> {
                             ? '${hours}h ${minutes}m' 
                             : '${minutes}m';
                         
-                        // Get distance based on user preference
-                        final distanceKm = session['distance_km'] ?? 0.0;
+                        // Get distance directly from session map based on user preference
+                        final distanceKm = session['distance_km'] as double? ?? 0.0;
                         bool preferMetric = true;
                         final authState = context.read<AuthBloc>().state;
                         if (authState is Authenticated) {
@@ -376,6 +406,9 @@ class _HomeTabState extends State<_HomeTab> {
                             ? distanceKm.toStringAsFixed(1) 
                             : (distanceKm * 0.621371).toStringAsFixed(1);
                         final distanceUnit = preferMetric ? 'km' : 'mi';
+                        
+                        // Get calories directly from session map
+                        final calories = session['calories_burned']?.toString() ?? '0';
                         
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -420,7 +453,7 @@ class _HomeTabState extends State<_HomeTab> {
                                       const SizedBox(width: 16),
                                       _buildSessionStat(
                                         Icons.local_fire_department, 
-                                        '${session['calories_burned']?.toString() ?? '0'} cal'
+                                        '$calories cal'
                                       ),
                                     ],
                                   ),
