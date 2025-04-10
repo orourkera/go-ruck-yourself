@@ -8,13 +8,15 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 
-/// Screen for editing user profile
+/// Screen for editing user profile information
 class EditProfileScreen extends StatefulWidget {
   final User user;
+  final bool preferMetric;
 
   const EditProfileScreen({
     Key? key,
     required this.user,
+    required this.preferMetric,
   }) : super(key: key);
 
   @override
@@ -26,18 +28,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _weightController;
   late TextEditingController _heightController;
-  bool _saving = false;
+  bool _isLoading = false;
+
+  // Constants for conversion
+  static const double kgToLbs = 2.20462;
+  static const double cmToInches = 0.393701;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.user.name);
-    _weightController = TextEditingController(
-      text: widget.user.weightKg?.toString() ?? '',
-    );
-    _heightController = TextEditingController(
-      text: widget.user.heightCm?.toString() ?? '',
-    );
+    
+    // Initialize weight controller with display value
+    double displayWeight = 0;
+    if (widget.user.weightKg != null) {
+        displayWeight = widget.preferMetric 
+            ? widget.user.weightKg! 
+            : widget.user.weightKg! * kgToLbs;
+    }
+    _weightController = TextEditingController(text: displayWeight > 0 ? displayWeight.toStringAsFixed(1) : '');
+
+    // Initialize height controller with display value
+    double displayHeight = 0;
+     if (widget.user.heightCm != null) {
+        displayHeight = widget.preferMetric 
+            ? widget.user.heightCm! 
+            : widget.user.heightCm! * cmToInches;
+     }
+    _heightController = TextEditingController(text: displayHeight > 0 ? displayHeight.toStringAsFixed(1) : '');
   }
 
   @override
@@ -48,192 +66,163 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  /// Saves the user profile changes
   void _saveProfile() {
     if (_formKey.currentState!.validate()) {
       setState(() {
-        _saving = true;
+        _isLoading = true;
       });
 
-      double? weight = _weightController.text.isEmpty
-          ? null
-          : double.parse(_weightController.text);
-          
-      double? height = _heightController.text.isEmpty
-          ? null
-          : double.parse(_heightController.text);
+      // Prepare data, converting back to metric if needed
+      double? weightKg;
+      if (_weightController.text.isNotEmpty) {
+          final weightVal = double.tryParse(_weightController.text);
+          if (weightVal != null) {
+              weightKg = widget.preferMetric ? weightVal : weightVal / kgToLbs;
+          }
+      }
 
+      double? heightCm;
+      if (_heightController.text.isNotEmpty) {
+          final heightVal = double.tryParse(_heightController.text);
+           if (heightVal != null) {
+              heightCm = widget.preferMetric ? heightVal : heightVal / cmToInches;
+           }
+      }
+      
       context.read<AuthBloc>().add(
-        AuthProfileUpdateRequested(
-          name: _nameController.text.trim(),
-          weightKg: weight,
-          heightCm: height,
-        ),
-      );
+            AuthProfileUpdateRequested(
+              name: _nameController.text,
+              weightKg: weightKg,
+              heightCm: heightCm,
+              // preferMetric is handled on the ProfileScreen itself
+            ),
+          );
+
+      // Listen for state changes to pop or show error
+      // Using BlocListener might be cleaner here if not already wrapping the screen
+      final streamSub = context.read<AuthBloc>().stream.listen((state) {
+         if (state is Authenticated) {
+            if (mounted) {
+               Navigator.pop(context); // Pop on success
+            }
+         } else if (state is AuthError) {
+             if (mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 SnackBar(content: Text("Update failed: ${state.message}"), backgroundColor: AppColors.error),
+               );
+               setState(() {
+                 _isLoading = false; // Re-enable button on error
+               });
+            }
+         } 
+      });
+      // Cancel subscription after a delay or on dispose to avoid memory leaks
+      // This part is simplified, real implementation might need more robust handling
+       Future.delayed(Duration(seconds: 5), () => streamSub.cancel());
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final weightUnit = widget.preferMetric ? 'kg' : 'lbs';
+    final heightUnit = widget.preferMetric ? 'cm' : 'inches'; // Use inches for imperial height
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
         centerTitle: true,
       ),
-      body: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is Authenticated) {
-            // Update successful, pop screen
-            Navigator.pop(context);
-          } else if (state is AuthError) {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // Removed profile picture circle avatar placeholder
+              const SizedBox(height: 20),
+              CustomTextField(
+                controller: _nameController,
+                label: 'Full Name',
+                hint: 'Enter your full name',
+                prefixIcon: Icons.person_outline,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your name';
+                  }
+                  return null;
+                },
               ),
-            );
-            setState(() {
-              _saving = false;
-            });
-          }
-        },
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile avatar
-                Center(
-                  child: CircleAvatar(
-                    radius: 60,
-                    backgroundColor: AppColors.primary,
-                    child: Text(
-                      _getInitials(widget.user.name),
-                      style: AppTextStyles.headline4.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                
-                // Name field
-                CustomTextField(
-                  controller: _nameController,
-                  label: 'Full Name',
-                  hint: 'Enter your name',
-                  prefixIcon: Icons.person_outline,
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                
-                // Weight field
-                CustomTextField(
-                  controller: _weightController,
-                  label: 'Weight (kg) - Optional',
-                  hint: 'Enter your weight',
-                  keyboardType: TextInputType.number,
-                  prefixIcon: Icons.monitor_weight_outlined,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                  ],
-                  validator: (value) {
+              const SizedBox(height: 20),
+              CustomTextField(
+                controller: _weightController,
+                label: 'Weight ($weightUnit) - Optional',
+                hint: 'Enter your weight',
+                prefixIcon: Icons.monitor_weight_outlined,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                ],
+                validator: (value) {
                     if (value != null && value.isNotEmpty) {
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      if (double.parse(value) <= 0) {
-                        return 'Weight must be greater than 0';
-                      }
+                        final number = double.tryParse(value);
+                        if (number == null) {
+                           return 'Please enter a valid number';
+                        }
+                        if (number <= 0) {
+                           return 'Weight must be positive';
+                        }
                     }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                
-                // Height field
-                CustomTextField(
-                  controller: _heightController,
-                  label: 'Height (cm) - Optional',
-                  hint: 'Enter your height',
-                  keyboardType: TextInputType.number,
-                  prefixIcon: Icons.height_outlined,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                  ],
-                  validator: (value) {
+                   return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              CustomTextField(
+                controller: _heightController,
+                label: 'Height ($heightUnit) - Optional',
+                hint: 'Enter your height',
+                prefixIcon: Icons.height_outlined,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                ],
+                 validator: (value) {
                     if (value != null && value.isNotEmpty) {
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      if (double.parse(value) <= 0) {
-                        return 'Height must be greater than 0';
-                      }
+                        final number = double.tryParse(value);
+                        if (number == null) {
+                           return 'Please enter a valid number';
+                        }
+                        if (number <= 0) {
+                           return 'Height must be positive';
+                        }
                     }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 32),
-                
-                // Helper text
-                Text(
-                  'Weight and height information help calculate calories burned during your rucking sessions more accurately.',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textDarkSecondary,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                
-                // Save button
-                CustomButton(
-                  text: 'Save Changes',
-                  isLoading: _saving,
-                  onPressed: _saveProfile,
-                ),
-                const SizedBox(height: 16),
-                
-                // Cancel button
-                Center(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      'Cancel',
-                      style: AppTextStyles.button.copyWith(
-                        color: AppColors.textDarkSecondary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                   return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Weight and height information help calculate calories burned during your rucking sessions more accurately.',
+                style: AppTextStyles.caption.copyWith(color: AppColors.textDarkSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              CustomButton(
+                text: 'Save Profile',
+                onPressed: _saveProfile,
+                isLoading: _isLoading,
+                icon: Icons.save_outlined,
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                    'Cancel',
+                     style: AppTextStyles.button.copyWith(color: AppColors.textDarkSecondary),
+                 ),
+              ),
+            ],
           ),
         ),
       ),
     );
-  }
-
-  /// Gets the initials from a name
-  String _getInitials(String name) {
-    List<String> nameParts = name.split(' ');
-    String initials = '';
-    
-    if (nameParts.length > 1) {
-      initials = nameParts[0][0] + nameParts[1][0];
-    } else if (nameParts.isNotEmpty) {
-      initials = nameParts[0][0];
-    }
-    
-    return initials.toUpperCase();
   }
 } 

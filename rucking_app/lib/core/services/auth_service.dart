@@ -37,6 +37,7 @@ abstract class AuthService {
     String? name,
     double? weightKg,
     double? heightCm,
+    bool? preferMetric,
   });
 }
 
@@ -49,7 +50,6 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User> signIn(String email, String password) async {
-    debugPrint('AuthService: Attempting signIn for $email');
     try {
       final response = await _apiClient.post(
         '/auth/login',
@@ -58,8 +58,6 @@ class AuthServiceImpl implements AuthService {
           'password': password,
         },
       );
-      
-      debugPrint('AuthService: Received signIn response: $response');
       
       final token = response['token'] as String;
       final userData = response['user'] as Map<String, dynamic>;
@@ -88,7 +86,6 @@ class AuthServiceImpl implements AuthService {
     double? heightCm,
     String? dateOfBirth,
   }) async {
-    debugPrint('AuthService: Attempting register for $email');
     try {
       final response = await _apiClient.post(
         '/users/register',
@@ -134,54 +131,45 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User?> getCurrentUser() async {
-    debugPrint('AuthService: Attempting getCurrentUser');
+    User? userToReturn;
+    String? userId = await _storageService.getString(AppConfig.userIdKey);
+    String? userEmail; // We need the email, maybe get from storage if stored?
+                     // Or rely on the fact that AuthBloc holds the user with email?
+                     // Let's assume for now we reconstruct using profile + stored ID/Email
+                     
+    // Ideally, fetch email stored securely during login if available
+    // For simplicity now, we'll assume ID is enough to link
+    if (userId == null) {
+        await signOut(); // If no ID, sign out
+        return null;
+    }
+
     try {
-      // Check if we have a stored user first (can be stale)
-      final storedUserData = await _storageService.getObject(AppConfig.userProfileKey);
-      User? storedUser = storedUserData != null ? User.fromJson(storedUserData) : null;
-      debugPrint('AuthService: Found stored user data?: ${storedUser != null}');
+      // Get profile data from API using userId
+      final profileResponse = await _apiClient.get('/users/profile'); // This uses g.user.id on backend
       
-      // Get fresh user data from API
-      debugPrint('AuthService: Calling GET /users/profile');
-      final response = await _apiClient.get('/users/profile');
+      final userFromProfile = User.fromJson(profileResponse);
       
-      // --- Add Logging --- 
-      debugPrint('AuthService: Received profile response: $response');
-      if (response is! Map<String, dynamic>) {
-          debugPrint('AuthService: Error - Profile response is not a Map!');
-          // Return stored user or null if fetch failed badly
-          return storedUser; 
-      }
-      // --- End Logging ---
+      // Update stored user data (might overwrite email if missing from profile)
+      await _storageService.setObject(AppConfig.userProfileKey, userFromProfile.toJson());
+      userToReturn = userFromProfile;
       
-      final user = User.fromJson(response);
-      debugPrint('AuthService: Parsed fresh User from profile: ${user.toJson()}');
-      
-      // Update stored user data
-      await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
-      
-      return user;
     } catch (e) {
-      debugPrint('AuthService: getCurrentUser error: $e'); // Log error
       if (e is UnauthorizedException) {
         await signOut();
         return null;
       }
-      
-      // If there's a network error, return the stored user if available
+      // Fallback to stored user on network error
       final storedUserData = await _storageService.getObject(AppConfig.userProfileKey);
       if (storedUserData != null) {
-        debugPrint('AuthService: Returning stored user due to network error');
-        return User.fromJson(storedUserData);
+        userToReturn = User.fromJson(storedUserData);
       }
-      
-      return null;
     }
+    return userToReturn;
   }
   
   @override
   Future<bool> isAuthenticated() async {
-    debugPrint('AuthService: Checking isAuthenticated');
     // First check if we have a token stored
     final token = await _storageService.getSecureString(AppConfig.tokenKey);
     if (token == null) {
@@ -218,19 +206,28 @@ class AuthServiceImpl implements AuthService {
     String? name,
     double? weightKg,
     double? heightCm,
+    bool? preferMetric,
   }) async {
-    debugPrint('AuthService: Attempting updateProfile');
     try {
       final data = <String, dynamic>{};
       if (name != null) data['name'] = name;
       if (weightKg != null) data['weight_kg'] = weightKg;
       if (heightCm != null) data['height_cm'] = heightCm;
+      if (preferMetric != null) data['preferMetric'] = preferMetric;
       
+      // Only send request if there is data to update
+      if (data.isEmpty) {
+         final currentUser = await getCurrentUser(); // This might hit API again
+         if (currentUser != null) return currentUser;
+         throw ApiException('No profile data provided for update.');
+      }
+
       final response = await _apiClient.put(
-        '/users/profile',
+        '/users/profile', // No /api prefix needed here
         data,
       );
       
+      // The response from PUT likely contains the updated profile
       final user = User.fromJson(response);
       
       // Update stored user data

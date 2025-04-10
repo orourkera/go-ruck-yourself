@@ -46,25 +46,57 @@ class _HomeScreenState extends State<HomeScreen> {
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.grey,
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
+            icon: Image.asset(
+              'assets/images/home.png',
+              width: 48,
+              height: 48,
+            ),
+            activeIcon: Image.asset(
+              'assets/images/home_active.png',
+              width: 48,
+              height: 48,
+            ),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.history_outlined),
-            activeIcon: Icon(Icons.history),
+            icon: Image.asset(
+              'assets/images/history.png',
+              width: 48,
+              height: 48,
+            ),
+            activeIcon: Image.asset(
+              'assets/images/history_active.png',
+              width: 48,
+              height: 48,
+            ),
             label: 'History',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_outlined),
-            activeIcon: Icon(Icons.bar_chart),
+            icon: Image.asset(
+              'assets/images/stats.png',
+              width: 48,
+              height: 48,
+            ),
+            activeIcon: Image.asset(
+              'assets/images/stats_active.png',
+              width: 48,
+              height: 48,
+            ),
             label: 'Stats',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
+            icon: Image.asset(
+              'assets/images/profile.png',
+              width: 48,
+              height: 48,
+            ),
+            activeIcon: Image.asset(
+              'assets/images/profile_active.png',
+              width: 48,
+              height: 48,
+            ),
             label: 'Profile',
           ),
         ],
@@ -102,19 +134,19 @@ class _HomeTabState extends State<_HomeTab> {
     });
     try {
       // Fetch recent sessions
-      debugPrint('Fetching recent sessions from /rucks?limit=3');
+      // debugPrint('Fetching recent sessions from /rucks?limit=3');
       final sessionsResponse = await _apiClient.get('/rucks?limit=3');
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
 
       // Fetch monthly stats
-      debugPrint('Fetching monthly stats from /statistics/monthly');
+      // debugPrint('Fetching monthly stats from /statistics/monthly');
       final statsResponse = await _apiClient.get('/statistics/monthly');
       Map<String, dynamic> processedStats = {};
       if (statsResponse is Map && statsResponse.containsKey('data') && statsResponse['data'] is Map) {
           processedStats = statsResponse['data'] as Map<String, dynamic>;
-          debugPrint('Monthly stats fetched: $processedStats');
+          // debugPrint('Monthly stats fetched: $processedStats');
       } else {
-          debugPrint('Unexpected monthly stats format: $statsResponse');
+          // debugPrint('Unexpected monthly stats format: $statsResponse');
       }
 
       if (mounted) {
@@ -125,7 +157,7 @@ class _HomeTabState extends State<_HomeTab> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching home screen data: $e');
+      // debugPrint('Error fetching home screen data: $e');
       if (mounted) {
         setState(() {
           _recentSessions = [];
@@ -140,7 +172,7 @@ class _HomeTabState extends State<_HomeTab> {
   List<dynamic> _processSessionResponse(dynamic response) {
     List<dynamic> processedSessions = [];
     if (response == null) {
-      debugPrint('Session response is null');
+      // debugPrint('Session response is null');
     } else if (response is List) {
       processedSessions = response;
     } else if (response is Map && response.containsKey('data') && response['data'] is List) {
@@ -160,7 +192,7 @@ class _HomeTabState extends State<_HomeTab> {
         }
      }
      
-    debugPrint('Processed ${processedSessions.length} sessions');
+    // debugPrint('Processed ${processedSessions.length} sessions');
     return processedSessions;
   }
   
@@ -186,10 +218,7 @@ class _HomeTabState extends State<_HomeTab> {
                   builder: (context, state) {
                     String userName = 'Rucker'; // Default
                     if (state is Authenticated) {
-                      // --- Add Logging ---
-                      debugPrint('HomeTab: AuthState is Authenticated. User data: ${state.user.toJson()}');
-                      // --- End Logging ---
-                      
+                      // debugPrint('HomeTab: AuthState is Authenticated. User data: ${state.user.toJson()}');
                       // Use the display name from user model
                       if (state.user.displayName.isNotEmpty) {
                         userName = state.user.displayName.split(' ')[0];
@@ -199,14 +228,10 @@ class _HomeTabState extends State<_HomeTab> {
                          userName = 'Rucker'; // Or maybe state.user.email?
                       }
                     } else {
-                       // --- Add Logging ---
-                       debugPrint('HomeTab: AuthState is NOT Authenticated ($state)');
-                       // --- End Logging ---
+                       // debugPrint('HomeTab: AuthState is NOT Authenticated ($state)');
                     }
                     
-                    // --- Add Logging ---
-                    debugPrint('HomeTab: Setting userName to: $userName');
-                    // --- End Logging ---
+                    // debugPrint('HomeTab: Setting userName to: $userName');
                     
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +401,7 @@ class _HomeTabState extends State<_HomeTab> {
                         
                         // Ensure session is a Map
                         if (session is! Map<String, dynamic>) {
-                          debugPrint('Skipping invalid session data: $session');
+                          // debugPrint('Skipping invalid session data: $session');
                           return const SizedBox.shrink(); // Skip non-map items
                         }
                         

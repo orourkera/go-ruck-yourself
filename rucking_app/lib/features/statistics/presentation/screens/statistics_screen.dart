@@ -126,6 +126,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textDarkSecondary,
+          indicatorColor: AppColors.primary,
+          labelStyle: AppTextStyles.button.copyWith(fontWeight: FontWeight.bold),
+          unselectedLabelStyle: AppTextStyles.button,
           tabs: const [
             Tab(text: 'WEEKLY'),
             Tab(text: 'MONTHLY'),

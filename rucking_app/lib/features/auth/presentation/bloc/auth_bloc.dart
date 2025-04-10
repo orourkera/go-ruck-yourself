@@ -127,19 +127,34 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     // Keep current state while updating
     final currentState = state;
     if (currentState is Authenticated) {
-      emit(AuthLoading());
+      // Optionally show loading state, or update optimistically
+      // emit(AuthLoading()); 
       
       try {
-        final updatedUser = await _authRepository.updateProfile(
-          name: event.name,
-          weightKg: event.weightKg,
-          heightCm: event.heightCm,
-        );
-        
-        emit(Authenticated(updatedUser));
+        // Create a map of only the non-null fields to update
+        final Map<String, dynamic> updateData = {};
+        if (event.name != null) updateData['name'] = event.name;
+        if (event.weightKg != null) updateData['weight_kg'] = event.weightKg;
+        if (event.heightCm != null) updateData['height_cm'] = event.heightCm;
+        if (event.preferMetric != null) updateData['preferMetric'] = event.preferMetric;
+
+        // Only call update if there's something to update
+        if (updateData.isNotEmpty) {
+            final updatedUser = await _authRepository.updateProfile(
+              name: event.name,
+              weightKg: event.weightKg,
+              heightCm: event.heightCm,
+              preferMetric: event.preferMetric, // Pass preferMetric
+            );
+            
+            emit(Authenticated(updatedUser));
+        } else {
+             // No actual changes requested, revert to current state if loading was shown
+             emit(currentState);
+        }
       } catch (e) {
         emit(AuthError('Profile update failed: $e'));
-        // Revert to previous authenticated state
+        // Revert to previous authenticated state if loading was shown
         emit(currentState);
       }
     }

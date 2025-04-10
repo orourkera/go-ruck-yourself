@@ -33,5 +33,6 @@ abstract class AuthRepository {
     String? name,
     double? weightKg,
     double? heightCm,
+    bool? preferMetric,
   });
 } 

@@ -159,7 +159,7 @@ class RefreshTokenResource(Resource):
 
 class UserProfileResource(Resource):
     def get(self):
-        """Get the current user's profile from the profiles table"""
+        """Get the current user's profile from the profiles table AND include email"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
@@ -171,13 +171,26 @@ class UserProfileResource(Resource):
                 .single() \
                 .execute()
                 
+            profile_data = {}
             if response.data:
                 logger.debug(f"Profile data found: {response.data}")
-                return response.data, 200
+                profile_data = response.data
             else:
                 logger.warning(f"User profile not found in profiles table for ID: {g.user.id}")
-                # Check if maybe the auth user exists but profile wasn't created
-                return {'message': 'User profile not found'}, 404
+                # Still return basic info if profile row is missing
+
+            # Ensure essential auth info (like email) is present in the final response
+            # Even if the profile row was missing, we return the email associated with the token
+            if 'email' not in profile_data and hasattr(g.user, 'email') and g.user.email:
+                 profile_data['email'] = g.user.email
+                 
+            # Also ensure ID is present, using the authenticated user ID as definitive source
+            profile_data['id'] = g.user.id 
+
+            # Return the combined/ensured data
+            # If profile row was missing, this will primarily contain id and email
+            # If profile row existed, it contains profile data + potentially added email/id
+            return profile_data, 200
                 
         except Exception as e:
             logger.error(f"Error retrieving user profile: {str(e)}", exc_info=True)
@@ -193,16 +206,12 @@ class UserProfileResource(Resource):
             if not data:
                  return {'message': 'No update data provided'}, 400
                  
-            update_data = {
-                # updated_at is handled by the trigger
-            }
-            
-            # Add fields that can be updated
+            update_data = {}
             allowed_fields = ['name', 'weight_kg', 'height_cm', 'preferMetric']
             for field in allowed_fields:
                 if field in data:
                     update_data[field] = data[field]
-            
+                 
             if not update_data:
                  return {'message': 'No valid fields provided for update'}, 400
 
@@ -212,21 +221,38 @@ class UserProfileResource(Resource):
                 .eq('id', g.user.id) \
                 .execute()
                 
+            # Check if update was successful based on returned data
             if response.data:
                 logger.debug(f"Profile updated successfully: {response.data[0]}")
                 return response.data[0], 200
             else:
-                # Check if the profile row actually existed
-                check_exists = supabase.table('profiles').select('id').eq('id', g.user.id).maybe_single().execute()
-                if check_exists.data is None:
-                     logger.warning(f"Attempted to update non-existent profile for ID: {g.user.id}")
-                     return {'message': 'User profile not found'}, 404
+                # Update failed, figure out why
+                logger.warning(f"Profile update for user ID {g.user.id} returned no data. Checking if profile exists...")
+                
+                # Safely check if the profile row exists
+                profile_exists = False
+                try:
+                    check_exists_response = supabase.table('profiles').select('id', count='exact').eq('id', g.user.id).execute()
+                    if check_exists_response.count is not None and check_exists_response.count > 0:
+                        profile_exists = True
+                except Exception as check_err:
+                    logger.error(f"Error checking profile existence for user {g.user.id}: {check_err}")
+                    # Proceed assuming we don't know if it exists, report original failure
+                
+                if not profile_exists:
+                    logger.warning(f"Attempted to update non-existent profile for ID: {g.user.id}")
+                    return {'message': 'User profile not found to update'}, 404
                 else:
-                     logger.error(f"Profile update failed for ID {g.user.id}, but row exists. Response: {getattr(response, 'error', 'Unknown error')}")
-                     error_detail = getattr(response, 'error', None)
-                     error_msg = error_detail.message if error_detail else 'Update failed'
-                     return {'message': f'Profile update failed: {error_msg}'}, 500
+                    # Profile exists, but update failed. Report original error if possible.
+                    error_message = "Profile update failed for unknown reason."
+                    if hasattr(response, 'error') and response.error:
+                         error_message = f"Profile update failed: {getattr(response.error, 'message', str(response.error))}"
+                    elif hasattr(response, 'message') and response.message: # Sometimes error might be here
+                         error_message = f"Profile update failed: {response.message}"
+                         
+                    logger.error(f"Profile update failed for existing profile {g.user.id}. Detail: {error_message}")
+                    return {'message': error_message}, 500
                 
         except Exception as e:
-            logger.error(f"Error updating user profile: {str(e)}", exc_info=True)
+            logger.error(f"Unhandled exception updating user profile: {str(e)}", exc_info=True)
             return {'message': f'Error updating user profile: {str(e)}'}, 500 
