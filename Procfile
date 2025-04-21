@@ -1,0 +1,1 @@
+web: gunicorn rucking_app.app:app
