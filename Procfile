@@ -1,1 +1,1 @@
-web: gunicorn rucking_app.app:app
+web: gunicorn RuckTracker.app:app
