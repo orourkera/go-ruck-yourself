@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import sys
 import logging
 
-from supabase_client import supabase
+from ..supabase_client import supabase
 
 logger = logging.getLogger(__name__)
 
