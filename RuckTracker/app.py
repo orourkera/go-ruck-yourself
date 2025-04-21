@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import Supabase client
-from supabase_client import supabase
+from .supabase_client import supabase
 
 # Configure logging
 logging.basicConfig(
