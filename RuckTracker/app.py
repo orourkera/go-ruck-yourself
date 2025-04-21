@@ -123,7 +123,7 @@ def load_user():
 # Import and register API resources
 try:
     # Import API resources
-    from api.ruck import (
+    from .api.ruck import (
         RuckSessionListResource, 
         RuckSessionResource, 
         RuckSessionStartResource,
@@ -134,7 +134,7 @@ try:
         # RuckSessionDetailResource # Commented out - not found in api.ruck.py
     )
     
-    from api.auth import (
+    from .api.auth import (
         SignUpResource,
         SignInResource,
         SignOutResource,
@@ -142,7 +142,7 @@ try:
         UserProfileResource
     )
     
-    from api.stats import ( # Import new stats resources
+    from .api.stats import ( # Import new stats resources
         WeeklyStatsResource,
         MonthlyStatsResource,
         YearlyStatsResource
