@@ -3,7 +3,7 @@ from flask import g, jsonify
 from flask_restful import Resource
 from datetime import datetime, timedelta, timezone
 
-from supabase_client import supabase
+from ..supabase_client import supabase
 
 logger = logging.getLogger(__name__)
 
