@@ -10,4 +10,5 @@ marshmallow==3.20.2
 python-dotenv==1.0.1
 sqlalchemy==2.0.29
 supabase==2.15.0
-werkzeug==3.0.1 
+werkzeug==3.0.1
+vercel-wsgi

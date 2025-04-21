@@ -6,7 +6,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app
+from vercel_wsgi import handle
 
-def handler(request):
+def handler(request, context):
     """Handle incoming requests for Vercel serverless deployment"""
-    return app(request)
+    return handle(app, request, context)
