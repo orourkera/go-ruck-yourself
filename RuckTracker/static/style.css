@@ -64,12 +64,22 @@ body {
   gap: 36px;
   align-items: center;
 }
-.store-badge img {
-  height: 80px;
-  width: auto;
-  display: block;
-  object-fit: contain;
+.badge-container {
+  width: 320px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
+}
+.badge-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.store-badge {
+  display: block;
 }
 .download-btn, .download-btn:visited, .download-btn:active {
   background: #CC6A2A;
@@ -131,6 +141,10 @@ footer {
     flex-direction: column;
     align-items: center;
     gap: 18px;
+  }
+  .badge-container {
+    width: 200px;
+    height: 56px;
   }
   .store-badge img {
     height: 56px;
