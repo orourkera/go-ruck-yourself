@@ -7,6 +7,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
+import 'package:rucking_app/shared/utils/error_mapper.dart';
 
 /// Screen for registering new users
 class RegisterScreen extends StatefulWidget {
@@ -73,13 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   String _friendlyErrorMessage(String? error) {
-    if (error == null) return 'An unexpected error occurred.';
-    if (error.contains('500')) return 'Server error, please try again later.';
-    if (error.contains('401') || error.contains('403')) return 'You are not authorized. Please log in again.';
-    if (error.contains('404')) return 'Resource not found.';
-    if (error.contains('timeout')) return 'Network timeout. Please check your connection.';
-    if (error.toLowerCase().contains('network')) return 'Network error. Please check your connection.';
-    return error;
+    return mapFriendlyErrorMessage(error);
   }
 
   @override

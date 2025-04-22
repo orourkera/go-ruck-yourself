@@ -5,6 +5,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
+import 'package:rucking_app/shared/utils/error_mapper.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
@@ -40,16 +41,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         final data = jsonDecode(response.body);
         if (response.statusCode == 200) {
           setState(() {
-            _message = data['message'] ?? 'If an account exists for this email, a password reset link has been sent.';
+            _message = mapFriendlyErrorMessage(data['message'] ?? 'If an account exists for this email, a password reset link has been sent.');
           });
         } else {
           setState(() {
-            _message = data['message'] ?? 'Failed to send reset link.';
+            _message = mapFriendlyErrorMessage(data['message'] ?? 'Failed to send reset link.');
           });
         }
       } catch (e) {
         setState(() {
-          _message = 'Network error. Please try again.';
+          _message = mapFriendlyErrorMessage(e.toString());
         });
       } finally {
         setState(() {
@@ -79,10 +80,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
+                    return mapFriendlyErrorMessage('Please enter your email');
                   }
-                  if (!RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}\$').hasMatch(value)) {
-                    return 'Please enter a valid email';
+                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                    return mapFriendlyErrorMessage('Please enter a valid email');
                   }
                   return null;
                 },
