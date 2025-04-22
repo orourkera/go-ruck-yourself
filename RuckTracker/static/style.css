@@ -2,7 +2,7 @@ body {
   margin: 0;
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
   background: #728C69; /* App's green */
-  color: #CC6A2A; /* App's orange */
+  color: #F7F3E8; /* Tan for main text */
 }
 .container {
   display: flex;
@@ -42,7 +42,7 @@ body {
   letter-spacing: 2px;
 }
 .subtitle {
-  color: #CC6A2A;
+  color: #F7F3E8; /* Tan for subtitle */
   font-family: 'Inter', Arial, sans-serif;
   font-size: 1.3rem;
   margin-bottom: 36px;
@@ -55,14 +55,15 @@ body {
   gap: 18px;
 }
 .store-badge img {
-  height: 56px;
+  height: 72px;
   width: auto;
-  margin: 0 2px;
+  margin: 0 6px;
   transition: transform 0.15s;
+  display: block;
 }
 .store-badge img:hover {
-  transform: scale(1.06);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transform: scale(1.08);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
 }
 .download-btn, .download-btn:visited, .download-btn:active {
   background: #CC6A2A;
@@ -89,7 +90,7 @@ footer {
   margin-top: 40px;
 }
 .footer-links a {
-  color: #CC6A2A;
+  color: #F7F3E8;
   text-decoration: none;
   margin: 0 8px;
   font-weight: 500;
@@ -126,6 +127,6 @@ footer {
     gap: 12px;
   }
   .store-badge img {
-    height: 48px;
+    height: 56px;
   }
 }
