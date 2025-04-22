@@ -57,7 +57,7 @@ Future<void> setupServiceLocator() async {
 Dio _configureDio() {
   final Dio dio = Dio(
     BaseOptions(
-      baseUrl: 'http://localhost:8000/api', // Use localhost for development
+      baseUrl: 'https://getrucky.com/api', // Use production API
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {'Content-Type': 'application/json'},
