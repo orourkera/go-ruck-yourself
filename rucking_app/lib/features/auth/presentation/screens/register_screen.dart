@@ -72,6 +72,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  String _friendlyErrorMessage(String? error) {
+    if (error == null) return 'An unexpected error occurred.';
+    if (error.contains('500')) return 'Server error, please try again later.';
+    if (error.contains('401') || error.contains('403')) return 'You are not authorized. Please log in again.';
+    if (error.contains('404')) return 'Resource not found.';
+    if (error.contains('timeout')) return 'Network timeout. Please check your connection.';
+    if (error.toLowerCase().contains('network')) return 'Network error. Please check your connection.';
+    return error;
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
@@ -88,10 +98,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               content: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: Text(state.message)),
+                  Expanded(child: Text('An account already exists for this email.')),
                   TextButton(
                     onPressed: () {
-                      Navigator.of(context).pop(); // Go back to login screen
+                      Navigator.of(context).pushReplacementNamed('/login');
                     },
                     child: Text(
                       'Sign In',
@@ -104,26 +114,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ],
               ),
-              backgroundColor: AppColors.warning,
-              duration: const Duration(seconds: 10),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 5),
             ),
           );
         } else if (state is AuthError) {
-          // Show error message if registration fails
-          String errorMessage = state.message;
-          
-          // Make error message more user-friendly
-          if (errorMessage.contains('404')) {
-            errorMessage = 'Server connection error: The backend server might not be running or the endpoint does not exist.';
-          } else if (errorMessage.contains('Connection')) {
-            errorMessage = 'Cannot connect to the server. Please check your internet connection.';
-          }
-          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: AppColors.error,
+              content: Text(_friendlyErrorMessage(state.message)),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () {
+                  // Optionally trigger retry logic
+                },
+              ),
             ),
           );
         }
