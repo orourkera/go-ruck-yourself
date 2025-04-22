@@ -17,13 +17,13 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding: 12px 16px 0 16px;
+  padding: -8px 16px 0 16px;
   box-sizing: border-box;
   position: relative;
 }
 .headline {
   font-family: 'Bangers', 'Arial Black', cursive, sans-serif;
-  font-size: 3.6em;
+  font-size: 5.4em;
   color: #CC6A2A;
   margin: 0 0 16px 0;
   text-align: center;
@@ -88,7 +88,7 @@ body {
 }
 @media (max-width: 700px) {
   .headline {
-    font-size: 2.2em;
+    font-size: 3.3em;
   }
   .download-links {
     flex-direction: column;
@@ -99,6 +99,6 @@ body {
     margin: 24px auto 0 auto;
   }
   .landing-container {
-    padding-top: 18px;
+    padding-top: -8px;
   }
 }
