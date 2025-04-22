@@ -4,7 +4,7 @@ import sys
 import json
 from datetime import datetime
 
-from flask import Flask, render_template, Blueprint, g, jsonify, request
+from flask import Flask, render_template, Blueprint, g, jsonify, request, redirect
 from flask_restful import Api
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
@@ -119,6 +119,13 @@ def load_user():
                 email="dev@example.com", 
                 user_metadata={"name": "Development User"}
             )
+
+# Force HTTPS redirect in production
+@app.before_request
+def enforce_https():
+    if not request.is_secure and not app.debug:
+        url = request.url.replace("http://", "https://", 1)
+        return redirect(url, code=301)
 
 # Import and register API resources
 try:
