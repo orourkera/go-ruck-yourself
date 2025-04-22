@@ -1,8 +1,8 @@
 body {
   margin: 0;
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-  background: #F7F3E8; /* App's tan background */
-  color: #728C69; /* App's green */
+  background: #728C69; /* App's green */
+  color: #CC6A2A; /* App's orange */
 }
 .container {
   display: flex;
@@ -25,7 +25,6 @@ body {
   margin-bottom: 0;
   margin-right: 36px;
   border-radius: 24px;
-  box-shadow: 0 2px 24px rgba(0,0,0,0.18);
   object-fit: contain;
 }
 .text-content {
@@ -37,13 +36,13 @@ body {
 }
 .headline {
   font-family: 'Bangers', 'Arial Black', cursive, sans-serif;
-  color: #728C69;
+  color: #CC6A2A;
   font-size: 3rem;
   margin-bottom: 12px;
   letter-spacing: 2px;
 }
 .subtitle {
-  color: #728C69;
+  color: #CC6A2A;
   font-family: 'Inter', Arial, sans-serif;
   font-size: 1.3rem;
   margin-bottom: 36px;
@@ -55,8 +54,18 @@ body {
   flex-direction: row;
   gap: 18px;
 }
-.download-btn {
-  background: #728C69;
+.store-badge img {
+  height: 56px;
+  width: auto;
+  margin: 0 2px;
+  transition: transform 0.15s;
+}
+.store-badge img:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.download-btn, .download-btn:visited, .download-btn:active {
+  background: #CC6A2A;
   color: #fff;
   font-family: 'Inter', Arial, sans-serif;
   font-size: 1.1rem;
@@ -64,12 +73,12 @@ body {
   border-radius: 8px;
   padding: 14px 28px;
   text-decoration: none;
-  box-shadow: 0 2px 8px rgba(114,140,105,0.10);
+  box-shadow: 0 2px 8px rgba(204,106,42,0.10);
   transition: background 0.2s, color 0.2s;
 }
 .download-btn:hover {
-  background: #546A4A;
-  color: #F7F3E8;
+  background: #A04F18;
+  color: #fff;
 }
 footer {
   background: #23272c;
@@ -80,7 +89,7 @@ footer {
   margin-top: 40px;
 }
 .footer-links a {
-  color: #728C69;
+  color: #CC6A2A;
   text-decoration: none;
   margin: 0 8px;
   font-weight: 500;
@@ -115,5 +124,8 @@ footer {
     flex-direction: column;
     align-items: center;
     gap: 12px;
+  }
+  .store-badge img {
+    height: 48px;
   }
 }
