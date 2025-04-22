@@ -100,7 +100,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 const SizedBox(height: 20),
                 // App tagline
                 Text(
-                  'Track your rucking, challenge yourself',
+                  'Track your distance, count your calories.',
                   style: AppTextStyles.subtitle1.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
