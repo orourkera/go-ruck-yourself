@@ -1,35 +1,73 @@
 body {
   margin: 0;
   font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-  background: #181c20;
-  color: #f7f7f7;
+  background: #e7c24f; /* Tan background */
+  color: #3b6d4c; /* Green text */
 }
 .container {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 80vh;
+  min-height: 80dvh;
+  height: 80vh;
+  height: 80dvh;
   padding: 32px 12px 0 12px;
 }
 .main-image {
-  width: 220px;
-  max-width: 80vw;
-  margin-bottom: 32px;
-  border-radius: 20px;
-  box-shadow: 0 2px 24px rgba(0,0,0,0.3);
+  height: 80vh;
+  height: 80dvh;
+  max-height: 80vh;
+  max-height: 80dvh;
+  width: auto;
+  max-width: 45vw;
+  margin-bottom: 0;
+  margin-right: 36px;
+  border-radius: 24px;
+  box-shadow: 0 2px 24px rgba(0,0,0,0.18);
+  object-fit: contain;
+}
+.text-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  height: 100%;
 }
 h1 {
-  color: #e7c24f;
+  color: #3b6d4c;
   margin-bottom: 12px;
   font-size: 2.8rem;
   letter-spacing: 2px;
 }
 .subtitle {
-  color: #8fd694;
+  color: #3b6d4c;
   font-size: 1.3rem;
   margin-bottom: 36px;
-  text-align: center;
+  text-align: left;
+}
+.download-links {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: row;
+  gap: 18px;
+}
+.download-btn {
+  display: inline-block;
+  padding: 14px 28px;
+  border-radius: 8px;
+  background: #3b6d4c;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(59,109,76,0.10);
+  transition: background 0.2s, color 0.2s;
+}
+.download-btn:hover {
+  background: #285133;
+  color: #e7c24f;
 }
 footer {
   background: #23272c;
@@ -40,7 +78,7 @@ footer {
   margin-top: 40px;
 }
 .footer-links a {
-  color: #8fd694;
+  color: #3b6d4c;
   text-decoration: none;
   margin: 0 8px;
   font-weight: 500;
@@ -51,4 +89,29 @@ footer {
 .copyright {
   margin-top: 8px;
   font-size: 0.95rem;
+}
+@media (max-width: 900px) {
+  .container {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    height: auto;
+    min-height: 70vh;
+  }
+  .main-image {
+    margin-right: 0;
+    margin-bottom: 24px;
+    max-width: 70vw;
+    max-height: 40vh;
+    height: auto;
+  }
+  .text-content {
+    align-items: center;
+    text-align: center;
+  }
+  .download-links {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
 }
