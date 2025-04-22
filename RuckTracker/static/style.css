@@ -37,7 +37,7 @@ body {
 .headline {
   font-family: 'Bangers', 'Arial Black', cursive, sans-serif;
   color: #CC6A2A;
-  font-size: 8rem;
+  font-size: clamp(2.5rem, 8vw, 8rem);
   margin-bottom: 12px;
   letter-spacing: 2px;
   text-shadow:
@@ -49,6 +49,12 @@ body {
      2px  0px 0 #fff,
      0px -2px 0 #fff,
     -2px  0px 0 #fff;
+}
+.mascot {
+  display: block;
+  margin: 0 auto 16px auto;
+  max-width: 100%;
+  height: auto;
 }
 .subtitle {
   color: #F7F3E8; /* Tan for subtitle */
@@ -148,5 +154,22 @@ footer {
   }
   .store-badge img {
     height: 56px;
+  }
+  .headline {
+    font-size: clamp(2rem, 7vw, 4rem);
+    margin-bottom: 6px;
+  }
+  .mascot {
+    margin-bottom: 8px;
+    max-height: 160px;
+  }
+  footer {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    font-size: 0.98rem;
+    padding: 18px 8px 12px 8px;
+    gap: 8px;
+    word-break: break-word;
   }
 }
