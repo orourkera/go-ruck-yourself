@@ -77,7 +77,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (_weightController.text.isNotEmpty) {
           final weightVal = double.tryParse(_weightController.text);
           if (weightVal != null) {
-              weightKg = widget.preferMetric ? weightVal : weightVal / kgToLbs;
+              // If user prefers metric, do nothing. If standard, convert lbs to kg before saving
+              weightKg = widget.preferMetric ? weightVal : weightVal * 0.453592;
           }
       }
 
