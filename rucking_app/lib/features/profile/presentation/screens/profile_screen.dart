@@ -47,7 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           
           // Initialize dropdown value if not already set
           // Do this within build or didChangeDependencies for safety with Bloc state
-          _selectedUnit ??= user.preferMetric ? 'Metric' : 'Imperial';
+          _selectedUnit ??= user.preferMetric ? 'Metric' : 'Standard';
           
           // Safely get initials, checking for null or empty values
           String initials = '';
@@ -136,12 +136,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         label: 'Weight',
                         value: weightDisplay,
                       ),
-                      const Divider(),
-                      _buildInfoItem(
-                        icon: Icons.height_outlined,
-                        label: 'Height',
-                        value: heightDisplay,
-                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -156,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         trailing: DropdownButton<String>(
                           value: _selectedUnit,
                           underline: const SizedBox(),
-                          items: ['Metric', 'Imperial']
+                          items: ['Metric', 'Standard']
                               .map((String value) {
                                 return DropdownMenuItem<String>(
                                   value: value,

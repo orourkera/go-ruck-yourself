@@ -54,6 +54,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       double? weight = _weightController.text.isEmpty
           ? null
           : double.tryParse(_weightController.text);
+      // If user prefers standard, convert lbs to kg before sending
+      if (weight != null && !_preferMetric) {
+        weight = weight / 2.20462;
+      }
 
       context.read<AuthBloc>().add(
         AuthRegisterRequested(
@@ -293,6 +297,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 onChanged: (value) {
                                   setState(() {
                                     _preferMetric = value;
+                                    _weightController.clear(); // Clear weight field on toggle
                                   });
                                 },
                               ),
