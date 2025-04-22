@@ -54,9 +54,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       double? weight = _weightController.text.isEmpty
           ? null
           : double.tryParse(_weightController.text);
-      // If user prefers standard, convert lbs to kg before sending
+      // If user prefers metric, do nothing. If standard, convert lbs to kg before sending
       if (weight != null && !_preferMetric) {
-        weight = weight / 2.20462;
+        weight = weight * 0.453592;
       }
 
       context.read<AuthBloc>().add(
