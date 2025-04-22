@@ -8,6 +8,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
+import 'package:rucking_app/shared/utils/error_mapper.dart';
 
 /// Login screen for user authentication
 class LoginScreen extends StatefulWidget {
@@ -56,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
           // Show error message if login fails
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.message),
+              content: Text(mapFriendlyErrorMessage(state.message)),
               backgroundColor: AppColors.error,
             ),
           );
