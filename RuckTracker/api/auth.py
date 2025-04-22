@@ -157,6 +157,22 @@ class RefreshTokenResource(Resource):
         except Exception as e:
             return {'message': f'Error refreshing token: {str(e)}'}, 500
 
+class ForgotPasswordResource(Resource):
+    def post(self):
+        """Trigger password reset email using Supabase"""
+        try:
+            data = request.get_json()
+            email = data.get('email')
+            if not email:
+                return {'message': 'Email is required'}, 400
+            response = supabase.auth.reset_password_email(email)
+            if hasattr(response, 'error') and response.error:
+                return {'message': f'Failed to send reset email: {response.error.message}'}, 400
+            return {'message': 'If an account exists for this email, a password reset link has been sent.'}, 200
+        except Exception as e:
+            logger.error(f"Error during forgot password: {str(e)}", exc_info=True)
+            return {'message': f'Error during forgot password: {str(e)}'}, 500
+
 class UserProfileResource(Resource):
     def get(self):
         """Get the current user's profile from the profiles table AND include email"""
