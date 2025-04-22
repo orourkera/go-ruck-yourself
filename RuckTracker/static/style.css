@@ -139,6 +139,9 @@ footer {
     justify-content: flex-start;
     height: auto;
     min-height: 70vh;
+    padding-top: 16px;
+    padding-bottom: 12px;
+    gap: 12px;
   }
   .main-image {
     margin-right: 0;
@@ -154,27 +157,32 @@ footer {
   .download-links {
     flex-direction: column;
     align-items: center;
-    gap: 18px;
+    gap: 9px;
+    margin-top: 10px;
+    margin-bottom: 6px;
   }
   .badge-container {
     width: 220px;
     height: 70px;
   }
   .headline {
-    font-size: clamp(2rem, 7vw, 4rem);
-    margin-bottom: 6px;
+    font-size: clamp(2rem, 7vw, 3.2rem);
+    margin-bottom: 3px;
   }
   .mascot {
+    margin-bottom: 4px;
+    max-height: 120px;
+  }
+  .subtitle {
     margin-bottom: 8px;
-    max-height: 160px;
   }
   footer {
     flex-direction: column;
     align-items: center;
     text-align: center;
     font-size: 0.98rem;
-    padding: 18px 8px 12px 8px;
-    gap: 8px;
+    padding: 9px 4px 6px 4px;
+    gap: 4px;
     word-break: break-word;
   }
 }
