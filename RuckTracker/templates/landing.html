@@ -8,6 +8,15 @@
   <!-- Google Fonts: Bangers and Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
+  <meta property="og:title" content="Go Ruck Yourself" />
+  <meta property="og:description" content="The ultimate rucking tracker app." />
+  <meta property="og:image" content="{{ url_for('static', filename='images/og-preview.png', _external=True) }}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://go-ruck-yourself-3ac314790ae6.herokuapp.com/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Go Ruck Yourself" />
+  <meta name="twitter:description" content="The ultimate rucking tracker app." />
+  <meta name="twitter:image" content="{{ url_for('static', filename='images/og-preview.png', _external=True) }}" />
 </head>
 <body>
   <main class="container">
