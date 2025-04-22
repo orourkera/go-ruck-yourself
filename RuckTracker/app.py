@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import Supabase client
-from .supabase_client import supabase
+from .still more esupabase_client import supabase
 
 # Configure logging
 logging.basicConfig(
@@ -139,6 +139,7 @@ try:
         SignInResource,
         SignOutResource,
         RefreshTokenResource,
+        ForgotPasswordResource,
         UserProfileResource
     )
     
@@ -153,6 +154,7 @@ try:
     api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login') # Keep /api/auth/login
     api.add_resource(SignOutResource, '/api/auth/signout')
     api.add_resource(RefreshTokenResource, '/api/auth/refresh')
+    api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
     api.add_resource(UserProfileResource, '/api/users/profile') # Should be /api/users/profile
     
     # Ruck session endpoints (prefixed with /api)
@@ -172,8 +174,16 @@ try:
     
     # Add route for homepage (remains unprefixed)
     @app.route('/')
-    def index():
-        return render_template('index.html')
+    def landing():
+        return render_template('landing.html')
+
+    @app.route('/privacy')
+    def privacy():
+        return render_template('privacy.html')
+
+    @app.route('/terms')
+    def terms():
+        return render_template('terms.html')
     
     # Add route for health check (remains unprefixed)
     @app.route('/health')
