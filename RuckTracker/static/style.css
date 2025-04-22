@@ -71,18 +71,26 @@ body {
   align-items: center;
 }
 .badge-container {
-  width: 320px;
-  height: 100px;
+  width: 340px;
+  height: 110px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+  padding: 0;
 }
 .badge-container img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   display: block;
+  background: #000;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+  margin: 0;
+  padding: 0;
 }
 .store-badge {
   display: block;
@@ -149,11 +157,8 @@ footer {
     gap: 18px;
   }
   .badge-container {
-    width: 200px;
-    height: 56px;
-  }
-  .store-badge img {
-    height: 56px;
+    width: 220px;
+    height: 70px;
   }
   .headline {
     font-size: clamp(2rem, 7vw, 4rem);
