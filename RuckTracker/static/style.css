@@ -16,7 +16,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
   padding: 32px 16px 0 16px;
   box-sizing: border-box;
   position: relative;
@@ -24,6 +24,7 @@ body {
 .headline {
   font-family: 'Bangers', 'Arial Black', cursive, sans-serif;
   font-size: 3.6em;
+  color: #CC6A2A;
   margin: 0 0 16px 0;
   text-align: center;
   letter-spacing: 2px;
