@@ -1,8 +1,8 @@
 body {
   margin: 0;
-  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-  background: #e7c24f; /* Tan background */
-  color: #3b6d4c; /* Green text */
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  background: #F7F3E8; /* App's tan background */
+  color: #728C69; /* App's green */
 }
 .container {
   display: flex;
@@ -35,14 +35,16 @@ body {
   justify-content: center;
   height: 100%;
 }
-h1 {
-  color: #3b6d4c;
+.headline {
+  font-family: 'Bangers', 'Arial Black', cursive, sans-serif;
+  color: #728C69;
+  font-size: 3rem;
   margin-bottom: 12px;
-  font-size: 2.8rem;
   letter-spacing: 2px;
 }
 .subtitle {
-  color: #3b6d4c;
+  color: #728C69;
+  font-family: 'Inter', Arial, sans-serif;
   font-size: 1.3rem;
   margin-bottom: 36px;
   text-align: left;
@@ -54,20 +56,20 @@ h1 {
   gap: 18px;
 }
 .download-btn {
-  display: inline-block;
-  padding: 14px 28px;
-  border-radius: 8px;
-  background: #3b6d4c;
+  background: #728C69;
   color: #fff;
+  font-family: 'Inter', Arial, sans-serif;
   font-size: 1.1rem;
   font-weight: 600;
+  border-radius: 8px;
+  padding: 14px 28px;
   text-decoration: none;
-  box-shadow: 0 2px 8px rgba(59,109,76,0.10);
+  box-shadow: 0 2px 8px rgba(114,140,105,0.10);
   transition: background 0.2s, color 0.2s;
 }
 .download-btn:hover {
-  background: #285133;
-  color: #e7c24f;
+  background: #546A4A;
+  color: #F7F3E8;
 }
 footer {
   background: #23272c;
@@ -78,7 +80,7 @@ footer {
   margin-top: 40px;
 }
 .footer-links a {
-  color: #3b6d4c;
+  color: #728C69;
   text-decoration: none;
   margin: 0 8px;
   font-weight: 500;
