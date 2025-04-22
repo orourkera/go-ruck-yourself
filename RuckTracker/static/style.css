@@ -71,8 +71,6 @@ body {
   align-items: center;
 }
 .badge-container {
-  width: 340px;
-  height: 110px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,8 +80,8 @@ body {
   padding: 0;
 }
 .badge-container img {
-  width: 100%;
-  height: 100%;
+  height: 64px;
+  width: auto;
   object-fit: contain;
   display: block;
   background: #000;
@@ -161,9 +159,8 @@ footer {
     margin-top: 10px;
     margin-bottom: 6px;
   }
-  .badge-container {
-    width: 220px;
-    height: 70px;
+  .badge-container img {
+    height: 44px;
   }
   .headline {
     font-size: clamp(2rem, 7vw, 3.2rem);
