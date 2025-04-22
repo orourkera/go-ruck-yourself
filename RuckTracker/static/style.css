@@ -1,7 +1,8 @@
 body {
   margin: 0;
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-  background: #728C69; /* App's green */
+  background: url('/static/images/bg-test.png') no-repeat center center fixed;
+  background-size: cover;
   color: #F7F3E8; /* Tan for main text */
 }
 .container {
