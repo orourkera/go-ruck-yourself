@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
@@ -42,7 +41,6 @@ class ApiClient {
       if (endpoint.contains('/rucks')) {
         final token = await _storageService.getAuthToken();
         if (token == null) {
-          print('Auth token missing when trying to access: $endpoint');
           throw UnauthorizedException('Not authenticated - please log in first');
         }
         
@@ -59,23 +57,8 @@ class ApiClient {
         options: options,
       );
       
-      // Log the response for debugging
-      print('API GET $endpoint - Response: ${response.statusCode}');
-      print('Response data type: ${response.data.runtimeType}');
-      if (response.data is Map) {
-        print('Response keys: ${(response.data as Map).keys.toList()}');
-      }
-      
       return response.data;
     } catch (e) {
-      print('API GET Error: $e');
-      if (e is DioException) {
-        // Add detailed error information
-        print('Status code: ${e.response?.statusCode}, URL: ${e.requestOptions.path}');
-        print('Response data: ${e.response?.data}');
-      }
-      
-      // Throw a properly handled error
       throw _handleError(e);
     }
   }
@@ -86,7 +69,6 @@ class ApiClient {
     if (endpoint.contains('/rucks')) {
       final token = await _storageService.getAuthToken();
       if (token == null) {
-        print('Auth token missing when trying to access: $endpoint');
         throw UnauthorizedException('Not authenticated - please log in first');
       }
       
@@ -103,14 +85,6 @@ class ApiClient {
       
       return response.data;
     } catch (e) {
-      print('API POST Error: $e');
-      if (e is DioException) {
-        // Add detailed error information
-        print('Status code: ${e.response?.statusCode}, URL: ${e.requestOptions.path}');
-        print('Response data: ${e.response?.data}');
-      }
-      
-      // Throw a properly handled error
       throw _handleError(e);
     }
   }
@@ -126,7 +100,6 @@ class ApiClient {
       
       return response.data;
     } catch (e) {
-      print('API PUT Error: $e');
       throw _handleError(e);
     }
   }
@@ -141,7 +114,6 @@ class ApiClient {
       
       return response.data;
     } catch (e) {
-      print('API DELETE Error: $e');
       throw _handleError(e);
     }
   }
@@ -161,7 +133,6 @@ class ApiClient {
       }
     } catch (e) {
       // Storage service might not be initialized yet
-      print('Warning: Storage service not available yet: $e');
     }
     
     return headers;
@@ -176,8 +147,6 @@ class ApiClient {
   
   /// Converts API exceptions to app-specific exceptions
   Exception _handleError(dynamic error) {
-    print('API Error: $error');
-    
     if (error is DioException) {
       switch (error.type) {
         case DioExceptionType.connectionTimeout:
@@ -195,7 +164,6 @@ class ApiClient {
           // Check if the response is HTML (typically means wrong API URL)
           if (data is String && data.contains('<!doctype html>')) {
             final url = error.requestOptions.uri.toString();
-            print('WARNING: Received HTML response for $url. Verify your API endpoint is correct!');
             if (statusCode == 404) {
               return NotFoundException('API endpoint not found. Check that your server is running and the URL is correct.');
             }

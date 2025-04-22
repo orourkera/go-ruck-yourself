@@ -3,7 +3,6 @@ import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
-import 'package:flutter/foundation.dart';
 
 /// Interface for authentication operations
 abstract class AuthService {
@@ -133,10 +132,7 @@ class AuthServiceImpl implements AuthService {
   Future<User?> getCurrentUser() async {
     User? userToReturn;
     String? userId = await _storageService.getString(AppConfig.userIdKey);
-    String? userEmail; // We need the email, maybe get from storage if stored?
-                     // Or rely on the fact that AuthBloc holds the user with email?
-                     // Let's assume for now we reconstruct using profile + stored ID/Email
-                     
+    
     // Ideally, fetch email stored securely during login if available
     // For simplicity now, we'll assume ID is enough to link
     if (userId == null) {
