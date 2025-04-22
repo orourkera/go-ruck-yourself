@@ -34,7 +34,7 @@ class SignUpResource(Resource):
                     'name': data.get('name'),
                     'weight_kg': data.get('weight_kg'),
                     'height_cm': data.get('height_cm'),
-                    'preferMetric': data.get('preferMetric', True) # Use plain key
+                    'preferMetric': data['preferMetric'] if 'preferMetric' in data else False
                 }
                 # Clean data - remove None values before insert
                 profile_data_clean = {k: v for k, v in profile_data.items() if v is not None}
