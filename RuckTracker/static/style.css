@@ -37,9 +37,18 @@ body {
 .headline {
   font-family: 'Bangers', 'Arial Black', cursive, sans-serif;
   color: #CC6A2A;
-  font-size: 3rem;
+  font-size: 8rem;
   margin-bottom: 12px;
   letter-spacing: 2px;
+  text-shadow:
+    -2px -2px 0 #fff,
+     2px -2px 0 #fff,
+    -2px  2px 0 #fff,
+     2px  2px 0 #fff,
+     0px  2px 0 #fff,
+     2px  0px 0 #fff,
+     0px -2px 0 #fff,
+    -2px  0px 0 #fff;
 }
 .subtitle {
   color: #F7F3E8; /* Tan for subtitle */
@@ -52,18 +61,15 @@ body {
   margin-top: 32px;
   display: flex;
   flex-direction: row;
-  gap: 18px;
+  gap: 36px;
+  align-items: center;
 }
 .store-badge img {
-  height: 72px;
+  height: 80px;
   width: auto;
-  margin: 0 6px;
-  transition: transform 0.15s;
   display: block;
-}
-.store-badge img:hover {
-  transform: scale(1.08);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  object-fit: contain;
+  background: transparent;
 }
 .download-btn, .download-btn:visited, .download-btn:active {
   background: #CC6A2A;
@@ -124,7 +130,7 @@ footer {
   .download-links {
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 18px;
   }
   .store-badge img {
     height: 56px;
