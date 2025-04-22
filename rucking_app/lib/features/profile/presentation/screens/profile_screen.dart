@@ -8,6 +8,7 @@ import 'package:rucking_app/features/profile/presentation/screens/terms_of_servi
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
+import 'package:http/http.dart' as http;
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -215,7 +216,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+
+                  // Delete account section
+                  _buildSection(
+                    title: 'Danger Zone',
+                    children: [
+                      _buildClickableItem(
+                        icon: Icons.delete_forever_outlined,
+                        label: 'Delete Account',
+                        onTap: () => _showDeleteAccountDialog(context, user.id),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
                   
                   // Logout button
                   CustomButton(
@@ -428,6 +442,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context, int userId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text('Are you sure you want to delete your account? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Call backend to delete account
+              final success = await _deleteAccount(userId, context);
+              if (success && mounted) {
+                // Log out and redirect to login
+                context.read<AuthBloc>().add(AuthLogoutRequested());
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to delete account. Please try again.')),
+                  );
+                }
+              }
+            },
+            child: Text('Delete', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _deleteAccount(int userId, BuildContext context) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('https://getrucky.com/api/users/$userId'),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Gets the initials from a name
