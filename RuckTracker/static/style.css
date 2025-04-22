@@ -181,28 +181,39 @@ footer {
     padding-bottom: 80px; /* space for footer */
   }
   .text-content {
-    order: -1;
+    order: 1;
     text-align: center;
     margin-bottom: 24px;
     margin-top: 32px;
   }
+  .headline {
+    font-size: 3.6em;
+    line-height: 1.05;
+  }
+  .subtitle {
+    font-size: 1.15em;
+  }
   .left-block {
+    order: 2;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
-    margin-left: 18vw;
+    margin-left: 0;
     margin-bottom: 16px;
+    gap: 18px;
   }
   .main-image {
-    width: 140px;
+    width: 100px;
     height: auto;
-    margin-bottom: 16px;
+    margin-bottom: 0;
   }
   .download-links {
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin-left: 0;
+    justify-content: flex-start;
+    align-items: flex-start;
   }
 }
 .footer-pinned {
