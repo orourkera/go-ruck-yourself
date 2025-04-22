@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import Supabase client
-from .still more esupabase_client import supabase
+from RuckTracker.supabase_client import supabase
 
 # Configure logging
 logging.basicConfig(
