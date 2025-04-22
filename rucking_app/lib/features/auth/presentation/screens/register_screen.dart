@@ -271,8 +271,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Weight is used to calculate calories burned.',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 8),
                           // Weight field
                           CustomTextField(
                             controller: _weightController,
