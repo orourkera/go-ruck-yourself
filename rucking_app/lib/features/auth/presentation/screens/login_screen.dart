@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/register_screen.dart';
+import 'package:rucking_app/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -178,14 +179,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       // Forgot password
                       TextButton(
                         onPressed: () {
-                          // TODO: Implement forgot password functionality
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => ForgotPasswordScreen(),
+                            ),
+                          );
                         },
                         child: Text(
-                          'Forgot Password?',
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          'Forgot password?',
+                          style: AppTextStyles.body2.copyWith(color: AppColors.primary),
                         ),
                       ),
                     ],
