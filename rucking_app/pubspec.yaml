@@ -82,7 +82,7 @@ flutter:
   
   assets:
     - assets/images/
-    - assets/icons/
+    # - assets/icons/   # Commented out because directory does not exist
   
   fonts:
     - family: Roboto
