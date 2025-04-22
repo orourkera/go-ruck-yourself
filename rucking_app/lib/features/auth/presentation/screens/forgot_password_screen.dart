@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
@@ -29,12 +31,31 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         _isLoading = true;
         _message = null;
       });
-      // TODO: Replace with actual API call
-      await Future.delayed(const Duration(seconds: 2));
-      setState(() {
-        _isLoading = false;
-        _message = 'If an account exists for this email, a password reset link has been sent.';
-      });
+      try {
+        final response = await http.post(
+          Uri.parse('https://getrucky.com/api/auth/forgot-password'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': _emailController.text.trim()}),
+        );
+        final data = jsonDecode(response.body);
+        if (response.statusCode == 200) {
+          setState(() {
+            _message = data['message'] ?? 'If an account exists for this email, a password reset link has been sent.';
+          });
+        } else {
+          setState(() {
+            _message = data['message'] ?? 'Failed to send reset link.';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _message = 'Network error. Please try again.';
+        });
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -54,12 +75,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               CustomTextField(
                 controller: _emailController,
                 label: 'Email',
+                hint: 'Enter your email',
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your email';
                   }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}").hasMatch(value)) {
+                  if (!RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}\$').hasMatch(value)) {
                     return 'Please enter a valid email';
                   }
                   return null;

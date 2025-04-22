@@ -225,7 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _buildClickableItem(
                         icon: Icons.delete_forever_outlined,
                         label: 'Delete Account',
-                        onTap: () => _showDeleteAccountDialog(context, user.id),
+                        onTap: () => _showDeleteAccountDialog(context, user.userId),
                       ),
                     ],
                   ),
@@ -444,7 +444,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showDeleteAccountDialog(BuildContext context, int userId) {
+  void _showDeleteAccountDialog(BuildContext context, String userId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -478,7 +478,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<bool> _deleteAccount(int userId, BuildContext context) async {
+  Future<bool> _deleteAccount(String userId, BuildContext context) async {
     try {
       final response = await http.delete(
         Uri.parse('https://getrucky.com/api/users/$userId'),
