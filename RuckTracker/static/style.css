@@ -144,7 +144,35 @@ footer {
     width: 100vw;
     max-width: 100vw;
   }
+  .headline {
+    font-size: 5.4em;
+    line-height: 1.05;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .mascot-wrapper {
+    display: flex;
+    justify-content: center;
+    width: 100vw;
+    margin-top: auto;
+    margin-bottom: 0;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 64px; /* leave space for footer */
+    z-index: 2;
+    pointer-events: none;
+  }
+  .main-image.mascot {
+    width: 320px;
+    max-width: 90vw;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    pointer-events: none;
+  }
   .main-content {
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -152,46 +180,19 @@ footer {
     width: 100vw;
     padding: 0 6vw;
     margin-top: 18px;
-  }
-  .headline {
-    font-size: 2.7em;
-    line-height: 1.1;
-    margin-bottom: 12px;
-    text-align: center;
-  }
-  .subtitle {
-    font-size: 1.15em;
-    margin-bottom: 18px;
-    text-align: center;
+    position: relative;
+    z-index: 3;
   }
   .download-links {
-    flex-direction: column;
-    gap: 14px;
-    align-items: center;
-    margin-top: 10px;
-    margin-bottom: 18px;
-  }
-  .mascot-wrapper {
-    display: flex;
-    justify-content: center;
-    width: 100vw;
-    margin-top: 8px;
-    margin-bottom: 0;
-  }
-  .main-image.mascot {
-    width: 160px;
-    max-width: 60vw;
-    height: auto;
-    display: block;
-    margin: 0 auto;
+    z-index: 4;
   }
 }
 @media (max-width: 600px) {
   .headline {
-    font-size: 2.1em;
+    font-size: 4.2em;
   }
   .main-image.mascot {
-    width: 120px;
+    width: 220px;
   }
 }
 @media (min-width: 901px) {
