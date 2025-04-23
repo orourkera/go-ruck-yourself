@@ -13,9 +13,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Remove broken import
-# from RuckTracker.supabase_client import supabase
-# Only import get_supabase_client if needed elsewhere
+# Import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_client
 
 # Configure logging
 logging.basicConfig(
@@ -65,6 +64,7 @@ def load_user():
             # Supabase JWT tokens don't require a refresh token in many operations
             try:
                 # Use Supabase admin API to verify the token and get user
+                supabase = get_supabase_client()
                 user_response = supabase.auth.get_user(token)
                 
                 if user_response and user_response.user:
