@@ -68,7 +68,10 @@ def load_user():
                 user_response = supabase.auth.get_user(token)
                 
                 if user_response and user_response.user:
-                    g.user = user_response.user
+                    # Attach the token to the user object for downstream RLS
+                    user = user_response.user
+                    user.token = token
+                    g.user = user
                     logger.debug(f"Authenticated user: {g.user.id}")
                 else:
                     logger.warning("No user found in token validation")
