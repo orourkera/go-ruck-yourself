@@ -98,11 +98,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Handle app background/foreground transitions
-    if (state == AppLifecycleState.paused && !_isPaused) {
-      // App going to background, pause session
-      _togglePause();
-    }
+    // No automatic pause on background; session continues unless user explicitly pauses or ends.
   }
   
   /// Initialize location tracking service

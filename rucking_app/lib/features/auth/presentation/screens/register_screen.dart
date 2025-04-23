@@ -124,8 +124,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         appBar: AppBar(
-          title: const Text('Create Account'),
-          centerTitle: true,
           backgroundColor: Colors.transparent,
           elevation: 0,
           foregroundColor: AppColors.textDark,
@@ -138,7 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Stack(
             children: [
               SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 120),
+                padding: const EdgeInsets.only(bottom: 20),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 18.0),
                   child: Form(
@@ -146,7 +144,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 8),
                         Center(
                           child: Text(
                             'CREATE ACCOUNT',
@@ -286,52 +284,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ],
                         ),
                         const SizedBox(height: 30),
-                        // Add extra bottom padding to avoid being covered by keyboard
-                        const SizedBox(height: 120),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _acceptTerms,
+                              onChanged: (value) {
+                                setState(() {
+                                  _acceptTerms = value ?? false;
+                                });
+                              },
+                              activeColor: AppColors.primary,
+                            ),
+                            Expanded(
+                              child: Text(
+                                'I accept the Terms and Conditions and Privacy Policy',
+                                style: AppTextStyles.body2,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        BlocBuilder<AuthBloc, AuthState>(
+                          builder: (context, state) {
+                            return CustomButton(
+                              text: 'Create Account',
+                              isLoading: state is AuthLoading,
+                              onPressed: _register,
+                            );
+                          },
+                        ),
                       ],
                     ),
-                  ),
-                ),
-              ),
-              // Fixed bottom: Terms and Create Account button
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _acceptTerms,
-                            onChanged: (value) {
-                              setState(() {
-                                _acceptTerms = value ?? false;
-                              });
-                            },
-                            activeColor: AppColors.primary,
-                          ),
-                          Expanded(
-                            child: Text(
-                              'I accept the Terms and Conditions and Privacy Policy',
-                              style: AppTextStyles.body2,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      BlocBuilder<AuthBloc, AuthState>(
-                        builder: (context, state) {
-                          return CustomButton(
-                            text: 'Create Account',
-                            isLoading: state is AuthLoading,
-                            onPressed: _register,
-                          );
-                        },
-                      ),
-                    ],
                   ),
                 ),
               ),

@@ -8,6 +8,8 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:get_it/get_it.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -110,34 +112,34 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     });
     
     // Prepare data for the /complete endpoint
-    // Currently, only 'notes' is explicitly handled by the backend
     final Map<String, dynamic> completionData = {
-      'notes': _notesController.text, 
-      // Add other data if the backend is updated to handle them:
-      // 'final_rating': _rating, 
-      // 'final_perceived_exertion': _perceivedExertion,
-      // 'final_tags': _selectedTags,
+      'notes': _notesController.text,
+      'final_distance_km': widget.distance,
+      'final_calories_burned': widget.caloriesBurned,
+      'final_elevation_gain': widget.elevationGain,
+      'final_elevation_loss': widget.elevationLoss,
+      'final_average_pace': widget.distance > 0 ? (widget.duration.inSeconds / 60 / widget.distance) : null,
     };
 
-    // Use then/catchError instead of async/await
+    // Remove null values (especially if average pace is not computable)
+    completionData.removeWhere((key, value) => value == null);
+
     _apiClient.post('/rucks/${widget.ruckId}/complete', completionData)
       .then((response) {
-        // Log success or response details if needed
         debugPrint("Session completed successfully: $response");
         if (mounted) {
-          // Navigate to home screen and clear the stack
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const HomeScreen()),
             (route) => false,
           );
         }
     }).catchError((e) {
-      debugPrint("Error completing session: $e"); // Log the error
+      debugPrint("Error completing session: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to complete session: $e'),
-            backgroundColor: AppColors.error, // Use error color
+            backgroundColor: AppColors.error,
           ),
         );
         setState(() {
@@ -155,6 +157,13 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get user measurement preference
+    bool preferMetric = true;
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      preferMetric = authState.user.preferMetric;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Session Complete'),
@@ -214,7 +223,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     ),
                     StatCard(
                       title: 'Distance',
-                      value: '${widget.distance.toStringAsFixed(2)} km',
+                      value: preferMetric
+                          ? '${widget.distance.toStringAsFixed(2)} km'
+                          : '${(widget.distance * 0.621371).toStringAsFixed(2)} mi',
                       icon: Icons.straighten,
                       color: AppColors.secondary,
                     ),
@@ -232,14 +243,20 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     ),
                     StatCard(
                       title: 'Elevation',
-                      value: '+${widget.elevationGain.toStringAsFixed(1)} m',
-                      secondaryValue: '-${widget.elevationLoss.toStringAsFixed(1)} m',
+                      value: preferMetric
+                          ? '+${widget.elevationGain.toStringAsFixed(1)} m'
+                          : '+${(widget.elevationGain * 3.28084).toStringAsFixed(1)} ft',
+                      secondaryValue: preferMetric
+                          ? '-${widget.elevationLoss.toStringAsFixed(1)} m'
+                          : '-${(widget.elevationLoss * 3.28084).toStringAsFixed(1)} ft',
                       icon: Icons.terrain,
                       color: Colors.green,
                     ),
                     StatCard(
                       title: 'Ruck Weight',
-                      value: '${widget.ruckWeight} kg',
+                      value: preferMetric
+                          ? '${widget.ruckWeight.toStringAsFixed(1)} kg'
+                          : '${(widget.ruckWeight * 2.20462).toStringAsFixed(1)} lbs',
                       icon: Icons.fitness_center,
                       color: Colors.blueGrey,
                     ),

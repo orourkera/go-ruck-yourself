@@ -18,6 +18,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeInAnimation;
+  bool _navigated = false;
 
   @override
   void initState() {
@@ -54,24 +55,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Future<void> _checkAuthStatus() async {
     // Add delay for splash screen
     await Future.delayed(const Duration(seconds: 2));
-    
     if (!mounted) return;
-    
-    // Dispatch auth check event
     context.read<AuthBloc>().add(AuthCheckRequested());
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
-      listener: (context, state) {
+      listener: (context, state) async {
+        if (_navigated) return;
+        await Future.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
         if (state is Authenticated) {
-          // Navigate to home screen if authenticated
+          _navigated = true;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         } else if (state is Unauthenticated) {
-          // Navigate to login screen if not authenticated
+          _navigated = true;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
           );
@@ -87,7 +88,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               children: [
                 // Main logo image
                 Image.asset(
-                  'assets/images/go_ruck_yourself.png',
+                  'assets/images/go ruck yourself.png',
                   width: 250,
                   height: 250,
                   fit: BoxFit.contain,

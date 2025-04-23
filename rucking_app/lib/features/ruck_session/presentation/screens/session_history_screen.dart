@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/widgets.dart';
 
 /// Screen for viewing ruck session history
 class SessionHistoryScreen extends StatefulWidget {
@@ -15,7 +16,7 @@ class SessionHistoryScreen extends StatefulWidget {
   _SessionHistoryScreenState createState() => _SessionHistoryScreenState();
 }
 
-class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
+class _SessionHistoryScreenState extends State<SessionHistoryScreen> with RouteAware {
   final ApiClient _apiClient = GetIt.instance<ApiClient>();
   bool _isLoading = true;
   List<dynamic> _sessions = [];
@@ -113,6 +114,32 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
       _activeFilter = filter;
       _isLoading = true;
     });
+    _fetchSessions();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+      routeObserver?.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+      routeObserver?.unsubscribe(this);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when returning to this screen
     _fetchSessions();
   }
 
@@ -225,7 +252,10 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                           : '${minutes}m';
                       
                       // Get distance directly from session map
-                      final distanceKm = session['distance_km'] as double? ?? 0.0;
+                      final distanceKmRaw = session['distance_km'];
+                      final double distanceKm = distanceKmRaw is int
+                          ? distanceKmRaw.toDouble()
+                          : (distanceKmRaw as double? ?? 0.0);
                       final distanceValue = preferMetric 
                           ? distanceKm.toStringAsFixed(2) 
                           : (distanceKm * 0.621371).toStringAsFixed(2);
@@ -236,7 +266,9 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                       
                       // Get weight and round it
                       final weightValue = session['ruck_weight_kg'] as num? ?? 0;
-                      final formattedWeight = weightValue.round(); // Round to nearest integer
+                      final formattedWeight = preferMetric
+                          ? '${weightValue.round()} kg'
+                          : '${(weightValue * 2.20462).round()} lbs';
                       
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -293,7 +325,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                                       child: _buildSessionStat(
                                         Icons.fitness_center,
                                         'Weight',
-                                        '$formattedWeight kg', // Use rounded value
+                                        formattedWeight,
                                       ),
                                     ),
                                   ],
