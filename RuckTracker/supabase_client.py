@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from postgrest import ClientOptions
 
 # Load environment variables
 load_dotenv()
@@ -16,12 +17,10 @@ def get_supabase_client(user_jwt=None):
     """
     Returns a Supabase client instance. If user_jwt is provided, attaches it for RLS-authenticated requests.
     """
-    options = {}
+    options = None
     if user_jwt:
-        options = {
-            "headers": {
-                "Authorization": f"Bearer {user_jwt}"
-            }
-        }
+        options = ClientOptions(
+            headers={"Authorization": f"Bearer {user_jwt}"}
+        )
     client = create_client(url, key, options)
     return client
