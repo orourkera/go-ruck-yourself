@@ -110,8 +110,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ],
               ),
               backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 5),
             ),
           );
         } else if (state is AuthError) {
@@ -119,20 +117,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             SnackBar(
               content: Text(_friendlyErrorMessage(state.message)),
               backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 5),
-              action: SnackBarAction(
-                label: 'Retry',
-                textColor: Colors.white,
-                onPressed: () {
-                  // Optionally trigger retry logic
-                },
-              ),
             ),
           );
         }
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           title: const Text('Create Account'),
           centerTitle: true,
@@ -145,229 +135,210 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         body: SafeArea(
-          bottom: true, // Ensure bottom safe area is respected
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 20), // Extra bottom padding
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Name field
-                          CustomTextField(
-                            controller: _nameController,
-                            label: 'What should we call you, rucker?',
-                            hint: 'Enter your name',
-                            keyboardType: TextInputType.name,
-                            prefixIcon: Icons.person_outline,
-                            textCapitalization: TextCapitalization.words,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your name';
-                              }
-                              return null;
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 120),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 18.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 24),
+                        Center(
+                          child: Text(
+                            'CREATE ACCOUNT',
+                            style: AppTextStyles.headline6.copyWith(
+                              fontSize: 24,
+                              letterSpacing: 1.5,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        CustomTextField(
+                          controller: _nameController,
+                          label: 'What should we call you, rucker?',
+                          hint: 'Name',
+                          prefixIcon: Icons.person_outline,
+                          textInputAction: TextInputAction.next,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        CustomTextField(
+                          controller: _emailController,
+                          label: 'Email',
+                          hint: 'Email',
+                          prefixIcon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        CustomTextField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          hint: 'Password',
+                          prefixIcon: Icons.lock_outline,
+                          obscureText: !_isPasswordVisible,
+                          textInputAction: TextInputAction.next,
+                          suffixIcon: IconButton(
+                            icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () {
+                              setState(() {
+                                _isPasswordVisible = !_isPasswordVisible;
+                              });
                             },
                           ),
-                          const SizedBox(height: 20),
-                          
-                          // Email field
-                          CustomTextField(
-                            controller: _emailController,
-                            label: 'Email',
-                            hint: 'Enter your email',
-                            keyboardType: TextInputType.emailAddress,
-                            prefixIcon: Icons.email_outlined,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a password';
+                            }
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        CustomTextField(
+                          controller: _confirmPasswordController,
+                          label: 'Confirm Password',
+                          hint: 'Confirm Password',
+                          prefixIcon: Icons.lock_outline,
+                          obscureText: !_isConfirmPasswordVisible,
+                          textInputAction: TextInputAction.next,
+                          suffixIcon: IconButton(
+                            icon: Icon(_isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () {
+                              setState(() {
+                                _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                              });
                             },
                           ),
-                          const SizedBox(height: 20),
-                          
-                          // Password field
-                          CustomTextField(
-                            controller: _passwordController,
-                            label: 'Password',
-                            hint: 'Enter your password',
-                            obscureText: !_isPasswordVisible,
-                            prefixIcon: Icons.lock_outline,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _isPasswordVisible
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                                color: AppColors.grey,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please confirm your password';
+                            }
+                            if (value != _passwordController.text) {
+                              return 'Passwords do not match';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        CustomTextField(
+                          controller: _weightController,
+                          label: _preferMetric ? 'Weight (kg)' : 'Weight (lbs)',
+                          hint: _preferMetric ? 'Enter your weight in kg' : 'Enter your weight in lbs',
+                          keyboardType: TextInputType.number,
+                          prefixIcon: Icons.monitor_weight_outlined,
+                          textInputAction: TextInputAction.done,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Text(
+                              'Measurement units:',
+                              style: AppTextStyles.subtitle1,
+                            ),
+                            const Spacer(),
+                            Text(
+                              'Standard',
+                              style: AppTextStyles.body2.copyWith(
+                                color: !_preferMetric ? AppColors.primary : AppColors.grey,
                               ),
-                              onPressed: () {
+                            ),
+                            Switch(
+                              value: _preferMetric,
+                              activeColor: AppColors.primary,
+                              onChanged: (value) {
                                 setState(() {
-                                  _isPasswordVisible = !_isPasswordVisible;
+                                  _preferMetric = value;
+                                  _weightController.clear();
                                 });
                               },
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter a password';
-                              }
-                              if (value.length < 6) {
-                                return 'Password must be at least 6 characters';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Confirm password field
-                          CustomTextField(
-                            controller: _confirmPasswordController,
-                            label: 'Confirm Password',
-                            hint: 'Confirm your password',
-                            obscureText: !_isConfirmPasswordVisible,
-                            prefixIcon: Icons.lock_outline,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _isConfirmPasswordVisible
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                                color: AppColors.grey,
+                            Text(
+                              'Metric',
+                              style: AppTextStyles.body2.copyWith(
+                                color: _preferMetric ? AppColors.primary : AppColors.grey,
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
-                                });
-                              },
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please confirm your password';
-                              }
-                              if (value != _passwordController.text) {
-                                return 'Passwords do not match';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Optional information section
-                          Text(
-                            'Optional Information',
-                            style: AppTextStyles.subtitle1.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Weight is used to calculate calories burned.',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 8),
-                          // Weight field
-                          CustomTextField(
-                            controller: _weightController,
-                            label: _preferMetric ? 'Weight (kg)' : 'Weight (lbs)',
-                            hint: _preferMetric ? 'Enter your weight in kg' : 'Enter your weight in lbs',
-                            keyboardType: TextInputType.number,
-                            prefixIcon: Icons.monitor_weight_outlined,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Unit preference
-                          Row(
-                            children: [
-                              Text(
-                                'Measurement units:',
-                                style: AppTextStyles.subtitle1,
-                              ),
-                              const Spacer(),
-                              Text(
-                                'Standard',
-                                style: AppTextStyles.body2.copyWith(
-                                  color: !_preferMetric ? AppColors.primary : AppColors.grey,
-                                ),
-                              ),
-                              Switch(
-                                value: _preferMetric,
-                                activeColor: AppColors.primary,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _preferMetric = value;
-                                    _weightController.clear(); // Clear weight field on toggle
-                                  });
-                                },
-                              ),
-                              Text(
-                                'Metric',
-                                style: AppTextStyles.body2.copyWith(
-                                  color: _preferMetric ? AppColors.primary : AppColors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 30),
-                        ],
-                      ),
+                          ],
+                        ),
+                        const SizedBox(height: 30),
+                        // Add extra bottom padding to avoid being covered by keyboard
+                        const SizedBox(height: 120),
+                      ],
                     ),
                   ),
                 ),
-                
-                // Terms and conditions checkbox - moved outside of scroll view
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Row(
+              ),
+              // Fixed bottom: Terms and Create Account button
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Checkbox(
-                        value: _acceptTerms,
-                        onChanged: (value) {
-                          setState(() {
-                            _acceptTerms = value ?? false;
-                          });
-                        },
-                        activeColor: AppColors.primary,
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _acceptTerms,
+                            onChanged: (value) {
+                              setState(() {
+                                _acceptTerms = value ?? false;
+                              });
+                            },
+                            activeColor: AppColors.primary,
+                          ),
+                          Expanded(
+                            child: Text(
+                              'I accept the Terms and Conditions and Privacy Policy',
+                              style: AppTextStyles.body2,
+                            ),
+                          ),
+                        ],
                       ),
-                      Expanded(
-                        child: Text(
-                          'I accept the Terms and Conditions and Privacy Policy',
-                          style: AppTextStyles.body2,
-                        ),
+                      const SizedBox(height: 8),
+                      BlocBuilder<AuthBloc, AuthState>(
+                        builder: (context, state) {
+                          return CustomButton(
+                            text: 'Create Account',
+                            isLoading: state is AuthLoading,
+                            onPressed: _register,
+                          );
+                        },
                       ),
                     ],
                   ),
                 ),
-                
-                const SizedBox(height: 16),
-                
-                // Button placed at the bottom outside of the scroll view
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                  child: BlocBuilder<AuthBloc, AuthState>(
-                    builder: (context, state) {
-                      return CustomButton(
-                        text: 'Create Account',
-                        isLoading: state is AuthLoading,
-                        onPressed: _register,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
-} 
+}
