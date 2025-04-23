@@ -113,6 +113,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     hint: 'Enter your email',
                     keyboardType: TextInputType.emailAddress,
                     prefixIcon: Icons.email_outlined,
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) {
+                      FocusScope.of(context).nextFocus();
+                    },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
@@ -145,6 +149,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
                       },
                     ),
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _login(),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your password';

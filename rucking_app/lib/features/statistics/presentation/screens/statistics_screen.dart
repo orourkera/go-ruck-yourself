@@ -5,6 +5,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:flutter/widgets.dart';
 
 /// Screen for displaying statistics and analytics
 class StatisticsScreen extends StatefulWidget {
@@ -14,7 +15,7 @@ class StatisticsScreen extends StatefulWidget {
   _StatisticsScreenState createState() => _StatisticsScreenState();
 }
 
-class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerProviderStateMixin {
+class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerProviderStateMixin, RouteAware {
   late TabController _tabController;
   final ApiClient _apiClient = GetIt.instance<ApiClient>();
   
@@ -35,6 +36,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   
   @override
   void dispose() {
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+      routeObserver?.unsubscribe(this);
+    }
     _tabController.dispose();
     super.dispose();
   }
@@ -112,6 +118,22 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   }
   
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+      routeObserver?.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    // Called when returning to this screen
+    _fetchStatistics();
+  }
+  
+  @override
   Widget build(BuildContext context) {
     // Get user's metric preference
     bool preferMetric = true;
@@ -126,7 +148,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.primary,
+          labelColor: AppColors.secondary,
           unselectedLabelColor: AppColors.textDarkSecondary,
           indicatorColor: AppColors.primary,
           labelStyle: AppTextStyles.button.copyWith(fontWeight: FontWeight.bold),
@@ -938,4 +960,4 @@ class _YearlyStatsTab extends StatelessWidget {
       child: Text('Yearly Statistics'),
     );
   }
-} 
+}

@@ -167,11 +167,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               // Dispatch update event
                               bool newPreferMetric = newValue == 'Metric';
                               context.read<AuthBloc>().add(AuthProfileUpdateRequested(
-                                preferMetric: newPreferMetric, 
-                                // Pass other fields as null if only updating units
-                                name: null, 
-                                weightKg: null, 
-                                heightCm: null,
+                                preferMetric: newPreferMetric,
+                                name: user.name,
+                                weightKg: user.weightKg,
+                                heightCm: user.heightCm,
+                                email: user.email,
                               ));
                             }
                           },

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/features/auth/presentation/screens/splash_screen.dart';
+import 'package:rucking_app/features/splash/presentation/screens/splash_screen.dart';
 import 'package:rucking_app/shared/theme/app_theme.dart';
 
 /// Main application widget

@@ -60,7 +60,8 @@ class StatCard extends StatelessWidget {
             ),
             
             // Main content area with value
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Center(
                 child: Text(
                   numericPart,
@@ -75,24 +76,31 @@ class StatCard extends StatelessWidget {
             
             // Unit part at the bottom
             if (unitPart.isNotEmpty)
-              Text(
-                unitPart,
-                style: AppTextStyles.body2.copyWith(
-                  color: Colors.grey[600],
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2.0),
+                child: Center(
+                  child: Text(
+                    unitPart,
+                    style: AppTextStyles.body2.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-                textAlign: TextAlign.center,
               ),
             
             // Secondary value (if provided)
             if (secondaryValue != null)
               Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: Text(
-                  secondaryValue!,
-                  style: AppTextStyles.body2.copyWith(
-                    color: Colors.grey[600],
+                padding: const EdgeInsets.only(top: 2.0),
+                child: Center(
+                  child: Text(
+                    secondaryValue!,
+                    style: AppTextStyles.body2.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
           ],

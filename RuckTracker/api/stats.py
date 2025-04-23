@@ -153,7 +153,7 @@ class MonthlyStatsResource(Resource):
 
             supabase = get_supabase_client()
             response = supabase.table('ruck_sessions') \
-                .select('distance_km, duration_seconds, calories_burned') \
+                .select('distance_km, duration_seconds, calories_burned, created_at') \
                 .eq('user_id', g.user.id) \
                 .gte('created_at', start_iso) \
                 .lte('created_at', end_iso) \
@@ -190,7 +190,7 @@ class YearlyStatsResource(Resource):
             
             supabase = get_supabase_client()
             response = supabase.table('ruck_sessions') \
-                .select('distance_km, duration_seconds, calories_burned') \
+                .select('distance_km, duration_seconds, calories_burned, created_at') \
                 .eq('user_id', g.user.id) \
                 .gte('created_at', start_iso) \
                 .lte('created_at', end_iso) \
