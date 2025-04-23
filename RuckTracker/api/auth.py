@@ -203,9 +203,19 @@ class UserProfileResource(Resource):
 
             # Ensure essential auth info (like email) is present in the final response
             # Even if the profile row was missing, we return the email associated with the token
-            if 'email' not in profile_data and hasattr(g.user, 'email') and g.user.email:
-                 profile_data['email'] = g.user.email
-                 
+            if 'email' not in profile_data or not profile_data['email']:
+                # Try to get email from g.user (JWT/session)
+                if hasattr(g.user, 'email') and g.user.email:
+                    profile_data['email'] = g.user.email
+                else:
+                    # Fallback: fetch from auth.users
+                    try:
+                        auth_user_resp = supabase.table('users').select('email').eq('id', g.user.id).single().execute()
+                        if auth_user_resp.data and 'email' in auth_user_resp.data:
+                            profile_data['email'] = auth_user_resp.data['email']
+                    except Exception as e:
+                        logger.warning(f"Could not fetch email from auth.users for user {g.user.id}: {e}")
+            
             # Also ensure ID is present, using the authenticated user ID as definitive source
             profile_data['id'] = g.user.id 
 
