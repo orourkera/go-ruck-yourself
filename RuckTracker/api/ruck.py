@@ -42,11 +42,14 @@ class RuckSessionListResource(Resource):
                 'created_at': datetime.utcnow().isoformat()
             }
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            logger.debug(f"Creating ruck session with user_id={g.user.id}, token={getattr(g.user, 'token', None)[:10]}...")
             response = supabase.table('ruck_sessions') \
                 .insert(session_data) \
                 .execute()
+            logger.debug(f"Supabase insert response: {response.__dict__}")
             return response.data[0], 201
         except Exception as e:
+            logger.error(f"Error creating session: {str(e)}", exc_info=True)
             return {'message': f'Error creating session: {str(e)}'}, 500
 
 class RuckSessionResource(Resource):
