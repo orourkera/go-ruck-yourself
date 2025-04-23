@@ -73,11 +73,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _locationService = LocationServiceImpl();
     _apiClient = GetIt.instance<ApiClient>();
     
+    // Request location permission at startup
+    _requestLocationPermission();
+    
     // Start session timer
     _stopwatch = Stopwatch()..start();
     _timer = Timer.periodic(const Duration(seconds: 1), _updateTime);
     
-    // Start location tracking
+    // Start location tracking (will only run if permission granted)
     _initLocationTracking();
     
     // Notify API that session has started
@@ -364,6 +367,19 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return "$hours:$minutes:$seconds";
+  }
+
+  /// Request location permission
+  Future<void> _requestLocationPermission() async {
+    final hasPermission = await _locationService.hasLocationPermission();
+    if (!hasPermission) {
+      final granted = await _locationService.requestLocationPermission();
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permission is required for tracking. Please enable it in settings.')),
+        );
+      }
+    }
   }
 
   @override

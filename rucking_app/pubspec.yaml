@@ -60,6 +60,8 @@ dependencies:
   flutter_local_notifications: ^15.1.0+1
   get_it: ^8.0.3
   json_serializable: ^6.9.4
+  firebase_core: ^2.27.0
+  firebase_analytics: ^10.8.0
   
 dev_dependencies:
   flutter_test:
