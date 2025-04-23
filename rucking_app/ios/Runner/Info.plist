@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>This app uses HealthKit to read your workout and activity data in order to provide insights and track your rucking sessions. Your data is never shared without your permission.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>This app uses HealthKit to write your rucking session data, such as workouts and calories burned, so you can track your fitness progress in the Health app.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs background location access to track your rucking sessions even when the app is in the background.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
