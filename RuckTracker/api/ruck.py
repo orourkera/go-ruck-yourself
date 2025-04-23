@@ -41,8 +41,10 @@ class RuckSessionListResource(Resource):
                 'notes': data.get('notes'),
                 'created_at': datetime.utcnow().isoformat()
             }
+            logger.debug(f"Creating ruck session: user_id={g.user.id}, token={getattr(g.user, 'token', None)[:10]}...")
+            logger.info(f"DEBUG: g.user.id = {g.user.id}")
+            logger.info(f"DEBUG: session_data = {session_data}")
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            logger.debug(f"Creating ruck session with user_id={g.user.id}, token={getattr(g.user, 'token', None)[:10]}...")
             response = supabase.table('ruck_sessions') \
                 .insert(session_data) \
                 .execute()
