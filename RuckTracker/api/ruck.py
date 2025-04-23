@@ -89,7 +89,14 @@ class RuckSessionStartResource(Resource):
             if not check.data:
                 return {'message': 'Session not found'}, 404
             if check.data['status'] != 'created':
-                return {'message': 'Session already started'}, 400
+                # Instead of error, return the existing session with 200
+                existing_session = supabase.table('ruck_sessions') \
+                    .select('*') \
+                    .eq('id', ruck_id) \
+                    .eq('user_id', g.user.id) \
+                    .single() \
+                    .execute()
+                return existing_session.data, 200
             update_data = {
                 'status': 'in_progress',
                 'started_at': datetime.utcnow().isoformat()
