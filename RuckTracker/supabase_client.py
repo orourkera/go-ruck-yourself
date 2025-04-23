@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from postgrest import ClientOptions
+from supabase.lib.client_options import ClientOptions
 
 # Load environment variables
 load_dotenv()
