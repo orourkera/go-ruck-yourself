@@ -13,8 +13,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Import Supabase client
-from RuckTracker.supabase_client import supabase
+# Remove broken import
+# from RuckTracker.supabase_client import supabase
+# Only import get_supabase_client if needed elsewhere
 
 # Configure logging
 logging.basicConfig(
