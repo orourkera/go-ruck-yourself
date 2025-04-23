@@ -16,8 +16,12 @@ def get_supabase_client(user_jwt=None):
     """
     Returns a Supabase client instance. If user_jwt is provided, attaches it for RLS-authenticated requests.
     """
-    client = create_client(url, key)
+    options = {}
     if user_jwt:
-        # Attach the JWT as the session for authenticated requests
-        client.auth.session = {'access_token': user_jwt}
+        options = {
+            "headers": {
+                "Authorization": f"Bearer {user_jwt}"
+            }
+        }
+    client = create_client(url, key, options)
     return client
