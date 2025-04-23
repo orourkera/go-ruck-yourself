@@ -69,10 +69,17 @@ def load_user():
                 
                 if user_response and user_response.user:
                     # Attach the token to the user object for downstream RLS
-                    user = user_response.user
-                    user.token = token
-                    g.user = user
-                    logger.debug(f"Authenticated user: {g.user.id}")
+                    try:
+                        setattr(user_response.user, "token", token)
+                    except Exception as e:
+                        logger.warning(f"Could not set token on user object: {e}")
+                        # If user is a namedtuple or similar, wrap in SimpleNamespace
+                        from types import SimpleNamespace
+                        user_ns = SimpleNamespace(**user_response.user.__dict__)
+                        user_ns.token = token
+                        user_response.user = user_ns
+                    g.user = user_response.user
+                    logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
                 else:
                     logger.warning("No user found in token validation")
                     
