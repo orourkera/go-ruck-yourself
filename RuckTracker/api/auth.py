@@ -237,8 +237,9 @@ class UserProfileResource(Resource):
             if not update_data:
                  return {'message': 'No valid fields provided for update'}, 400
 
-            logger.debug(f"Updating profile for user ID {g.user.id} with: {update_data}")
-            supabase = get_supabase_client()
+            logger.debug(f"Authenticated user id: {g.user.id}")
+            logger.debug(f"Attempting update on profiles where id = {g.user.id} with: {update_data}")
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             # Only allow updating the row where id = g.user.id
             response = supabase.table('profiles') \
                 .update(update_data) \
