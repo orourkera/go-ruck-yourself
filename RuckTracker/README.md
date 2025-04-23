@@ -1,4 +1,7 @@
-# Rucking App API
+CREATE POLICY "Users can update their own profile"
+ON profiles
+FOR UPDATE
+USING (auth.uid() = id);# Rucking App API
 
 A Flask-based RESTful API backend for a rucking app that provides endpoints for tracking, analyzing, and storing workout data.
 

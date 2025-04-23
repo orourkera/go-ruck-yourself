@@ -66,6 +66,10 @@ body {
   margin: 16px auto 0 auto;
   display: block;
 }
+.mascot-up {
+  position: relative;
+  top: -20px;
+}
 .footer-pinned {
   position: fixed;
   left: 0;
