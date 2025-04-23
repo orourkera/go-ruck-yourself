@@ -12,6 +12,7 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:flutter/widgets.dart';
 
 /// Main home screen that serves as the central hub of the app
 class HomeScreen extends StatefulWidget {
@@ -113,7 +114,7 @@ class _HomeTab extends StatefulWidget {
   _HomeTabState createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<_HomeTab> {
+class _HomeTabState extends State<_HomeTab> with RouteAware {
   late final ApiClient _apiClient;
   bool _isLoading = true;
   List<dynamic> _recentSessions = [];
@@ -194,6 +195,32 @@ class _HomeTabState extends State<_HomeTab> {
      
     // debugPrint('Processed ${processedSessions.length} sessions');
     return processedSessions;
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+      routeObserver?.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+      routeObserver?.unsubscribe(this);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when returning to this screen
+    _fetchData();
   }
   
   @override
@@ -420,7 +447,10 @@ class _HomeTabState extends State<_HomeTab> {
                             : '${minutes}m';
                         
                         // Get distance directly from session map based on user preference
-                        final distanceKm = session['distance_km'] as double? ?? 0.0;
+                        final distanceKmRaw = session['distance_km'];
+                        final double distanceKm = distanceKmRaw is int
+                            ? distanceKmRaw.toDouble()
+                            : (distanceKmRaw as double? ?? 0.0);
                         bool preferMetric = true;
                         final authState = context.read<AuthBloc>().state;
                         if (authState is Authenticated) {
