@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import sys
 import logging
 
-from ..supabase_client import supabase
+from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ class SignUpResource(Resource):
                 return {'message': 'Email and password are required'}, 400
                 
             # Create user in Supabase Auth
+            supabase = get_supabase_client()
             auth_response = supabase.auth.sign_up({
                 "email": email,
                 "password": password,
@@ -96,6 +97,7 @@ class SignInResource(Resource):
                 return {'message': 'Email and password are required'}, 400
                 
             # Sign in with Supabase
+            supabase = get_supabase_client()
             auth_response = supabase.auth.sign_in_with_password({
                 "email": email,
                 "password": password,
@@ -124,6 +126,7 @@ class SignOutResource(Resource):
         """Sign out a user"""
         try:
             # Sign out with Supabase
+            supabase = get_supabase_client()
             supabase.auth.sign_out()
             return {'message': 'User signed out successfully'}, 200
         except Exception as e:
@@ -140,6 +143,7 @@ class RefreshTokenResource(Resource):
                 return {'message': 'Refresh token is required'}, 400
                 
             # Refresh token with Supabase
+            supabase = get_supabase_client()
             auth_response = supabase.auth.refresh_session(refresh_token)
             
             if auth_response.session:
@@ -165,6 +169,7 @@ class ForgotPasswordResource(Resource):
             email = data.get('email')
             if not email:
                 return {'message': 'Email is required'}, 400
+            supabase = get_supabase_client()
             response = supabase.auth.reset_password_email(email)
             if hasattr(response, 'error') and response.error:
                 return {'message': f'Failed to send reset email: {response.error.message}'}, 400
@@ -181,6 +186,7 @@ class UserProfileResource(Resource):
                 return {'message': 'User not authenticated'}, 401
                 
             logger.debug(f"Fetching profile for user ID: {g.user.id}")
+            supabase = get_supabase_client()
             response = supabase.table('profiles') \
                 .select('*') \
                 .eq('id', g.user.id) \
@@ -232,6 +238,7 @@ class UserProfileResource(Resource):
                  return {'message': 'No valid fields provided for update'}, 400
 
             logger.debug(f"Updating profile for user ID {g.user.id} with: {update_data}")
+            supabase = get_supabase_client()
             response = supabase.table('profiles') \
                 .update(update_data) \
                 .eq('id', g.user.id) \
