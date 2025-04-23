@@ -239,17 +239,17 @@ class UserProfileResource(Resource):
 
             logger.debug(f"Updating profile for user ID {g.user.id} with: {update_data}")
             supabase = get_supabase_client()
-            update_data['id'] = g.user.id  # Ensure id is present for upsert
-            # Use upsert instead of update for robustness
+            # Only allow updating the row where id = g.user.id
             response = supabase.table('profiles') \
-                .upsert(update_data) \
+                .update(update_data) \
+                .eq('id', g.user.id) \
                 .execute()
-            logger.debug(f"Upsert response: {response.__dict__}")
+            logger.debug(f"Update response: {response.__dict__}")
             if response.data:
-                logger.debug(f"Profile upserted/updated successfully: {response.data[0]}")
+                logger.debug(f"Profile updated successfully: {response.data[0]}")
                 return response.data[0], 200
             else:
-                logger.warning(f"Profile upsert for user ID {g.user.id} returned no data. Checking if profile exists...")
+                logger.warning(f"Profile update for user ID {g.user.id} returned no data. Checking if profile exists...")
                 profile_exists = False
                 try:
                     check_exists_response = supabase.table('profiles').select('id', count='exact').eq('id', g.user.id).execute()
@@ -258,15 +258,15 @@ class UserProfileResource(Resource):
                 except Exception as check_err:
                     logger.error(f"Error checking profile existence for user {g.user.id}: {check_err}")
                 if not profile_exists:
-                    logger.warning(f"Attempted to upsert non-existent profile for ID: {g.user.id}")
+                    logger.warning(f"Attempted to update non-existent profile for ID: {g.user.id}")
                     return {'message': 'User profile not found to update'}, 404
                 else:
-                    error_message = "Profile upsert failed for unknown reason."
+                    error_message = "Profile update failed for unknown reason."
                     if hasattr(response, 'error') and response.error:
-                         error_message = f"Profile upsert failed: {getattr(response.error, 'message', str(response.error))}"
+                         error_message = f"Profile update failed: {getattr(response.error, 'message', str(response.error))}"
                     elif hasattr(response, 'message') and response.message:
-                         error_message = f"Profile upsert failed: {response.message}"
-                    logger.error(f"Profile upsert failed for existing profile {g.user.id}. Detail: {error_message}")
+                         error_message = f"Profile update failed: {response.message}"
+                    logger.error(f"Profile update failed for existing profile {g.user.id}. Detail: {error_message}")
                     return {'message': error_message}, 500
                 
         except Exception as e:
