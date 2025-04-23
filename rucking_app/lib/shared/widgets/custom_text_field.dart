@@ -71,6 +71,9 @@ class CustomTextField extends StatelessWidget {
   /// Text capitalization for the field
   final TextCapitalization textCapitalization;
 
+  /// Text input action for the field
+  final TextInputAction? textInputAction;
+
   /// Creates a new custom text field
   const CustomTextField({
     Key? key,
@@ -96,6 +99,7 @@ class CustomTextField extends StatelessWidget {
     this.onTap,
     this.validator,
     this.textCapitalization = TextCapitalization.none,
+    this.textInputAction,
   }) : super(key: key);
 
   @override
@@ -160,6 +164,7 @@ class CustomTextField extends StatelessWidget {
           onTap: onTap,
           validator: validator,
           textCapitalization: textCapitalization,
+          textInputAction: textInputAction,
         ),
       ],
     );

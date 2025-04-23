@@ -42,6 +42,18 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       _preferMetric = authState.user.preferMetric;
+      // --- Populate user weight if available ---
+      final userWeightKg = authState.user.weightKg;
+      if (userWeightKg != null && userWeightKg > 0) {
+        if (_preferMetric) {
+          _userWeightController.text = userWeightKg.toStringAsFixed(1);
+        } else {
+          // Convert kg to lbs (1 kg = 2.20462 lbs)
+          final weightLbs = userWeightKg * 2.20462;
+          _userWeightController.text = weightLbs.toStringAsFixed(1);
+        }
+      }
+      // --- End populate user weight ---
       _loadLastSessionData();
     } else {
       _isLoading = false;
@@ -202,6 +214,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             : double.parse(userWeightRaw) / 2.20462; // Convert lbs to kg
         createRequestData['user_weight_kg'] = userWeightKg;
 
+        // --- Add user_id for Supabase RLS ---
+        createRequestData['user_id'] = authState.user.userId;
+        // --- End user_id ---
+        
         // ---- Step 1: Create session in the backend ----
         debugPrint('Creating session via POST /rucks...');
         final apiClient = GetIt.instance<ApiClient>();
