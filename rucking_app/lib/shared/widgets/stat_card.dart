@@ -8,6 +8,8 @@ class StatCard extends StatelessWidget {
   final String? secondaryValue;
   final IconData icon;
   final Color color;
+  final bool centerContent;
+  final double valueFontSize;
 
   const StatCard({
     Key? key,
@@ -16,6 +18,8 @@ class StatCard extends StatelessWidget {
     this.secondaryValue,
     required this.icon,
     required this.color,
+    this.centerContent = false,
+    this.valueFontSize = 28,
   }) : super(key: key);
 
   @override
@@ -39,7 +43,7 @@ class StatCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: centerContent ? CrossAxisAlignment.center : CrossAxisAlignment.start,
           children: [
             // Title and icon
             Row(
@@ -68,6 +72,7 @@ class StatCard extends StatelessWidget {
                   style: AppTextStyles.headline4.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
+                    fontSize: valueFontSize,
                   ),
                   textAlign: TextAlign.center,
                 ),

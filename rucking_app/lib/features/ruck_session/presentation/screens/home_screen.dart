@@ -140,8 +140,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
 
       // Fetch monthly stats
-      // debugPrint('Fetching monthly stats from /statistics/monthly');
       final statsResponse = await _apiClient.get('/statistics/monthly');
+      debugPrint('Monthly stats response: ' + statsResponse.toString());
       Map<String, dynamic> processedStats = {};
       if (statsResponse is Map && statsResponse.containsKey('data') && statsResponse['data'] is Map) {
           processedStats = statsResponse['data'] as Map<String, dynamic>;
@@ -157,8 +157,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           _isLoading = false;
         });
       }
-    } catch (e) {
-      // debugPrint('Error fetching home screen data: $e');
+    } catch (e, stack) {
+      debugPrint('Error fetching home screen data: $e');
+      debugPrint('Stack: $stack');
       if (mounted) {
         setState(() {
           _recentSessions = [];
