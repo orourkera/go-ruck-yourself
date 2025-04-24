@@ -20,7 +20,16 @@ class RuckSessionListResource(Resource):
                 .eq('user_id', g.user.id) \
                 .order('created_at', desc=True) \
                 .execute()
-            return response.data, 200
+            sessions = response.data
+            # Attach route (list of lat/lng) to each session
+            for session in sessions:
+                locations_resp = supabase.table('ruck_session_locations') \
+                    .select('latitude,longitude') \
+                    .eq('session_id', session['id']) \
+                    .order('timestamp') \
+                    .execute()
+                session['route'] = locations_resp.data if locations_resp.data else []
+            return sessions, 200
         except Exception as e:
             return {'message': f'Error retrieving sessions: {str(e)}'}, 500
 
@@ -69,6 +78,12 @@ class RuckSessionResource(Resource):
                 .execute()
             if not response.data:
                 return {'message': 'Session not found'}, 404
+            locations_resp = supabase.table('ruck_session_locations') \
+                .select('latitude,longitude') \
+                .eq('session_id', ruck_id) \
+                .order('timestamp') \
+                .execute()
+            response.data['route'] = locations_resp.data if locations_resp.data else []
             return response.data, 200
         except Exception as e:
             return {'message': f'Error retrieving session: {str(e)}'}, 500
@@ -96,6 +111,12 @@ class RuckSessionStartResource(Resource):
                     .eq('user_id', g.user.id) \
                     .single() \
                     .execute()
+                locations_resp = supabase.table('ruck_session_locations') \
+                    .select('latitude,longitude') \
+                    .eq('session_id', ruck_id) \
+                    .order('timestamp') \
+                    .execute()
+                existing_session.data['route'] = locations_resp.data if locations_resp.data else []
                 return existing_session.data, 200
             update_data = {
                 'status': 'in_progress',
