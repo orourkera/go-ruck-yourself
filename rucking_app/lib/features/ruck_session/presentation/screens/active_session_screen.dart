@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -16,6 +17,29 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+
+LatLng _getRouteCenter(List locationPoints) {
+  if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
+  double avgLat = locationPoints.map((p) => p.latitude).reduce((a, b) => a + b) / locationPoints.length;
+  double avgLng = locationPoints.map((p) => p.longitude).reduce((a, b) => a + b) / locationPoints.length;
+  return LatLng(avgLat, avgLng);
+}
+
+double _getFitZoom(List locationPoints) {
+  if (locationPoints.length < 2) return 15.5;
+  final points = locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList();
+  final bounds = LatLngBounds.fromPoints(points);
+  final latDiff = (bounds.north - bounds.south).abs();
+  final lngDiff = (bounds.east - bounds.west).abs();
+  final maxDiff = [latDiff, lngDiff].reduce((a, b) => a > b ? a : b);
+  if (maxDiff < 0.001) return 17.0;
+  if (maxDiff < 0.01) return 15.0;
+  if (maxDiff < 0.05) return 13.0;
+  if (maxDiff < 0.1) return 11.0;
+  return 9.0;
+}
 
 /// Screen for tracking an active ruck session
 class ActiveSessionScreen extends StatefulWidget {
@@ -51,6 +75,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   late Stopwatch _stopwatch;
   late Timer _timer;
   Duration _elapsed = Duration.zero;
+  // Countdown for planned duration
+  Duration? _plannedCountdownStart;
   
   // Location tracking
   StreamSubscription<LocationPoint>? _locationSubscription;
@@ -95,6 +121,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     
     // Notify API that session has started
     _startSession();
+    
+    // Set planned countdown if provided
+    if (widget.plannedDuration != null && widget.plannedDuration! > 0) {
+      _plannedCountdownStart = Duration(minutes: widget.plannedDuration!);
+    }
   }
   
   @override
@@ -275,9 +306,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   /// Updates the elapsed time display
   void _updateTime(Timer timer) {
-    if (mounted) {
+    if (!_isPaused) {
       setState(() {
-        _elapsed = _stopwatch.elapsed;
+        _elapsed = Duration(seconds: _stopwatch.elapsed.inSeconds);
         // Recalculate pace and calories in real time
         if (_distance > 0 && _elapsed.inSeconds > 0) {
           _pace = _elapsed.inMinutes / _distance; // min/km
@@ -445,170 +476,217 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         automaticallyImplyLeading: false,
         elevation: 0,
       ),
-      body: Column(
-        children: [
-          // Timer display
-          Container(
-            color: AppColors.backgroundLight,
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            child: Column(
-              children: [
-                // Time display
-                Center(
-                  child: Container(
-                    width: MediaQuery.of(context).size.width * 0.8,
-                    child: Text(
-                      _formatDuration(_elapsed),
-                      style: AppTextStyles.headline1.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 54, // much larger
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Map at the very top below header (fixed size, not in scroll view)
+            Container(
+              width: double.infinity,
+              height: 240,
+              child: FlutterMap(
+                options: MapOptions(
+                  center: _locationPoints.isNotEmpty
+                      ? _getRouteCenter(_locationPoints)
+                      : LatLng(40.421, -3.678),
+                  zoom: _locationPoints.length > 1 ? _getFitZoom(_locationPoints) : 15.5,
+                  interactiveFlags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+                  bounds: _locationPoints.length > 1 ? LatLngBounds.fromPoints(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()) : null,
+                  boundsOptions: const FitBoundsOptions(padding: EdgeInsets.all(20)),
                 ),
-                const SizedBox(height: 8),
-                // Weight display 
-                Text(
-                  'Ruck weight: $weightDisplay',
-                  style: AppTextStyles.subtitle1.copyWith(
-                    color: AppColors.textDarkSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Stats grid
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
                 children: [
-                  // First row of stats
-                  Expanded(
-                    child: Row(
-                      children: [
-                        // Distance card
-                        Expanded(
-                          child: StatCard(
-                            title: 'Distance',
-                            value: distanceDisplay,
-                            icon: Icons.straighten,
-                            color: AppColors.primary,
-                            centerContent: true,
-                            valueFontSize: 40,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        // Pace card
-                        Expanded(
-                          child: StatCard(
-                            title: 'Pace',
-                            value: paceDisplay,
-                            icon: Icons.speed,
-                            color: AppColors.secondary,
-                            centerContent: true,
-                            valueFontSize: 40,
-                          ),
+                  TileLayer(
+                    urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+                    userAgentPackageName: 'com.getrucky.gfy',
+                  ),
+                  if (_locationPoints.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: _locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList(),
+                          color: AppColors.primary,
+                          strokeWidth: 4.0,
                         ),
                       ],
                     ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Second row of stats
-                  Expanded(
-                    child: Row(
-                      children: [
-                        // Calories card
-                        Expanded(
-                          child: StatCard(
-                            title: 'Calories',
-                            value: _caloriesBurned.toInt().toString(),
-                            icon: Icons.local_fire_department,
-                            color: AppColors.accent,
-                            centerContent: true,
-                            valueFontSize: 40,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        // Elevation card
-                        Expanded(
-                          child: StatCard(
-                            title: 'Elevation',
-                            value: elevationGainDisplay,
-                            secondaryValue: elevationLossDisplay,
-                            icon: Icons.terrain,
-                            color: AppColors.success,
-                            centerContent: true,
-                            valueFontSize: 40,
-                          ),
+                  if (_locationPoints.isNotEmpty)
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude),
+                          width: 30,
+                          height: 30,
+                          builder: (ctx) => const Icon(Icons.location_pin, color: Colors.red, size: 30),
                         ),
                       ],
                     ),
-                  ),
                 ],
               ),
             ),
-          ),
-          
-          // Controls section
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Pause/Resume Button
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _togglePause,
-                    icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-                    label: Text(
-                      _isPaused ? 'RESUME' : 'PAUSE',
-                      style: AppTextStyles.button.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+            const SizedBox(height: 10),
+            // The rest of the content is scrollable
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Timer and ruck weight
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
+                      child: Column(
+                        children: [
+                          // Timer
+                          Text(
+                            _formatDuration(_elapsed),
+                            style: AppTextStyles.timerDisplay,
+                            textAlign: TextAlign.center,
+                          ),
+                          if (_plannedCountdownStart != null && widget.plannedDuration != null && widget.plannedDuration! > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+                              child: Text(
+                                _plannedCountdownStart!.inSeconds - _elapsed.inSeconds > 0
+                                  ? _formatDuration(Duration(seconds: _plannedCountdownStart!.inSeconds - _elapsed.inSeconds))
+                                  : '00:00:00',
+                                style: AppTextStyles.headline3.copyWith(
+                                  fontSize: 20,
+                                  color: AppColors.secondary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          // Ruck weight (smaller, neutral color, less vertical space)
+                          Text(
+                            weightDisplay,
+                            style: AppTextStyles.body2.copyWith(fontSize: 18, color: AppColors.textDarkSecondary),
+                          ),
+                        ],
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                    const SizedBox(height: 8),
+                    // Stats grid (fix overflow, calories up)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              // Distance card
+                              Expanded(
+                                child: StatCard(
+                                  title: 'Distance',
+                                  value: distanceDisplay,
+                                  icon: Icons.straighten,
+                                  color: AppColors.primary,
+                                  centerContent: true,
+                                  valueFontSize: 28,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Calories card (moved up)
+                              Expanded(
+                                child: StatCard(
+                                  title: 'Calories',
+                                  value: _caloriesBurned.toInt().toString(),
+                                  icon: Icons.local_fire_department,
+                                  color: AppColors.accent,
+                                  centerContent: true,
+                                  valueFontSize: 28,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              // Pace card
+                              Expanded(
+                                child: StatCard(
+                                  title: 'Pace',
+                                  value: paceDisplay,
+                                  icon: Icons.speed,
+                                  color: AppColors.secondary,
+                                  centerContent: true,
+                                  valueFontSize: 28,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Elevation card
+                              Expanded(
+                                child: StatCard(
+                                  title: 'Elevation',
+                                  value: elevationGainDisplay,
+                                  secondaryValue: elevationLossDisplay,
+                                  icon: Icons.terrain,
+                                  color: AppColors.success,
+                                  centerContent: true,
+                                  valueFontSize: 28,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                    // Controls section (unchanged)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          // Pause/Resume Button
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _togglePause,
+                              icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
+                              label: Text(
+                                _isPaused ? 'RESUME' : 'PAUSE',
+                                style: AppTextStyles.button.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          // End session button
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _isEnding ? null : _showEndConfirmationDialog,
+                              icon: const Icon(Icons.stop),
+                              label: const Text(
+                                'END SESSION',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.error,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                // End session button
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isEnding ? null : _showEndConfirmationDialog,
-                    icon: const Icon(Icons.stop),
-                    label: const Text(
-                      'END SESSION',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
-} 
+}

@@ -265,7 +265,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                       icon: Icons.terrain,
                       color: AppColors.success,
                       centerContent: true,
-                      valueFontSize: 36,
+                      valueFontSize: 28,
                     ),
                     StatCard(
                       title: 'Ruck Weight',

@@ -22,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
 
@@ -29,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -115,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icons.email_outlined,
                     textInputAction: TextInputAction.next,
                     onFieldSubmitted: (_) {
-                      FocusScope.of(context).nextFocus();
+                      FocusScope.of(context).requestFocus(_passwordFocusNode);
                     },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -149,6 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
                       },
                     ),
+                    focusNode: _passwordFocusNode,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _login(),
                     validator: (value) {

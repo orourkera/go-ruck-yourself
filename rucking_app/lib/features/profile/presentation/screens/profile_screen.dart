@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/edit_profile_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/feedback_form_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/privacy_policy_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/terms_of_service_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
@@ -210,6 +211,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(builder: (context) => const TermsOfServiceScreen()),
+                          );
+                        },
+                      ),
+                      const Divider(),
+                      _buildClickableItem(
+                        icon: Icons.feedback,
+                        label: 'Give Feedback',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const FeedbackFormScreen()),
                           );
                         },
                       ),

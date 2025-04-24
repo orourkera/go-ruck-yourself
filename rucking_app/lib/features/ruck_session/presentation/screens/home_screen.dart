@@ -13,6 +13,30 @@ import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+LatLng _getRouteCenter(List<LatLng> points) {
+  if (points.isEmpty) return LatLng(40.421, -3.678);
+  double avgLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
+  double avgLng = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
+  return LatLng(avgLat, avgLng);
+}
+
+double _getFitZoom(List<LatLng> points) {
+  // You can tune this logic if needed
+  if (points.length < 2) return 15.5;
+  final bounds = LatLngBounds.fromPoints(points);
+  final latDiff = (bounds.north - bounds.south).abs();
+  final lngDiff = (bounds.east - bounds.west).abs();
+  final maxDiff = [latDiff, lngDiff].reduce((a, b) => a > b ? a : b);
+  if (maxDiff < 0.001) return 17.0;
+  if (maxDiff < 0.01) return 15.0;
+  if (maxDiff < 0.05) return 13.0;
+  if (maxDiff < 0.1) return 11.0;
+  return 9.0;
+}
 
 /// Main home screen that serves as the central hub of the app
 class HomeScreen extends StatefulWidget {
@@ -466,6 +490,39 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         // Get calories directly from session map
                         final calories = session['calories_burned']?.toString() ?? '0';
                         
+                        // Get average pace directly from session map
+                        final averagePaceSecs = session['average_pace_seconds'] as int? ?? 0;
+                        final averagePace = Duration(seconds: averagePaceSecs);
+                        final averagePaceMinutes = averagePace.inMinutes;
+                        final averagePaceSeconds = averagePace.inSeconds % 60;
+                        final averagePaceDisplay = preferMetric 
+                            ? '${averagePaceMinutes}m ${averagePaceSeconds}s/km'
+                            : '${averagePaceMinutes}m ${averagePaceSeconds}s/mi';
+                        
+                        // Map route points
+                        List<LatLng> routePoints = [];
+                        if (session['route'] is List && (session['route'] as List).isNotEmpty) {
+                          try {
+                            routePoints = (session['route'] as List)
+                                .where((p) => p is Map && p.containsKey('latitude') && p.containsKey('longitude'))
+                                .map((p) => LatLng(
+                                  (p['latitude'] as num).toDouble(),
+                                  (p['longitude'] as num).toDouble(),
+                                ))
+                                .toList();
+                          } catch (e) {
+                            debugPrint('Error parsing route for session: $e');
+                          }
+                        }
+                        if (routePoints.isEmpty) {
+                          debugPrint('No route data for session on $formattedDate, using mock polyline.');
+                          routePoints = [
+                            LatLng(40.421, -3.678),
+                            LatLng(40.422, -3.678),
+                            LatLng(40.423, -3.677),
+                            LatLng(40.424, -3.676),
+                          ];
+                        }
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           elevation: 1,
@@ -482,6 +539,50 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // MAP PREVIEW
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: SizedBox(
+                                      height: 180, // reduced from 240 by 25%
+                                      width: double.infinity,
+                                      child: FlutterMap(
+                                        options: MapOptions(
+                                          center: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
+                                          zoom: routePoints.length > 1 ? _getFitZoom(routePoints) : 15.5,
+                                          interactiveFlags: InteractiveFlag.none,
+                                          bounds: routePoints.length > 1 ? LatLngBounds.fromPoints(routePoints) : null,
+                                          boundsOptions: const FitBoundsOptions(padding: EdgeInsets.all(20)),
+                                        ),
+                                        children: [
+                                          TileLayer(
+                                            urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+                                            userAgentPackageName: 'com.getrucky.gfy',
+                                          ),
+                                          PolylineLayer(
+                                            polylines: [
+                                              Polyline(
+                                                points: routePoints,
+                                                color: AppColors.primary,
+                                                strokeWidth: 4,
+                                              ),
+                                            ],
+                                          ),
+                                          if (routePoints.isNotEmpty)
+                                            MarkerLayer(
+                                              markers: [
+                                                Marker(
+                                                  point: routePoints.last,
+                                                  width: 20,
+                                                  height: 20,
+                                                  builder: (ctx) => const Icon(Icons.location_pin, color: Colors.red, size: 20),
+                                                ),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
@@ -499,7 +600,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 8),
                                   Row(
                                     children: [
                                       _buildSessionStat(
@@ -510,6 +611,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                       _buildSessionStat(
                                         Icons.local_fire_department, 
                                         '$calories cal'
+                                      ),
+                                      const SizedBox(width: 16),
+                                      _buildSessionStat(
+                                        Icons.timer,
+                                        averagePaceDisplay,
                                       ),
                                     ],
                                   ),

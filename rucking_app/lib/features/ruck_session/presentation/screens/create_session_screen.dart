@@ -23,10 +23,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _userWeightController = TextEditingController();
   final _durationController = TextEditingController();
-  final _notesController = TextEditingController();
 
   double _ruckWeight = AppConfig.defaultRuckWeight;
-  int _plannedDuration = 60; // Default 60 minutes
+  int? _plannedDuration; // Default is now empty
   bool _preferMetric = false; // Default to standard
   
   // Add loading state variable
@@ -36,7 +35,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   @override
   void initState() {
     super.initState();
-    _durationController.text = _plannedDuration.toString();
     
     // Get user's unit preference and load last session data
     final authState = context.read<AuthBloc>().state;
@@ -163,7 +161,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   void dispose() {
     _userWeightController.dispose();
     _durationController.dispose();
-    _notesController.dispose();
     super.dispose();
   }
 
@@ -201,7 +198,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         // Prepare request data for creation
         Map<String, dynamic> createRequestData = {
           'ruck_weight_kg': ruckWeightKg,
-          'notes': _notesController.text.isEmpty ? null : _notesController.text, // Send null if empty
         };
         
         // Add user's weight (required)
@@ -262,7 +258,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
               userWeight: double.parse(_userWeightController.text),
               plannedDuration: _durationController.text.isEmpty ? 
                   0 : int.parse(_durationController.text),
-              notes: _notesController.text,
             ),
           ),
         );
@@ -393,17 +388,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   }
                   return null;
                 },
-              ),
-              const SizedBox(height: 20),
-              
-              // Notes field
-              CustomTextField(
-                controller: _notesController,
-                label: 'Notes - Optional',
-                hint: 'Add any notes for this session',
-                maxLines: 3,
-                keyboardType: TextInputType.multiline,
-                textCapitalization: TextCapitalization.sentences,
               ),
               const SizedBox(height: 32),
               
