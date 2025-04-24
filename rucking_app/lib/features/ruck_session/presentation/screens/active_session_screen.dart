@@ -486,13 +486,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
               height: 240,
               child: FlutterMap(
                 options: MapOptions(
-                  center: _locationPoints.isNotEmpty
+                  initialCenter: _locationPoints.isNotEmpty
                       ? _getRouteCenter(_locationPoints)
                       : LatLng(40.421, -3.678),
-                  zoom: _locationPoints.length > 1 ? _getFitZoom(_locationPoints) : 15.5,
-                  interactiveFlags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-                  bounds: _locationPoints.length > 1 ? LatLngBounds.fromPoints(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()) : null,
-                  boundsOptions: const FitBoundsOptions(padding: EdgeInsets.all(20)),
+                  initialZoom: _locationPoints.length > 1 ? _getFitZoom(_locationPoints) : 15.5,
+                  // You can add interactionOptions if you want to disable interactions
                 ),
                 children: [
                   TileLayer(
@@ -516,7 +514,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                           point: LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude),
                           width: 30,
                           height: 30,
-                          builder: (ctx) => const Icon(Icons.location_pin, color: Colors.red, size: 30),
+                          child: const Icon(Icons.location_pin, color: Colors.red, size: 30),
                         ),
                       ],
                     ),
