@@ -171,7 +171,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 name: user.name,
                                 weightKg: user.weightKg,
                                 heightCm: user.heightCm,
-                                email: user.email,
                               ));
                             }
                           },
@@ -241,17 +240,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () {
-                      // TODO: Implement account deletion
-                    },
-                    child: Text(
-                      'Delete Account',
-                      style: AppTextStyles.button.copyWith(
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 32),
                 ],
               ),
