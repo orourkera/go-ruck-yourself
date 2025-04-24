@@ -258,7 +258,10 @@ class UserProfileResource(Resource):
             logger.debug(f"Update response: {response.__dict__}")
             if response.data:
                 logger.debug(f"Profile updated successfully: {response.data[0]}")
-                return response.data[0], 200
+                # Fetch and return the full user profile (including email and all fields)
+                full_profile = supabase.table('profiles').select('*').eq('id', g.user.id).single().execute()
+                logger.debug(f"Full profile after update: {full_profile.data}")
+                return full_profile.data, 200
             else:
                 logger.warning(f"Profile update for user ID {g.user.id} returned no data. Checking if profile exists...")
                 profile_exists = False
