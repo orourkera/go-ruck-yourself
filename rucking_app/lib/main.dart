@@ -4,8 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/app.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_analytics/observer.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
