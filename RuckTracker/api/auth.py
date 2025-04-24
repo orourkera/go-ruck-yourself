@@ -186,7 +186,8 @@ class UserProfileResource(Resource):
                 return {'message': 'User not authenticated'}, 401
                 
             logger.debug(f"Fetching profile for user ID: {g.user.id}")
-            supabase = get_supabase_client()
+            # Use the authenticated user's JWT for RLS
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             response = supabase.table('profiles') \
                 .select('*') \
                 .eq('id', g.user.id) \

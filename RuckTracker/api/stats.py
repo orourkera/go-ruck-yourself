@@ -112,7 +112,8 @@ class WeeklyStatsResource(Resource):
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
 
-            supabase = get_supabase_client()
+            # Use the authenticated user's JWT for RLS
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             response = supabase.table('ruck_sessions') \
                 .select('distance_km, duration_seconds, calories_burned, created_at') \
                 .eq('user_id', g.user.id) \
@@ -151,7 +152,8 @@ class MonthlyStatsResource(Resource):
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
 
-            supabase = get_supabase_client()
+            # Use the authenticated user's JWT for RLS
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             response = supabase.table('ruck_sessions') \
                 .select('distance_km, duration_seconds, calories_burned, created_at') \
                 .eq('user_id', g.user.id) \
@@ -188,7 +190,8 @@ class YearlyStatsResource(Resource):
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
             
-            supabase = get_supabase_client()
+            # Use the authenticated user's JWT for RLS
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             response = supabase.table('ruck_sessions') \
                 .select('distance_km, duration_seconds, calories_burned, created_at') \
                 .eq('user_id', g.user.id) \
