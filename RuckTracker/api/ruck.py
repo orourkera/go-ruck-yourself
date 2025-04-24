@@ -217,7 +217,9 @@ class RuckSessionCompleteResource(Resource):
                 'average_pace_min_km': data.get('final_average_pace'),
                 'elevation_gain_meters': data.get('final_elevation_gain'),
                 'elevation_loss_meters': data.get('final_elevation_loss'),
-                'notes': data.get('notes')
+                'notes': data.get('notes'),
+                'rating': data.get('rating'),
+                'perceived_exertion': data.get('perceived_exertion'),
             }
             session_update_data_clean = {k: v for k, v in session_update_data.items() if v is not None}
             session_response = supabase.table('ruck_sessions') \
