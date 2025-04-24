@@ -73,6 +73,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _locationService = LocationServiceImpl();
     _apiClient = GetIt.instance<ApiClient>();
     
+    // Reset all session stats to ensure a clean start
+    _distance = 0.0;
+    _pace = 0.0;
+    _caloriesBurned = 0.0;
+    _elevationGain = 0.0;
+    _elevationLoss = 0.0;
+    _elapsed = Duration.zero;
+    _locationPoints.clear();
+    _lastLocationUpdate = null;
+    
     // Request location permission at startup
     _requestLocationPermission();
     
@@ -268,6 +278,22 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     if (mounted) {
       setState(() {
         _elapsed = _stopwatch.elapsed;
+        // Recalculate pace and calories in real time
+        if (_distance > 0 && _elapsed.inSeconds > 0) {
+          _pace = _elapsed.inMinutes / _distance; // min/km
+        }
+        // Calories calculation (repeat logic from _calculateStats)
+        final authState = context.read<AuthBloc>().state;
+        final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
+        double ruckWeightKg = preferMetric 
+            ? widget.ruckWeight 
+            : widget.ruckWeight / 2.20462; // Convert lbs to kg
+        double userWeightKg = preferMetric
+            ? widget.userWeight
+            : widget.userWeight / 2.20462; // Convert lbs to kg
+        _caloriesBurned = (_distance * 
+            (ruckWeightKg * 0.1 + userWeightKg) / 10) + 
+            (_elevationGain * 0.05 * (ruckWeightKg + userWeightKg));
       });
     }
   }
@@ -428,11 +454,18 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
             child: Column(
               children: [
                 // Time display
-                Text(
-                  _formatDuration(_elapsed),
-                  style: AppTextStyles.headline3.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
+                Center(
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    child: Text(
+                      _formatDuration(_elapsed),
+                      style: AppTextStyles.headline1.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 54, // much larger
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -464,6 +497,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                             value: distanceDisplay,
                             icon: Icons.straighten,
                             color: AppColors.primary,
+                            centerContent: true,
+                            valueFontSize: 40,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -474,6 +509,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                             value: paceDisplay,
                             icon: Icons.speed,
                             color: AppColors.secondary,
+                            centerContent: true,
+                            valueFontSize: 40,
                           ),
                         ),
                       ],
@@ -493,6 +530,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                             value: _caloriesBurned.toInt().toString(),
                             icon: Icons.local_fire_department,
                             color: AppColors.accent,
+                            centerContent: true,
+                            valueFontSize: 40,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -504,6 +543,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                             secondaryValue: elevationLossDisplay,
                             icon: Icons.terrain,
                             color: AppColors.success,
+                            centerContent: true,
+                            valueFontSize: 40,
                           ),
                         ),
                       ],

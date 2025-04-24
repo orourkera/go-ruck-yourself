@@ -54,7 +54,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   /// Check if user is logged in and navigate accordingly
   Future<void> _checkAuthStatus() async {
     // Add delay for splash screen
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 5));
     if (!mounted) return;
     context.read<AuthBloc>().add(AuthCheckRequested());
   }
@@ -64,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) async {
         if (_navigated) return;
-        await Future.delayed(const Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 5));
         if (!mounted) return;
         if (state is Authenticated) {
           _navigated = true;
@@ -86,12 +86,20 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Main logo image
-                Image.asset(
-                  'assets/images/go ruck yourself.png',
-                  width: 250,
-                  height: 250,
-                  fit: BoxFit.contain,
+                // Main logo image with animation
+                ScaleTransition(
+                  scale: Tween<double>(begin: 1.0, end: 1.5).animate(
+                    CurvedAnimation(
+                      parent: _animationController,
+                      curve: Curves.elasticOut,
+                    ),
+                  ),
+                  child: Image.asset(
+                    'assets/images/go ruck yourself.png',
+                    width: 281.25, // 375 * 0.75
+                    height: 281.25, // 375 * 0.75
+                    fit: BoxFit.contain,
+                  ),
                 ),
                 const SizedBox(height: 30),
                 // Loading indicator
@@ -105,6 +113,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   style: AppTextStyles.subtitle1.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
+                    fontFamily: 'Bangers',
+                    fontSize: AppTextStyles.subtitle1.fontSize != null ? AppTextStyles.subtitle1.fontSize! * 1.25 : 25,
                   ),
                 ),
               ],

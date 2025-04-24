@@ -119,6 +119,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       'final_elevation_gain': widget.elevationGain,
       'final_elevation_loss': widget.elevationLoss,
       'final_average_pace': widget.distance > 0 ? (widget.duration.inSeconds / 60 / widget.distance) : null,
+      'rating': _rating,
+      'perceived_exertion': _perceivedExertion,
+      'tags': _selectedTags,
     };
 
     // Remove null values (especially if average pace is not computable)
@@ -213,33 +216,43 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 1.5,
+                  childAspectRatio: 1.1,
                   children: [
                     StatCard(
                       title: 'Time',
                       value: _formatDuration(widget.duration),
                       icon: Icons.timer,
                       color: AppColors.primary,
+                      centerContent: true,
+                      valueFontSize: 36,
                     ),
                     StatCard(
                       title: 'Distance',
                       value: preferMetric
-                          ? '${widget.distance.toStringAsFixed(2)} km'
-                          : '${(widget.distance * 0.621371).toStringAsFixed(2)} mi',
+                          ? widget.distance.toStringAsFixed(2) + ' km'
+                          : (widget.distance * 0.621371).toStringAsFixed(2) + ' mi',
                       icon: Icons.straighten,
-                      color: AppColors.secondary,
+                      color: AppColors.primary,
+                      centerContent: true,
+                      valueFontSize: 36,
                     ),
                     StatCard(
                       title: 'Calories',
-                      value: '${widget.caloriesBurned}',
+                      value: widget.caloriesBurned.toString(),
                       icon: Icons.local_fire_department,
-                      color: Colors.orange,
+                      color: AppColors.accent,
+                      centerContent: true,
+                      valueFontSize: 36,
                     ),
                     StatCard(
                       title: 'Pace',
-                      value: _formatPace(),
+                      value: preferMetric
+                          ? _formatPace() + ' min/km'
+                          : _formatPace() + ' min/mi',
                       icon: Icons.speed,
-                      color: Colors.purple,
+                      color: AppColors.secondary,
+                      centerContent: true,
+                      valueFontSize: 36,
                     ),
                     StatCard(
                       title: 'Elevation',
@@ -250,15 +263,19 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                           ? '-${widget.elevationLoss.toStringAsFixed(1)} m'
                           : '-${(widget.elevationLoss * 3.28084).toStringAsFixed(1)} ft',
                       icon: Icons.terrain,
-                      color: Colors.green,
+                      color: AppColors.success,
+                      centerContent: true,
+                      valueFontSize: 36,
                     ),
                     StatCard(
                       title: 'Ruck Weight',
                       value: preferMetric
-                          ? '${widget.ruckWeight.toStringAsFixed(1)} kg'
-                          : '${(widget.ruckWeight * 2.20462).toStringAsFixed(1)} lbs',
+                          ? widget.ruckWeight.toStringAsFixed(1) + ' kg'
+                          : (widget.ruckWeight).toStringAsFixed(1) + ' lbs',
                       icon: Icons.fitness_center,
-                      color: Colors.blueGrey,
+                      color: AppColors.secondary,
+                      centerContent: true,
+                      valueFontSize: 36,
                     ),
                   ],
                 ),
