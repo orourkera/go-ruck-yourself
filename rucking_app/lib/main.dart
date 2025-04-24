@@ -6,10 +6,14 @@ import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_analytics/observer.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables from .env
+  await dotenv.load(fileName: ".env");
   
   // Initialize Firebase
   await Firebase.initializeApp();
