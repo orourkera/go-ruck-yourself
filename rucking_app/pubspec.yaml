@@ -31,7 +31,7 @@ dependencies:
   flutter_rating_bar: ^4.0.1
   
   # State Management
-  flutter_bloc: ^8.1.3
+  flutter_bloc: ^9.1.0
   equatable: ^2.0.5
   
   # Network
@@ -41,37 +41,38 @@ dependencies:
   
   # Storage
   shared_preferences: ^2.2.0
-  flutter_secure_storage: ^8.0.0
+  flutter_secure_storage: ^10.0.0-beta.4
   sqflite: ^2.3.0
   path: ^1.8.3
   
   # Location and Maps
-  geolocator: ^9.0.2
-  flutter_map: ^5.0.0
+  geolocator: ^14.0.0
+  flutter_map: ^8.1.1
   latlong2: ^0.9.0
   
   # Health Integration
-  health: ^12.1.0
+  # health: ^12.1.0
   
   # Utils
-  intl: ^0.18.1
+  intl: ^0.20.2
   json_annotation: ^4.9.0
-  permission_handler: ^10.4.3
+  permission_handler: ^12.0.0+1
   flutter_local_notifications: ^19.1.0
   get_it: ^8.0.3
   json_serializable: ^6.9.4
-  firebase_core: ^2.27.0
-  firebase_analytics: ^10.8.0
+  firebase_core: ^3.13.0
+  firebase_analytics: ^11.4.5
   keyboard_actions: ^4.2.0
   email_launcher: ^1.1.1
+  flutter_dotenv: ^5.1.0
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.2
+  flutter_lints: ^5.0.0
   build_runner: ^2.4.15
   mockito: ^5.4.2
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.3
 
 # Configuration for flutter_launcher_icons
 flutter_launcher_icons:
@@ -85,6 +86,7 @@ flutter:
   uses-material-design: true
   
   assets:
+    - .env
     - assets/images/
     # - assets/icons/   # Commented out because directory does not exist
   

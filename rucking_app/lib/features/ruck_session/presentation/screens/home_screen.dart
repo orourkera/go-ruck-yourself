@@ -547,11 +547,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                       width: double.infinity,
                                       child: FlutterMap(
                                         options: MapOptions(
-                                          center: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
-                                          zoom: routePoints.length > 1 ? _getFitZoom(routePoints) : 15.5,
-                                          interactiveFlags: InteractiveFlag.none,
-                                          bounds: routePoints.length > 1 ? LatLngBounds.fromPoints(routePoints) : null,
-                                          boundsOptions: const FitBoundsOptions(padding: EdgeInsets.all(20)),
+                                          initialCenter: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
+                                          initialZoom: routePoints.length > 1 ? _getFitZoom(routePoints) : 15.5,
+                                          interactionOptions: const InteractionOptions(
+                                            flags: InteractiveFlag.none, // Disable interactions for preview
+                                          ),
                                         ),
                                         children: [
                                           TileLayer(
@@ -574,7 +574,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                                   point: routePoints.last,
                                                   width: 20,
                                                   height: 20,
-                                                  builder: (ctx) => const Icon(Icons.location_pin, color: Colors.red, size: 20),
+                                                  child: const Icon(Icons.location_pin, color: Colors.red, size: 20),
                                                 ),
                                               ],
                                             ),
