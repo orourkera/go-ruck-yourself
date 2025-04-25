@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Subtitle
                   Text(
                     'Sign in to continue tracking your ruck sessions',
-                    style: AppTextStyles.body2.copyWith(color: AppColors.textDarkSecondary),
+                    style: AppTextStyles.body2.copyWith(color: Colors.white),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),

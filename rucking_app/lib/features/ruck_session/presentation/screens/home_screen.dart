@@ -291,7 +291,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         Text(
                           'Welcome back,',
                           style: AppTextStyles.body1.copyWith(
-                            color: AppColors.textDarkSecondary,
+                            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -299,6 +299,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           userName,
                           style: AppTextStyles.headline5.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
                           ),
                         ),
                       ],
@@ -490,14 +491,21 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         // Get calories directly from session map
                         final calories = session['calories_burned']?.toString() ?? '0';
                         
-                        // Get average pace directly from session map
-                        final averagePaceSecs = session['average_pace_seconds'] as int? ?? 0;
-                        final averagePace = Duration(seconds: averagePaceSecs);
-                        final averagePaceMinutes = averagePace.inMinutes;
-                        final averagePaceSeconds = averagePace.inSeconds % 60;
-                        final averagePaceDisplay = preferMetric 
-                            ? '${averagePaceMinutes}m ${averagePaceSeconds}s/km'
-                            : '${averagePaceMinutes}m ${averagePaceSeconds}s/mi';
+                        // Get average pace directly from session map (now using average_pace_min_km)
+                        final paceMinPerKm = (session['average_pace_min_km'] as num?)?.toDouble();
+                        double? paceMinPerMi;
+                        if (paceMinPerKm != null) {
+                          paceMinPerMi = paceMinPerKm / 0.621371;
+                        }
+                        final double? displayPace = preferMetric ? paceMinPerKm : paceMinPerMi;
+                        String averagePaceDisplay;
+                        if (displayPace != null && displayPace > 0) {
+                          final int minutes = displayPace.floor();
+                          final int seconds = ((displayPace - minutes) * 60).round();
+                          averagePaceDisplay = '${minutes}m ${seconds}s/' + (preferMetric ? 'km' : 'mi');
+                        } else {
+                          averagePaceDisplay = '0m 0s/' + (preferMetric ? 'km' : 'mi');
+                        }
                         
                         // Map route points
                         List<LatLng> routePoints = [];
@@ -526,6 +534,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           elevation: 1,
+                          color: Theme.of(context).cardColor, // Use theme card color (tan in dark mode)
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -590,12 +599,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                         formattedDate,
                                         style: AppTextStyles.subtitle1.copyWith(
                                           fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
                                         ),
                                       ),
                                       Text(
                                         durationText,
                                         style: AppTextStyles.body2.copyWith(
-                                          color: AppColors.textDarkSecondary,
+                                          color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                                         ),
                                       ),
                                     ],
@@ -689,12 +699,14 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         Icon(
           icon,
           size: 14,
-          color: AppColors.textDarkSecondary,
+          color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
         ),
         const SizedBox(width: 4),
         Text(
           value,
-          style: AppTextStyles.caption,
+          style: AppTextStyles.caption.copyWith(
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+          ),
         ),
       ],
     );

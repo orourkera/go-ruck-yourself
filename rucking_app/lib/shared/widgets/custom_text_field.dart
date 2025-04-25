@@ -112,7 +112,7 @@ class CustomTextField extends StatelessWidget {
           Text(
             label,
             style: AppTextStyles.subtitle2.copyWith(
-              color: AppColors.textDark,
+              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
               fontWeight: FontWeight.w500,
             ),
           ),

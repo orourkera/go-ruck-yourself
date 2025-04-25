@@ -276,18 +276,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Builds a section with a title and children
   Widget _buildSection({
     required String title,
+    String? subtitle,
     required List<Widget> children,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -300,9 +302,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title,
               style: AppTextStyles.subtitle1.copyWith(
                 fontWeight: FontWeight.bold,
+                color: isDark ? Color(0xFF728C69) : AppColors.textDark,
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          if (subtitle != null) ...[
+            Text(
+              subtitle!,
+              style: AppTextStyles.body2.copyWith(
+                color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(16),
@@ -321,6 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String label,
     required String value,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -338,13 +352,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   label,
                   style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textDarkSecondary,
+                    color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: AppTextStyles.body1,
+                  style: AppTextStyles.body1.copyWith(
+                    color: isDark ? Color(0xFF728C69) : AppColors.textDark,
+                  ),
                 ),
               ],
             ),
@@ -360,6 +376,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String label,
     required Widget trailing,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -373,7 +390,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(
             child: Text(
               label,
-              style: AppTextStyles.body1,
+              style: AppTextStyles.body1.copyWith(
+                color: isDark ? Color(0xFF728C69) : AppColors.textDark,
+              ),
             ),
           ),
           trailing,
@@ -388,6 +407,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -404,7 +424,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: Text(
                 label,
-                style: AppTextStyles.body1,
+                style: AppTextStyles.body1.copyWith(
+                  color: isDark ? Color(0xFF728C69) : AppColors.textDark,
+                ),
               ),
             ),
             const Icon(
@@ -421,26 +443,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showLogoutConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<AuthBloc>().add(AuthLogoutRequested());
-            },
-            child: Text(
-              'Logout',
-              style: TextStyle(color: AppColors.error),
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(
+              color: isDark ? Colors.black : null,
             ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.read<AuthBloc>().add(AuthLogoutRequested());
+              },
+              child: Text(
+                'Logout',
+                style: TextStyle(color: AppColors.error),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

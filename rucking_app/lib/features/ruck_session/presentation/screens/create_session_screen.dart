@@ -10,6 +10,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
+import 'package:keyboard_actions/keyboard_actions.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _userWeightController = TextEditingController();
   final _durationController = TextEditingController();
+  final FocusNode _durationFocusNode = FocusNode();
 
   double _ruckWeight = AppConfig.defaultRuckWeight;
   int? _plannedDuration; // Default is now empty
@@ -35,6 +37,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Set default ruck weight immediately
+    _ruckWeight = AppConfig.defaultRuckWeight;
+    setState(() {
+      _isLoading = true;
+    });
     
     // Get user's unit preference and load last session data
     final authState = context.read<AuthBloc>().state;
@@ -51,10 +59,11 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           _userWeightController.text = weightLbs.toStringAsFixed(1);
         }
       }
-      // --- End populate user weight ---
       _loadLastSessionData();
     } else {
-      _isLoading = false;
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -123,14 +132,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       } else {
         debugPrint('No sessions found');
       }
-      
-      // Hide loading indicator
-      setState(() {
-        _isLoading = false;
-      });
     } catch (e) {
       // Ignore errors when loading last session data
       debugPrint('Error loading last session data: $e');
+    } finally {
       setState(() {
         _isLoading = false;
       });
@@ -161,6 +166,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   void dispose() {
     _userWeightController.dispose();
     _durationController.dispose();
+    _durationFocusNode.dispose();
     super.dispose();
   }
 
@@ -282,139 +288,165 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   @override
   Widget build(BuildContext context) {
     final weightUnit = _preferMetric ? 'kg' : 'lbs';
+    final keyboardActionsConfig = KeyboardActionsConfig(
+      actions: [
+        KeyboardActionsItem(
+          focusNode: _durationFocusNode,
+          toolbarButtons: [
+            (node) => TextButton(
+                  onPressed: () {
+                    node.unfocus();
+                    if (!_isCreating) _createSession();
+                  },
+                  child: const Text('Done'),
+                ),
+          ],
+        ),
+      ],
+      nextFocus: false,
+    );
     
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Ruck Session'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Section title
-              Text(
-                'Session Details',
-                style: AppTextStyles.headline6,
-              ),
-              const SizedBox(height: 24),
-              
-              // Quick ruck weight selection
-              Text(
-                'Ruck Weight ($weightUnit)',
-                style: AppTextStyles.subtitle1.copyWith(
-                  fontWeight: FontWeight.bold,
+      body: KeyboardActions(
+        config: keyboardActionsConfig,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Section title
+                Text(
+                  'Session Details',
+                  style: AppTextStyles.headline6,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Weight is used to calculate calories burned during your ruck',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textDarkSecondary,
+                const SizedBox(height: 24),
+                
+                // Quick ruck weight selection
+                Text(
+                  'Ruck Weight ($weightUnit)',
+                  style: AppTextStyles.subtitle1.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 50,
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(),
-                      )
-                    : ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: _preferMetric 
-                          ? [5, 10, 15, 20, 25, 30, 35, 40].map((weight) => 
-                              Padding(
-                                padding: const EdgeInsets.only(right: 12),
-                                child: _buildWeightChip(weight.toDouble()),
-                              )
-                            ).toList()
-                          : [10, 20, 30, 40, 50, 60, 70, 80].map((weight) => 
-                              Padding(
-                                padding: const EdgeInsets.only(right: 12),
-                                child: _buildWeightChip(weight.toDouble()),
-                              )
-                            ).toList(),
-                      ),
-              ),
-              const SizedBox(height: 32),
-              
-              // User weight field (optional)
-              CustomTextField(
-                controller: _userWeightController,
-                label: 'Your Weight ($weightUnit)',
-                hint: 'Enter your weight',
-                keyboardType: TextInputType.number,
-                prefixIcon: Icons.monitor_weight_outlined,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your weight';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  if (double.parse(value) <= 0) {
-                    return 'Weight must be greater than 0';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              
-              // Planned duration field
-              CustomTextField(
-                controller: _durationController,
-                label: 'Planned Duration (minutes) - Optional',
-                hint: 'Enter planned duration',
-                keyboardType: TextInputType.number,
-                prefixIcon: Icons.timer_outlined,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    if (int.tryParse(value) == null) {
+                const SizedBox(height: 8),
+                Text(
+                  'Weight is used to calculate calories burned during your ruck',
+                  style: AppTextStyles.caption.copyWith(
+                    color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 50,
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(),
+                        )
+                      : ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: _preferMetric 
+                              ? [5, 10, 15, 20, 25, 30, 35, 40].map((weight) => 
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: _buildWeightChip(weight.toDouble()),
+                                  )
+                                ).toList()
+                              : [10, 20, 30, 40, 50, 60, 70, 80].map((weight) => 
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: _buildWeightChip(weight.toDouble()),
+                                  )
+                                ).toList(),
+                        ),
+                ),
+                const SizedBox(height: 32),
+                
+                // User weight field (optional)
+                CustomTextField(
+                  controller: _userWeightController,
+                  label: 'Your Weight ($weightUnit)',
+                  hint: 'Enter your weight',
+                  keyboardType: TextInputType.number,
+                  prefixIcon: Icons.monitor_weight_outlined,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your weight';
+                    }
+                    if (double.tryParse(value) == null) {
                       return 'Please enter a valid number';
                     }
-                    if (int.parse(value) <= 0) {
-                      return 'Duration must be greater than 0';
+                    if (double.parse(value) <= 0) {
+                      return 'Weight must be greater than 0';
                     }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-              
-              // Start session button - orange and full width
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.play_arrow),
-                  label: Text(
-                    'START SESSION', 
-                    style: AppTextStyles.button.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    )
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: _isCreating ? null : _createSession,
+                    return null;
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                
+                // Planned duration field
+                CustomTextField(
+                  controller: _durationController,
+                  label: 'Planned Duration (minutes) - Optional',
+                  hint: 'Enter planned duration',
+                  keyboardType: TextInputType.number,
+                  focusNode: _durationFocusNode,
+                  prefixIcon: Icons.timer_outlined,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      if (int.tryParse(value) == null) {
+                        return 'Please enter a valid number';
+                      }
+                      if (int.parse(value) <= 0) {
+                        return 'Duration must be greater than 0';
+                      }
+                    }
+                    return null;
+                  },
+                  onFieldSubmitted: (_) {
+                    FocusScope.of(context).unfocus(); // Hide keyboard
+                    if (!_isCreating) _createSession(); // Start session immediately
+                  },
+                ),
+                const SizedBox(height: 32),
+                
+                // Start session button - orange and full width
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.play_arrow),
+                    label: Text(
+                      'START SESSION', 
+                      style: AppTextStyles.button.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      )
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: _isCreating ? null : _createSession,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -425,6 +457,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   Widget _buildWeightChip(double weight) {
     final isSelected = _ruckWeight == weight;
     final weightUnit = _preferMetric ? 'kg' : 'lbs';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return GestureDetector(
       onTap: () {
@@ -445,7 +478,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         child: Text(
           '${weight.toInt()} $weightUnit',
           style: AppTextStyles.button.copyWith(
-            color: isSelected ? Colors.white : AppColors.textDark,
+            color: isSelected ? Colors.white : (isDark ? Color(0xFF728C69) : AppColors.textDark),
           ),
         ),
       ),
