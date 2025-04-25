@@ -26,10 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<!-- <key>NSHealthShareUsageDescription</key>
-	<string>This app uses your health data (distance and calories) to track and analyze your ruck sessions.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>This app uses your health data (distance, calories, heart rate) to track and analyze your ruck sessions.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>This app writes your ruck session distances and calories burned to Apple Health.</string> -->
+	<string>This app writes your ruck session distances, calories burned, and workouts to Apple Health.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs background location access to track your rucking sessions even when the app is in the background.</string>
 	<key>NSLocationAlwaysUsageDescription</key>

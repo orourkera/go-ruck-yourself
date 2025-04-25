@@ -17,16 +17,20 @@ class LocationPoint extends Equatable {
   /// Accuracy of the reading in meters
   final double accuracy;
   
+  /// Speed in meters per second (optional)
+  final double? speed;
+
   const LocationPoint({
     required this.latitude,
     required this.longitude,
     required this.elevation,
     required this.timestamp,
     required this.accuracy,
+    this.speed,
   });
   
   @override
-  List<Object?> get props => [latitude, longitude, elevation, timestamp, accuracy];
+  List<Object?> get props => [latitude, longitude, elevation, timestamp, accuracy, speed];
   
   /// Create a LocationPoint from JSON
   factory LocationPoint.fromJson(Map<String, dynamic> json) {
@@ -36,6 +40,7 @@ class LocationPoint extends Equatable {
       elevation: (json['elevation_meters'] as num).toDouble(),
       timestamp: DateTime.parse(json['timestamp'] as String),
       accuracy: (json['accuracy_meters'] as num).toDouble(),
+      speed: json['speed'] != null ? (json['speed'] as num).toDouble() : null,
     );
   }
   
@@ -47,6 +52,7 @@ class LocationPoint extends Equatable {
       'elevation_meters': elevation,
       'timestamp': timestamp.toIso8601String(),
       'accuracy_meters': accuracy,
+      if (speed != null) 'speed': speed,
     };
   }
 } 

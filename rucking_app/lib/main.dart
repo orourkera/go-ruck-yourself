@@ -5,6 +5,8 @@ import 'package:rucking_app/app.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -27,7 +29,16 @@ void main() async {
   
   // Run the app with BlocObserver for debugging
   Bloc.observer = AppBlocObserver();
-  runApp(const RuckingApp());
+  
+  // The health bloc will be provided separately since it's not part of the original service locator
+  runApp(
+    BlocProvider(
+      create: (context) => HealthBloc(
+        healthService: HealthService(),
+      ),
+      child: const RuckingApp(),
+    ),
+  );
 }
 
 /// Custom BlocObserver for debugging
