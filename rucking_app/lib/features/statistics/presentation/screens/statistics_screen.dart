@@ -298,6 +298,7 @@ class _StatsContentWidget extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildSummaryCard(
+                  context: context,
                   icon: Icons.directions_walk,
                   value: totalRucks.toString(),
                   label: 'Total Rucks',
@@ -307,6 +308,7 @@ class _StatsContentWidget extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: _buildSummaryCard(
+                  context: context,
                   icon: Icons.straighten,
                   value: '$distanceValue $distanceUnit',
                   label: 'Total Distance',
@@ -320,6 +322,7 @@ class _StatsContentWidget extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildSummaryCard(
+                  context: context,
                   icon: Icons.local_fire_department,
                   value: totalCalories.toString(),
                   label: 'Calories Burned',
@@ -329,6 +332,7 @@ class _StatsContentWidget extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: _buildSummaryCard(
+                  context: context,
                   icon: Icons.timer,
                   value: durationText,
                   label: 'Total Time',
@@ -342,13 +346,13 @@ class _StatsContentWidget extends StatelessWidget {
           
           // Performance metrics
           if (stats['performance'] != null)
-            _buildPerformanceSection(stats['performance']),
+            _buildPerformanceSection(context, stats['performance']),
           
           const SizedBox(height: 24),
           
           // Day breakdown (for weekly)
           if (timeframe == 'weekly' && stats['daily_breakdown'] != null)
-            _buildDailyBreakdownSection(stats['daily_breakdown']),
+            _buildDailyBreakdownSection(stats['daily_breakdown'], context),
         ],
       ),
     );
@@ -431,6 +435,7 @@ class _StatsContentWidget extends StatelessWidget {
 
   /// Builds a summary card
   Widget _buildSummaryCard({
+    required BuildContext context,
     required IconData icon,
     required String value,
     required String label,
@@ -439,7 +444,7 @@ class _StatsContentWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: color.withOpacity(0.3),
@@ -451,7 +456,7 @@ class _StatsContentWidget extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: color,
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : color,
             size: 24,
           ),
           const SizedBox(height: 12),
@@ -459,14 +464,14 @@ class _StatsContentWidget extends StatelessWidget {
             value,
             style: AppTextStyles.headline5.copyWith(
               fontWeight: FontWeight.bold,
-              color: AppColors.textDark,
+              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: AppTextStyles.caption.copyWith(
-              color: AppColors.textDarkSecondary,
+              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
             ),
           ),
         ],
@@ -475,7 +480,7 @@ class _StatsContentWidget extends StatelessWidget {
   }
 
   /// Builds the performance metrics section
-  Widget _buildPerformanceSection(Map<String, dynamic> performance) {
+  Widget _buildPerformanceSection(BuildContext context, Map<String, dynamic> performance) {
     final avgPaceValue = performance['avg_pace_seconds_per_km'] ?? 0;
     final avgPaceMinutes = (avgPaceValue / 60).floor();
     final avgPaceSeconds = (avgPaceValue % 60).round();
@@ -504,6 +509,7 @@ class _StatsContentWidget extends StatelessWidget {
           'Performance',
           style: AppTextStyles.subtitle1.copyWith(
             fontWeight: FontWeight.bold,
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
@@ -516,18 +522,21 @@ class _StatsContentWidget extends StatelessWidget {
             child: Column(
               children: [
                 _buildPerformanceItem(
+                  context: context,
                   label: 'Average Pace',
                   value: formattedPace,
                   icon: Icons.speed,
                 ),
                 const Divider(),
                 _buildPerformanceItem(
+                  context: context,
                   label: 'Average Distance',
                   value: '$avgDistanceValue $distanceUnit',
                   icon: Icons.straighten,
                 ),
                 const Divider(),
                 _buildPerformanceItem(
+                  context: context,
                   label: 'Average Duration',
                   value: avgDurationText,
                   icon: Icons.timer,
@@ -542,6 +551,7 @@ class _StatsContentWidget extends StatelessWidget {
 
   /// Builds a performance item
   Widget _buildPerformanceItem({
+    required BuildContext context,
     required String label,
     required String value,
     required IconData icon,
@@ -549,7 +559,7 @@ class _StatsContentWidget extends StatelessWidget {
     return ListTile(
       leading: Icon(
         icon,
-        color: AppColors.primary,
+        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.primary,
       ),
       title: Text(
         label,
@@ -565,7 +575,7 @@ class _StatsContentWidget extends StatelessWidget {
   }
 
   /// Builds the daily breakdown section for weekly view
-  Widget _buildDailyBreakdownSection(List<dynamic> dailyBreakdown) {
+  Widget _buildDailyBreakdownSection(List<dynamic> dailyBreakdown, BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -573,6 +583,7 @@ class _StatsContentWidget extends StatelessWidget {
           'Daily Breakdown',
           style: AppTextStyles.subtitle1.copyWith(
             fontWeight: FontWeight.bold,
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
@@ -590,7 +601,7 @@ class _StatsContentWidget extends StatelessWidget {
                 ? distanceKm.toStringAsFixed(1)
                 : (distanceKm * 0.621371).toStringAsFixed(1);
             final distanceUnit = preferMetric ? 'km' : 'mi';
-            
+            final isDark = Theme.of(context).brightness == Brightness.dark;
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               shape: RoundedRectangleBorder(
@@ -608,16 +619,19 @@ class _StatsContentWidget extends StatelessWidget {
                       dayName,
                       style: AppTextStyles.body1.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: isDark ? Color(0xFF728C69) : AppColors.textDark,
                       ),
                     ),
                     Text(
                       '$distanceValue $distanceUnit',
-                      style: AppTextStyles.body1,
+                      style: AppTextStyles.body1.copyWith(
+                        color: isDark ? Color(0xFF728C69) : AppColors.textDark,
+                      ),
                     ),
                     Text(
                       '$sessionsCount ${sessionsCount == 1 ? 'ruck' : 'rucks'}',
                       style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textDarkSecondary,
+                        color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                       ),
                     ),
                   ],
@@ -648,17 +662,17 @@ class _WeeklyStatsTab extends StatelessWidget {
           const SizedBox(height: 24),
           
           // Summary cards
-          _buildSummarySection(),
+          _buildSummarySection(context),
           
           const SizedBox(height: 24),
           
           // Daily breakdown
-          _buildDailyBreakdownSection(),
+          _buildDailyBreakdownSection(context),
           
           const SizedBox(height: 24),
           
           // Performance metrics
-          _buildPerformanceSection(),
+          _buildPerformanceSection(context),
         ],
       ),
     );
@@ -690,7 +704,7 @@ class _WeeklyStatsTab extends StatelessWidget {
   }
 
   /// Builds the summary cards section
-  Widget _buildSummarySection() {
+  Widget _buildSummarySection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -698,6 +712,7 @@ class _WeeklyStatsTab extends StatelessWidget {
           'Summary',
           style: AppTextStyles.subtitle1.copyWith(
             fontWeight: FontWeight.bold,
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
@@ -705,6 +720,7 @@ class _WeeklyStatsTab extends StatelessWidget {
           children: [
             Expanded(
               child: _buildSummaryCard(
+                context: context,
                 icon: Icons.directions_walk,
                 value: '3',
                 label: 'Total Rucks',
@@ -714,6 +730,7 @@ class _WeeklyStatsTab extends StatelessWidget {
             const SizedBox(width: 16),
             Expanded(
               child: _buildSummaryCard(
+                context: context,
                 icon: Icons.straighten,
                 value: '13.5 km',
                 label: 'Total Distance',
@@ -727,6 +744,7 @@ class _WeeklyStatsTab extends StatelessWidget {
           children: [
             Expanded(
               child: _buildSummaryCard(
+                context: context,
                 icon: Icons.local_fire_department,
                 value: '1,680',
                 label: 'Calories Burned',
@@ -736,6 +754,7 @@ class _WeeklyStatsTab extends StatelessWidget {
             const SizedBox(width: 16),
             Expanded(
               child: _buildSummaryCard(
+                context: context,
                 icon: Icons.timer,
                 value: '3:12:00',
                 label: 'Total Time',
@@ -750,6 +769,7 @@ class _WeeklyStatsTab extends StatelessWidget {
 
   /// Builds a summary card
   Widget _buildSummaryCard({
+    required BuildContext context,
     required IconData icon,
     required String value,
     required String label,
@@ -758,7 +778,7 @@ class _WeeklyStatsTab extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: color.withOpacity(0.3),
@@ -770,7 +790,7 @@ class _WeeklyStatsTab extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: color,
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : color,
             size: 24,
           ),
           const SizedBox(height: 12),
@@ -778,14 +798,14 @@ class _WeeklyStatsTab extends StatelessWidget {
             value,
             style: AppTextStyles.headline5.copyWith(
               fontWeight: FontWeight.bold,
-              color: AppColors.textDark,
+              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: AppTextStyles.caption.copyWith(
-              color: AppColors.textDarkSecondary,
+              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
             ),
           ),
         ],
@@ -794,7 +814,7 @@ class _WeeklyStatsTab extends StatelessWidget {
   }
 
   /// Builds the daily breakdown section
-  Widget _buildDailyBreakdownSection() {
+  Widget _buildDailyBreakdownSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -802,13 +822,14 @@ class _WeeklyStatsTab extends StatelessWidget {
           'Daily Breakdown',
           style: AppTextStyles.subtitle1.copyWith(
             fontWeight: FontWeight.bold,
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
         Container(
           height: 200,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
@@ -824,7 +845,7 @@ class _WeeklyStatsTab extends StatelessWidget {
             child: Text(
               'Bar Chart: Daily Distance',
               style: AppTextStyles.body2.copyWith(
-                color: AppColors.textDarkSecondary,
+                color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
               ),
             ),
           ),
@@ -834,7 +855,7 @@ class _WeeklyStatsTab extends StatelessWidget {
   }
 
   /// Builds the performance metrics section
-  Widget _buildPerformanceSection() {
+  Widget _buildPerformanceSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -842,10 +863,12 @@ class _WeeklyStatsTab extends StatelessWidget {
           'Performance',
           style: AppTextStyles.subtitle1.copyWith(
             fontWeight: FontWeight.bold,
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
         _buildMetricCard(
+          context: context,
           label: 'Average Pace',
           value: '14.2 min/km',
           change: '+0.5 from last week',
@@ -853,6 +876,7 @@ class _WeeklyStatsTab extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _buildMetricCard(
+          context: context,
           label: 'Average Duration',
           value: '1h 04m',
           change: '+8m from last week',
@@ -860,6 +884,7 @@ class _WeeklyStatsTab extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _buildMetricCard(
+          context: context,
           label: 'Average Distance',
           value: '4.5 km',
           change: '+0.3 km from last week',
@@ -871,6 +896,7 @@ class _WeeklyStatsTab extends StatelessWidget {
 
   /// Builds a performance metric card
   Widget _buildMetricCard({
+    required BuildContext context,
     required String label,
     required String value,
     required String change,
@@ -879,7 +905,7 @@ class _WeeklyStatsTab extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -898,7 +924,7 @@ class _WeeklyStatsTab extends StatelessWidget {
               Text(
                 label,
                 style: AppTextStyles.subtitle2.copyWith(
-                  color: AppColors.textDarkSecondary,
+                  color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -917,8 +943,8 @@ class _WeeklyStatsTab extends StatelessWidget {
                     ? Icons.arrow_upward
                     : Icons.arrow_downward,
                 color: isPositive
-                    ? AppColors.success
-                    : AppColors.error,
+                    ? (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.success)
+                    : (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.error),
                 size: 16,
               ),
               const SizedBox(width: 4),
@@ -926,8 +952,8 @@ class _WeeklyStatsTab extends StatelessWidget {
                 change,
                 style: AppTextStyles.caption.copyWith(
                   color: isPositive
-                      ? AppColors.success
-                      : AppColors.error,
+                      ? (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.success)
+                      : (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.error),
                 ),
               ),
             ],

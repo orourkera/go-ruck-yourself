@@ -202,7 +202,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 16),
               Text(
                 'Weight and height information help calculate calories burned during your rucking sessions more accurately.',
-                style: AppTextStyles.caption.copyWith(color: AppColors.textDarkSecondary),
+                style: AppTextStyles.caption.copyWith(
+                  color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -217,7 +219,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                     'Cancel',
-                     style: AppTextStyles.button.copyWith(color: AppColors.textDarkSecondary),
+                     style: AppTextStyles.button.copyWith(
+                       color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                     ),
                  ),
               ),
             ],

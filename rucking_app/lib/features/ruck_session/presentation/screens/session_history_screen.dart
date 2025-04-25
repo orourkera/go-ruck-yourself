@@ -404,6 +404,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with RouteA
   
   /// Builds a session statistic item
   Widget _buildSessionStat(IconData icon, String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -412,13 +413,13 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with RouteA
             Icon(
               icon,
               size: 16,
-              color: AppColors.textDarkSecondary,
+              color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
             ),
             const SizedBox(width: 4),
             Text(
               label,
               style: AppTextStyles.caption.copyWith(
-                color: AppColors.textDarkSecondary,
+                color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
               ),
             ),
           ],
@@ -428,6 +429,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with RouteA
           value,
           style: AppTextStyles.body1.copyWith(
             fontWeight: FontWeight.bold,
+            color: isDark ? Color(0xFF728C69) : AppColors.textDark,
           ),
         ),
       ],
