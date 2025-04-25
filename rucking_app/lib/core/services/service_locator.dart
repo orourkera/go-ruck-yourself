@@ -5,9 +5,11 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Global service locator instance
@@ -41,6 +43,10 @@ Future<void> setupServiceLocator() async {
     )
   );
   getIt.registerSingleton<LocationService>(LocationServiceImpl());
+  getIt.registerSingleton<HealthService>(HealthService());
+  
+  // Register watch communication service
+  getIt.registerSingleton<WatchService>(WatchService());
   
   // Repositories
   getIt.registerSingleton<AuthRepository>(
