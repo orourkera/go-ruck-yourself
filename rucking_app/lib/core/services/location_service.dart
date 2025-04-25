@@ -78,6 +78,7 @@ class LocationServiceImpl implements LocationService {
       elevation: position.altitude,
       timestamp: DateTime.now(),
       accuracy: position.accuracy,
+      speed: position.speed,
     );
   }
   
@@ -96,6 +97,7 @@ class LocationServiceImpl implements LocationService {
               elevation: position.altitude,
               timestamp: DateTime.now(),
               accuracy: position.accuracy,
+              speed: position.speed,
             ))
         .handleError((error) {
           debugPrint('Location tracking error (continuing stream): $error');
