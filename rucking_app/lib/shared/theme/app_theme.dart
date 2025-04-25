@@ -136,8 +136,38 @@ class AppTheme {
     );
   }
 
-  /// Dark theme configuration with rustic style
+  /// Dark theme configuration: same as light, but with black background
   static ThemeData get darkTheme {
+    final base = lightTheme;
+    return base.copyWith(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: Colors.black,
+      colorScheme: base.colorScheme.copyWith(
+        brightness: Brightness.dark,
+        background: Colors.black,
+        surface: Colors.black,
+      ),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+        iconTheme: IconThemeData(color: AppColors.secondary), // Orange back arrows
+      ),
+      cardTheme: base.cardTheme.copyWith(
+        color: AppColors.backgroundLight, // Use tan color for containers in dark mode
+      ),
+      bottomNavigationBarTheme: base.bottomNavigationBarTheme.copyWith(
+        backgroundColor: Colors.black,
+      ),
+      checkboxTheme: base.checkboxTheme.copyWith(
+        checkColor: MaterialStateProperty.all<Color>(Colors.white),
+        fillColor: MaterialStateProperty.all<Color>(AppColors.secondary),
+      ),
+      textTheme: _getTextTheme(Color(0xFF728C69)), // Olive green for body text in dark mode
+    );
+  }
+
+  /// Dark theme configuration with rustic style
+  static ThemeData get darkThemeOriginal {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,

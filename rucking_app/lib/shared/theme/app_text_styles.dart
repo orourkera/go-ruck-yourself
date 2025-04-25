@@ -66,6 +66,7 @@ class AppTextStyles {
     fontWeight: FontWeight.normal,
     fontSize: 16,
     letterSpacing: 0.5,
+    // No color here; set by theme
   );
   
   static const TextStyle body2 = TextStyle(
@@ -73,7 +74,7 @@ class AppTextStyles {
     fontWeight: FontWeight.normal,
     fontSize: 14,
     letterSpacing: 0.25,
-    color: Color(0xFF728C69), // Olive green
+    // No color here; set by theme
   );
   
   // Other styles with Bangers font for buttons

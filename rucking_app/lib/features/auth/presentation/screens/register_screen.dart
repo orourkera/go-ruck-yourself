@@ -84,6 +84,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardActionsConfig = KeyboardActionsConfig(
+      actions: [
+        KeyboardActionsItem(
+          focusNode: _weightFocusNode,
+          toolbarButtons: [
+            (node) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: TextButton(
+                onPressed: () => node.unfocus(),
+                child: Text(
+                  'Done',
+                  style: TextStyle(
+                    fontFamily: 'Bangers',
+                    fontSize: 18,
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
@@ -139,24 +162,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         body: SafeArea(
           child: KeyboardActions(
-            config: KeyboardActionsConfig(
-              actions: [
-                KeyboardActionsItem(
-                  focusNode: _weightFocusNode,
-                  toolbarButtons: [
-                    (node) {
-                      return GestureDetector(
-                        onTap: () => node.unfocus(),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text('Done', style: TextStyle(color: Colors.blue)),
-                        ),
-                      );
-                    }
-                  ],
-                ),
-              ],
-            ),
+            config: keyboardActionsConfig,
             child: Stack(
               children: [
                 SingleChildScrollView(
@@ -271,20 +277,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             },
                           ),
                           const SizedBox(height: 20),
-                          CustomTextField(
-                            controller: _weightController,
-                            label: _preferMetric ? 'Weight (kg)' : 'Weight (lbs)',
-                            hint: _preferMetric ? 'Enter your weight in kg' : 'Enter your weight in lbs',
-                            keyboardType: TextInputType.number,
-                            prefixIcon: Icons.monitor_weight_outlined,
-                            textInputAction: TextInputAction.done,
-                            focusNode: _weightFocusNode,
-                            onFieldSubmitted: (_) {
-                              FocusScope.of(context).unfocus();
-                            },
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                            ],
+                          KeyboardActions(
+                            config: keyboardActionsConfig,
+                            child: CustomTextField(
+                              controller: _weightController,
+                              label: _preferMetric ? 'Weight (kg)' : 'Weight (lbs)',
+                              hint: _preferMetric ? 'Enter your weight in kg' : 'Enter your weight in lbs',
+                              keyboardType: TextInputType.number,
+                              prefixIcon: Icons.monitor_weight_outlined,
+                              textInputAction: TextInputAction.done,
+                              focusNode: _weightFocusNode,
+                              onFieldSubmitted: (_) {
+                                FocusScope.of(context).unfocus();
+                              },
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 20),
                           Row(

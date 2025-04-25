@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rucking_app/core/models/location_point.dart';
@@ -22,7 +23,7 @@ abstract class LocationService {
   Future<LocationPoint> getCurrentLocation();
   
   /// Start tracking location
-  Stream<LocationPoint> startLocationTracking({int intervalMs = 5000});
+  Stream<LocationPoint> startLocationTracking({int intervalMs = 1000});
   
   /// Stop tracking location
   Future<void> stopLocationTracking();
@@ -81,33 +82,25 @@ class LocationServiceImpl implements LocationService {
   }
   
   @override
-  Stream<LocationPoint> startLocationTracking({int intervalMs = 5000}) {
-    // Stop any existing tracking
-    stopLocationTracking();
-    
-    // Configure location options
+  Stream<LocationPoint> startLocationTracking({int intervalMs = 1000}) {
+    debugPrint('Starting location tracking with interval: $intervalMs ms');
     final locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 10, // minimum distance (in meters) to travel before updates
-      timeLimit: Duration(milliseconds: intervalMs),
+      distanceFilter: 0, // minimum distance to travel before updates
+      // timeLimit REMOVED to allow indefinite waiting for a fix
     );
-    
-    // Start listening to location updates
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      final locationPoint = LocationPoint(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        elevation: position.altitude,
-        timestamp: DateTime.now(),
-        accuracy: position.accuracy,
-      );
-      
-      _locationController.add(locationPoint);
-    });
-    
-    return _locationController.stream;
+    return Geolocator.getPositionStream(locationSettings: locationSettings)
+        .map((position) => LocationPoint(
+              latitude: position.latitude,
+              longitude: position.longitude,
+              elevation: position.altitude,
+              timestamp: DateTime.now(),
+              accuracy: position.accuracy,
+            ))
+        .handleError((error) {
+          debugPrint('Location tracking error (continuing stream): $error');
+          // Do nothing on error to keep the stream alive; next update will retry
+        });
   }
   
   @override

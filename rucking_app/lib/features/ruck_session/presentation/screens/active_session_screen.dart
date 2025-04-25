@@ -167,21 +167,22 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   /// Handle incoming location updates
   void _handleLocationUpdate(LocationPoint locationPoint) {
-    if (_isPaused) return;
-    
-    final now = DateTime.now();
-    
-    // Add point to local list
-    setState(() {
-      _locationPoints.add(locationPoint);
-    });
-    
-    // Calculate stats based on new point
+    if (_isPaused) return; // Skip everything if paused - no updates at all
+
+    // Log to confirm location update received
+    debugPrint('Received location update: ${locationPoint.latitude}, ${locationPoint.longitude}');
+
+    // Always store every point for the path when not paused
+    _locationPoints.add(locationPoint);
+
+    // Update UI for map and stats
+    setState(() {}); // Rebuild UI for map and stats
+
     _calculateStats(locationPoint);
-    
+
     // Send update to API every 10 seconds
-    if (_lastLocationUpdate == null || 
-        now.difference(_lastLocationUpdate!).inSeconds >= 10) {
+    final now = DateTime.now();
+    if (_lastLocationUpdate == null || now.difference(_lastLocationUpdate!).inSeconds >= 10) {
       _sendLocationUpdate(locationPoint);
       _lastLocationUpdate = now;
     }
@@ -238,37 +239,26 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   }
   
   /// Send location update to API
-  Future<void> _sendLocationUpdate(LocationPoint point) async {
+  Future<void> _sendLocationUpdate(LocationPoint locationPoint) async {
     try {
-      final response = await _apiClient.post(
+      // Ensure all numeric values are doubles
+      final payload = {
+        'latitude': locationPoint.latitude.toDouble(),
+        'longitude': locationPoint.longitude.toDouble(),
+        'elevation_meters': locationPoint.elevation.toDouble(),
+        'timestamp': locationPoint.timestamp.toIso8601String(),
+        'accuracy_meters': locationPoint.accuracy.toDouble(),
+      };
+      debugPrint('Sending location update payload: $payload');
+      await _apiClient.post(
         '/rucks/${widget.ruckId}/location',
-        {
-          'latitude': point.latitude,
-          'longitude': point.longitude,
-          'elevation_meters': point.elevation,
-          'timestamp': point.timestamp.toIso8601String(),
-          'accuracy_meters': point.accuracy,
-        },
-      );
-      
-      // Update stats from server if available
-      if (response.containsKey('current_stats')) {
-        final stats = response['current_stats'];
-        setState(() {
-          _distance = stats['distance_km'] ?? _distance;
-          _caloriesBurned = stats['calories_burned']?.toDouble() ?? _caloriesBurned;
-          _elevationGain = stats['elevation_gain_meters'] ?? _elevationGain;
-          _elevationLoss = stats['elevation_loss_meters'] ?? _elevationLoss;
-          
-          // Calculate pace from duration and distance
-          if (stats['average_pace_min_km'] != null) {
-            _pace = stats['average_pace_min_km'];
-          }
-        });
-      }
+        payload,
+      ).catchError((e) {
+        debugPrint('Failed to send location update: $e');
+        return; // Ensure a return even in error case
+      });
     } catch (e) {
-      // Handle error silently to avoid disturbing the user
-      print('Failed to send location update: $e');
+      debugPrint('Error in _sendLocationUpdate: $e');
     }
   }
   
@@ -311,7 +301,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _elapsed = Duration(seconds: _stopwatch.elapsed.inSeconds);
         // Recalculate pace and calories in real time
         if (_distance > 0 && _elapsed.inSeconds > 0) {
-          _pace = _elapsed.inMinutes / _distance; // min/km
+          _pace = (_elapsed.inSeconds / 60) / _distance; // min/km
         }
         // Calories calculation (repeat logic from _calculateStats)
         final authState = context.read<AuthBloc>().state;
@@ -335,20 +325,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       if (_isPaused) {
         _stopwatch.start();
         _isPaused = false;
-        
         // Resume location tracking
-        _initLocationTracking();
-        
+        _locationSubscription?.resume();
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/resume', {})
             .catchError((e) => print('Failed to resume session: $e'));
       } else {
         _stopwatch.stop();
         _isPaused = true;
-        
         // Pause location tracking
         _locationSubscription?.pause();
-        
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/pause', {})
             .catchError((e) => print('Failed to pause session: $e'));
@@ -393,23 +379,31 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   void _showEndConfirmationDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('End Session'),
-        content: const Text('Are you sure you want to end this session?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          title: const Text('End Session'),
+          content: Text(
+            'Are you sure you want to end this session?',
+            style: TextStyle(
+              color: isDark ? Colors.black : null,
+            ),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _endSession();
-            },
-            child: const Text('End Session'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _endSession();
+              },
+              child: const Text('End Session'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -456,18 +450,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         ? '${_pace.toStringAsFixed(2)} min/km'
         : '${(_pace / 0.621371).toStringAsFixed(2)} min/mi';
         
-    // Format elevation gain based on user preference
-    final String elevationGainDisplay = preferMetric
-        ? '+${_elevationGain.toStringAsFixed(1)} m'
-        : '+${(_elevationGain * 3.28084).toStringAsFixed(1)} ft';
-        
-    // Format elevation loss based on user preference
-    final String elevationLossDisplay = preferMetric
-        ? '-${_elevationLoss.toStringAsFixed(1)} m'
-        : '-${(_elevationLoss * 3.28084).toStringAsFixed(1)} ft';
+    // Show only elevation difference (gain - loss)
+    final double elevationDiff = _elevationGain - _elevationLoss;
+    final String elevationDiffDisplay = preferMetric
+        ? '${elevationDiff >= 0 ? '+' : ''}${elevationDiff.toStringAsFixed(1)} m'
+        : '${elevationDiff >= 0 ? '+' : ''}${(elevationDiff * 3.28084).toStringAsFixed(1)} ft';
     
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('ACTIVE SESSION'),
         centerTitle: true,
@@ -496,6 +486,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                   TileLayer(
                     urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
                     userAgentPackageName: 'com.getrucky.gfy',
+                    retinaMode: true, // Enable retina mode explicitly as a boolean
                   ),
                   if (_locationPoints.isNotEmpty)
                     PolylineLayer(
@@ -613,8 +604,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                               Expanded(
                                 child: StatCard(
                                   title: 'Elevation',
-                                  value: elevationGainDisplay,
-                                  secondaryValue: elevationLossDisplay,
+                                  value: elevationDiffDisplay,
                                   icon: Icons.terrain,
                                   color: AppColors.success,
                                   centerContent: true,
