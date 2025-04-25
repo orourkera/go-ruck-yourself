@@ -644,37 +644,61 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
 
   /// Shows a confirmation dialog for ending session due to idle time
   void _showIdleEndConfirmationDialog() {
-    // Only show if not already showing another dialog
     if (_isEnding) return;
-    
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('No Activity Detected'),
-          content: const Text('You\'ve been idle for over 2 minutes. Would you like to end this session?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Resume tracking
-                if (_isPaused) {
-                  _togglePause();
-                }
-              },
-              child: const Text('CONTINUE SESSION'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _endSession();
-              },
-              child: Text(
-                'END SESSION',
-                style: TextStyle(color: Colors.red),
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).dialogBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'NO ACTIVITY DETECTED',
+                style: AppTextStyles.headline6.copyWith(fontWeight: FontWeight.bold),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              const Text(
+                "You've been idle for over 2 minutes. Would you like to end this session?",
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      if (_isPaused) _togglePause();
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.secondary,
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    child: const Text('CONTINUE SESSION'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _endSession();
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    child: const Text('END SESSION'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
