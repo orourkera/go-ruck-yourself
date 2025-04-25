@@ -51,7 +51,7 @@ dependencies:
   latlong2: ^0.9.0
   
   # Health Integration
-  # health: ^12.1.0
+  health: ^12.1.0
   
   # Utils
   intl: ^0.20.2

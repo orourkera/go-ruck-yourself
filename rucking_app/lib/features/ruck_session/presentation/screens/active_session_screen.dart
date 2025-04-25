@@ -1,24 +1,29 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:intl/intl.dart';
+import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
-import 'package:rucking_app/core/models/location_point.dart';
-import 'package:rucking_app/core/api/api_exceptions.dart';
-import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
+import 'package:rucking_app/core/utils/met_calculator.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
-import 'package:rucking_app/shared/widgets/custom_button.dart';
-import 'package:rucking_app/shared/widgets/stat_card.dart';
-import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
+import 'package:rucking_app/core/api/api_exceptions.dart';
+import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 
 LatLng _getRouteCenter(List locationPoints) {
   if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
@@ -64,16 +69,21 @@ class ActiveSessionScreen extends StatefulWidget {
 
 class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsBindingObserver {
   // Services
-  late final LocationServiceImpl _locationService;
-  late final ApiClient _apiClient;
+  late LocationService _locationService;
+  late ApiClient _apiClient;
+  late SessionValidationService _validationService;
+  late HealthService _healthService;
   
   // Session state
   bool _isPaused = false;
   bool _isEnding = false;
+  String? _validationMessage;
+  bool _showValidationMessage = false;
   
   // Timer variables
   late Stopwatch _stopwatch;
-  late Timer _timer;
+  Timer? _timer;
+  Timer? _heartRateTimer;
   Duration _elapsed = Duration.zero;
   // Countdown for planned duration
   Duration? _plannedCountdownStart;
@@ -89,7 +99,18 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   double _caloriesBurned = 0.0;
   double _elevationGain = 0.0;
   double _elevationLoss = 0.0;
-  
+  double? _heartRate; // Current heart rate from health kit
+  List<double> _recentPaces = [];
+  bool _canShowStats = false;
+  double _uncountedDistance = 0.0;
+
+  /// Shows an error message in a SnackBar
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -98,6 +119,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     // Initialize services
     _locationService = LocationServiceImpl();
     _apiClient = GetIt.instance<ApiClient>();
+    _validationService = SessionValidationService();
+    _healthService = HealthService();
+    
+    // Set user ID for health service from auth state
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      _healthService.setUserId(authState.user.userId);
+    }
     
     // Reset all session stats to ensure a clean start
     _distance = 0.0;
@@ -108,18 +137,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _elapsed = Duration.zero;
     _locationPoints.clear();
     _lastLocationUpdate = null;
+    _recentPaces.clear();
+    _canShowStats = false;
+    _uncountedDistance = 0.0;
     
     // Request location permission at startup
     _requestLocationPermission();
     
     // Start session timer
-    _stopwatch = Stopwatch()..start();
-    _timer = Timer.periodic(const Duration(seconds: 1), _updateTime);
-    
-    // Start location tracking (will only run if permission granted)
-    _initLocationTracking();
-    
-    // Notify API that session has started
     _startSession();
     
     // Set planned countdown if provided
@@ -131,9 +156,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _timer.cancel();
+    _timer?.cancel();
     _stopwatch.stop();
     _locationSubscription?.cancel();
+    _stopHeartRateMonitoring();
     super.dispose();
   }
   
@@ -167,75 +193,181 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   /// Handle incoming location updates
   void _handleLocationUpdate(LocationPoint locationPoint) {
-    if (_isPaused) return; // Skip everything if paused - no updates at all
-
-    // Log to confirm location update received
-    debugPrint('Received location update: ${locationPoint.latitude}, ${locationPoint.longitude}');
-
-    // Always store every point for the path when not paused
-    _locationPoints.add(locationPoint);
-
-    // Update UI for map and stats
-    setState(() {}); // Rebuild UI for map and stats
-
-    _calculateStats(locationPoint);
-
-    // Send update to API every 10 seconds
-    final now = DateTime.now();
-    if (_lastLocationUpdate == null || now.difference(_lastLocationUpdate!).inSeconds >= 10) {
-      _sendLocationUpdate(locationPoint);
-      _lastLocationUpdate = now;
+    if (_isPaused) return;
+    
+    if (_locationPoints.isNotEmpty) {
+      // Validate the location point
+      final previousPoint = _locationPoints.last;
+      final validation = _validationService.validateLocationPoint(
+        locationPoint, 
+        previousPoint, 
+      );
+      
+      // Handle invalid points
+      if (!validation['isValid']) {
+        // Show error message
+        setState(() {
+          _validationMessage = validation['message'];
+          _showValidationMessage = true;
+        });
+        
+        // Hide message after 5 seconds
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) {
+            setState(() {
+              _showValidationMessage = false;
+            });
+          }
+        });
+        
+        // Don't process invalid points
+        return;
+      }
+      
+      // Check if session should end due to long idle time
+      if (validation['shouldEnd'] == true) {
+        setState(() {
+          _validationMessage = validation['message'];
+          _showValidationMessage = true;
+        });
+        
+        // Show a dialog asking the user if they want to end the session
+        _showIdleEndConfirmationDialog();
+        return;
+      }
+      
+      // Auto-pause if needed
+      if (validation['shouldPause'] && !_isPaused) {
+        setState(() {
+          _validationMessage = validation['message'];
+          _showValidationMessage = true;
+        });
+        _togglePause();
+        return;
+      }
+      
+      // Check if initial distance threshold has been reached
+      if (validation.containsKey('initialDistanceReached') && 
+          validation['initialDistanceReached'] == true && 
+          !_canShowStats) {
+        setState(() {
+          _canShowStats = true;
+          // Transfer accumulated untracked distance to official distance
+          _uncountedDistance = _validationService.getAccumulatedDistanceMeters();
+          _distance = _uncountedDistance / 1000; // Convert to km
+        });
+      }
     }
+    
+    // Add point to route
+    _locationPoints.add(locationPoint);
+    _lastLocationUpdate = DateTime.now();
+    
+    // Only calculate stats if we're past initial threshold or this is first couple of points
+    if (_canShowStats || _locationPoints.length <= 2) {
+      _calculateStats(locationPoint);
+    }
+    
+    // Update the UI
+    setState(() {});
+    
+    // Send point to API in the background
+    _sendLocationUpdate(locationPoint);
   }
-  
+
   /// Calculate new stats based on new location point
   void _calculateStats(LocationPoint newPoint) {
+    // Only process if we have at least two points
     if (_locationPoints.length < 2) return;
     
+    // Get previous point for calculations
     final previousPoint = _locationPoints[_locationPoints.length - 2];
     
-    // Calculate distance increment
-    final double distanceIncrement = _locationService.calculateDistance(
-      previousPoint, 
-      newPoint,
-    );
+    // Calculate distance between points in kilometers
+    final distanceMeters = _locationService.calculateDistance(previousPoint, newPoint) * 1000;
     
-    // Calculate elevation changes
-    double elevationChange = newPoint.elevation - previousPoint.elevation;
-    double elevationGainIncrement = elevationChange > 0 ? elevationChange : 0;
-    double elevationLossIncrement = elevationChange < 0 ? -elevationChange : 0;
-    
-    setState(() {
+    // Only update stats if we're past the initial threshold or collecting initial data
+    if (_canShowStats) {
       // Update distance
-      _distance += distanceIncrement;
+      _distance += distanceMeters / 1000; // Convert to km
       
-      // Update pace (minutes per km)
-      _pace = _distance > 0
-          ? (_elapsed.inSeconds / 60) / _distance
-          : 0.0;
+      // Calculate elevation changes
+      final elevationChange = newPoint.elevation - previousPoint.elevation;
+      if (elevationChange > 0) {
+        _elevationGain += elevationChange;
+      } else {
+        _elevationLoss += elevationChange.abs();
+      }
       
-      // Update elevation metrics
-      _elevationGain += elevationGainIncrement;
-      _elevationLoss += elevationLossIncrement;
+      // Calculate pace (min/km) - time taken for this segment / distance in km
+      double segmentPace = 0.0;
+      if (distanceMeters > 0) {
+        segmentPace = (DateTime.now().difference(previousPoint.timestamp).inSeconds) / (distanceMeters / 1000);
+        _recentPaces.add(segmentPace);
+        // Keep only the most recent 5 paces for smoothing
+        if (_recentPaces.length > 5) {
+          _recentPaces.removeAt(0);
+        }
+        // Get smoothed pace value
+        _pace = _validationService.getSmoothedPace(segmentPace, _recentPaces);
+      }
       
-      // Get weight in kg for calculations - convert from lbs if needed
-      final authState = context.read<AuthBloc>().state;
-      bool preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
-      double ruckWeightKg = preferMetric 
+      // Convert weights to kg if needed
+      bool preferMetric = true;
+      try {
+        final prefs = GetIt.instance<SharedPreferences>();
+        preferMetric = prefs.getBool('prefer_metric') ?? true;
+      } catch (e) {
+        // Use metric as default
+      }
+      
+      // Get weights in appropriate units
+      final userWeightKg = preferMetric 
+          ? widget.userWeight 
+          : widget.userWeight / 2.20462; // Convert lbs to kg
+          
+      final ruckWeightKg = preferMetric 
           ? widget.ruckWeight 
           : widget.ruckWeight / 2.20462; // Convert lbs to kg
           
-      // Convert user weight to kg if needed
-      double userWeightKg = preferMetric
-          ? widget.userWeight
-          : widget.userWeight / 2.20462; // Convert lbs to kg
+      final ruckWeightLbs = preferMetric
+          ? widget.ruckWeight * 2.20462 // Convert kg to lbs
+          : widget.ruckWeight;
       
-      // Estimate calories burned based on weight, distance, and elevation
-      // This is a more accurate formula using actual body weight
-      _caloriesBurned = (_distance * 
-          (ruckWeightKg * 0.1 + userWeightKg) / 10) + 
-          (_elevationGain * 0.05 * (ruckWeightKg + userWeightKg));
-    });
+      // Calculate segment time in minutes
+      final segmentTimeMinutes = DateTime.now().difference(previousPoint.timestamp).inSeconds / 60;
+      
+      // Convert pace to km/h then mph for MET calculation
+      final double paceMinPerKm = _pace > 0 ? _pace / 60 : 0.0; // minutes per km
+      final double speedKmh = paceMinPerKm > 0 ? 60.0 / paceMinPerKm : 0.0; // km/h
+      final double speedMph = MetCalculator.kmhToMph(speedKmh); // mph
+      
+      // Calculate grade (slope percentage)
+      final grade = MetCalculator.calculateGrade(
+        elevationChangeMeters: elevationChange,
+        distanceMeters: distanceMeters
+      );
+      
+      // Calculate MET value based on speed, grade and weight
+      final metValue = MetCalculator.calculateRuckingMetByGrade(
+        speedMph: speedMph,
+        grade: grade,
+        ruckWeightLbs: ruckWeightLbs,
+      );
+      
+      // Calculate calories burned for this segment
+      final segmentCalories = MetCalculator.calculateCaloriesBurned(
+        weightKg: userWeightKg + (ruckWeightKg * 0.75), // Count 75% of ruck weight for metabolic impact
+        durationMinutes: segmentTimeMinutes.round(),
+        metValue: metValue,
+      );
+      
+      _caloriesBurned += segmentCalories;
+      
+    } else {
+      // Still in initial distance collection phase
+      _uncountedDistance = _validationService.getAccumulatedDistanceMeters();
+    }
   }
   
   /// Send location update to API
@@ -264,6 +396,32 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   /// Start session on the backend
   Future<void> _startSession() async {
+    // Start stopwatch
+    _stopwatch = Stopwatch()..start();
+    _timer = Timer.periodic(const Duration(seconds: 1), _updateTime);
+    
+    // Start heart rate monitoring if health integration is available
+    _startHeartRateMonitoring();
+    
+    // Request location permissions if needed
+    bool hasPermission = await _locationService.hasLocationPermission();
+    if (!hasPermission) {
+      hasPermission = await _locationService.requestLocationPermission();
+    }
+    
+    if (!hasPermission) {
+      _showErrorSnackBar('Location permission required for ruck tracking.');
+      return;
+    }
+    
+    // Start location tracking
+    _locationSubscription = _locationService.startLocationTracking().listen(
+      _handleLocationUpdate,
+      onError: (error) {
+        _showErrorSnackBar('Error tracking location: $error');
+      }
+    );
+    
     try {
       await _apiClient.post('/rucks/${widget.ruckId}/start', {});
     } catch (e) {
@@ -303,18 +461,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         if (_distance > 0 && _elapsed.inSeconds > 0) {
           _pace = (_elapsed.inSeconds / 60) / _distance; // min/km
         }
-        // Calories calculation (repeat logic from _calculateStats)
-        final authState = context.read<AuthBloc>().state;
-        final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
-        double ruckWeightKg = preferMetric 
-            ? widget.ruckWeight 
-            : widget.ruckWeight / 2.20462; // Convert lbs to kg
-        double userWeightKg = preferMetric
-            ? widget.userWeight
-            : widget.userWeight / 2.20462; // Convert lbs to kg
-        _caloriesBurned = (_distance * 
-            (ruckWeightKg * 0.1 + userWeightKg) / 10) + 
-            (_elevationGain * 0.05 * (ruckWeightKg + userWeightKg));
       });
     }
   }
@@ -343,36 +489,125 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   }
   
   /// Ends the current session
-  Future<void> _endSession() async {
-    // Stop timers and tracking immediately
-    _timer.cancel();
-    _stopwatch.stop();
-    _locationSubscription?.cancel();
+  void _endSession() async {
+    if (_isEnding) return;
     
     setState(() {
-      _isEnding = true; // Keep UI disabled while navigating
+      _isEnding = true;
     });
     
-    // Navigate to completion screen, passing final calculated stats
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SessionCompleteScreen(
-            ruckId: widget.ruckId,
-            duration: _elapsed, // Pass final elapsed time
-            distance: _distance, // Pass final calculated distance
-            caloriesBurned: _caloriesBurned.round(), // Pass final calculated calories
-            elevationGain: _elevationGain,
-            elevationLoss: _elevationLoss,
-            ruckWeight: widget.ruckWeight,
-            // Pass initial notes if available, SessionCompleteScreen allows editing
-            initialNotes: widget.notes, 
-          ),
-        ),
+    // Stop timers and location tracking
+    _timer?.cancel();
+    _stopwatch.stop();
+    _locationSubscription?.cancel();
+    _stopHeartRateMonitoring();
+    
+    try {
+      // Get final session distance
+      final distanceMeters = _distance * 1000; // Convert km to meters
+      
+      // Validate session before saving
+      final sessionValidation = _validationService.validateSessionForSave(
+        distanceMeters: distanceMeters,
+        duration: _elapsed,
+        caloriesBurned: _caloriesBurned,
       );
-    } 
-    // No need for try-catch or setting _isEnding=false if only navigating
+      
+      if (!sessionValidation['isValid']) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(sessionValidation['message']),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.pop(context);
+        return;
+      }
+      
+      // Create route coordinates string for API
+      List<Map<String, dynamic>> routeCoordinates = [];
+      
+      // Use only valid location points that met our criteria
+      if (_locationPoints.isNotEmpty) {
+        for (final point in _locationPoints) {
+          routeCoordinates.add({
+            'latitude': point.latitude,
+            'longitude': point.longitude,
+            'elevation': point.elevation,
+            'timestamp': point.timestamp.toIso8601String(),
+          });
+        }
+      }
+      
+      // Determine user's unit preference
+      final authState = context.read<AuthBloc>().state;
+      final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+
+      // Write data to Apple Health if available and enabled in app config
+      if (AppConfig.enableHealthSync) {
+        try {
+          // Get the last heart rate reading if available
+          final heartRateReading = (_heartRate != null && _heartRate! > 0) ? _heartRate : null;
+          
+          // Convert weight from pounds to kg if needed
+          double? ruckWeightKg;
+          if (widget.ruckWeight != null && widget.ruckWeight! > 0) {
+            ruckWeightKg = preferMetric ? widget.ruckWeight : widget.ruckWeight! * 0.453592;
+          }
+          
+          // End time is now, start time is calculated by subtracting elapsed time
+          final endTime = DateTime.now();
+          final startTime = endTime.subtract(Duration(seconds: _elapsed.inSeconds));
+          
+          // Save as a complete workout with all metadata
+          context.read<HealthBloc>().add(SaveRuckWorkout(
+            distanceMeters: distanceMeters,
+            caloriesBurned: _caloriesBurned,
+            startTime: startTime,
+            endTime: endTime,
+            ruckWeightKg: ruckWeightKg,
+            elevationGainMeters: _elevationGain,
+            elevationLossMeters: _elevationLoss,
+            heartRate: heartRateReading,
+          ));
+          
+          // For backwards compatibility, also write as individual health records
+          context.read<HealthBloc>().add(WriteHealthData(
+            distanceMeters: distanceMeters,
+            caloriesBurned: _caloriesBurned,
+            startTime: startTime,
+            endTime: endTime,
+          ));
+        } catch (e) {
+          // Log error but don't block session completion
+          debugPrint('Failed to write to Apple Health: $e');
+        }
+      }
+      
+      // Navigate to completion screen, passing final calculated stats
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SessionCompleteScreen(
+              ruckId: widget.ruckId,
+              duration: _elapsed, // Pass final elapsed time
+              distance: _distance, // Pass final calculated distance
+              caloriesBurned: _caloriesBurned.round(), // Pass final calculated calories
+              elevationGain: _elevationGain,
+              elevationLoss: _elevationLoss,
+              ruckWeight: widget.ruckWeight,
+              // Pass initial notes if available, SessionCompleteScreen allows editing
+              initialNotes: widget.notes, 
+            ),
+          ),
+        );
+      } 
+      // No need for try-catch or setting _isEnding=false if only navigating
+    } catch (e) {
+      debugPrint('Error in _endSession: $e');
+    }
   }
   
   /// Shows a confirmation dialog for ending the session
@@ -407,6 +642,44 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     );
   }
 
+  /// Shows a confirmation dialog for ending session due to idle time
+  void _showIdleEndConfirmationDialog() {
+    // Only show if not already showing another dialog
+    if (_isEnding) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('No Activity Detected'),
+          content: const Text('You\'ve been idle for over 2 minutes. Would you like to end this session?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Resume tracking
+                if (_isPaused) {
+                  _togglePause();
+                }
+              },
+              child: const Text('CONTINUE SESSION'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _endSession();
+              },
+              child: Text(
+                'END SESSION',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   /// Format duration as HH:MM:SS
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -429,8 +702,78 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     }
   }
 
+  /// Start heart rate monitoring
+  void _startHeartRateMonitoring() async {
+    // Check if health integration is enabled
+    final isEnabled = await _healthService.isHealthIntegrationEnabled();
+    if (!isEnabled) {
+      return;
+    }
+    
+    // Request authorization for heart rate monitoring
+    await _healthService.requestAuthorization();
+    
+    // Start periodic heart rate updates every 15 seconds
+    _heartRateTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      if (_isPaused) return; // Don't update during pause
+      
+      final heartRate = await _healthService.getCurrentHeartRate();
+      if (heartRate != null) {
+        setState(() {
+          _heartRate = heartRate;
+        });
+      }
+    });
+    
+    // Fetch initial heart rate
+    final initialHeartRate = await _healthService.getCurrentHeartRate();
+    if (initialHeartRate != null) {
+      setState(() {
+        _heartRate = initialHeartRate;
+      });
+    }
+  }
+
+  /// Stop heart rate monitoring
+  void _stopHeartRateMonitoring() {
+    _heartRateTimer?.cancel();
+    _heartRateTimer = null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    debugPrint('ActiveSessionScreen.build: _heartRate=$_heartRate');
+    // Format display values
+    final String durationDisplay = _formatDuration(_elapsed);
+    final String distanceDisplay = _canShowStats
+      ? _distance.toStringAsFixed(2) + ' km'
+      : '--';
+    final String paceDisplay = _canShowStats
+      ? (_pace > 0 ? '${(_pace / 60).floor()}:${((_pace % 60).floor()).toString().padLeft(2, '0')}' : '0:00') + ' /km'
+      : '--';
+    final String caloriesDisplay = _canShowStats
+      ? _caloriesBurned.toStringAsFixed(0)
+      : '--';
+    final String elevationDisplay = _canShowStats
+      ? '+${_elevationGain.toStringAsFixed(0)}m/-${_elevationLoss.toStringAsFixed(0)}m'
+      : '--';
+    
+    // Calculate remaining time if planned duration was set
+    String? remainingTimeDisplay;
+    if (widget.plannedDuration != null && _plannedCountdownStart != null) {
+      final elapsedSeconds = _elapsed.inSeconds;
+      final plannedSeconds = widget.plannedDuration! * 60;
+      final remainingSeconds = plannedSeconds - elapsedSeconds;
+      
+      if (remainingSeconds > 0) {
+        final remainingMinutes = (remainingSeconds / 60).floor();
+        final secondsLeft = remainingSeconds % 60;
+        remainingTimeDisplay = '$remainingMinutes:${secondsLeft.toString().padLeft(2, '0')}';
+      } else {
+        remainingTimeDisplay = 'Completed!';
+      }
+    }
+    
     // Get user's unit preference
     final authState = context.read<AuthBloc>().state;
     final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
@@ -440,229 +783,185 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         ? '${widget.ruckWeight.toStringAsFixed(1)} kg'
         : '${widget.ruckWeight.toStringAsFixed(1)} lbs';
     
-    // Format distance based on user preference
-    final String distanceDisplay = preferMetric
-        ? '${_distance.toStringAsFixed(2)} km'
-        : '${(_distance * 0.621371).toStringAsFixed(2)} mi';
-    
-    // Format pace based on user preference
-    final String paceDisplay = preferMetric
-        ? '${_pace.toStringAsFixed(2)} min/km'
-        : '${(_pace / 0.621371).toStringAsFixed(2)} min/mi';
-        
-    // Show only elevation difference (gain - loss)
-    final double elevationDiff = _elevationGain - _elevationLoss;
-    final String elevationDiffDisplay = preferMetric
-        ? '${elevationDiff >= 0 ? '+' : ''}${elevationDiff.toStringAsFixed(1)} m'
-        : '${elevationDiff >= 0 ? '+' : ''}${(elevationDiff * 3.28084).toStringAsFixed(1)} ft';
-    
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
       appBar: AppBar(
-        title: const Text('ACTIVE SESSION'),
-        centerTitle: true,
+        title: Text('Active Session', style: AppTextStyles.headline6.copyWith(color: Colors.white)),
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        automaticallyImplyLeading: false,
+        centerTitle: true,
         elevation: 0,
+        iconTheme: IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _showEndConfirmationDialog,
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: () {
+              // Menu options
+            },
+          ),
+        ],
       ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Map at the very top below header (fixed size, not in scroll view)
+      body: Column(
+        children: [
+          // Map section
+          Expanded(
+            flex: 2,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: _locationPoints.length >= 2
+                    ? FlutterMap(
+                        options: MapOptions(
+                          initialCenter: _getRouteCenter(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
+                          initialZoom: _getFitZoom(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.rucking.app',
+                          ),
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: _locationPoints
+                                    .map((p) => LatLng(p.latitude, p.longitude))
+                                    .toList(),
+                                color: AppColors.primary,
+                                strokeWidth: 4.0,
+                              ),
+                            ],
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              if (_locationPoints.isNotEmpty)
+                                Marker(
+                                  point: LatLng(_locationPoints.first.latitude, _locationPoints.first.longitude),
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.green,
+                                    size: 25,
+                                  ),
+                                ),
+                              if (_locationPoints.length > 1)
+                                Marker(
+                                  point: LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude),
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 25,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : const Center(
+                        child: Text(
+                          'Start moving to see your route...',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          
+          // Validation message
+          if (_showValidationMessage && _validationMessage != null)
             Container(
-              width: double.infinity,
-              height: 240,
-              child: FlutterMap(
-                options: MapOptions(
-                  initialCenter: _locationPoints.isNotEmpty
-                      ? _getRouteCenter(_locationPoints)
-                      : LatLng(40.421, -3.678),
-                  initialZoom: _locationPoints.length > 1 ? _getFitZoom(_locationPoints) : 15.5,
-                  // You can add interactionOptions if you want to disable interactions
-                ),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange),
+              ),
+              child: Row(
                 children: [
-                  TileLayer(
-                    urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-                    userAgentPackageName: 'com.getrucky.gfy',
-                    retinaMode: true, // Enable retina mode explicitly as a boolean
+                  const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _validationMessage!,
+                      style: const TextStyle(color: Colors.deepOrange),
+                    ),
                   ),
-                  if (_locationPoints.isNotEmpty)
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: _locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList(),
-                          color: AppColors.primary,
-                          strokeWidth: 4.0,
-                        ),
-                      ],
-                    ),
-                  if (_locationPoints.isNotEmpty)
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude),
-                          width: 30,
-                          height: 30,
-                          child: const Icon(Icons.location_pin, color: Colors.red, size: 30),
-                        ),
-                      ],
-                    ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-            // The rest of the content is scrollable
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            
+          // Timer and weight display
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Timer display
+                Text(
+                  durationDisplay,
+                  style: AppTextStyles.headline1.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Timer and ruck weight
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
-                      child: Column(
-                        children: [
-                          // Timer
-                          Text(
-                            _formatDuration(_elapsed),
-                            style: AppTextStyles.timerDisplay,
-                            textAlign: TextAlign.center,
-                          ),
-                          if (_plannedCountdownStart != null && widget.plannedDuration != null && widget.plannedDuration! > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-                              child: Text(
-                                _plannedCountdownStart!.inSeconds - _elapsed.inSeconds > 0
-                                  ? _formatDuration(Duration(seconds: _plannedCountdownStart!.inSeconds - _elapsed.inSeconds))
-                                  : '00:00:00',
-                                style: AppTextStyles.headline3.copyWith(
-                                  fontSize: 20,
-                                  color: AppColors.secondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          // Ruck weight (smaller, neutral color, less vertical space)
-                          Text(
-                            weightDisplay,
-                            style: AppTextStyles.body2.copyWith(fontSize: 18, color: AppColors.textDarkSecondary),
-                          ),
-                        ],
+                    // Ruck weight
+                    Text(
+                      '$weightDisplay',
+                      style: AppTextStyles.headline6.copyWith(
+                        color: Colors.grey.shade600,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    // Stats grid (fix overflow, calories up)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              // Distance card
-                              Expanded(
-                                child: StatCard(
-                                  title: 'Distance',
-                                  value: distanceDisplay,
-                                  icon: Icons.straighten,
-                                  color: AppColors.primary,
-                                  centerContent: true,
-                                  valueFontSize: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Calories card (moved up)
-                              Expanded(
-                                child: StatCard(
-                                  title: 'Calories',
-                                  value: _caloriesBurned.toInt().toString(),
-                                  icon: Icons.local_fire_department,
-                                  color: AppColors.accent,
-                                  centerContent: true,
-                                  valueFontSize: 28,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              // Pace card
-                              Expanded(
-                                child: StatCard(
-                                  title: 'Pace',
-                                  value: paceDisplay,
-                                  icon: Icons.speed,
-                                  color: AppColors.secondary,
-                                  centerContent: true,
-                                  valueFontSize: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Elevation card
-                              Expanded(
-                                child: StatCard(
-                                  title: 'Elevation',
-                                  value: elevationDiffDisplay,
-                                  icon: Icons.terrain,
-                                  color: AppColors.success,
-                                  centerContent: true,
-                                  valueFontSize: 28,
-                                ),
-                              ),
-                            ],
+                    
+                    // Heart rate pill (now always shown)
+                    Container(
+                      margin: const EdgeInsets.only(left: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark 
+                          ? Colors.black 
+                          : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
                         ],
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark 
+                            ? Colors.grey[800]! 
+                            : Colors.grey[300]!,
+                          width: 1,
+                        ),
                       ),
-                    ),
-                    // Controls section (unchanged)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Pause/Resume Button
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _togglePause,
-                              icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-                              label: Text(
-                                _isPaused ? 'RESUME' : 'PAUSE',
-                                style: AppTextStyles.button.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
+                          Icon(
+                            Icons.favorite,
+                            color: Colors.red[400],
+                            size: 24,
                           ),
-                          const SizedBox(width: 16),
-                          // End session button
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _isEnding ? null : _showEndConfirmationDialog,
-                              icon: const Icon(Icons.stop),
-                              label: const Text(
-                                'END SESSION',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.error,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _heartRate != null ? '${_heartRate!.toInt()}' : '--',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: Theme.of(context).brightness == Brightness.dark 
+                                ? Colors.white
+                                : Colors.black,
                             ),
                           ),
                         ],
@@ -670,10 +969,237 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                     ),
                   ],
                 ),
+                
+                // Remaining time if planned duration
+                if (widget.plannedDuration != null && remainingTimeDisplay != null)
+                  Text(
+                    'Remaining: $remainingTimeDisplay',
+                    style: AppTextStyles.subtitle1.copyWith(
+                      color: remainingTimeDisplay == 'Completed!' ? Colors.green : Colors.grey.shade600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          
+          // Stats section
+          Expanded(
+            flex: 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  // First row: Distance and Pace
+                  Expanded(
+                    child: Row(
+                      children: [
+                        // Distance card
+                        Expanded(
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.straighten, color: AppColors.primary, size: 20),
+                                      SizedBox(width: 6),
+                                      Text('Distance', style: AppTextStyles.subtitle2),
+                                    ],
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    distanceDisplay,
+                                    style: AppTextStyles.headline5.copyWith(
+                                      color: Theme.of(context).brightness == Brightness.dark 
+                                          ? AppColors.primaryLight 
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        // Pace card
+                        Expanded(
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.speed, color: AppColors.secondary, size: 20),
+                                      SizedBox(width: 6),
+                                      Text('Pace', style: AppTextStyles.subtitle2),
+                                    ],
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    paceDisplay,
+                                    style: AppTextStyles.headline5.copyWith(
+                                      color: Theme.of(context).brightness == Brightness.dark 
+                                          ? AppColors.success 
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Second row: Calories and Elevation
+                  Expanded(
+                    child: Row(
+                      children: [
+                        // Calories card
+                        Expanded(
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.local_fire_department, color: AppColors.accent, size: 20),
+                                      SizedBox(width: 6),
+                                      Text('Calories', style: AppTextStyles.subtitle2),
+                                    ],
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    caloriesDisplay,
+                                    style: AppTextStyles.headline5.copyWith(
+                                      color: Theme.of(context).brightness == Brightness.dark 
+                                          ? AppColors.success 
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        // Elevation card
+                        Expanded(
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.terrain, color: AppColors.success, size: 20),
+                                      SizedBox(width: 6),
+                                      Text('Elevation', style: AppTextStyles.subtitle2),
+                                    ],
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    elevationDisplay,
+                                    style: AppTextStyles.headline5.copyWith(
+                                      color: Theme.of(context).brightness == Brightness.dark 
+                                          ? AppColors.primaryLight 
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          
+          // Control buttons
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Pause/Resume Button
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _togglePause,
+                    icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
+                    label: Text(
+                      _isPaused ? 'RESUME' : 'PAUSE',
+                      style: AppTextStyles.button.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // End session button
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isEnding ? null : _showEndConfirmationDialog,
+                    icon: const Icon(Icons.stop),
+                    label: const Text(
+                      'END SESSION',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

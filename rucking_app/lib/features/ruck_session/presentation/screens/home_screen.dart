@@ -19,23 +19,47 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678);
-  double avgLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
-  double avgLng = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
-  return LatLng(avgLat, avgLng);
+  
+  // If only the start point exists
+  if (points.length == 1) return points.first;
+  
+  // Calculate the center between start and end points for better map focus
+  final startPoint = points.first;
+  final endPoint = points.last;
+  double centerLat = (startPoint.latitude + endPoint.latitude) / 2;
+  double centerLng = (startPoint.longitude + endPoint.longitude) / 2;
+  
+  return LatLng(centerLat, centerLng);
 }
 
 double _getFitZoom(List<LatLng> points) {
-  // You can tune this logic if needed
+  // Default zoom if insufficient points
   if (points.length < 2) return 15.5;
-  final bounds = LatLngBounds.fromPoints(points);
+  
+  // Create a bounds object focusing on start and end points
+  final startPoint = points.first;
+  final endPoint = points.last;
+  
+  // Initialize bounds with the start point
+  final bounds = LatLngBounds.fromPoints([startPoint, endPoint]);
+  
+  // Calculate the span of the bounds
   final latDiff = (bounds.north - bounds.south).abs();
   final lngDiff = (bounds.east - bounds.west).abs();
-  final maxDiff = [latDiff, lngDiff].reduce((a, b) => a > b ? a : b);
-  if (maxDiff < 0.001) return 17.0;
-  if (maxDiff < 0.01) return 15.0;
-  if (maxDiff < 0.05) return 13.0;
-  if (maxDiff < 0.1) return 11.0;
-  return 9.0;
+  
+  // Add a buffer to ensure points aren't right at the edge (15% padding)
+  final maxDiff = [latDiff, lngDiff].reduce((a, b) => a > b ? a : b) * 1.15;
+  
+  // Determine zoom level based on the distance between points
+  if (maxDiff < 0.001) return 17.0;    // Very close together
+  if (maxDiff < 0.005) return 16.0;    // Close together
+  if (maxDiff < 0.01) return 15.0;     // Somewhat close
+  if (maxDiff < 0.03) return 14.0;     // Moderate distance
+  if (maxDiff < 0.05) return 13.0;     // Further apart
+  if (maxDiff < 0.1) return 12.0;      // Distant
+  if (maxDiff < 0.2) return 11.0;      // Very distant
+  if (maxDiff < 0.5) return 10.0;      // Extremely distant
+  return 9.0;                         // Default for very large distances
 }
 
 /// Main home screen that serves as the central hub of the app
@@ -153,10 +177,18 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   
   /// Fetches both recent sessions and monthly stats
   Future<void> _fetchData() async {
+    // Prevent setState calls if widget is not attached to widget tree
     if (!mounted) return;
+    
+    // Safety check: we shouldn't fetch data before we've fully initialized
+    if (_apiClient == null) {
+      _apiClient = GetIt.instance<ApiClient>();
+    }
+    
     setState(() {
       _isLoading = true;
     });
+    
     try {
       // Fetch recent sessions
       // debugPrint('Fetching recent sessions from /rucks?limit=3');
@@ -174,23 +206,26 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           // debugPrint('Unexpected monthly stats format: $statsResponse');
       }
 
-      if (mounted) {
-        setState(() {
-          _recentSessions = processedSessions;
-          _monthlySummaryStats = processedStats;
-          _isLoading = false;
-        });
-      }
+      // Add another safety check in case widget is disposed during the async operation
+      if (!mounted) return;
+      
+      setState(() {
+        _recentSessions = processedSessions;
+        _monthlySummaryStats = processedStats;
+        _isLoading = false;
+      });
     } catch (e, stack) {
       debugPrint('Error fetching home screen data: $e');
       debugPrint('Stack: $stack');
-      if (mounted) {
-        setState(() {
-          _recentSessions = [];
-          _monthlySummaryStats = {};
-          _isLoading = false;
-        });
-      }
+      
+      // Final safety check before setState
+      if (!mounted) return;
+      
+      setState(() {
+        _recentSessions = [];
+        _monthlySummaryStats = {};
+        _isLoading = false;
+      });
     }
   }
 
@@ -225,19 +260,34 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final route = ModalRoute.of(context);
-    if (route is PageRoute) {
-      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
-      routeObserver?.subscribe(this, route);
+    
+    // Only attempt to subscribe to route if the context is still valid
+    if (mounted) {
+      try {
+        final route = ModalRoute.of(context);
+        if (route is PageRoute) {
+          final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+          routeObserver?.subscribe(this, route);
+        }
+      } catch (e) {
+        debugPrint('Error in didChangeDependencies: $e');
+      }
     }
   }
 
   @override
   void dispose() {
-    final route = ModalRoute.of(context);
-    if (route is PageRoute) {
-      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
-      routeObserver?.unsubscribe(this);
+    // Only attempt to unsubscribe if mounted
+    if (mounted) {
+      try {
+        final route = ModalRoute.of(context);
+        if (route is PageRoute) {
+          final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
+          routeObserver?.unsubscribe(this);
+        }
+      } catch (e) {
+        debugPrint('Error in dispose: $e');
+      }
     }
     super.dispose();
   }
@@ -245,7 +295,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   @override
   void didPopNext() {
     // Called when returning to this screen
-    _fetchData();
+    // Wrap in a Future.microtask to ensure it's not called during build
+    if (mounted) {
+      Future.microtask(() {
+        if (mounted) _fetchData();
+      });
+    }
   }
   
   @override
@@ -332,7 +387,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                       Text(
                         _monthlySummaryStats['date_range'] ?? 'This Month',
                         style: AppTextStyles.subtitle1.copyWith(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -507,6 +562,21 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           averagePaceDisplay = '0m 0s/' + (preferMetric ? 'km' : 'mi');
                         }
                         
+                        // Get elevation data from session
+                        final elevationGain = (session['elevation_gain_meters'] as num?)?.toDouble() ?? 0.0;
+                        final elevationLoss = (session['elevation_loss_meters'] as num?)?.toDouble() ?? 0.0;
+                        
+                        // Format elevation data based on user preference
+                        String elevationDisplay;
+                        if (preferMetric) {
+                          elevationDisplay = '+${elevationGain.toInt()}/-${elevationLoss.toInt()}m';
+                        } else {
+                          // Convert meters to feet
+                          final gainFeet = (elevationGain * 3.28084).toInt();
+                          final lossFeet = (elevationLoss * 3.28084).toInt();
+                          elevationDisplay = '+${gainFeet}/-${lossFeet}ft';
+                        }
+                        
                         // Map route points
                         List<LatLng> routePoints = [];
                         if (session['route'] is List && (session['route'] as List).isNotEmpty) {
@@ -566,6 +636,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                           TileLayer(
                                             urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
                                             userAgentPackageName: 'com.getrucky.gfy',
+                                            retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
                                           ),
                                           PolylineLayer(
                                             polylines: [
@@ -579,6 +650,14 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                           if (routePoints.isNotEmpty)
                                             MarkerLayer(
                                               markers: [
+                                                // Start marker (green)
+                                                Marker(
+                                                  point: routePoints.first,
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: const Icon(Icons.trip_origin, color: Colors.green, size: 20),
+                                                ),
+                                                // End marker (red)
                                                 Marker(
                                                   point: routePoints.last,
                                                   width: 20,
@@ -613,19 +692,37 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      _buildSessionStat(
-                                        Icons.straighten, 
-                                        '$distanceValue $distanceUnit'
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _buildSessionStat(
+                                              Icons.straighten,
+                                              '$distanceValue $distanceUnit',
+                                            ),
+                                            const SizedBox(height: 4),
+                                            _buildSessionStat(
+                                              Icons.timer,
+                                              averagePaceDisplay,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      const SizedBox(width: 16),
-                                      _buildSessionStat(
-                                        Icons.local_fire_department, 
-                                        '$calories cal'
-                                      ),
-                                      const SizedBox(width: 16),
-                                      _buildSessionStat(
-                                        Icons.timer,
-                                        averagePaceDisplay,
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _buildSessionStat(
+                                              Icons.local_fire_department,
+                                              '$calories cal',
+                                            ),
+                                            const SizedBox(height: 4),
+                                            _buildSessionStat(
+                                              Icons.vertical_align_top,
+                                              elevationDisplay,
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -695,11 +792,15 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   /// Builds a session stat item
   Widget _buildSessionStat(IconData icon, String value) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 14,
-          color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+        SizedBox(
+          width: 18, // fixed width for all icons for perfect column alignment
+          child: Icon(
+            icon,
+            size: 14,
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+          ),
         ),
         const SizedBox(width: 4),
         Text(
