@@ -8,39 +8,52 @@
 import SwiftUI
 
 struct SecondaryMetricsView: View {
-    @ObservedObject private var sessionManager = SessionManager.shared
+    @StateObject private var sessionManager = SessionManager.shared
     
     var body: some View {
-        VStack(spacing: 8) {
-            // Heart Rate
-            MetricCard(
-                title: "HEART RATE",
-                value: formatHeartRate(sessionManager.heartRate)
-            )
-            .frame(maxWidth: .infinity)
-            
-            // Pace
-            MetricCard(
-                title: "PACE",
-                value: formatPace(sessionManager.pace)
-            )
-            .frame(maxWidth: .infinity)
-            
-            // Calories
-            MetricCard(
-                title: "CALORIES",
-                value: formatCalories(sessionManager.caloriesBurned)
-            )
-            .frame(maxWidth: .infinity)
-            
-            // Ruck weight
-            MetricCard(
-                title: "RUCK WEIGHT",
-                value: formatWeight(sessionManager.ruckWeight)
-            )
-            .frame(maxWidth: .infinity)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                // Title at the top, left-aligned, positioned with the time
+                Text("GRY")
+                    .font(.system(size: 24))
+                    .bold()
+                    .padding(.top, 2) // Small positive padding instead of negative
+                
+                // Grid layout for metrics
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 8) {
+                    // Heart Rate
+                    MetricCard(
+                        title: "HEART RATE",
+                        value: formatHeartRate(sessionManager.heartRate)
+                    )
+                    
+                    // Pace
+                    MetricCard(
+                        title: "PACE",
+                        value: formatPace(sessionManager.pace)
+                    )
+                    
+                    // Calories
+                    MetricCard(
+                        title: "CALORIES",
+                        value: formatCalories(sessionManager.calories)
+                    )
+                    
+                    // Ruck weight
+                    MetricCard(
+                        title: "RUCK WEIGHT",
+                        value: formatWeight(sessionManager.ruckWeight)
+                    )
+                }
+                .padding(.top, 2)
+            }
+            .padding(.horizontal)
+            .padding(.top, 0)
         }
-        .padding()
+        .edgesIgnoringSafeArea(.top) // Extend content to the very top of the screen
     }
     
     private func formatHeartRate(_ heartRate: Double?) -> String {
