@@ -9,32 +9,37 @@ import Foundation
 import WatchConnectivity
 import HealthKit
 
-class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
+class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDelegate {
     static let shared = SessionManager()
     
     // Session properties
     @Published var isSessionActive = false
     @Published var isPaused = false
-    @Published var sessionDuration: TimeInterval = 0
+    @Published var startDate = Date()  // Use a non-optional Date with a default value
+    @Published var isTimerRunning = false  // Track if timer is running instead of using optional
+    @Published var elapsedDuration: TimeInterval = 0
     @Published var distance: Double = 0 // in meters
-    @Published var pace: Double = 0 // min/km
-    @Published var heartRate: Double? = nil
-    @Published var caloriesBurned: Double = 0
+    @Published var calories: Double = 0 // in calories
+    @Published var pace: Double = 0 // in minutes per km
+    @Published var heartRate: Double = 0 // in BPM
     @Published var ruckWeight: Double = 0 // in kg
+    @Published var elevationGain: Double = 0 // in meters
+    
+    // User preferences
+    @Published var userId: String = ""
+    @Published var useMetricUnits: Bool = true // Default to metric
     
     // Watch connectivity
     private var wcSession: WCSession?
     private let healthKitManager = HealthKitManager.shared
+    private var timer: Timer?
     
-    // Timer for updating session duration when watch is the source of truth
-    private var durationTimer: Timer?
-    private var sessionStartTime: Date?
-    private var accumulatedTime: TimeInterval = 0
-    
-    private override init() {
+    override init() {
         super.init()
         setupWatchConnectivity()
-        healthKitManager.requestAuthorization()
+        
+        // Set this class as the HealthKit delegate
+        healthKitManager.delegate = self
     }
     
     private func setupWatchConnectivity() {
@@ -47,22 +52,18 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     // MARK: - Session Control
     
-    func startSession(weight: Double) {
+    func startSession(withWeight weight: Double) {
         ruckWeight = weight
         isSessionActive = true
         isPaused = false
-        sessionStartTime = Date()
+        startDate = Date()
+        isTimerRunning = true
         
         // Start the timer for updating duration
-        startDurationTimer()
+        startTimer()
         
         // Start heart rate monitoring
-        healthKitManager.startHeartRateMonitoring { [weak self] heartRate in
-            DispatchQueue.main.async {
-                self?.heartRate = heartRate
-                self?.sendHeartRateToPhone(heartRate)
-            }
-        }
+        healthKitManager.startHeartRateMonitoring()
         
         // Send start command to phone
         sendMessageToPhone([
@@ -73,15 +74,13 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     func pauseSession() {
         isPaused = true
+        isTimerRunning = false
         
         // Pause the timer
-        durationTimer?.invalidate()
+        timer?.invalidate()
         
         // Calculate accumulated time
-        if let startTime = sessionStartTime {
-            accumulatedTime += Date().timeIntervalSince(startTime)
-            sessionStartTime = nil
-        }
+        elapsedDuration += Date().timeIntervalSince(startDate)
         
         // Send pause command to phone
         sendMessageToPhone([
@@ -91,10 +90,11 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     func resumeSession() {
         isPaused = false
-        sessionStartTime = Date()
+        startDate = Date()
+        isTimerRunning = true
         
         // Restart the timer
-        startDurationTimer()
+        startTimer()
         
         // Send resume command to phone
         sendMessageToPhone([
@@ -104,27 +104,25 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     func endSession() {
         // Calculate final stats
-        if let startTime = sessionStartTime {
-            accumulatedTime += Date().timeIntervalSince(startTime)
-        }
+        elapsedDuration += Date().timeIntervalSince(startDate)
         
         // Send end command to phone with final stats
         sendMessageToPhone([
             "command": "endSession",
-            "duration": accumulatedTime,
+            "duration": elapsedDuration,
             "distance": distance,
-            "calories": caloriesBurned
+            "calories": calories
         ])
         
         // Save workout to HealthKit
         let endTime = Date()
-        let startTime = endTime.addingTimeInterval(-accumulatedTime)
+        let workoutStartTime = endTime.addingTimeInterval(-elapsedDuration)
         
         healthKitManager.saveWorkout(
-            startDate: startTime,
+            startDate: workoutStartTime,
             endDate: endTime,
             distance: distance,
-            calories: caloriesBurned,
+            calories: calories,
             ruckWeight: ruckWeight
         )
         
@@ -135,30 +133,28 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     private func resetSession() {
         isSessionActive = false
         isPaused = false
-        sessionDuration = 0
+        isTimerRunning = false
+        elapsedDuration = 0
         distance = 0
         pace = 0
-        heartRate = nil
-        caloriesBurned = 0
-        sessionStartTime = nil
-        accumulatedTime = 0
-        durationTimer?.invalidate()
+        heartRate = 0
+        calories = 0
+        elevationGain = 0
+        startDate = Date()
+        timer?.invalidate()
         healthKitManager.stopHeartRateMonitoring()
     }
     
     // MARK: - Timer Management
     
-    private func startDurationTimer() {
-        durationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self, !self.isPaused else { return }
+    private func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.isTimerRunning else { return }
             
-            if let startTime = self.sessionStartTime {
-                let currentDuration = self.accumulatedTime + Date().timeIntervalSince(startTime)
-                self.sessionDuration = currentDuration
-                
-                // Update calories burned estimate
-                self.updateCaloriesBurned()
-            }
+            self.elapsedDuration += 1.0
+            
+            // Update calories burned estimate
+            self.updateCaloriesBurned()
         }
     }
     
@@ -167,9 +163,9 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         // MET * weight (kg) * duration (hours)
         let metValue: Double = 7.0 // Moderate to vigorous rucking
         let weightWithRuck = 70.0 + ruckWeight // Assuming 70kg person + ruck weight
-        let hours = sessionDuration / 3600.0
+        let hours = elapsedDuration / 3600.0
         
-        caloriesBurned = metValue * weightWithRuck * hours
+        calories = metValue * weightWithRuck * hours
     }
     
     // MARK: - Communication Methods
@@ -190,9 +186,9 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         }
         
         if wcSession.isReachable {
-            wcSession.sendMessage(message, replyHandler: nil) { error in
+            wcSession.sendMessage(message, replyHandler: nil, errorHandler: { error in
                 print("Error sending message to phone: \(error.localizedDescription)")
-            }
+            })
         } else {
             // Queue the message for later delivery if not reachable
             wcSession.transferUserInfo(message)
@@ -209,7 +205,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                     self.distance = distance
                 }
                 if let duration = message["duration"] as? TimeInterval {
-                    self.sessionDuration = duration
+                    self.elapsedDuration = duration
                 }
                 if let pace = message["pace"] as? Double {
                     self.pace = pace
@@ -220,10 +216,13 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 if let heartRate = message["heartRate"] as? Double {
                     self.heartRate = heartRate
                 }
+                if let elevation = message["elevation"] as? Double {
+                    self.elevationGain = elevation
+                }
                 
             case "startSession":
                 if let weight = message["ruckWeight"] as? Double {
-                    self.startSession(weight: weight)
+                    self.startSession(withWeight: weight)
                 }
                 
             case "pauseSession":
@@ -241,23 +240,58 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         }
     }
     
+    // MARK: - HealthKitDelegate
+    
+    func heartRateUpdated(heartRate: Double) {
+        // Update the local heart rate property
+        self.heartRate = heartRate
+        
+        // Send heart rate to the phone if session is active
+        if isSessionActive {
+            sendMessageToPhone([
+                "command": "updateHeartRate",
+                "heartRate": heartRate
+            ])
+        }
+    }
+    
     // MARK: - WCSessionDelegate
     
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        if let error = error {
-            print("WCSession activation failed with error: \(error.localizedDescription)")
-            return
-        }
-        
-        print("WCSession activated with state: \(activationState.rawValue)")
+        print("Watch WCSession activation state: \(activationState.rawValue)")
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         processReceivedMessage(message)
     }
     
-    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any] = [:]) {
-        processReceivedMessage(userInfo)
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        // Process user info on the main thread
+        DispatchQueue.main.async {
+            self.handleReceivedUserInfo(userInfo)
+        }
+    }
+    
+    private func handleReceivedUserInfo(_ userInfo: [String: Any]) {
+        // Check the type of information received
+        guard let type = userInfo["type"] as? String else {
+            print("Received user info without type field")
+            return
+        }
+        
+        switch type {
+        case "userPreferences":
+            if let userId = userInfo["userId"] as? String {
+                self.userId = userId
+            }
+            if let useMetricUnits = userInfo["useMetricUnits"] as? Bool {
+                self.useMetricUnits = useMetricUnits
+            }
+            print("Updated user preferences: userId=\(self.userId), useMetricUnits=\(self.useMetricUnits)")
+            
+        default:
+            print("Received unknown user info type: \(type)")
+        }
     }
     
     #if os(watchOS)
