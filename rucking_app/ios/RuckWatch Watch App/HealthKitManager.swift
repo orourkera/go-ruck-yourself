@@ -1,97 +1,178 @@
 import Foundation
 import HealthKit
+import Combine
 
-class HealthKitManager {
+class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
     
     private let healthStore = HKHealthStore()
-    private var heartRateQuery: HKAnchoredObjectQuery? // Changed to specific type
+    private var heartRateQuery: HKQuery?
+    private var heartRateObserver: Any?
     
-    private init() {}
+    @Published var heartRate: Double = 0.0
     
-    // Health data types we'll use
-    private let typesToRead: Set<HKObjectType> = [
-        HKObjectType.quantityType(forIdentifier: .heartRate)!,
-        HKObjectType.workoutType()
-    ]
+    // Delegate to receive heart rate updates
+    weak var delegate: HealthKitDelegate?
     
-    private let typesToWrite: Set<HKSampleType> = [
-        HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
-        HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
-        HKObjectType.workoutType()
-    ]
+    init() {
+        requestAuthorization()
+    }
     
     func requestAuthorization() {
-        // Request HealthKit authorization
-        healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { (success: Bool, error: Error?) in
-            if let error = error {
-                print("HealthKit authorization error: \(error.localizedDescription)")
-                return
-            }
-            
-            if success {
-                print("HealthKit authorization granted")
+        // Define the health data types we want to read
+        let typesToRead: Set<HKObjectType> = [
+            HKObjectType.quantityType(forIdentifier: .heartRate)!,
+            HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
+            HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!
+        ]
+        
+        // Request authorization
+        healthStore.requestAuthorization(toShare: nil, read: typesToRead) { (success, error) in
+            if !success {
+                print("HealthKit authorization was not granted: \(String(describing: error))")
             } else {
-                print("HealthKit authorization denied")
+                print("HealthKit authorization granted")
             }
         }
     }
     
-    // Start continuous heart rate monitoring
-    func startHeartRateMonitoring(completion: @escaping (Double?) -> Void) {
-        stopHeartRateMonitoring()
+    // Start monitoring heart rate
+    func startHeartRateMonitoring() {
+        // Get the heart rate type
+        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else {
+            print("Heart Rate Type is not available")
+            return
+        }
         
-        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
+        // Create a predicate to get recent heart rate samples
+        let predicate = HKQuery.predicateForSamples(withStart: Date.distantPast, end: nil, options: .strictEndDate)
         
-        // Create a predicate to get samples from now onwards
-        let predicate = HKQuery.predicateForSamples(withStart: Date(), end: nil, options: .strictStartDate)
-        
-        // Create the query
-        heartRateQuery = HKAnchoredObjectQuery(
-            type: heartRateType,
-            predicate: predicate,
-            anchor: nil,
-            limit: HKObjectQueryNoLimit
-        ) { (query: HKAnchoredObjectQuery, samples: [HKSample]?, deletedObjects: [HKDeletedObject]?, anchor: HKQueryAnchor?, error: Error?) in
-            guard error == nil else {
-                print("Heart rate query error: \(error!.localizedDescription)")
+        // Set up the heart rate observer
+        let heartRateObserver = HKObserverQuery(sampleType: heartRateType, predicate: predicate) { (query, completionHandler, error) in
+            if let error = error {
+                print("Error with heart rate observer: \(error.localizedDescription)")
                 return
             }
             
-            self.processHeartRateSamples(samples, completion: completion)
-        }
-        
-        // Get updates for future samples
-        if let query = heartRateQuery {
-            query.updateHandler = { (query: HKAnchoredObjectQuery, samples: [HKSample]?, deletedObjects: [HKDeletedObject]?, anchor: HKQueryAnchor?, error: Error?) in
-                guard error == nil else {
-                    print("Heart rate update error: \(error!.localizedDescription)")
-                    return
-                }
-                
-                self.processHeartRateSamples(samples, completion: completion)
-            }
+            // Perform the actual heart rate query
+            self.performHeartRateQuery()
             
-            healthStore.execute(query)
+            // Call the completion handler
+            completionHandler()
         }
+        
+        // Execute the query
+        healthStore.execute(heartRateObserver)
+        
+        // Also execute a heart rate query to get initial data
+        performHeartRateQuery()
+        
+        // Save the reference to the observer
+        self.heartRateObserver = heartRateObserver
     }
     
-    private func processHeartRateSamples(_ samples: [HKSample]?, completion: @escaping (Double?) -> Void) {
-        guard let samples = samples as? [HKQuantitySample] else { return }
-        
-        // Find the most recent sample
-        guard let sample = samples.max(by: { $0.startDate < $1.startDate }) else { return }
-        
-        // Get the heart rate in BPM
-        let heartRate = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
-        completion(heartRate)
-    }
-    
+    // Stop monitoring heart rate
     func stopHeartRateMonitoring() {
+        if let heartRateObserver = self.heartRateObserver {
+            healthStore.stop(heartRateObserver as! HKQuery)
+            self.heartRateObserver = nil
+        }
+        
         if let query = heartRateQuery {
             healthStore.stop(query)
             heartRateQuery = nil
         }
+    }
+    
+    // Perform heart rate query
+    private func performHeartRateQuery() {
+        // Get the heart rate type
+        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else {
+            print("Heart Rate Type is not available")
+            return
+        }
+        
+        // Create the query for recent heart rate samples
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(
+            sampleType: heartRateType,
+            predicate: nil,
+            limit: 1,
+            sortDescriptors: [sortDescriptor]
+        ) { (query, samples, error) in
+            guard let samples = samples as? [HKQuantitySample], let sample = samples.first else {
+                if let error = error {
+                    print("Error querying heart rate: \(error.localizedDescription)")
+                }
+                return
+            }
+            
+            // Get the heart rate value in beats per minute
+            let heartRateValue = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: HKUnit.minute()))
+            
+            // Update heartRate property on the main thread
+            DispatchQueue.main.async {
+                self.heartRate = heartRateValue
+                print("Current heart rate: \(heartRateValue) BPM")
+                
+                // Notify the delegate about the heart rate update
+                self.delegate?.heartRateUpdated(heartRate: heartRateValue)
+            }
+        }
+        
+        // Execute the query
+        healthStore.execute(query)
+        
+        // Save reference to the query
+        self.heartRateQuery = query
+    }
+    
+    // Get workout duration, distance, and calories (called at the end of a workout)
+    func getWorkoutStats(startDate: Date, completion: @escaping (Double, Double, Double) -> Void) {
+        var duration = 0.0
+        var distance = 0.0
+        var calories = 0.0
+        
+        let endDate = Date()
+        duration = endDate.timeIntervalSince(startDate)
+        
+        let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
+        let caloriesType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!
+        
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        
+        // Query for distance
+        let distanceQuery = HKStatisticsQuery(
+            quantityType: distanceType,
+            quantitySamplePredicate: predicate,
+            options: .cumulativeSum
+        ) { (_, result, error) in
+            if let result = result, let sum = result.sumQuantity() {
+                // Convert to meters
+                distance = sum.doubleValue(for: HKUnit.meter())
+            }
+            
+            // Query for calories
+            let caloriesQuery = HKStatisticsQuery(
+                quantityType: caloriesType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum
+            ) { (_, result, error) in
+                if let result = result, let sum = result.sumQuantity() {
+                    // Convert to calories
+                    calories = sum.doubleValue(for: HKUnit.kilocalorie())
+                }
+                
+                // Call the completion handler with all stats
+                DispatchQueue.main.async {
+                    completion(duration, distance, calories)
+                }
+            }
+            
+            self.healthStore.execute(caloriesQuery)
+        }
+        
+        healthStore.execute(distanceQuery)
     }
     
     // Save a workout to HealthKit
@@ -162,4 +243,9 @@ class HealthKitManager {
             }
         }
     }
+}
+
+// Protocol for heart rate updates
+protocol HealthKitDelegate: AnyObject {
+    func heartRateUpdated(heartRate: Double)
 }

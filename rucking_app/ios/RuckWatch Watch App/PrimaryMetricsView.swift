@@ -8,55 +8,117 @@
 import SwiftUI
 
 struct PrimaryMetricsView: View {
-    @ObservedObject private var sessionManager = SessionManager.shared
+    @StateObject private var sessionManager = SessionManager.shared
     
     var body: some View {
-        VStack(spacing: 8) {
-            // Time
-            MetricCard(title: "TIME", value: formatDuration(sessionManager.sessionDuration))
-                .frame(maxWidth: .infinity)
-            
-            // Distance
-            MetricCard(title: "DISTANCE", value: formatDistance(sessionManager.distance))
-                .frame(maxWidth: .infinity)
-            
-            // Control buttons
-            HStack(spacing: 12) {
-                Button(action: {
-                    if sessionManager.isPaused {
-                        sessionManager.resumeSession()
-                    } else {
-                        sessionManager.pauseSession()
-                    }
-                }) {
-                    Image(systemName: sessionManager.isPaused ? "play.fill" : "pause.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(sessionManager.isPaused ? .green : .orange)
-                }
-                .buttonStyle(.plain)
-                .background(
-                    Circle()
-                        .fill(Color.black.opacity(0.3))
-                        .frame(width: 40, height: 40)
-                )
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                // Title at the top, left-aligned, positioned with the time
+                Text("GRY")
+                    .font(.system(size: 24))
+                    .bold()
+                    .padding(.top, 2) // Small positive padding instead of negative
                 
-                Button(action: {
-                    sessionManager.endSession()
-                }) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 20))
-                        .foregroundColor(.red)
+                // Grid layout for metrics (2x2)
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 8) {
+                    // Time
+                    MetricCard(
+                        title: "TIME", 
+                        value: formatDuration(sessionManager.elapsedDuration)
+                    )
+                    
+                    // Distance
+                    MetricCard(
+                        title: "DISTANCE", 
+                        value: formatDistance(sessionManager.distance)
+                    )
+                    
+                    // Calories
+                    MetricCard(
+                        title: "CALORIES", 
+                        value: formatCalories(sessionManager.calories)
+                    )
+                    
+                    // Elevation
+                    MetricCard(
+                        title: "ELEVATION", 
+                        value: formatElevation(sessionManager.elevationGain)
+                    )
                 }
-                .buttonStyle(.plain)
-                .background(
-                    Circle()
-                        .fill(Color.black.opacity(0.3))
-                        .frame(width: 40, height: 40)
-                )
+                .padding(.top, 2)
+                
+                // Control buttons
+                HStack(spacing: 12) {
+                    Button(action: {
+                        if sessionManager.isPaused {
+                            sessionManager.resumeSession()
+                        } else {
+                            sessionManager.pauseSession()
+                        }
+                    }) {
+                        Image(systemName: sessionManager.isPaused ? "play.fill" : "pause.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(sessionManager.isPaused ? .green : .orange)
+                    }
+                    .buttonStyle(.plain)
+                    .background(
+                        Circle()
+                            .fill(Color.black.opacity(0.3))
+                            .frame(width: 40, height: 40)
+                    )
+                    
+                    Button(action: {
+                        sessionManager.endSession()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20))
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
+                    .background(
+                        Circle()
+                            .fill(Color.black.opacity(0.3))
+                            .frame(width: 40, height: 40)
+                    )
+                }
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .center)
+                
+                // Bottom buttons
+                HStack {
+                    Button(action: {
+                        if sessionManager.isPaused {
+                            sessionManager.resumeSession()
+                        } else {
+                            sessionManager.pauseSession()
+                        }
+                    }) {
+                        Text(sessionManager.isPaused ? "Resume" : "Pause")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(sessionManager.isPaused ? .green : .orange)
+                    
+                    Button(action: {
+                        sessionManager.endSession()
+                    }) {
+                        Text("End")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
+                .padding(.bottom)
             }
-            .padding(.top, 8)
+            .padding(.horizontal)
+            .padding(.top, 0)
         }
-        .padding()
+        .edgesIgnoringSafeArea(.top) // Extend content to the very top of the screen
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -75,6 +137,14 @@ struct PrimaryMetricsView: View {
         // Convert meters to kilometers
         let km = distance / 1000.0
         return String(format: "%.2f km", km)
+    }
+    
+    private func formatCalories(_ calories: Double) -> String {
+        return String(format: "%.0f", calories)
+    }
+    
+    private func formatElevation(_ elevation: Double) -> String {
+        return String(format: "%.0f m", elevation)
     }
 }
 
