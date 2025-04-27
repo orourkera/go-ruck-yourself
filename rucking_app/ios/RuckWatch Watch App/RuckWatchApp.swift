@@ -7,13 +7,15 @@
 
 import SwiftUI
 
+@available(iOS 14.0, watchOS 9.0, *)
 @main
 struct RuckWatchApp: App {
-    @StateObject private var sessionManager = SessionManager.shared
+    @StateObject private var sessionManager = SessionManager()
     
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(sessionManager)
         }
     }
     

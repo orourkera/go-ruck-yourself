@@ -89,135 +89,26 @@ class RuckingApiPigeonCodec: FlutterStandardMessageCodec, @unchecked Sendable {
   static let shared = RuckingApiPigeonCodec(readerWriter: RuckingApiPigeonCodecReaderWriter())
 }
 
-
-/// Messages from Watch to Flutter
-///
-/// Generated protocol from Pigeon that represents a handler of messages from Flutter.
-protocol RuckingApi {
-  /// Start a new session from the watch
-  func startSessionFromWatch(ruckWeight: Double, completion: @escaping (Result<Bool, Error>) -> Void)
-  /// Pause an active session from the watch
-  func pauseSessionFromWatch(completion: @escaping (Result<Bool, Error>) -> Void)
-  /// Resume a paused session from the watch
-  func resumeSessionFromWatch(completion: @escaping (Result<Bool, Error>) -> Void)
-  /// End the current session from the watch
-  func endSessionFromWatch(duration: Int64, distance: Double, calories: Double, completion: @escaping (Result<Bool, Error>) -> Void)
-  /// Update heart rate from the watch
-  func updateHeartRateFromWatch(heartRate: Double, completion: @escaping (Result<Bool, Error>) -> Void)
-}
-
-/// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
-class RuckingApiSetup {
-  static var codec: FlutterStandardMessageCodec { RuckingApiPigeonCodec.shared }
-  /// Sets up an instance of `RuckingApi` to handle messages through the `binaryMessenger`.
-  static func setUp(binaryMessenger: FlutterBinaryMessenger, api: RuckingApi?, messageChannelSuffix: String = "") {
-    let channelSuffix = messageChannelSuffix.count > 0 ? ".\(messageChannelSuffix)" : ""
-    /// Start a new session from the watch
-    let startSessionFromWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      startSessionFromWatchChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let ruckWeightArg = args[0] as! Double
-        api.startSessionFromWatch(ruckWeight: ruckWeightArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      startSessionFromWatchChannel.setMessageHandler(nil)
-    }
-    /// Pause an active session from the watch
-    let pauseSessionFromWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.RuckingApi.pauseSessionFromWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      pauseSessionFromWatchChannel.setMessageHandler { _, reply in
-        api.pauseSessionFromWatch { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      pauseSessionFromWatchChannel.setMessageHandler(nil)
-    }
-    /// Resume a paused session from the watch
-    let resumeSessionFromWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.RuckingApi.resumeSessionFromWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      resumeSessionFromWatchChannel.setMessageHandler { _, reply in
-        api.resumeSessionFromWatch { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      resumeSessionFromWatchChannel.setMessageHandler(nil)
-    }
-    /// End the current session from the watch
-    let endSessionFromWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      endSessionFromWatchChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let durationArg = args[0] as! Int64
-        let distanceArg = args[1] as! Double
-        let caloriesArg = args[2] as! Double
-        api.endSessionFromWatch(duration: durationArg, distance: distanceArg, calories: caloriesArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      endSessionFromWatchChannel.setMessageHandler(nil)
-    }
-    /// Update heart rate from the watch
-    let updateHeartRateFromWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      updateHeartRateFromWatchChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let heartRateArg = args[0] as! Double
-        api.updateHeartRateFromWatch(heartRate: heartRateArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      updateHeartRateFromWatchChannel.setMessageHandler(nil)
-    }
-  }
-}
-/// Messages from Flutter to Watch
+/// Messages from native (Watch) to Flutter
 ///
 /// Generated protocol from Pigeon that represents Flutter messages that can be called from Swift.
-protocol FlutterRuckingApiProtocol {
-  /// Update session metrics on the watch
-  func updateSessionOnWatch(distance distanceArg: Double, duration durationArg: Double, pace paceArg: Double, isPaused isPausedArg: Bool, completion: @escaping (Result<Void, PigeonError>) -> Void)
-  /// Start a session on the watch
-  func startSessionOnWatch(ruckWeight ruckWeightArg: Double, completion: @escaping (Result<Void, PigeonError>) -> Void)
-  /// Pause a session on the watch
-  func pauseSessionOnWatch(completion: @escaping (Result<Void, PigeonError>) -> Void)
-  /// Resume a session on the watch
-  func resumeSessionOnWatch(completion: @escaping (Result<Void, PigeonError>) -> Void)
-  /// End a session on the watch
-  func endSessionOnWatch(completion: @escaping (Result<Void, PigeonError>) -> Void)
+protocol RuckingApiProtocol {
+  /// Start a new session from the watch
+  func startSessionFromWatch(ruckWeight ruckWeightArg: Double, completion: @escaping (Result<Bool, PigeonError>) -> Void)
+  /// Start a session on the watch (Flutter -> native)
+  func startSessionOnWatch(ruckWeight ruckWeightArg: Double, completion: @escaping (Result<Bool, PigeonError>) -> Void)
+  /// Update session metrics on the watch (Flutter -> native)
+  func updateSessionOnWatch(distance distanceArg: Double, duration durationArg: Double, pace paceArg: Double, isPaused isPausedArg: Bool, completion: @escaping (Result<Bool, PigeonError>) -> Void)
+  /// Pause an active session from the watch
+  func pauseSessionFromWatch(completion: @escaping (Result<Bool, PigeonError>) -> Void)
+  /// Resume a paused session from the watch
+  func resumeSessionFromWatch(completion: @escaping (Result<Bool, PigeonError>) -> Void)
+  /// End the current session from the watch
+  func endSessionFromWatch(duration durationArg: Int64, distance distanceArg: Double, calories caloriesArg: Double, completion: @escaping (Result<Bool, PigeonError>) -> Void)
+  /// Update heart rate from the watch
+  func updateHeartRateFromWatch(heartRate heartRateArg: Double, completion: @escaping (Result<Bool, PigeonError>) -> Void)
 }
-class FlutterRuckingApi: FlutterRuckingApiProtocol {
+class RuckingApi: RuckingApiProtocol {
   private let binaryMessenger: FlutterBinaryMessenger
   private let messageChannelSuffix: String
   init(binaryMessenger: FlutterBinaryMessenger, messageChannelSuffix: String = "") {
@@ -227,28 +118,9 @@ class FlutterRuckingApi: FlutterRuckingApiProtocol {
   var codec: RuckingApiPigeonCodec {
     return RuckingApiPigeonCodec.shared
   }
-  /// Update session metrics on the watch
-  func updateSessionOnWatch(distance distanceArg: Double, duration durationArg: Double, pace paceArg: Double, isPaused isPausedArg: Bool, completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.updateSessionOnWatch\(messageChannelSuffix)"
-    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
-    channel.sendMessage([distanceArg, durationArg, paceArg, isPausedArg] as [Any?]) { response in
-      guard let listResponse = response as? [Any?] else {
-        completion(.failure(createConnectionError(withChannelName: channelName)))
-        return
-      }
-      if listResponse.count > 1 {
-        let code: String = listResponse[0] as! String
-        let message: String? = nilOrValue(listResponse[1])
-        let details: String? = nilOrValue(listResponse[2])
-        completion(.failure(PigeonError(code: code, message: message, details: details)))
-      } else {
-        completion(.success(()))
-      }
-    }
-  }
-  /// Start a session on the watch
-  func startSessionOnWatch(ruckWeight ruckWeightArg: Double, completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.startSessionOnWatch\(messageChannelSuffix)"
+  /// Start a new session from the watch
+  func startSessionFromWatch(ruckWeight ruckWeightArg: Double, completion: @escaping (Result<Bool, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage([ruckWeightArg] as [Any?]) { response in
       guard let listResponse = response as? [Any?] else {
@@ -260,66 +132,245 @@ class FlutterRuckingApi: FlutterRuckingApiProtocol {
         let message: String? = nilOrValue(listResponse[1])
         let details: String? = nilOrValue(listResponse[2])
         completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else if listResponse[0] == nil {
+        completion(.failure(PigeonError(code: "null-error", message: "Flutter api returned null value for non-null return value.", details: "")))
       } else {
-        completion(.success(()))
+        let result = listResponse[0] as! Bool
+        completion(.success(result))
       }
     }
   }
+  /// Start a session on the watch (Flutter -> native)
+  func startSessionOnWatch(ruckWeight ruckWeightArg: Double, completion: @escaping (Result<Bool, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.rucking_app.RuckingApi.startSessionOnWatch\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([ruckWeightArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else if listResponse[0] == nil {
+        completion(.failure(PigeonError(code: "null-error", message: "Flutter api returned null value for non-null return value.", details: "")))
+      } else {
+        let result = listResponse[0] as! Bool
+        completion(.success(result))
+      }
+    }
+  }
+  /// Update session metrics on the watch (Flutter -> native)
+  func updateSessionOnWatch(distance distanceArg: Double, duration durationArg: Double, pace paceArg: Double, isPaused isPausedArg: Bool, completion: @escaping (Result<Bool, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([distanceArg, durationArg, paceArg, isPausedArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else if listResponse[0] == nil {
+        completion(.failure(PigeonError(code: "null-error", message: "Flutter api returned null value for non-null return value.", details: "")))
+      } else {
+        let result = listResponse[0] as! Bool
+        completion(.success(result))
+      }
+    }
+  }
+  /// Pause an active session from the watch
+  func pauseSessionFromWatch(completion: @escaping (Result<Bool, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.rucking_app.RuckingApi.pauseSessionFromWatch\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage(nil) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else if listResponse[0] == nil {
+        completion(.failure(PigeonError(code: "null-error", message: "Flutter api returned null value for non-null return value.", details: "")))
+      } else {
+        let result = listResponse[0] as! Bool
+        completion(.success(result))
+      }
+    }
+  }
+  /// Resume a paused session from the watch
+  func resumeSessionFromWatch(completion: @escaping (Result<Bool, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.rucking_app.RuckingApi.resumeSessionFromWatch\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage(nil) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else if listResponse[0] == nil {
+        completion(.failure(PigeonError(code: "null-error", message: "Flutter api returned null value for non-null return value.", details: "")))
+      } else {
+        let result = listResponse[0] as! Bool
+        completion(.success(result))
+      }
+    }
+  }
+  /// End the current session from the watch
+  func endSessionFromWatch(duration durationArg: Int64, distance distanceArg: Double, calories caloriesArg: Double, completion: @escaping (Result<Bool, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([durationArg, distanceArg, caloriesArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else if listResponse[0] == nil {
+        completion(.failure(PigeonError(code: "null-error", message: "Flutter api returned null value for non-null return value.", details: "")))
+      } else {
+        let result = listResponse[0] as! Bool
+        completion(.success(result))
+      }
+    }
+  }
+  /// Update heart rate from the watch
+  func updateHeartRateFromWatch(heartRate heartRateArg: Double, completion: @escaping (Result<Bool, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage([heartRateArg] as [Any?]) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else if listResponse[0] == nil {
+        completion(.failure(PigeonError(code: "null-error", message: "Flutter api returned null value for non-null return value.", details: "")))
+      } else {
+        let result = listResponse[0] as! Bool
+        completion(.success(result))
+      }
+    }
+  }
+}
+/// Messages from Flutter to native (Watch)
+///
+/// Generated protocol from Pigeon that represents a handler of messages from Flutter.
+protocol FlutterRuckingApi {
+  /// Update session metrics on the watch
+  func updateSessionOnWatch(distance: Double, duration: Double, pace: Double, isPaused: Bool) throws
+  /// Start a session on the watch
+  func startSessionOnWatch(ruckWeight: Double) throws
   /// Pause a session on the watch
-  func pauseSessionOnWatch(completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.pauseSessionOnWatch\(messageChannelSuffix)"
-    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
-    channel.sendMessage(nil) { response in
-      guard let listResponse = response as? [Any?] else {
-        completion(.failure(createConnectionError(withChannelName: channelName)))
-        return
-      }
-      if listResponse.count > 1 {
-        let code: String = listResponse[0] as! String
-        let message: String? = nilOrValue(listResponse[1])
-        let details: String? = nilOrValue(listResponse[2])
-        completion(.failure(PigeonError(code: code, message: message, details: details)))
-      } else {
-        completion(.success(()))
-      }
-    }
-  }
+  func pauseSessionOnWatch() throws
   /// Resume a session on the watch
-  func resumeSessionOnWatch(completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.resumeSessionOnWatch\(messageChannelSuffix)"
-    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
-    channel.sendMessage(nil) { response in
-      guard let listResponse = response as? [Any?] else {
-        completion(.failure(createConnectionError(withChannelName: channelName)))
-        return
-      }
-      if listResponse.count > 1 {
-        let code: String = listResponse[0] as! String
-        let message: String? = nilOrValue(listResponse[1])
-        let details: String? = nilOrValue(listResponse[2])
-        completion(.failure(PigeonError(code: code, message: message, details: details)))
-      } else {
-        completion(.success(()))
-      }
-    }
-  }
+  func resumeSessionOnWatch() throws
   /// End a session on the watch
-  func endSessionOnWatch(completion: @escaping (Result<Void, PigeonError>) -> Void) {
-    let channelName: String = "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.endSessionOnWatch\(messageChannelSuffix)"
-    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
-    channel.sendMessage(nil) { response in
-      guard let listResponse = response as? [Any?] else {
-        completion(.failure(createConnectionError(withChannelName: channelName)))
-        return
+  func endSessionOnWatch() throws
+}
+
+/// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
+class FlutterRuckingApiSetup {
+  static var codec: FlutterStandardMessageCodec { RuckingApiPigeonCodec.shared }
+  /// Sets up an instance of `FlutterRuckingApi` to handle messages through the `binaryMessenger`.
+  static func setUp(binaryMessenger: FlutterBinaryMessenger, api: FlutterRuckingApi?, messageChannelSuffix: String = "") {
+    let channelSuffix = messageChannelSuffix.count > 0 ? ".\(messageChannelSuffix)" : ""
+    /// Update session metrics on the watch
+    let updateSessionOnWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.updateSessionOnWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      updateSessionOnWatchChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let distanceArg = args[0] as! Double
+        let durationArg = args[1] as! Double
+        let paceArg = args[2] as! Double
+        let isPausedArg = args[3] as! Bool
+        do {
+          try api.updateSessionOnWatch(distance: distanceArg, duration: durationArg, pace: paceArg, isPaused: isPausedArg)
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
       }
-      if listResponse.count > 1 {
-        let code: String = listResponse[0] as! String
-        let message: String? = nilOrValue(listResponse[1])
-        let details: String? = nilOrValue(listResponse[2])
-        completion(.failure(PigeonError(code: code, message: message, details: details)))
-      } else {
-        completion(.success(()))
+    } else {
+      updateSessionOnWatchChannel.setMessageHandler(nil)
+    }
+    /// Start a session on the watch
+    let startSessionOnWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.startSessionOnWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      startSessionOnWatchChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let ruckWeightArg = args[0] as! Double
+        do {
+          try api.startSessionOnWatch(ruckWeight: ruckWeightArg)
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
       }
+    } else {
+      startSessionOnWatchChannel.setMessageHandler(nil)
+    }
+    /// Pause a session on the watch
+    let pauseSessionOnWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.pauseSessionOnWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      pauseSessionOnWatchChannel.setMessageHandler { _, reply in
+        do {
+          try api.pauseSessionOnWatch()
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      pauseSessionOnWatchChannel.setMessageHandler(nil)
+    }
+    /// Resume a session on the watch
+    let resumeSessionOnWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.resumeSessionOnWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      resumeSessionOnWatchChannel.setMessageHandler { _, reply in
+        do {
+          try api.resumeSessionOnWatch()
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      resumeSessionOnWatchChannel.setMessageHandler(nil)
+    }
+    /// End a session on the watch
+    let endSessionOnWatchChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.rucking_app.FlutterRuckingApi.endSessionOnWatch\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      endSessionOnWatchChannel.setMessageHandler { _, reply in
+        do {
+          try api.endSessionOnWatch()
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      endSessionOnWatchChannel.setMessageHandler(nil)
     }
   }
 }

@@ -23,6 +23,15 @@ class MarkHealthIntroSeen extends HealthEvent {
   const MarkHealthIntroSeen();
 }
 
+class SetHasAppleWatch extends HealthEvent {
+  final bool hasWatch;
+  
+  const SetHasAppleWatch({required this.hasWatch});
+  
+  @override
+  List<Object?> get props => [hasWatch];
+}
+
 class WriteHealthData extends HealthEvent {
   final double distanceMeters;
   final double caloriesBurned;

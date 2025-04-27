@@ -11,6 +11,7 @@ class HealthService {
   // Base keys - will be prefixed with userId for user-specific settings
   static const String _hasSeenIntroKeyBase = 'health_has_seen_intro';
   static const String _isHealthIntegrationEnabledKeyBase = 'health_integration_enabled';
+  static const String _hasAppleWatchKeyBase = 'has_apple_watch';
   
   // Set the current user ID to make settings user-specific
   void setUserId(String userId) {
@@ -20,6 +21,7 @@ class HealthService {
   // Get user-specific keys
   String get _hasSeenIntroKey => '${_userId}_$_hasSeenIntroKeyBase';
   String get _isHealthIntegrationEnabledKey => '${_userId}_$_isHealthIntegrationEnabledKeyBase';
+  String get _hasAppleWatchKey => '${_userId}_$_hasAppleWatchKeyBase';
 
   /// Request authorization for health data access
   Future<bool> requestAuthorization() async {
@@ -217,6 +219,28 @@ class HealthService {
     await setHealthIntegrationEnabled(false);
   }
 
+  /// Sets whether the user has an Apple Watch
+  Future<void> setHasAppleWatch(bool hasWatch) async {
+    if (_userId.isEmpty) {
+      print('Warning: User ID not set when setting Apple Watch status');
+      return;
+    }
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hasAppleWatchKey, hasWatch);
+  }
+  
+  /// Checks if the user has indicated they have an Apple Watch
+  Future<bool> hasAppleWatch() async {
+    if (_userId.isEmpty) {
+      print('Warning: User ID not set when checking Apple Watch status');
+      return false;
+    }
+    
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_hasAppleWatchKey) ?? true; // Default to true if not set
+  }
+
   /// Read current heart rate from health store
   Future<double?> getCurrentHeartRate() async {
     if (!_isAuthorized) {
@@ -262,5 +286,16 @@ class HealthService {
       print('Error reading heart rate: $e');
       return null;
     }
+  }
+
+  /// Update current heart rate value
+  /// This method is used to receive real-time heart rate updates from the Watch
+  void updateHeartRate(double heartRate) {
+    // For now, we just log the heart rate
+    // This could be expanded to store the value or send to a health bloc
+    print('Received heart rate update from Watch: $heartRate BPM');
+    
+    // In a future version, this could write to Health/HealthKit
+    // Or update a heart rate stream that UI components could listen to
   }
 }

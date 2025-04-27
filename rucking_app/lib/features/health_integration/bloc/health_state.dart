@@ -15,11 +15,15 @@ class HealthUnavailable extends HealthState {}
 
 class HealthAvailable extends HealthState {
   final bool hasSeenIntro;
+  final bool hasAppleWatch;
   
-  const HealthAvailable({required this.hasSeenIntro});
+  const HealthAvailable({
+    required this.hasSeenIntro, 
+    this.hasAppleWatch = true,
+  });
   
   @override
-  List<Object> get props => [hasSeenIntro];
+  List<Object> get props => [hasSeenIntro, hasAppleWatch];
 }
 
 class HealthAuthorizationStatus extends HealthState {

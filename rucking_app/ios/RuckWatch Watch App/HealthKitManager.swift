@@ -2,7 +2,8 @@ import Foundation
 import HealthKit
 import Combine
 
-class HealthKitManager: ObservableObject {
+@available(iOS 13.0, watchOS 9.0, *)
+class HealthKitManager: NSObject, ObservableObject {
     static let shared = HealthKitManager()
     
     private let healthStore = HKHealthStore()
@@ -14,7 +15,8 @@ class HealthKitManager: ObservableObject {
     // Delegate to receive heart rate updates
     weak var delegate: HealthKitDelegate?
     
-    init() {
+    override init() {
+        super.init()
         requestAuthorization()
     }
     
@@ -27,7 +29,7 @@ class HealthKitManager: ObservableObject {
         ]
         
         // Request authorization
-        healthStore.requestAuthorization(toShare: nil, read: typesToRead) { (success, error) in
+        healthStore.requestAuthorization(toShare: nil, read: typesToRead) { success, error in
             if !success {
                 print("HealthKit authorization was not granted: \(String(describing: error))")
             } else {
@@ -48,7 +50,9 @@ class HealthKitManager: ObservableObject {
         let predicate = HKQuery.predicateForSamples(withStart: Date.distantPast, end: nil, options: .strictEndDate)
         
         // Set up the heart rate observer
-        let heartRateObserver = HKObserverQuery(sampleType: heartRateType, predicate: predicate) { (query, completionHandler, error) in
+        let heartRateObserver = HKObserverQuery(sampleType: heartRateType, predicate: predicate) { [weak self] query, completionHandler, error in
+            guard let self = self else { return }
+            
             if let error = error {
                 print("Error with heart rate observer: \(error.localizedDescription)")
                 return
@@ -99,7 +103,9 @@ class HealthKitManager: ObservableObject {
             predicate: nil,
             limit: 1,
             sortDescriptors: [sortDescriptor]
-        ) { (query, samples, error) in
+        ) { [weak self] query, samples, error in
+            guard let self = self else { return }
+            
             guard let samples = samples as? [HKQuantitySample], let sample = samples.first else {
                 if let error = error {
                     print("Error querying heart rate: \(error.localizedDescription)")
@@ -110,12 +116,12 @@ class HealthKitManager: ObservableObject {
             // Get the heart rate value in beats per minute
             let heartRateValue = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: HKUnit.minute()))
             
-            // Update heartRate property on the main thread
+            // Update the heart rate on the main thread
             DispatchQueue.main.async {
+                // Update the published property
                 self.heartRate = heartRateValue
-                print("Current heart rate: \(heartRateValue) BPM")
                 
-                // Notify the delegate about the heart rate update
+                // Notify via delegate
                 self.delegate?.heartRateUpdated(heartRate: heartRateValue)
             }
         }
@@ -136,9 +142,14 @@ class HealthKitManager: ObservableObject {
         let endDate = Date()
         duration = endDate.timeIntervalSince(startDate)
         
-        let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
-        let caloriesType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!
+        // Query for distance and calories
+        guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning),
+              let caloriesType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else {
+            completion(duration, 0, 0)
+            return
+        }
         
+        // Define predicate for the time range
         let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
         
         // Query for distance
@@ -146,7 +157,9 @@ class HealthKitManager: ObservableObject {
             quantityType: distanceType,
             quantitySamplePredicate: predicate,
             options: .cumulativeSum
-        ) { (_, result, error) in
+        ) { [weak self] _, result, error in
+            guard let self = self else { return }
+            
             if let result = result, let sum = result.sumQuantity() {
                 // Convert to meters
                 distance = sum.doubleValue(for: HKUnit.meter())
@@ -157,7 +170,7 @@ class HealthKitManager: ObservableObject {
                 quantityType: caloriesType,
                 quantitySamplePredicate: predicate,
                 options: .cumulativeSum
-            ) { (_, result, error) in
+            ) { _, result, error in
                 if let result = result, let sum = result.sumQuantity() {
                     // Convert to calories
                     calories = sum.doubleValue(for: HKUnit.kilocalorie())
@@ -194,7 +207,9 @@ class HealthKitManager: ObservableObject {
         )
         
         // Save the workout
-        healthStore.save(workout) { (success: Bool, error: Error?) in
+        healthStore.save(workout) { [weak self] success, error in
+            guard let self = self else { return }
+            
             if let error = error {
                 print("Error saving workout: \(error.localizedDescription)")
                 return
@@ -232,7 +247,7 @@ class HealthKitManager: ObservableObject {
         )
         
         // Add samples to the workout
-        healthStore.add([distanceSample, caloriesSample], to: workout) { (success: Bool, error: Error?) in
+        healthStore.add([distanceSample, caloriesSample], to: workout) { success, error in
             if let error = error {
                 print("Error saving workout samples: \(error.localizedDescription)")
                 return

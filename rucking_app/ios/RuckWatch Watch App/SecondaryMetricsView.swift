@@ -7,17 +7,19 @@
 
 import SwiftUI
 
+@available(iOS 13.0, watchOS 9.0, *)
 struct SecondaryMetricsView: View {
-    @StateObject private var sessionManager = SessionManager.shared
+    @EnvironmentObject var sessionManager: SessionManager
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 4) {
                 // Title at the top, left-aligned, positioned with the time
                 Text("GRY")
-                    .font(.system(size: 24))
-                    .bold()
-                    .padding(.top, 2) // Small positive padding instead of negative
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color("ArmyGreen"))
+                    .padding(.top, 2)
                 
                 // Grid layout for metrics
                 LazyVGrid(columns: [
@@ -53,12 +55,11 @@ struct SecondaryMetricsView: View {
             .padding(.horizontal)
             .padding(.top, 0)
         }
-        .edgesIgnoringSafeArea(.top) // Extend content to the very top of the screen
+        .ignoresSafeArea(edges: .top) // Modern syntax for ignoring safe area
     }
     
-    private func formatHeartRate(_ heartRate: Double?) -> String {
-        guard let hr = heartRate else { return "--" }
-        return "\(Int(hr)) BPM"
+    private func formatHeartRate(_ heartRate: Double) -> String {
+        return "\(Int(heartRate)) BPM"
     }
     
     private func formatPace(_ pace: Double) -> String {

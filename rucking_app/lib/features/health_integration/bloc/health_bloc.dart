@@ -20,6 +20,7 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
     on<SaveRuckWorkout>(_onSaveRuckWorkout);
     on<MarkHealthIntroSeen>(_onMarkHealthIntroSeen);
     on<DisableHealthIntegration>(_onDisableHealthIntegration);
+    on<SetHasAppleWatch>(_onSetHasAppleWatch);
   }
 
   Future<void> _onCheckAvailability(
@@ -30,7 +31,8 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
     final isAvailable = await healthService.isHealthIntegrationAvailable();
     if (isAvailable) {
       final hasSeenIntro = await healthService.hasSeenIntro();
-      emit(HealthAvailable(hasSeenIntro: hasSeenIntro));
+      final hasWatch = await healthService.hasAppleWatch();
+      emit(HealthAvailable(hasSeenIntro: hasSeenIntro, hasAppleWatch: hasWatch));
     } else {
       emit(HealthUnavailable());
     }
@@ -82,7 +84,28 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
     Emitter<HealthState> emit,
   ) async {
     await healthService.setHasSeenIntro();
-    emit(HealthIntroShown());
+    emit(const HealthIntroShown());
+  }
+
+  Future<void> _onSetHasAppleWatch(
+    SetHasAppleWatch event,
+    Emitter<HealthState> emit,
+  ) async {
+    await healthService.setHasAppleWatch(event.hasWatch);
+    
+    // Update the state - get current seen intro status
+    final hasSeenIntro = await healthService.hasSeenIntro();
+    
+    if (state is HealthAvailable) {
+      emit(HealthAvailable(
+        hasSeenIntro: hasSeenIntro, 
+        hasAppleWatch: event.hasWatch
+      ));
+    }
+    
+    // Mark intro as seen
+    await healthService.setHasSeenIntro();
+    emit(const HealthIntroShown());
   }
   
   Future<void> _onDisableHealthIntegration(

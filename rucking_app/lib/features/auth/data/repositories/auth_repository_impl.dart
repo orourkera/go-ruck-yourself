@@ -27,6 +27,7 @@ class AuthRepositoryImpl implements AuthRepository {
       name: name,
       email: email,
       password: password,
+      preferMetric: preferMetric,
       weightKg: weightKg,
       heightCm: heightCm,
       dateOfBirth: dateOfBirth,

@@ -9,6 +9,7 @@ import Foundation
 import WatchConnectivity
 import HealthKit
 
+@available(iOS 13.0, watchOS 9.0, *)
 class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDelegate {
     static let shared = SessionManager()
     
@@ -24,6 +25,10 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
     @Published var heartRate: Double = 0 // in BPM
     @Published var ruckWeight: Double = 0 // in kg
     @Published var elevationGain: Double = 0 // in meters
+    
+    // For session review
+    @Published var isShowingSessionReview = false
+    @Published var sessionSummary: SessionSummary?
     
     // User preferences
     @Published var userId: String = ""
@@ -106,13 +111,15 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
         // Calculate final stats
         elapsedDuration += Date().timeIntervalSince(startDate)
         
-        // Send end command to phone with final stats
-        sendMessageToPhone([
-            "command": "endSession",
-            "duration": elapsedDuration,
-            "distance": distance,
-            "calories": calories
-        ])
+        // Create session summary for review
+        let summary = SessionSummary(
+            duration: elapsedDuration,
+            distance: distance,
+            calories: calories,
+            avgHeartRate: heartRate, // Using current HR as average (in a real app you'd calculate the average)
+            ruckWeight: ruckWeight,
+            elevationGain: elevationGain
+        )
         
         // Save workout to HealthKit
         let endTime = Date()
@@ -126,7 +133,19 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
             ruckWeight: ruckWeight
         )
         
-        // Reset session state
+        // Send end command to phone with final stats
+        sendMessageToPhone([
+            "command": "endSession",
+            "duration": elapsedDuration,
+            "distance": distance,
+            "calories": calories
+        ])
+        
+        // Show session review
+        self.sessionSummary = summary
+        self.isShowingSessionReview = true
+        
+        // Reset session state after review is shown
         resetSession()
     }
     
@@ -145,27 +164,35 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
         healthKitManager.stopHeartRateMonitoring()
     }
     
+    // Method to dismiss session review and clean up
+    func dismissSessionReview() {
+        isShowingSessionReview = false
+        sessionSummary = nil
+    }
+    
     // MARK: - Timer Management
     
     private func startTimer() {
+        // Using modern Timer API without KeyPath
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self, self.isTimerRunning else { return }
             
-            self.elapsedDuration += 1.0
-            
-            // Update calories burned estimate
-            self.updateCaloriesBurned()
+            if !self.isPaused {
+                self.elapsedDuration += 1.0
+                
+                // Update pace calculation if distance > 0
+                if self.distance > 0 {
+                    // Convert from minutes per km
+                    self.pace = (self.elapsedDuration / 60) / (self.distance / 1000)
+                }
+                
+                // Estimate calories burned every second
+                // Very rough estimation based on weight, speed, and time
+                let MET = 7.0 // MET for rucking (estimate)
+                let caloriesPerSecond = (MET * 3.5 * (70 + self.ruckWeight)) / 60 / 60
+                self.calories += caloriesPerSecond
+            }
         }
-    }
-    
-    private func updateCaloriesBurned() {
-        // Simple calorie calculation based on MET value for rucking (approximately 6-8 METs)
-        // MET * weight (kg) * duration (hours)
-        let metValue: Double = 7.0 // Moderate to vigorous rucking
-        let weightWithRuck = 70.0 + ruckWeight // Assuming 70kg person + ruck weight
-        let hours = elapsedDuration / 3600.0
-        
-        calories = metValue * weightWithRuck * hours
     }
     
     // MARK: - Communication Methods
