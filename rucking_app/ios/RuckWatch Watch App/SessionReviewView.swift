@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-@available(iOS 13.0, watchOS 9.0, *)
+@available(watchOS 9.0, *)
 struct SessionReviewView: View {
     let duration: TimeInterval
     let distance: Double
@@ -32,37 +32,34 @@ struct SessionReviewView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible())
                 ], spacing: 8) {
-                    // Time
+                    // Row 1: Time and Heart Rate
                     MetricCard(
                         title: "TIME",
                         value: formatDuration(duration)
                     )
                     
-                    // Distance
-                    MetricCard(
-                        title: "DISTANCE",
-                        value: formatDistance(distance)
-                    )
-                    
-                    // Calories
-                    MetricCard(
-                        title: "CALORIES",
-                        value: formatCalories(calories)
-                    )
-                    
-                    // Heart Rate
                     MetricCard(
                         title: "AVG HR",
                         value: formatHeartRate(avgHeartRate)
                     )
                     
-                    // Pace
+                    // Row 2: Calories and Distance
+                    MetricCard(
+                        title: "CALORIES",
+                        value: formatCalories(calories)
+                    )
+                    
+                    MetricCard(
+                        title: "DISTANCE",
+                        value: formatDistance(distance)
+                    )
+                    
+                    // Row 3: Pace and Elevation
                     MetricCard(
                         title: "AVG PACE",
                         value: formatPace(duration, distance)
                     )
                     
-                    // Elevation gain
                     MetricCard(
                         title: "ELEVATION",
                         value: formatElevation(elevationGain)
@@ -79,7 +76,7 @@ struct SessionReviewView: View {
                         .foregroundColor(.white)
                         .padding(.vertical, 12)
                         .frame(maxWidth: .infinity)
-                        .background(Color.green)
+                        .background(Color("ArmyGreen"))
                         .cornerRadius(12)
                 }
                 .padding(.top, 12)
