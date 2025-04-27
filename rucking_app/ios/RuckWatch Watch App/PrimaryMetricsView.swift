@@ -53,7 +53,7 @@ struct PrimaryMetricsView: View {
                 .padding(.top, 2)
                 
                 // Control buttons
-                HStack(spacing: 12) {
+                HStack(spacing: 24) {
                     Button {
                         if sessionManager.isPaused {
                             sessionManager.resumeSession()
@@ -61,60 +61,33 @@ struct PrimaryMetricsView: View {
                             sessionManager.pauseSession()
                         }
                     } label: {
-                        Image(systemName: sessionManager.isPaused ? "play.fill" : "pause.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(sessionManager.isPaused ? .green : .orange)
-                            .frame(width: 40, height: 40)
-                            .background(Color.black.opacity(0.3))
-                            .clipShape(Circle())
+                        if sessionManager.isPaused {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(Color("ArmyGreen"))
+                        } else {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(.white)
+                        }
                     }
                     
                     Button {
                         sessionManager.endSession()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 20))
+                            .font(.system(size: 32))
                             .foregroundColor(.red)
-                            .frame(width: 40, height: 40)
-                            .background(Color.black.opacity(0.3))
-                            .clipShape(Circle())
                     }
                 }
                 .padding(.top, 8)
                 .frame(maxWidth: .infinity, alignment: .center)
                 
-                // Bottom buttons
-                HStack {
-                    Button {
-                        if sessionManager.isPaused {
-                            sessionManager.resumeSession()
-                        } else {
-                            sessionManager.pauseSession()
-                        }
-                    } label: {
-                        Text(sessionManager.isPaused ? "Resume" : "Pause")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(sessionManager.isPaused ? .green : .orange)
-                    
-                    Button {
-                        sessionManager.endSession()
-                    } label: {
-                        Text("End")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                }
-                .padding(.bottom)
+                .padding(.horizontal)
+                .padding(.top, 0)
             }
-            .padding(.horizontal)
-            .padding(.top, 0)
+            .ignoresSafeArea(.all, edges: .top) // Modern SwiftUI syntax for ignoring safe area
         }
-        .ignoresSafeArea(.all, edges: .top) // Modern SwiftUI syntax for ignoring safe area
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
