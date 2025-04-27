@@ -7,17 +7,19 @@
 
 import SwiftUI
 
+@available(iOS 13.0, watchOS 9.0, *)
 struct PrimaryMetricsView: View {
-    @StateObject private var sessionManager = SessionManager.shared
+    @EnvironmentObject var sessionManager: SessionManager
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 4) {
                 // Title at the top, left-aligned, positioned with the time
                 Text("GRY")
-                    .font(.system(size: 24))
-                    .bold()
-                    .padding(.top, 2) // Small positive padding instead of negative
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color("ArmyGreen"))
+                    .padding(.top, 2)
                 
                 // Grid layout for metrics (2x2)
                 LazyVGrid(columns: [
@@ -52,50 +54,44 @@ struct PrimaryMetricsView: View {
                 
                 // Control buttons
                 HStack(spacing: 12) {
-                    Button(action: {
+                    Button {
                         if sessionManager.isPaused {
                             sessionManager.resumeSession()
                         } else {
                             sessionManager.pauseSession()
                         }
-                    }) {
+                    } label: {
                         Image(systemName: sessionManager.isPaused ? "play.fill" : "pause.fill")
                             .font(.system(size: 20))
                             .foregroundColor(sessionManager.isPaused ? .green : .orange)
-                    }
-                    .buttonStyle(.plain)
-                    .background(
-                        Circle()
-                            .fill(Color.black.opacity(0.3))
                             .frame(width: 40, height: 40)
-                    )
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(Circle())
+                    }
                     
-                    Button(action: {
+                    Button {
                         sessionManager.endSession()
-                    }) {
+                    } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 20))
                             .foregroundColor(.red)
-                    }
-                    .buttonStyle(.plain)
-                    .background(
-                        Circle()
-                            .fill(Color.black.opacity(0.3))
                             .frame(width: 40, height: 40)
-                    )
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(Circle())
+                    }
                 }
                 .padding(.top, 8)
                 .frame(maxWidth: .infinity, alignment: .center)
                 
                 // Bottom buttons
                 HStack {
-                    Button(action: {
+                    Button {
                         if sessionManager.isPaused {
                             sessionManager.resumeSession()
                         } else {
                             sessionManager.pauseSession()
                         }
-                    }) {
+                    } label: {
                         Text(sessionManager.isPaused ? "Resume" : "Pause")
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity)
@@ -103,9 +99,9 @@ struct PrimaryMetricsView: View {
                     .buttonStyle(.bordered)
                     .tint(sessionManager.isPaused ? .green : .orange)
                     
-                    Button(action: {
+                    Button {
                         sessionManager.endSession()
-                    }) {
+                    } label: {
                         Text("End")
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity)
@@ -118,7 +114,7 @@ struct PrimaryMetricsView: View {
             .padding(.horizontal)
             .padding(.top, 0)
         }
-        .edgesIgnoringSafeArea(.top) // Extend content to the very top of the screen
+        .ignoresSafeArea(.all, edges: .top) // Modern SwiftUI syntax for ignoring safe area
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {

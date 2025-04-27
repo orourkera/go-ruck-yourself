@@ -6,10 +6,10 @@
 //
 
 import SwiftUI
-import WatchKit
 
+@available(iOS 13.0, watchOS 9.0, *)
 struct ContentView: View {
-    @StateObject private var sessionManager = SessionManager.shared
+    @EnvironmentObject var sessionManager: SessionManager
     @State private var selectedTab: Tab = .primary
     
     enum Tab {
@@ -17,21 +17,38 @@ struct ContentView: View {
     }
     
     var body: some View {
-        if sessionManager.isSessionActive {
-            TabView(selection: $selectedTab) {
-                PrimaryMetricsView()
-                    .tag(Tab.primary)
-                
-                SecondaryMetricsView()
-                    .tag(Tab.secondary)
+        ZStack {
+            if sessionManager.isShowingSessionReview, let summary = sessionManager.sessionSummary {
+                SessionReviewView(
+                    duration: summary.duration,
+                    distance: summary.distance,
+                    calories: summary.calories,
+                    avgHeartRate: summary.avgHeartRate,
+                    ruckWeight: summary.ruckWeight,
+                    elevationGain: summary.elevationGain
+                )
+                .transition(.opacity)
+                .onDisappear {
+                    sessionManager.isShowingSessionReview = false
+                    sessionManager.sessionSummary = nil
+                }
+            } else if sessionManager.isSessionActive {
+                TabView(selection: $selectedTab) {
+                    PrimaryMetricsView()
+                        .tag(Tab.primary)
+                    
+                    SecondaryMetricsView()
+                        .tag(Tab.secondary)
+                }
+                .tabViewStyle(.page)
+            } else {
+                StartSessionView()
             }
-            .tabViewStyle(.page)
-        } else {
-            StartSessionView()
         }
     }
 }
 
+@available(iOS 14.0, watchOS 9.0, *)
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()

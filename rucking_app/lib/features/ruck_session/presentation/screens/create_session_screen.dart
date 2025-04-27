@@ -145,7 +145,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   /// Snaps the current weight to the nearest predefined weight option
   void _snapToNearestWeight() {
     final weightOptions = _preferMetric 
-        ? [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0]
+        ? [2.5, 4.5, 9.0, 20.0, 30.0]
         : [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0];
     
     double closestWeight = weightOptions.first;
@@ -352,10 +352,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                       : ListView(
                           scrollDirection: Axis.horizontal,
                           children: _preferMetric 
-                              ? [5, 10, 15, 20, 25, 30, 35, 40].map((weight) => 
+                              ? [2.5, 4.5, 9.0, 20.0, 30.0].map((weight) => 
                                   Padding(
                                     padding: const EdgeInsets.only(right: 12),
-                                    child: _buildWeightChip(weight.toDouble()),
+                                    child: _buildWeightChip(weight),
                                   )
                                 ).toList()
                               : [10, 20, 30, 40, 50, 60, 70, 80].map((weight) => 

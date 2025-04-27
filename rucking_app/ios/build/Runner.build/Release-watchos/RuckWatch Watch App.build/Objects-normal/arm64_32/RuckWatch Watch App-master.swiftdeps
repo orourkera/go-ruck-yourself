@@ -1,0 +1,17 @@
+version: "Apple Swift version 6.1 (swiftlang-6.1.0.110.21 clang-1700.0.13.3)"
+options: "f9049ac449f320b42dc8ec4076cedaf3ef58680faddd21f19598d6b82063d0ad"
+build_start_time: [1745734468, 232830000]
+build_end_time: [1745734471, 577645000]
+inputs:
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/ContentView.swift": !dirty [1745693312, 288210395]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/HealthKitManager.swift": !dirty [1745693300, 924272932]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/MinimumDeploymentTarget.swift": !dirty [1745693235, 471595031]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/PrimaryMetricsView.swift": !dirty [1745693334, 341738722]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/RuckWatchApp.swift": !dirty [1745693278, 144799884]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/SecondaryMetricsView.swift": !dirty [1745693343, 743249197]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/SessionManager.swift": !dirty [1745693289, 128949496]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/SessionReviewView.swift": !dirty [1745693321, 967573646]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/SessionSummary.swift": !dirty [1745693365, 29469289]
+  "/Users/rory/RuckingApp/rucking_app/ios/RuckWatch Watch App/StartSessionView.swift": !dirty [1745693354, 174390000]
+  ? "/Users/rory/RuckingApp/rucking_app/ios/build/Runner.build/Release-watchos/RuckWatch Watch App.build/DerivedSources/GeneratedAssetSymbols.swift"
+  : !dirty [1745734467, 995937744]

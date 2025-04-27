@@ -14,10 +14,16 @@ NS_ASSUME_NONNULL_BEGIN
 /// The codec used by all APIs.
 NSObject<FlutterMessageCodec> *nullGetRuckingApiCodec(void);
 
-/// Messages from Watch to Flutter
-@protocol RuckingApi
+/// Messages from native (Watch) to Flutter
+@interface RuckingApi : NSObject
+- (instancetype)initWithBinaryMessenger:(id<FlutterBinaryMessenger>)binaryMessenger;
+- (instancetype)initWithBinaryMessenger:(id<FlutterBinaryMessenger>)binaryMessenger messageChannelSuffix:(nullable NSString *)messageChannelSuffix;
 /// Start a new session from the watch
 - (void)startSessionFromWatchRuckWeight:(double)ruckWeight completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion;
+/// Start a session on the watch (Flutter -> native)
+- (void)startSessionOnWatchRuckWeight:(double)ruckWeight completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion;
+/// Update session metrics on the watch (Flutter -> native)
+- (void)updateSessionOnWatchDistance:(double)distance duration:(double)duration pace:(double)pace isPaused:(BOOL)isPaused completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion;
 /// Pause an active session from the watch
 - (void)pauseSessionFromWatchWithCompletion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion;
 /// Resume a paused session from the watch
@@ -28,25 +34,23 @@ NSObject<FlutterMessageCodec> *nullGetRuckingApiCodec(void);
 - (void)updateHeartRateFromWatchHeartRate:(double)heartRate completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion;
 @end
 
-extern void SetUpRuckingApi(id<FlutterBinaryMessenger> binaryMessenger, NSObject<RuckingApi> *_Nullable api);
 
-extern void SetUpRuckingApiWithSuffix(id<FlutterBinaryMessenger> binaryMessenger, NSObject<RuckingApi> *_Nullable api, NSString *messageChannelSuffix);
-
-
-/// Messages from Flutter to Watch
-@interface FlutterRuckingApi : NSObject
-- (instancetype)initWithBinaryMessenger:(id<FlutterBinaryMessenger>)binaryMessenger;
-- (instancetype)initWithBinaryMessenger:(id<FlutterBinaryMessenger>)binaryMessenger messageChannelSuffix:(nullable NSString *)messageChannelSuffix;
+/// Messages from Flutter to native (Watch)
+@protocol FlutterRuckingApi
 /// Update session metrics on the watch
-- (void)updateSessionOnWatchDistance:(double)distance duration:(double)duration pace:(double)pace isPaused:(BOOL)isPaused completion:(void (^)(FlutterError *_Nullable))completion;
+- (void)updateSessionOnWatchDistance:(double)distance duration:(double)duration pace:(double)pace isPaused:(BOOL)isPaused error:(FlutterError *_Nullable *_Nonnull)error;
 /// Start a session on the watch
-- (void)startSessionOnWatchRuckWeight:(double)ruckWeight completion:(void (^)(FlutterError *_Nullable))completion;
+- (void)startSessionOnWatchRuckWeight:(double)ruckWeight error:(FlutterError *_Nullable *_Nonnull)error;
 /// Pause a session on the watch
-- (void)pauseSessionOnWatchWithCompletion:(void (^)(FlutterError *_Nullable))completion;
+- (void)pauseSessionOnWatchWithError:(FlutterError *_Nullable *_Nonnull)error;
 /// Resume a session on the watch
-- (void)resumeSessionOnWatchWithCompletion:(void (^)(FlutterError *_Nullable))completion;
+- (void)resumeSessionOnWatchWithError:(FlutterError *_Nullable *_Nonnull)error;
 /// End a session on the watch
-- (void)endSessionOnWatchWithCompletion:(void (^)(FlutterError *_Nullable))completion;
+- (void)endSessionOnWatchWithError:(FlutterError *_Nullable *_Nonnull)error;
 @end
+
+extern void SetUpFlutterRuckingApi(id<FlutterBinaryMessenger> binaryMessenger, NSObject<FlutterRuckingApi> *_Nullable api);
+
+extern void SetUpFlutterRuckingApiWithSuffix(id<FlutterBinaryMessenger> binaryMessenger, NSObject<FlutterRuckingApi> *_Nullable api, NSString *messageChannelSuffix);
 
 NS_ASSUME_NONNULL_END
