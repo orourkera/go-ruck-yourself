@@ -7,44 +7,55 @@
 
 import SwiftUI
 
-@available(iOS 13.0, watchOS 9.0, *)
+@available(watchOS 9.0, *)
 struct PrimaryMetricsView: View {
     @EnvironmentObject var sessionManager: SessionManager
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 0) {
                 // Title at the top, left-aligned, positioned with the time
                 Text("GRY")
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(Color("ArmyGreen"))
-                    .padding(.top, 2)
+                    .padding(.top, 0)
+                    .padding(.bottom, 8)
                 
                 // Grid layout for metrics (2x2)
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
                     GridItem(.flexible())
                 ], spacing: 8) {
-                    // Time
+                    // Row 1: Time and Heart Rate
                     MetricCard(
                         title: "TIME", 
                         value: formatDuration(sessionManager.elapsedDuration)
                     )
                     
-                    // Distance
+                    // Heart Rate
                     MetricCard(
-                        title: "DISTANCE", 
-                        value: formatDistance(sessionManager.distance)
+                        title: "HEART RATE",
+                        value: formatHeartRate(sessionManager.heartRate)
                     )
                     
-                    // Calories
+                    // Row 2: Calories and Distance
                     MetricCard(
                         title: "CALORIES", 
                         value: formatCalories(sessionManager.calories)
                     )
                     
-                    // Elevation
+                    MetricCard(
+                        title: "DISTANCE", 
+                        value: formatDistance(sessionManager.distance)
+                    )
+                    
+                    // Row 3: Pace and Elevation
+                    MetricCard(
+                        title: "PACE",
+                        value: formatPace(sessionManager.pace)
+                    )
+                    
                     MetricCard(
                         title: "ELEVATION", 
                         value: formatElevation(sessionManager.elevationGain)
@@ -71,6 +82,7 @@ struct PrimaryMetricsView: View {
                                 .foregroundColor(.white)
                         }
                     }
+                    .buttonStyle(PlainButtonStyle())
                     
                     Button {
                         sessionManager.endSession()
@@ -79,6 +91,7 @@ struct PrimaryMetricsView: View {
                             .font(.system(size: 32))
                             .foregroundColor(.red)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 .padding(.top, 8)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -114,6 +127,22 @@ struct PrimaryMetricsView: View {
     
     private func formatElevation(_ elevation: Double) -> String {
         return String(format: "%.0f m", elevation)
+    }
+    
+    private func formatHeartRate(_ heartRate: Double) -> String {
+        return String(format: "%.0f BPM", heartRate)
+    }
+    
+    private func formatPace(_ pace: Double) -> String {
+        if pace <= 0 {
+            return "--:--"
+        }
+        
+        // pace is in min/km
+        let minutes = Int(pace)
+        let seconds = Int((pace - Double(minutes)) * 60)
+        
+        return String(format: "%d:%02d /km", minutes, seconds)
     }
 }
 

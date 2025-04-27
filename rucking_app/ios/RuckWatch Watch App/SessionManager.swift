@@ -282,10 +282,16 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
         }
     }
     
-    // MARK: - WCSessionDelegate
+    // MARK: - WCSessionDelegate Methods
     
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        print("Watch WCSession activation state: \(activationState.rawValue)")
+        // Handle session activation completion
+        if let error = error {
+            print("WCSession activation failed with error: \(error.localizedDescription)")
+            return
+        }
+        
+        print("WCSession activated with state: \(activationState.rawValue)")
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
@@ -324,6 +330,18 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
     #if os(watchOS)
     func sessionReachabilityDidChange(_ session: WCSession) {
         // Handle reachability changes if needed
+    }
+    #endif
+    
+    #if os(iOS)
+    func sessionDidBecomeInactive(_ session: WCSession) {
+        print("WCSession became inactive")
+    }
+    
+    func sessionDidDeactivate(_ session: WCSession) {
+        // Reactivate session if needed
+        print("WCSession deactivated")
+        WCSession.default.activate()
     }
     #endif
 }
