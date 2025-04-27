@@ -7,14 +7,9 @@
 
 import SwiftUI
 
-@available(iOS 13.0, watchOS 9.0, *)
+@available(watchOS 9.0, *)
 struct ContentView: View {
     @EnvironmentObject var sessionManager: SessionManager
-    @State private var selectedTab: Tab = .primary
-    
-    enum Tab {
-        case primary, secondary
-    }
     
     var body: some View {
         ZStack {
@@ -27,20 +22,12 @@ struct ContentView: View {
                     ruckWeight: summary.ruckWeight,
                     elevationGain: summary.elevationGain
                 )
-                .transition(.opacity)
                 .onDisappear {
                     sessionManager.isShowingSessionReview = false
                     sessionManager.sessionSummary = nil
                 }
             } else if sessionManager.isSessionActive {
-                TabView(selection: $selectedTab) {
-                    PrimaryMetricsView()
-                        .tag(Tab.primary)
-                    
-                    SecondaryMetricsView()
-                        .tag(Tab.secondary)
-                }
-                .tabViewStyle(.page)
+                PrimaryMetricsView()
             } else {
                 StartSessionView()
             }
@@ -48,7 +35,6 @@ struct ContentView: View {
     }
 }
 
-@available(iOS 14.0, watchOS 9.0, *)
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
