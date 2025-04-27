@@ -22,7 +22,7 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
     return BlocListener<HealthBloc, HealthState>(
       listenWhen: (previous, current) => 
         current is HealthAuthorizationStatus || 
-        (current is HealthIntroShown && previous is HealthAuthorizationStatus),
+        current is HealthIntroShown,
       listener: (context, state) {
         if (state is HealthAuthorizationStatus) {
           // Mark intro as seen regardless of authorization status
@@ -188,7 +188,7 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
                     onPressed: () {
                       // Mark as seen and don't show again
                       // Navigation will be handled by the BlocListener
-                      context.read<HealthBloc>().add(const MarkHealthIntroSeen());
+                      context.read<HealthBloc>().add(const SetHasAppleWatch(hasWatch: false));
                     },
                     style: TextButton.styleFrom(
                       minimumSize: const Size(double.infinity, 40),

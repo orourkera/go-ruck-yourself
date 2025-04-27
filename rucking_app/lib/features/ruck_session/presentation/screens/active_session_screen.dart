@@ -79,6 +79,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   bool _isEnding = false;
   String? _validationMessage;
   bool _showValidationMessage = false;
+  bool _hasAppleWatch = true; // Track if user has Apple Watch
   
   // Timer variables
   late Stopwatch _stopwatch;
@@ -115,12 +116,19 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Initialize services
-    _locationService = LocationServiceImpl();
     _apiClient = GetIt.instance<ApiClient>();
+    _locationService = GetIt.instance<LocationService>();
     _validationService = SessionValidationService();
     _healthService = HealthService();
+    
+    // Check if user has an Apple Watch
+    _checkHasAppleWatch();
+
+    // Setup stopwatch
+    _stopwatch = Stopwatch();
+    _stopwatch.start();
     
     // Set user ID for health service from auth state
     final authState = context.read<AuthBloc>().state;
@@ -764,6 +772,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _heartRateTimer = null;
   }
 
+  /// Check if user has an Apple Watch
+  void _checkHasAppleWatch() async {
+    final hasWatch = await _healthService.hasAppleWatch();
+    setState(() {
+      _hasAppleWatch = hasWatch;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('ActiveSessionScreen.build: _heartRate=$_heartRate');
@@ -946,51 +962,52 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                       ),
                     ),
                     
-                    // Heart rate pill (now always shown)
-                    Container(
-                      margin: const EdgeInsets.only(left: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.black 
-                          : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                        border: Border.all(
+                    // Heart rate pill (only shown if user has an Apple Watch)
+                    if (_hasAppleWatch)
+                      Container(
+                        margin: const EdgeInsets.only(left: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
                           color: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.grey[800]! 
-                            : Colors.grey[300]!,
-                          width: 1,
+                            ? Colors.black 
+                            : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: Theme.of(context).brightness == Brightness.dark 
+                              ? Colors.grey[800]! 
+                              : Colors.grey[300]!,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.favorite,
+                              color: Colors.red[400],
+                              size: 24,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _heartRate != null ? '${_heartRate!.toInt()}' : '--',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: Theme.of(context).brightness == Brightness.dark 
+                                  ? Colors.white
+                                  : Colors.black,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.favorite,
-                            color: Colors.red[400],
-                            size: 24,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _heartRate != null ? '${_heartRate!.toInt()}' : '--',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: Theme.of(context).brightness == Brightness.dark 
-                                ? Colors.white
-                                : Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
                 

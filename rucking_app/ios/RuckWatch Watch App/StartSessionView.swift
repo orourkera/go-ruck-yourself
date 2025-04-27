@@ -7,21 +7,23 @@
 
 import SwiftUI
 
+@available(watchOS 9.0, *)
 struct StartSessionView: View {
-    @StateObject private var sessionManager = SessionManager.shared
-    @State private var ruckWeight: Double = 10.0 // Default weight
+    @EnvironmentObject var sessionManager: SessionManager
+    @State private var ruckWeight: Double = 9.0 // Default weight
     
     // Weight options to display as tiles
-    private let weightOptions: [Double] = [5, 10, 15, 20, 25, 30, 35, 40]
+    private let weightOptions: [Double] = [2.5, 4.5, 9, 20, 30]
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 4) {
                 // Title at the top, left-aligned with zero top spacing
                 Text("GRY")
-                    .font(.system(size: 24))
-                    .bold()
-                    .padding(.top, 2) // Small positive padding instead of negative
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color("ArmyGreen"))
+                    .padding(.top, 2)
                 
                 Text("Ruck Weight: \(Int(ruckWeight)) kg")
                     .font(.system(size: 16))
@@ -34,9 +36,9 @@ struct StartSessionView: View {
                     GridItem(.flexible())
                 ], spacing: 6) {
                     ForEach(weightOptions, id: \.self) { weight in
-                        Button(action: {
+                        Button {
                             ruckWeight = weight
-                        }) {
+                        } label: {
                             Text("\(Int(weight))")
                                 .font(.system(size: 14, weight: .medium))
                                 .frame(minWidth: 0, maxWidth: .infinity)
@@ -45,15 +47,14 @@ struct StartSessionView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.top, 2)
                 
                 // Start button
-                Button(action: {
+                Button {
                     sessionManager.startSession(withWeight: ruckWeight)
-                }) {
+                } label: {
                     Text("Start Ruck")
                         .fontWeight(.bold)
                         .foregroundColor(.white)
@@ -68,6 +69,6 @@ struct StartSessionView: View {
             .padding(.horizontal)
             .padding(.top, 0)
         }
-        .edgesIgnoringSafeArea(.top) // Extend content to the very top of the screen
+        .ignoresSafeArea(edges: .top) // Modern syntax for ignoring safe area
     }
 }

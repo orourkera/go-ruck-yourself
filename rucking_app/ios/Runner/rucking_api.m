@@ -72,117 +72,12 @@ NSObject<FlutterMessageCodec> *nullGetRuckingApiCodec(void) {
   });
   return sSharedObject;
 }
-void SetUpRuckingApi(id<FlutterBinaryMessenger> binaryMessenger, NSObject<RuckingApi> *api) {
-  SetUpRuckingApiWithSuffix(binaryMessenger, api, @"");
-}
-
-void SetUpRuckingApiWithSuffix(id<FlutterBinaryMessenger> binaryMessenger, NSObject<RuckingApi> *api, NSString *messageChannelSuffix) {
-  messageChannelSuffix = messageChannelSuffix.length > 0 ? [NSString stringWithFormat: @".%@", messageChannelSuffix] : @"";
-  /// Start a new session from the watch
-  {
-    FlutterBasicMessageChannel *channel =
-      [[FlutterBasicMessageChannel alloc]
-        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch", messageChannelSuffix]
-        binaryMessenger:binaryMessenger
-        codec:nullGetRuckingApiCodec()];
-    if (api) {
-      NSCAssert([api respondsToSelector:@selector(startSessionFromWatchRuckWeight:completion:)], @"RuckingApi api (%@) doesn't respond to @selector(startSessionFromWatchRuckWeight:completion:)", api);
-      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
-        NSArray<id> *args = message;
-        double arg_ruckWeight = [GetNullableObjectAtIndex(args, 0) doubleValue];
-        [api startSessionFromWatchRuckWeight:arg_ruckWeight completion:^(NSNumber *_Nullable output, FlutterError *_Nullable error) {
-          callback(wrapResult(output, error));
-        }];
-      }];
-    } else {
-      [channel setMessageHandler:nil];
-    }
-  }
-  /// Pause an active session from the watch
-  {
-    FlutterBasicMessageChannel *channel =
-      [[FlutterBasicMessageChannel alloc]
-        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.pauseSessionFromWatch", messageChannelSuffix]
-        binaryMessenger:binaryMessenger
-        codec:nullGetRuckingApiCodec()];
-    if (api) {
-      NSCAssert([api respondsToSelector:@selector(pauseSessionFromWatchWithCompletion:)], @"RuckingApi api (%@) doesn't respond to @selector(pauseSessionFromWatchWithCompletion:)", api);
-      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
-        [api pauseSessionFromWatchWithCompletion:^(NSNumber *_Nullable output, FlutterError *_Nullable error) {
-          callback(wrapResult(output, error));
-        }];
-      }];
-    } else {
-      [channel setMessageHandler:nil];
-    }
-  }
-  /// Resume a paused session from the watch
-  {
-    FlutterBasicMessageChannel *channel =
-      [[FlutterBasicMessageChannel alloc]
-        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.resumeSessionFromWatch", messageChannelSuffix]
-        binaryMessenger:binaryMessenger
-        codec:nullGetRuckingApiCodec()];
-    if (api) {
-      NSCAssert([api respondsToSelector:@selector(resumeSessionFromWatchWithCompletion:)], @"RuckingApi api (%@) doesn't respond to @selector(resumeSessionFromWatchWithCompletion:)", api);
-      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
-        [api resumeSessionFromWatchWithCompletion:^(NSNumber *_Nullable output, FlutterError *_Nullable error) {
-          callback(wrapResult(output, error));
-        }];
-      }];
-    } else {
-      [channel setMessageHandler:nil];
-    }
-  }
-  /// End the current session from the watch
-  {
-    FlutterBasicMessageChannel *channel =
-      [[FlutterBasicMessageChannel alloc]
-        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch", messageChannelSuffix]
-        binaryMessenger:binaryMessenger
-        codec:nullGetRuckingApiCodec()];
-    if (api) {
-      NSCAssert([api respondsToSelector:@selector(endSessionFromWatchDuration:distance:calories:completion:)], @"RuckingApi api (%@) doesn't respond to @selector(endSessionFromWatchDuration:distance:calories:completion:)", api);
-      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
-        NSArray<id> *args = message;
-        NSInteger arg_duration = [GetNullableObjectAtIndex(args, 0) integerValue];
-        double arg_distance = [GetNullableObjectAtIndex(args, 1) doubleValue];
-        double arg_calories = [GetNullableObjectAtIndex(args, 2) doubleValue];
-        [api endSessionFromWatchDuration:arg_duration distance:arg_distance calories:arg_calories completion:^(NSNumber *_Nullable output, FlutterError *_Nullable error) {
-          callback(wrapResult(output, error));
-        }];
-      }];
-    } else {
-      [channel setMessageHandler:nil];
-    }
-  }
-  /// Update heart rate from the watch
-  {
-    FlutterBasicMessageChannel *channel =
-      [[FlutterBasicMessageChannel alloc]
-        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch", messageChannelSuffix]
-        binaryMessenger:binaryMessenger
-        codec:nullGetRuckingApiCodec()];
-    if (api) {
-      NSCAssert([api respondsToSelector:@selector(updateHeartRateFromWatchHeartRate:completion:)], @"RuckingApi api (%@) doesn't respond to @selector(updateHeartRateFromWatchHeartRate:completion:)", api);
-      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
-        NSArray<id> *args = message;
-        double arg_heartRate = [GetNullableObjectAtIndex(args, 0) doubleValue];
-        [api updateHeartRateFromWatchHeartRate:arg_heartRate completion:^(NSNumber *_Nullable output, FlutterError *_Nullable error) {
-          callback(wrapResult(output, error));
-        }];
-      }];
-    } else {
-      [channel setMessageHandler:nil];
-    }
-  }
-}
-@interface FlutterRuckingApi ()
+@interface RuckingApi ()
 @property(nonatomic, strong) NSObject<FlutterBinaryMessenger> *binaryMessenger;
 @property(nonatomic, strong) NSString *messageChannelSuffix;
 @end
 
-@implementation FlutterRuckingApi
+@implementation RuckingApi
 
 - (instancetype)initWithBinaryMessenger:(NSObject<FlutterBinaryMessenger> *)binaryMessenger {
   return [self initWithBinaryMessenger:binaryMessenger messageChannelSuffix:@""];
@@ -195,27 +90,8 @@ void SetUpRuckingApiWithSuffix(id<FlutterBinaryMessenger> binaryMessenger, NSObj
   }
   return self;
 }
-- (void)updateSessionOnWatchDistance:(double)arg_distance duration:(double)arg_duration pace:(double)arg_pace isPaused:(BOOL)arg_isPaused completion:(void (^)(FlutterError *_Nullable))completion {
-  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.updateSessionOnWatch", _messageChannelSuffix];
-  FlutterBasicMessageChannel *channel =
-    [FlutterBasicMessageChannel
-      messageChannelWithName:channelName
-      binaryMessenger:self.binaryMessenger
-      codec:nullGetRuckingApiCodec()];
-  [channel sendMessage:@[@(arg_distance), @(arg_duration), @(arg_pace), @(arg_isPaused)] reply:^(NSArray<id> *reply) {
-    if (reply != nil) {
-      if (reply.count > 1) {
-        completion([FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
-      } else {
-        completion(nil);
-      }
-    } else {
-      completion(createConnectionError(channelName));
-    } 
-  }];
-}
-- (void)startSessionOnWatchRuckWeight:(double)arg_ruckWeight completion:(void (^)(FlutterError *_Nullable))completion {
-  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.startSessionOnWatch", _messageChannelSuffix];
+- (void)startSessionFromWatchRuckWeight:(double)arg_ruckWeight completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion {
+  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch", _messageChannelSuffix];
   FlutterBasicMessageChannel *channel =
     [FlutterBasicMessageChannel
       messageChannelWithName:channelName
@@ -224,17 +100,58 @@ void SetUpRuckingApiWithSuffix(id<FlutterBinaryMessenger> binaryMessenger, NSObj
   [channel sendMessage:@[@(arg_ruckWeight)] reply:^(NSArray<id> *reply) {
     if (reply != nil) {
       if (reply.count > 1) {
-        completion([FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
+        completion(nil, [FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
       } else {
-        completion(nil);
+        NSNumber *output = reply[0] == [NSNull null] ? nil : reply[0];
+        completion(output, nil);
       }
     } else {
-      completion(createConnectionError(channelName));
+      completion(nil, createConnectionError(channelName));
     } 
   }];
 }
-- (void)pauseSessionOnWatchWithCompletion:(void (^)(FlutterError *_Nullable))completion {
-  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.pauseSessionOnWatch", _messageChannelSuffix];
+- (void)startSessionOnWatchRuckWeight:(double)arg_ruckWeight completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion {
+  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.startSessionOnWatch", _messageChannelSuffix];
+  FlutterBasicMessageChannel *channel =
+    [FlutterBasicMessageChannel
+      messageChannelWithName:channelName
+      binaryMessenger:self.binaryMessenger
+      codec:nullGetRuckingApiCodec()];
+  [channel sendMessage:@[@(arg_ruckWeight)] reply:^(NSArray<id> *reply) {
+    if (reply != nil) {
+      if (reply.count > 1) {
+        completion(nil, [FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
+      } else {
+        NSNumber *output = reply[0] == [NSNull null] ? nil : reply[0];
+        completion(output, nil);
+      }
+    } else {
+      completion(nil, createConnectionError(channelName));
+    } 
+  }];
+}
+- (void)updateSessionOnWatchDistance:(double)arg_distance duration:(double)arg_duration pace:(double)arg_pace isPaused:(BOOL)arg_isPaused completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion {
+  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch", _messageChannelSuffix];
+  FlutterBasicMessageChannel *channel =
+    [FlutterBasicMessageChannel
+      messageChannelWithName:channelName
+      binaryMessenger:self.binaryMessenger
+      codec:nullGetRuckingApiCodec()];
+  [channel sendMessage:@[@(arg_distance), @(arg_duration), @(arg_pace), @(arg_isPaused)] reply:^(NSArray<id> *reply) {
+    if (reply != nil) {
+      if (reply.count > 1) {
+        completion(nil, [FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
+      } else {
+        NSNumber *output = reply[0] == [NSNull null] ? nil : reply[0];
+        completion(output, nil);
+      }
+    } else {
+      completion(nil, createConnectionError(channelName));
+    } 
+  }];
+}
+- (void)pauseSessionFromWatchWithCompletion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion {
+  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.pauseSessionFromWatch", _messageChannelSuffix];
   FlutterBasicMessageChannel *channel =
     [FlutterBasicMessageChannel
       messageChannelWithName:channelName
@@ -243,17 +160,18 @@ void SetUpRuckingApiWithSuffix(id<FlutterBinaryMessenger> binaryMessenger, NSObj
   [channel sendMessage:nil reply:^(NSArray<id> *reply) {
     if (reply != nil) {
       if (reply.count > 1) {
-        completion([FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
+        completion(nil, [FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
       } else {
-        completion(nil);
+        NSNumber *output = reply[0] == [NSNull null] ? nil : reply[0];
+        completion(output, nil);
       }
     } else {
-      completion(createConnectionError(channelName));
+      completion(nil, createConnectionError(channelName));
     } 
   }];
 }
-- (void)resumeSessionOnWatchWithCompletion:(void (^)(FlutterError *_Nullable))completion {
-  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.resumeSessionOnWatch", _messageChannelSuffix];
+- (void)resumeSessionFromWatchWithCompletion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion {
+  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.resumeSessionFromWatch", _messageChannelSuffix];
   FlutterBasicMessageChannel *channel =
     [FlutterBasicMessageChannel
       messageChannelWithName:channelName
@@ -262,33 +180,159 @@ void SetUpRuckingApiWithSuffix(id<FlutterBinaryMessenger> binaryMessenger, NSObj
   [channel sendMessage:nil reply:^(NSArray<id> *reply) {
     if (reply != nil) {
       if (reply.count > 1) {
-        completion([FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
+        completion(nil, [FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
       } else {
-        completion(nil);
+        NSNumber *output = reply[0] == [NSNull null] ? nil : reply[0];
+        completion(output, nil);
       }
     } else {
-      completion(createConnectionError(channelName));
+      completion(nil, createConnectionError(channelName));
     } 
   }];
 }
-- (void)endSessionOnWatchWithCompletion:(void (^)(FlutterError *_Nullable))completion {
-  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.endSessionOnWatch", _messageChannelSuffix];
+- (void)endSessionFromWatchDuration:(NSInteger)arg_duration distance:(double)arg_distance calories:(double)arg_calories completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion {
+  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch", _messageChannelSuffix];
   FlutterBasicMessageChannel *channel =
     [FlutterBasicMessageChannel
       messageChannelWithName:channelName
       binaryMessenger:self.binaryMessenger
       codec:nullGetRuckingApiCodec()];
-  [channel sendMessage:nil reply:^(NSArray<id> *reply) {
+  [channel sendMessage:@[@(arg_duration), @(arg_distance), @(arg_calories)] reply:^(NSArray<id> *reply) {
     if (reply != nil) {
       if (reply.count > 1) {
-        completion([FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
+        completion(nil, [FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
       } else {
-        completion(nil);
+        NSNumber *output = reply[0] == [NSNull null] ? nil : reply[0];
+        completion(output, nil);
       }
     } else {
-      completion(createConnectionError(channelName));
+      completion(nil, createConnectionError(channelName));
+    } 
+  }];
+}
+- (void)updateHeartRateFromWatchHeartRate:(double)arg_heartRate completion:(void (^)(NSNumber *_Nullable, FlutterError *_Nullable))completion {
+  NSString *channelName = [NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch", _messageChannelSuffix];
+  FlutterBasicMessageChannel *channel =
+    [FlutterBasicMessageChannel
+      messageChannelWithName:channelName
+      binaryMessenger:self.binaryMessenger
+      codec:nullGetRuckingApiCodec()];
+  [channel sendMessage:@[@(arg_heartRate)] reply:^(NSArray<id> *reply) {
+    if (reply != nil) {
+      if (reply.count > 1) {
+        completion(nil, [FlutterError errorWithCode:reply[0] message:reply[1] details:reply[2]]);
+      } else {
+        NSNumber *output = reply[0] == [NSNull null] ? nil : reply[0];
+        completion(output, nil);
+      }
+    } else {
+      completion(nil, createConnectionError(channelName));
     } 
   }];
 }
 @end
 
+void SetUpFlutterRuckingApi(id<FlutterBinaryMessenger> binaryMessenger, NSObject<FlutterRuckingApi> *api) {
+  SetUpFlutterRuckingApiWithSuffix(binaryMessenger, api, @"");
+}
+
+void SetUpFlutterRuckingApiWithSuffix(id<FlutterBinaryMessenger> binaryMessenger, NSObject<FlutterRuckingApi> *api, NSString *messageChannelSuffix) {
+  messageChannelSuffix = messageChannelSuffix.length > 0 ? [NSString stringWithFormat: @".%@", messageChannelSuffix] : @"";
+  /// Update session metrics on the watch
+  {
+    FlutterBasicMessageChannel *channel =
+      [[FlutterBasicMessageChannel alloc]
+        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.updateSessionOnWatch", messageChannelSuffix]
+        binaryMessenger:binaryMessenger
+        codec:nullGetRuckingApiCodec()];
+    if (api) {
+      NSCAssert([api respondsToSelector:@selector(updateSessionOnWatchDistance:duration:pace:isPaused:error:)], @"FlutterRuckingApi api (%@) doesn't respond to @selector(updateSessionOnWatchDistance:duration:pace:isPaused:error:)", api);
+      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
+        NSArray<id> *args = message;
+        double arg_distance = [GetNullableObjectAtIndex(args, 0) doubleValue];
+        double arg_duration = [GetNullableObjectAtIndex(args, 1) doubleValue];
+        double arg_pace = [GetNullableObjectAtIndex(args, 2) doubleValue];
+        BOOL arg_isPaused = [GetNullableObjectAtIndex(args, 3) boolValue];
+        FlutterError *error;
+        [api updateSessionOnWatchDistance:arg_distance duration:arg_duration pace:arg_pace isPaused:arg_isPaused error:&error];
+        callback(wrapResult(nil, error));
+      }];
+    } else {
+      [channel setMessageHandler:nil];
+    }
+  }
+  /// Start a session on the watch
+  {
+    FlutterBasicMessageChannel *channel =
+      [[FlutterBasicMessageChannel alloc]
+        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.startSessionOnWatch", messageChannelSuffix]
+        binaryMessenger:binaryMessenger
+        codec:nullGetRuckingApiCodec()];
+    if (api) {
+      NSCAssert([api respondsToSelector:@selector(startSessionOnWatchRuckWeight:error:)], @"FlutterRuckingApi api (%@) doesn't respond to @selector(startSessionOnWatchRuckWeight:error:)", api);
+      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
+        NSArray<id> *args = message;
+        double arg_ruckWeight = [GetNullableObjectAtIndex(args, 0) doubleValue];
+        FlutterError *error;
+        [api startSessionOnWatchRuckWeight:arg_ruckWeight error:&error];
+        callback(wrapResult(nil, error));
+      }];
+    } else {
+      [channel setMessageHandler:nil];
+    }
+  }
+  /// Pause a session on the watch
+  {
+    FlutterBasicMessageChannel *channel =
+      [[FlutterBasicMessageChannel alloc]
+        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.pauseSessionOnWatch", messageChannelSuffix]
+        binaryMessenger:binaryMessenger
+        codec:nullGetRuckingApiCodec()];
+    if (api) {
+      NSCAssert([api respondsToSelector:@selector(pauseSessionOnWatchWithError:)], @"FlutterRuckingApi api (%@) doesn't respond to @selector(pauseSessionOnWatchWithError:)", api);
+      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
+        FlutterError *error;
+        [api pauseSessionOnWatchWithError:&error];
+        callback(wrapResult(nil, error));
+      }];
+    } else {
+      [channel setMessageHandler:nil];
+    }
+  }
+  /// Resume a session on the watch
+  {
+    FlutterBasicMessageChannel *channel =
+      [[FlutterBasicMessageChannel alloc]
+        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.resumeSessionOnWatch", messageChannelSuffix]
+        binaryMessenger:binaryMessenger
+        codec:nullGetRuckingApiCodec()];
+    if (api) {
+      NSCAssert([api respondsToSelector:@selector(resumeSessionOnWatchWithError:)], @"FlutterRuckingApi api (%@) doesn't respond to @selector(resumeSessionOnWatchWithError:)", api);
+      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
+        FlutterError *error;
+        [api resumeSessionOnWatchWithError:&error];
+        callback(wrapResult(nil, error));
+      }];
+    } else {
+      [channel setMessageHandler:nil];
+    }
+  }
+  /// End a session on the watch
+  {
+    FlutterBasicMessageChannel *channel =
+      [[FlutterBasicMessageChannel alloc]
+        initWithName:[NSString stringWithFormat:@"%@%@", @"dev.flutter.pigeon.rucking_app.FlutterRuckingApi.endSessionOnWatch", messageChannelSuffix]
+        binaryMessenger:binaryMessenger
+        codec:nullGetRuckingApiCodec()];
+    if (api) {
+      NSCAssert([api respondsToSelector:@selector(endSessionOnWatchWithError:)], @"FlutterRuckingApi api (%@) doesn't respond to @selector(endSessionOnWatchWithError:)", api);
+      [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
+        FlutterError *error;
+        [api endSessionOnWatchWithError:&error];
+        callback(wrapResult(nil, error));
+      }];
+    } else {
+      [channel setMessageHandler:nil];
+    }
+  }
+}

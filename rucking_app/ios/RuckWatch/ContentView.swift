@@ -1,5 +1,4 @@
 import SwiftUI
-import WatchKit
 
 struct ContentView: View {
     @StateObject private var sessionManager = SessionManager.shared
