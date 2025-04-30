@@ -51,6 +51,8 @@ class ActiveSessionScreen extends StatefulWidget {
   final String ruckId;
   final double ruckWeight;
   final double userWeight;
+  final double displayRuckWeight;
+  final bool preferMetric;
   final int? plannedDuration;
   final String? notes;
 
@@ -59,6 +61,8 @@ class ActiveSessionScreen extends StatefulWidget {
     required this.ruckId,
     required this.ruckWeight,
     required this.userWeight,
+    required this.displayRuckWeight,
+    required this.preferMetric,
     this.plannedDuration,
     this.notes,
   }) : super(key: key);
@@ -104,6 +108,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   List<double> _recentPaces = [];
   bool _canShowStats = false;
   double _uncountedDistance = 0.0;
+  
+  // User preferences
+  bool _preferMetric = true; // Default, will be overridden
+  double _userWeightKg = 75.0; // Default, will be overridden
 
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
@@ -126,15 +134,17 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     // Check if user has an Apple Watch
     _checkHasAppleWatch();
 
-    // Setup stopwatch
-    _stopwatch = Stopwatch();
-    _stopwatch.start();
-    
-    // Set user ID for health service from auth state
+    // Get user preference and weight
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
-      _healthService.setUserId(authState.user.userId);
+      _preferMetric = authState.user.preferMetric;
+      _userWeightKg = authState.user.weightKg ?? 75.0; // Use default if null
+      debugPrint('ActiveSessionScreen.initState: _preferMetric = $_preferMetric, _userWeightKg = $_userWeightKg');
+    } else {
+      debugPrint('ActiveSessionScreen.initState: User not authenticated, using default preferences.');
     }
+
+    _stopwatch = Stopwatch();
     
     // Reset all session stats to ensure a clean start
     _distance = 0.0;
@@ -173,7 +183,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // No automatic pause on background; session continues unless user explicitly pauses or ends.
+    // Auto-pause when app goes to background to respect iOS background-execution rules
+    if ((state == AppLifecycleState.inactive || state == AppLifecycleState.paused) && !_isPaused) {
+      _togglePause();
+    }
   }
   
   /// Initialize location tracking service
@@ -320,53 +333,30 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _pace = _validationService.getSmoothedPace(segmentPace, _recentPaces);
       }
       
-      // Convert weights to kg if needed
-      bool preferMetric = true;
-      try {
-        final prefs = GetIt.instance<SharedPreferences>();
-        preferMetric = prefs.getBool('prefer_metric') ?? true;
-      } catch (e) {
-        // Use metric as default
-      }
-      
-      // Get weights in appropriate units
-      final userWeightKg = preferMetric 
-          ? widget.userWeight 
-          : widget.userWeight / 2.20462; // Convert lbs to kg
-          
-      final ruckWeightKg = preferMetric 
-          ? widget.ruckWeight 
-          : widget.ruckWeight / 2.20462; // Convert lbs to kg
-          
-      final ruckWeightLbs = preferMetric
-          ? widget.ruckWeight * 2.20462 // Convert kg to lbs
-          : widget.ruckWeight;
-      
-      // Calculate segment time in minutes
-      final segmentTimeMinutes = DateTime.now().difference(previousPoint.timestamp).inSeconds / 60;
-      
-      // Convert pace to km/h then mph for MET calculation
-      final double paceMinPerKm = _pace > 0 ? _pace / 60 : 0.0; // minutes per km
-      final double speedKmh = paceMinPerKm > 0 ? 60.0 / paceMinPerKm : 0.0; // km/h
-      final double speedMph = MetCalculator.kmhToMph(speedKmh); // mph
-      
-      // Calculate grade (slope percentage)
+      // Calculate MET value using the correct method
+      final double speedKmh = segmentPace > 0 ? (distanceMeters / 1000) / (segmentPace / 60) : 0.0;
+      final double speedMph = MetCalculator.kmhToMph(speedKmh);
+      final double ruckWeightKg = widget.ruckWeight;
+      final double ruckWeightLbs = ruckWeightKg * AppConfig.kgToLbs;
+
       final grade = MetCalculator.calculateGrade(
         elevationChangeMeters: elevationChange,
-        distanceMeters: distanceMeters
+        distanceMeters: distanceMeters,
       );
-      
-      // Calculate MET value based on speed, grade and weight
+
       final metValue = MetCalculator.calculateRuckingMetByGrade(
         speedMph: speedMph,
         grade: grade,
-        ruckWeightLbs: ruckWeightLbs,
+        ruckWeightLbs: ruckWeightLbs, 
       );
-      
+
+      // Calculate segment time in minutes
+      final segmentTimeMinutes = DateTime.now().difference(previousPoint.timestamp).inSeconds / 60;
+
       // Calculate calories burned for this segment
       final segmentCalories = MetCalculator.calculateCaloriesBurned(
-        weightKg: userWeightKg + (ruckWeightKg * 0.75), // Count 75% of ruck weight for metabolic impact
-        durationMinutes: segmentTimeMinutes.round(),
+        weightKg: _userWeightKg + (ruckWeightKg * 0.75), // Count 75% of ruck weight
+        durationMinutes: segmentTimeMinutes, // Use fractional minutes
         metValue: metValue,
       );
       
@@ -405,7 +395,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   /// Start session on the backend
   Future<void> _startSession() async {
     // Start stopwatch
-    _stopwatch = Stopwatch()..start();
+    _stopwatch.start();
     _timer = Timer.periodic(const Duration(seconds: 1), _updateTime);
     
     // Start heart rate monitoring if health integration is available
@@ -422,13 +412,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       return;
     }
     
-    // Start location tracking
-    _locationSubscription = _locationService.startLocationTracking().listen(
-      _handleLocationUpdate,
-      onError: (error) {
-        _showErrorSnackBar('Error tracking location: $error');
-      }
-    );
+    // Start location tracking (extracted helper)
+    await _initLocationTracking();
     
     try {
       await _apiClient.post('/rucks/${widget.ruckId}/start', {});
@@ -465,10 +450,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     if (!_isPaused) {
       setState(() {
         _elapsed = Duration(seconds: _stopwatch.elapsed.inSeconds);
-        // Recalculate pace and calories in real time
-        if (_distance > 0 && _elapsed.inSeconds > 0) {
-          _pace = (_elapsed.inSeconds / 60) / _distance; // min/km
-        }
       });
     }
   }
@@ -780,17 +761,36 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     });
   }
 
+  /// Get formatted weight string
+  String _getFormattedWeight() {
+    final String weightDisplay = widget.preferMetric 
+        ? '${widget.displayRuckWeight.toStringAsFixed(1)} kg'
+        : '${widget.displayRuckWeight.toStringAsFixed(1)} lbs';
+    
+    return weightDisplay;
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('ActiveSessionScreen.build: _heartRate=$_heartRate');
     // Format display values
     final String durationDisplay = _formatDuration(_elapsed);
     final String distanceDisplay = _canShowStats
-      ? _distance.toStringAsFixed(2) + ' km'
+      ? (
+          widget.preferMetric
+            ? _distance.toStringAsFixed(2) + ' km'
+            : (_distance * 0.621371).toStringAsFixed(2) + ' mi'
+        )
       : '--';
+    
+    // pace is stored as seconds per km; convert if needed
+    double _displayPaceSec = widget.preferMetric ? _pace : _pace * 1.60934;
     final String paceDisplay = _canShowStats
-      ? (_pace > 0 ? '${(_pace / 60).floor()}:${((_pace % 60).floor()).toString().padLeft(2, '0')}' : '0:00') + ' /km'
+      ? (_displayPaceSec > 0
+          ? '${(_displayPaceSec / 60).floor()}:${((_displayPaceSec % 60).floor()).toString().padLeft(2, '0')}'
+          : '0:00') + (widget.preferMetric ? ' /km' : ' /mi')
       : '--';
+    
     final String caloriesDisplay = _canShowStats
       ? _caloriesBurned.toStringAsFixed(0)
       : '--';
@@ -813,15 +813,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         remainingTimeDisplay = 'Completed!';
       }
     }
-    
-    // Get user's unit preference
-    final authState = context.read<AuthBloc>().state;
-    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
-    
-    // Format ruck weight based on user preference
-    final String weightDisplay = preferMetric 
-        ? '${widget.ruckWeight.toStringAsFixed(1)} kg'
-        : '${widget.ruckWeight.toStringAsFixed(1)} lbs';
     
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
@@ -956,7 +947,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                   children: [
                     // Ruck weight
                     Text(
-                      '$weightDisplay',
+                      _getFormattedWeight(),
                       style: AppTextStyles.headline6.copyWith(
                         color: Colors.grey.shade600,
                       ),
