@@ -241,6 +241,7 @@ class RuckSessionCompleteResource(Resource):
                 'notes': data.get('notes'),
                 'rating': data.get('rating'),
                 'perceived_exertion': data.get('perceived_exertion'),
+                'tags': data.get('tags')
             }
             session_update_data_clean = {k: v for k, v in session_update_data.items() if v is not None}
             session_response = supabase.table('ruck_sessions') \
