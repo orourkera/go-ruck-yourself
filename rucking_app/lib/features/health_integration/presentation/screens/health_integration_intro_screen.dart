@@ -108,6 +108,7 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
                   const Text(
                     'Connect Apple Health',
                     style: TextStyle(
+                      fontFamily: 'Banger',
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
