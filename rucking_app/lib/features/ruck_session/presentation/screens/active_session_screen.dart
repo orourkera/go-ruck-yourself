@@ -106,6 +106,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   double _elevationLoss = 0.0;
   double? _heartRate; // Current heart rate from health kit
   List<double> _recentPaces = [];
+  // Exponential moving-average smoothing factor for pace (0 = no smoothing, 1 = no lag)
+  static const double _paceAlpha = 0.05;
   bool _canShowStats = false;
   double _uncountedDistance = 0.0;
   
@@ -183,10 +185,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Auto-pause when app goes to background to respect iOS background-execution rules
-    if ((state == AppLifecycleState.inactive || state == AppLifecycleState.paused) && !_isPaused) {
-      _togglePause();
-    }
+    // Removed automatic pausing on background/lock so the timer keeps running.
+    // If you need to react to termination, handle AppLifecycleState.detached here.
   }
   
   /// Initialize location tracking service
@@ -325,16 +325,25 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       if (distanceMeters > 0) {
         segmentPace = (DateTime.now().difference(previousPoint.timestamp).inSeconds) / (distanceMeters / 1000);
         _recentPaces.add(segmentPace);
-        // Keep only the most recent 5 paces for smoothing
-        if (_recentPaces.length > 5) {
+        // Keep only the most recent 30 paces for initial trimming
+        if (_recentPaces.length > 30) {
           _recentPaces.removeAt(0);
         }
-        // Get smoothed pace value
-        _pace = _validationService.getSmoothedPace(segmentPace, _recentPaces);
+        
+        // Step 1: trimmed-mean to reduce outliers
+        final double trimmedPace =
+            _validationService.getSmoothedPace(segmentPace, _recentPaces);
+        
+        // Step 2: exponential moving average for smooth yet responsive update
+        if (_pace == 0) {
+          _pace = trimmedPace;
+        } else {
+          _pace = _pace * (1 - _paceAlpha) + trimmedPace * _paceAlpha;
+        }
       }
       
       // Calculate MET value using the correct method
-      final double speedKmh = segmentPace > 0 ? (distanceMeters / 1000) / (segmentPace / 60) : 0.0;
+      final double speedKmh = segmentPace > 0 ? 3600 / segmentPace : 0.0;
       final double speedMph = MetCalculator.kmhToMph(speedKmh);
       final double ruckWeightKg = widget.ruckWeight;
       final double ruckWeightLbs = ruckWeightKg * AppConfig.kgToLbs;

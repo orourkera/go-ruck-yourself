@@ -13,14 +13,17 @@ class MetCalculator {
   /// - [metValue]: MET value for the activity
   static double calculateCaloriesBurned({
     required double weightKg,
-    required int durationMinutes,
+    required double durationMinutes,
     required double metValue,
   }) {
     // Convert duration to hours
-    final durationHours = durationMinutes / 60;
+    final double durationHours = durationMinutes / 60.0;
     
     // Apply MET formula
-    return metValue * weightKg * durationHours;
+    final calories = metValue * weightKg * durationHours;
+    
+    // Ensure calories are not negative
+    return calories > 0 ? calories : 0.0;
   }
   
   /// Calculate MET value for rucking activity based on grade (slope)

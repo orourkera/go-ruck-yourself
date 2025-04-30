@@ -1,0 +1,10 @@
+// Configuration for proper Watch app integration with Flutter iOS builds
+// 
+// // Set correct deployement target for watchOS
+// WATCHOS_DEPLOYMENT_TARGET = 9.0
+// 
+// // Architecture settings - exclude problematic architectures for simulators
+// EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 x86_64
+// 
+// // These settings ensure Watch app is properly embedded
+// SKIP_INSTALL_GRY_Watch_App = NO

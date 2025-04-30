@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,11 +35,15 @@ class HealthService {
         HealthDataType.HEART_RATE,
       ];
       
+      // Request WRITE access for all requested types
+      final List<HealthDataAccess> permissions =
+          List.filled(types.length, HealthDataAccess.WRITE);
+      
       // Debug: log authorization request types
-      print('Requesting HealthKit authorization for types: $types');
+      print('Requesting HealthKit authorization for types: $types with permissions: $permissions');
       
       // This call will trigger the iOS permission dialog
-      bool requested = await health.requestAuthorization(types);
+      bool requested = await health.requestAuthorization(types, permissions: permissions);
       // Debug: log authorization result
       print('HealthKit authorization result: $requested');
       _isAuthorized = requested;
@@ -102,6 +107,7 @@ class HealthService {
     double? elevationLossMeters,
     double? heartRate,
   }) async {
+    debugPrint('[HealthService] Entering saveRuckWorkout');
     if (!_isAuthorized) {
       bool authorized = await requestAuthorization();
       if (!authorized) return false;
@@ -140,6 +146,9 @@ class HealthService {
         totalEnergyBurned: caloriesBurned.toInt(),
         totalEnergyBurnedUnit: HealthDataUnit.KILOCALORIE,
       );
+
+      // 🔍 Log the result for easier debugging / verification
+      debugPrint('[HealthService] writeWorkoutData → $success  | distance: $distanceMeters m, calories: $caloriesBurned kcal');
       
       return success;
     } catch (e) {

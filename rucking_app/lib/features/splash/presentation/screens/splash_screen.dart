@@ -101,7 +101,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     fit: BoxFit.contain,
                   ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 50),
                 // App tagline
                 Text(
                   'Track your ruck, count your calories.',
