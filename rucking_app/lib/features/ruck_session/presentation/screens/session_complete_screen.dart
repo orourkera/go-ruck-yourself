@@ -10,10 +10,13 @@ import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
 class SessionCompleteScreen extends StatefulWidget {
+  /// Timestamp when the user ended the session
+  final DateTime completedAt;
   final String ruckId;
   final Duration duration;
   final double distance;
@@ -24,6 +27,7 @@ class SessionCompleteScreen extends StatefulWidget {
   final String? initialNotes;
 
   const SessionCompleteScreen({
+    required this.completedAt,
     Key? key,
     required this.ruckId,
     required this.duration,
@@ -111,8 +115,33 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       _isSaving = true;
     });
     
+    // Prevent saving if session distance is below minimum
+    final distanceMeters = widget.distance * 1000;
+    if (distanceMeters < SessionValidationService.minSessionDistanceMeters) {
+      // Delete the short session
+      try {
+        _apiClient.delete('/rucks/${widget.ruckId}');
+        debugPrint('Deleted short distance session ${widget.ruckId}');
+      } catch (e) {
+        debugPrint('Failed to delete short distance session: $e');
+      }
+      // Inform user and navigate home
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Distance too short. Session not saved.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
+      return;
+    }
+    
     // Prepare data for the /complete endpoint
     final Map<String, dynamic> completionData = {
+      'completed_at': widget.completedAt.toIso8601String(),
       'notes': _notesController.text,
       'final_distance_km': widget.distance,
       'final_calories_burned': widget.caloriesBurned,

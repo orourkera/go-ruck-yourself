@@ -145,7 +145,10 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
                   
                   // Action buttons
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      // Directly trigger HealthKit authorization prompt
+                      await context.read<HealthBloc>().healthService.requestAuthorization();
+                      // Notify bloc of authorization result
                       context.read<HealthBloc>().add(const RequestHealthAuthorization());
                     },
                     style: ElevatedButton.styleFrom(

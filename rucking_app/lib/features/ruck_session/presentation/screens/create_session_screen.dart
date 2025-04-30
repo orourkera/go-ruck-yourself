@@ -47,6 +47,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       // Load last used weight (KG)
       double lastWeightKg = prefs.getDouble('lastRuckWeightKg') ?? AppConfig.defaultRuckWeight;
       _ruckWeight = lastWeightKg;
+      // Update display weight to match unit preference so the correct chip appears selected
+      _displayRuckWeight = _preferMetric
+          ? _ruckWeight
+          : double.parse((_ruckWeight * AppConfig.kgToLbs).toStringAsFixed(1));
 
       // Load last used duration (minutes)
       int lastDurationMinutes = prefs.getInt('lastSessionDurationMinutes') ?? 30; // Default to 30 mins
@@ -119,12 +123,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
       String? ruckId;
       try {
-        // Convert weight to kg if user is using imperial units
+        // Weight is stored internally in KG
         double weightForApiKg = _ruckWeight;
-        if (!_preferMetric) { // If UI weight is in lbs, convert to kg
-          weightForApiKg = _ruckWeight / AppConfig.kgToLbs;
-        }
-
+        
         // Prepare request data for creation
         Map<String, dynamic> createRequestData = {
           'ruck_weight_kg': weightForApiKg,
@@ -278,21 +279,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   Widget _buildWeightChip(double weightValue, bool isMetric) {
     // Determine the actual KG value this chip represents
     double weightInKg;
-    int index = -1;
     
     if (isMetric) {
       weightInKg = weightValue;
-      index = AppConfig.metricWeightOptions.indexOf(weightValue);
     } else {
-      // Find the index of this lbs value in the standard list
-      index = AppConfig.standardWeightOptions.indexOf(weightValue);
-      // Get the corresponding kg value - with safety check
-      if (index >= 0 && index < AppConfig.metricWeightOptions.length) {
-        weightInKg = AppConfig.metricWeightOptions[index];
-      } else {
-        // Fallback if index is invalid (shouldn't happen, but prevents RangeError)
-        weightInKg = weightValue / AppConfig.kgToLbs; // Convert lbs to kg as fallback
-      }
+      // Convert lbs to kg directly for accurate comparison
+      weightInKg = weightValue / AppConfig.kgToLbs;
     }
 
     // Check if this chip's KG value matches the selected internal KG weight
