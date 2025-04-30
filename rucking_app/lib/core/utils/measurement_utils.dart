@@ -69,10 +69,10 @@ class MeasurementUtils {
   /// Weight formatted to the nearest whole number + unit label.
   static String formatWeight(double kg, {required bool metric}) {
     if (metric) {
-      return '${kg.round()} kg';
+      return '${kg.toStringAsFixed(1)} kg'; // Show one decimal place for metric
     } else {
       final lbs = kg * AppConfig.kgToLbs;
-      return '${lbs.round()} lbs';
+      return '${lbs.round()} lbs'; // Round to whole number for standard
     }
   }
 
