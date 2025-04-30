@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:flutter/widgets.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 /// Screen for displaying statistics and analytics
 class StatisticsScreen extends StatefulWidget {
@@ -261,10 +262,7 @@ class _StatsContentWidget extends StatelessWidget {
     final totalDurationSecs = stats['total_duration_seconds'] ?? 0;
     
     // Format stats
-    final distanceValue = preferMetric
-        ? totalDistanceKm.toStringAsFixed(1)
-        : (totalDistanceKm * 0.621371).toStringAsFixed(1);
-    final distanceUnit = preferMetric ? 'km' : 'mi';
+    final distanceValue = MeasurementUtils.formatDistance(totalDistanceKm, metric: preferMetric);
     
     // Format duration
     final duration = Duration(seconds: totalDurationSecs);
@@ -310,7 +308,7 @@ class _StatsContentWidget extends StatelessWidget {
                 child: _buildSummaryCard(
                   context: context,
                   icon: Icons.straighten,
-                  value: '$distanceValue $distanceUnit',
+                  value: distanceValue,
                   label: 'Total Distance',
                   color: AppColors.secondary,
                 ),
@@ -482,17 +480,10 @@ class _StatsContentWidget extends StatelessWidget {
   /// Builds the performance metrics section
   Widget _buildPerformanceSection(BuildContext context, Map<String, dynamic> performance) {
     final avgPaceValue = performance['avg_pace_seconds_per_km'] ?? 0;
-    final avgPaceMinutes = (avgPaceValue / 60).floor();
-    final avgPaceSeconds = (avgPaceValue % 60).round();
-    final formattedPace = preferMetric
-        ? '${avgPaceMinutes}:${avgPaceSeconds.toString().padLeft(2, '0')} /km'
-        : '${avgPaceMinutes}:${avgPaceSeconds.toString().padLeft(2, '0')} /mi';
-        
+    final paceDisplay = avgPaceValue > 0 ? MeasurementUtils.formatPace(avgPaceValue.toDouble(), metric: preferMetric) : '--';
+    
     final avgDistanceKm = (performance['avg_distance_km'] ?? 0.0).toDouble();
-    final avgDistanceValue = preferMetric
-        ? avgDistanceKm.toStringAsFixed(1)
-        : (avgDistanceKm * 0.621371).toStringAsFixed(1);
-    final distanceUnit = preferMetric ? 'km' : 'mi';
+    final avgDistanceValue = MeasurementUtils.formatDistance(avgDistanceKm, metric: preferMetric);
     
     final avgDurationSecs = performance['avg_duration_seconds'] ?? 0;
     final avgDuration = Duration(seconds: avgDurationSecs);
@@ -524,14 +515,14 @@ class _StatsContentWidget extends StatelessWidget {
                 _buildPerformanceItem(
                   context: context,
                   label: 'Average Pace',
-                  value: formattedPace,
+                  value: paceDisplay,
                   icon: Icons.speed,
                 ),
                 const Divider(),
                 _buildPerformanceItem(
                   context: context,
                   label: 'Average Distance',
-                  value: '$avgDistanceValue $distanceUnit',
+                  value: avgDistanceValue,
                   icon: Icons.straighten,
                 ),
                 const Divider(),
@@ -597,10 +588,8 @@ class _StatsContentWidget extends StatelessWidget {
             final sessionsCount = day['sessions_count'] ?? 0;
             final distanceKm = (day['distance_km'] ?? 0.0).toDouble();
             
-            final distanceValue = preferMetric
-                ? distanceKm.toStringAsFixed(1)
-                : (distanceKm * 0.621371).toStringAsFixed(1);
-            final distanceUnit = preferMetric ? 'km' : 'mi';
+            final distanceValue = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
+            
             final isDark = Theme.of(context).brightness == Brightness.dark;
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
@@ -623,7 +612,7 @@ class _StatsContentWidget extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '$distanceValue $distanceUnit',
+                      distanceValue,
                       style: AppTextStyles.body1.copyWith(
                         color: isDark ? Color(0xFF728C69) : AppColors.textDark,
                       ),

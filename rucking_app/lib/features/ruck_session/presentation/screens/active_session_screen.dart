@@ -24,6 +24,9 @@ import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 LatLng _getRouteCenter(List locationPoints) {
   if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
@@ -115,6 +118,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   bool _preferMetric = true; // Default, will be overridden
   double _userWeightKg = 75.0; // Default, will be overridden
 
+  // Custom marker icon data
+  Uint8List? _customMarkerIcon;
+
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -171,6 +177,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     if (widget.plannedDuration != null && widget.plannedDuration! > 0) {
       _plannedCountdownStart = Duration(minutes: widget.plannedDuration!);
     }
+
+    // Load custom marker icon
+    _loadCustomMarker();
   }
   
   @override
@@ -799,12 +808,22 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   }
 
   /// Get formatted weight string
-  String _getFormattedWeight() {
-    final String weightDisplay = widget.preferMetric 
-        ? '${widget.displayRuckWeight.toStringAsFixed(1)} kg'
-        : '${widget.displayRuckWeight.toStringAsFixed(1)} lbs';
-    
+  String _getFormattedWeight(double ruckWeightKg) {
+    final String weightDisplay = MeasurementUtils.formatWeight(ruckWeightKg, metric: widget.preferMetric);
     return weightDisplay;
+  }
+
+  // Method to load custom marker icon
+  Future<void> _loadCustomMarker() async {
+    try {
+      final ByteData data = await rootBundle.load('assets/images/map marker.png');
+      final Uint8List bytes = data.buffer.asUint8List();
+      setState(() {
+        _customMarkerIcon = bytes;
+      });
+    } catch (e) {
+      debugPrint('Error loading custom marker: $e');
+    }
   }
 
   @override
@@ -813,31 +832,21 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     // Format display values
     final String durationDisplay = _formatDuration(_elapsed);
     final String distanceDisplay = _canShowStats
-      ? (
-          widget.preferMetric
-            ? _distance.toStringAsFixed(2) + ' km'
-            : (_distance * 0.621371).toStringAsFixed(2) + ' mi'
-        )
+      ? MeasurementUtils.formatDistance(_distance, metric: widget.preferMetric)
       : '--';
     
     // pace is stored as seconds per km; adjust display based on user preference
     double _displayPaceSec = _pace; // Base pace in seconds per km
     final String paceDisplay = _canShowStats
-      ? (_displayPaceSec > 0
-          ? widget.preferMetric
-            ? '${(_displayPaceSec / 60).floor()}:${((_displayPaceSec % 60).floor()).toString().padLeft(2, '0')}/km'
-            : '${((_displayPaceSec * 1.60934) / 60).floor()}:${(((_displayPaceSec * 1.60934) % 60).floor()).toString().padLeft(2, '0')}/mi'
-          : '--')
+      ? MeasurementUtils.formatPace(_displayPaceSec, metric: widget.preferMetric)
       : '--';
     
     final String caloriesDisplay = _canShowStats
       ? _caloriesBurned.toStringAsFixed(0)
       : '--';
     final String elevationDisplay = _canShowStats
-      ? widget.preferMetric
-        ? '+${_elevationGain.toStringAsFixed(0)}m/-${_elevationLoss.toStringAsFixed(0)}m'
-        : '+${(_elevationGain * 3.28084).toStringAsFixed(0)}ft/-${(_elevationLoss * 3.28084).toStringAsFixed(0)}ft'
-      : '--';
+      ? MeasurementUtils.formatElevationCompact(_elevationGain, _elevationLoss, metric: widget.preferMetric)
+      : '+0/-0';
     
     // Calculate remaining time if planned duration was set
     String? remainingTimeDisplay;
@@ -916,20 +925,24 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                               if (_locationPoints.isNotEmpty)
                                 Marker(
                                   point: LatLng(_locationPoints.first.latitude, _locationPoints.first.longitude),
-                                  child: const Icon(
-                                    Icons.location_on,
-                                    color: Colors.green,
-                                    size: 25,
-                                  ),
+                                  child: _customMarkerIcon != null
+                                      ? Image.memory(_customMarkerIcon!, width: 25, height: 25)
+                                      : const Icon(
+                                          Icons.location_on,
+                                          color: Colors.green,
+                                          size: 25,
+                                        ),
                                 ),
                               if (_locationPoints.length > 1)
                                 Marker(
                                   point: LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude),
-                                  child: const Icon(
-                                    Icons.location_on,
-                                    color: Colors.red,
-                                    size: 25,
-                                  ),
+                                  child: _customMarkerIcon != null
+                                      ? Image.memory(_customMarkerIcon!, width: 25, height: 25)
+                                      : const Icon(
+                                          Icons.location_on,
+                                          color: Colors.red,
+                                          size: 25,
+                                        ),
                                 ),
                             ],
                           ),
@@ -988,7 +1001,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                   children: [
                     // Ruck weight
                     Text(
-                      _getFormattedWeight(),
+                      _getFormattedWeight(widget.ruckWeight),
                       style: AppTextStyles.headline6.copyWith(
                         color: Colors.grey.shade600,
                       ),

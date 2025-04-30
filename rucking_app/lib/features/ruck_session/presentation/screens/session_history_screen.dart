@@ -7,6 +7,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/widgets.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/core/config/app_config.dart'; // Import AppConfig
 
 /// Screen for viewing ruck session history
 class SessionHistoryScreen extends StatefulWidget {
@@ -256,19 +258,14 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with RouteA
                       final double distanceKm = distanceKmRaw is int
                           ? distanceKmRaw.toDouble()
                           : (distanceKmRaw as double? ?? 0.0);
-                      final distanceValue = preferMetric 
-                          ? distanceKm.toStringAsFixed(2) 
-                          : (distanceKm * 0.621371).toStringAsFixed(2);
-                      final distanceUnit = preferMetric ? 'km' : 'mi';
+                      final distanceValue = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
                       
                       // Get calories directly from session map
                       final calories = session['calories_burned']?.toString() ?? '0';
                       
                       // Get weight and round it
                       final weightValue = session['ruck_weight_kg'] as num? ?? 0;
-                      final formattedWeight = preferMetric
-                          ? '${weightValue.round()} kg'
-                          : '${(weightValue * 2.20462).round()} lbs';
+                      final weightDisplay = MeasurementUtils.formatWeight(weightValue.toDouble(), metric: preferMetric);
                       
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -306,7 +303,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with RouteA
                                       child: _buildSessionStat(
                                         Icons.straighten,
                                         'Distance',
-                                        '$distanceValue $distanceUnit',
+                                        distanceValue,
                                       ),
                                     ),
                                   ],
@@ -325,7 +322,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with RouteA
                                       child: _buildSessionStat(
                                         Icons.fitness_center,
                                         'Weight',
-                                        formattedWeight,
+                                        weightDisplay,
                                       ),
                                     ),
                                   ],
