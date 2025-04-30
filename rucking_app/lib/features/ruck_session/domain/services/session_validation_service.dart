@@ -100,7 +100,7 @@ class SessionValidationService {
           _overSpeedStartTime = point.timestamp;
         } else if (point.timestamp.difference(_overSpeedStartTime!) > maxSpeedDuration) {
           _validationErrorCount++;
-          results['shouldPause'] = true;
+          results['shouldPause'] = true; // Auto-pause on unrealistic speed
           results['message'] = 'Moving too fast (${speedKmh.toStringAsFixed(1)} km/h). Rucking is walking speed.';
         }
       } else {

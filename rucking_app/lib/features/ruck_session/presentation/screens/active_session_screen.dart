@@ -200,13 +200,24 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         return;
       }
       
-      // Start listening to location updates
+      // Start listening to location updates and get initial position for map
       _locationSubscription = _locationService.startLocationTracking().listen(
         _handleLocationUpdate,
         onError: (error) {
           print('Location error: $error');
         }
       );
+      
+      // Get current location to initialize map immediately
+      try {
+        final initialLocation = await _locationService.getCurrentLocation();
+        if (initialLocation != null) {
+          _locationPoints.add(initialLocation);
+          setState(() {}); // Update UI with initial position
+        }
+      } catch (e) {
+        debugPrint('Failed to get initial location: $e');
+      }
     } catch (e) {
       print('Failed to initialize location tracking: $e');
     }
@@ -809,19 +820,23 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         )
       : '--';
     
-    // pace is stored as seconds per km; convert if needed
-    double _displayPaceSec = widget.preferMetric ? _pace : _pace * 1.60934;
+    // pace is stored as seconds per km; adjust display based on user preference
+    double _displayPaceSec = _pace; // Base pace in seconds per km
     final String paceDisplay = _canShowStats
       ? (_displayPaceSec > 0
-          ? '${(_displayPaceSec / 60).floor()}:${((_displayPaceSec % 60).floor()).toString().padLeft(2, '0')}'
-          : '0:00') + (widget.preferMetric ? ' /km' : ' /mi')
+          ? widget.preferMetric
+            ? '${(_displayPaceSec / 60).floor()}:${((_displayPaceSec % 60).floor()).toString().padLeft(2, '0')}/km'
+            : '${((_displayPaceSec * 1.60934) / 60).floor()}:${(((_displayPaceSec * 1.60934) % 60).floor()).toString().padLeft(2, '0')}/mi'
+          : '0:00')
       : '--';
     
     final String caloriesDisplay = _canShowStats
       ? _caloriesBurned.toStringAsFixed(0)
       : '--';
     final String elevationDisplay = _canShowStats
-      ? '+${_elevationGain.toStringAsFixed(0)}m/-${_elevationLoss.toStringAsFixed(0)}m'
+      ? widget.preferMetric
+        ? '+${_elevationGain.toStringAsFixed(0)}m/-${_elevationLoss.toStringAsFixed(0)}m'
+        : '+${(_elevationGain * 3.28084).toStringAsFixed(0)}ft/-${(_elevationLoss * 3.28084).toStringAsFixed(0)}ft'
       : '--';
     
     // Calculate remaining time if planned duration was set
