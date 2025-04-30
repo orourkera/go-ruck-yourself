@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'package:keyboard_actions/keyboard_actions.dart';
+import 'package:provider/provider.dart';
 import 'package:rucking_app/core/config/app_config.dart';
-import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_screen.dart';
+import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
-import 'package:rucking_app/shared/widgets/custom_button.dart';
-import 'package:rucking_app/shared/widgets/custom_text_field.dart';
-import 'package:keyboard_actions/keyboard_actions.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -27,6 +29,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   final FocusNode _durationFocusNode = FocusNode();
 
   double _ruckWeight = AppConfig.defaultRuckWeight;
+  double _displayRuckWeight = 0.0; // Will be set in kg or lbs based on preference
   int? _plannedDuration; // Default is now empty
   bool _preferMetric = false; // Default to standard
   
@@ -34,140 +37,58 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   bool _isCreating = false;
   bool _isLoading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    
-    // Set default ruck weight immediately
-    _ruckWeight = AppConfig.defaultRuckWeight;
-    setState(() {
-      _isLoading = true;
-    });
-    
-    // Get user's unit preference and load last session data
-    final authState = context.read<AuthBloc>().state;
-    if (authState is Authenticated) {
-      _preferMetric = authState.user.preferMetric;
-      // --- Populate user weight if available ---
-      final userWeightKg = authState.user.weightKg;
-      if (userWeightKg != null && userWeightKg > 0) {
-        if (_preferMetric) {
-          _userWeightController.text = userWeightKg.toStringAsFixed(1);
-        } else {
-          // Convert kg to lbs (1 kg = 2.20462 lbs)
-          final weightLbs = userWeightKg * 2.20462;
-          _userWeightController.text = weightLbs.toStringAsFixed(1);
-        }
-      }
-      _loadLastSessionData();
-    } else {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  /// Load the last session data
-  Future<void> _loadLastSessionData() async {
+  /// Loads preferences and last used values (ruck weight and duration)
+  Future<void> _loadDefaults() async {
+    setState(() { _isLoading = true; });
     try {
-      final apiClient = GetIt.instance<ApiClient>();
-      debugPrint('Loading last session data from /rucks?limit=1');
-      final response = await apiClient.get('/rucks?limit=1');
+      final prefs = await SharedPreferences.getInstance();
+      _preferMetric = prefs.getBool('preferMetric') ?? false;
+
+      // Load last used weight (KG)
+      double lastWeightKg = prefs.getDouble('lastRuckWeightKg') ?? AppConfig.defaultRuckWeight;
+      _ruckWeight = lastWeightKg;
+
+      // Load last used duration (minutes)
+      int lastDurationMinutes = prefs.getInt('lastSessionDurationMinutes') ?? 30; // Default to 30 mins
+      _durationController.text = lastDurationMinutes.toString();
       
-      debugPrint('Response type: ${response.runtimeType}');
-      if (response is Map) {
-        debugPrint('Response keys: ${response.keys.toList()}');
+      // Load user's body weight (if previously saved)
+      String? lastUserWeight = prefs.getString('lastUserWeight');
+      if (lastUserWeight != null && lastUserWeight.isNotEmpty) {
+        _userWeightController.text = lastUserWeight;
       }
-      
-      List<dynamic> sessions = [];
-      
-      if (response == null) {
-        debugPrint('Response is null');
-      } else if (response is List) {
-        debugPrint('Response is a List with ${response.length} items');
-        sessions = response;
-      } else if (response is Map && response.containsKey('data') && response['data'] is List) {
-        debugPrint('Response is a Map with "data" key containing a List of ${(response['data'] as List).length} items');
-        sessions = response['data'] as List;
-      } else if (response is Map && response.containsKey('sessions') && response['sessions'] is List) {
-        debugPrint('Response is a Map with "sessions" key containing a List of ${(response['sessions'] as List).length} items');
-        sessions = response['sessions'] as List;
-      } else if (response is Map && response.containsKey('items') && response['items'] is List) {
-        debugPrint('Response is a Map with "items" key containing a List of ${(response['items'] as List).length} items');
-        sessions = response['items'] as List;
-      } else if (response is Map && response.containsKey('results') && response['results'] is List) {
-        debugPrint('Response is a Map with "results" key containing a List of ${(response['results'] as List).length} items');
-        sessions = response['results'] as List;
-      } else if (response is Map) {
-        // Last resort: check for the first key that contains a List
-        for (var key in response.keys) {
-          if (response[key] is List) {
-            debugPrint('Found List under key "$key" with ${(response[key] as List).length} items');
-            sessions = response[key] as List;
-            break;
-          }
-        }
-        
-        if (sessions.isEmpty) {
-          debugPrint('Unexpected response format: $response');
-        }
-      } else {
-        debugPrint('Unknown response type: ${response.runtimeType}');
-      }
-      
-      if (sessions.isNotEmpty) {
-        debugPrint('Found ${sessions.length} sessions, using first one');
-        final lastSession = sessions[0];
-        final lastWeight = lastSession['weight_kg'];
-        
-        if (lastWeight != null) {
-          setState(() {
-            _ruckWeight = lastWeight.toDouble();
-            // Convert to lbs if user preference is not metric
-            if (!_preferMetric) {
-              _ruckWeight = _ruckWeight * 2.20462;
-            }
-          });
-        }
-      } else {
-        debugPrint('No sessions found');
-      }
+
     } catch (e) {
-      // Ignore errors when loading last session data
-      debugPrint('Error loading last session data: $e');
+      debugPrint('Error loading defaults: $e');
+      // Fallback to defaults on error
+      _ruckWeight = AppConfig.defaultRuckWeight;
+      _durationController.text = '30'; // Default duration on error
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
   }
-  
-  /// Snaps the current weight to the nearest predefined weight option
-  void _snapToNearestWeight() {
-    final weightOptions = _preferMetric 
-        ? [2.5, 4.5, 9.0, 15.0, 20.0, 30.0]
-        : [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0];
-    
-    double closestWeight = weightOptions.first;
-    double smallestDifference = (_ruckWeight - closestWeight).abs();
-    
-    for (double weight in weightOptions) {
-      double difference = (_ruckWeight - weight).abs();
-      if (difference < smallestDifference) {
-        smallestDifference = difference;
-        closestWeight = weight;
-      }
-    }
-    
-    _ruckWeight = closestWeight;
+
+  /// Saves the last used ruck weight to SharedPreferences
+  Future<void> _saveLastWeight(double weightKg) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('lastRuckWeightKg', weightKg);
+    debugPrint('Saved last ruck weight (KG): $weightKg');
   }
 
-  @override
-  void dispose() {
-    _userWeightController.dispose();
-    _durationController.dispose();
-    _durationFocusNode.dispose();
-    super.dispose();
+  /// Saves the last used session duration to SharedPreferences
+  Future<void> _saveLastDuration(int durationMinutes) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('lastSessionDurationMinutes', durationMinutes);
+    debugPrint('Saved last session duration (minutes): $durationMinutes');
+  }
+  
+  /// Saves the user's body weight to SharedPreferences
+  Future<void> _saveUserWeight(String weight) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lastUserWeight', weight);
+    debugPrint('Saved user body weight: $weight');
   }
 
   /// Creates and starts a new ruck session
@@ -199,11 +120,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       String? ruckId;
       try {
         // Convert weight to kg if user is using imperial units
-        double ruckWeightKg = _preferMetric ? _ruckWeight : _ruckWeight / 2.20462;
+        double weightForApiKg = _ruckWeight;
+        if (!_preferMetric) { // If UI weight is in lbs, convert to kg
+          weightForApiKg = _ruckWeight / AppConfig.kgToLbs;
+        }
 
         // Prepare request data for creation
         Map<String, dynamic> createRequestData = {
-          'ruck_weight_kg': ruckWeightKg,
+          'ruck_weight_kg': weightForApiKg,
         };
         
         // Add user's weight (required)
@@ -254,6 +178,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         
         debugPrint('Session started successfully on backend.');
         
+        // Save the used weight (always in KG) to SharedPreferences on success
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setDouble('lastRuckWeightKg', weightForApiKg);
+
+        // Save the user's entered body weight
+        _saveUserWeight(_userWeightController.text);
+        
+        // Save duration if entered
+        if (_durationController.text.isNotEmpty) {
+          int duration = int.parse(_durationController.text);
+          _plannedDuration = duration;
+          await _saveLastDuration(duration);
+        }
+        
         // ---- Step 3: Navigate to active session screen ----
         Navigator.pushReplacement(
           context,
@@ -261,9 +199,11 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             builder: (context) => ActiveSessionScreen(
               ruckId: ruckId!, // Now we know ruckId is not null here
               ruckWeight: _ruckWeight,
+              displayRuckWeight: _displayRuckWeight,
               userWeight: double.parse(_userWeightController.text),
               plannedDuration: _durationController.text.isEmpty ? 
                   0 : int.parse(_durationController.text),
+              preferMetric: _preferMetric,
             ),
           ),
         );
@@ -286,8 +226,121 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadDefaults();
+    _durationFocusNode.addListener(() {
+    });
+  }
+
+  @override
+  void dispose() {
+    _userWeightController.dispose();
+    _durationController.dispose();
+    _durationFocusNode.dispose();
+    super.dispose();
+  }
+
+  /// Snaps the current weight to the nearest predefined weight option
+  void _snapToNearestWeight() {
+    final isMetric = _preferMetric;
+    final weightOptions = isMetric 
+        ? AppConfig.metricWeightOptions 
+        : AppConfig.standardWeightOptions;
+  
+    double comparisonWeight = _ruckWeight;
+    if (!isMetric) {
+      comparisonWeight = _ruckWeight * AppConfig.kgToLbs;
+    }
+
+    double closestWeightOption = weightOptions.first;
+    double smallestDifference = (comparisonWeight - closestWeightOption).abs();
+    int closestIndex = 0; // Keep track of the index
+
+    for (int i = 0; i < weightOptions.length; i++) {
+      double weight = weightOptions[i];
+      double difference = (comparisonWeight - weight).abs();
+      if (difference < smallestDifference) {
+        smallestDifference = difference;
+        closestWeightOption = weight;
+        closestIndex = i;
+      }
+    }
+  
+    // Ensure internal weight is the corresponding KG value
+    _ruckWeight = AppConfig.metricWeightOptions[closestIndex]; 
+    
+    // Also update the display weight based on user preference
+    _displayRuckWeight = _preferMetric ? _ruckWeight : AppConfig.standardWeightOptions[closestIndex];
+  }
+
+  /// Builds a chip for quick ruck weight selection
+  Widget _buildWeightChip(double weightValue, bool isMetric) {
+    // Determine the actual KG value this chip represents
+    double weightInKg;
+    int index = -1;
+    
+    if (isMetric) {
+      weightInKg = weightValue;
+      index = AppConfig.metricWeightOptions.indexOf(weightValue);
+    } else {
+      // Find the index of this lbs value in the standard list
+      index = AppConfig.standardWeightOptions.indexOf(weightValue);
+      // Get the corresponding kg value - with safety check
+      if (index >= 0 && index < AppConfig.metricWeightOptions.length) {
+        weightInKg = AppConfig.metricWeightOptions[index];
+      } else {
+        // Fallback if index is invalid (shouldn't happen, but prevents RangeError)
+        weightInKg = weightValue / AppConfig.kgToLbs; // Convert lbs to kg as fallback
+      }
+    }
+
+    // Check if this chip's KG value matches the selected internal KG weight
+    // Use a small tolerance for floating point comparisons
+    final bool isSelected = (weightInKg - _ruckWeight).abs() < 0.01;
+
+    return ChoiceChip(
+      label: Text(
+        '${weightValue.toStringAsFixed(1)} ${isMetric ? "kg" : "lbs"}',
+        style: TextStyle(
+          fontSize: 14, // Reduce font size slightly
+          color: isSelected 
+              ? (Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white) 
+              : (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark),
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (bool selected) {
+        if (selected) {
+          setState(() {
+            // Update internal _ruckWeight with the KG value of the selected chip
+            _ruckWeight = weightInKg;
+            
+            // Store the exact display weight value that was selected
+            _displayRuckWeight = weightValue;
+          });
+        }
+      },
+      selectedColor: Theme.of(context).primaryColor,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade400,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // Reduce padding
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final weightUnit = _preferMetric ? 'kg' : 'lbs';
+    // Determine the correct list for the chips
+    final List<double> currentWeightOptions = _preferMetric 
+        ? AppConfig.metricWeightOptions 
+        : AppConfig.standardWeightOptions;
+        
     final keyboardActionsConfig = KeyboardActionsConfig(
       actions: [
         KeyboardActionsItem(
@@ -329,11 +382,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 
                 // Quick ruck weight selection
                 Text(
-                  'Ruck Weight ($weightUnit)',
-                  style: AppTextStyles.subtitle1.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
-                  ),
+                  'Ruck Weight',
+                  style: AppTextStyles.subtitle1.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -344,28 +394,23 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: 50,
+                  height: 40, // Reduced height for the chip list
                   child: _isLoading
                       ? const Center(
                           child: CircularProgressIndicator(),
                         )
-                      : ListView(
+                      : ListView.separated(
                           scrollDirection: Axis.horizontal,
-                          children: _preferMetric 
-                              ? [2.5, 4.5, 9.0, 15.0, 20.0, 30.0].map((weight) => 
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 12),
-                                    child: _buildWeightChip(weight),
-                                  )
-                                ).toList()
-                              : [10, 20, 30, 40, 50, 60, 70, 80].map((weight) => 
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 12),
-                                    child: _buildWeightChip(weight.toDouble()),
-                                  )
-                                ).toList(),
+                          clipBehavior: Clip.none, // Make sure the ListView doesn't overflow
+                          itemCount: currentWeightOptions.length,
+                          itemBuilder: (context, index) {
+                            final weightValue = currentWeightOptions[index];
+                            return _buildWeightChip(weightValue, _preferMetric);
+                          },
+                          separatorBuilder: (context, index) => const SizedBox(width: 8), // Reduced spacing between chips
                         ),
                 ),
+                const SizedBox(height: 16), // Single spacing is enough
                 const SizedBox(height: 32),
                 
                 // User weight field (optional)
@@ -442,7 +487,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: _isCreating ? null : _createSession,
+                    onPressed: () {
+                      _snapToNearestWeight(); 
+                      if (_formKey.currentState!.validate()) {
+                        if (!_isCreating) _createSession();
+                      }
+                    },
                   ),
                 ),
               ],
@@ -452,36 +502,4 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       ),
     );
   }
-
-  /// Builds a chip for quick ruck weight selection
-  Widget _buildWeightChip(double weight) {
-    final isSelected = _ruckWeight == weight;
-    final weightUnit = _preferMetric ? 'kg' : 'lbs';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _ruckWeight = weight;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.grey,
-            width: 1,
-          ),
-        ),
-        child: Text(
-          '${weight.toInt()} $weightUnit',
-          style: AppTextStyles.button.copyWith(
-            color: isSelected ? Colors.white : (isDark ? Color(0xFF728C69) : AppColors.textDark),
-          ),
-        ),
-      ),
-    );
-  }
-} 
+}
