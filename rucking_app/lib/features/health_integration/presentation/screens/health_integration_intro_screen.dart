@@ -64,42 +64,13 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Apple Watch Image and Branding Section
-                  SizedBox(
-                    height: 200,
-                    child: Stack(
-                      children: [
-                        // Background triangle with colorful pattern
-                        Positioned(
-                          left: -20,
-                          top: 0,
-                          child: Container(
-                            width: MediaQuery.of(context).size.width,
-                            height: 280,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.8),
-                              borderRadius: const BorderRadius.only(
-                                bottomRight: Radius.circular(200),
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                        // Apple Watch Image
-                        Center(
-                          child: Image.asset(
-                            'assets/images/apple_watch.png',
-                            height: 150,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
-                                Icons.watch,
-                                size: 120,
-                                color: Colors.black,
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                  // Apple Health Screen Image
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
+                    child: Image.asset(
+                      'assets/images/apple health screen.png',
+                      height: 200,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   
