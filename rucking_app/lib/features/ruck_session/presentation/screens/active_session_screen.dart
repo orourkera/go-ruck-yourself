@@ -214,6 +214,12 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   /// Handle incoming location updates
   void _handleLocationUpdate(LocationPoint locationPoint) {
+    // Drop points with poor GPS accuracy immediately
+    if (locationPoint.accuracy > SessionValidationService.minGpsAccuracyMeters) {
+      debugPrint('Dropped low-accuracy point: ${locationPoint.accuracy}m');
+      return;
+    }
+    
     if (_isPaused) return;
     
     if (_locationPoints.isNotEmpty) {
@@ -494,6 +500,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       _isEnding = true;
     });
     
+    // Capture end-session timestamp
+    final DateTime completedAt = DateTime.now();
+    
     // Stop timers and location tracking
     _timer?.cancel();
     _stopwatch.stop();
@@ -512,6 +521,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       );
       
       if (!sessionValidation['isValid']) {
+        // Remove the session from backend if it's too short or invalid
+        try {
+          await _apiClient.delete('/rucks/${widget.ruckId}');
+          debugPrint('Deleted short session ${widget.ruckId} from backend');
+        } catch (e) {
+          debugPrint('Failed to delete short session: $e');
+        }
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -589,13 +605,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
           context,
           MaterialPageRoute(
             builder: (context) => SessionCompleteScreen(
+              completedAt: completedAt,
               ruckId: widget.ruckId,
               duration: _elapsed, // Pass final elapsed time
               distance: _distance, // Pass final calculated distance
               caloriesBurned: _caloriesBurned.round(), // Pass final calculated calories
               elevationGain: _elevationGain,
               elevationLoss: _elevationLoss,
-              ruckWeight: widget.ruckWeight,
+              ruckWeight: widget.displayRuckWeight,
               // Pass initial notes if available, SessionCompleteScreen allows editing
               initialNotes: widget.notes, 
             ),
