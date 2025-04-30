@@ -117,7 +117,7 @@ PODS:
   - permission_handler_apple (9.3.0):
     - Flutter
   - PromisesObjC (2.4.0)
-  - purchases_flutter (8.7.3):
+  - purchases_flutter (8.7.4):
     - Flutter
     - PurchasesHybridCommon (= 13.28.1)
   - PurchasesHybridCommon (13.28.1):
@@ -215,7 +215,7 @@ SPEC CHECKSUMS:
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
-  purchases_flutter: 60844032c222595e7647099ad8a90ca49c78527f
+  purchases_flutter: adf27f06620548890f850c315ed47f0cffb65069
   PurchasesHybridCommon: bb4c1ddc8683a18859da35f45a0717379f889d94
   RevenueCat: d8174cfd72fab33f3b877d38c9f033142dc87c60
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
