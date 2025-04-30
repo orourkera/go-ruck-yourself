@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:flutter/foundation.dart'; // Added debug logging import
 
 part 'health_event.dart';
 part 'health_state.dart';
@@ -58,6 +59,7 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
       event.startTime,
       event.endTime,
     );
+    debugPrint('[HealthBloc] writeHealthData → $success'); // Added debug logging
     emit(HealthDataWriteStatus(success: success));
   }
 
@@ -76,6 +78,7 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
       elevationLossMeters: event.elevationLossMeters,
       heartRate: event.heartRate,
     );
+    debugPrint('[HealthBloc] saveRuckWorkout → $success'); // Added debug logging
     emit(HealthDataWriteStatus(success: success));
   }
 

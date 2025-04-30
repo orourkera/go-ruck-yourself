@@ -34,7 +34,7 @@ void main() async {
   runApp(
     BlocProvider(
       create: (context) => HealthBloc(
-        healthService: HealthService(),
+        healthService: getIt<HealthService>(),
       ),
       child: const RuckingApp(),
     ),
