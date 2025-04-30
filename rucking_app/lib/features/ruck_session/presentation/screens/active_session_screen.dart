@@ -827,7 +827,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
           ? widget.preferMetric
             ? '${(_displayPaceSec / 60).floor()}:${((_displayPaceSec % 60).floor()).toString().padLeft(2, '0')}/km'
             : '${((_displayPaceSec * 1.60934) / 60).floor()}:${(((_displayPaceSec * 1.60934) % 60).floor()).toString().padLeft(2, '0')}/mi'
-          : '0:00')
+          : '--')
       : '--';
     
     final String caloriesDisplay = _canShowStats
