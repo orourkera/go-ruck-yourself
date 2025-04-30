@@ -327,7 +327,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final weightUnit = _preferMetric ? 'kg' : 'lbs';
+    final String weightUnit = _preferMetric ? 'kg' : 'lbs';
     // Determine the correct list for the chips
     final List<double> currentWeightOptions = _preferMetric 
         ? AppConfig.metricWeightOptions 
@@ -374,7 +374,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 
                 // Quick ruck weight selection
                 Text(
-                  'Ruck Weight',
+                  'Ruck Weight ($weightUnit)',
                   style: AppTextStyles.subtitle1.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -417,7 +417,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   ],
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your weight';
+                      return null; // Make it optional
                     }
                     if (double.tryParse(value) == null) {
                       return 'Please enter a valid number';
