@@ -1,12 +1,18 @@
 /// Application configuration constants
 class AppConfig {
   // API configuration
-  static const String apiBaseUrl = 'https://www.getrucky.com';
+  static const String apiBaseUrl = 'https://getrucky.com/api';
   static const int apiTimeout = 30; // seconds
   
   // App information
-  static const String appName = 'GRY';
+  static const String appName = 'Go Ruck Yourself';
   static const String appVersion = '1.0.0';
+  
+  // Weight Conversion and Options
+  static const double kgToLbs = 2.20462;
+  static const double defaultRuckWeight = 10.0; // Default weight in KG
+  static const List<double> metricWeightOptions = [5.0, 7.5, 10.0, 12.5, 15.0, 20.0, 25.0, 30.0]; // KG
+  static const List<double> standardWeightOptions = [10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 60.0]; // LBS
   
   // Storage keys
   static const String tokenKey = 'auth_token';
@@ -18,9 +24,6 @@ class AppConfig {
   // Feature flags
   static const bool enableHealthSync = true;
   static const bool enableOfflineMode = true;
-  
-  // Default values
-  static const double defaultRuckWeight = 10.0; // kg
   
   // Notification channels
   static const String ruckSessionChannel = 'ruck_session_channel';
