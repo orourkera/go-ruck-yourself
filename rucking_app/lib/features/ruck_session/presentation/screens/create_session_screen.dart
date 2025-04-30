@@ -42,7 +42,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     setState(() { _isLoading = true; });
     try {
       final prefs = await SharedPreferences.getInstance();
-      _preferMetric = prefs.getBool('preferMetric') ?? false;
+      // Do not override _preferMetric if it will be set by AuthBloc
+      if (!(context.read<AuthBloc>().state is Authenticated)) {
+        _preferMetric = prefs.getBool('preferMetric') ?? false;
+      }
 
       // Load last used weight (KG)
       double lastWeightKg = prefs.getDouble('lastRuckWeightKg') ?? AppConfig.defaultRuckWeight;
@@ -125,6 +128,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       try {
         // Weight is stored internally in KG
         double weightForApiKg = _ruckWeight;
+        
+        // Log the weight value being saved to the database
+        debugPrint('Saving ruck weight in kg: $weightForApiKg');
         
         // Prepare request data for creation
         Map<String, dynamic> createRequestData = {
@@ -229,7 +235,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   @override
   void initState() {
     super.initState();
+    // Log the metric preference to verify it's set correctly
+    debugPrint('CreateSessionScreen: User metric preference is $_preferMetric');
     _loadDefaults();
+    // Load metric preference from AuthBloc state
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      setState(() {
+        _preferMetric = authState.user.preferMetric;
+        // Update display weight based on new preference
+        _displayRuckWeight = _preferMetric ? _ruckWeight : (_ruckWeight * AppConfig.kgToLbs);
+        debugPrint('CreateSessionScreen: Weight display updated to $_displayRuckWeight');
+      });
+      debugPrint('CreateSessionScreen: Updated metric preference from AuthBloc to $_preferMetric');
+    }
     _durationFocusNode.addListener(() {
     });
   }
@@ -306,10 +325,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         if (selected) {
           setState(() {
             // Update internal _ruckWeight with the KG value of the selected chip
-            _ruckWeight = weightInKg;
-            
-            // Store the exact display weight value that was selected
-            _displayRuckWeight = weightValue;
+            _ruckWeight = _preferMetric ? weightInKg : weightInKg / AppConfig.kgToLbs;
+            _displayRuckWeight = _preferMetric ? _ruckWeight : weightInKg;
           });
         }
       },
@@ -332,7 +349,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     final List<double> currentWeightOptions = _preferMetric 
         ? AppConfig.metricWeightOptions 
         : AppConfig.standardWeightOptions;
-        
+    debugPrint('CreateSessionScreen: Building UI at ${DateTime.now().millisecondsSinceEpoch}, Metric preference: $_preferMetric, Weight options: $currentWeightOptions');
+    
     final keyboardActionsConfig = KeyboardActionsConfig(
       actions: [
         KeyboardActionsItem(

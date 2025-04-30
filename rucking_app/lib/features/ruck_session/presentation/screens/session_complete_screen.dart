@@ -11,6 +11,7 @@ import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -89,13 +90,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   /// Format pace (minutes per km) as MM:SS
   String _formatPace() {
     if (widget.distance <= 0) return '--:--';
-    
     // Calculate pace (minutes per km)
-    final paceMinutes = widget.duration.inSeconds / 60 / widget.distance;
-    final mins = paceMinutes.floor();
-    final secs = ((paceMinutes - mins) * 60).round();
-    
-    return '$mins:${secs.toString().padLeft(2, '0')}';
+    final paceSeconds = widget.duration.inSeconds / widget.distance;
+    return MeasurementUtils.formatPace(paceSeconds, metric: true);
   }
   
   /// Toggle a tag's selection status
@@ -257,9 +254,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     ),
                     StatCard(
                       title: 'Distance',
-                      value: preferMetric
-                          ? widget.distance.toStringAsFixed(2) + ' km'
-                          : (widget.distance * 0.621371).toStringAsFixed(2) + ' mi',
+                      value: MeasurementUtils.formatDistance(widget.distance, metric: preferMetric),
                       icon: Icons.straighten,
                       color: AppColors.primary,
                       centerContent: true,
@@ -275,9 +270,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     ),
                     StatCard(
                       title: 'Pace',
-                      value: preferMetric
-                          ? _formatPace() + ' min/km'
-                          : _formatPace() + ' min/mi',
+                      value: MeasurementUtils.formatPace(widget.duration.inSeconds / widget.distance, metric: preferMetric),
                       icon: Icons.speed,
                       color: AppColors.secondary,
                       centerContent: true,
@@ -285,12 +278,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     ),
                     StatCard(
                       title: 'Elevation',
-                      value: preferMetric
-                          ? '+${widget.elevationGain.toStringAsFixed(1)} m'
-                          : '+${(widget.elevationGain * 3.28084).toStringAsFixed(1)} ft',
-                      secondaryValue: preferMetric
-                          ? '-${widget.elevationLoss.toStringAsFixed(1)} m'
-                          : '-${(widget.elevationLoss * 3.28084).toStringAsFixed(1)} ft',
+                      value: MeasurementUtils.formatElevationCompact(widget.elevationGain, widget.elevationLoss, metric: preferMetric),
                       icon: Icons.terrain,
                       color: AppColors.success,
                       centerContent: true,

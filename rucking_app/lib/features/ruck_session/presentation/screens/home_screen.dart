@@ -16,6 +16,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678);
@@ -402,9 +403,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                            // Use data from _monthlySummaryStats
                            final rucks = _monthlySummaryStats['total_sessions']?.toString() ?? '0';
                            final distanceKm = (_monthlySummaryStats['total_distance_km'] ?? 0.0).toDouble();
-                           final distance = preferMetric 
-                               ? '${distanceKm.toStringAsFixed(1)} km'
-                               : '${(distanceKm * 0.621371).toStringAsFixed(1)} mi';
+                           final distance = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
                            final calories = _monthlySummaryStats['total_calories']?.toString() ?? '0';
                             
                            return Row(
@@ -538,44 +537,21 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           preferMetric = authState.user.preferMetric;
                         }
                         
-                        final distanceValue = preferMetric 
-                            ? distanceKm.toStringAsFixed(1) 
-                            : (distanceKm * 0.621371).toStringAsFixed(1);
-                        final distanceUnit = preferMetric ? 'km' : 'mi';
+                        final distanceValue = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
                         
                         // Get calories directly from session map
                         final calories = session['calories_burned']?.toString() ?? '0';
                         
                         // Get average pace directly from session map (now using average_pace_min_km)
                         final paceMinPerKm = (session['average_pace_min_km'] as num?)?.toDouble();
-                        double? paceMinPerMi;
-                        if (paceMinPerKm != null) {
-                          paceMinPerMi = paceMinPerKm / 0.621371;
-                        }
-                        final double? displayPace = preferMetric ? paceMinPerKm : paceMinPerMi;
-                        String averagePaceDisplay;
-                        if (displayPace != null && displayPace > 0) {
-                          final int minutes = displayPace.floor();
-                          final int seconds = ((displayPace - minutes) * 60).round();
-                          averagePaceDisplay = '${minutes}m ${seconds}s/' + (preferMetric ? 'km' : 'mi');
-                        } else {
-                          averagePaceDisplay = '0m 0s/' + (preferMetric ? 'km' : 'mi');
-                        }
+                        final paceDisplay = paceMinPerKm != null ? MeasurementUtils.formatPace(paceMinPerKm * 60, metric: preferMetric) : '--';
                         
                         // Get elevation data from session
                         final elevationGain = (session['elevation_gain_meters'] as num?)?.toDouble() ?? 0.0;
                         final elevationLoss = (session['elevation_loss_meters'] as num?)?.toDouble() ?? 0.0;
                         
                         // Format elevation data based on user preference
-                        String elevationDisplay;
-                        if (preferMetric) {
-                          elevationDisplay = '+${elevationGain.toInt()}/-${elevationLoss.toInt()}m';
-                        } else {
-                          // Convert meters to feet
-                          final gainFeet = (elevationGain * 3.28084).toInt();
-                          final lossFeet = (elevationLoss * 3.28084).toInt();
-                          elevationDisplay = '+${gainFeet}/-${lossFeet}ft';
-                        }
+                        String elevationDisplay = MeasurementUtils.formatElevationCompact(elevationGain, elevationLoss, metric: preferMetric);
                         
                         // Map route points
                         List<LatLng> routePoints = [];
@@ -698,12 +674,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                           children: [
                                             _buildSessionStat(
                                               Icons.straighten,
-                                              '$distanceValue $distanceUnit',
+                                              distanceValue,
                                             ),
                                             const SizedBox(height: 4),
                                             _buildSessionStat(
                                               Icons.timer,
-                                              averagePaceDisplay,
+                                              paceDisplay,
                                             ),
                                           ],
                                         ),
@@ -718,7 +694,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                             ),
                                             const SizedBox(height: 4),
                                             _buildSessionStat(
-                                              Icons.vertical_align_top,
+                                              Icons.landscape,
                                               elevationDisplay,
                                             ),
                                           ],
