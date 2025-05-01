@@ -38,6 +38,16 @@ class SessionSchema(Schema):
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 
+class SessionLocationUpdateSchema(Schema):
+    """Schema for validating session location updates"""
+    latitude = fields.Float(required=True)
+    longitude = fields.Float(required=True)
+    elevation_meters = fields.Float(required=True)
+    timestamp = fields.DateTime(required=True)
+    accuracy_meters = fields.Float(required=True)
+    elevation_gain_meters = fields.Float(required=False, allow_none=True)
+    elevation_loss_meters = fields.Float(required=False, allow_none=True)
+
 class LocationPointSchema(Schema):
     """Schema for validating location point data"""
     id = fields.Int(dump_only=True)
