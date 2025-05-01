@@ -25,21 +25,21 @@ class _PaywallScreenState extends State<PaywallScreen> {
     {
       'title': 'Go Ruck Yourself',
       'screenshot': 'assets/screenshots/screenshot1.png',
-      'valueProp': 'Track your ruck sessions with precision and ease.',
+      'valueProp': 'Track your ruck sessions in standard or metric weights.',
     },
     {
       'title': 'Go Ruck Yourself',
       'screenshot': 'assets/screenshots/screenshot2.png',
-      'valueProp': 'Analyze your progress and improve your performance.',
+      'valueProp': 'The most precise calorie tracking based on body weight, pace and real-time elevation change.',
     },
     {
       'title': 'Go Ruck Yourself',
-      'valueProp': 'Integrate with HealthKit for seamless data sync.',
       'screenshot': 'assets/screenshots/screenshot3.png',
+      'valueProp': 'Easily sync all your rucks with Apple Fitness.',
     },
     {
       'title': 'Go Ruck Yourself',
-      'valueProp': 'Join a community of ruck enthusiasts and compete.',
+      'valueProp': "You'll never have more fun rucking.",
       'screenshot': 'assets/screenshots/screenshot4.png',
     },
   ];
@@ -177,7 +177,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
         children: [
           Text(
             title,
-            style: AppTextStyles.headline1, 
+            style: AppTextStyles.paywallHeadline, 
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 30),
