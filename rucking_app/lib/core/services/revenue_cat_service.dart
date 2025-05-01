@@ -46,15 +46,19 @@ class RevenueCatService {
       'mock_monthly',
       PackageType.monthly,
       mockStoreProduct,
-      null,
+      PresentedOfferingContext(
+        'mock_offering',
+        null,
+        null,
+      ),
     );
     return Offering(
       'mock_offering',
       'Mock Offering for Development',
+      {
+        'monthly': mockPackage,
+      },
       [mockPackage],
-      null,
-      null,
-      mockPackage,
     );
   }
 
