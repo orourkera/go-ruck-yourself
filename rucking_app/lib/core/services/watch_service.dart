@@ -9,6 +9,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'dart:convert';
 
 /// Service for managing communication with Apple Watch companion app
 class WatchService {
@@ -38,6 +39,9 @@ class WatchService {
   Stream<Map<String, dynamic>> get sessionEvents => _sessionEventController.stream;
   Stream<Map<String, dynamic>> get healthData => _healthDataController.stream;
   
+  // Add navigatorKey for navigation purposes
+  final GlobalKey<NavigatorState> navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
+  
   WatchService() {
     _initPlatformChannels();
   }
@@ -58,129 +62,153 @@ class WatchService {
   
   /// Handle method calls from the watch session channel
   Future<dynamic> _handleWatchSessionMethod(MethodCall call) async {
+    print("[WatchService] Handling watch session method: ${call.method}, arguments: ${call.arguments}");
+    Map<String, dynamic> data;
+    if (call.arguments is String) {
+      final jsonString = call.arguments as String;
+      final jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
+      data = jsonData;
+    } else if (call.arguments is Map<String, dynamic>) {
+      data = call.arguments as Map<String, dynamic>;
+    } else {
+      print("[WatchService] Error: Unexpected argument type for session method: ${call.arguments.runtimeType}");
+      return;
+    }
+    
     switch (call.method) {
       case 'onWatchSessionUpdated':
-        final data = call.arguments as Map<String, dynamic>;
-        _sessionEventController.add(data);
-        
-        // Check if a session was started from the watch
         if (data['action'] == 'startSession') {
+          print("[WatchService] Processing startSession from watch with data: $data");
           await _handleSessionStartedFromWatch(data);
         } else if (data['action'] == 'endSession') {
-          await _handleSessionEndedFromWatch(data);
+          print("[WatchSession] Watch requested to end session");
+          await _handleSessionEndedFromWatch();
         } else if (data['action'] == 'pauseSession') {
-          _isPaused = true;
+          print("[WatchSession] Watch requested to pause session");
+          await _handlePauseSessionFromWatch();
         } else if (data['action'] == 'resumeSession') {
-          _isPaused = false;
+          print("[WatchSession] Watch requested to resume session");
+          await _handleResumeSessionFromWatch();
+        } else {
+          print("[WatchService] Unknown session action received: ${data['action']}");
         }
-        
-        return true;
+        break;
       default:
-        throw PlatformException(
-          code: 'UNIMPLEMENTED',
-          message: 'Method ${call.method} not implemented',
-        );
+        print("[WatchService] Unknown method call from watch: ${call.method}");
     }
   }
   
   /// Handle method calls from the watch health channel
   Future<dynamic> _handleWatchHealthMethod(MethodCall call) async {
+    print("[WatchService] Handling watch health method: ${call.method}, arguments: ${call.arguments}");
+    Map<String, dynamic> data;
+    if (call.arguments is String) {
+      final jsonString = call.arguments as String;
+      final jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
+      data = jsonData;
+    } else if (call.arguments is Map<String, dynamic>) {
+      data = call.arguments as Map<String, dynamic>;
+    } else {
+      print("[WatchService] Error: Unexpected argument type for health method: ${call.arguments.runtimeType}");
+      return;
+    }
+
     switch (call.method) {
       case 'onHealthDataUpdated':
-        final data = call.arguments as Map<String, dynamic>;
-        _healthDataController.add(data);
-        
-        // Update heart rate if needed
         if (data['type'] == 'heartRate') {
-          _currentHeartRate = data['value'];
-          
-          // If session is active, send to health service
+          _currentHeartRate = (data['value'] as num?)?.toDouble();
+          print("[WatchService] Received heart rate update from watch: $_currentHeartRate");
           if (_isSessionActive) {
             _healthService.updateHeartRate(_currentHeartRate!);
           }
+        } else {
+          print("[WatchService] Unknown health data type received: ${data['type']}");
         }
-        
-        return true;
+        break;
       default:
-        throw PlatformException(
-          code: 'UNIMPLEMENTED',
-          message: 'Method ${call.method} not implemented',
-        );
+        print("[WatchService] Unknown health method call from watch: ${call.method}");
     }
   }
   
   /// Handle a session started from the watch
   Future<void> _handleSessionStartedFromWatch(Map<String, dynamic> data) async {
-    final ruckWeight = data['ruckWeight'] as double;
-    
     // Update local state
     _isSessionActive = true;
-    _isPaused = false;
-    _ruckWeight = ruckWeight;
+    _ruckWeight = (data['ruckWeight'] as num?)?.toDouble() ?? 0.0;
+    print("[WatchService] Session started from watch with ruck weight: $_ruckWeight");
     
     try {
-      // Get current user info
-      final user = await _authService.getCurrentUser();
-      if (user == null) {
-        debugPrint('No authenticated user found. Cannot create session.');
-        return;
+      // Navigate to active session screen if not already there
+      if (navigatorKey.currentState != null) {
+        final currentRoute = ModalRoute.of(navigatorKey.currentContext!)?.settings.name;
+        if (currentRoute != '/activeSession') {
+          print("[WatchService] Navigating to active session screen from watch start");
+          await navigatorKey.currentState?.pushNamed(
+            '/activeSession',
+            arguments: {
+              'ruckWeight': _ruckWeight,
+              'fromWatch': true,
+            },
+          );
+        } else {
+          print("[WatchService] Already on active session screen");
+        }
+      } else {
+        print("[WatchService] Navigator state not available, skipping navigation");
       }
-      
-      // Create session in backend
-      final apiClient = GetIt.instance<ApiClient>();
-      final payload = {
-        'ruck_weight_kg': ruckWeight,
-        'user_weight_kg': user.weightKg,
-        'status': 'in_progress',
-        'user_id': user.userId,
-        'started_from': 'apple_watch',
-        'start_time': DateTime.now().toUtc().toIso8601String(),
-      };
-      
-      final response = await apiClient.post('/rucks', payload);
-      debugPrint('Session created from watch: $response');
-      
-      // Auto-navigate to active session screen if needed
-      final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
-      navigatorKey.currentState?.pushNamedAndRemoveUntil(
-        '/activeSession',
-        (route) => false,
-        arguments: response,
-      );
     } catch (e) {
-      debugPrint('Error processing session start from watch: $e');
+      print("[WatchService] Error navigating to active session screen: $e");
     }
   }
-  
+
   /// Handle a session ended from the watch
-  Future<void> _handleSessionEndedFromWatch(Map<String, dynamic> data) async {
+  Future<void> _handleSessionEndedFromWatch() async {
     // Update local state
     _isSessionActive = false;
     
-    // Session data from watch
-    final duration = data['duration'] as double;
-    final distance = data['distance'] as double;
-    final calories = data['calories'] as double;
+    // Extract session data if available
+    // Note: Currently not passed from watch, so using placeholders
+    // final duration = data['duration'] as double? ?? 0.0;
+    // final distance = data['distance'] as double? ?? 0.0;
+    // final calories = data['calories'] as double? ?? 0.0;
     
     try {
       // Notify active session about completion
-      // This is usually handled through the session bloc,
-      // but here we're directly passing the watch data
-      final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
-      navigatorKey.currentState?.pushNamed(
-        '/sessionComplete',
-        arguments: {
-          'duration': Duration(seconds: duration.toInt()),
-          'distance': distance,
-          'calories': calories,
-          'ruckWeight': _ruckWeight,
-          'heartRate': _currentHeartRate,
-          'fromWatch': true,
-        },
-      );
+      _sessionEventController.add({'action': 'endSession'});
+      
+      // Navigate to session complete screen
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState?.pushNamed(
+          '/sessionComplete',
+          arguments: {
+            // 'duration': Duration(seconds: duration.toInt()),
+            // 'distance': distance,
+            // 'calories': calories,
+            'ruckWeight': _ruckWeight,
+            'heartRate': _currentHeartRate,
+            'fromWatch': true,
+          },
+        );
+      } else {
+        print("[WatchService] Navigator state not available, skipping navigation for session complete");
+      }
     } catch (e) {
-      debugPrint('Error handling session end from watch: $e');
+      print("[WatchService] Error handling session end: $e");
     }
+  }
+
+  /// Handle a session pause from the watch
+  Future<void> _handlePauseSessionFromWatch() async {
+    _isPaused = true;
+    print("[WatchService] Session paused from watch");
+    _sessionEventController.add({'action': 'pauseSession'});
+  }
+
+  /// Handle a session resume from the watch
+  Future<void> _handleResumeSessionFromWatch() async {
+    _isPaused = false;
+    print("[WatchService] Session resumed from watch");
+    _sessionEventController.add({'action': 'resumeSession'});
   }
   
   /// Start a new rucking session on the watch
@@ -317,6 +345,52 @@ class WatchService {
     _sessionEventController.close();
     _healthDataController.close();
   }
+  
+  /// Start a rucking session from the watch app
+  Future<void> startRuckSession(double ruckWeight) async {
+    debugPrint('Starting session from watch with weight: $ruckWeight');
+    try {
+      // Create new ruck session via backend API
+      final apiClient = GetIt.instance<ApiClient>();
+      final authService = GetIt.instance<AuthService>();
+      final user = await authService.getCurrentUser();
+      if (user == null) {
+        debugPrint('No authenticated user found. Cannot create session.');
+        return;
+      }
+
+      final payload = {
+        'ruck_weight_kg': ruckWeight,
+        'user_weight_kg': user.weightKg,
+        'status': 'in_progress',
+        'user_id': user.userId,
+        'started_from': 'apple_watch',
+        'start_time': DateTime.now().toUtc().toIso8601String(),
+      };
+
+      final response = await apiClient.post('/rucks', payload);
+      debugPrint('Session created from watch: $response');
+
+      // Update local state
+      _ruckWeight = ruckWeight;
+      _isSessionActive = true;
+      _isPaused = false;
+
+      // Auto-navigate to active session screen if context is available
+      // (Assume navigatorKey is set in your app for global navigation)
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          '/activeSession',
+          (route) => false,
+          arguments: response,
+        );
+      } else {
+        print("[WatchService] Navigator state not available in startRuckSession");
+      }
+    } catch (e) {
+      debugPrint('Error starting session from watch: $e');
+    }
+  }
 }
 
 /// Implementation of the RuckingApi for handling watch messages
@@ -361,7 +435,7 @@ class RuckingApiHandler extends RuckingApi {
 
       // Auto-navigate to active session screen if context is available
       // (Assume navigatorKey is set in your app for global navigation)
-      final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
+      final navigatorKey = _watchService.navigatorKey;
       navigatorKey.currentState?.pushNamedAndRemoveUntil(
         '/activeSession',
         (route) => false,
