@@ -43,7 +43,7 @@ class RuckSessionListResource(Resource):
                 'id': str(uuid.uuid4()),
                 'user_id': g.user.id,
                 'status': 'created',
-                'ruck_weight_id': data.get('ruck_weight_id'),
+                # 'ruck_weight_id': data.get('ruck_weight_id'),  # Removed legacy field
                 'ruck_weight_kg': data.get('ruck_weight_kg', 0),
                 'user_weight_kg': data.get('user_weight_kg'),
                 'planned_duration_minutes': data.get('planned_duration_minutes'),
