@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/core/error_messages.dart';
 
 /// Provides validation logic for ruck sessions
 class SessionValidationService {
@@ -157,18 +158,25 @@ class SessionValidationService {
     // 1. Minimum session duration check
     if (duration < minSessionDuration) {
       results['isValid'] = false;
-      results['message'] = 'Session too short. Minimum duration is ${minSessionDuration.inMinutes} minutes.';
+      results['message'] = sessionTooShortError.replaceFirst('{minutes}', minSessionDuration.inMinutes.toString());
       return results;
     }
 
     // 2. Minimum distance check
-    if (distanceMeters < minSessionDistanceMeters) {
+    if (distanceMeters < minSessionDistanceMeters || distanceMeters <= 0.0) {
       results['isValid'] = false;
-      results['message'] = 'Distance too short. Minimum distance is ${minSessionDistanceMeters} meters.';
+      results['message'] = sessionDistanceTooShortError;
       return results;
     }
 
-    // 3. Calories sanity check
+    // 3. Minimum calories check (block if zero or negative)
+    if (caloriesBurned <= 0.0) {
+      results['isValid'] = false;
+      results['message'] = sessionCaloriesTooLowError;
+      return results;
+    }
+
+    // 4. Calories sanity check (warn, but don't block)
     final durationHours = duration.inSeconds / 3600;
     if (durationHours > 0) {
       final caloriesPerHour = caloriesBurned / durationHours;

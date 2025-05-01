@@ -1,4 +1,6 @@
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:rucking_app/core/models/location_point.dart';
 
 /// MeasurementUtils centralizes all unit conversions and number
 /// formatting rules so that every widget in the app shows data with
@@ -78,4 +80,41 @@ class MeasurementUtils {
 
   /// Calories formatted as integer string.
   static String formatCalories(int calories) => calories.toString();
+
+  /// Calculates total distance in kilometers from a list of LocationPoints.
+  static double totalDistance(List<LocationPoint> points) {
+    if (points.length < 2) return 0.0;
+    double total = 0.0;
+    for (int i = 1; i < points.length; i++) {
+      total += Geolocator.distanceBetween(
+        points[i - 1].latitude,
+        points[i - 1].longitude,
+        points[i].latitude,
+        points[i].longitude,
+      );
+    }
+    return total / 1000; // meters to km
+  }
+
+  /// Calculates total elevation gain in meters from a list of LocationPoints.
+  static double totalElevationGain(List<LocationPoint> points) {
+    if (points.length < 2) return 0.0;
+    double gain = 0.0;
+    for (int i = 1; i < points.length; i++) {
+      final diff = points[i].elevation - points[i - 1].elevation;
+      if (diff > 0) gain += diff;
+    }
+    return gain;
+  }
+
+  /// Calculates total elevation loss in meters from a list of LocationPoints.
+  static double totalElevationLoss(List<LocationPoint> points) {
+    if (points.length < 2) return 0.0;
+    double loss = 0.0;
+    for (int i = 1; i < points.length; i++) {
+      final diff = points[i].elevation - points[i - 1].elevation;
+      if (diff < 0) loss -= diff;
+    }
+    return loss;
+  }
 }

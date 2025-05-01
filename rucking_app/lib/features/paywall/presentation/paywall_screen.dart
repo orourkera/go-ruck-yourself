@@ -24,13 +24,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Future<void> _fetchOfferings() async {
     setState(() { _loading = true; _error = null; });
     try {
-      // final offerings = await Purchases.getOfferings();
-      // setState(() {
-      //   _offerings = offerings;
-      //   _loading = false;
-      // });
+      final offerings = await Purchases.getOfferings();
       setState(() {
-        _offerings = null;
+        _offerings = offerings;
         _loading = false;
       });
     } catch (e) {

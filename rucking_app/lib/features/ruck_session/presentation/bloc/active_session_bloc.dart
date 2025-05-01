@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart'; // Import MeasurementUtils
+import 'package:rucking_app/core/utils/met_calculator.dart'; // Import MetCalculator
 
 // Events
 abstract class ActiveSessionEvent extends Equatable {
@@ -16,11 +18,17 @@ abstract class ActiveSessionEvent extends Equatable {
 
 class SessionStarted extends ActiveSessionEvent {
   final String ruckId;
+  final double? userWeightKg;
+  final double? ruckWeightKg;
   
-  const SessionStarted(this.ruckId);
+  const SessionStarted({
+    required this.ruckId,
+    this.userWeightKg,
+    this.ruckWeightKg,
+  });
   
   @override
-  List<Object?> get props => [ruckId];
+  List<Object?> get props => [ruckId, userWeightKg, ruckWeightKg];
 }
 
 class LocationUpdated extends ActiveSessionEvent {
@@ -65,6 +73,8 @@ class ActiveSessionInProgress extends ActiveSessionState {
   final double elevationLoss;
   final double caloriesBurned;
   final double pace;
+  final double? userWeightKg;
+  final double? ruckWeightKg;
   
   const ActiveSessionInProgress({
     required this.ruckId,
@@ -75,6 +85,8 @@ class ActiveSessionInProgress extends ActiveSessionState {
     required this.elevationLoss,
     required this.caloriesBurned,
     required this.pace,
+    this.userWeightKg,
+    this.ruckWeightKg,
   });
   
   @override
@@ -86,7 +98,9 @@ class ActiveSessionInProgress extends ActiveSessionState {
     elevationGain, 
     elevationLoss, 
     caloriesBurned, 
-    pace
+    pace,
+    userWeightKg,
+    ruckWeightKg,
   ];
   
   ActiveSessionInProgress copyWith({
@@ -98,6 +112,8 @@ class ActiveSessionInProgress extends ActiveSessionState {
     double? elevationLoss,
     double? caloriesBurned,
     double? pace,
+    double? userWeightKg,
+    double? ruckWeightKg,
   }) {
     return ActiveSessionInProgress(
       ruckId: ruckId ?? this.ruckId,
@@ -108,6 +124,8 @@ class ActiveSessionInProgress extends ActiveSessionState {
       elevationLoss: elevationLoss ?? this.elevationLoss,
       caloriesBurned: caloriesBurned ?? this.caloriesBurned,
       pace: pace ?? this.pace,
+      userWeightKg: userWeightKg ?? this.userWeightKg,
+      ruckWeightKg: ruckWeightKg ?? this.ruckWeightKg,
     );
   }
 }
@@ -122,6 +140,8 @@ class ActiveSessionPaused extends ActiveSessionInProgress {
     required super.elevationLoss,
     required super.caloriesBurned,
     required super.pace,
+    super.userWeightKg,
+    super.ruckWeightKg,
   });
 }
 
@@ -220,8 +240,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       try {
         final hasPermission = await _locationService.hasLocationPermission();
         if (!hasPermission) {
-          emit(const ActiveSessionError('Location permission is required'));
-          return;
+          await _locationService.requestLocationPermission();
         }
       } catch (e) {
         print('Failed to check location permission: $e');
@@ -231,6 +250,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       _startLocationTracking();
       
+      // TODO: Pass these values from ActiveSessionScreen when starting the session
+      double? userWeightKg = event.userWeightKg;
+      double? ruckWeightKg = event.ruckWeightKg;
+      // If you have a way to pass these values, set them here
+      // For now, fallback to null (handled elsewhere)
+
       // Initial state
       emit(ActiveSessionInProgress(
         ruckId: event.ruckId,
@@ -241,6 +266,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elevationLoss: 0,
         caloriesBurned: 0,
         pace: 0,
+        userWeightKg: userWeightKg,
+        ruckWeightKg: ruckWeightKg,
       ));
     } catch (e) {
       emit(ActiveSessionError('Failed to start session: $e'));
@@ -267,39 +294,41 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final newPoints = List<LocationPoint>.from(currentState.locationPoints)
         ..add(event.locationPoint);
       
-      // Calculate new stats
-      double newDistance = currentState.distance;
-      double newElevationGain = currentState.elevationGain;
-      double newElevationLoss = currentState.elevationLoss;
-      
-      if (newPoints.length >= 2) {
-        final previous = newPoints[newPoints.length - 2];
-        final current = newPoints[newPoints.length - 1];
-        
-        // Calculate distance increment
-        final distanceIncrement = _locationService.calculateDistance(
-          previous,
-          current,
-        );
-        
-        // Calculate elevation changes
-        final elevationChange = current.elevation - previous.elevation;
-        final elevationGainIncrement = elevationChange > 0 ? elevationChange : 0;
-        final elevationLossIncrement = elevationChange < 0 ? -elevationChange : 0;
-        
-        newDistance += distanceIncrement;
-        newElevationGain += elevationGainIncrement;
-        newElevationLoss += elevationLossIncrement;
-      }
-      
-      // Calculate pace (minutes per km)
+      // Calculate updated stats using MeasurementUtils
+      final newDistance = MeasurementUtils.totalDistance(newPoints);
+      final newElevationGain = MeasurementUtils.totalElevationGain(newPoints);
+      final newElevationLoss = MeasurementUtils.totalElevationLoss(newPoints);
       final newPace = newDistance > 0
           ? (_stopwatch.elapsed.inSeconds / 60) / newDistance
           : 0.0;
-          
-      // Estimate calories (simplified calculation)
-      final newCalories = newDistance * 100;  // Simplified
-      
+
+      // --- MET-based calorie calculation using actual weights ---
+      // Try to get actual user and ruck weights from currentState if available
+      double userWeightKg = currentState.userWeightKg ?? 75.0; // fallback
+      double ruckWeightKg = currentState.ruckWeightKg ?? 0.0; // fallback
+
+      final double totalWeightKg = userWeightKg + ruckWeightKg;
+      final double durationMinutes = _stopwatch.elapsed.inSeconds / 60.0;
+      final double distanceMeters = newDistance * 1000;
+      final double grade = (distanceMeters > 0)
+          ? newElevationGain / distanceMeters * 100
+          : 0.0;
+      final double speedKmh = (_stopwatch.elapsed.inHours > 0)
+          ? newDistance / _stopwatch.elapsed.inHours
+          : 0.0;
+      final double speedMph = MetCalculator.kmhToMph(speedKmh);
+      final double ruckWeightLbs = ruckWeightKg * 2.20462;
+      final double met = MetCalculator.calculateRuckingMetByGrade(
+        speedMph: speedMph,
+        grade: grade,
+        ruckWeightLbs: ruckWeightLbs,
+      );
+      final double newCalories = MetCalculator.calculateCaloriesBurned(
+        weightKg: totalWeightKg,
+        durationMinutes: durationMinutes,
+        metValue: met,
+      );
+
       emit(currentState.copyWith(
         locationPoints: newPoints,
         elapsed: _stopwatch.elapsed,
@@ -310,8 +339,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         pace: newPace,
       ));
       
-      // Send update to API periodically
-      _sendLocationUpdateToApi(event.locationPoint, currentState.ruckId);
+      // Send update to API periodically, now with elevation gain/loss
+      _sendLocationUpdateToApi(
+        event.locationPoint, 
+        currentState.ruckId,
+        elevationGain: newElevationGain,
+        elevationLoss: newElevationLoss,
+      );
     }
   }
   
@@ -344,6 +378,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elevationLoss: currentState.elevationLoss,
         caloriesBurned: currentState.caloriesBurned,
         pace: currentState.pace,
+        userWeightKg: currentState.userWeightKg,
+        ruckWeightKg: currentState.ruckWeightKg,
       ));
     }
   }
@@ -377,6 +413,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elevationLoss: currentState.elevationLoss,
         caloriesBurned: currentState.caloriesBurned,
         pace: currentState.pace,
+        userWeightKg: currentState.userWeightKg,
+        ruckWeightKg: currentState.ruckWeightKg,
       ));
     }
   }
@@ -429,7 +467,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   
   Future<void> _sendLocationUpdateToApi(
     LocationPoint point, 
-    String ruckId
+    String ruckId,
+    {double? elevationGain, double? elevationLoss}
   ) async {
     try {
       await _apiClient.post(
@@ -440,25 +479,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           'elevation_meters': point.elevation,
           'timestamp': point.timestamp.toIso8601String(),
           'accuracy_meters': point.accuracy,
+          if (elevationGain != null) 'elevation_gain_meters': elevationGain,
+          if (elevationLoss != null) 'elevation_loss_meters': elevationLoss,
         },
       );
     } catch (e) {
       print('Failed to send location update: $e');
     }
-  }
-
-  void _calculateStats(List<LocationPoint> points) {
-    if (points.length < 2) return;
-
-    final newPoint = points.last;
-    final previousPoint = points[points.length - 2];
-
-    // Calculate distance
-    final distanceIncrement = _locationService.calculateDistance(
-      previousPoint,
-      newPoint,
-    );
-
-    // ... existing code ...
   }
 } 
