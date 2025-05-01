@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -14,6 +15,9 @@ void main() async {
   
   // Load environment variables from .env
   await dotenv.load(fileName: ".env");
+  
+  // Configure RevenueCat
+  await Purchases.configure(PurchasesConfiguration(dotenv.env['REVENUECAT_API_KEY']!));
   
   // Initialize Firebase
   await Firebase.initializeApp();
