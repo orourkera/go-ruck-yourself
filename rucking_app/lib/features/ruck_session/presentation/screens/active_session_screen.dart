@@ -27,6 +27,7 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'package:rucking_app/core/error_messages.dart';
 
 LatLng _getRouteCenter(List locationPoints) {
   if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
@@ -87,6 +88,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   String? _validationMessage;
   bool _showValidationMessage = false;
   bool _hasAppleWatch = true; // Track if user has Apple Watch
+  bool _isSessionEnded = false; // New flag
   
   // Timer variables
   late Stopwatch _stopwatch;
@@ -117,6 +119,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   // User preferences
   bool _preferMetric = true; // Default, will be overridden
   double _userWeightKg = 75.0; // Default, will be overridden
+  double ruckWeightKg = 0.0;
 
   // Custom marker icon data
   Uint8List? _customMarkerIcon;
@@ -146,15 +149,18 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       _preferMetric = authState.user.preferMetric;
-      _userWeightKg = authState.user.weightKg ?? 75.0; // Use default if null
-      debugPrint('ActiveSessionScreen.initState: _preferMetric = $_preferMetric, _userWeightKg = $_userWeightKg');
+      _userWeightKg = authState.user.weightKg ?? widget.userWeight;
     } else {
-      debugPrint('ActiveSessionScreen.initState: User not authenticated, using default preferences.');
+      _userWeightKg = widget.userWeight;
     }
-
+    ruckWeightKg = widget.ruckWeight;
+    
+    // Initialize stopwatch
     _stopwatch = Stopwatch();
     
-    // Reset all session stats to ensure a clean start
+    // --- MAP AND LOCATION LOAD FIRST ---
+    _initLocationTracking(); // Always load map and location as first thing
+
     _distance = 0.0;
     _pace = 0.0;
     _caloriesBurned = 0.0;
@@ -167,11 +173,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _canShowStats = false;
     _uncountedDistance = 0.0;
     
-    // Request location permission at startup
-    _requestLocationPermission();
-    
-    // Start session timer
-    _startSession();
+    // Initialize session weights for BLoC
+    _initializeSessionWeights();
+    _startSession(); // Start the timers and stopwatch
     
     // Set planned countdown if provided
     if (widget.plannedDuration != null && widget.plannedDuration! > 0) {
@@ -181,13 +185,24 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     // Load custom marker icon
     _loadCustomMarker();
   }
+
+  void _initializeSessionWeights() {
+    // Start session in BLoC with weights
+    context.read<ActiveSessionBloc>().add(
+      SessionStarted(
+        ruckId: widget.ruckId,
+        userWeightKg: _userWeightKg,
+        ruckWeightKg: ruckWeightKg,
+      ),
+    );
+  }
   
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _stopwatch.stop();
-    _locationSubscription?.cancel();
+    _stopLocationTracking(); // Explicitly stop location tracking
     _stopHeartRateMonitoring();
     super.dispose();
   }
@@ -201,10 +216,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   /// Initialize location tracking service
   Future<void> _initLocationTracking() async {
     try {
+      debugPrint('Starting location tracking...');
       final hasPermission = await _locationService.hasLocationPermission();
       if (!hasPermission) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission is required for tracking'))
+          const SnackBar(content: Text(sessionLocationPermissionDenied), backgroundColor: Colors.red),
         );
         return;
       }
@@ -227,16 +243,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       } catch (e) {
         debugPrint('Failed to get initial location: $e');
       }
+      debugPrint('Location tracking started successfully.');
     } catch (e) {
-      print('Failed to initialize location tracking: $e');
+      debugPrint('Error starting location tracking: $e');
     }
   }
   
   /// Handle incoming location updates
   void _handleLocationUpdate(LocationPoint locationPoint) {
-    // Drop points with poor GPS accuracy immediately
-    if (locationPoint.accuracy > SessionValidationService.minGpsAccuracyMeters) {
-      debugPrint('Dropped low-accuracy point: ${locationPoint.accuracy}m');
+    if (_isSessionEnded) {
+      debugPrint('Session ended. Ignoring location update.');
       return;
     }
     
@@ -286,7 +302,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       // Auto-pause if needed
       if (validation['shouldPause'] && !_isPaused) {
         setState(() {
-          _validationMessage = validation['message'];
+          _validationMessage = sessionAutoPaused;
           _showValidationMessage = true;
         });
         _togglePause();
@@ -316,7 +332,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     }
     
     // Update the UI
-    setState(() {});
+    if (mounted) setState(() {});
     
     // Send point to API in the background
     _sendLocationUpdate(locationPoint);
@@ -443,7 +459,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     }
     
     if (!hasPermission) {
-      _showErrorSnackBar('Location permission required for ruck tracking.');
+      _showErrorSnackBar(sessionLocationPermissionDenied);
       return;
     }
     
@@ -460,7 +476,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // More specific error message for auth issues
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('You must be logged in to track sessions. Please log in.'),
+            content: const Text(serverUnauthorized),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
@@ -474,7 +490,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       } else {
         // Generic error message
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to start session: $e'))
+          SnackBar(content: Text(sessionStartError))
         );
       }
     }
@@ -513,34 +529,39 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   }
   
   /// Ends the current session
-  void _endSession() async {
-    if (_isEnding) return;
-    
-    setState(() {
-      _isEnding = true;
-    });
-    
+  Future<void> _endSession() async {
+    debugPrint('Ending session...');
+    _isSessionEnded = true; // Set flag
+    // Stop tracking before processing end of session
+    _stopwatch.stop();
+    _timer?.cancel();
+    _stopLocationTracking(); // Explicitly stop location tracking
+    debugPrint('Timers and location tracking stopped for session end.');
+
+    // Check if we have a valid session to save
+    if (_locationPoints.isEmpty || _distance < 0.05) {
+      debugPrint('Session too short to save: distance $_distance km');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(sessionTooShortError.replaceAll('{minutes}', '3')), backgroundColor: Colors.red),
+        );
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
     // Capture end-session timestamp
     final DateTime completedAt = DateTime.now();
-    
-    // Stop timers and location tracking
-    _timer?.cancel();
-    _stopwatch.stop();
-    _locationSubscription?.cancel();
-    _stopHeartRateMonitoring();
     
     try {
       // Get final session distance
       final distanceMeters = _distance * 1000; // Convert km to meters
       
-      // Validate session before saving
-      final sessionValidation = _validationService.validateSessionForSave(
-        distanceMeters: distanceMeters,
-        duration: _elapsed,
-        caloriesBurned: _caloriesBurned,
-      );
+      // Validate session before saving - ensure at least 3 minutes of activity
+      final Duration minDuration = Duration(minutes: 3);
+      bool isValid = _elapsed.inSeconds >= minDuration.inSeconds;
       
-      if (!sessionValidation['isValid']) {
+      if (!isValid) {
         // Remove the session from backend if it's too short or invalid
         try {
           await _apiClient.delete('/rucks/${widget.ruckId}');
@@ -551,7 +572,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(sessionValidation['message']),
+            content: Text(sessionTooShortError.replaceAll('{minutes}', '3')),
             backgroundColor: Colors.red,
           ),
         );
@@ -620,26 +641,22 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       }
       
       // Navigate to completion screen, passing final calculated stats
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SessionCompleteScreen(
-              completedAt: completedAt,
-              ruckId: widget.ruckId,
-              duration: _elapsed, // Pass final elapsed time
-              distance: _distance, // Pass final calculated distance
-              caloriesBurned: _caloriesBurned.round(), // Pass final calculated calories
-              elevationGain: _elevationGain,
-              elevationLoss: _elevationLoss,
-              ruckWeight: widget.displayRuckWeight,
-              // Pass initial notes if available, SessionCompleteScreen allows editing
-              initialNotes: widget.notes, 
-            ),
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => SessionCompleteScreen(
+            completedAt: completedAt,
+            ruckId: widget.ruckId,
+            duration: _elapsed, // Pass final elapsed time
+            distance: _distance, // Pass final calculated distance
+            caloriesBurned: _caloriesBurned.round(), // Pass final calculated calories
+            elevationGain: _elevationGain,
+            elevationLoss: _elevationLoss,
+            ruckWeight: widget.ruckWeight, // Pass numeric value instead of formatted string
+            // Pass initial notes if available, SessionCompleteScreen allows editing
+            initialNotes: widget.notes, 
           ),
-        );
-      } 
-      // No need for try-catch or setting _isEnding=false if only navigating
+        ),
+      );
     } catch (e) {
       debugPrint('Error in _endSession: $e');
     }
@@ -649,6 +666,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   void _showEndConfirmationDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false, // Prevent dismissing by tapping outside
       builder: (context) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
@@ -670,6 +688,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                 _endSession();
               },
               child: const Text('End Session'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
             ),
           ],
         );
@@ -755,7 +776,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       final granted = await _locationService.requestLocationPermission();
       if (!granted && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission is required for tracking. Please enable it in settings.')),
+          const SnackBar(content: Text(sessionLocationPermissionDenied), backgroundColor: Colors.red),
         );
       }
     }
@@ -808,9 +829,12 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   }
 
   /// Get formatted weight string
-  String _getFormattedWeight(double ruckWeightKg) {
-    final String weightDisplay = MeasurementUtils.formatWeight(ruckWeightKg, metric: widget.preferMetric);
-    return weightDisplay;
+  String _getDisplayWeight() {
+    if (widget.preferMetric) {
+      return '${widget.displayRuckWeight.toStringAsFixed(1)} kg';
+    } else {
+      return '${widget.displayRuckWeight.round()} lbs';
+    }
   }
 
   // Method to load custom marker icon
@@ -826,24 +850,31 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     }
   }
 
+  void _stopLocationTracking() {
+    debugPrint('Stopping location tracking...');
+    _locationSubscription?.cancel();
+    _locationSubscription = null;
+    debugPrint('Location tracking stopped.');
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('ActiveSessionScreen.build: _heartRate=$_heartRate');
     // Format display values
     final String durationDisplay = _formatDuration(_elapsed);
-    final String distanceDisplay = _canShowStats
+    final String? distanceDisplay = _canShowStats
       ? MeasurementUtils.formatDistance(_distance, metric: widget.preferMetric)
-      : '--';
+      : null;
     
     // pace is stored as seconds per km; adjust display based on user preference
     double _displayPaceSec = _pace; // Base pace in seconds per km
-    final String paceDisplay = _canShowStats
+    final String? paceDisplay = _canShowStats
       ? MeasurementUtils.formatPace(_displayPaceSec, metric: widget.preferMetric)
-      : '--';
+      : null;
     
-    final String caloriesDisplay = _canShowStats
+    final String? caloriesDisplay = _canShowStats
       ? _caloriesBurned.toStringAsFixed(0)
-      : '--';
+      : null;
     final String elevationDisplay = _canShowStats
       ? MeasurementUtils.formatElevationCompact(_elevationGain, _elevationLoss, metric: widget.preferMetric)
       : '+0/-0';
@@ -925,13 +956,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                               if (_locationPoints.isNotEmpty)
                                 Marker(
                                   point: LatLng(_locationPoints.first.latitude, _locationPoints.first.longitude),
-                                  child: _customMarkerIcon != null
-                                      ? Image.memory(_customMarkerIcon!, width: 25, height: 25)
-                                      : const Icon(
-                                          Icons.location_on,
-                                          color: Colors.green,
-                                          size: 25,
-                                        ),
+                                  child: const Icon(Icons.location_on, color: Colors.blue, size: 25),
                                 ),
                               if (_locationPoints.length > 1)
                                 Marker(
@@ -940,7 +965,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                       ? Image.memory(_customMarkerIcon!, width: 25, height: 25)
                                       : const Icon(
                                           Icons.location_on,
-                                          color: Colors.red,
+                                          color: Colors.green,
                                           size: 25,
                                         ),
                                 ),
@@ -1001,7 +1026,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                   children: [
                     // Ruck weight
                     Text(
-                      _getFormattedWeight(widget.ruckWeight),
+                      _getDisplayWeight(),
                       style: AppTextStyles.headline6.copyWith(
                         color: Colors.grey.shade600,
                       ),
@@ -1101,13 +1126,21 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                   ),
                                   SizedBox(height: 8),
                                   Text(
-                                    distanceDisplay,
+                                    distanceDisplay != null
+                                        ? distanceDisplay
+                                        : '',
                                     style: AppTextStyles.headline5.copyWith(
                                       color: Theme.of(context).brightness == Brightness.dark 
                                           ? AppColors.primaryLight 
                                           : null,
                                     ),
                                   ),
+                                  if (distanceDisplay == null)
+                                    SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
+                                    ),
                                 ],
                               ),
                             ),
@@ -1136,13 +1169,21 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                   ),
                                   SizedBox(height: 8),
                                   Text(
-                                    paceDisplay,
+                                    paceDisplay != null
+                                        ? paceDisplay
+                                        : '',
                                     style: AppTextStyles.headline5.copyWith(
                                       color: Theme.of(context).brightness == Brightness.dark 
                                           ? AppColors.success 
                                           : null,
                                     ),
                                   ),
+                                  if (paceDisplay == null)
+                                    SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
+                                    ),
                                 ],
                               ),
                             ),
@@ -1171,20 +1212,40 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.local_fire_department, color: AppColors.accent, size: 20),
+                                      Icon(Icons.local_fire_department, color: AppColors.success, size: 20),
                                       SizedBox(width: 6),
                                       Text('Calories', style: AppTextStyles.subtitle2),
                                     ],
                                   ),
                                   SizedBox(height: 8),
-                                  Text(
-                                    caloriesDisplay,
-                                    style: AppTextStyles.headline5.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark 
-                                          ? AppColors.success 
-                                          : null,
-                                    ),
-                                  ),
+                                  caloriesDisplay != null
+                                    ? Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            caloriesDisplay,
+                                            style: AppTextStyles.headline5.copyWith(
+                                              color: Theme.of(context).brightness == Brightness.dark 
+                                                  ? AppColors.warning 
+                                                  : null,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'kCal',
+                                            style: AppTextStyles.headline5.copyWith(
+                                              color: Theme.of(context).brightness == Brightness.dark 
+                                                  ? AppColors.warning 
+                                                  : null,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
+                                      ),
                                 ],
                               ),
                             ),
@@ -1212,14 +1273,20 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                     ],
                                   ),
                                   SizedBox(height: 8),
-                                  Text(
-                                    elevationDisplay,
-                                    style: AppTextStyles.headline5.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark 
-                                          ? AppColors.primaryLight 
-                                          : null,
-                                    ),
-                                  ),
+                                  elevationDisplay != '+0/-0'
+                                    ? Text(
+                                        elevationDisplay,
+                                        style: AppTextStyles.headline5.copyWith(
+                                          color: Theme.of(context).brightness == Brightness.dark 
+                                              ? AppColors.primaryLight 
+                                              : null,
+                                        ),
+                                      )
+                                    : SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
+                                      ),
                                 ],
                               ),
                             ),
