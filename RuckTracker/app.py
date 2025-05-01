@@ -202,6 +202,10 @@ try:
     @app.route('/terms')
     def terms():
         return render_template('terms.html')
+
+    @app.route('/support')
+    def support():
+        return render_template('support.html')
     
     # Add route for health check (remains unprefixed)
     @app.route('/health')
