@@ -30,16 +30,47 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  platform :ios, '14.0' # Set minimum iOS version for health package
   use_frameworks!
+  use_modular_headers! # Added for better compatibility with some Pods
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  
+  # Explicitly list Pods for the iOS target (e.g., RevenueCat)
+  pod 'RevenueCat' # Add this line if not already included by flutter_install_all_ios_pods
+
   target 'RunnerTests' do
     inherit! :search_paths
   end
 end
 
+# Add a separate target for the watchOS app
+target 'GRY Watch App' do
+  platform :watchos, '7.0' # Set the watchOS deployment target
+  # Do not include Pods here unless they are explicitly compatible with watchOS
+  # RevenueCat is not typically compatible with watchOS, so we exclude it
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # Ensure watchOS targets don't include incompatible frameworks
+    target.build_configurations.each do |config|
+      # Explicitly disable signing for all Pod targets
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+      config.build_settings['CODE_SIGN_IDENTITY'] = ''
+      config.build_settings['DEVELOPMENT_TEAM'] = '' # Explicitly clear team
+
+      if target.name.include?('GRY Watch App')
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = '' # Clear framework paths for watchOS
+        config.build_settings['LD_RUNPATH_SEARCH_PATHS'] = '' # Clear runtime search paths
+        config.build_settings['OTHER_LDFLAGS'] = '' # Clear linker flags
+      end
+
+      # Ensure all targets use the correct Swift version (if applicable)
+      config.build_settings['SWIFT_VERSION'] = '5.0'
+    end
   end
 end
