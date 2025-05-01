@@ -260,7 +260,7 @@ class RuckSessionCompleteResource(Resource):
 
 class RuckSessionLocationResource(Resource):
     def post(self, ruck_id):
-        """Add location point to a ruck session"""
+        """Handle location update for a session, including elevation gain/loss."""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
@@ -276,6 +276,16 @@ class RuckSessionLocationResource(Resource):
             if check.data['status'] != 'in_progress':
                 return {'message': 'Session not in progress'}, 400
             data = request.get_json()
+            elevation_gain = data.get('elevation_gain_meters')
+            elevation_loss = data.get('elevation_loss_meters')
+            update_data = {}
+            if elevation_gain is not None:
+                update_data['elevation_gain_meters'] = elevation_gain
+            if elevation_loss is not None:
+                update_data['elevation_loss_meters'] = elevation_loss
+            # Update session with elevation gain/loss if present
+            if update_data:
+                supabase.table('ruck_sessions').update(update_data).eq('id', ruck_id).execute()
             location_data = {
                 'id': str(uuid.uuid4()),
                 'session_id': ruck_id,
@@ -290,8 +300,6 @@ class RuckSessionLocationResource(Resource):
                 .execute()
             stats_data = {
                 'distance_km': data.get('distance_km'),
-                'elevation_gain_meters': data.get('elevation_gain_meters'),
-                'elevation_loss_meters': data.get('elevation_loss_meters'),
                 'calories_burned': data.get('calories_burned'),
                 'duration_seconds': data.get('duration_seconds'),
                 'average_pace_min_km': data.get('average_pace_min_km')
