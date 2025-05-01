@@ -34,6 +34,7 @@ class SessionSchema(Schema):
     elevation_gain_m = fields.Float(dump_only=True)
     elevation_loss_m = fields.Float(dump_only=True)
     calories_burned = fields.Float(dump_only=True)
+    planned_duration_minutes = fields.Int(required=False, allow_none=True)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 
