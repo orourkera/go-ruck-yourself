@@ -45,6 +45,33 @@ class AppTextStyles {
     letterSpacing: 0.4,
   );
   
+  // Paywall header style with 3D text effect
+  static const TextStyle paywallHeadline = TextStyle(
+    fontFamily: 'Bangers',
+    fontSize: 38, // Equivalent to ~5.4em for mobile
+    color: Color(0xFFCC6A2A), // #CC6A2A orange
+    letterSpacing: 2.0,
+    height: 1.2,
+    shadows: [
+      Shadow(
+        offset: Offset(-2.0, -2.0),
+        color: Colors.white,
+      ),
+      Shadow(
+        offset: Offset(2.0, -2.0),
+        color: Colors.white,
+      ),
+      Shadow(
+        offset: Offset(-2.0, 2.0),
+        color: Colors.white,
+      ),
+      Shadow(
+        offset: Offset(2.0, 2.0),
+        color: Colors.white,
+      ),
+    ],
+  );
+  
   // Subtitle styles with Inter font
   static const TextStyle subtitle1 = TextStyle(
     fontFamily: 'Inter',
