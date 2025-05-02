@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -126,6 +127,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   // Custom marker icon data
   Uint8List? _customMarkerIcon;
 
+  DateTime _startTime = DateTime.now();
+
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -192,9 +195,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     // Start session in BLoC with weights
     context.read<ActiveSessionBloc>().add(
       SessionStarted(
-        ruckId: widget.ruckId,
-        userWeightKg: _userWeightKg,
         ruckWeightKg: ruckWeightKg,
+        notes: 'Session started with ${ruckWeightKg}kg ruck weight',
       ),
     );
   }
@@ -466,10 +468,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _stopwatch.stop();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(sessionLocationPermissionDenied),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text(sessionLocationPermissionDenied), backgroundColor: Colors.red),
       );
       return;
     }
@@ -585,11 +584,28 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       _showCompletionDialog(
         onComplete: (String? notes, int? rating) async {
           try {
-            // Send session completed event to API
-            await _apiClient.post('/rucks/${widget.ruckId}/complete', {
-              'notes': notes,
-              'rating': rating,
-            });
+            // Get the session ID from the bloc
+            final activeSessionBloc = context.read<ActiveSessionBloc>();
+            final activeSessionState = activeSessionBloc.state;
+            String? sessionId;
+            
+            if (activeSessionState is ActiveSessionRunning) {
+              sessionId = activeSessionState.sessionId;
+            }
+            
+            // Send session completed event to API with the session ID from the bloc
+            if (sessionId != null) {
+              await _apiClient.post('/rucks/$sessionId/complete', {
+                'notes': notes,
+                'rating': rating,
+              });
+            } else {
+              // Fallback to the passed ruckId if no session is active
+              await _apiClient.post('/rucks/${widget.ruckId}/complete', {
+                'notes': notes,
+                'rating': rating,
+              });
+            }
             
             // Try to save to Apple Health
             if (Platform.isIOS) {
@@ -598,9 +614,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                 await _healthService.saveWorkout(
                   startDate: _startTime,
                   endDate: DateTime.now(),
-                  distanceKm: finalDistanceKm,
+                  distanceKm: _distance,
                   caloriesBurned: _calculateCalories().toInt(),
-                  ruckWeightKg: widget.ruckWeightKg,
+                  ruckWeightKg: ruckWeightKg,
                 );
               } catch (e) {
                 // Log error but don't block session completion
@@ -661,38 +677,36 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Session Too Short'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Your session is too short to save.',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text('Distance: ${_distance.toStringAsFixed(2)} km (minimum 0.1 km)'),
-              Text('Duration: ${_formatDuration(_elapsed)} (minimum 2 min)'),
-              const SizedBox(height: 12),
-              const Text(
-                'To save your workout, please make sure to ruck for at least 100 meters and 2 minutes.',
-                style: TextStyle(fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              child: const Text('OK'),
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).pop(); // Return to previous screen
-              },
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Session Too Short'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your session is too short to save.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text('Distance: ${_distance.toStringAsFixed(2)} km (minimum 0.1 km)'),
+            Text('Duration: ${_formatDuration(_elapsed)} (minimum 2 min)'),
+            const SizedBox(height: 12),
+            const Text(
+              'To save your workout, please make sure to ruck for at least 100 meters and 2 minutes.',
+              style: TextStyle(fontStyle: FontStyle.italic),
             ),
           ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            child: const Text('OK'),
+            onPressed: () {
+              Navigator.of(context).pop(); // Close dialog
+              Navigator.of(context).pop(); // Return to previous screen
+            },
+          ),
+        ],
+      ),
     );
   }
   
@@ -709,69 +723,67 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Session Complete'),
-          content: StatefulBuilder(
-            builder: (context, setState) {
-              return SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Distance: ${_distance.toStringAsFixed(2)} km'),
-                    Text('Duration: ${_formatDuration(_elapsed)}'),
-                    Text('Calories: ${_calculateCalories().toInt()}'),
-                    const SizedBox(height: 16),
-                    const Text('How was your ruck?'),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(5, (index) {
-                        return IconButton(
-                          icon: Icon(
-                            index < rating ? Icons.star : Icons.star_border,
-                            color: Theme.of(context).primaryColor,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              rating = index + 1;
-                            });
-                          },
-                        );
-                      }),
+      builder: (context) => AlertDialog(
+        title: const Text('Session Complete'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Distance: ${_distance.toStringAsFixed(2)} km'),
+                  Text('Duration: ${_formatDuration(_elapsed)}'),
+                  Text('Calories: ${_calculateCalories().toInt()}'),
+                  const SizedBox(height: 16),
+                  const Text('How was your ruck?'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            rating = index + 1;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Notes:'),
+                  TextField(
+                    maxLines: 3,
+                    onChanged: (value) {
+                      notes = value;
+                    },
+                    decoration: const InputDecoration(
+                      hintText: 'Optional notes about your session',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 16),
-                    const Text('Notes:'),
-                    TextField(
-                      maxLines: 3,
-                      onChanged: (value) {
-                        notes = value;
-                      },
-                      decoration: const InputDecoration(
-                        hintText: 'Optional notes about your session',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: onCancel,
+            child: const Text('Cancel'),
           ),
-          actions: [
-            TextButton(
-              onPressed: onCancel,
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                onComplete(notes.isNotEmpty ? notes : null, rating > 0 ? rating : null);
-              },
-              child: const Text('Complete'),
-            ),
-          ],
-        );
-      },
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              onComplete(notes.isNotEmpty ? notes : null, rating > 0 ? rating : null);
+            },
+            child: const Text('Complete'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -812,7 +824,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _heartRateTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
       if (_isPaused) return; // Don't update during pause
       
-      final heartRate = await _healthService.getCurrentHeartRate();
+      final heartRate = await _healthService.getHeartRate();
       if (heartRate != null) {
         setState(() {
           _heartRate = heartRate;
@@ -821,7 +833,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     });
     
     // Fetch initial heart rate
-    final initialHeartRate = await _healthService.getCurrentHeartRate();
+    final initialHeartRate = await _healthService.getHeartRate();
     if (initialHeartRate != null) {
       setState(() {
         _heartRate = initialHeartRate;
@@ -870,6 +882,79 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _locationSubscription?.cancel();
     _locationSubscription = null;
     AppLogger.info('Location tracking stopped.');
+  }
+
+  /// Shows a confirmation dialog when user attempts to exit the active session
+  Future<void> _showEndConfirmationDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('End Session?'),
+        content: const Text(
+          'Are you sure you want to end your ruck session? This will save your current progress.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('End Session'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true) {
+      _endSession();
+    }
+  }
+
+  /// Show a dialog when the session appears to be idle for too long
+  Future<void> _showIdleEndConfirmationDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Session Inactive'),
+        content: const Text(
+          'It looks like you haven\'t moved in a while. Would you like to end your session?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Continue Session'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('End Session'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true) {
+      _endSession();
+    }
+  }
+
+  /// Calculate calories based on distance, duration, and weight
+  double _calculateCalories() {
+    // MET values (Metabolic Equivalent of Task):
+    // - Walking with weighted backpack (10-20kg): ~7.0 MET
+    // - Walking with very heavy backpack (>20kg): ~8.5 MET
+    double metValue = widget.ruckWeight < 20 ? 7.0 : 8.5;
+    
+    // Calculate calories using the MetCalculator
+    double durationMinutes = _elapsed.inSeconds / 60.0; // Convert seconds to minutes
+    
+    return MetCalculator.calculateCaloriesBurned(
+      weightKg: widget.userWeight + widget.ruckWeight, // Total weight is user + ruck
+      durationMinutes: durationMinutes,
+      metValue: metValue,
+    );
   }
 
   @override

@@ -91,7 +91,7 @@ class LocationServiceImpl implements LocationService {
     final positionStream = Geolocator.getPositionStream(
       locationSettings: AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: _minDistanceFilter,
+        distanceFilter: _minDistanceFilter.toInt(),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Rucking in Progress',
           notificationText: 'Tracking your ruck session',
