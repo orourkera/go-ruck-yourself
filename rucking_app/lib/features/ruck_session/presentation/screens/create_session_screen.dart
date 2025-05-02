@@ -52,14 +52,23 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       // Load last used weight (KG)
       double lastWeightKg = prefs.getDouble('lastRuckWeightKg') ?? AppConfig.defaultRuckWeight;
       _ruckWeight = lastWeightKg;
-      // Update display weight to match unit preference so the correct chip appears selected
-      _displayRuckWeight = _preferMetric
-          ? _ruckWeight
-          : double.parse((_ruckWeight * AppConfig.kgToLbs).toStringAsFixed(1));
-
-      // Load last used duration (minutes)
-      int lastDurationMinutes = prefs.getInt('lastSessionDurationMinutes') ?? 30; // Default to 30 mins
-      _durationController.text = lastDurationMinutes.toString();
+      _selectedRuckWeight = lastWeightKg; // Ensure selectedRuckWeight is synced with ruckWeight
+      
+      // Update display weight based on preference
+      if (_preferMetric) {
+        _displayRuckWeight = _ruckWeight;
+      } else {
+        _displayRuckWeight = _ruckWeight * AppConfig.kgToLbs;
+      }
+      
+      debugPrint('Loaded weight from prefs: _ruckWeight=$_ruckWeight kg, _selectedRuckWeight=$_selectedRuckWeight kg');
+      
+      // Load last used duration (might be null if not previously set)
+      int? lastDurationMinutes = prefs.getInt('lastSessionDurationMinutes');
+      _plannedDuration = lastDurationMinutes;
+      if (lastDurationMinutes != null) {
+        _durationController.text = lastDurationMinutes.toString();
+      }
       
       // Load user's body weight (if previously saved)
       String? lastUserWeight = prefs.getString('lastUserWeight');
@@ -75,6 +84,16 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     } finally {
       setState(() {
         _isLoading = false;
+      });
+      // Make sure we trigger a UI update with the loaded weights
+      Future.delayed(Duration.zero, () {
+        if (mounted) {
+          setState(() {
+            // Force synchronization
+            _selectedRuckWeight = _ruckWeight;
+            debugPrint('UI rebuild triggered to reflect loaded weight: $_ruckWeight kg');
+          });
+        }
       });
     }
   }
@@ -176,25 +195,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         
         // Extract ruck ID from response
         ruckId = createResponse['id'].toString();
+        debugPrint('Extracted ruckId: $ruckId');
         debugPrint('Session created successfully with ID: $ruckId');
 
-        // ---- Step 2: Start the created session ----
-        final startEndpoint = '/rucks/$ruckId/start';
-        debugPrint('Starting session via POST $startEndpoint...');
-        final startResponse = await apiClient.post(startEndpoint, {}); // No body needed for start
-        
-        if (!mounted) return;
-        
-        // Minimal check for start response (can be more robust)
-        if (startResponse == null || !(startResponse is Map && startResponse.containsKey('message'))) {
-             debugPrint('Invalid response from POST $startEndpoint: $startResponse');
-             // Decide if we should throw or just log a warning
-             // throw Exception('Failed to confirm session start on server.');
-             print("Warning: Could not confirm session start on server, but proceeding.");
-        }
-        
-        debugPrint('Session started successfully on backend.');
-        
         // Save the used weight (always in KG) to SharedPreferences on success
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('lastRuckWeightKg', weightForApiKg);
@@ -279,6 +282,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         debugPrint('CreateSessionScreen: Weight display updated to $_displayRuckWeight');
       });
       debugPrint('CreateSessionScreen: Updated metric preference from AuthBloc to $_preferMetric');
+      // Ensure the last ruck weight is loaded and set as selected
+      _loadLastRuckWeight();
     }
     _durationFocusNode.addListener(() {
     });
@@ -302,6 +307,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     });
   }
 
+  // Load last saved ruck weight from SharedPreferences
+  Future<void> _loadLastRuckWeight() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastWeightKg = prefs.getDouble('lastRuckWeightKg');
+    if (lastWeightKg != null) {
+      setState(() {
+        _ruckWeight = lastWeightKg;
+        _selectedRuckWeight = lastWeightKg;
+        _displayRuckWeight = _preferMetric ? lastWeightKg : (lastWeightKg * AppConfig.kgToLbs);
+        debugPrint('Loaded last ruck weight: $_ruckWeight kg');
+      });
+    }
+  }
+
   @override
   void dispose() {
     _userWeightController.dispose();
@@ -312,41 +331,55 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
   /// Snaps the current weight to the nearest predefined weight option
   void _snapToNearestWeight() {
-    final isMetric = _preferMetric;
-    final weightOptions = isMetric 
-        ? AppConfig.metricWeightOptions 
-        : AppConfig.standardWeightOptions;
-  
-    double comparisonWeight = _ruckWeight;
-    if (!isMetric) {
-      comparisonWeight = _ruckWeight * AppConfig.kgToLbs;
+    List<double> weightOptions = [];
+    
+    if (_preferMetric) {
+      // Metric options (kg)
+      weightOptions = AppConfig.metricWeightOptions;
+    } else {
+      // Imperial options (lbs)
+      weightOptions = AppConfig.standardWeightOptions;
     }
-
-    double closestWeightOption = weightOptions.first;
-    double smallestDifference = (comparisonWeight - closestWeightOption).abs();
-    int closestIndex = 0; // Keep track of the index
-
-    for (int i = 0; i < weightOptions.length; i++) {
-      double weight = weightOptions[i];
-      double difference = (comparisonWeight - weight).abs();
-      if (difference < smallestDifference) {
-        smallestDifference = difference;
-        closestWeightOption = weight;
-        closestIndex = i;
+    
+    // Find the nearest weight option
+    double? closestOption;
+    double minDifference = double.infinity;
+    
+    for (var option in weightOptions) {
+      final optionInKg = _preferMetric ? option : option / AppConfig.kgToLbs;
+      // Use a slightly more forgiving comparison for imperial weights due to conversion rounding
+      final difference = (optionInKg - _ruckWeight).abs();
+      
+      if (difference < minDifference) {
+        minDifference = difference;
+        closestOption = option;
       }
     }
-  
-    // Ensure internal weight is the corresponding KG value
-    _ruckWeight = AppConfig.metricWeightOptions[closestIndex]; 
     
-    // Also update the display weight based on user preference
-    _displayRuckWeight = _preferMetric ? _ruckWeight : AppConfig.standardWeightOptions[closestIndex];
+    if (closestOption != null) {
+      setState(() {
+        if (_preferMetric) {
+          _ruckWeight = closestOption!;
+          _displayRuckWeight = closestOption!;
+        } else {
+          _ruckWeight = closestOption! / AppConfig.kgToLbs;
+          _displayRuckWeight = closestOption!;
+        }
+        // Make sure _selectedRuckWeight is also updated
+        _selectedRuckWeight = _ruckWeight;
+        
+        debugPrint('Snapped to nearest weight: $_ruckWeight kg (display: $_displayRuckWeight)');
+      });
+    }
   }
 
   /// Builds a chip for quick ruck weight selection
   Widget _buildWeightChip(double weightValue, bool isMetric) {
     double weightInKg = isMetric ? weightValue : weightValue / AppConfig.kgToLbs;
-    final bool isSelected = (weightInKg - _selectedRuckWeight).abs() < 0.01;
+    // For imperial weights, we need to be more forgiving due to conversion precision issues
+    final bool isSelected = isMetric
+        ? (weightInKg - _selectedRuckWeight).abs() < 0.01
+        : (weightInKg - _selectedRuckWeight).abs() < 0.1;  // Use a larger tolerance for imperial
 
     // Log for debugging
     debugPrint('Building chip for weightInKg: $weightInKg, current _ruckWeight: $_ruckWeight');
