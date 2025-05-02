@@ -52,6 +52,32 @@ import WatchConnectivity
         healthChannel = FlutterMethodChannel(name: HEALTH_CHANNEL_NAME, binaryMessenger: binaryMessenger)
         print("Method Channels Established (Watch -> Flutter)")
         
+        // Set up watch communication channel
+        let watchCommunicationChannel = FlutterMethodChannel(name: "com.getrucky.gfy/watch_communication", binaryMessenger: binaryMessenger)
+        watchCommunicationChannel.setMethodCallHandler { [weak self] (call, result) in
+            guard let self = self else { return }
+            
+            print("[AppDelegate] Received method call: \(call.method)")
+            
+            if call.method == "sendMessageToWatch" {
+                if let jsonString = call.arguments as? String,
+                   let data = jsonString.data(using: .utf8),
+                   let message = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                    
+                    print("[AppDelegate] Forwarding message to Watch: \(message)")
+                    self.sendMessageToWatch(message)
+                    result(true)
+                } else {
+                    print("[AppDelegate] Error parsing message for Watch")
+                    result(FlutterError(code: "INVALID_ARGUMENTS", 
+                                       message: "Could not parse message for Watch", 
+                                       details: nil))
+                }
+            } else {
+                result(FlutterMethodNotImplemented)
+            }
+        }
+        
         // ** Set up Pigeon HostApi (Flutter -> Watch) **
         FlutterRuckingApiSetup.setUp(binaryMessenger: binaryMessenger, api: self)
         print("Pigeon Host API Setup (Flutter -> Watch)")
@@ -202,14 +228,48 @@ import WatchConnectivity
             // --- Other Commands ---    
             case "requestInitialState":
                  print("---> [AppDelegate] Watch requested initial state (Not fully implemented)")
-                 let currentState = ["isSessionActive": false] // Placeholder
-                 if isReplyExpected { replyHandler?(["status": "success", "data": currentState]) }
-            
-             // case "userPreferences": // Example if needed later
-             //     print("---> [AppDelegate] Handling 'userPreferences'...")
-             //     // Forward flutterArgs to appropriate channel/method
-             //     if isReplyExpected { replyHandler?(["status": "success"]) }
-
+                 // For now, we just acknowledge this request without transferring state
+                 // Future: fetch and send over current session state, if any
+                if isReplyExpected { replyHandler?(["status": "success"]) }
+                
+            case "updateUserWeight":
+                print("---> [AppDelegate] Handling user weight update")
+                if let userWeightKg = data["userWeightKg"] as? Double {
+                    // Forward the user weight to the watch
+                    self.sendMessageToWatch([
+                        "command": "updateUserWeight",
+                        "userWeightKg": userWeightKg
+                    ])
+                    
+                    if isReplyExpected { replyHandler?(["status": "success"]) }
+                } else {
+                    print("---> [AppDelegate] Error: User weight not provided or invalid")
+                    if isReplyExpected { replyHandler?(["status": "error", "message": "Invalid user weight"]) }
+                }
+                
+            case "syncUserPreferences":
+                print("---> [AppDelegate] Syncing user preferences to watch")
+                var prefsPayload: [String: Any] = [
+                    "type": "userPreferences"
+                ]
+                
+                if let userId = data["userId"] as? String {
+                    prefsPayload["userId"] = userId
+                }
+                
+                if let useMetricUnits = data["useMetricUnits"] as? Bool {
+                    prefsPayload["useMetricUnits"] = useMetricUnits
+                }
+                
+                if let userWeightKg = data["userWeightKg"] as? Double {
+                    prefsPayload["userWeightKg"] = userWeightKg
+                }
+                
+                // Send preferences to watch
+                WCSession.default.transferUserInfo(prefsPayload)
+                
+                if isReplyExpected { replyHandler?(["status": "success"]) }
+                
             default:
                  print("---> [AppDelegate] Unknown command received: \(command)")
                  if isReplyExpected { replyHandler?(["status": "error", "message": "Unknown command"]) }
@@ -246,7 +306,7 @@ import WatchConnectivity
             "pace": pace,
             "isPaused": isPaused
         ]
-        sendMessageToWatch(message)
+        self.sendMessageToWatch(message)
     }
     
     func startSessionOnWatch(ruckWeight: Double) throws {
@@ -255,7 +315,7 @@ import WatchConnectivity
              "command": "startSession",
              "ruckWeight": ruckWeight
          ]
-         sendMessageToWatch(message)
+         self.sendMessageToWatch(message)
     }
 
     func pauseSessionOnWatch() throws {

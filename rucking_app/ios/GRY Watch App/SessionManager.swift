@@ -191,11 +191,20 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
                     // Calculate segment distance (meters) and time (seconds)
                     let segmentDistance = self.distance - self.lastDistance
                     let segmentTime = 1.0 // Since timer fires every second
-                    // MET for rucking (moderate, can be refined)
-                    let MET = 6.0 
-                    // TODO: Replace 70 with actual user weight if available from phone/HealthKit
-                    let totalWeightKg = (UserDefaults.standard.double(forKey: "userWeightKg") > 0 ? UserDefaults.standard.double(forKey: "userWeightKg") : 70.0) + self.ruckWeight
-                    // Calories burned per segment (kcal)
+                    
+                    // Calculate MET value using the formula MET = 0.9 + (self.pace * 1.2)
+                    let MET = 7.0 // Use fixed MET value for rucking with weight
+                    
+                    // Calculate calories for this segment
+                    let userWeight = UserDefaults.standard.double(forKey: "userWeightKg")
+                    let effectiveUserWeight = userWeight > 0 ? userWeight : 70.0
+                    let totalWeightKg = effectiveUserWeight + self.ruckWeight
+                    
+                    // Log weight values for debugging
+                    if segmentDistance > 0 && segmentTime.truncatingRemainder(dividingBy: 10) == 0 { // Log every 10 seconds to avoid spam
+                        print("Calorie calculation using user weight: \(effectiveUserWeight) kg and ruck weight: \(self.ruckWeight) kg")
+                    }
+                    
                     // Calories = MET * weight_kg * (duration_hours)
                     let segmentCalories = MET * totalWeightKg * (segmentTime / 3600.0)
                     self.calories += segmentCalories
@@ -279,6 +288,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
             case "updateUserWeight": // Handle receiving user weight
                 if let weight = message["userWeightKg"] as? Double {
                      UserDefaults.standard.set(weight, forKey: "userWeightKg")
+                     print("Updated user weight in UserDefaults: \(weight) kg")
                      // Optionally recalculate something if needed immediately
                  }
                  

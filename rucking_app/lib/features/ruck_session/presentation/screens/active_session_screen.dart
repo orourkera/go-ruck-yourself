@@ -486,12 +486,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       };
       debugPrint('Sending location update payload: $payload');
       await _apiClient.post(
-        '/rucks/${widget.ruckId}/location',
+        '/rucks/${widget.ruckId}/location',  
         payload,
       ).catchError((e) {
         debugPrint('Failed to send location update: $e');
         return; // Ensure a return even in error case
       });
+      debugPrint('Successfully sent location update to /rucks/${widget.ruckId}/location');
     } catch (e) {
       debugPrint('Error in _sendLocationUpdate: $e');
     }

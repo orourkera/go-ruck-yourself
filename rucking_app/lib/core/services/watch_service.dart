@@ -212,17 +212,52 @@ class WatchService {
   
   /// Start a new rucking session on the watch
   Future<bool> startSessionOnWatch(double ruckWeight) async {
-    _ruckWeight = ruckWeight;
-    _isSessionActive = true;
-    _isPaused = false;
-
     try {
-      final api = FlutterRuckingApi();
-      await api.startSessionOnWatch(ruckWeight);
+      // Get user weight
+      final userWeight = await _getUserWeight();
+      
+      // Call the Pigeon API to start session on watch
+      await FlutterRuckingApi().startSessionOnWatch(ruckWeight);
+      
+      // Also update user weight on the watch for calorie calculations
+      if (userWeight != null) {
+        await updateUserWeightOnWatch(userWeight);
+      }
+      
+      debugPrint('Start session command sent to watch with weight: $ruckWeight kg');
       return true;
     } catch (e) {
-      debugPrint('Error starting session on watch: $e');
+      debugPrint('Error sending start session command to watch: $e');
       return false;
+    }
+  }
+  
+  /// Send user weight update to watch for calorie calculations
+  Future<bool> updateUserWeightOnWatch(double userWeightKg) async {
+    try {
+      // Send message to watch
+      await _sendMessageToWatch({
+        'command': 'updateUserWeight',
+        'userWeightKg': userWeightKg
+      });
+      
+      debugPrint('Sent user weight to watch: $userWeightKg kg');
+      return true;
+    } catch (e) {
+      debugPrint('Error sending user weight to watch: $e');
+      return false;
+    }
+  }
+  
+  /// Helper method to send messages to the watch
+  Future<void> _sendMessageToWatch(Map<String, dynamic> message) async {
+    try {
+      final jsonString = jsonEncode(message);
+      await const MethodChannel('com.getrucky.gfy/watch_communication')
+          .invokeMethod('sendMessageToWatch', jsonString);
+    } catch (e) {
+      debugPrint('Error sending message to watch: $e');
+      rethrow;
     }
   }
   
@@ -310,6 +345,7 @@ class WatchService {
   Future<bool> syncUserPreferencesToWatch({
     required String userId,
     required bool useMetricUnits,
+    double? userWeightKg,
   }) async {
     try {
       // Define the method channel for user preferences
@@ -321,6 +357,7 @@ class WatchService {
         {
           'userId': userId,
           'useMetricUnits': useMetricUnits,
+          'userWeightKg': userWeightKg ?? await _getUserWeight(),
         },
       );
       
@@ -330,6 +367,12 @@ class WatchService {
       debugPrint('Error syncing user preferences to watch: $e');
       return false;
     }
+  }
+  
+  Future<double?> _getUserWeight() async {
+    final authService = GetIt.instance<AuthService>();
+    final user = await authService.getCurrentUser();
+    return user?.weightKg;
   }
   
   /// Get current state values
@@ -448,29 +491,58 @@ class RuckingApiHandler extends RuckingApi {
   
   @override
   Future<bool> pauseSessionFromWatch() async {
-    // Implement pausing an active session
-    debugPrint('Pausing session from watch');
-    
-    // You'll need to implement this logic to interact with your existing app
-    return true;
+    try {
+      // Get the active session bloc
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      
+      // Dispatch the pause event
+      activeSessionBloc.add(SessionPaused());
+      
+      debugPrint('Successfully dispatched SessionPaused event');
+      return true;
+    } catch (e) {
+      debugPrint('Error pausing session from watch: $e');
+      return false;
+    }
   }
   
   @override
   Future<bool> resumeSessionFromWatch() async {
-    // Implement resuming a paused session
-    debugPrint('Resuming session from watch');
-    
-    // You'll need to implement this logic to interact with your existing app
-    return true;
+    try {
+      // Get the active session bloc
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      
+      // Dispatch the resume event
+      activeSessionBloc.add(SessionResumed());
+      
+      debugPrint('Successfully dispatched SessionResumed event');
+      return true;
+    } catch (e) {
+      debugPrint('Error resuming session from watch: $e');
+      return false;
+    }
   }
   
   @override
   Future<bool> endSessionFromWatch(int duration, double distance, double calories) async {
-    // Implement ending a session
     debugPrint('Ending session from watch. Duration: $duration, Distance: $distance, Calories: $calories');
     
-    // You'll need to implement this logic to interact with your existing app
-    return true;
+    try {
+      // Get the active session bloc
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      
+      // Create a SessionCompleted event
+      activeSessionBloc.add(SessionCompleted(
+        // Note: SessionCompleted takes notes and rating, not metrics
+        // Metrics are handled in the bloc internally
+      ));
+      
+      debugPrint('Successfully dispatched SessionCompleted event');
+      return true;
+    } catch (e) {
+      debugPrint('Error completing session from watch: $e');
+      return false;
+    }
   }
   
   @override
