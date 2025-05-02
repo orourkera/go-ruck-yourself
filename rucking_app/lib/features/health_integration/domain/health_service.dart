@@ -35,9 +35,13 @@ class HealthService {
         HealthDataType.HEART_RATE,
       ];
       
-      // Request WRITE access for all requested types
-      final List<HealthDataAccess> permissions =
-          List.filled(types.length, HealthDataAccess.WRITE);
+      // Create permissions list with appropriate access levels
+      final List<HealthDataAccess> permissions = [
+        HealthDataAccess.WRITE, // WORKOUT
+        HealthDataAccess.WRITE, // DISTANCE_WALKING_RUNNING
+        HealthDataAccess.WRITE, // ACTIVE_ENERGY_BURNED
+        HealthDataAccess.READ_WRITE, // HEART_RATE - Need both READ and WRITE
+      ];
       
       // Debug: log authorization request types
       print('Requesting HealthKit authorization for types: $types with permissions: $permissions');
@@ -258,9 +262,9 @@ class HealthService {
     }
 
     try {
-      // Fetch heart rate from last 5 minutes
+      // Fetch heart rate from last 30 minutes
       final now = DateTime.now();
-      final window = const Duration(minutes: 5);
+      final window = const Duration(minutes: 30);
       final startTime = now.subtract(window);
       print('Fetching heart rate from $startTime to $now');
       List<HealthDataPoint> heartRateData = await health.getHealthDataFromTypes(
@@ -270,7 +274,7 @@ class HealthService {
       );
       print('Fetched heart rate data points: ${heartRateData.length}');
       if (heartRateData.isEmpty) {
-        print('No heart rate data available in the last 5 minutes');
+        print('No heart rate data available in the last 30 minutes');
         return null;
       }
       

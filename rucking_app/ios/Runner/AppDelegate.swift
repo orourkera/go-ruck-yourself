@@ -166,44 +166,39 @@ import WatchConnectivity
             case "updateHeartRate": // Add other health commands like updateDistance if needed
                 print("---> [AppDelegate] Handling health update: \(command)")
                 // Structure arguments for onWatchHealthUpdated - expects a map
-                // Let's assume Flutter expects something like {'type': 'heartRate', 'value': 89}
-                var healthPayload: [String: Any]? = nil
-                let heartRateValue = data["heartRate"]
-                print("---> [AppDelegate] Raw heartRate value: \(heartRateValue ?? "nil"), Type: \(type(of: heartRateValue)))")
-
-                if command == "updateHeartRate" {
-                    if let rate = heartRateValue as? Double {
-                        print("---> [AppDelegate] Casting heartRate directly to Double.")
-                        healthPayload = ["type": "heartRate", "value": rate]
-                    } else if let nsRate = heartRateValue as? NSNumber {
-                        print("---> [AppDelegate] Casting heartRate from NSNumber to Double.")
-                        healthPayload = ["type": "heartRate", "value": nsRate.doubleValue]
+                var healthPayload: [String: Any] = [:]
+                
+                // Extract heart rate value if present
+                if let heartRate = data["heartRate"] {
+                    if let heartRateDouble = heartRate as? Double {
+                        healthPayload["heartRate"] = heartRateDouble
+                        print("---> [AppDelegate] Added heart rate to payload: \(heartRateDouble) BPM")
+                    } else if let heartRateNumber = heartRate as? NSNumber {
+                        healthPayload["heartRate"] = heartRateNumber.doubleValue
+                        print("---> [AppDelegate] Added heart rate to payload (from NSNumber): \(heartRateNumber.doubleValue) BPM")
                     } else {
                         print("---> [AppDelegate] WARN: Could not cast heartRate to Double or NSNumber.")
                     }
                 }
-                 // Add other health types here...
+                 // Add other health types here..
                 
-                if let payload = healthPayload {
+                if !healthPayload.isEmpty {
                     // Encode as JSON string to avoid type issues
-                    if let jsonString = self.dictionaryToJsonString(payload) {
-                        print("---> [AppDelegate] Prepared health JSON string: \(jsonString)")
-                        print("---> [AppDelegate] Attempting to invoke 'onHealthDataUpdated' on healthChannel...")
-                        self.healthChannel?.invokeMethod("onHealthDataUpdated", arguments: jsonString) { result in
+                    if let jsonString = self.dictionaryToJsonString(healthPayload) {
+                        self.healthChannel?.invokeMethod("onHealthDataUpdated", arguments: jsonString, result: { result in
                             if let error = result as? FlutterError {
-                                print("---> [AppDelegate] Error invoking Flutter method 'onHealthDataUpdated': \(error.message ?? "Unknown Flutter Error")")
-                            } // No reply needed for health updates typically
-                            if isReplyExpected { replyHandler?(["status": "success"]) } // Still acknowledge if reply was expected
-                        }
+                                print("---> [AppDelegate] Error invoking onHealthDataUpdated: \(error)")
+                                if isReplyExpected { replyHandler?(["status": "error", "message": error.message ?? "Unknown error"]) }
+                            } else {
+                                print("---> [AppDelegate] Successfully invoked onHealthDataUpdated with health data")
+                                if isReplyExpected { replyHandler?(["status": "success"]) }
+                            }
+                        })
                     } else {
                         print("---> [AppDelegate] Failed to encode health args to JSON")
                         if isReplyExpected { replyHandler?(["status": "error", "message": "JSON encoding failed for health update"]) }
                     }
-                } else {
-                    print("---> [AppDelegate] Could not prepare payload for health update: \(command)")
-                    if isReplyExpected { replyHandler?(["status": "error", "message": "Missing data for healthUpdate: \(command)"]) }
                 }
-
             // --- Other Commands ---    
             case "requestInitialState":
                  print("---> [AppDelegate] Watch requested initial state (Not fully implemented)")

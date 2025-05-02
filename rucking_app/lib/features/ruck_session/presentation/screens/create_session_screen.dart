@@ -52,14 +52,23 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       // Load last used weight (KG)
       double lastWeightKg = prefs.getDouble('lastRuckWeightKg') ?? AppConfig.defaultRuckWeight;
       _ruckWeight = lastWeightKg;
-      // Update display weight to match unit preference so the correct chip appears selected
-      _displayRuckWeight = _preferMetric
-          ? _ruckWeight
-          : double.parse((_ruckWeight * AppConfig.kgToLbs).toStringAsFixed(1));
-
-      // Load last used duration (minutes)
-      int lastDurationMinutes = prefs.getInt('lastSessionDurationMinutes') ?? 30; // Default to 30 mins
-      _durationController.text = lastDurationMinutes.toString();
+      _selectedRuckWeight = lastWeightKg; // Ensure selectedRuckWeight is synced with ruckWeight
+      
+      // Update display weight based on preference
+      if (_preferMetric) {
+        _displayRuckWeight = _ruckWeight;
+      } else {
+        _displayRuckWeight = _ruckWeight * AppConfig.kgToLbs;
+      }
+      
+      debugPrint('Loaded weight from prefs: _ruckWeight=$_ruckWeight kg, _selectedRuckWeight=$_selectedRuckWeight kg');
+      
+      // Load last used duration (might be null if not previously set)
+      int? lastDurationMinutes = prefs.getInt('lastSessionDurationMinutes');
+      _plannedDuration = lastDurationMinutes;
+      if (lastDurationMinutes != null) {
+        _durationController.text = lastDurationMinutes.toString();
+      }
       
       // Load user's body weight (if previously saved)
       String? lastUserWeight = prefs.getString('lastUserWeight');
@@ -263,6 +272,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         debugPrint('CreateSessionScreen: Weight display updated to $_displayRuckWeight');
       });
       debugPrint('CreateSessionScreen: Updated metric preference from AuthBloc to $_preferMetric');
+      // Ensure the last ruck weight is loaded and set as selected
+      _loadLastRuckWeight();
     }
     _durationFocusNode.addListener(() {
     });
@@ -284,6 +295,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         debugPrint('No last ruck weight found in SharedPreferences');
       }
     });
+  }
+
+  // Load last saved ruck weight from SharedPreferences
+  Future<void> _loadLastRuckWeight() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastWeightKg = prefs.getDouble('lastRuckWeightKg');
+    if (lastWeightKg != null) {
+      setState(() {
+        _ruckWeight = lastWeightKg;
+        _selectedRuckWeight = lastWeightKg;
+        _displayRuckWeight = _preferMetric ? lastWeightKg : (lastWeightKg * AppConfig.kgToLbs);
+        debugPrint('Loaded last ruck weight: $_ruckWeight kg');
+      });
+    }
   }
 
   @override

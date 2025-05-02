@@ -41,6 +41,7 @@ class WatchService {
   // Public streams
   Stream<Map<String, dynamic>> get sessionEvents => _sessionEventController.stream;
   Stream<Map<String, dynamic>> get healthData => _healthDataController.stream;
+  Stream<Map<String, dynamic>> get onHeartRateUpdate => _healthDataController.stream;
   
   // Add navigatorKey for navigation purposes
   final GlobalKey<NavigatorState> navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
@@ -147,6 +148,7 @@ class WatchService {
   Future<void> _handleHeartRateUpdate(Map<String, dynamic> data) async {
     final heartRate = (data['heartRate'] as num?)?.toDouble() ?? 0.0;
     print("[WatchService] Received heart rate update from Watch: $heartRate BPM");
+    print("[WatchService Debug] Adding heart rate data to stream: $heartRate BPM");
     _healthDataController.add({'heartRate': heartRate});
   }
   
@@ -300,6 +302,7 @@ class WatchService {
     // Notify health service if needed
     if (_isSessionActive) {
       _healthService.updateHeartRate(heartRate);
+      print("[WatchService Debug] Updated heart rate to HealthService: $heartRate BPM");
     }
   }
   

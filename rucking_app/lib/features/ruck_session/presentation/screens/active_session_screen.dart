@@ -128,6 +128,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   // Custom marker icon data
   Uint8List? _customMarkerIcon;
 
+  // Variable to store heart rate message for user notification
+  String _heartRateMessage = '';
+
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -542,6 +545,17 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         debugPrint('Non-critical error on session start: $e');
       }
     }
+    
+    // Listen for real-time heart rate updates from WatchService
+    _watchService.onHeartRateUpdate.listen((heartRateData) {
+      if (mounted && !_isPaused) {
+        debugPrint('Real-time heart rate update from Watch: $heartRateData bpm');
+        debugPrint('Debug: Watch update received - confirm WCSession data: $heartRateData');
+        setState(() {
+          _heartRate = heartRateData['heartRate'] as double? ?? _heartRate;
+        });
+      }
+    });
   }
   
   /// Updates the elapsed time display
@@ -857,13 +871,27 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       });
     } else {
       debugPrint('No heart rate data received; using fallback value 70 bpm');
+      debugPrint('Debug: Check HealthKit permissions or recent data availability.');
+      debugPrint('Debug: Heart rate is null - HealthKit may lack recent data or permissions are denied.');
       setState(() {
         _heartRate = 70;
+        _heartRateMessage = 'No recent heart rate data available. Please ensure your Apple Watch is active and Health permissions are granted.';
+      });
+      // Show a snackbar to inform the user
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_heartRateMessage),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
       });
     }
 
     // Start a periodic timer to poll heart rate every 15 seconds
-    _heartRateTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+    _heartRateTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       if (!mounted) return;
       if (_isPaused) return; // Skip update if session is paused
       debugPrint('Polling for heart rate update...');
@@ -876,6 +904,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         });
       } else {
         debugPrint('No heart rate data received on poll; using fallback value 70 bpm');
+        debugPrint('Debug: Polling failed - ensure HealthKit data or permissions.');
+        debugPrint('Debug: Heart rate is null on poll - no recent data in last 5 minutes or permission issue.');
         setState(() {
           _heartRate = 70;
         });

@@ -28,8 +28,16 @@ class HealthKitManager: NSObject, ObservableObject {
             HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!
         ]
         
+        // Define the health data types we want to write
+        let typesToWrite: Set<HKSampleType> = [
+            HKObjectType.workoutType(),
+            HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
+            HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
+            HKObjectType.quantityType(forIdentifier: .heartRate)!
+        ]
+        
         // Request authorization
-        healthStore.requestAuthorization(toShare: nil, read: typesToRead) { success, error in
+        healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { success, error in
             if !success {
                 print("HealthKit authorization was not granted: \(String(describing: error))")
             } else {
