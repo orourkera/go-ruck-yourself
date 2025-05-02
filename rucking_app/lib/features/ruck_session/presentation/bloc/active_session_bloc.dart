@@ -246,7 +246,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           await _locationService.requestLocationPermission();
         }
       } catch (e) {
-        print('Failed to check location permission: $e');
+        debugPrint('[ERROR] Failed to check location permission: $e');
         emit(const ActiveSessionError('Failed to check location permission'));
         return;
       }
@@ -367,7 +367,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       try {
         await _apiClient.post('/rucks/${currentState.ruckId}/pause', {});
       } catch (e) {
-        print('Failed to pause session: $e');
+        debugPrint('[ERROR] Failed to pause session: $e');
       }
       
       emit(ActiveSessionPaused(
@@ -402,7 +402,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       try {
         await _apiClient.post('/rucks/${currentState.ruckId}/resume', {});
       } catch (e) {
-        print('Failed to resume session: $e');
+        debugPrint('[ERROR] Failed to resume session: $e');
       }
       
       emit(ActiveSessionInProgress(
@@ -479,7 +479,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _locationSubscription = _locationService.startLocationTracking().listen(
       _handleLocationUpdate,
       onError: (error) {
-        print('Location error: $error');
+        debugPrint('[ERROR] Location tracking error: $error');
       }
     );
   }
@@ -507,7 +507,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         },
       );
     } catch (e) {
-      print('Failed to send location update: $e');
+      debugPrint('[ERROR] Failed to send location update: $e');
     }
   }
 } 
