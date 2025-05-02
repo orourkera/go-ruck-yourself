@@ -40,7 +40,7 @@ class WatchService {
   Stream<Map<String, dynamic>> get healthData => _healthDataController.stream;
   
   // Add navigatorKey for navigation purposes
-  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
   
   WatchService() {
     print("[WatchService] Initializing WatchService");

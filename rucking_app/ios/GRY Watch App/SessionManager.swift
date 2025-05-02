@@ -208,18 +208,18 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
     
     private func sendMessageToPhone(_ message: [String: Any]) {
         guard let wcSession = wcSession, wcSession.activationState == .activated else {
-            print("WCSession not activated, cannot send message")
+            print("!!! WCSession not activated, cannot send message: \(message)")
+            // Optionally queue the message locally if needed when not activated
             return
         }
         
-        if wcSession.isReachable {
-            wcSession.sendMessage(message, replyHandler: nil, errorHandler: { error in
-                print("Error sending message to phone: \(error.localizedDescription)")
-            })
-        } else {
-            // Queue the message for later delivery if not reachable
-            wcSession.transferUserInfo(message)
-        }
+        print("--> Watch sending message: \(message)")
+        // Always use sendMessage, relying on its queuing mechanism.
+        // No need to check isReachable beforehand in most modern scenarios.
+        wcSession.sendMessage(message, replyHandler: nil, errorHandler: { error in
+            // This error handler ONLY catches immediate sending errors, not delivery errors.
+            print("!!! Error attempting to send message to phone: \(error.localizedDescription)")
+        })
     }
     
     func processReceivedMessage(_ message: [String: Any]) {

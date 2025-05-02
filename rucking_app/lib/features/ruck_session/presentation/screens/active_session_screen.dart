@@ -89,6 +89,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   bool _showValidationMessage = false;
   bool _hasAppleWatch = true; // Track if user has Apple Watch
   bool _isSessionEnded = false; // New flag
+  String? _ruckId; // Add variable to hold ruckId from args or widget
+  Map<String, dynamic>? _initialSessionData; // Add variable to hold args
   
   // Timer variables
   late Stopwatch _stopwatch;
@@ -144,23 +146,58 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     
     // Check if user has an Apple Watch
     _checkHasAppleWatch();
+  }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Get arguments passed via navigation if _initialSessionData is null
+    if (_initialSessionData == null) {
+      final arguments = ModalRoute.of(context)?.settings.arguments;
+      if (arguments != null && arguments is Map<String, dynamic>) {
+        _initialSessionData = arguments;
+        // Extract needed data from arguments
+        // The actual ruckId from the backend response might be under 'id' or 'ruck_id'
+        _ruckId = _initialSessionData!['id'] as String? ?? _initialSessionData!['ruck_id'] as String?;
+        debugPrint('Received session data from arguments: $_initialSessionData');
+        debugPrint('Extracted ruckId from arguments: $_ruckId');
+      }
+    }
+
+    // Ensure ruckId is set either from arguments or widget
+    _ruckId ??= widget.ruckId;
+    debugPrint('Final ruckId for session: $_ruckId');
+
+    // --- Initialization that DEPENDS on arguments/widget props ---
+    // This part needs to run *after* arguments are potentially processed
+    _loadDataAndStartSession();
+  }
+
+  // New method to contain logic previously in initState that depends on props/args
+  void _loadDataAndStartSession() {
     // Get user preference and weight
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       _preferMetric = authState.user.preferMetric;
+      // Prioritize argument/state value if available, else use widget prop
       _userWeightKg = authState.user.weightKg ?? widget.userWeight;
     } else {
       _userWeightKg = widget.userWeight;
     }
-    ruckWeightKg = widget.ruckWeight;
-    
+    // Prioritize argument/state value if available, else use widget prop
+    // Use the ruckWeight passed via constructor as WatchService doesn't include it in API response
+    ruckWeightKg = widget.ruckWeight; 
+    // Potentially extract from _initialSessionData if API response includes it:
+    // ruckWeightKg = _initialSessionData?['ruck_weight_kg'] as double? ?? widget.ruckWeight;
+
     // Initialize stopwatch
     _stopwatch = Stopwatch();
-    
-    // --- MAP AND LOCATION LOAD FIRST ---
-    _initLocationTracking(); // Always load map and location as first thing
 
+    // Start map/location tracking
+    _initLocationTracking();
+
+    // Initialize stats
     _distance = 0.0;
     _pace = 0.0;
     _caloriesBurned = 0.0;
@@ -172,14 +209,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _recentPaces.clear();
     _canShowStats = false;
     _uncountedDistance = 0.0;
-    
-    // Initialize session weights for BLoC
+
+    // Initialize session weights for BLoC using the determined ruckId
     _initializeSessionWeights();
     _startSession(); // Start the timers and stopwatch
-    
-    // Set planned countdown if provided
-    if (widget.plannedDuration != null && widget.plannedDuration! > 0) {
-      _plannedCountdownStart = Duration(minutes: widget.plannedDuration!);
+
+    // Set planned countdown if provided (use widget prop here)
+    // Check _initialSessionData if watch can send planned duration
+    int? plannedDurationMinutes = _initialSessionData?['planned_duration_minutes'] as int? ?? widget.plannedDuration;
+    if (plannedDurationMinutes != null && plannedDurationMinutes > 0) {
+      _plannedCountdownStart = Duration(minutes: plannedDurationMinutes);
     }
 
     // Load custom marker icon
@@ -187,14 +226,22 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   }
 
   void _initializeSessionWeights() {
+    if (_ruckId == null) {
+      debugPrint("Error: Ruck ID is null, cannot initialize session weights in BLoC.");
+      _showErrorSnackBar("Failed to initialize session: Missing Ruck ID.");
+      // Optionally navigate back or handle error
+      // Navigator.of(context).pop(); 
+      return;
+    }
     // Start session in BLoC with weights
     context.read<ActiveSessionBloc>().add(
       SessionStarted(
-        ruckId: widget.ruckId,
+        ruckId: _ruckId!, // Use the state variable _ruckId
         userWeightKg: _userWeightKg,
         ruckWeightKg: ruckWeightKg,
       ),
     );
+    debugPrint('Session weights initialized in BLoC for ruckId: $_ruckId');
   }
   
   @override

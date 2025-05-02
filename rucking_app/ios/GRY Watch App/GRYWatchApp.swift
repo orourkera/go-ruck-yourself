@@ -14,7 +14,7 @@ struct GRYWatchApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            StartSessionView()
                 .environmentObject(sessionManager)
         }
     }

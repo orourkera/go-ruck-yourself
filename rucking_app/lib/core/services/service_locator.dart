@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
@@ -23,6 +24,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<FlutterSecureStorage>(const FlutterSecureStorage());
   
   // Core services - order matters!
+  getIt.registerSingleton<GlobalKey<NavigatorState>>(GlobalKey<NavigatorState>());
   getIt.registerSingleton<Dio>(_configureDio());
   final apiClient = ApiClient(getIt<Dio>());
   getIt.registerSingleton<ApiClient>(apiClient);
