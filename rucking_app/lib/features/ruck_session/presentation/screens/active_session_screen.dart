@@ -216,7 +216,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   /// Initialize location tracking service
   Future<void> _initLocationTracking() async {
     try {
-      debugPrint('Starting location tracking...');
+      debugPrint('[INFO] Starting location tracking...');
       final hasPermission = await _locationService.hasLocationPermission();
       if (!hasPermission) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -229,7 +229,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       _locationSubscription = _locationService.startLocationTracking().listen(
         _handleLocationUpdate,
         onError: (error) {
-          print('Location error: $error');
+          debugPrint('[ERROR] Location tracking error: $error');
         }
       );
       
@@ -241,18 +241,18 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
           setState(() {}); // Update UI with initial position
         }
       } catch (e) {
-        debugPrint('Failed to get initial location: $e');
+        debugPrint('[ERROR] Failed to get initial location: $e');
       }
-      debugPrint('Location tracking started successfully.');
+      debugPrint('[INFO] Location tracking started successfully.');
     } catch (e) {
-      debugPrint('Error starting location tracking: $e');
+      debugPrint('[ERROR] Error starting location tracking: $e');
     }
   }
   
   /// Handle incoming location updates
   void _handleLocationUpdate(LocationPoint locationPoint) {
     if (_isSessionEnded) {
-      debugPrint('Session ended. Ignoring location update.');
+      debugPrint('[INFO] Session ended. Ignoring location update.');
       return;
     }
     
@@ -430,16 +430,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         'timestamp': locationPoint.timestamp.toIso8601String(),
         'accuracy_meters': locationPoint.accuracy.toDouble(),
       };
-      debugPrint('Sending location update payload: $payload');
+      debugPrint('[INFO] Sending location update payload: $payload');
       await _apiClient.post(
         '/rucks/${widget.ruckId}/location',
         payload,
       ).catchError((e) {
-        debugPrint('Failed to send location update: $e');
+        debugPrint('[ERROR] Failed to send location update: $e');
         return; // Ensure a return even in error case
       });
     } catch (e) {
-      debugPrint('Error in _sendLocationUpdate: $e');
+      debugPrint('[ERROR] Error in _sendLocationUpdate: $e');
     }
   }
   
@@ -469,7 +469,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     try {
       await _apiClient.post('/rucks/${widget.ruckId}/start', {});
     } catch (e) {
-      print('Failed to start session: $e');
+      debugPrint('[ERROR] Failed to start session: $e');
       
       // Handle unauthorized errors specifically
       if (e is UnauthorizedException) {
@@ -515,7 +515,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _locationSubscription?.resume();
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/resume', {})
-            .catchError((e) => print('Failed to resume session: $e'));
+            .catchError((e) => debugPrint('[ERROR] Failed to resume session: $e'));
       } else {
         _stopwatch.stop();
         _isPaused = true;
@@ -523,7 +523,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _locationSubscription?.pause();
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/pause', {})
-            .catchError((e) => print('Failed to pause session: $e'));
+            .catchError((e) => debugPrint('[ERROR] Failed to pause session: $e'));
       }
     });
   }
@@ -584,9 +584,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // Remove the session from backend if it's too short or invalid
         try {
           await _apiClient.delete('/rucks/${widget.ruckId}');
-          debugPrint('Deleted short session ${widget.ruckId} from backend');
+          debugPrint('[INFO] Deleted short session ${widget.ruckId} from backend');
         } catch (e) {
-          debugPrint('Failed to delete short session: $e');
+          debugPrint('[ERROR] Failed to delete short session: $e');
         }
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -655,7 +655,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
           ));
         } catch (e) {
           // Log error but don't block session completion
-          debugPrint('Failed to write to Apple Health: $e');
+          debugPrint('[ERROR] Failed to write to Apple Health: $e');
         }
       }
       
@@ -677,7 +677,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         ),
       );
     } catch (e) {
-      debugPrint('Error in _endSession: $e');
+      debugPrint('[ERROR] Error in _endSession: $e');
     }
   }
   
@@ -865,20 +865,20 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _customMarkerIcon = bytes;
       });
     } catch (e) {
-      debugPrint('Error loading custom marker: $e');
+      debugPrint('[ERROR] Error loading custom marker: $e');
     }
   }
 
   void _stopLocationTracking() {
-    debugPrint('Stopping location tracking...');
+    debugPrint('[INFO] Stopping location tracking...');
     _locationSubscription?.cancel();
     _locationSubscription = null;
-    debugPrint('Location tracking stopped.');
+    debugPrint('[INFO] Location tracking stopped.');
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('ActiveSessionScreen.build: _heartRate=$_heartRate');
+    debugPrint('[INFO] ActiveSessionScreen.build: _heartRate=$_heartRate');
     // Format display values
     final String durationDisplay = _formatDuration(_elapsed);
     final String? distanceDisplay = _canShowStats
