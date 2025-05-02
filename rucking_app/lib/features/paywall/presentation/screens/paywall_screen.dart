@@ -1,0 +1,238 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/core/services/revenue_cat_service.dart';
+
+/// Paywall screen with auto-scrolling cards to encourage subscription
+class PaywallScreen extends StatefulWidget {
+  const PaywallScreen({Key? key}) : super(key: key);
+
+  @override
+  State<PaywallScreen> createState() => _PaywallScreenState();
+}
+
+class _PaywallScreenState extends State<PaywallScreen> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+  Timer? _timer;
+  int? _selectedPlanIndex;
+
+  // Define the content for each card
+  final List<Map<String, String>> _cards = [
+    {
+      'title': 'Go Ruck Yourself',
+      'screenshot': 'assets/images/go ruck yourself copy.png',
+      'valueProp': 'Track your ruck sessions, calorie burn, and sync with Apple Fitness.',
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // No auto-scrolling timer needed since we have only one card
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.backgroundDark
+          : AppColors.backgroundLight,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: _buildCard(
+                title: _cards[0]['title']!,
+                screenshot: _cards[0]['screenshot']!,
+                valueProp: _cards[0]['valueProp']!,
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Subscription Plans Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Subscription Plans',
+                style: AppTextStyles.paywallHeadline.copyWith(fontSize: 20),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanIndex = 0;
+                      });
+                    },
+                    child: _buildPlanCard('Weekly', r'$1.99 / week', _selectedPlanIndex == 0),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanIndex = 1;
+                      });
+                    },
+                    child: _buildPlanCard('Monthly', r'$4.99 / month', _selectedPlanIndex == 1),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanIndex = 2;
+                      });
+                    },
+                    child: _buildPlanCard('Annual', r'$29.99 / year', _selectedPlanIndex == 2),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Get Rucky Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: ElevatedButton(
+                onPressed: () async {
+                  await _handleGetRuckyPressed(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'GET RUCKY',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Bangers',
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleGetRuckyPressed(BuildContext context) async {
+    final revenueCatService = GetIt.instance<RevenueCatService>();
+    final offerings = await revenueCatService.getOfferings();
+    if (offerings.isNotEmpty) {
+      final package = offerings.first.availablePackages.first;
+      final isPurchased = await revenueCatService.makePurchase(package);
+      if (isPurchased) {
+        // After successful purchase, go directly to Home Screen
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // Handle purchase failure
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Purchase failed. Please try again.')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No subscription offerings available.')),
+      );
+    }
+  }
+
+  Widget _buildCard({
+    required String title,
+    required String screenshot,
+    required String valueProp,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            style: AppTextStyles.paywallHeadline, 
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          // App Screenshot (bigger, no background)
+          SizedBox(
+            height: 220,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                screenshot,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          // Value Proposition Text
+          Text(
+            valueProp,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanCard(String planName, String price, bool isSelected) {
+    return Card(
+      elevation: isSelected ? 6 : 2,
+      color: isSelected ? AppColors.secondary : null,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: EdgeInsets.all(isSelected ? 16.0 : 12.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              planName,
+              style: TextStyle(
+                fontSize: isSelected ? 18 : 16, 
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : null,
+                fontFamily: isSelected ? 'Bangers' : null,
+              ),
+            ),
+            Text(
+              price,
+              style: TextStyle(
+                fontSize: isSelected ? 18 : 16, 
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white : null,
+                fontFamily: isSelected ? 'Bangers' : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

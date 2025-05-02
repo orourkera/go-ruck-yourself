@@ -12,9 +12,9 @@ import 'package:rucking_app/core/services/auth_service.dart';
 
 /// Service for managing communication with Apple Watch companion app
 class WatchService {
-  final LocationService _locationService = GetIt.instance<LocationService>();
-  final HealthService _healthService = GetIt.instance<HealthService>();
-  final AuthService _authService = GetIt.instance<AuthService>();
+  final LocationService _locationService;
+  final HealthService _healthService;
+  final AuthService _authService;
   
   // Session state
   bool _isSessionActive = false;
@@ -38,9 +38,7 @@ class WatchService {
   Stream<Map<String, dynamic>> get sessionEvents => _sessionEventController.stream;
   Stream<Map<String, dynamic>> get healthData => _healthDataController.stream;
   
-  WatchService() {
-    _initPlatformChannels();
-  }
+  WatchService(this._locationService, this._healthService, this._authService);
   
   void _initPlatformChannels() {
     // Set up method channels
