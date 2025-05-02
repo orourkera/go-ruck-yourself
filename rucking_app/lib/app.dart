@@ -6,6 +6,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_screen.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/splash/presentation/screens/splash_screen.dart';
 import 'package:rucking_app/shared/theme/app_theme.dart';
 
@@ -51,6 +52,30 @@ class RuckingApp extends StatelessWidget {
               ),
               settings: settings,
             );
+          }
+          if (settings.name == '/sessionComplete') {
+            // Expect ActiveSessionCompleted state as arguments
+            final completedState = settings.arguments as ActiveSessionCompleted?;
+            if (completedState != null) {
+              return MaterialPageRoute(
+                builder: (context) => SessionCompleteScreen(
+                  // Pass individual fields from the state to the screen constructor
+                  completedAt: completedState.completedAt,
+                  ruckId: completedState.ruckId,
+                  duration: completedState.elapsed,
+                  distance: completedState.distance, // Assuming SessionCompleteScreen takes distance in km
+                  caloriesBurned: completedState.caloriesBurned.toInt(), // Convert double to int
+                  elevationGain: completedState.elevationGain,
+                  elevationLoss: completedState.elevationLoss,
+                  ruckWeight: completedState.ruckWeightKg ?? 0.0, // Use ruckWeightKg, provide default
+                  // initialNotes might come from somewhere else or be null
+                ),
+                settings: settings, // Pass settings for potential future use
+              );
+            } else {
+              print("Error: Missing or invalid arguments for /sessionComplete");
+              return MaterialPageRoute(builder: (context) => const SplashScreen());
+            }
           }
           return null;
         },

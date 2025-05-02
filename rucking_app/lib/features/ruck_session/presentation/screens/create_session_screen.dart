@@ -176,25 +176,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         
         // Extract ruck ID from response
         ruckId = createResponse['id'].toString();
+        debugPrint('Extracted ruckId: $ruckId');
         debugPrint('Session created successfully with ID: $ruckId');
 
-        // ---- Step 2: Start the created session ----
-        final startEndpoint = '/rucks/$ruckId/start';
-        debugPrint('Starting session via POST $startEndpoint...');
-        final startResponse = await apiClient.post(startEndpoint, {}); // No body needed for start
-        
-        if (!mounted) return;
-        
-        // Minimal check for start response (can be more robust)
-        if (startResponse == null || !(startResponse is Map && startResponse.containsKey('message'))) {
-             debugPrint('Invalid response from POST $startEndpoint: $startResponse');
-             // Decide if we should throw or just log a warning
-             // throw Exception('Failed to confirm session start on server.');
-             print("Warning: Could not confirm session start on server, but proceeding.");
-        }
-        
-        debugPrint('Session started successfully on backend.');
-        
         // Save the used weight (always in KG) to SharedPreferences on success
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('lastRuckWeightKg', weightForApiKg);

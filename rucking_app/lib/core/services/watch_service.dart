@@ -10,12 +10,15 @@ import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart'
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'dart:convert';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:uuid/uuid.dart';
 
 /// Service for managing communication with Apple Watch companion app
 class WatchService {
   final LocationService _locationService = GetIt.instance<LocationService>();
   final HealthService _healthService = GetIt.instance<HealthService>();
   final AuthService _authService = GetIt.instance<AuthService>();
+  final ActiveSessionBloc _activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
   
   // Session state
   bool _isSessionActive = false;
@@ -182,52 +185,27 @@ class WatchService {
 
   /// Handle a session ended from the watch
   Future<void> _handleSessionEndedFromWatch() async {
-    // Update local state
-    _isSessionActive = false;
+    print('[WatchService] Session end requested from watch.');
     
-    // Extract session data if available
-    // Note: Currently not passed from watch, so using placeholders
-    // final duration = data['duration'] as double? ?? 0.0;
-    // final distance = data['distance'] as double? ?? 0.0;
-    // final calories = data['calories'] as double? ?? 0.0;
-    
-    try {
-      // Notify active session about completion
-      _sessionEventController.add({'action': 'endSession'});
-      
-      // Navigate to session complete screen
-      if (navigatorKey.currentState != null) {
-        navigatorKey.currentState?.pushNamed(
-          '/sessionComplete',
-          arguments: {
-            // 'duration': Duration(seconds: duration.toInt()),
-            // 'distance': distance,
-            // 'calories': calories,
-            'ruckWeight': _ruckWeight,
-            'heartRate': _currentHeartRate,
-            'fromWatch': true,
-          },
-        );
-      } else {
-        print("[WatchService] Navigator state not available, skipping navigation for session complete");
-      }
-    } catch (e) {
-      print("[WatchService] Error handling session end: $e");
-    }
+    // Dispatch SessionCompleted event to ActiveSessionBloc
+    _activeSessionBloc.add(const SessionCompleted()); 
+    print('[WatchService] Dispatched SessionCompleted event to ActiveSessionBloc.');
   }
 
   /// Handle a session pause from the watch
   Future<void> _handlePauseSessionFromWatch() async {
-    _isPaused = true;
-    print("[WatchService] Session paused from watch");
-    _sessionEventController.add({'action': 'pauseSession'});
+    print('[WatchService] Session pause requested from watch.');
+    _activeSessionBloc.add(const SessionPaused()); // Dispatch SessionPaused event
+    print('[WatchService] Dispatched SessionPaused event to ActiveSessionBloc.');
+    // No need to manually update _isPaused here, Bloc state should handle it
   }
 
   /// Handle a session resume from the watch
   Future<void> _handleResumeSessionFromWatch() async {
-    _isPaused = false;
-    print("[WatchService] Session resumed from watch");
-    _sessionEventController.add({'action': 'resumeSession'});
+    print('[WatchService] Session resume requested from watch.');
+    _activeSessionBloc.add(const SessionResumed()); // Dispatch SessionResumed event
+    print('[WatchService] Dispatched SessionResumed event to ActiveSessionBloc.');
+    // No need to manually update _isPaused here, Bloc state should handle it
   }
   
   /// Start a new rucking session on the watch
@@ -422,7 +400,6 @@ class RuckingApiHandler extends RuckingApi {
   Future<bool> startSessionFromWatch(double ruckWeight) async {
     debugPrint('Starting session from watch with weight: $ruckWeight');
     try {
-      // Create new ruck session via backend API
       final apiClient = GetIt.instance<ApiClient>();
       final authService = GetIt.instance<AuthService>();
       final user = await authService.getCurrentUser();
@@ -430,37 +407,35 @@ class RuckingApiHandler extends RuckingApi {
         debugPrint('No authenticated user found. Cannot create session.');
         return false;
       }
-
-      // Use user's default body weight if available
       final double? userWeightKg = user.weightKg;
-
-      // Minimal payload for session creation
       final payload = {
         'ruck_weight_kg': ruckWeight,
         'user_weight_kg': userWeightKg,
         'status': 'in_progress',
-        'user_id': user.userId, // Ensure user ID is included
+        'user_id': user.userId,
         'started_from': 'apple_watch',
         'start_time': DateTime.now().toUtc().toIso8601String(),
       };
-      
       final response = await apiClient.post('/rucks', payload);
       debugPrint('Session created from watch: $response');
-
-      // Update app state
-      _watchService._isSessionActive = true;
-      _watchService._isPaused = false;
-      _watchService._ruckWeight = ruckWeight;
-
-      // Auto-navigate to active session screen if context is available
-      // (Assume navigatorKey is set in your app for global navigation)
-      final navigatorKey = _watchService.navigatorKey;
+      final String ruckId = (response['id'] == null || response['id'].toString().trim().isEmpty)
+        ? Uuid().v4()
+        : response['id'].toString();
+      debugPrint('Extracted ruckId: $ruckId');
+      // Dispatch SessionStarted event to ActiveSessionBloc
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      activeSessionBloc.add(SessionStarted(
+        ruckId: ruckId,
+        userWeightKg: userWeightKg,
+        ruckWeightKg: ruckWeight,
+      ));
+      // Navigate to active session screen
+      final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
       navigatorKey.currentState?.pushNamedAndRemoveUntil(
         '/activeSession',
         (route) => false,
-        arguments: response, // Pass the session data if needed
+        arguments: {'ruckId': ruckId}
       );
-
       return true;
     } catch (e) {
       debugPrint('Error creating session from watch: $e');

@@ -18,8 +18,8 @@ void main() async {
   
   // Configure RevenueCat
   try {
-    await Purchases.configure(PurchasesConfiguration(dotenv.env['REVENUECAT_API_KEY']!));
-    print("[Main] RevenueCat configured successfully");
+    // await Purchases.configure(PurchasesConfiguration(dotenv.env['REVENUECAT_API_KEY']!)); // Temporarily commented out
+    print("[Main] RevenueCat configured successfully (Bypassed for testing)"); // Modified print statement
   } catch (e) {
     print("[Main] Error configuring RevenueCat: $e");
     // Continue app loading despite the error

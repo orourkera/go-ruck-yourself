@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/models/location_point.dart';
@@ -40,9 +41,13 @@ class LocationUpdated extends ActiveSessionEvent {
   List<Object?> get props => [locationPoint];
 }
 
-class SessionPaused extends ActiveSessionEvent {}
+class SessionPaused extends ActiveSessionEvent {
+  const SessionPaused();
+}
 
-class SessionResumed extends ActiveSessionEvent {}
+class SessionResumed extends ActiveSessionEvent {
+  const SessionResumed();
+}
 
 class SessionCompleted extends ActiveSessionEvent {
   final String? notes;
@@ -161,7 +166,9 @@ class ActiveSessionCompleted extends ActiveSessionState {
   final double elevationGain;
   final double elevationLoss;
   final double caloriesBurned;
-  
+  final double? ruckWeightKg;
+  final DateTime completedAt;
+
   const ActiveSessionCompleted({
     required this.ruckId,
     required this.elapsed,
@@ -169,17 +176,21 @@ class ActiveSessionCompleted extends ActiveSessionState {
     required this.elevationGain,
     required this.elevationLoss,
     required this.caloriesBurned,
+    this.ruckWeightKg,
+    required this.completedAt,
   });
-  
+
   @override
   List<Object?> get props => [
-    ruckId, 
-    elapsed, 
-    distance, 
-    elevationGain, 
-    elevationLoss, 
-    caloriesBurned
-  ];
+        ruckId,
+        elapsed,
+        distance,
+        elevationGain,
+        elevationLoss,
+        caloriesBurned,
+        ruckWeightKg,
+        completedAt,
+      ];
 }
 
 // BLoC
@@ -217,9 +228,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    debugPrint('ActiveSessionBloc: Received event to start session with ruckId: ${event.ruckId}');
     try {
-      // Notify API that session has started
-      await _apiClient.put('/rucks/${event.ruckId}/start', {});
+      // Notify API that session has started using POST
+      await _apiClient.post('/rucks/${event.ruckId}/start', {});
       
       // Start tracking time
       _stopwatch.start();
@@ -230,27 +242,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             latitude: 0, 
             longitude: 0, 
             elevation: 0, 
+            accuracy: 0, 
             timestamp: DateTime.now(),
-            accuracy: 0,
           )
         ))
       );
       
       // Start location tracking
-      try {
-        final hasPermission = await _locationService.hasLocationPermission();
-        if (!hasPermission) {
-          await _locationService.requestLocationPermission();
-        }
-      } catch (e) {
-        print('Failed to check location permission: $e');
-        emit(const ActiveSessionError('Failed to check location permission'));
-        return;
-      }
-      
       _startLocationTracking();
       
-      // TODO: Pass these values from ActiveSessionScreen when starting the session
+      // You can pass user weight and ruck weight if available from the event
       double? userWeightKg = event.userWeightKg;
       double? ruckWeightKg = event.ruckWeightKg;
       // If you have a way to pass these values, set them here
@@ -340,12 +341,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       ));
       
       // Send update to API periodically, now with elevation gain/loss
-      _sendLocationUpdateToApi(
-        event.locationPoint, 
-        currentState.ruckId,
-        elevationGain: newElevationGain,
-        elevationLoss: newElevationLoss,
-      );
+      if (state is ActiveSessionInProgress) {
+        final currentState = state as ActiveSessionInProgress;
+        debugPrint('Sending location update for ruckId: ${currentState.ruckId}');
+        _sendLocationUpdateToApi(
+          event.locationPoint, 
+          currentState.ruckId,
+          elevationGain: newElevationGain,
+          elevationLoss: newElevationLoss,
+        );
+      }
     }
   }
   
@@ -364,7 +369,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       // Notify API
       try {
-        await _apiClient.put('/rucks/${currentState.ruckId}/pause', {});
+        await _apiClient.post('/rucks/${currentState.ruckId}/pause', {});
       } catch (e) {
         print('Failed to pause session: $e');
       }
@@ -399,7 +404,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       // Notify API
       try {
-        await _apiClient.put('/rucks/${currentState.ruckId}/resume', {});
+        await _apiClient.post('/rucks/${currentState.ruckId}/resume', {});
       } catch (e) {
         print('Failed to resume session: $e');
       }
@@ -433,7 +438,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       try {
         // Complete session on backend
-        await _apiClient.put('/rucks/${currentState.ruckId}/complete', {
+        await _apiClient.post('/rucks/${currentState.ruckId}/complete', {
           'notes': event.notes,
           'rating': event.rating,
         });
@@ -445,6 +450,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           elevationGain: currentState.elevationGain,
           elevationLoss: currentState.elevationLoss,
           caloriesBurned: currentState.caloriesBurned,
+          ruckWeightKg: currentState.ruckWeightKg,
+          completedAt: DateTime.now(),
         ));
       } catch (e) {
         emit(ActiveSessionError('Failed to complete session: $e'));
@@ -470,9 +477,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     String ruckId,
     {double? elevationGain, double? elevationLoss}
   ) async {
+    if (ruckId.trim().isEmpty) {
+      debugPrint('Warning: Empty ruckId provided, skipping location update.');
+      return;
+    }
     try {
       await _apiClient.post(
-        '/rucks/$ruckId/location',
+        '/sessions/$ruckId/statistics',
         {
           'latitude': point.latitude,
           'longitude': point.longitude,
@@ -484,7 +495,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         },
       );
     } catch (e) {
-      print('Failed to send location update: $e');
+      debugPrint('Failed to send location update: $e');
     }
   }
 } 

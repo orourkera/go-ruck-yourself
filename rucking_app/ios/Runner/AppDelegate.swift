@@ -264,18 +264,42 @@ import WatchConnectivity
     }
 
     func pauseSessionOnWatch() throws {
-        print("[AppDelegate/Pigeon] pauseSessionOnWatch called")
-        sendMessageToWatch(["command": "pauseSession"])
+        if WCSession.default.isReachable {
+            print("Watch is reachable. Sending pause command.")
+            let message = ["command": "pauseSession"]
+            WCSession.default.sendMessage(message, replyHandler: nil) { error in
+                print("Error sending pause message: \(error.localizedDescription)")
+            }
+            print("Pause message queued successfully.")
+        } else {
+            print("Watch not reachable for pausing.")
+        }
     }
 
     func resumeSessionOnWatch() throws {
-        print("[AppDelegate/Pigeon] resumeSessionOnWatch called")
-        sendMessageToWatch(["command": "resumeSession"])
+        if WCSession.default.isReachable {
+            print("Watch is reachable. Sending resume command.")
+            let message = ["command": "resumeSession"]
+            WCSession.default.sendMessage(message, replyHandler: nil) { error in
+                print("Error sending resume message: \(error.localizedDescription)")
+            }
+            print("Resume message queued successfully.")
+        } else {
+            print("Watch not reachable for resuming.")
+        }
     }
 
     func endSessionOnWatch() throws {
-        print("[AppDelegate/Pigeon] endSessionOnWatch called")
-        sendMessageToWatch(["command": "endSession"])
+        if WCSession.default.isReachable {
+             print("Watch is reachable. Sending end command.")
+            let message = ["command": "endSession"]
+            WCSession.default.sendMessage(message, replyHandler: nil) { error in
+                 print("Error sending end message: \(error.localizedDescription)")
+            }
+            print("End message queued successfully.")
+        } else {
+            print("Watch not reachable for ending.")
+        }
     }
     
     // Helper to send message to Watch

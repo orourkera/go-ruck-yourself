@@ -966,7 +966,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     }
     
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
       appBar: AppBar(
         title: Text('Active Session', style: AppTextStyles.headline6.copyWith(color: Colors.white)),
         backgroundColor: AppColors.primary,
@@ -986,378 +985,468 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Map section
-          Expanded(
-            flex: 2,
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: _locationPoints.length >= 2
-                    ? FlutterMap(
-                        options: MapOptions(
-                          initialCenter: _getRouteCenter(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
-                          initialZoom: _getFitZoom(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.rucking.app',
-                          ),
-                          PolylineLayer(
-                            polylines: [
-                              Polyline(
-                                points: _locationPoints
-                                    .map((p) => LatLng(p.latitude, p.longitude))
-                                    .toList(),
-                                color: AppColors.primary,
-                                strokeWidth: 4.0,
-                              ),
-                            ],
-                          ),
-                          MarkerLayer(
-                            markers: [
-                              if (_locationPoints.isNotEmpty)
-                                Marker(
-                                  point: LatLng(_locationPoints.first.latitude, _locationPoints.first.longitude),
-                                  child: const Icon(Icons.location_on, color: Colors.blue, size: 25),
-                                ),
-                              if (_locationPoints.length > 1)
-                                Marker(
-                                  point: LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude),
-                                  child: _customMarkerIcon != null
-                                      ? Image.memory(_customMarkerIcon!, width: 25, height: 25)
-                                      : const Icon(
-                                          Icons.location_on,
-                                          color: Colors.green,
-                                          size: 25,
-                                        ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      )
-                    : const Center(
-                        child: Text(
-                          'Start moving to see your route...',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          
-          // Validation message
-          if (_showValidationMessage && _validationMessage != null)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
-              ),
-              child: Row(
+      body: BlocListener<ActiveSessionBloc, ActiveSessionState>(
+        listener: (context, state) {
+          if (state is ActiveSessionCompleted) {
+            print("[ActiveSessionScreen] Detected ActiveSessionCompleted state. Navigating...");
+            // Navigate to the session summary screen, clearing the stack
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/sessionComplete', // Ensure this route is defined in your main router
+              (route) => false, // Remove all previous routes
+              arguments: state, // Pass the completed state which contains final metrics
+            );
+          } else if (state is ActiveSessionError) {
+            // Optional: Show a snackbar or dialog for errors
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Session Error: ${state.message}')),
+            );
+          }
+        },
+        child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+          builder: (context, state) {
+            if (state is ActiveSessionInitial) {
+              return Column(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                  const SizedBox(width: 8),
+                  // Map section
                   Expanded(
-                    child: Text(
-                      _validationMessage!,
-                      style: const TextStyle(color: Colors.deepOrange),
+                    flex: 2,
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: _locationPoints.length >= 2
+                            ? FlutterMap(
+                                options: MapOptions(
+                                  initialCenter: _getRouteCenter(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
+                                  initialZoom: _getFitZoom(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
+                                ),
+                                children: [
+                                  TileLayer(
+                                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                    userAgentPackageName: 'com.rucking.app',
+                                  ),
+                                  PolylineLayer(
+                                    polylines: [
+                                      Polyline(
+                                        points: _locationPoints
+                                            .map((p) => LatLng(p.latitude, p.longitude))
+                                            .toList(),
+                                        color: AppColors.primary,
+                                        strokeWidth: 4.0,
+                                      ),
+                                    ],
+                                  ),
+                                  MarkerLayer(
+                                    markers: [
+                                      if (_locationPoints.isNotEmpty)
+                                        Marker(
+                                          point: LatLng(_locationPoints.first.latitude, _locationPoints.first.longitude),
+                                          child: const Icon(Icons.location_on, color: Colors.blue, size: 25),
+                                        ),
+                                      if (_locationPoints.length > 1)
+                                        Marker(
+                                          point: LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude),
+                                          child: _customMarkerIcon != null
+                                              ? Image.memory(_customMarkerIcon!, width: 25, height: 25)
+                                              : const Icon(
+                                                  Icons.location_on,
+                                                  color: Colors.green,
+                                                  size: 25,
+                                                ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            : const Center(
+                                child: Text(
+                                  'Start moving to see your route...',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            
-          // Timer and weight display
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Timer display
-                Text(
-                  durationDisplay,
-                  style: AppTextStyles.headline1.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Ruck weight
-                    Text(
-                      _getDisplayWeight(),
-                      style: AppTextStyles.headline6.copyWith(
-                        color: Colors.grey.shade600,
+                  
+                  // Validation message
+                  if (_showValidationMessage && _validationMessage != null)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _validationMessage!,
+                              style: const TextStyle(color: Colors.deepOrange),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     
-                    // Heart rate pill (only shown if user has an Apple Watch)
-                    if (_hasAppleWatch)
-                      Container(
-                        margin: const EdgeInsets.only(left: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.black 
-                            : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Theme.of(context).brightness == Brightness.dark 
-                              ? Colors.grey[800]! 
-                              : Colors.grey[300]!,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.favorite,
-                              color: Colors.red[400],
-                              size: 24,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _heartRate != null ? '${_heartRate!.toInt()}' : '--',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: Theme.of(context).brightness == Brightness.dark 
-                                  ? Colors.white
-                                  : Colors.black,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-                
-                // Remaining time if planned duration
-                if (widget.plannedDuration != null && remainingTimeDisplay != null)
-                  Text(
-                    'Remaining: $remainingTimeDisplay',
-                    style: AppTextStyles.subtitle1.copyWith(
-                      color: remainingTimeDisplay == 'Completed!' ? Colors.green : Colors.grey.shade600,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          
-          // Stats section
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  // First row: Distance and Pace
-                  Expanded(
-                    child: Row(
+                  // Timer and weight display
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
                       children: [
-                        // Distance card
-                        Expanded(
-                          child: Card(
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.straighten, color: AppColors.primary, size: 20),
-                                      SizedBox(width: 6),
-                                      Text('Distance', style: AppTextStyles.subtitle2),
-                                    ],
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    distanceDisplay != null
-                                        ? distanceDisplay
-                                        : '',
-                                    style: AppTextStyles.headline5.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark 
-                                          ? AppColors.primaryLight 
-                                          : null,
-                                    ),
-                                  ),
-                                  if (distanceDisplay == null)
-                                    SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
-                                    ),
-                                ],
-                              ),
-                            ),
+                        // Timer display
+                        Text(
+                          durationDisplay,
+                          style: AppTextStyles.headline1.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontStyle: FontStyle.italic,
                           ),
                         ),
-                        SizedBox(width: 12),
-                        // Pace card
-                        Expanded(
-                          child: Card(
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.speed, color: AppColors.secondary, size: 20),
-                                      SizedBox(width: 6),
-                                      Text('Pace', style: AppTextStyles.subtitle2),
-                                    ],
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    paceDisplay != null
-                                        ? paceDisplay
-                                        : '',
-                                    style: AppTextStyles.headline5.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark 
-                                          ? AppColors.success 
-                                          : null,
-                                    ),
-                                  ),
-                                  if (paceDisplay == null)
-                                    SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
-                                    ),
-                                ],
+                        
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Ruck weight
+                            Text(
+                              _getDisplayWeight(),
+                              style: AppTextStyles.headline6.copyWith(
+                                color: Colors.grey.shade600,
                               ),
                             ),
-                          ),
+                            
+                            // Heart rate pill (only shown if user has an Apple Watch)
+                            if (_hasAppleWatch)
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).brightness == Brightness.dark 
+                                    ? Colors.black 
+                                    : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                  border: Border.all(
+                                    color: Theme.of(context).brightness == Brightness.dark 
+                                      ? Colors.grey[800]! 
+                                      : Colors.grey[300]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.favorite,
+                                      color: Colors.red[400],
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _heartRate != null ? '${_heartRate!.toInt()}' : '--',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        color: Theme.of(context).brightness == Brightness.dark 
+                                          ? Colors.white
+                                          : Colors.black,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
+                        
+                        // Remaining time if planned duration
+                        if (widget.plannedDuration != null && remainingTimeDisplay != null)
+                          Text(
+                            'Remaining: $remainingTimeDisplay',
+                            style: AppTextStyles.subtitle1.copyWith(
+                              color: remainingTimeDisplay == 'Completed!' ? Colors.green : Colors.grey.shade600,
+                            ),
+                          ),
                       ],
                     ),
                   ),
                   
-                  // Second row: Calories and Elevation
+                  // Stats section
                   Expanded(
-                    child: Row(
-                      children: [
-                        // Calories card
-                        Expanded(
-                          child: Card(
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.local_fire_department, color: AppColors.success, size: 20),
-                                      SizedBox(width: 6),
-                                      Text('Calories', style: AppTextStyles.subtitle2),
-                                    ],
-                                  ),
-                                  SizedBox(height: 8),
-                                  caloriesDisplay != null
-                                    ? Row(
+                    flex: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: [
+                          // First row: Distance and Pace
+                          Expanded(
+                            child: Row(
+                              children: [
+                                // Distance card
+                                Expanded(
+                                  child: Card(
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.straighten, color: AppColors.primary, size: 20),
+                                              SizedBox(width: 6),
+                                              Text('Distance', style: AppTextStyles.subtitle2),
+                                            ],
+                                          ),
+                                          SizedBox(height: 8),
                                           Text(
-                                            caloriesDisplay,
+                                            distanceDisplay != null
+                                                ? distanceDisplay
+                                                : '',
                                             style: AppTextStyles.headline5.copyWith(
                                               color: Theme.of(context).brightness == Brightness.dark 
-                                                  ? AppColors.warning 
+                                                  ? AppColors.primaryLight 
                                                   : null,
                                             ),
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'kCal',
-                                            style: AppTextStyles.headline5.copyWith(
-                                              color: Theme.of(context).brightness == Brightness.dark 
-                                                  ? AppColors.warning 
-                                                  : null,
+                                          if (distanceDisplay == null)
+                                            SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
                                             ),
-                                          ),
                                         ],
-                                      )
-                                    : SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
                                       ),
-                                ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                // Pace card
+                                Expanded(
+                                  child: Card(
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.speed, color: AppColors.secondary, size: 20),
+                                              SizedBox(width: 6),
+                                              Text('Pace', style: AppTextStyles.subtitle2),
+                                            ],
+                                          ),
+                                          SizedBox(height: 8),
+                                          Text(
+                                            paceDisplay != null
+                                                ? paceDisplay
+                                                : '',
+                                            style: AppTextStyles.headline5.copyWith(
+                                              color: Theme.of(context).brightness == Brightness.dark 
+                                                  ? AppColors.success 
+                                                  : null,
+                                            ),
+                                          ),
+                                          if (paceDisplay == null)
+                                            SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          // Second row: Calories and Elevation
+                          Expanded(
+                            child: Row(
+                              children: [
+                                // Calories card
+                                Expanded(
+                                  child: Card(
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.local_fire_department, color: AppColors.success, size: 20),
+                                              SizedBox(width: 6),
+                                              Text('Calories', style: AppTextStyles.subtitle2),
+                                            ],
+                                          ),
+                                          SizedBox(height: 8),
+                                          caloriesDisplay != null
+                                            ? Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    caloriesDisplay,
+                                                    style: AppTextStyles.headline5.copyWith(
+                                                      color: Theme.of(context).brightness == Brightness.dark 
+                                                          ? AppColors.warning 
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'kCal',
+                                                    style: AppTextStyles.headline5.copyWith(
+                                                      color: Theme.of(context).brightness == Brightness.dark 
+                                                          ? AppColors.warning 
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
+                                              ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                // Elevation card
+                                Expanded(
+                                  child: Card(
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.terrain, color: AppColors.success, size: 20),
+                                              SizedBox(width: 6),
+                                              Text('Elevation', style: AppTextStyles.subtitle2),
+                                            ],
+                                          ),
+                                          SizedBox(height: 8),
+                                          elevationDisplay != '+0/-0'
+                                            ? Text(
+                                                elevationDisplay,
+                                                style: AppTextStyles.headline5.copyWith(
+                                                  color: Theme.of(context).brightness == Brightness.dark 
+                                                      ? AppColors.primaryLight 
+                                                      : null,
+                                                ),
+                                              )
+                                            : SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
+                                              ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Add heart rate display below the metrics container
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Heart Rate: ${_heartRate != null ? _heartRate.toString() + " bpm" : "--"}',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Control buttons
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        // Pause/Resume Button
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _togglePause,
+                            icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
+                            label: Text(
+                              _isPaused ? 'RESUME' : 'PAUSE',
+                              style: AppTextStyles.button.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                           ),
                         ),
-                        SizedBox(width: 12),
-                        // Elevation card
+                        const SizedBox(width: 16),
+                        // End session button
                         Expanded(
-                          child: Card(
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                          child: ElevatedButton.icon(
+                            onPressed: _isEnding ? null : _showEndConfirmationDialog,
+                            icon: const Icon(Icons.stop),
+                            label: const Text(
+                              'END SESSION',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.terrain, color: AppColors.success, size: 20),
-                                      SizedBox(width: 6),
-                                      Text('Elevation', style: AppTextStyles.subtitle2),
-                                    ],
-                                  ),
-                                  SizedBox(height: 8),
-                                  elevationDisplay != '+0/-0'
-                                    ? Text(
-                                        elevationDisplay,
-                                        style: AppTextStyles.headline5.copyWith(
-                                          color: Theme.of(context).brightness == Brightness.dark 
-                                              ? AppColors.primaryLight 
-                                              : null,
-                                        ),
-                                      )
-                                    : SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
-                                      ),
-                                ],
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.error,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                           ),
@@ -1366,75 +1455,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-          // Add heart rate display below the metrics container
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Heart Rate: ${_heartRate != null ? _heartRate.toString() + " bpm" : "--"}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-          // Control buttons
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Pause/Resume Button
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _togglePause,
-                    icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-                    label: Text(
-                      _isPaused ? 'RESUME' : 'PAUSE',
-                      style: AppTextStyles.button.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // End session button
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isEnding ? null : _showEndConfirmationDialog,
-                    icon: const Icon(Icons.stop),
-                    label: const Text(
-                      'END SESSION',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+              );
+            } else {
+              // Fallback or loading indicator if needed
+              return const Center(child: Text('Initializing session...'));
+            }
+          },
+        ),
       ),
     );
   }
