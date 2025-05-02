@@ -458,7 +458,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
   
   void _handleLocationUpdate(LocationPoint locationPoint) {
-    add(LocationUpdated(locationPoint));
+    if (!isClosed) {  
+      add(LocationUpdated(locationPoint));
+    } else {
+      // Session is already completed or bloc is closed, cancel the subscription to prevent further calls
+      _locationSubscription?.cancel();
+      debugPrint('Ignoring location update after session completion');
+    }
   }
   
   Future<void> _sendLocationUpdateToApi(

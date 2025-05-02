@@ -85,6 +85,16 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       setState(() {
         _isLoading = false;
       });
+      // Make sure we trigger a UI update with the loaded weights
+      Future.delayed(Duration.zero, () {
+        if (mounted) {
+          setState(() {
+            // Force synchronization
+            _selectedRuckWeight = _ruckWeight;
+            debugPrint('UI rebuild triggered to reflect loaded weight: $_ruckWeight kg');
+          });
+        }
+      });
     }
   }
 
@@ -321,41 +331,55 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
   /// Snaps the current weight to the nearest predefined weight option
   void _snapToNearestWeight() {
-    final isMetric = _preferMetric;
-    final weightOptions = isMetric 
-        ? AppConfig.metricWeightOptions 
-        : AppConfig.standardWeightOptions;
-  
-    double comparisonWeight = _ruckWeight;
-    if (!isMetric) {
-      comparisonWeight = _ruckWeight * AppConfig.kgToLbs;
+    List<double> weightOptions = [];
+    
+    if (_preferMetric) {
+      // Metric options (kg)
+      weightOptions = AppConfig.metricWeightOptions;
+    } else {
+      // Imperial options (lbs)
+      weightOptions = AppConfig.standardWeightOptions;
     }
-
-    double closestWeightOption = weightOptions.first;
-    double smallestDifference = (comparisonWeight - closestWeightOption).abs();
-    int closestIndex = 0; // Keep track of the index
-
-    for (int i = 0; i < weightOptions.length; i++) {
-      double weight = weightOptions[i];
-      double difference = (comparisonWeight - weight).abs();
-      if (difference < smallestDifference) {
-        smallestDifference = difference;
-        closestWeightOption = weight;
-        closestIndex = i;
+    
+    // Find the nearest weight option
+    double? closestOption;
+    double minDifference = double.infinity;
+    
+    for (var option in weightOptions) {
+      final optionInKg = _preferMetric ? option : option / AppConfig.kgToLbs;
+      // Use a slightly more forgiving comparison for imperial weights due to conversion rounding
+      final difference = (optionInKg - _ruckWeight).abs();
+      
+      if (difference < minDifference) {
+        minDifference = difference;
+        closestOption = option;
       }
     }
-  
-    // Ensure internal weight is the corresponding KG value
-    _ruckWeight = AppConfig.metricWeightOptions[closestIndex]; 
     
-    // Also update the display weight based on user preference
-    _displayRuckWeight = _preferMetric ? _ruckWeight : AppConfig.standardWeightOptions[closestIndex];
+    if (closestOption != null) {
+      setState(() {
+        if (_preferMetric) {
+          _ruckWeight = closestOption!;
+          _displayRuckWeight = closestOption!;
+        } else {
+          _ruckWeight = closestOption! / AppConfig.kgToLbs;
+          _displayRuckWeight = closestOption!;
+        }
+        // Make sure _selectedRuckWeight is also updated
+        _selectedRuckWeight = _ruckWeight;
+        
+        debugPrint('Snapped to nearest weight: $_ruckWeight kg (display: $_displayRuckWeight)');
+      });
+    }
   }
 
   /// Builds a chip for quick ruck weight selection
   Widget _buildWeightChip(double weightValue, bool isMetric) {
     double weightInKg = isMetric ? weightValue : weightValue / AppConfig.kgToLbs;
-    final bool isSelected = (weightInKg - _selectedRuckWeight).abs() < 0.01;
+    // For imperial weights, we need to be more forgiving due to conversion precision issues
+    final bool isSelected = isMetric
+        ? (weightInKg - _selectedRuckWeight).abs() < 0.01
+        : (weightInKg - _selectedRuckWeight).abs() < 0.1;  // Use a larger tolerance for imperial
 
     // Log for debugging
     debugPrint('Building chip for weightInKg: $weightInKg, current _ruckWeight: $_ruckWeight');

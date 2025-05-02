@@ -1167,9 +1167,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                               ),
                             ),
                             
-                            // Heart rate pill (only shown if user has an Apple Watch)
-                            if (_hasAppleWatch)
-                              Container(
+                            // Heart rate pill
+                            Container(
                                 margin: const EdgeInsets.only(left: 16),
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
@@ -1195,16 +1194,17 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      Icons.favorite,
+                                      Icons.favorite_rounded,
                                       color: Colors.red[400],
                                       size: 24,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      _heartRate != null ? '${_heartRate!.toInt()}' : '--',
+                                      _heartRate != null ? '${_heartRate!.toInt()} bpm' : '--',
                                       style: TextStyle(
+                                        fontFamily: 'Bangers',
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 18,
+                                        fontSize: 20,
                                         color: Theme.of(context).brightness == Brightness.dark 
                                           ? Colors.white
                                           : Colors.black,
@@ -1432,19 +1432,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                  // Add heart rate display below the metrics container
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Heart Rate: ${_heartRate != null ? _heartRate.toString() + " bpm" : "--"}',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      ],
                     ),
                   ),
                   // Control buttons
