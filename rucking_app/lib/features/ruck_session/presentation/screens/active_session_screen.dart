@@ -529,7 +529,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   }
   
   /// Ends the current session
-  Future<void> _endSession() async {
+  Future<void> _endSession({bool fromWatch = false}) async {
     debugPrint('Ending session...');
     _isSessionEnded = true; // Set flag
     // Stop tracking before processing end of session
@@ -538,13 +538,33 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _stopLocationTracking(); // Explicitly stop location tracking
     debugPrint('Timers and location tracking stopped for session end.');
 
-    // Check if we have a valid session to save
-    if (_locationPoints.isEmpty || _distance < 0.05) {
-      debugPrint('Session too short to save: distance $_distance km');
+    // Check if we have a valid session to save using SessionValidationService thresholds
+    final distanceMeters = _distance * 1000; // Convert km to meters
+    final sessionDuration = _elapsed;
+    
+    if (_locationPoints.isEmpty || 
+        distanceMeters < SessionValidationService.minSessionDistanceMeters ||
+        sessionDuration < SessionValidationService.minSessionDuration) {
+      debugPrint('Session too short to save: distance ${_distance} km, duration ${sessionDuration.inMinutes} minutes');
+      
+      // Try to delete the session from the backend
+      try {
+        await _apiClient.delete('/rucks/${widget.ruckId}');
+        debugPrint('Successfully deleted short session ${widget.ruckId}');
+      } catch (e) {
+        debugPrint('Error deleting short session: $e');
+        // Continue anyway, as we still want to exit the session screen
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(sessionTooShortError.replaceAll('{minutes}', '3')), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Session too short to save: minimum ${SessionValidationService.minSessionDistanceMeters}m and ${SessionValidationService.minSessionDuration.inMinutes} minutes required.'), 
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
+        // Navigate back to home screen
         Navigator.of(context).pop();
       }
       return;

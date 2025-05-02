@@ -7,6 +7,7 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart'; // Import MeasurementUtils
 import 'package:rucking_app/core/utils/met_calculator.dart'; // Import MetCalculator
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart'; // Import SessionValidationService
 
 // Events
 abstract class ActiveSessionEvent extends Equatable {
@@ -432,6 +433,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _timer?.cancel();
       
       try {
+        // Validate session meets minimum thresholds before completing
+        final distanceMeters = currentState.distance * 1000; // Convert km to meters
+        final sessionDuration = currentState.elapsed;
+        
+        // Check if session meets minimum criteria
+        if (distanceMeters < SessionValidationService.minSessionDistanceMeters || 
+            sessionDuration < SessionValidationService.minSessionDuration) {
+          debugPrint('Session too short to save in BLoC: distance ${currentState.distance} km, duration ${sessionDuration.inMinutes} minutes');
+          
+          // Try to delete the session as it's too short
+          try {
+            await _apiClient.delete('/rucks/${currentState.ruckId}');
+            debugPrint('Successfully deleted short session ${currentState.ruckId} from BLoC');
+          } catch (e) {
+            debugPrint('Error deleting short session in BLoC: $e');
+          }
+          
+          // Emit error state with appropriate message
+          emit(ActiveSessionError('Session too short: minimum ${SessionValidationService.minSessionDistanceMeters}m and ${SessionValidationService.minSessionDuration.inMinutes} minutes required.'));
+          return;
+        }
+        
         // Complete session on backend
         await _apiClient.post('/rucks/${currentState.ruckId}/complete', {
           'notes': event.notes,
