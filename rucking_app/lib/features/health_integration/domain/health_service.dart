@@ -8,6 +8,7 @@ class HealthService {
   final Health health = Health();
   bool _isAuthorized = false;
   String _userId = '';
+  String _platform = '';
   
   // Base keys - will be prefixed with userId for user-specific settings
   static const String _hasSeenIntroKeyBase = 'health_has_seen_intro';
@@ -40,12 +41,12 @@ class HealthService {
           List.filled(types.length, HealthDataAccess.WRITE);
       
       // Debug: log authorization request types
-      print('Requesting HealthKit authorization for types: $types with permissions: $permissions');
+      debugPrint('[INFO] HealthService: Requesting HealthKit authorization for types: $types with permissions: $permissions');
       
       // This call will trigger the iOS permission dialog
       bool requested = await health.requestAuthorization(types, permissions: permissions);
       // Debug: log authorization result
-      print('HealthKit authorization result: $requested');
+      debugPrint('[INFO] HealthService: HealthKit authorization result: $requested');
       _isAuthorized = requested;
       
       if (requested) {
@@ -55,7 +56,7 @@ class HealthService {
       
       return requested;
     } catch (e) {
-      print('Error requesting health authorization: $e');
+      debugPrint('[ERROR] HealthService: Error requesting health authorization: $e');
       return false;
     }
   }
@@ -88,7 +89,7 @@ class HealthService {
         unit: HealthDataUnit.KILOCALORIE,
       );
     } catch (e) {
-      print('Error writing health data: $e');
+      debugPrint('[ERROR] HealthService: Error writing health data: $e');
       return false;
     }
 
@@ -107,52 +108,57 @@ class HealthService {
     double? elevationLossMeters,
     double? heartRate,
   }) async {
-    debugPrint('[HealthService] Entering saveRuckWorkout');
+    debugPrint('[INFO] HealthService: Saving workout with distance=${distanceMeters}m, calories=$caloriesBurned');
     if (!_isAuthorized) {
-      bool authorized = await requestAuthorization();
-      if (!authorized) return false;
+      await _requestAuthorization();
+      if (!_isAuthorized) {
+        return false;
+      }
     }
-
+    
     try {
-      // Create metadata for ruck weight and elevation
-      final Map<String, dynamic> metadata = {};
+      // Convert to health plugin units
+      final activityType = _platform == 'ios'
+          ? HealthWorkoutActivityType.HIKING 
+          : HealthWorkoutActivityType.WALKING;
+
+      // Create workout metadata object for additional stats
+      final metadata = <String, dynamic>{};
       
-      // Add ruck weight to metadata if available
-      if (ruckWeightKg != null) {
+      // Include ruck weight if available (as kilograms)
+      if (ruckWeightKg != null && ruckWeightKg > 0) {
         metadata['ruckWeightKg'] = ruckWeightKg;
       }
-
-      // Add elevation data to metadata if available
-      if (elevationGainMeters != null) {
+      
+      // Include elevation data if available
+      if (elevationGainMeters != null && elevationGainMeters > 0) {
         metadata['elevationGainMeters'] = elevationGainMeters;
       }
       
-      if (elevationLossMeters != null) {
+      if (elevationLossMeters != null && elevationLossMeters > 0) {
         metadata['elevationLossMeters'] = elevationLossMeters;
       }
-
-      // Add heart rate to metadata if available
-      if (heartRate != null) {
-        metadata['heartRate'] = heartRate;
+      
+      // Include heart rate data if available
+      if (heartRate != null && heartRate > 0) {
+        metadata['averageHeartRateBpm'] = heartRate;
       }
-
-      // Add workout with HIKING activity type
-      final success = await health.writeWorkoutData(
-        activityType: HealthWorkoutActivityType.HIKING,
+      
+      // Save the workout to HealthKit/Google Fit
+      final success = await _health.writeWorkoutData(
+        activityType: activityType,
         start: startTime,
         end: endTime,
-        totalDistance: distanceMeters.toInt(),
+        totalDistance: distanceMeters,
         totalDistanceUnit: HealthDataUnit.METER,
         totalEnergyBurned: caloriesBurned.toInt(),
         totalEnergyBurnedUnit: HealthDataUnit.KILOCALORIE,
       );
 
-      // 🔍 Log the result for easier debugging / verification
-      debugPrint('[HealthService] writeWorkoutData → $success  | distance: $distanceMeters m, calories: $caloriesBurned kcal');
-      
+      debugPrint('[INFO] HealthService: Workout saved successfully: $success');
       return success;
     } catch (e) {
-      print('Error saving ruck workout: $e');
+      debugPrint('[ERROR] HealthService: Failed to save workout: $e');
       return false;
     }
   }
@@ -160,7 +166,7 @@ class HealthService {
   /// Checks if the user has seen the health integration intro screen
   Future<bool> hasSeenIntro() async {
     if (_userId.isEmpty) {
-      print('Warning: User ID not set when checking health intro status');
+      debugPrint('[WARNING] HealthService: User ID not set when checking health intro status');
       return false;
     }
     
@@ -171,7 +177,7 @@ class HealthService {
   /// Marks the health integration intro screen as seen
   Future<void> setHasSeenIntro() async {
     if (_userId.isEmpty) {
-      print('Warning: User ID not set when setting health intro status');
+      debugPrint('[WARNING] HealthService: User ID not set when setting health intro status');
       return;
     }
     
@@ -196,7 +202,7 @@ class HealthService {
       // Not available on other platforms
       return false;
     } catch (e) {
-      print('Error checking health integration: $e');
+      debugPrint('[ERROR] HealthService: Error checking health integration: $e');
       return false;
     }
   }
@@ -204,7 +210,7 @@ class HealthService {
   /// Checks if the user has enabled health integration
   Future<bool> isHealthIntegrationEnabled() async {
     if (_userId.isEmpty) {
-      print('Warning: User ID not set when checking health integration status');
+      debugPrint('[WARNING] HealthService: User ID not set when checking health integration status');
       return false;
     }
     
@@ -215,7 +221,7 @@ class HealthService {
   /// Sets health integration status
   Future<void> setHealthIntegrationEnabled(bool enabled) async {
     if (_userId.isEmpty) {
-      print('Warning: User ID not set when setting health integration status');
+      debugPrint('[WARNING] HealthService: User ID not set when setting health integration status');
       return;
     }
     
@@ -231,7 +237,7 @@ class HealthService {
   /// Sets whether the user has an Apple Watch
   Future<void> setHasAppleWatch(bool hasWatch) async {
     if (_userId.isEmpty) {
-      print('Warning: User ID not set when setting Apple Watch status');
+      debugPrint('[WARNING] HealthService: User ID not set when setting Apple Watch status');
       return;
     }
     
@@ -242,7 +248,7 @@ class HealthService {
   /// Checks if the user has indicated they have an Apple Watch
   Future<bool> hasAppleWatch() async {
     if (_userId.isEmpty) {
-      print('Warning: User ID not set when checking Apple Watch status');
+      debugPrint('[WARNING] HealthService: User ID not set when checking Apple Watch status');
       return false;
     }
     
@@ -262,22 +268,22 @@ class HealthService {
       final now = DateTime.now();
       final window = const Duration(minutes: 5);
       final startTime = now.subtract(window);
-      print('Fetching heart rate from $startTime to $now');
+      debugPrint('[INFO] HealthService: Fetching heart rate from $startTime to $now');
       List<HealthDataPoint> heartRateData = await health.getHealthDataFromTypes(
         types: [HealthDataType.HEART_RATE],
         startTime: startTime,
         endTime: now,
       );
-      print('Fetched heart rate data points: ${heartRateData.length}');
+      debugPrint('[INFO] HealthService: Fetched heart rate data points: ${heartRateData.length}');
       if (heartRateData.isEmpty) {
-        print('No heart rate data available in the last 5 minutes');
+        debugPrint('[INFO] HealthService: No heart rate data available in the last 5 minutes');
         return null;
       }
       
       // Sort by timestamp to get most recent reading
       heartRateData.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
       final mostRecent = heartRateData.first;
-      print('Most recent heart rate raw value: ${mostRecent.value} at ${mostRecent.dateFrom}');
+      debugPrint('[INFO] HealthService: Most recent heart rate raw value: ${mostRecent.value} at ${mostRecent.dateFrom}');
       // Extract heart rate value dynamically, handling NumericHealthValue
       final dynamic rawValue = mostRecent.value;
       dynamic extracted = rawValue is NumericHealthValue
@@ -289,10 +295,10 @@ class HealthService {
       } else {
         heartRateValue = double.tryParse(extracted.toString());
       }
-      print('Parsed heart rate: $heartRateValue');
+      debugPrint('[INFO] HealthService: Parsed heart rate: $heartRateValue');
       return heartRateValue;
     } catch (e) {
-      print('Error reading heart rate: $e');
+      debugPrint('[ERROR] HealthService: Error reading heart rate: $e');
       return null;
     }
   }
@@ -302,7 +308,7 @@ class HealthService {
   void updateHeartRate(double heartRate) {
     // For now, we just log the heart rate
     // This could be expanded to store the value or send to a health bloc
-    print('Received heart rate update from Watch: $heartRate BPM');
+    debugPrint('[INFO] HealthService: Received heart rate update from Watch: $heartRate BPM');
     
     // In a future version, this could write to Health/HealthKit
     // Or update a heart rate stream that UI components could listen to

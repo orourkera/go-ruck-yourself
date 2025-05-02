@@ -253,11 +253,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       _startLocationTracking();
       
-      // TODO: Pass these values from ActiveSessionScreen when starting the session
+      // Extract weights from event - these are properly passed from ActiveSessionScreen
       double? userWeightKg = event.userWeightKg;
       double? ruckWeightKg = event.ruckWeightKg;
-      // If you have a way to pass these values, set them here
-      // For now, fallback to null (handled elsewhere)
 
       // Initial state
       emit(ActiveSessionInProgress(
