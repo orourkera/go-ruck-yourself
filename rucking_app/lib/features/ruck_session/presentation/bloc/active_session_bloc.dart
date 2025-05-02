@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/models/location_point.dart';
@@ -440,14 +442,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Check if session meets minimum criteria
         if (distanceMeters < SessionValidationService.minSessionDistanceMeters || 
             sessionDuration < SessionValidationService.minSessionDuration) {
-          debugPrint('Session too short to save in BLoC: distance ${currentState.distance} km, duration ${sessionDuration.inMinutes} minutes');
+          debugPrint('[ERROR] Session too short to save: ${currentState.distance}km, ${sessionDuration.inMinutes}min');
           
           // Try to delete the session as it's too short
           try {
             await _apiClient.delete('/rucks/${currentState.ruckId}');
-            debugPrint('Successfully deleted short session ${currentState.ruckId} from BLoC');
           } catch (e) {
-            debugPrint('Error deleting short session in BLoC: $e');
+            debugPrint('[ERROR] Failed to delete short session: $e');
           }
           
           // Emit error state with appropriate message
@@ -470,6 +471,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           caloriesBurned: currentState.caloriesBurned,
         ));
       } catch (e) {
+        debugPrint('[ERROR] Failed to complete session: $e');
         emit(ActiveSessionError('Failed to complete session: $e'));
       }
     }

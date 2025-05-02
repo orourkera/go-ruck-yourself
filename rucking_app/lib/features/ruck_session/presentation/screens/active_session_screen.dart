@@ -530,14 +530,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   /// Ends the current session
   Future<void> _endSession({bool fromWatch = false}) async {
-    debugPrint('Ending session...');
+    // Only log critical operations, not routine ones
     _isSessionEnded = true; // Set flag
+    
     // Stop tracking before processing end of session
     _stopwatch.stop();
     _timer?.cancel();
     _stopLocationTracking(); // Explicitly stop location tracking
-    debugPrint('Timers and location tracking stopped for session end.');
-
+    
     // Check if we have a valid session to save using SessionValidationService thresholds
     final distanceMeters = _distance * 1000; // Convert km to meters
     final sessionDuration = _elapsed;
@@ -545,14 +545,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     if (_locationPoints.isEmpty || 
         distanceMeters < SessionValidationService.minSessionDistanceMeters ||
         sessionDuration < SessionValidationService.minSessionDuration) {
-      debugPrint('Session too short to save: distance ${_distance} km, duration ${sessionDuration.inMinutes} minutes');
+      debugPrint('[ERROR] Session too short: ${_distance}km, ${_elapsed.inMinutes}min');
       
       // Try to delete the session from the backend
       try {
         await _apiClient.delete('/rucks/${widget.ruckId}');
-        debugPrint('Successfully deleted short session ${widget.ruckId}');
       } catch (e) {
-        debugPrint('Error deleting short session: $e');
+        debugPrint('[ERROR] Failed to delete short session: $e');
         // Continue anyway, as we still want to exit the session screen
       }
       

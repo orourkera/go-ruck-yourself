@@ -109,91 +109,92 @@ class WatchService {
   
   /// Handle a session started from the watch
   Future<void> _handleSessionStartedFromWatch(Map<String, dynamic> data) async {
-    final ruckWeight = data['ruckWeight'] as double;
-    
-    // Update local state
-    _isSessionActive = true;
-    _isPaused = false;
-    _ruckWeight = ruckWeight;
+    // Extract ruckWeight or use a default
+    final double ruckWeight = (data['ruckWeight'] as num?)?.toDouble() ?? 10.0;
     
     try {
-      // Get current user info
-      final user = await _authService.getCurrentUser();
-      if (user == null) {
-        debugPrint('No authenticated user found. Cannot create session.');
+      // Get current user
+      final authState = _authService.currentUser;
+      if (authState == null) {
+        debugPrint('[ERROR] No authenticated user found - cannot create session from Watch');
         return;
       }
       
-      // Create session in backend
-      final apiClient = GetIt.instance<ApiClient>();
-      final payload = {
-        'ruck_weight_kg': ruckWeight,
-        'user_weight_kg': user.weightKg,
-        'status': 'in_progress',
-        'user_id': user.userId,
-        'started_from': 'apple_watch',
-        'start_time': DateTime.now().toUtc().toIso8601String(),
-      };
+      // Create ruck session
+      final response = await GetIt.instance<ApiClient>().post('/rucks', {
+        'ruckWeight': ruckWeight,
+      });
       
-      final response = await apiClient.post('/rucks', payload);
-      debugPrint('Session created from watch: $response');
+      if (response == null || !response.containsKey('id')) {
+        return;
+      }
       
-      // Auto-navigate to active session screen if needed
-      final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
-      navigatorKey.currentState?.pushNamedAndRemoveUntil(
-        '/activeSession',
-        (route) => false,
-        arguments: response,
-      );
+      // Extract session ID and start the session
+      final String sessionId = response['id'].toString();
+      
+      // Send session ID to watch so it can include it in API calls
+      await sendSessionIdToWatch(sessionId);
+      
+      // Start session on backend
+      await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {});
+      
+      // Send event to BLoC to update UI
+      GetIt.instance<ActiveSessionBloc>().add(SessionStarted(
+        ruckId: sessionId,
+        ruckWeight: ruckWeight,
+        userWeight: await _getUserWeight() ?? 70.0, // Get from service or use default
+      ));
+      
     } catch (e) {
-      debugPrint('Error processing session start from watch: $e');
+      debugPrint('[ERROR] Failed to process session start from Watch: $e');
     }
   }
   
   /// Handle a session ended from the watch
   Future<void> _handleSessionEndedFromWatch(Map<String, dynamic> data) async {
-    // Update local state
-    _isSessionActive = false;
-    
-    // Session data from watch
-    final duration = data['duration'] as double;
-    final distance = data['distance'] as double;
-    final calories = data['calories'] as double;
-    
     try {
-      // Notify active session about completion
-      // This is usually handled through the session bloc,
-      // but here we're directly passing the watch data
-      final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
-      navigatorKey.currentState?.pushNamed(
-        '/sessionComplete',
-        arguments: {
-          'duration': Duration(seconds: duration.toInt()),
-          'distance': distance,
-          'calories': calories,
-          'ruckWeight': _ruckWeight,
-          'heartRate': _currentHeartRate,
-          'fromWatch': true,
-        },
-      );
+      final bloc = GetIt.instance<ActiveSessionBloc>();
+      if (bloc.state is ActiveSessionInProgress || bloc.state is ActiveSessionPaused) {
+        bloc.add(const SessionCompleted());
+      }
     } catch (e) {
-      debugPrint('Error handling session end from watch: $e');
+      debugPrint('[ERROR] Failed to handle session end from Watch: $e');
+    }
+  }
+  
+  /// Handle a session pause from the watch
+  Future<void> _handlePauseSessionFromWatch(Map<String, dynamic> data) async {
+    try {
+      final bloc = GetIt.instance<ActiveSessionBloc>();
+      if (bloc.state is ActiveSessionInProgress) {
+        bloc.add(const SessionPaused());
+      }
+    } catch (e) {
+      debugPrint('[ERROR] Failed to pause session from Watch: $e');
+    }
+  }
+  
+  /// Handle a session resume from the watch
+  Future<void> _handleResumeSessionFromWatch(Map<String, dynamic> data) async {
+    try {
+      final bloc = GetIt.instance<ActiveSessionBloc>();
+      if (bloc.state is ActiveSessionPaused) {
+        bloc.add(const SessionResumed());
+      }
+    } catch (e) {
+      debugPrint('[ERROR] Failed to resume session from Watch: $e');
     }
   }
   
   /// Start a new rucking session on the watch
-  Future<bool> startSessionOnWatch(double ruckWeight) async {
-    _ruckWeight = ruckWeight;
-    _isSessionActive = true;
-    _isPaused = false;
-
+  Future<void> startSessionOnWatch(double ruckWeight) async {
     try {
-      final api = FlutterRuckingApi();
-      await api.startSessionOnWatch(ruckWeight);
-      return true;
+      await _sendMessageToWatch({
+        'command': 'startSession',
+        'ruckWeight': ruckWeight,
+      });
     } catch (e) {
-      debugPrint('Error starting session on watch: $e');
-      return false;
+      debugPrint('[ERROR] Failed to start session on Watch: $e');
     }
   }
   
@@ -220,7 +221,7 @@ class WatchService {
       );
       return true;
     } catch (e) {
-      debugPrint('Error updating session on watch: $e');
+      debugPrint('[ERROR] Failed to update session on Watch: $e');
       return false;
     }
   }
@@ -234,7 +235,7 @@ class WatchService {
       await api.pauseSessionOnWatch();
       return true;
     } catch (e) {
-      debugPrint('Error pausing session on watch: $e');
+      debugPrint('[ERROR] Failed to pause session on Watch: $e');
       return false;
     }
   }
@@ -248,7 +249,7 @@ class WatchService {
       await api.resumeSessionOnWatch();
       return true;
     } catch (e) {
-      debugPrint('Error resuming session on watch: $e');
+      debugPrint('[ERROR] Failed to resume session on Watch: $e');
       return false;
     }
   }
@@ -262,7 +263,7 @@ class WatchService {
       await api.endSessionOnWatch();
       return true;
     } catch (e) {
-      debugPrint('Error ending session on watch: $e');
+      debugPrint('[ERROR] Failed to end session on Watch: $e');
       return false;
     }
   }
@@ -294,10 +295,10 @@ class WatchService {
         },
       );
       
-      debugPrint('Sync user preferences to watch result: $result');
+      debugPrint('[INFO] Sync user preferences to watch result: $result');
       return result ?? false;
     } catch (e) {
-      debugPrint('Error syncing user preferences to watch: $e');
+      debugPrint('[ERROR] Failed to sync user preferences to watch: $e');
       return false;
     }
   }
@@ -325,14 +326,14 @@ class RuckingApiHandler extends RuckingApi {
   
   @override
   Future<bool> startSessionFromWatch(double ruckWeight) async {
-    debugPrint('Starting session from watch with weight: $ruckWeight');
+    debugPrint('[INFO] Starting session from watch with weight: $ruckWeight');
     try {
       // Create new ruck session via backend API
       final apiClient = GetIt.instance<ApiClient>();
       final authService = GetIt.instance<AuthService>();
       final user = await authService.getCurrentUser();
       if (user == null) {
-        debugPrint('No authenticated user found. Cannot create session.');
+        debugPrint('[ERROR] No authenticated user found. Cannot create session.');
         return false;
       }
 
@@ -350,7 +351,7 @@ class RuckingApiHandler extends RuckingApi {
       };
       
       final response = await apiClient.post('/rucks', payload);
-      debugPrint('Session created from watch: $response');
+      debugPrint('[INFO] Session created from watch: $response');
 
       // Update app state
       _watchService._isSessionActive = true;
@@ -368,7 +369,7 @@ class RuckingApiHandler extends RuckingApi {
 
       return true;
     } catch (e) {
-      debugPrint('Error creating session from watch: $e');
+      debugPrint('[ERROR] Failed to create session from watch: $e');
       return false;
     }
   }
@@ -376,7 +377,7 @@ class RuckingApiHandler extends RuckingApi {
   @override
   Future<bool> pauseSessionFromWatch() async {
     // Implement pausing an active session
-    debugPrint('Pausing session from watch');
+    debugPrint('[INFO] Pausing session from watch');
     
     // You'll need to implement this logic to interact with your existing app
     return true;
@@ -385,7 +386,7 @@ class RuckingApiHandler extends RuckingApi {
   @override
   Future<bool> resumeSessionFromWatch() async {
     // Implement resuming a paused session
-    debugPrint('Resuming session from watch');
+    debugPrint('[INFO] Resuming session from watch');
     
     // You'll need to implement this logic to interact with your existing app
     return true;
@@ -394,7 +395,7 @@ class RuckingApiHandler extends RuckingApi {
   @override
   Future<bool> endSessionFromWatch(int duration, double distance, double calories) async {
     // Implement ending a session
-    debugPrint('Ending session from watch. Duration: $duration, Distance: $distance, Calories: $calories');
+    debugPrint('[INFO] Ending session from watch. Duration: $duration, Distance: $distance, Calories: $calories');
     
     // You'll need to implement this logic to interact with your existing app
     return true;
@@ -412,7 +413,7 @@ class RuckingApiHandler extends RuckingApi {
     // This method is for Flutter->Watch communication
     // It's implemented in RuckingApi but we don't need logic here
     // since our WatchService handles this using FlutterRuckingApi directly
-    debugPrint('startSessionOnWatch called on Flutter side, ignoring.');
+    debugPrint('[INFO] startSessionOnWatch called on Flutter side, ignoring.');
     return true;
   }
 
@@ -421,7 +422,7 @@ class RuckingApiHandler extends RuckingApi {
     // This method is for Flutter->Watch communication
     // It's implemented in RuckingApi but we don't need logic here
     // since our WatchService handles this using FlutterRuckingApi directly
-    debugPrint('updateSessionOnWatch called on Flutter side, ignoring.');
+    debugPrint('[INFO] updateSessionOnWatch called on Flutter side, ignoring.');
     return true;
   }
 }

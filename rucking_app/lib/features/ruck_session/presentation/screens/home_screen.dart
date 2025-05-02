@@ -586,7 +586,44 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           ),
                           child: InkWell(
                             onTap: () {
-                              // TODO: Navigate to session details
+                              // Show basic session details in a dialog instead of navigating to a new screen
+                              // This is a temporary solution until SessionDetailsScreen is implemented
+                              final sessionId = session['id']?.toString() ?? 'Unknown';
+                              final date = session['created_at'] != null 
+                                  ? DateFormat('MMM d, yyyy').format(DateTime.parse(session['created_at'] as String))
+                                  : 'Unknown date';
+                              final duration = session['duration_seconds'] != null
+                                  ? _formatDuration(Duration(seconds: (session['duration_seconds'] as num).toInt()))
+                                  : 'Unknown duration';
+                              final distance = session['distance_km'] != null
+                                  ? MeasurementUtils.formatDistance(session['distance_km'] as double, metric: preferMetric)
+                                  : 'Unknown distance';
+                              
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text('Session Details'),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Date: $date'),
+                                      SizedBox(height: 8),
+                                      Text('Duration: $duration'),
+                                      SizedBox(height: 8),
+                                      Text('Distance: $distance'),
+                                      SizedBox(height: 8),
+                                      Text('Session ID: $sessionId'),
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      child: Text('Close'),
+                                    ),
+                                  ],
+                                ),
+                              );
                             },
                             borderRadius: BorderRadius.circular(12),
                             child: Padding(
@@ -787,5 +824,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         ),
       ],
     );
+  }
+  
+  // Format duration as HH:MM:SS
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return '${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds';
   }
 } 
