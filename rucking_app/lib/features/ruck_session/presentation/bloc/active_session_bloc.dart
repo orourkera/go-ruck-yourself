@@ -1,219 +1,36 @@
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:rucking_app/core/models/api_exception.dart';
+import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
-import 'package:rucking_app/core/models/location_point.dart';
-import 'package:rucking_app/core/utils/measurement_utils.dart'; // Import MeasurementUtils
-import 'package:rucking_app/core/utils/met_calculator.dart'; // Import MetCalculator
-import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart'; // Import SessionValidationService
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/utils/error_handler.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 
-// Events
-abstract class ActiveSessionEvent extends Equatable {
-  const ActiveSessionEvent();
-  
-  @override
-  List<Object?> get props => [];
-}
+part 'active_session_event.dart';
+part 'active_session_state.dart';
 
-class SessionStarted extends ActiveSessionEvent {
-  final String ruckId;
-  final double? userWeightKg;
-  final double? ruckWeightKg;
-  
-  const SessionStarted({
-    required this.ruckId,
-    this.userWeightKg,
-    this.ruckWeightKg,
-  });
-  
-  @override
-  List<Object?> get props => [ruckId, userWeightKg, ruckWeightKg];
-}
-
-class LocationUpdated extends ActiveSessionEvent {
-  final LocationPoint locationPoint;
-  
-  const LocationUpdated(this.locationPoint);
-  
-  @override
-  List<Object?> get props => [locationPoint];
-}
-
-class SessionPaused extends ActiveSessionEvent {}
-
-class SessionResumed extends ActiveSessionEvent {}
-
-class SessionCompleted extends ActiveSessionEvent {
-  final String? notes;
-  final int? rating;
-  
-  const SessionCompleted({this.notes, this.rating});
-  
-  @override
-  List<Object?> get props => [notes, rating];
-}
-
-// States
-abstract class ActiveSessionState extends Equatable {
-  const ActiveSessionState();
-  
-  @override
-  List<Object?> get props => [];
-}
-
-class ActiveSessionInitial extends ActiveSessionState {}
-
-class ActiveSessionInProgress extends ActiveSessionState {
-  final String ruckId;
-  final List<LocationPoint> locationPoints;
-  final Duration elapsed;
-  final double distance;
-  final double elevationGain;
-  final double elevationLoss;
-  final double caloriesBurned;
-  final double pace;
-  final double? userWeightKg;
-  final double? ruckWeightKg;
-  
-  const ActiveSessionInProgress({
-    required this.ruckId,
-    required this.locationPoints,
-    required this.elapsed,
-    required this.distance,
-    required this.elevationGain,
-    required this.elevationLoss,
-    required this.caloriesBurned,
-    required this.pace,
-    this.userWeightKg,
-    this.ruckWeightKg,
-  });
-  
-  @override
-  List<Object?> get props => [
-    ruckId, 
-    locationPoints, 
-    elapsed, 
-    distance, 
-    elevationGain, 
-    elevationLoss, 
-    caloriesBurned, 
-    pace,
-    userWeightKg,
-    ruckWeightKg,
-  ];
-  
-  ActiveSessionInProgress copyWith({
-    String? ruckId,
-    List<LocationPoint>? locationPoints,
-    Duration? elapsed,
-    double? distance,
-    double? elevationGain,
-    double? elevationLoss,
-    double? caloriesBurned,
-    double? pace,
-    double? userWeightKg,
-    double? ruckWeightKg,
-  }) {
-    return ActiveSessionInProgress(
-      ruckId: ruckId ?? this.ruckId,
-      locationPoints: locationPoints ?? this.locationPoints,
-      elapsed: elapsed ?? this.elapsed,
-      distance: distance ?? this.distance,
-      elevationGain: elevationGain ?? this.elevationGain,
-      elevationLoss: elevationLoss ?? this.elevationLoss,
-      caloriesBurned: caloriesBurned ?? this.caloriesBurned,
-      pace: pace ?? this.pace,
-      userWeightKg: userWeightKg ?? this.userWeightKg,
-      ruckWeightKg: ruckWeightKg ?? this.ruckWeightKg,
-    );
-  }
-}
-
-class ActiveSessionPaused extends ActiveSessionInProgress {
-  const ActiveSessionPaused({
-    required super.ruckId,
-    required super.locationPoints,
-    required super.elapsed,
-    required super.distance,
-    required super.elevationGain,
-    required super.elevationLoss,
-    required super.caloriesBurned,
-    required super.pace,
-    super.userWeightKg,
-    super.ruckWeightKg,
-  });
-}
-
-class ActiveSessionError extends ActiveSessionState {
-  final String message;
-  
-  const ActiveSessionError(this.message);
-  
-  @override
-  List<Object?> get props => [message];
-}
-
-class ActiveSessionCompleted extends ActiveSessionState {
-  final String ruckId;
-  final Duration elapsed;
-  final double distance;
-  final double elevationGain;
-  final double elevationLoss;
-  final double caloriesBurned;
-  
-  const ActiveSessionCompleted({
-    required this.ruckId,
-    required this.elapsed,
-    required this.distance,
-    required this.elevationGain,
-    required this.elevationLoss,
-    required this.caloriesBurned,
-  });
-  
-  @override
-  List<Object?> get props => [
-    ruckId, 
-    elapsed, 
-    distance, 
-    elevationGain, 
-    elevationLoss, 
-    caloriesBurned
-  ];
-}
-
-// BLoC
 class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final ApiClient _apiClient;
   final LocationService _locationService;
-  
   StreamSubscription<LocationPoint>? _locationSubscription;
-  Timer? _timer;
-  final Stopwatch _stopwatch = Stopwatch();
   
   ActiveSessionBloc({
     required ApiClient apiClient,
     required LocationService locationService,
-  }) : 
-    _apiClient = apiClient,
-    _locationService = locationService,
-    super(ActiveSessionInitial()) {
+  }) : _apiClient = apiClient,
+       _locationService = locationService,
+       super(ActiveSessionInitial()) {
     on<SessionStarted>(_onSessionStarted);
     on<LocationUpdated>(_onLocationUpdated);
     on<SessionPaused>(_onSessionPaused);
     on<SessionResumed>(_onSessionResumed);
     on<SessionCompleted>(_onSessionCompleted);
-  }
-  
-  @override
-  Future<void> close() {
-    _locationSubscription?.cancel();
-    _timer?.cancel();
-    _stopwatch.stop();
-    return super.close();
+    on<SessionFailed>(_onSessionFailed);
   }
   
   Future<void> _onSessionStarted(
@@ -221,57 +38,82 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     Emitter<ActiveSessionState> emit
   ) async {
     try {
-      // Notify API that session has started
-      await _apiClient.post('/rucks/${event.ruckId}/start', {});
+      // Start a new session
+      emit(ActiveSessionLoading());
       
-      // Start tracking time
-      _stopwatch.start();
-      _timer = Timer.periodic(
-        const Duration(seconds: 1), 
-        (_) => add(LocationUpdated(
-          LocationPoint(
-            latitude: 0, 
-            longitude: 0, 
-            elevation: 0, 
-            timestamp: DateTime.now(),
-            accuracy: 0,
-          )
-        ))
-      );
+      AppLogger.info('Starting a new ruck session with weight: ${event.ruckWeightKg}kg');
+      
+      // Create a new session in the backend
+      final response = await _apiClient.post('/rucks', {
+        'ruck_weight_kg': event.ruckWeightKg,
+        'notes': event.notes,
+      });
+      
+      // Extract session ID from response
+      final String sessionId = response['id'];
+      AppLogger.info('Created new session with ID: $sessionId');
       
       // Start location tracking
-      try {
-        final hasPermission = await _locationService.hasLocationPermission();
-        if (!hasPermission) {
-          await _locationService.requestLocationPermission();
-        }
-      } catch (e) {
-        debugPrint('[ERROR] Failed to check location permission: $e');
-        emit(const ActiveSessionError('Failed to check location permission'));
-        return;
-      }
+      _startLocationTracking(emit);
       
-      _startLocationTracking();
-      
-      // Extract weights from event - these are properly passed from ActiveSessionScreen
-      double? userWeightKg = event.userWeightKg;
-      double? ruckWeightKg = event.ruckWeightKg;
-
-      // Initial state
-      emit(ActiveSessionInProgress(
-        ruckId: event.ruckId,
+      // Emit success state with session ID
+      emit(ActiveSessionRunning(
+        sessionId: sessionId,
         locationPoints: [],
-        elapsed: Duration.zero,
-        distance: 0,
+        elapsedSeconds: 0,
+        distanceKm: 0.0,
+        ruckWeightKg: event.ruckWeightKg,
+        notes: event.notes,
+        calories: 0,
         elevationGain: 0,
         elevationLoss: 0,
-        caloriesBurned: 0,
-        pace: 0,
-        userWeightKg: userWeightKg,
-        ruckWeightKg: ruckWeightKg,
       ));
     } catch (e) {
-      emit(ActiveSessionError('Failed to start session: $e'));
+      AppLogger.error('Failed to start session: $e');
+      
+      // Emit failure state with user-friendly error message
+      emit(ActiveSessionFailure(
+        errorMessage: ErrorHandler.getUserFriendlyMessage(e, 'Session Start'),
+      ));
+    }
+  }
+  
+  void _startLocationTracking(Emitter<ActiveSessionState> emit) {
+    try {
+      _locationSubscription?.cancel();
+      
+      final locationStream = _locationService.startLocationTracking();
+      
+      _locationSubscription = locationStream.listen(
+        (locationPoint) {
+          add(LocationUpdated(locationPoint));
+        },
+        onError: (error) {
+          AppLogger.error('Location error: $error');
+          
+          // Only send location errors that are critical to the session
+          if (state is ActiveSessionRunning) {
+            add(SessionFailed(
+              errorMessage: ErrorHandler.getUserFriendlyMessage(
+                error, 
+                'Location Tracking'
+              ),
+            ));
+          }
+        },
+      );
+    } catch (e) {
+      AppLogger.error('Failed to start location tracking: $e');
+      
+      // Don't change state if we're not in Running state - just log the error
+      if (state is ActiveSessionRunning) {
+        emit(ActiveSessionFailure(
+          errorMessage: ErrorHandler.getUserFriendlyMessage(
+            e, 
+            'Location Tracking'
+          ),
+        ));
+      }
     }
   }
   
@@ -279,74 +121,83 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     LocationUpdated event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    if (state is ActiveSessionInProgress) {
-      final currentState = state as ActiveSessionInProgress;
-      
-      if (event.locationPoint.latitude == 0 && 
-          event.locationPoint.longitude == 0) {
-        // This is just a timer tick, update elapsed time
-        emit(currentState.copyWith(
-          elapsed: _stopwatch.elapsed,
-        ));
-        return;
-      }
-      
-      // Real location update
-      final newPoints = List<LocationPoint>.from(currentState.locationPoints)
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      final List<LocationPoint> updatedPoints = List.from(currentState.locationPoints)
         ..add(event.locationPoint);
       
-      // Calculate updated stats using MeasurementUtils
-      final newDistance = MeasurementUtils.totalDistance(newPoints);
-      final newElevationGain = MeasurementUtils.totalElevationGain(newPoints);
-      final newElevationLoss = MeasurementUtils.totalElevationLoss(newPoints);
-      final newPace = newDistance > 0
-          ? (_stopwatch.elapsed.inSeconds / 60) / newDistance
-          : 0.0;
-
-      // --- MET-based calorie calculation using actual weights ---
-      // Try to get actual user and ruck weights from currentState if available
-      double userWeightKg = currentState.userWeightKg ?? 75.0; // fallback
-      double ruckWeightKg = currentState.ruckWeightKg ?? 0.0; // fallback
-
-      final double totalWeightKg = userWeightKg + ruckWeightKg;
-      final double durationMinutes = _stopwatch.elapsed.inSeconds / 60.0;
-      final double distanceMeters = newDistance * 1000;
-      final double grade = (distanceMeters > 0)
-          ? newElevationGain / distanceMeters * 100
-          : 0.0;
-      final double speedKmh = (_stopwatch.elapsed.inHours > 0)
-          ? newDistance / _stopwatch.elapsed.inHours
-          : 0.0;
-      final double speedMph = MetCalculator.kmhToMph(speedKmh);
-      final double ruckWeightLbs = ruckWeightKg * 2.20462;
-      final double met = MetCalculator.calculateRuckingMetByGrade(
-        speedMph: speedMph,
-        grade: grade,
-        ruckWeightLbs: ruckWeightLbs,
-      );
-      final double newCalories = MetCalculator.calculateCaloriesBurned(
-        weightKg: totalWeightKg,
-        durationMinutes: durationMinutes,
-        metValue: met,
-      );
-
-      emit(currentState.copyWith(
-        locationPoints: newPoints,
-        elapsed: _stopwatch.elapsed,
-        distance: newDistance,
-        elevationGain: newElevationGain,
-        elevationLoss: newElevationLoss,
-        caloriesBurned: newCalories,
-        pace: newPace,
+      // Calculate new distance
+      double newDistance = currentState.distanceKm;
+      if (updatedPoints.length > 1) {
+        final previousPoint = updatedPoints[updatedPoints.length - 2];
+        final newPoint = event.locationPoint;
+        
+        try {
+          // Calculate distance between last two points
+          final segmentDistance = _locationService.calculateDistanceKm(
+            previousPoint, 
+            newPoint
+          );
+          
+          // Only add distance if it's reasonable (prevents GPS jumps)
+          if (segmentDistance < 0.5) { // Less than 500m per update
+            newDistance += segmentDistance;
+          } else {
+            AppLogger.warning('Ignoring large distance jump: ${segmentDistance}km');
+          }
+        } catch (e) {
+          AppLogger.error('Error calculating distance: $e');
+          // Don't update distance on error, keep previous value
+        }
+      }
+      
+      // Calculate elevation changes
+      double elevationGain = currentState.elevationGain;
+      double elevationLoss = currentState.elevationLoss;
+      
+      if (updatedPoints.length > 1) {
+        final previousPoint = updatedPoints[updatedPoints.length - 2];
+        final newPoint = event.locationPoint;
+        
+        final elevationDifference = newPoint.elevation - previousPoint.elevation;
+        
+        // Only count significant elevation changes (>1m) to filter noise
+        if (elevationDifference > 1) {
+          elevationGain += elevationDifference;
+        } else if (elevationDifference < -1) {
+          elevationLoss += elevationDifference.abs();
+        }
+      }
+      
+      // Update the state with new location data
+      emit(ActiveSessionRunning(
+        sessionId: currentState.sessionId,
+        locationPoints: updatedPoints,
+        elapsedSeconds: currentState.elapsedSeconds + 1, // Increment elapsed time
+        distanceKm: newDistance,
+        ruckWeightKg: currentState.ruckWeightKg,
+        notes: currentState.notes,
+        calories: _calculateCalories(
+          newDistance, 
+          currentState.ruckWeightKg
+        ),
+        elevationGain: elevationGain,
+        elevationLoss: elevationLoss,
+        isPaused: currentState.isPaused,
       ));
       
-      // Send update to API periodically, now with elevation gain/loss
-      _sendLocationUpdateToApi(
-        event.locationPoint, 
-        currentState.ruckId,
-        elevationGain: newElevationGain,
-        elevationLoss: newElevationLoss,
-      );
+      // Update backend with new location point
+      try {
+        await _apiClient.post('/rucks/${currentState.sessionId}/locations', {
+          'latitude': event.locationPoint.latitude,
+          'longitude': event.locationPoint.longitude,
+          'elevation': event.locationPoint.elevation,
+          'timestamp': event.locationPoint.timestamp.toIso8601String(),
+        });
+      } catch (e) {
+        // Only log the error, don't disrupt the session for location updates
+        AppLogger.error('Failed to send location to backend: $e');
+      }
     }
   }
   
@@ -354,34 +205,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionPaused event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    if (state is ActiveSessionInProgress) {
-      final currentState = state as ActiveSessionInProgress;
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
       
-      // Pause time tracking
-      _stopwatch.stop();
+      AppLogger.info('Pausing session ${currentState.sessionId}');
       
-      // Pause location tracking
-      _locationSubscription?.pause();
-      
-      // Notify API
+      // Update backend about pause
       try {
-        await _apiClient.post('/rucks/${currentState.ruckId}/pause', {});
+        await _apiClient.post('/rucks/${currentState.sessionId}/pause', {});
       } catch (e) {
-        debugPrint('[ERROR] Failed to pause session: $e');
+        AppLogger.error('Failed to pause session in backend: $e');
+        // Continue with local pause even if backend update fails
       }
       
-      emit(ActiveSessionPaused(
-        ruckId: currentState.ruckId,
-        locationPoints: currentState.locationPoints,
-        elapsed: currentState.elapsed,
-        distance: currentState.distance,
-        elevationGain: currentState.elevationGain,
-        elevationLoss: currentState.elevationLoss,
-        caloriesBurned: currentState.caloriesBurned,
-        pace: currentState.pace,
-        userWeightKg: currentState.userWeightKg,
-        ruckWeightKg: currentState.ruckWeightKg,
-      ));
+      // Emit paused state
+      emit(currentState.copyWith(isPaused: true));
     }
   }
   
@@ -389,34 +227,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionResumed event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    if (state is ActiveSessionPaused) {
-      final currentState = state as ActiveSessionPaused;
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
       
-      // Resume time tracking
-      _stopwatch.start();
+      AppLogger.info('Resuming session ${currentState.sessionId}');
       
-      // Resume location tracking
-      _locationSubscription?.resume();
-      
-      // Notify API
+      // Update backend about resume
       try {
-        await _apiClient.post('/rucks/${currentState.ruckId}/resume', {});
+        await _apiClient.post('/rucks/${currentState.sessionId}/resume', {});
       } catch (e) {
-        debugPrint('[ERROR] Failed to resume session: $e');
+        AppLogger.error('Failed to resume session in backend: $e');
+        // Continue with local resume even if backend update fails
       }
       
-      emit(ActiveSessionInProgress(
-        ruckId: currentState.ruckId,
-        locationPoints: currentState.locationPoints,
-        elapsed: currentState.elapsed,
-        distance: currentState.distance,
-        elevationGain: currentState.elevationGain,
-        elevationLoss: currentState.elevationLoss,
-        caloriesBurned: currentState.caloriesBurned,
-        pace: currentState.pace,
-        userWeightKg: currentState.userWeightKg,
-        ruckWeightKg: currentState.ruckWeightKg,
-      ));
+      // Emit resumed state
+      emit(currentState.copyWith(isPaused: false));
     }
   }
   
@@ -424,90 +249,117 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionCompleted event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    if (state is ActiveSessionInProgress || state is ActiveSessionPaused) {
-      final currentState = state as ActiveSessionInProgress;
-      
-      // Stop tracking
-      _stopwatch.stop();
-      _locationSubscription?.cancel();
-      _timer?.cancel();
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
       
       try {
-        // Validate session meets minimum thresholds before completing
-        final distanceMeters = currentState.distance * 1000; // Convert km to meters
-        final sessionDuration = currentState.elapsed;
+        AppLogger.info('Completing session ${currentState.sessionId}');
         
-        // Check if session meets minimum criteria
-        if (distanceMeters < SessionValidationService.minSessionDistanceMeters || 
-            sessionDuration < SessionValidationService.minSessionDuration) {
-          debugPrint('[ERROR] Session too short to save: ${currentState.distance}km, ${sessionDuration.inMinutes}min');
+        // Validate session meets minimum requirements
+        if (currentState.locationPoints.isEmpty ||
+            currentState.distanceKm < SessionValidationService.minSessionDistanceMeters / 1000 ||
+            currentState.elapsedSeconds < SessionValidationService.minSessionDuration.inSeconds) {
           
-          // Try to delete the session as it's too short
+          AppLogger.warning('Session too short to save: ${currentState.distanceKm}km, ${currentState.elapsedSeconds}s');
+          
+          // Try to delete the session from the backend
           try {
-            await _apiClient.delete('/rucks/${currentState.ruckId}');
+            await _apiClient.delete('/rucks/${currentState.sessionId}');
+            AppLogger.info('Deleted short session from backend');
           } catch (e) {
-            debugPrint('[ERROR] Failed to delete short session: $e');
+            AppLogger.error('Failed to delete short session: $e');
           }
           
-          // Emit error state with appropriate message
-          emit(ActiveSessionError('Session too short: minimum ${SessionValidationService.minSessionDistanceMeters}m and ${SessionValidationService.minSessionDuration.inMinutes} minutes required.'));
+          emit(ActiveSessionFailure(
+            errorMessage: 'Session too short to save. Please ruck for at least 100m and 2 minutes.',
+          ));
           return;
         }
         
-        // Complete session on backend
-        await _apiClient.post('/rucks/${currentState.ruckId}/complete', {
+        // Update backend about session completion
+        await _apiClient.post('/rucks/${currentState.sessionId}/complete', {
           'notes': event.notes,
           'rating': event.rating,
         });
         
-        emit(ActiveSessionCompleted(
-          ruckId: currentState.ruckId,
-          elapsed: currentState.elapsed,
-          distance: currentState.distance,
-          elevationGain: currentState.elevationGain,
-          elevationLoss: currentState.elevationLoss,
-          caloriesBurned: currentState.caloriesBurned,
+        // Cancel location subscription
+        await _locationSubscription?.cancel();
+        _locationSubscription = null;
+        
+        // Emit completion state
+        emit(ActiveSessionComplete(
+          session: RuckSession(
+            id: currentState.sessionId,
+            ruckWeightKg: currentState.ruckWeightKg,
+            distanceKm: currentState.distanceKm,
+            durationSeconds: currentState.elapsedSeconds,
+            startTime: DateTime.now().subtract(Duration(seconds: currentState.elapsedSeconds)),
+            endTime: DateTime.now(),
+            notes: event.notes,
+            rating: event.rating,
+            caloriesBurned: currentState.calories.toInt(),
+            elevationGainMeters: currentState.elevationGain,
+            elevationLossMeters: currentState.elevationLoss,
+          ),
         ));
       } catch (e) {
-        debugPrint('[ERROR] Failed to complete session: $e');
-        emit(ActiveSessionError('Failed to complete session: $e'));
+        AppLogger.error('Failed to complete session: $e');
+        
+        // Try fallback - complete locally even if backend fails
+        await _locationSubscription?.cancel();
+        _locationSubscription = null;
+        
+        // Check if the error is a network issue
+        final errorMessage = e is ApiException && e.statusCode == 503
+            ? 'Could not save to server - check your internet connection. Your session data is saved locally.'
+            : ErrorHandler.getUserFriendlyMessage(e, 'Session Completion');
+        
+        emit(ActiveSessionFailure(
+          errorMessage: errorMessage,
+        ));
       }
     }
   }
   
-  void _startLocationTracking() {
-    _locationSubscription = _locationService.startLocationTracking().listen(
-      _handleLocationUpdate,
-      onError: (error) {
-        debugPrint('[ERROR] Location tracking error: $error');
-      }
-    );
+  void _onSessionFailed(
+    SessionFailed event, 
+    Emitter<ActiveSessionState> emit
+  ) {
+    AppLogger.error('Session failed: ${event.errorMessage}');
+    
+    // Cancel location subscription
+    _locationSubscription?.cancel();
+    _locationSubscription = null;
+    
+    // Emit failure state
+    emit(ActiveSessionFailure(
+      errorMessage: event.errorMessage,
+    ));
   }
   
-  void _handleLocationUpdate(LocationPoint locationPoint) {
-    add(LocationUpdated(locationPoint));
+  /// Calculate calories burned based on distance, weight, and MET value
+  int _calculateCalories(double distanceKm, double ruckWeightKg) {
+    // MET values (Metabolic Equivalent of Task):
+    // - Walking with weighted backpack (10-20kg): ~7.0 MET
+    // - Walking with very heavy backpack (>20kg): ~8.5 MET
+    double metValue = ruckWeightKg < 20 ? 7.0 : 8.5;
+    
+    // Average weight of a person in kg (adjust if needed)
+    const double averageWeightKg = 70.0;
+    
+    // Standard formula for calories burned:
+    // Calories = MET × Weight (kg) × Duration (hours)
+    
+    // Estimate duration based on distance and average walking speed (4.5 km/h with ruck)
+    double durationHours = distanceKm / 4.5;
+    
+    // Calculate calories
+    return (metValue * averageWeightKg * durationHours).round();
   }
   
-  Future<void> _sendLocationUpdateToApi(
-    LocationPoint point, 
-    String ruckId,
-    {double? elevationGain, double? elevationLoss}
-  ) async {
-    try {
-      await _apiClient.post(
-        '/rucks/$ruckId/location',
-        {
-          'latitude': point.latitude,
-          'longitude': point.longitude,
-          'elevation_meters': point.elevation,
-          'timestamp': point.timestamp.toIso8601String(),
-          'accuracy_meters': point.accuracy,
-          if (elevationGain != null) 'elevation_gain_meters': elevationGain,
-          if (elevationLoss != null) 'elevation_loss_meters': elevationLoss,
-        },
-      );
-    } catch (e) {
-      debugPrint('[ERROR] Failed to send location update: $e');
-    }
+  @override
+  Future<void> close() {
+    _locationSubscription?.cancel();
+    return super.close();
   }
-} 
+}

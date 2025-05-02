@@ -28,6 +28,8 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:rucking_app/core/error_messages.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/utils/error_handler.dart';
 
 LatLng _getRouteCenter(List locationPoints) {
   if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
@@ -216,7 +218,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   /// Initialize location tracking service
   Future<void> _initLocationTracking() async {
     try {
-      debugPrint('[INFO] Starting location tracking...');
+      AppLogger.info('Starting location tracking...');
       final hasPermission = await _locationService.hasLocationPermission();
       if (!hasPermission) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -229,7 +231,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       _locationSubscription = _locationService.startLocationTracking().listen(
         _handleLocationUpdate,
         onError: (error) {
-          debugPrint('[ERROR] Location tracking error: $error');
+          AppLogger.error('Location tracking error: $error');
         }
       );
       
@@ -241,18 +243,18 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
           setState(() {}); // Update UI with initial position
         }
       } catch (e) {
-        debugPrint('[ERROR] Failed to get initial location: $e');
+        AppLogger.error('Failed to get initial location: $e');
       }
-      debugPrint('[INFO] Location tracking started successfully.');
+      AppLogger.info('Location tracking started successfully.');
     } catch (e) {
-      debugPrint('[ERROR] Error starting location tracking: $e');
+      AppLogger.error('Error starting location tracking: $e');
     }
   }
   
   /// Handle incoming location updates
   void _handleLocationUpdate(LocationPoint locationPoint) {
     if (_isSessionEnded) {
-      debugPrint('[INFO] Session ended. Ignoring location update.');
+      AppLogger.info('Session ended. Ignoring location update.');
       return;
     }
     
@@ -430,16 +432,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         'timestamp': locationPoint.timestamp.toIso8601String(),
         'accuracy_meters': locationPoint.accuracy.toDouble(),
       };
-      debugPrint('[INFO] Sending location update payload: $payload');
+      AppLogger.info('Sending location update payload: $payload');
       await _apiClient.post(
         '/rucks/${widget.ruckId}/location',
         payload,
       ).catchError((e) {
-        debugPrint('[ERROR] Failed to send location update: $e');
+        AppLogger.error('Failed to send location update: $e');
         return; // Ensure a return even in error case
       });
     } catch (e) {
-      debugPrint('[ERROR] Error in _sendLocationUpdate: $e');
+      AppLogger.error('Error in _sendLocationUpdate: $e');
     }
   }
   
@@ -459,24 +461,32 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     }
     
     if (!hasPermission) {
-      _showErrorSnackBar(sessionLocationPermissionDenied);
+      setState(() {
+        _isPaused = true;
+        _stopwatch.stop();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(sessionLocationPermissionDenied),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
     
-    // Start location tracking (extracted helper)
+    // Start location tracking
     await _initLocationTracking();
     
     try {
       await _apiClient.post('/rucks/${widget.ruckId}/start', {});
     } catch (e) {
-      debugPrint('[ERROR] Failed to start session: $e');
+      AppLogger.error('Failed to start session: $e');
       
       // Handle unauthorized errors specifically
       if (e is UnauthorizedException) {
-        // More specific error message for auth issues
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text(serverUnauthorized),
+            content: const Text('Your session has expired. Please login again.'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
@@ -490,7 +500,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       } else {
         // Generic error message
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(sessionStartError))
+          SnackBar(content: Text(ErrorHandler.getUserFriendlyMessage(e, 'Start Session')))
         );
       }
     }
@@ -515,7 +525,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _locationSubscription?.resume();
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/resume', {})
-            .catchError((e) => debugPrint('[ERROR] Failed to resume session: $e'));
+            .catchError((e) => AppLogger.error('Failed to resume session: $e'));
       } else {
         _stopwatch.stop();
         _isPaused = true;
@@ -523,257 +533,243 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _locationSubscription?.pause();
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/pause', {})
-            .catchError((e) => debugPrint('[ERROR] Failed to pause session: $e'));
+            .catchError((e) => AppLogger.error('Failed to pause session: $e'));
       }
     });
   }
   
   /// Ends the current session
-  Future<void> _endSession({bool fromWatch = false}) async {
-    // Only log critical operations, not routine ones
-    _isSessionEnded = true; // Set flag
-    
-    // Stop tracking before processing end of session
-    _stopwatch.stop();
-    _timer?.cancel();
-    _stopLocationTracking(); // Explicitly stop location tracking
-    
-    // Check if we have a valid session to save using SessionValidationService thresholds
-    final distanceMeters = _distance * 1000; // Convert km to meters
-    final sessionDuration = _elapsed;
-    
-    if (_locationPoints.isEmpty || 
-        distanceMeters < SessionValidationService.minSessionDistanceMeters ||
-        sessionDuration < SessionValidationService.minSessionDuration) {
-      debugPrint('[ERROR] Session too short: ${_distance}km, ${_elapsed.inMinutes}min');
-      
-      // Try to delete the session from the backend
-      try {
-        await _apiClient.delete('/rucks/${widget.ruckId}');
-      } catch (e) {
-        debugPrint('[ERROR] Failed to delete short session: $e');
-        // Continue anyway, as we still want to exit the session screen
-      }
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Session too short to save: minimum ${SessionValidationService.minSessionDistanceMeters}m and ${SessionValidationService.minSessionDuration.inMinutes} minutes required.'), 
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-        // Navigate back to home screen
-        Navigator.of(context).pop();
-      }
-      return;
-    }
-
-    // Capture end-session timestamp
-    final DateTime completedAt = DateTime.now();
-    
+  Future<void> _endSession() async {
     try {
-      // Get final session distance
-      final distanceMeters = _distance * 1000; // Convert km to meters
+      // Prevent double-ending
+      if (_isSessionEnded) return;
       
-      // Validate session before saving - ensure at least 3 minutes of activity
-      final Duration minDuration = Duration(minutes: 3);
-      bool isValid = _elapsed.inSeconds >= minDuration.inSeconds;
+      // Mark session as ended and stop tracking
+      setState(() {
+        _isSessionEnded = true;
+      });
       
-      if (!isValid) {
-        // Remove the session from backend if it's too short or invalid
+      // Safely stop location tracking with error handling
+      try {
+        _stopLocationTracking();
+      } catch (e) {
+        AppLogger.error('Error stopping location tracking: $e');
+        // Continue with session end even if tracking stop fails
+      }
+      
+      // Check if session meets minimum requirements
+      if (_locationPoints.isEmpty || 
+          _distance < SessionValidationService.minSessionDistanceMeters / 1000 ||
+          _elapsed.inSeconds < SessionValidationService.minSessionDuration.inSeconds) {
+        
+        AppLogger.error('Session too short: ${_distance}km, ${_elapsed.inMinutes}min');
+        
+        // Show user friendly message
+        _showShortSessionDialog();
+        
+        // Delete short session from API
         try {
           await _apiClient.delete('/rucks/${widget.ruckId}');
-          debugPrint('[INFO] Deleted short session ${widget.ruckId} from backend');
+          AppLogger.info('Deleted short session ${widget.ruckId} from backend');
         } catch (e) {
-          debugPrint('[ERROR] Failed to delete short session: $e');
+          AppLogger.error('Failed to delete short session: $e');
         }
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(sessionTooShortError.replaceAll('{minutes}', '3')),
-            backgroundColor: Colors.red,
-          ),
-        );
-        Navigator.pop(context);
+        
         return;
       }
       
-      // Create route coordinates string for API
-      List<Map<String, dynamic>> routeCoordinates = [];
+      // Calculate final values
+      final double finalDistanceKm = _distance;
       
-      // Use only valid location points that met our criteria
-      if (_locationPoints.isNotEmpty) {
-        for (final point in _locationPoints) {
-          routeCoordinates.add({
-            'latitude': point.latitude,
-            'longitude': point.longitude,
-            'elevation': point.elevation,
-            'timestamp': point.timestamp.toIso8601String(),
-          });
-        }
-      }
-      
-      // Determine user's unit preference
-      final authState = context.read<AuthBloc>().state;
-      final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-
-      // Write data to Apple Health if available and enabled in app config
-      if (AppConfig.enableHealthSync) {
-        try {
-          // Get the last heart rate reading if available
-          final heartRateReading = (_heartRate != null && _heartRate! > 0) ? _heartRate : null;
-          
-          // Convert weight from pounds to kg if needed
-          double? ruckWeightKg;
-          if (widget.ruckWeight != null && widget.ruckWeight! > 0) {
-            ruckWeightKg = preferMetric ? widget.ruckWeight : widget.ruckWeight! * 0.453592;
+      // Show session completion dialog
+      _showCompletionDialog(
+        onComplete: (String? notes, int? rating) async {
+          try {
+            // Send session completed event to API
+            await _apiClient.post('/rucks/${widget.ruckId}/complete', {
+              'notes': notes,
+              'rating': rating,
+            });
+            
+            // Try to save to Apple Health
+            if (Platform.isIOS) {
+              try {
+                // Save data to Apple Health if we're on iOS
+                await _healthService.saveWorkout(
+                  startDate: _startTime,
+                  endDate: DateTime.now(),
+                  distanceKm: finalDistanceKm,
+                  caloriesBurned: _calculateCalories().toInt(),
+                  ruckWeightKg: widget.ruckWeightKg,
+                );
+              } catch (e) {
+                // Log error but don't block session completion
+                AppLogger.error('Failed to write to Apple Health: $e');
+              }
+            }
+            
+            // Navigate back to home screen after successful completion
+            if (mounted) {
+              Navigator.of(context).pop();
+            }
+          } catch (e) {
+            AppLogger.error('Failed to complete session: $e');
+            
+            // Show friendly error message
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(ErrorHandler.getUserFriendlyMessage(e, 'Complete Session')),
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+            
+            // Still navigate back to avoid being stuck on this screen
+            if (mounted) {
+              Navigator.of(context).pop();
+            }
           }
-          
-          // End time is now, start time is calculated by subtracting elapsed time
-          final endTime = DateTime.now();
-          final startTime = endTime.subtract(Duration(seconds: _elapsed.inSeconds));
-          
-          // Save as a complete workout with all metadata
-          context.read<HealthBloc>().add(SaveRuckWorkout(
-            distanceMeters: distanceMeters,
-            caloriesBurned: _caloriesBurned,
-            startTime: startTime,
-            endTime: endTime,
-            ruckWeightKg: ruckWeightKg,
-            elevationGainMeters: _elevationGain,
-            elevationLossMeters: _elevationLoss,
-            heartRate: heartRateReading,
-          ));
-          
-          // For backwards compatibility, also write as individual health records
-          context.read<HealthBloc>().add(WriteHealthData(
-            distanceMeters: distanceMeters,
-            caloriesBurned: _caloriesBurned,
-            startTime: startTime,
-            endTime: endTime,
-          ));
-        } catch (e) {
-          // Log error but don't block session completion
-          debugPrint('[ERROR] Failed to write to Apple Health: $e');
-        }
-      }
-      
-      // Navigate to completion screen, passing final calculated stats
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => SessionCompleteScreen(
-            completedAt: completedAt,
-            ruckId: widget.ruckId,
-            duration: _elapsed, // Pass final elapsed time
-            distance: _distance, // Pass final calculated distance
-            caloriesBurned: _caloriesBurned.round(), // Pass final calculated calories
-            elevationGain: _elevationGain,
-            elevationLoss: _elevationLoss,
-            ruckWeight: widget.ruckWeight, // Pass numeric value instead of formatted string
-            // Pass initial notes if available, SessionCompleteScreen allows editing
-            initialNotes: widget.notes, 
-          ),
-        ),
+        },
+        onCancel: () {
+          // Just navigate back if user cancels
+          Navigator.of(context).pop();
+        },
       );
     } catch (e) {
-      debugPrint('[ERROR] Error in _endSession: $e');
+      AppLogger.error('Error in _endSession: $e');
+      
+      // Show friendly error and safely return to previous screen
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorHandler.getUserFriendlyMessage(e, 'End Session')),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        
+        // Always try to navigate back to avoid being stuck
+        Navigator.of(context).pop();
+      }
     }
   }
   
-  /// Shows a confirmation dialog for ending the session
-  void _showEndConfirmationDialog() {
+  /// Show dialog for session that is too short
+  void _showShortSessionDialog() {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
-      barrierDismissible: false, // Prevent dismissing by tapping outside
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
+      barrierDismissible: false,
+      builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('End Session'),
-          content: Text(
-            'Are you sure you want to end this session?',
-            style: TextStyle(
-              color: isDark ? Colors.black : null,
-            ),
+          title: const Text('Session Too Short'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Your session is too short to save.',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text('Distance: ${_distance.toStringAsFixed(2)} km (minimum 0.1 km)'),
+              Text('Duration: ${_formatDuration(_elapsed)} (minimum 2 min)'),
+              const SizedBox(height: 12),
+              const Text(
+                'To save your workout, please make sure to ruck for at least 100 meters and 2 minutes.',
+                style: TextStyle(fontStyle: FontStyle.italic),
+              ),
+            ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
+              child: const Text('OK'),
               onPressed: () {
-                Navigator.pop(context);
-                _endSession();
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Return to previous screen
               },
-              child: const Text('End Session'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
             ),
           ],
         );
       },
     );
   }
-
-  /// Shows a confirmation dialog for ending session due to idle time
-  void _showIdleEndConfirmationDialog() {
-    if (_isEnding) return;
-    showModalBottomSheet(
+  
+  /// Show dialog for completed session to gather rating and notes
+  void _showCompletionDialog({
+    required Function(String? notes, int? rating) onComplete,
+    required VoidCallback onCancel,
+  }) {
+    if (!mounted) return;
+    
+    String notes = '';
+    int rating = 0;
+    
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).dialogBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'NO ACTIVITY DETECTED',
-                style: AppTextStyles.headline6.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                "You've been idle for over 2 minutes. Would you like to end this session?",
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 28),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      if (_isPaused) _togglePause();
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.secondary,
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Session Complete'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Distance: ${_distance.toStringAsFixed(2)} km'),
+                    Text('Duration: ${_formatDuration(_elapsed)}'),
+                    Text('Calories: ${_calculateCalories().toInt()}'),
+                    const SizedBox(height: 16),
+                    const Text('How was your ruck?'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          icon: Icon(
+                            index < rating ? Icons.star : Icons.star_border,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              rating = index + 1;
+                            });
+                          },
+                        );
+                      }),
                     ),
-                    child: const Text('CONTINUE SESSION'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _endSession();
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                    const SizedBox(height: 16),
+                    const Text('Notes:'),
+                    TextField(
+                      maxLines: 3,
+                      onChanged: (value) {
+                        notes = value;
+                      },
+                      decoration: const InputDecoration(
+                        hintText: 'Optional notes about your session',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                    child: const Text('END SESSION'),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              );
+            },
           ),
+          actions: [
+            TextButton(
+              onPressed: onCancel,
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onComplete(notes.isNotEmpty ? notes : null, rating > 0 ? rating : null);
+              },
+              child: const Text('Complete'),
+            ),
+          ],
         );
       },
     );
@@ -865,20 +861,20 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _customMarkerIcon = bytes;
       });
     } catch (e) {
-      debugPrint('[ERROR] Error loading custom marker: $e');
+      AppLogger.error('Error loading custom marker: $e');
     }
   }
 
   void _stopLocationTracking() {
-    debugPrint('[INFO] Stopping location tracking...');
+    AppLogger.info('Stopping location tracking...');
     _locationSubscription?.cancel();
     _locationSubscription = null;
-    debugPrint('[INFO] Location tracking stopped.');
+    AppLogger.info('Location tracking stopped.');
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[INFO] ActiveSessionScreen.build: _heartRate=$_heartRate');
+    AppLogger.info('ActiveSessionScreen.build: _heartRate=$_heartRate');
     // Format display values
     final String durationDisplay = _formatDuration(_elapsed);
     final String? distanceDisplay = _canShowStats

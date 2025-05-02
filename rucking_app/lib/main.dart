@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/app.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
@@ -36,12 +37,12 @@ class AppBlocObserver extends BlocObserver {
   @override
   void onChange(BlocBase bloc, Change change) {
     super.onChange(bloc, change);
-    debugPrint('${bloc.runtimeType} $change');
+    AppLogger.info('${bloc.runtimeType} $change');
   }
 
   @override
   void onError(BlocBase bloc, Object error, StackTrace stackTrace) {
-    debugPrint('${bloc.runtimeType} $error $stackTrace');
+    AppLogger.error('${bloc.runtimeType} $error');
     super.onError(bloc, error, stackTrace);
   }
 }
