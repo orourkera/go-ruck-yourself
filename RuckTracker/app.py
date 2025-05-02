@@ -80,8 +80,8 @@ def register_endpoint():
 
 # Enable CORS with specific allowed origins
 allowed_origins = [
-    "https://go-rucky-yourself.app",
-    "https://www.go-rucky-yourself.app"
+    "https://getrucky.com",
+    "https://www.getrucky.com"
 ]
 
 # Add localhost in development
