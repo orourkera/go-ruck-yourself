@@ -104,32 +104,58 @@ import WatchConnectivity
 
             switch command {
             // --- Session Actions ---    
-            case "startSession", "endSession", "pauseSession", "resumeSession":
-                print("---> [AppDelegate] Handling session action: \(command)")
-                // Add 'action' key for Flutter WatchService handler
-                flutterArgs?["action"] = command
-                // Explicitly cast potential numbers to Double for better Dart compatibility
-                if let weight = flutterArgs?["ruckWeight"] as? NSNumber {
-                    flutterArgs?["ruckWeight"] = weight.doubleValue
+            case "startSession":
+                print("[AppDelegate] Handling session update: startSession")
+                guard let ruckWeight = data["ruckWeight"] as? Double else {
+                    print("[AppDelegate] Missing ruckWeight in startSession message")
+                    return
                 }
-                // Encode as JSON string to avoid type issues
-                if let jsonString = self.dictionaryToJsonString(flutterArgs ?? [:]) {
-                    print("---> [AppDelegate] Prepared session JSON string: \(jsonString)")
-                    print("---> [AppDelegate] Attempting to invoke 'onWatchSessionUpdated' on sessionChannel...")
-                    self.sessionChannel?.invokeMethod("onWatchSessionUpdated", arguments: jsonString) { result in
-                        if let error = result as? FlutterError {
-                            print("---> [AppDelegate] Error invoking Flutter method 'onWatchSessionUpdated': \(error.message ?? "Unknown Flutter Error")")
-                            if isReplyExpected { replyHandler?(["status": "error", "message": "Flutter processing error"]) }
-                        } else {
-                            print("---> [AppDelegate] Successfully invoked 'onWatchSessionUpdated' in Flutter. Result: \(result ?? "nil")")
-                            if isReplyExpected { replyHandler?(["status": "success"]) }
-                        }
+                let sessionData: [String: Any] = ["action": "startSession", "ruckWeight": ruckWeight]
+                if let sessionJSONString = self.dictionaryToJsonString(sessionData) {
+                    print("[AppDelegate] Prepared session JSON string: \(sessionJSONString)")
+                    self.sessionChannel?.invokeMethod("onWatchSessionUpdated", arguments: sessionJSONString) { result in
+                        print("[AppDelegate] Invoked 'onWatchSessionUpdated' with result: \(result ?? "No result")")
                     }
+                    print("[AppDelegate] Attempting to invoke 'onWatchSessionUpdated' on sessionChannel...")
                 } else {
-                    print("---> [AppDelegate] Failed to encode session args to JSON")
-                    if isReplyExpected { replyHandler?(["status": "error", "message": "JSON encoding failed"]) }
+                    print("[AppDelegate] Failed to convert session data to JSON string")
                 }
-
+            case "pauseSession":
+                print("[AppDelegate] Handling session update: pauseSession")
+                let sessionData: [String: Any] = ["action": "pauseSession"]
+                if let sessionJSONString = self.dictionaryToJsonString(sessionData) {
+                    print("[AppDelegate] Prepared session JSON string: \(sessionJSONString)")
+                    self.sessionChannel?.invokeMethod("onWatchSessionUpdated", arguments: sessionJSONString) { result in
+                        print("[AppDelegate] Invoked 'onWatchSessionUpdated' with result: \(result ?? "No result")")
+                    }
+                    print("[AppDelegate] Attempting to invoke 'onWatchSessionUpdated' on sessionChannel...")
+                } else {
+                    print("[AppDelegate] Failed to convert session data to JSON string")
+                }
+            case "resumeSession":
+                print("[AppDelegate] Handling session update: resumeSession")
+                let sessionData: [String: Any] = ["action": "resumeSession"]
+                if let sessionJSONString = self.dictionaryToJsonString(sessionData) {
+                    print("[AppDelegate] Prepared session JSON string: \(sessionJSONString)")
+                    self.sessionChannel?.invokeMethod("onWatchSessionUpdated", arguments: sessionJSONString) { result in
+                        print("[AppDelegate] Invoked 'onWatchSessionUpdated' with result: \(result ?? "No result")")
+                    }
+                    print("[AppDelegate] Attempting to invoke 'onWatchSessionUpdated' on sessionChannel...")
+                } else {
+                    print("[AppDelegate] Failed to convert session data to JSON string")
+                }
+            case "endSession":
+                print("[AppDelegate] Handling session update: endSession")
+                let sessionData: [String: Any] = ["action": "endSession"]
+                if let sessionJSONString = self.dictionaryToJsonString(sessionData) {
+                    print("[AppDelegate] Prepared session JSON string: \(sessionJSONString)")
+                    self.sessionChannel?.invokeMethod("onWatchSessionUpdated", arguments: sessionJSONString) { result in
+                        print("[AppDelegate] Invoked 'onWatchSessionUpdated' with result: \(result ?? "No result")")
+                    }
+                    print("[AppDelegate] Attempting to invoke 'onWatchSessionUpdated' on sessionChannel...")
+                } else {
+                    print("[AppDelegate] Failed to convert session data to JSON string")
+                }
             // --- Health Updates ---    
             case "updateHeartRate": // Add other health commands like updateDistance if needed
                 print("---> [AppDelegate] Handling health update: \(command)")

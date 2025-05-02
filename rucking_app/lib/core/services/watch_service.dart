@@ -40,10 +40,12 @@ class WatchService {
   Stream<Map<String, dynamic>> get healthData => _healthDataController.stream;
   
   // Add navigatorKey for navigation purposes
-  final GlobalKey<NavigatorState> navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   
   WatchService() {
+    print("[WatchService] Initializing WatchService");
     _initPlatformChannels();
+    print("[WatchService] WatchService initialization complete");
   }
   
   void _initPlatformChannels() {
@@ -68,8 +70,10 @@ class WatchService {
       final jsonString = call.arguments as String;
       final jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
       data = jsonData;
+      print("[WatchService] Parsed JSON string into data: $data");
     } else if (call.arguments is Map<String, dynamic>) {
       data = call.arguments as Map<String, dynamic>;
+      print("[WatchService] Received data as Map: $data");
     } else {
       print("[WatchService] Error: Unexpected argument type for session method: ${call.arguments.runtimeType}");
       return;
@@ -77,6 +81,7 @@ class WatchService {
     
     switch (call.method) {
       case 'onWatchSessionUpdated':
+        print("[WatchService] Processing onWatchSessionUpdated with action: ${data['action']}");
         if (data['action'] == 'startSession') {
           print("[WatchService] Processing startSession from watch with data: $data");
           await _handleSessionStartedFromWatch(data);
@@ -106,8 +111,10 @@ class WatchService {
       final jsonString = call.arguments as String;
       final jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
       data = jsonData;
+      print("[WatchService] Parsed JSON string into health data: $data");
     } else if (call.arguments is Map<String, dynamic>) {
       data = call.arguments as Map<String, dynamic>;
+      print("[WatchService] Received health data as Map: $data");
     } else {
       print("[WatchService] Error: Unexpected argument type for health method: ${call.arguments.runtimeType}");
       return;
@@ -115,6 +122,7 @@ class WatchService {
 
     switch (call.method) {
       case 'onHealthDataUpdated':
+        print("[WatchService] Processing onHealthDataUpdated with type: ${data['type']}");
         if (data['type'] == 'heartRate') {
           _currentHeartRate = (data['value'] as num?)?.toDouble();
           print("[WatchService] Received heart rate update from watch: $_currentHeartRate");
@@ -141,6 +149,7 @@ class WatchService {
       // Navigate to active session screen if not already there
       if (navigatorKey.currentState != null) {
         final currentRoute = ModalRoute.of(navigatorKey.currentContext!)?.settings.name;
+        print("[WatchService] Current route: $currentRoute");
         if (currentRoute != '/activeSession') {
           print("[WatchService] Navigating to active session screen from watch start");
           await navigatorKey.currentState?.pushNamed(
@@ -150,6 +159,7 @@ class WatchService {
               'fromWatch': true,
             },
           );
+          print("[WatchService] Navigation to active session attempted");
         } else {
           print("[WatchService] Already on active session screen");
         }

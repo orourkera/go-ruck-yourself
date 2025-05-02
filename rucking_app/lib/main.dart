@@ -17,7 +17,13 @@ void main() async {
   await dotenv.load(fileName: ".env");
   
   // Configure RevenueCat
-  await Purchases.configure(PurchasesConfiguration(dotenv.env['REVENUECAT_API_KEY']!));
+  try {
+    await Purchases.configure(PurchasesConfiguration(dotenv.env['REVENUECAT_API_KEY']!));
+    print("[Main] RevenueCat configured successfully");
+  } catch (e) {
+    print("[Main] Error configuring RevenueCat: $e");
+    // Continue app loading despite the error
+  }
   
   // Initialize Firebase
   await Firebase.initializeApp();
