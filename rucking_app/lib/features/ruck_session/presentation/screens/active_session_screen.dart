@@ -563,7 +563,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // Resume location tracking
         _locationSubscription?.resume();
         // Notify API
-        _apiClient.post('/rucks/${widget.ruckId}/resume', {})
+        _apiClient.post('/api/rucks/${widget.ruckId}/resume', {})
             .catchError((e) => print('Failed to resume session: $e'));
         // Notify Watch
         if (_hasAppleWatch) {
@@ -575,7 +575,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // Pause location tracking
         _locationSubscription?.pause();
         // Notify API
-        _apiClient.post('/rucks/${widget.ruckId}/pause', {})
+        _apiClient.post('/api/rucks/${widget.ruckId}/pause', {})
             .catchError((e) => print('Failed to pause session: $e'));
         // Notify Watch
         if (_hasAppleWatch) {
