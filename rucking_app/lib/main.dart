@@ -10,11 +10,11 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 void main() async {
-  // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+  // Initialize dependency injection
+  await setupServiceLocator();
   // Load environment variables from .env
-  await dotenv.load(fileName: ".env");
+  await dotenv.load();
   
   // Configure RevenueCat
   await Purchases.configure(PurchasesConfiguration(dotenv.env['REVENUECAT_API_KEY']!));
@@ -28,21 +28,7 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   
-  // Initialize services
-  await setupServiceLocator();
-  
-  // Run the app with BlocObserver for debugging
-  Bloc.observer = AppBlocObserver();
-  
-  // The health bloc will be provided separately since it's not part of the original service locator
-  runApp(
-    BlocProvider(
-      create: (context) => HealthBloc(
-        healthService: getIt<HealthService>(),
-      ),
-      child: const RuckingApp(),
-    ),
-  );
+  runApp(const RuckingApp());
 }
 
 /// Custom BlocObserver for debugging

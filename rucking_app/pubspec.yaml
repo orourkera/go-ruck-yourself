@@ -65,7 +65,8 @@ dependencies:
   keyboard_actions: ^4.2.0
   email_launcher: ^1.1.1
   flutter_dotenv: ^5.1.0
-  purchases_flutter: ^8.7.3
+  purchases_flutter: ^8.7.4
+  url_launcher: ^6.2.5
   
 dev_dependencies:
   flutter_test:
@@ -90,6 +91,7 @@ flutter:
   assets:
     - .env
     - assets/images/
+    - assets/screenshots/
     # - assets/icons/   # Commented out because directory does not exist
   
   fonts:

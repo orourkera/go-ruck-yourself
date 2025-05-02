@@ -5,7 +5,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
-import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -26,27 +26,14 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<Dio>(_configureDio());
   final apiClient = ApiClient(getIt<Dio>());
   getIt.registerSingleton<ApiClient>(apiClient);
-  
-  final storageService = StorageServiceImpl(
-    getIt<SharedPreferences>(), 
-    getIt<FlutterSecureStorage>()
-  );
-  getIt.registerSingleton<StorageService>(storageService);
-  
-  // Connect services to resolve circular dependencies
-  apiClient.setStorageService(storageService);
-  
-  getIt.registerSingleton<AuthService>(
-    AuthServiceImpl(
-      getIt<ApiClient>(), 
-      getIt<StorageService>()
-    )
-  );
+  getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
+  getIt.registerSingleton<AuthService>(AuthServiceImpl(getIt<ApiClient>(), getIt<StorageService>()));
   getIt.registerSingleton<LocationService>(LocationServiceImpl());
   getIt.registerSingleton<HealthService>(HealthService());
+  getIt.registerSingleton<RevenueCatService>(RevenueCatService());
   
-  // Register watch communication service
-  getIt.registerSingleton<WatchService>(WatchService());
+  // Connect services to resolve circular dependencies
+  apiClient.setStorageService(getIt<StorageService>());
   
   // Repositories
   getIt.registerSingleton<AuthRepository>(
