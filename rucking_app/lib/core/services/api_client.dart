@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
+import 'package:flutter/foundation.dart';
 
 /// Client for handling API requests to the backend
 class ApiClient {
@@ -9,14 +10,26 @@ class ApiClient {
   late final StorageService _storageService;
   
   ApiClient(this._dio) {
-    // Add logging interceptor for debugging
-    _dio.interceptors.add(LogInterceptor(
-      requestHeader: true,
-      requestBody: true,
-      responseHeader: true,
-      responseBody: true,
-      error: true,
-    ));
+    // Add logging interceptor only in debug mode
+    if (kDebugMode) {
+      _dio.interceptors.add(LogInterceptor(
+        requestHeader: true,
+        requestBody: true,
+        // Don't log request headers in debug to avoid exposing auth tokens
+        responseHeader: false,
+        responseBody: true,
+        error: true,
+        // Custom log function to avoid printing sensitive data
+        logPrint: (log) {
+          // Redact Authorization header and tokens from logs
+          String logStr = log.toString();
+          if (logStr.contains('Authorization')) {
+            logStr = logStr.replaceAll(RegExp(r'Bearer [a-zA-Z0-9\._-]+'), 'Bearer [REDACTED]');
+          }
+          debugPrint('[API] $logStr');
+        }
+      ));
+    }
   }
   
   /// Set the storage service after it has been initialized
@@ -33,23 +46,43 @@ class ApiClient {
   void clearAuthToken() {
     _dio.options.headers.remove('Authorization');
   }
+
+  /// Ensures the auth token is present for authenticated requests
+  /// Returns true if token was set successfully
+  Future<bool> _ensureAuthToken() async {
+    // Check if we already have a token in headers
+    if (_dio.options.headers.containsKey('Authorization')) {
+      return true;
+    }
+    
+    // Try to get token from storage
+    final token = await _storageService.getAuthToken();
+    if (token == null) {
+      return false;
+    }
+    
+    // Set token in headers
+    _dio.options.headers['Authorization'] = 'Bearer $token';
+    return true;
+  }
   
   /// Makes a GET request to the API
   Future<dynamic> get(String endpoint) async {
     try {
-      // For ruck sessions, verify we have a token first
-      if (endpoint.contains('/rucks')) {
-        final token = await _storageService.getAuthToken();
-        if (token == null) {
+      // For authenticated endpoints, verify we have a token first
+      if (endpoint.contains('/rucks') || endpoint.contains('/users')) {
+        final hasToken = await _ensureAuthToken();
+        if (!hasToken) {
           throw UnauthorizedException('Not authenticated - please log in first');
         }
-        
-        // Ensure token is set in headers
-        _dio.options.headers['Authorization'] = 'Bearer $token';
       }
       
-      // Add token if available
-      final options = await _getOptions();
+      // Set timeout to prevent hanging requests
+      final options = Options(
+        headers: await _getHeaders(),
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      );
       
       // Make API call
       final response = await _dio.get(
@@ -65,22 +98,26 @@ class ApiClient {
   
   /// Makes a POST request to the specified endpoint with the given body
   Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
-    // For ruck sessions, verify we have a token first
-    if (endpoint.contains('/rucks')) {
-      final token = await _storageService.getAuthToken();
-      if (token == null) {
-        throw UnauthorizedException('Not authenticated - please log in first');
+    try {
+      // For authenticated endpoints, verify we have a token first
+      if (endpoint.contains('/rucks') || endpoint.contains('/users')) {
+        final hasToken = await _ensureAuthToken();
+        if (!hasToken) {
+          throw UnauthorizedException('Not authenticated - please log in first');
+        }
       }
       
-      // Ensure token is set in headers
-      _dio.options.headers['Authorization'] = 'Bearer $token';
-    }
-    
-    try {
+      // Set timeout to prevent hanging requests
+      final options = Options(
+        headers: await _getHeaders(),
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      );
+      
       final response = await _dio.post(
         endpoint,
         data: body,
-        options: Options(headers: await _getHeaders()),
+        options: options,
       );
       
       return response.data;

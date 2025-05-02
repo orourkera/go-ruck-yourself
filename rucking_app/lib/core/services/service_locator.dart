@@ -6,6 +6,8 @@ import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
+import 'package:rucking_app/core/security/ssl_pinning.dart';
+import 'package:rucking_app/core/security/token_refresh_interceptor.dart';
 import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -28,12 +30,21 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<ApiClient>(apiClient);
   getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
   getIt.registerSingleton<AuthService>(AuthServiceImpl(getIt<ApiClient>(), getIt<StorageService>()));
-  getIt.registerSingleton<LocationService>(LocationServiceImpl());
-  getIt.registerSingleton<HealthService>(HealthService());
-  getIt.registerSingleton<RevenueCatService>(RevenueCatService());
   
   // Connect services to resolve circular dependencies
   apiClient.setStorageService(getIt<StorageService>());
+  
+  // Add token refresh interceptor after auth service is initialized
+  final tokenRefreshInterceptor = TokenRefreshInterceptor(
+    getIt<Dio>(), 
+    getIt<AuthService>(), 
+    getIt<StorageService>()
+  );
+  getIt<Dio>().interceptors.add(tokenRefreshInterceptor);
+  
+  getIt.registerSingleton<LocationService>(LocationServiceImpl());
+  getIt.registerSingleton<HealthService>(HealthService());
+  getIt.registerSingleton<RevenueCatService>(RevenueCatService());
   
   // Repositories
   getIt.registerSingleton<AuthRepository>(
@@ -51,9 +62,16 @@ Dio _configureDio() {
       baseUrl: 'https://getrucky.com/api', // Use production API
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
-      headers: {'Content-Type': 'application/json'},
+      sendTimeout: const Duration(seconds: 10),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
     ),
   );
+  
+  // Configure SSL certificate pinning
+  SslPinningService.setupSecureHttpClient(dio);
   
   // Add interceptors
   dio.interceptors.add(LogInterceptor(

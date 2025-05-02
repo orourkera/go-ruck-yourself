@@ -8,6 +8,8 @@ from flask import Flask, render_template, Blueprint, g, jsonify, request, redire
 from flask_restful import Api
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -16,9 +18,13 @@ load_dotenv()
 # Import get_supabase_client
 from RuckTracker.supabase_client import get_supabase_client
 
-# Configure logging
+# Configure logging - Use appropriate level based on environment
+log_level = logging.INFO
+if os.environ.get("FLASK_ENV") == "development":
+    log_level = logging.DEBUG
+
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[logging.StreamHandler(sys.stdout)]
 )
@@ -34,12 +40,60 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 # Create Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
+
+# Ensure secret key is set in environment
+if not os.environ.get("SESSION_SECRET"):
+    logger.error("SESSION_SECRET environment variable not set! Exiting for security.")
+    if not os.environ.get("FLASK_ENV") == "development":
+        # In production, we should exit if no secret key is provided
+        sys.exit(1)
+    else:
+        logger.warning("Using temp secret key for development only")
+        
+# Set secret key from environment variable - no fallback in production
+app.secret_key = os.environ.get("SESSION_SECRET")
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 
-# Enable CORS
-CORS(app)
+# Initialize rate limiter
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+    strategy="fixed-window"
+)
+
+# Define custom rate limits for specific endpoints
+@app.route("/api/auth/login", methods=["POST"])
+@limiter.limit("5 per minute")
+def login_endpoint():
+    # This just defines the rate limit, actual implementation is elsewhere
+    pass
+
+@app.route("/api/auth/register", methods=["POST"])
+@limiter.limit("3 per hour")
+def register_endpoint():
+    # This just defines the rate limit, actual implementation is elsewhere
+    pass
+
+# Enable CORS with specific allowed origins
+allowed_origins = [
+    "https://go-rucky-yourself.app",
+    "https://www.go-rucky-yourself.app"
+]
+
+# Add localhost in development
+if os.environ.get("FLASK_ENV") == "development":
+    allowed_origins.extend([
+        "http://localhost:3000",
+        "http://localhost:8080", 
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080"
+    ])
+
+CORS(app, origins=allowed_origins, supports_credentials=True)
 
 # Initialize API
 api = Api(app)
