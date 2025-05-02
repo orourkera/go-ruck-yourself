@@ -27,17 +27,22 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>This app uses your health data (distance, calories, heart rate) to track and analyze your ruck sessions.</string>
+	<string>Go Rucky Yourself reads your health data to track your heart rate during ruck sessions, which helps calculate calorie burn more accurately.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>This app writes your ruck session distances, calories burned, and workouts to Apple Health.</string>
+	<string>Go Rucky Yourself saves your ruck sessions as workouts in Apple Health, including distance, time, calories burned, and elevation data to help you track your fitness progress.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs background location access to track your rucking sessions even when the app is in the background.</string>
+	<string>Go Rucky Yourself uses your location to track your routes, calculate distance, pace and elevation during ruck sessions. Background location is used when tracking an active session.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>This app needs background location access to track your rucking sessions even when the app is in the background.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs location access to track your rucking sessions.</string>
+	<string>Go Rucky Yourself needs your location to track your routes, calculate distance, pace and elevation during ruck sessions. Your location data is only used while the app is in use.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>processing</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
