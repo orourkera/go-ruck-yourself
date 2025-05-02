@@ -19,47 +19,21 @@ class _PaywallScreenState extends State<PaywallScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _timer;
+  int? _selectedPlanIndex;
 
   // Define the content for each card
   final List<Map<String, String>> _cards = [
     {
       'title': 'Go Ruck Yourself',
-      'screenshot': 'assets/screenshots/screenshot1.png',
-      'valueProp': 'Track your ruck sessions in standard or metric weights.',
-    },
-    {
-      'title': 'Go Ruck Yourself',
-      'screenshot': 'assets/screenshots/screenshot2.png',
-      'valueProp': 'The most precise calorie tracking based on body weight, pace and real-time elevation change.',
-    },
-    {
-      'title': 'Go Ruck Yourself',
-      'screenshot': 'assets/screenshots/screenshot3.png',
-      'valueProp': 'Easily sync all your rucks with Apple Fitness.',
-    },
-    {
-      'title': 'Go Ruck Yourself',
-      'valueProp': "You'll never have more fun rucking.",
-      'screenshot': 'assets/screenshots/screenshot4.png',
+      'screenshot': 'assets/images/go ruck yourself copy.png',
+      'valueProp': 'Track your ruck sessions, calorie burn, and sync with Apple Fitness.',
     },
   ];
 
   @override
   void initState() {
     super.initState();
-    // Start auto-scrolling timer
-    _timer = Timer.periodic(const Duration(seconds: 5), (Timer timer) {
-      if (_currentPage < _cards.length - 1) {
-        _currentPage++;
-      } else {
-        _currentPage = 0;
-      }
-      _pageController.animateToPage(
-        _currentPage,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeIn,
-      );
-    });
+    // No auto-scrolling timer needed since we have only one card
   }
 
   @override
@@ -79,39 +53,54 @@ class _PaywallScreenState extends State<PaywallScreen> {
         child: Column(
           children: [
             Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (int page) {
-                  setState(() {
-                    _currentPage = page;
-                  });
-                },
-                itemCount: _cards.length,
-                itemBuilder: (context, index) {
-                  return _buildCard(
-                    title: _cards[index]['title']!,
-                    screenshot: _cards[index]['screenshot']!,
-                    valueProp: _cards[index]['valueProp']!,
-                  );
-                },
+              child: _buildCard(
+                title: _cards[0]['title']!,
+                screenshot: _cards[0]['screenshot']!,
+                valueProp: _cards[0]['valueProp']!,
               ),
             ),
-            // Page indicators
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _cards.length,
-                (index) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _currentPage == index
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade400,
+            const SizedBox(height: 20),
+            // Subscription Plans Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Subscription Plans',
+                style: AppTextStyles.paywallHeadline.copyWith(fontSize: 20),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanIndex = 0;
+                      });
+                    },
+                    child: _buildPlanCard('Weekly', r'$1.99 / week', _selectedPlanIndex == 0),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanIndex = 1;
+                      });
+                    },
+                    child: _buildPlanCard('Monthly', r'$4.99 / month', _selectedPlanIndex == 1),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanIndex = 2;
+                      });
+                    },
+                    child: _buildPlanCard('Annual', r'$29.99 / year', _selectedPlanIndex == 2),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
@@ -124,15 +113,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 },
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: const Text(
-                  'Get Rucky',
+                  'GET RUCKY',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    fontFamily: 'Bangers',
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -180,26 +172,22 @@ class _PaywallScreenState extends State<PaywallScreen> {
             style: AppTextStyles.paywallHeadline, 
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 30),
-          // App Screenshot
-          Container(
-            height: MediaQuery.of(context).size.height * 0.5,
-            decoration: BoxDecoration(
+          const SizedBox(height: 12),
+          // App Screenshot (bigger, no background)
+          SizedBox(
+            height: 220,
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 10,
-                  offset: Offset(0, 5),
-                ),
-              ],
-              image: DecorationImage(
-                image: AssetImage(screenshot),
-                fit: BoxFit.cover,
+              child: Image.asset(
+                screenshot,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const SizedBox.shrink();
+                },
               ),
             ),
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 18),
           // Value Proposition Text
           Text(
             valueProp,
@@ -210,6 +198,40 @@ class _PaywallScreenState extends State<PaywallScreen> {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPlanCard(String planName, String price, bool isSelected) {
+    return Card(
+      elevation: isSelected ? 6 : 2,
+      color: isSelected ? AppColors.secondary : null,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: EdgeInsets.all(isSelected ? 16.0 : 12.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              planName,
+              style: TextStyle(
+                fontSize: isSelected ? 18 : 16, 
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : null,
+                fontFamily: isSelected ? 'Bangers' : null,
+              ),
+            ),
+            Text(
+              price,
+              style: TextStyle(
+                fontSize: isSelected ? 18 : 16, 
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white : null,
+                fontFamily: isSelected ? 'Bangers' : null,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
