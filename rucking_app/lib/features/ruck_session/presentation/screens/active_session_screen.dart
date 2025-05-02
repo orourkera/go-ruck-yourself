@@ -1168,46 +1168,39 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                             ),
                             
                             // Heart rate pill
-                            Container(
+                            if (_hasAppleWatch)
+                              Container(
                                 margin: const EdgeInsets.only(left: 16),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).brightness == Brightness.dark 
-                                    ? Colors.black 
-                                    : Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
+                                      color: Colors.black.withOpacity(0.15),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 3),
                                     ),
                                   ],
-                                  border: Border.all(
-                                    color: Theme.of(context).brightness == Brightness.dark 
-                                      ? Colors.grey[800]! 
-                                      : Colors.grey[300]!,
-                                    width: 1,
-                                  ),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
                                       Icons.favorite_rounded,
-                                      color: Colors.red[400],
-                                      size: 24,
+                                      color: Colors.red,
+                                      size: 28,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      _heartRate != null ? '${_heartRate!.toInt()} bpm' : '--',
+                                      _heartRate != null ? '${_heartRate!.toInt()} BPM' : '-- BPM',
                                       style: TextStyle(
                                         fontFamily: 'Bangers',
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 20,
-                                        color: Theme.of(context).brightness == Brightness.dark 
-                                          ? Colors.white
-                                          : Colors.black,
+                                        fontWeight: FontWeight.normal,
+                                        fontSize: 24,
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.black,
+                                        letterSpacing: 1.0,
                                       ),
                                     ),
                                   ],
