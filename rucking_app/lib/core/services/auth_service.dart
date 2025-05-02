@@ -32,6 +32,12 @@ abstract class AuthService {
   /// Get the authentication token
   Future<String?> getToken();
   
+  /// Refresh the authentication token
+  Future<String?> refreshToken();
+  
+  /// Log the user out
+  Future<void> logout();
+  
   /// Update the user profile
   Future<User> updateProfile({
     String? name,
@@ -198,6 +204,29 @@ class AuthServiceImpl implements AuthService {
   @override
   Future<String?> getToken() async {
     return await _storageService.getSecureString(AppConfig.tokenKey);
+  }
+  
+  @override
+  Future<String?> refreshToken() async {
+    try {
+      final response = await _apiClient.post('/auth/refresh-token');
+      final newToken = response['token'] as String;
+      
+      // Store new token
+      await _storageService.setSecureString(AppConfig.tokenKey, newToken);
+      
+      // Set new token in API client
+      _apiClient.setAuthToken(newToken);
+      
+      return newToken;
+    } catch (e) {
+      throw _handleAuthError(e);
+    }
+  }
+  
+  @override
+  Future<void> logout() async {
+    await signOut();
   }
   
   @override
