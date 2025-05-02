@@ -563,7 +563,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // Resume location tracking
         _locationSubscription?.resume();
         // Notify API
-        _apiClient.post('/api/rucks/${widget.ruckId}/resume', {})
+        _apiClient.post('/rucks/${widget.ruckId}/resume', {})
             .catchError((e) => print('Failed to resume session: $e'));
         // Notify Watch
         if (_hasAppleWatch) {
@@ -575,7 +575,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // Pause location tracking
         _locationSubscription?.pause();
         // Notify API
-        _apiClient.post('/api/rucks/${widget.ruckId}/pause', {})
+        _apiClient.post('/rucks/${widget.ruckId}/pause', {})
             .catchError((e) => print('Failed to pause session: $e'));
         // Notify Watch
         if (_hasAppleWatch) {
@@ -930,83 +930,98 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   @override
   Widget build(BuildContext context) {
     debugPrint('ActiveSessionScreen.build: _heartRate=$_heartRate');
-    // Format display values
-    final String durationDisplay = _formatDuration(_elapsed);
-    final String? distanceDisplay = _canShowStats
-      ? MeasurementUtils.formatDistance(_distance, metric: widget.preferMetric)
-      : null;
-    
-    // pace is stored as seconds per km; adjust display based on user preference
-    double _displayPaceSec = _pace; // Base pace in seconds per km
-    final String? paceDisplay = _canShowStats
-      ? MeasurementUtils.formatPace(_displayPaceSec, metric: widget.preferMetric)
-      : null;
-    
-    final String? caloriesDisplay = _canShowStats
-      ? _caloriesBurned.toStringAsFixed(0)
-      : null;
-    final String elevationDisplay = _canShowStats
-      ? MeasurementUtils.formatElevationCompact(_elevationGain, _elevationLoss, metric: widget.preferMetric)
-      : '+0/-0';
-    
-    // Calculate remaining time if planned duration was set
-    String? remainingTimeDisplay;
-    if (widget.plannedDuration != null && _plannedCountdownStart != null) {
-      final elapsedSeconds = _elapsed.inSeconds;
-      final plannedSeconds = widget.plannedDuration! * 60;
-      final remainingSeconds = plannedSeconds - elapsedSeconds;
-      
-      if (remainingSeconds > 0) {
-        final remainingMinutes = (remainingSeconds / 60).floor();
-        final secondsLeft = remainingSeconds % 60;
-        remainingTimeDisplay = '$remainingMinutes:${secondsLeft.toString().padLeft(2, '0')}';
-      } else {
-        remainingTimeDisplay = 'Completed!';
-      }
-    }
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Active Session', style: AppTextStyles.headline6.copyWith(color: Colors.white)),
-        backgroundColor: AppColors.primary,
-        centerTitle: true,
-        elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _showEndConfirmationDialog,
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              // Menu options
-            },
-          ),
-        ],
-      ),
-      body: BlocListener<ActiveSessionBloc, ActiveSessionState>(
-        listener: (context, state) {
-          if (state is ActiveSessionCompleted) {
-            print("[ActiveSessionScreen] Detected ActiveSessionCompleted state. Navigating...");
-            // Navigate to the session summary screen, clearing the stack
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/sessionComplete', // Ensure this route is defined in your main router
-              (route) => false, // Remove all previous routes
-              arguments: state, // Pass the completed state which contains final metrics
-            );
-          } else if (state is ActiveSessionError) {
-            // Optional: Show a snackbar or dialog for errors
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Session Error: ${state.message}')),
-            );
+    return BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+      builder: (context, state) {
+        if (state is ActiveSessionError) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Error: ${state.message}', style: TextStyle(color: Colors.red, fontSize: 18)),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Go Back'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        } else if (state is ActiveSessionInProgress || state is ActiveSessionPaused) {
+          // Format display values
+          final String durationDisplay = _formatDuration(_elapsed);
+          final String? distanceDisplay = _canShowStats
+            ? MeasurementUtils.formatDistance(_distance, metric: widget.preferMetric)
+            : null;
+          
+          // pace is stored as seconds per km; adjust display based on user preference
+          double _displayPaceSec = _pace; // Base pace in seconds per km
+          final String? paceDisplay = _canShowStats
+            ? MeasurementUtils.formatPace(_displayPaceSec, metric: widget.preferMetric)
+            : null;
+          
+          final String? caloriesDisplay = _canShowStats
+            ? _caloriesBurned.toStringAsFixed(0)
+            : null;
+          final String elevationDisplay = _canShowStats
+            ? MeasurementUtils.formatElevationCompact(_elevationGain, _elevationLoss, metric: widget.preferMetric)
+            : '+0/-0';
+          
+          // Calculate remaining time if planned duration was set
+          String? remainingTimeDisplay;
+          if (widget.plannedDuration != null && _plannedCountdownStart != null) {
+            final elapsedSeconds = _elapsed.inSeconds;
+            final plannedSeconds = widget.plannedDuration! * 60;
+            final remainingSeconds = plannedSeconds - elapsedSeconds;
+            
+            if (remainingSeconds > 0) {
+              final remainingMinutes = (remainingSeconds / 60).floor();
+              final secondsLeft = remainingSeconds % 60;
+              remainingTimeDisplay = '$remainingMinutes:${secondsLeft.toString().padLeft(2, '0')}';
+            } else {
+              remainingTimeDisplay = 'Completed!';
+            }
           }
-        },
-        child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
-          builder: (context, state) {
-            if (state is ActiveSessionInitial) {
-              return Column(
+          
+          return Scaffold(
+            appBar: AppBar(
+              title: Text('Active Session', style: AppTextStyles.headline6.copyWith(color: Colors.white)),
+              backgroundColor: AppColors.primary,
+              centerTitle: true,
+              elevation: 0,
+              iconTheme: IconThemeData(color: Colors.white),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _showEndConfirmationDialog,
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.more_vert),
+                  onPressed: () {
+                    // Menu options
+                  },
+                ),
+              ],
+            ),
+            body: BlocListener<ActiveSessionBloc, ActiveSessionState>(
+              listener: (context, state) {
+                if (state is ActiveSessionCompleted) {
+                  print("[ActiveSessionScreen] Detected ActiveSessionCompleted state. Navigating...");
+                  // Navigate to the session summary screen, clearing the stack
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/sessionComplete', // Ensure this route is defined in your main router
+                    (route) => false, // Remove all previous routes
+                    arguments: state, // Pass the completed state which contains final metrics
+                  );
+                } else if (state is ActiveSessionError) {
+                  // Optional: Show a snackbar or dialog for errors
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Session Error: ${state.message}')),
+                  );
+                }
+              },
+              child: Column(
                 children: [
                   // Map section
                   Expanded(
@@ -1455,14 +1470,24 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                     ),
                   ),
                 ],
-              );
-            } else {
-              // Fallback or loading indicator if needed
-              return const Center(child: Text('Initializing session...'));
-            }
-          },
-        ),
-      ),
+              ),
+            ),
+          );
+        } else {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Initializing Session...'),
+                ],
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 }

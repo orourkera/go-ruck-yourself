@@ -201,6 +201,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   StreamSubscription<LocationPoint>? _locationSubscription;
   Timer? _timer;
   final Stopwatch _stopwatch = Stopwatch();
+  bool _isSessionStarted = false;
   
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -228,50 +229,38 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    debugPrint('ActiveSessionBloc: Received event to start session with ruckId: ${event.ruckId}');
     try {
-      // Notify API that session has started using POST
+      // Start session on backend
       await _apiClient.post('/rucks/${event.ruckId}/start', {});
-      
-      // Start tracking time
+      debugPrint('Session started successfully: ${event.ruckId}');
+      // Start time tracking
       _stopwatch.start();
-      _timer = Timer.periodic(
-        const Duration(seconds: 1), 
-        (_) => add(LocationUpdated(
-          LocationPoint(
-            latitude: 0, 
-            longitude: 0, 
-            elevation: 0, 
-            accuracy: 0, 
-            timestamp: DateTime.now(),
-          )
-        ))
-      );
-      
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (state is ActiveSessionInProgress) {
+          final currentState = state as ActiveSessionInProgress;
+          emit(currentState.copyWith(elapsed: Duration(seconds: _stopwatch.elapsed.inSeconds)));
+        }
+      });
       // Start location tracking
       _startLocationTracking();
       
-      // You can pass user weight and ruck weight if available from the event
-      double? userWeightKg = event.userWeightKg;
-      double? ruckWeightKg = event.ruckWeightKg;
-      // If you have a way to pass these values, set them here
-      // For now, fallback to null (handled elsewhere)
-
-      // Initial state
       emit(ActiveSessionInProgress(
         ruckId: event.ruckId,
         locationPoints: [],
         elapsed: Duration.zero,
-        distance: 0,
-        elevationGain: 0,
-        elevationLoss: 0,
-        caloriesBurned: 0,
-        pace: 0,
-        userWeightKg: userWeightKg,
-        ruckWeightKg: ruckWeightKg,
+        distance: 0.0,
+        elevationGain: 0.0,
+        elevationLoss: 0.0,
+        caloriesBurned: 0.0,
+        pace: 0.0,
+        userWeightKg: event.userWeightKg,
+        ruckWeightKg: event.ruckWeightKg,
       ));
+      // Flag to confirm session is started on backend
+      _isSessionStarted = true;
     } catch (e) {
-      emit(ActiveSessionError('Failed to start session: $e'));
+      debugPrint('Failed to start session: $e');
+      emit(ActiveSessionError('Failed to start session: $e.toString()'));
     }
   }
   
@@ -477,13 +466,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     String ruckId,
     {double? elevationGain, double? elevationLoss}
   ) async {
+    // Only send updates if session is confirmed started
+    if (!_isSessionStarted) {
+      debugPrint('Skipping location update: Session start not confirmed.');
+      return;
+    }
     if (ruckId.trim().isEmpty) {
       debugPrint('Warning: Empty ruckId provided, skipping location update.');
       return;
     }
     try {
       await _apiClient.post(
-        '/sessions/$ruckId/statistics',
+        '/rucks/$ruckId/location',
         {
           'latitude': point.latitude,
           'longitude': point.longitude,
