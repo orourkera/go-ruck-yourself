@@ -192,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onTap: () {
                           showAboutDialog(
                             context: context,
-                            applicationName: 'Rucking App',
+                            applicationName: 'Go Rucky Yourself App',
                             applicationVersion: '1.0.0',
                             applicationIcon: Image.asset(
                               'assets/images/app_icon.png',
@@ -203,12 +203,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               const SizedBox(height: 16),
                               const Text(
-                                'Track your rucking sessions, monitor your progress, and connect with other ruckers.',
+                                'Track your rucking sessions, monitor your progress, and have a great rucking time',
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 8),
                               const Text(
-                                'Made with  by the Get Rucky team.',
+                                'Made by the Get Rucky team.',
                                 textAlign: TextAlign.center,
                               ),
                             ],
