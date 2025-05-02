@@ -84,7 +84,8 @@ class LocationServiceImpl implements LocationService {
   
   @override
   Stream<LocationPoint> startLocationTracking({int intervalMs = 1000}) {
-    debugPrint('Starting location tracking with interval: $intervalMs ms');
+    // This is important info for debugging location issues, keep it
+    debugPrint('[INFO] Starting location tracking with interval: $intervalMs ms');
     final locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 0, // minimum distance to travel before updates
@@ -100,7 +101,7 @@ class LocationServiceImpl implements LocationService {
               speed: position.speed,
             ))
         .handleError((error) {
-          debugPrint('Location tracking error (continuing stream): $error');
+          debugPrint('[ERROR] Location tracking error: $error');
           // Do nothing on error to keep the stream alive; next update will retry
         });
   }
