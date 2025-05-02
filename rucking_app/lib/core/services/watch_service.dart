@@ -133,9 +133,18 @@ class WatchService {
           print("[WatchService] Unknown health data type received: ${data['type']}");
         }
         break;
+      case 'onHeartRateUpdate':
+        await _handleHeartRateUpdate(data);
+        break;
       default:
         print("[WatchService] Unknown health method call from watch: ${call.method}");
     }
+  }
+  
+  Future<void> _handleHeartRateUpdate(Map<String, dynamic> data) async {
+    final heartRate = (data['heartRate'] as num?)?.toDouble() ?? 0.0;
+    print("[WatchService] Received heart rate update from Watch: $heartRate BPM");
+    _healthDataController.add({'heartRate': heartRate});
   }
   
   /// Handle a session started from the watch

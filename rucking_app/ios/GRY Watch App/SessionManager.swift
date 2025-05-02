@@ -38,6 +38,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
     private var wcSession: WCSession?
     private let healthKitManager = HealthKitManager.shared
     private var timer: Timer?
+    private var lastDistance: Double = 0 // Track previous distance for movement validation
     
     override init() {
         super.init()
@@ -75,6 +76,11 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
             "command": "startSession",
             "ruckWeight": weight
         ])
+        
+        // Ensure UI updates to show active session screen
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
     }
     
     func pauseSession() {
@@ -180,17 +186,26 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
             if !self.isPaused {
                 self.elapsedDuration += 1.0
                 
+                // Only update pace and calories if user is moving (distance increased)
+                if self.distance > self.lastDistance {
+                    // Calculate segment distance (meters) and time (seconds)
+                    let segmentDistance = self.distance - self.lastDistance
+                    let segmentTime = 1.0 // Since timer fires every second
+                    // MET for rucking (moderate, can be refined)
+                    let MET = 6.0 
+                    // TODO: Replace 70 with actual user weight if available from phone/HealthKit
+                    let totalWeightKg = (UserDefaults.standard.double(forKey: "userWeightKg") > 0 ? UserDefaults.standard.double(forKey: "userWeightKg") : 70.0) + self.ruckWeight
+                    // Calories burned per segment (kcal)
+                    // Calories = MET * weight_kg * (duration_hours)
+                    let segmentCalories = MET * totalWeightKg * (segmentTime / 3600.0)
+                    self.calories += segmentCalories
+                    self.lastDistance = self.distance
+                }
+
                 // Update pace calculation if distance > 0
                 if self.distance > 0 {
-                    // Convert from minutes per km
                     self.pace = (self.elapsedDuration / 60) / (self.distance / 1000)
                 }
-                
-                // Estimate calories burned every second
-                // Very rough estimation based on weight, speed, and time
-                let MET = 7.0 // MET for rucking (estimate)
-                let caloriesPerSecond = (MET * 3.5 * (70 + self.ruckWeight)) / 60 / 60
-                self.calories += caloriesPerSecond
             }
         }
     }
@@ -260,7 +275,13 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
                 
             case "endSession":
                 self.endSession()
-                
+
+            case "updateUserWeight": // Handle receiving user weight
+                if let weight = message["userWeightKg"] as? Double {
+                     UserDefaults.standard.set(weight, forKey: "userWeightKg")
+                     // Optionally recalculate something if needed immediately
+                 }
+                 
             default:
                 break
             }
@@ -275,6 +296,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, HealthKitDe
         
         // Send heart rate to the phone if session is active
         if isSessionActive {
+            print("Sending heart rate update to phone: \(heartRate) BPM")
             sendMessageToPhone([
                 "command": "updateHeartRate",
                 "heartRate": heartRate

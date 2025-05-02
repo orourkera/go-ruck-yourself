@@ -10,16 +10,23 @@ import SwiftUI
 @available(iOS 14.0, watchOS 9.0, *)
 @main
 struct GRYWatchApp: App {
-    @StateObject private var sessionManager = SessionManager()
+    // Use the singleton so all views observe same instance
+    @StateObject private var sessionManager = SessionManager.shared
     
     var body: some Scene {
         WindowGroup {
-            StartSessionView()
-                .environmentObject(sessionManager)
+            Group {
+                if sessionManager.isSessionActive {
+                    PrimaryMetricsView()
+                } else {
+                    StartSessionView()
+                }
+            }
+            .environmentObject(sessionManager)
         }
     }
     
     init() {
-        // Initialize any services here if needed
+        // Additional init if needed
     }
 }

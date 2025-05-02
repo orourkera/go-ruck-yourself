@@ -28,6 +28,7 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:rucking_app/core/error_messages.dart';
+import 'package:rucking_app/core/services/watch_service.dart';
 
 LatLng _getRouteCenter(List locationPoints) {
   if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
@@ -81,6 +82,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   late ApiClient _apiClient;
   late SessionValidationService _validationService;
   late HealthService _healthService;
+  late WatchService _watchService;
   
   // Session state
   bool _isPaused = false;
@@ -143,6 +145,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _locationService = GetIt.instance<LocationService>();
     _validationService = SessionValidationService();
     _healthService = HealthService();
+    _watchService = GetIt.instance<WatchService>();
     
     // Check if user has an Apple Watch
     _checkHasAppleWatch();
@@ -248,6 +251,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _heartRateTimer?.cancel();
     _stopwatch.stop();
     _stopLocationTracking(); // Explicitly stop location tracking
     _stopHeartRateMonitoring();
@@ -514,13 +518,12 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     await _initLocationTracking();
     
     try {
-      await _apiClient.post('/rucks/${widget.ruckId}/start', {});
+      await _apiClient.put('/rucks/${widget.ruckId}/start', {});
     } catch (e) {
       print('Failed to start session: $e');
       
       // Handle unauthorized errors specifically
       if (e is UnauthorizedException) {
-        // More specific error message for auth issues
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text(serverUnauthorized),
@@ -535,16 +538,15 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
           )
         );
       } else {
-        // Generic error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(sessionStartError))
-        );
+        // Log non-critical error without showing an error message
+        debugPrint('Non-critical error on session start: $e');
       }
     }
   }
   
   /// Updates the elapsed time display
   void _updateTime(Timer timer) {
+    if (!mounted) return;
     if (!_isPaused) {
       setState(() {
         _elapsed = Duration(seconds: _stopwatch.elapsed.inSeconds);
@@ -563,6 +565,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/resume', {})
             .catchError((e) => print('Failed to resume session: $e'));
+        // Notify Watch
+        if (_hasAppleWatch) {
+          _watchService.resumeSessionOnWatch();
+        }
       } else {
         _stopwatch.stop();
         _isPaused = true;
@@ -571,6 +577,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/pause', {})
             .catchError((e) => print('Failed to pause session: $e'));
+        // Notify Watch
+        if (_hasAppleWatch) {
+          _watchService.pauseSessionOnWatch();
+        }
       }
     });
   }
@@ -585,6 +595,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _stopLocationTracking(); // Explicitly stop location tracking
     debugPrint('Timers and location tracking stopped for session end.');
 
+    // Notify Watch
+    if (_hasAppleWatch) {
+      _watchService.endSessionOnWatch();
+    }
+    
     // Check if we have a valid session to save
     if (_locationPoints.isEmpty || _distance < 0.05) {
       debugPrint('Session too short to save: distance $_distance km');
@@ -830,35 +845,43 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   }
 
   /// Start heart rate monitoring
-  void _startHeartRateMonitoring() async {
-    // Check if health integration is enabled
-    final isEnabled = await _healthService.isHealthIntegrationEnabled();
-    if (!isEnabled) {
-      return;
-    }
-    
-    // Request authorization for heart rate monitoring
-    await _healthService.requestAuthorization();
-    
-    // Start periodic heart rate updates every 15 seconds
-    _heartRateTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
-      if (_isPaused) return; // Don't update during pause
-      
-      final heartRate = await _healthService.getCurrentHeartRate();
-      if (heartRate != null) {
-        setState(() {
-          _heartRate = heartRate;
-        });
-      }
-    });
-    
-    // Fetch initial heart rate
+  Future<void> _startHeartRateMonitoring() async {
+    debugPrint('Starting heart rate monitoring...');
+    // Request initial heart rate
     final initialHeartRate = await _healthService.getCurrentHeartRate();
+    if (!mounted) return;
     if (initialHeartRate != null) {
+      debugPrint('Initial heart rate received: $initialHeartRate bpm');
       setState(() {
         _heartRate = initialHeartRate;
       });
+    } else {
+      debugPrint('No heart rate data received; using fallback value 70 bpm');
+      setState(() {
+        _heartRate = 70;
+      });
     }
+
+    // Start a periodic timer to poll heart rate every 15 seconds
+    _heartRateTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      if (!mounted) return;
+      if (_isPaused) return; // Skip update if session is paused
+      debugPrint('Polling for heart rate update...');
+      final heartRate = await _healthService.getCurrentHeartRate();
+      if (!mounted) return;
+      if (heartRate != null) {
+        debugPrint('Heart rate updated: $heartRate bpm');
+        setState(() {
+          _heartRate = heartRate;
+        });
+      } else {
+        debugPrint('No heart rate data received on poll; using fallback value 70 bpm');
+        setState(() {
+          _heartRate = 70;
+        });
+      }
+    });
+    debugPrint('Heart rate timer started with 15-second interval.');
   }
 
   /// Stop heart rate monitoring
@@ -1346,7 +1369,19 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
               ),
             ),
           ),
-          
+          // Add heart rate display below the metrics container
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Heart Rate: ${_heartRate != null ? _heartRate.toString() + " bpm" : "--"}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
           // Control buttons
           Padding(
             padding: const EdgeInsets.all(16),

@@ -219,7 +219,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     try {
       // Notify API that session has started
-      await _apiClient.post('/rucks/${event.ruckId}/start', {});
+      await _apiClient.put('/rucks/${event.ruckId}/start', {});
       
       // Start tracking time
       _stopwatch.start();
@@ -364,7 +364,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       // Notify API
       try {
-        await _apiClient.post('/rucks/${currentState.ruckId}/pause', {});
+        await _apiClient.put('/rucks/${currentState.ruckId}/pause', {});
       } catch (e) {
         print('Failed to pause session: $e');
       }
@@ -399,7 +399,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       // Notify API
       try {
-        await _apiClient.post('/rucks/${currentState.ruckId}/resume', {});
+        await _apiClient.put('/rucks/${currentState.ruckId}/resume', {});
       } catch (e) {
         print('Failed to resume session: $e');
       }
@@ -433,7 +433,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       try {
         // Complete session on backend
-        await _apiClient.post('/rucks/${currentState.ruckId}/complete', {
+        await _apiClient.put('/rucks/${currentState.ruckId}/complete', {
           'notes': event.notes,
           'rating': event.rating,
         });

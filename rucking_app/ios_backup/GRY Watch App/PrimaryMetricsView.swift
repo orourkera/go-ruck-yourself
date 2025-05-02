@@ -10,17 +10,19 @@ import SwiftUI
 @available(watchOS 9.0, *)
 struct PrimaryMetricsView: View {
     @EnvironmentObject var sessionManager: SessionManager
+    @State private var isDataReady: Bool = false
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 // Title at the top, left-aligned, positioned with the time
                 Text("GRY")
-                    .font(.title)
+                    .font(.headline)
                     .fontWeight(.bold)
                     .foregroundColor(Color("ArmyGreen"))
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding([.leading, .trailing], 10)
                     .padding(.top, 0)
-                    .padding(.bottom, 8)
                 
                 // Grid layout for metrics (2x2)
                 LazyVGrid(columns: [
@@ -28,38 +30,67 @@ struct PrimaryMetricsView: View {
                     GridItem(.flexible())
                 ], spacing: 8) {
                     // Row 1: Time and Heart Rate
-                    MetricCard(
-                        title: "TIME", 
-                        value: formatDuration(sessionManager.elapsedDuration)
-                    )
+                    if isDataReady {
+                        MetricCard(
+                            title: "TIME", 
+                            value: formatDuration(sessionManager.elapsedDuration)
+                        )
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    }
                     
-                    // Heart Rate
-                    MetricCard(
-                        title: "HEART RATE",
-                        value: formatHeartRate(sessionManager.heartRate)
-                    )
+                    if isDataReady {
+                        MetricCard(
+                            title: "HEART RATE",
+                            value: sessionManager.heartRate > 0 ? "\(sessionManager.heartRate) bpm" : "--"
+                        )
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    }
                     
                     // Row 2: Calories and Distance
-                    MetricCard(
-                        title: "CALORIES", 
-                        value: formatCalories(sessionManager.calories)
-                    )
+                    if isDataReady {
+                        MetricCard(
+                            title: "CALORIES",
+                            value: isDataReady ? "\(calculateCalories(weightKg: sessionManager.userWeightKg, ruckWeightKg: sessionManager.ruckWeightKg, durationSeconds: sessionManager.elapsedDuration))" : "--"
+                        )
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    }
                     
-                    MetricCard(
-                        title: "DISTANCE", 
-                        value: formatDistance(sessionManager.distance)
-                    )
+                    if isDataReady {
+                        MetricCard(
+                            title: "DISTANCE", 
+                            value: formatDistance(sessionManager.distance)
+                        )
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    }
                     
                     // Row 3: Pace and Elevation
-                    MetricCard(
-                        title: "PACE",
-                        value: formatPace(sessionManager.pace)
-                    )
+                    if isDataReady {
+                        MetricCard(
+                            title: "PACE",
+                            value: formatPace(sessionManager.pace)
+                        )
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    }
                     
-                    MetricCard(
-                        title: "ELEVATION", 
-                        value: formatElevation(sessionManager.elevationGain)
-                    )
+                    if isDataReady {
+                        MetricCard(
+                            title: "ELEVATION", 
+                            value: formatElevation(sessionManager.elevationGain)
+                        )
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    }
                 }
                 .padding(.top, 2)
                 
@@ -101,6 +132,12 @@ struct PrimaryMetricsView: View {
             }
             .ignoresSafeArea(.all, edges: .top) // Modern SwiftUI syntax for ignoring safe area
         }
+        .onAppear {
+            // Example: simulate data readiness update; in production, update based on actual connectivity/data
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                isDataReady = true
+            }
+        }
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -121,10 +158,6 @@ struct PrimaryMetricsView: View {
         return String(format: "%.2f km", km)
     }
     
-    private func formatCalories(_ calories: Double) -> String {
-        return String(format: "%.0f", calories)
-    }
-    
     private func formatElevation(_ elevation: Double) -> String {
         return String(format: "%.0f m", elevation)
     }
@@ -143,6 +176,15 @@ struct PrimaryMetricsView: View {
         let seconds = Int((pace - Double(minutes)) * 60)
         
         return String(format: "%d:%02d /km", minutes, seconds)
+    }
+    
+    private func calculateCalories(weightKg: Double, ruckWeightKg: Double, durationSeconds: Double) -> Int {
+        // Example MET value for rucking (moderate effort)
+        let MET = 6.0
+        let totalWeightKg = weightKg + ruckWeightKg
+        let hours = durationSeconds / 3600.0
+        let calories = MET * totalWeightKg * hours
+        return Int(calories.rounded())
     }
 }
 

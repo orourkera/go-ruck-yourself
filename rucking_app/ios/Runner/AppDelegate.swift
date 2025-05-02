@@ -3,7 +3,7 @@ import UIKit
 import WatchConnectivity
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, WCSessionDelegate {
+@objc class AppDelegate: FlutterAppDelegate, WCSessionDelegate, FlutterRuckingApi {
 
     // Define the method channel names (must match Flutter side)
     let SESSION_CHANNEL_NAME = "com.getrucky.gfy/watch_session"
@@ -41,14 +41,20 @@ import WatchConnectivity
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        // Set up Flutter Method Channel
-        // TODO: Consider moving channel setup to after Flutter engine is fully running
-        if let controller = window?.rootViewController as? FlutterViewController {
-            sessionChannel = FlutterMethodChannel(name: SESSION_CHANNEL_NAME, binaryMessenger: controller.binaryMessenger)
-            healthChannel = FlutterMethodChannel(name: HEALTH_CHANNEL_NAME, binaryMessenger: controller.binaryMessenger)
-            // Initialize user prefs channel if needed
-            print("Method Channel Established")
+        // Get the FlutterViewController and BinaryMessenger
+        guard let controller = window?.rootViewController as? FlutterViewController else {
+            fatalError("rootViewController is not type FlutterViewController")
         }
+        let binaryMessenger = controller.binaryMessenger
+
+        // Set up Flutter Method Channels (Watch -> Flutter)
+        sessionChannel = FlutterMethodChannel(name: SESSION_CHANNEL_NAME, binaryMessenger: binaryMessenger)
+        healthChannel = FlutterMethodChannel(name: HEALTH_CHANNEL_NAME, binaryMessenger: binaryMessenger)
+        print("Method Channels Established (Watch -> Flutter)")
+        
+        // ** Set up Pigeon HostApi (Flutter -> Watch) **
+        FlutterRuckingApiSetup.setUp(binaryMessenger: binaryMessenger, api: self)
+        print("Pigeon Host API Setup (Flutter -> Watch)")
 
         // Set up Watch Connectivity
         if WCSession.isSupported() {
@@ -232,5 +238,60 @@ import WatchConnectivity
         // Filter out non-app data if necessary, or adjust handleReceivedData
         print("---> [AppDelegate] session:didReceiveUserInfo called with: \(userInfo)")
         handleReceivedData(userInfo, isReplyExpected: false, replyHandler: nil)
+    }
+    
+    // MARK: - FlutterRuckingApi Implementation (Flutter -> Native)
+    
+    func updateSessionOnWatch(distance: Double, duration: Double, pace: Double, isPaused: Bool) throws {
+        print("[AppDelegate/Pigeon] updateSessionOnWatch called - Distance: \(distance), Duration: \(duration), Pace: \(pace), Paused: \(isPaused)")
+        let message: [String: Any] = [
+            "command": "updateSession",
+            "distance": distance,
+            "duration": duration,
+            "pace": pace,
+            "isPaused": isPaused
+        ]
+        sendMessageToWatch(message)
+    }
+    
+    func startSessionOnWatch(ruckWeight: Double) throws {
+         print("[AppDelegate/Pigeon] startSessionOnWatch called - Ruck Weight: \(ruckWeight)")
+         let message: [String: Any] = [
+             "command": "startSession",
+             "ruckWeight": ruckWeight
+         ]
+         sendMessageToWatch(message)
+    }
+
+    func pauseSessionOnWatch() throws {
+        print("[AppDelegate/Pigeon] pauseSessionOnWatch called")
+        sendMessageToWatch(["command": "pauseSession"])
+    }
+
+    func resumeSessionOnWatch() throws {
+        print("[AppDelegate/Pigeon] resumeSessionOnWatch called")
+        sendMessageToWatch(["command": "resumeSession"])
+    }
+
+    func endSessionOnWatch() throws {
+        print("[AppDelegate/Pigeon] endSessionOnWatch called")
+        sendMessageToWatch(["command": "endSession"])
+    }
+    
+    // Helper to send message to Watch
+    private func sendMessageToWatch(_ message: [String: Any]) {
+        guard let session = self.session, session.isReachable else {
+            print("[AppDelegate] Watch not reachable, can't send message: \(message)")
+            // Optionally handle queuing or error feedback to Flutter
+            return
+        }
+        
+        session.sendMessage(message, replyHandler: { reply in
+            print("[AppDelegate] Received reply from watch: \(reply)")
+            // Handle reply if needed
+        }, errorHandler: { error in
+            print("[AppDelegate] Error sending message to watch: \(error.localizedDescription)")
+            // Handle error if needed
+        })
     }
 }
