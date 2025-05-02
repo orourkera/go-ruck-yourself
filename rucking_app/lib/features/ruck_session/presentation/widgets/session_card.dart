@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
 
 /// A card widget that displays session information
 class SessionCard extends StatelessWidget {

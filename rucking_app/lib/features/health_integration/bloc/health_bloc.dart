@@ -1,7 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
-import 'package:flutter/foundation.dart'; // Added debug logging import
 
 part 'health_event.dart';
 part 'health_state.dart';
@@ -68,17 +69,17 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
     Emitter<HealthState> emit,
   ) async {
     emit(HealthLoading());
-    final success = await healthService.saveRuckWorkout(
-      distanceMeters: event.distanceMeters,
-      caloriesBurned: event.caloriesBurned,
-      startTime: event.startTime,
-      endTime: event.endTime,
+    final success = await healthService.saveWorkout(
+      startDate: event.startTime,
+      endDate: event.endTime,
+      distanceKm: event.distanceMeters / 1000, // Convert meters to km
+      caloriesBurned: event.caloriesBurned.toInt(), // Convert to int
       ruckWeightKg: event.ruckWeightKg,
       elevationGainMeters: event.elevationGainMeters,
       elevationLossMeters: event.elevationLossMeters,
       heartRate: event.heartRate,
     );
-    debugPrint('[HealthBloc] saveRuckWorkout → $success'); // Added debug logging
+    AppLogger.info('Health workout save result: $success');
     emit(HealthDataWriteStatus(success: success));
   }
 
@@ -116,12 +117,14 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
     Emitter<HealthState> emit,
   ) async {
     emit(HealthLoading());
-    await healthService.disableHealthIntegration();
+    await healthService.setHealthIntegrationEnabled(false);
     emit(HealthDisabled());
   }
 
   // Convenience method to disable health integration
-  void disableHealthIntegration() {
-    add(const DisableHealthIntegration());
+  void setHealthIntegrationEnabled(bool enabled) {
+    if (!enabled) {
+      add(const DisableHealthIntegration());
+    }
   }
 }

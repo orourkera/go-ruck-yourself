@@ -209,7 +209,7 @@ class AuthServiceImpl implements AuthService {
   @override
   Future<String?> refreshToken() async {
     try {
-      final response = await _apiClient.post('/auth/refresh-token');
+      final response = await _apiClient.post('/auth/refresh-token', {});
       final newToken = response['token'] as String;
       
       // Store new token

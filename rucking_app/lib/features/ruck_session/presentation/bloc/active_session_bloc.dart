@@ -134,7 +134,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         
         try {
           // Calculate distance between last two points
-          final segmentDistance = _locationService.calculateDistanceKm(
+          final segmentDistance = _locationService.calculateDistance(
             previousPoint, 
             newPoint
           );
@@ -180,7 +180,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         calories: _calculateCalories(
           newDistance, 
           currentState.ruckWeightKg
-        ),
+        ).toDouble(),
         elevationGain: elevationGain,
         elevationLoss: elevationLoss,
         isPaused: currentState.isPaused,
@@ -291,15 +291,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           session: RuckSession(
             id: currentState.sessionId,
             ruckWeightKg: currentState.ruckWeightKg,
-            distanceKm: currentState.distanceKm,
-            durationSeconds: currentState.elapsedSeconds,
+            distance: currentState.distanceKm,
+            duration: Duration(seconds: currentState.elapsedSeconds),
             startTime: DateTime.now().subtract(Duration(seconds: currentState.elapsedSeconds)),
             endTime: DateTime.now(),
             notes: event.notes,
             rating: event.rating,
             caloriesBurned: currentState.calories.toInt(),
-            elevationGainMeters: currentState.elevationGain,
-            elevationLossMeters: currentState.elevationLoss,
+            elevationGain: currentState.elevationGain,
+            elevationLoss: currentState.elevationLoss,
+            averagePace: currentState.distanceKm > 0 
+                ? (currentState.elapsedSeconds / 60) / currentState.distanceKm 
+                : 0.0,
           ),
         ));
       } catch (e) {
