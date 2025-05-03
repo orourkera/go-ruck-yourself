@@ -5,8 +5,8 @@ from flask import request
 from flask_restful import Resource
 from sqlalchemy import func, extract
 
-from app import db
-from models import User, RuckSession, LocationPoint, SessionReview
+from ..app import db
+from ..models import User, RuckSession, LocationPoint, SessionReview
 from api.schemas import (
     UserSchema, SessionSchema, LocationPointSchema, 
     SessionReviewSchema, StatisticsSchema, 
