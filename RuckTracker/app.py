@@ -72,6 +72,9 @@ def register_endpoint():
     # This just defines the rate limit, actual implementation is elsewhere
     pass
 
+# Apply rate limiting to Flask-RESTful endpoints
+decorators = [limiter.limit("5 per minute")]
+
 # Enable CORS with specific allowed origins
 allowed_origins = [
     "https://getrucky.com",
@@ -217,7 +220,7 @@ try:
     
     # Auth endpoints (prefixed with /api)
     api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
-    api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login') # Keep /api/auth/login
+    api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin', resource_class_args=(decorators,))
     api.add_resource(SignOutResource, '/api/auth/signout')
     api.add_resource(RefreshTokenResource, '/api/auth/refresh')
     api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
