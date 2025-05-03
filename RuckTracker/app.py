@@ -12,6 +12,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
+# Import db from extensions
+from .extensions import db
+
 # Load environment variables
 load_dotenv()
 
@@ -55,6 +58,9 @@ app.secret_key = os.environ.get("SESSION_SECRET")
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
+
+# Initialize extensions
+db.init_app(app)
 
 # Initialize rate limiter
 limiter = Limiter(
