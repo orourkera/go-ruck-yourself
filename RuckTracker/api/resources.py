@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from flask import request
+from flask import request, g
 from flask_restful import Resource
 from sqlalchemy import func, extract
 
@@ -23,6 +23,7 @@ apple_health_sync_schema = AppleHealthSyncSchema()
 apple_health_status_schema = AppleHealthStatusSchema()
 from ..utils.location import calculate_distance, calculate_elevation_change
 from ..utils.calculations import calculate_calories
+from ..supabase_client import get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +59,39 @@ class UserResource(Resource):
     
     def delete(self, user_id):
         """Delete a user"""
-        user = User.query.get_or_404(user_id)
-        db.session.delete(user)
-        db.session.commit()
-        return {"message": "User deleted successfully"}, 200
+        # Authorization check: Ensure the authenticated user matches the user_id being deleted
+        if not g.user or g.user.id != user_id:
+            logger.warning(f"Unauthorized delete attempt: auth_user='{g.user.id if g.user else None}' target_user='{user_id}'")
+            return {'message': 'Forbidden: You can only delete your own account'}, 403
+
+        user = User.query.filter_by(id=user_id).first()
+        if not user:
+            return {'message': 'User not found in local database'}, 404
+            
+        try:
+            # 1. Delete from Supabase Auth first
+            logger.info(f"Attempting Supabase Auth deletion for user {user_id}")
+            try:
+                admin_client = get_supabase_admin_client()
+                # Ensure you have the correct method path for your supabase-py version
+                admin_client.auth.admin.delete_user(user_id)
+                logger.info(f"Successfully deleted user {user_id} from Supabase Auth.")
+            except Exception as supabase_err:
+                logger.error(f"Failed to delete user {user_id} from Supabase Auth: {str(supabase_err)}", exc_info=True)
+                # Decide if this is a fatal error. Maybe just log and continue?
+                # For now, let's make it fatal to ensure cleanup consistency.
+                return {'message': 'Failed to delete user from authentication provider'}, 500
+            
+            # 2. Delete from local database
+            logger.info(f"Attempting local DB deletion for user {user_id}")
+            db.session.delete(user)
+            db.session.commit()
+            logger.info(f"User {user_id} deleted successfully from local DB.")
+            return {"message": "User deleted successfully"}, 200
+        except Exception as e:
+            db.session.rollback() # Rollback local DB changes if any step failed
+            logger.error(f"Error during user deletion process for {user_id}: {str(e)}", exc_info=True)
+            return {'message': 'An error occurred during deletion'}, 500
 
 
 class UserListResource(Resource):

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import sys
 import logging
 
-from ..supabase_client import get_supabase_client
+from ..supabase_client import get_supabase_client, get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +29,11 @@ class SignUpResource(Resource):
             })
             
             if auth_response.user:
-                # Create profile in the public.profiles table
+                user_id = auth_response.user.id # Get the ID of the newly created auth user
+                
+                # Create profile in the public.profiles table using ADMIN client to bypass RLS
                 profile_data = {
-                    'id': auth_response.user.id, # Link to auth.users
+                    'id': user_id, # Link to auth.users
                     'name': data.get('name'),
                     'weight_kg': data.get('weight_kg'),
                     'height_cm': data.get('height_cm'),
@@ -40,15 +42,17 @@ class SignUpResource(Resource):
                 # Clean data - remove None values before insert
                 profile_data_clean = {k: v for k, v in profile_data.items() if v is not None}
                 
-                logger.debug(f"Inserting into profiles: {profile_data_clean}")
-                profile_response = supabase.table('profiles').insert(profile_data_clean).execute()
+                logger.debug(f"Inserting into profiles for user {user_id}: {profile_data_clean}")
+                try:
+                    admin_supabase = get_supabase_admin_client() # Get admin client
+                    profile_response = admin_supabase.table('profiles').insert(profile_data_clean).execute()
+                except Exception as profile_insert_err:
+                    logger.error(f"Error inserting profile using admin client for user {user_id}: {profile_insert_err}", exc_info=True)
+                    # Consider deleting the auth user here for consistency?
+                    # supabase.auth.admin.delete_user(user_id) # Requires admin client again
+                    return {'message': f'User created in auth, but failed to create profile: {profile_insert_err}'}, 500
                 
-                # Check for errors during profile insertion
-                if profile_response.data is None and hasattr(profile_response, 'error'):
-                     logger.error(f"Error inserting profile: {profile_response.error}")
-                     # Decide how to handle: maybe delete the auth user? Or just return error?
-                     # For now, return error and leave the auth user
-                     return {'message': f'User created in auth, but failed to create profile: {profile_response.error.message}'}, 500
+                logger.info(f"Successfully created profile for user {user_id}")
                 
                 # Convert user model to a JSON-serializable dictionary
                 user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else None
