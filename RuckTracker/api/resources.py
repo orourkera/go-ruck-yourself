@@ -64,9 +64,12 @@ class UserResource(Resource):
             logger.warning(f"Unauthorized delete attempt: auth_user='{g.user.id if g.user else None}' target_user='{user_id}'")
             return {'message': 'Forbidden: You can only delete your own account'}, 403
 
+        logger.debug(f"Attempting to find user {user_id} in local DB for deletion.")
         user = User.query.filter_by(id=user_id).first()
         if not user:
+            logger.warning(f"User {user_id} not found in local database during delete attempt.")
             return {'message': 'User not found in local database'}, 404
+        logger.info(f"Found user {user_id} in local DB. Proceeding with deletion process.")
             
         try:
             # 1. Delete from Supabase Auth first
@@ -85,10 +88,12 @@ class UserResource(Resource):
             # 2. Delete from local database
             logger.info(f"Attempting local DB deletion for user {user_id}")
             db.session.delete(user)
+            logger.debug(f"Local DB delete initiated for user {user_id}. Attempting commit.")
             db.session.commit()
             logger.info(f"User {user_id} deleted successfully from local DB.")
             return {"message": "User deleted successfully"}, 200
         except Exception as e:
+            logger.error(f"Rolling back local DB session for user {user_id} due to error.")
             db.session.rollback() # Rollback local DB changes if any step failed
             logger.error(f"Error during user deletion process for {user_id}: {str(e)}", exc_info=True)
             return {'message': 'An error occurred during deletion'}, 500
