@@ -233,8 +233,6 @@ try:
         YearlyStatsResource
     )
     
-    from .api.resources import UserResource # Import UserResource
-    
     # Auth endpoints (prefixed with /api)
     api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
     api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin')
@@ -242,6 +240,7 @@ try:
     api.add_resource(RefreshTokenResource, '/api/auth/refresh')
     api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
     api.add_resource(UserProfileResource, '/api/users/profile') # Handles GET/PUT
+    from .api.resources import UserResource # Import UserResource
     api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
     
     # Ruck session endpoints (prefixed with /api)
