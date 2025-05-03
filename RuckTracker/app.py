@@ -72,6 +72,17 @@ def register_endpoint():
     # This just defines the rate limit, actual implementation is elsewhere
     pass
 
+# Use a decorator function to apply rate limiting to resources
+def rate_limit_resource(resource, limit):
+    original_dispatch_request = resource.dispatch_request
+    
+    @limiter.limit(limit)
+    def wrapped_dispatch_request(*args, **kwargs):
+        return original_dispatch_request(*args, **kwargs)
+    
+    resource.dispatch_request = wrapped_dispatch_request
+    return resource
+
 # Apply rate limiting to Flask-RESTful endpoints
 decorators = [limiter.limit("5 per minute")]
 
@@ -94,6 +105,10 @@ CORS(app, origins=allowed_origins, supports_credentials=True)
 
 # Initialize API
 api = Api(app)
+
+# Apply rate limiting to SignInResource
+from .api.auth import SignInResource
+rate_limit_resource(SignInResource, "5 per minute")
 
 # User authentication middleware
 @app.before_request
@@ -220,7 +235,7 @@ try:
     
     # Auth endpoints (prefixed with /api)
     api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
-    api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin', resource_class_args=(decorators,))
+    api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin')
     api.add_resource(SignOutResource, '/api/auth/signout')
     api.add_resource(RefreshTokenResource, '/api/auth/refresh')
     api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
