@@ -7,6 +7,7 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/home_scre
 import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/shared/theme/app_theme.dart';
 
 /// Main application widget
@@ -34,10 +35,45 @@ class RuckingApp extends StatelessWidget {
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
         home: const SplashScreen(),
-        // Routes will be added here as we develop more screens
-        routes: {
-          '/home': (context) => const HomeScreen(),
-          '/paywall': (context) => const PaywallScreen(),
+        onGenerateRoute: (settings) {
+          switch (settings.name) {
+            case '/home':
+              return MaterialPageRoute(builder: (_) => const HomeScreen());
+            case '/paywall':
+              return MaterialPageRoute(builder: (_) => const PaywallScreen());
+            case '/session_complete':
+              final args = settings.arguments as Map<String, dynamic>?;
+              if (args != null) {
+                return MaterialPageRoute(
+                  builder: (_) => SessionCompleteScreen(
+                    completedAt: args['completedAt'] as DateTime,
+                    ruckId: args['ruckId'] as String,
+                    duration: args['duration'] as Duration,
+                    distance: args['distance'] as double,
+                    caloriesBurned: args['caloriesBurned'] as int,
+                    elevationGain: args['elevationGain'] as double,
+                    elevationLoss: args['elevationLoss'] as double,
+                    ruckWeight: args['ruckWeight'] as double,
+                  ),
+                );
+              } else {
+                // Handle error: arguments are required for this route
+                return MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: Text('Error')),
+                    body: Center(child: Text('Missing session data.')),
+                  ),
+                );
+              }
+            default:
+              // Optionally handle unknown routes
+              return MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: Text('Error')),
+                  body: Center(child: Text('Route not found: ${settings.name}')),
+                ),
+              );
+          }
         },
       ),
     );

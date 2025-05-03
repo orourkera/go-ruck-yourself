@@ -1,6 +1,14 @@
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
+/// Enum representing the status of a ruck session
+enum RuckStatus {
+  inProgress,
+  completed,
+  cancelled,
+  unknown // Default/fallback
+}
+
 /// Model representing a completed ruck session
 class RuckSession {
   final String? id;
@@ -13,6 +21,7 @@ class RuckSession {
   final int caloriesBurned;
   final double averagePace;
   final double ruckWeightKg;
+  final RuckStatus status;
   final String? notes;
   final int? rating;
   final List<Map<String, dynamic>>? locationPoints;
@@ -28,6 +37,7 @@ class RuckSession {
     required this.caloriesBurned,
     required this.averagePace,
     required this.ruckWeightKg,
+    required this.status,
     this.notes,
     this.rating,
     this.locationPoints,
@@ -98,6 +108,17 @@ class RuckSession {
       
       final distance = parseDistance(json['distance_km'] ?? json['distance'] ?? 0.0);
       
+      // Handle status (map string to enum)
+      RuckStatus status = RuckStatus.unknown;
+      final statusString = json['status']?.toString().toLowerCase();
+      if (statusString == 'completed') {
+        status = RuckStatus.completed;
+      } else if (statusString == 'in_progress' || statusString == 'active') { // Allow 'active' as well
+        status = RuckStatus.inProgress;
+      } else if (statusString == 'cancelled') {
+        status = RuckStatus.cancelled;
+      } // else defaults to unknown
+      
       // Extract other fields with sensible defaults
       return RuckSession(
         id: json['id']?.toString(),
@@ -112,6 +133,7 @@ class RuckSession {
             : (json['calories_burned'] ?? json['caloriesBurned'] ?? 0).toInt(),
         averagePace: parseDistance(json['average_pace'] ?? json['averagePace'] ?? 0.0),
         ruckWeightKg: parseDistance(json['ruck_weight_kg'] ?? json['ruckWeightKg'] ?? 0.0),
+        status: status,
         notes: json['notes']?.toString(),
         rating: json['rating'] is int ? json['rating'] : null,
         locationPoints: json['location_points'] is List ? 
@@ -131,6 +153,10 @@ class RuckSession {
         caloriesBurned: 0,
         averagePace: 0,
         ruckWeightKg: 0,
+        status: RuckStatus.unknown,
+        notes: null,
+        rating: null,
+        locationPoints: null,
       );
     }
   }
@@ -138,6 +164,22 @@ class RuckSession {
   /// Convert the RuckSession to a JSON map
   Map<String, dynamic> toJson() {
     final dateFormat = DateFormat("yyyy-MM-ddTHH:mm:ss");
+    
+    // Helper to convert enum back to string for API
+    String statusToString(RuckStatus status) {
+      switch (status) {
+        case RuckStatus.inProgress:
+          return 'in_progress';
+        case RuckStatus.completed:
+          return 'completed';
+        case RuckStatus.cancelled:
+          return 'cancelled';
+        case RuckStatus.unknown:
+        default:
+          return 'unknown'; // Or maybe null?
+      }
+    }
+    
     return {
       'id': id,
       'start_time': dateFormat.format(startTime),
@@ -149,6 +191,7 @@ class RuckSession {
       'calories_burned': caloriesBurned,
       'average_pace': averagePace,
       'ruck_weight_kg': ruckWeightKg,
+      'status': statusToString(status),
       'notes': notes,
       'rating': rating,
       'location_points': locationPoints,

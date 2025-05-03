@@ -87,12 +87,16 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     return "$hours:$minutes:$seconds";
   }
   
-  /// Format pace (minutes per km) as MM:SS
-  String _formatPace() {
-    if (widget.distance <= 0) return '--:--';
-    // Calculate pace (minutes per km)
-    final paceSeconds = widget.duration.inSeconds / widget.distance;
-    return MeasurementUtils.formatPace(paceSeconds, metric: true);
+  /// Format pace based on user preference (metric/imperial)
+  String _formatPace(bool preferMetric) {
+    // Ensure distance is positive to avoid division by zero or negative pace
+    if (widget.distance <= 0 || widget.duration.inSeconds <= 0) return '--:--';
+    
+    // Calculate pace in seconds per kilometer (assuming widget.distance is in km)
+    final paceSecondsPerKm = widget.duration.inSeconds / widget.distance;
+    
+    // Use formatPaceSeconds which correctly handles metric/imperial conversion
+    return MeasurementUtils.formatPaceSeconds(paceSecondsPerKm, metric: preferMetric);
   }
   
   /// Toggle a tag's selection status
@@ -270,7 +274,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     ),
                     StatCard(
                       title: 'Pace',
-                      value: MeasurementUtils.formatPace(widget.duration.inSeconds / widget.distance, metric: preferMetric),
+                      value: _formatPace(preferMetric),
                       icon: Icons.speed,
                       color: AppColors.secondary,
                       centerContent: true,
