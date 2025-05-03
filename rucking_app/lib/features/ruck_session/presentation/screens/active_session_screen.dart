@@ -539,135 +539,85 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   
   /// Ends the current session
   Future<void> _endSession() async {
+    if (_isEnding) return;
+    setState(() => _isEnding = true);
+
     try {
-      // Prevent double-ending
-      if (_isSessionEnded) return;
-      
-      // Mark session as ended and stop tracking
-      setState(() {
-        _isSessionEnded = true;
-      });
-      
-      // Safely stop location tracking with error handling
-      try {
-        _stopLocationTracking();
-      } catch (e) {
-        AppLogger.error('Error stopping location tracking: $e');
-        // Continue with session end even if tracking stop fails
-      }
-      
-      // Check if session meets minimum requirements
-      if (_locationPoints.isEmpty || 
-          _distance < SessionValidationService.minSessionDistanceMeters / 1000 ||
-          _elapsed.inSeconds < SessionValidationService.minSessionDuration.inSeconds) {
-        
-        AppLogger.error('Session too short: ${_distance}km, ${_elapsed.inMinutes}min');
-        
-        // Show user friendly message
+      // Stop tracking location
+      await _locationService.stopLocationTracking();
+      _timer?.cancel();
+      setState(() => _isTracking = false);
+
+      // Check if session is too short
+      if (_elapsed.inSeconds < 60) {
         _showShortSessionDialog();
-        
-        // Delete short session from API
-        try {
-          await _apiClient.delete('/rucks/${widget.ruckId}');
-          AppLogger.info('Deleted short session ${widget.ruckId} from backend');
-        } catch (e) {
-          AppLogger.error('Failed to delete short session: $e');
-        }
-        
+        setState(() => _isEnding = false);
         return;
       }
-      
+
       // Calculate final values
       final double finalDistanceKm = _distance;
+      final String ruckId = widget.ruckId ?? 'temp-id';
       
-      // Show session completion dialog
-      _showCompletionDialog(
-        onComplete: (String? notes, int? rating) async {
-          try {
-            // Get the session ID from the bloc
-            final activeSessionBloc = context.read<ActiveSessionBloc>();
-            final activeSessionState = activeSessionBloc.state;
-            String? sessionId;
-            
-            if (activeSessionState is ActiveSessionRunning) {
-              sessionId = activeSessionState.sessionId;
-            }
-            
-            // Send session completed event to API with the session ID from the bloc
-            if (sessionId != null) {
-              await _apiClient.post('/rucks/$sessionId/complete', {
-                'notes': notes,
-                'rating': rating,
-              });
-            } else {
-              // Fallback to the passed ruckId if no session is active
-              await _apiClient.post('/rucks/${widget.ruckId}/complete', {
-                'notes': notes,
-                'rating': rating,
-              });
-            }
-            
-            // Try to save to Apple Health
-            if (Platform.isIOS) {
-              try {
-                // Save data to Apple Health if we're on iOS
-                await _healthService.saveWorkout(
-                  startDate: _startTime,
-                  endDate: DateTime.now(),
-                  distanceKm: _distance,
-                  caloriesBurned: _calculateCalories().toInt(),
-                  ruckWeightKg: ruckWeightKg,
-                );
-              } catch (e) {
-                // Log error but don't block session completion
-                AppLogger.error('Failed to write to Apple Health: $e');
-              }
-            }
-            
-            // Navigate back to home screen after successful completion
-            if (mounted) {
-              Navigator.of(context).pop();
-            }
-          } catch (e) {
-            AppLogger.error('Failed to complete session: $e');
-            
-            // Show friendly error message
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ErrorHandler.getUserFriendlyMessage(e, 'Complete Session')),
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            }
-            
-            // Still navigate back to avoid being stuck on this screen
-            if (mounted) {
-              Navigator.of(context).pop();
-            }
-          }
-        },
-        onCancel: () {
-          // Just navigate back if user cancels
-          Navigator.of(context).pop();
+      // Navigate to SessionCompleteScreen
+      Navigator.of(context).pushNamed(
+        '/session_complete',
+        arguments: {
+          'completedAt': DateTime.now(),
+          'ruckId': ruckId,
+          'duration': _elapsed,
+          'distance': finalDistanceKm,
+          'caloriesBurned': _calculateCalories().toInt(),
+          'elevationGain': _elevationGain,
+          'elevationLoss': _elevationLoss,
+          'ruckWeight': _ruckWeight,
         },
       );
     } catch (e) {
-      AppLogger.error('Error in _endSession: $e');
-      
-      // Show friendly error and safely return to previous screen
+      AppLogger.error('Error ending session: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorHandler.getUserFriendlyMessage(e, 'End Session')),
-            duration: const Duration(seconds: 4),
+            content: const Text('Failed to end session. Please try again.'),
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: _endSession,
+            ),
           ),
         );
-        
-        // Always try to navigate back to avoid being stuck
-        Navigator.of(context).pop();
+      }
+    } finally {
+      if (_isEnding) {
+        setState(() => _isEnding = false);
       }
     }
+  }
+  
+  /// Show dialog for completed session to gather rating and notes
+  void _showCompletionDialog({
+    required double distanceKm,
+    required int durationSeconds,
+    required double caloriesBurned,
+    required double avgPaceMinPerKm,
+    required double elevationGain,
+    required double elevationLoss,
+  }) {
+    // Navigate to SessionCompleteScreen instead of showing a dialog
+    final String ruckId = widget.ruckId ?? 'temp-id';
+    Navigator.of(context).pushNamed(
+      '/session_complete',
+      arguments: {
+        'completedAt': DateTime.now(),
+        'ruckId': ruckId,
+        'duration': Duration(seconds: durationSeconds),
+        'distance': distanceKm,
+        'caloriesBurned': caloriesBurned.toInt(),
+        'elevationGain': elevationGain,
+        'elevationLoss': elevationLoss,
+        'ruckWeight': _ruckWeight,
+      },
+    );
   }
   
   /// Show dialog for session that is too short
@@ -710,83 +660,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     );
   }
   
-  /// Show dialog for completed session to gather rating and notes
-  void _showCompletionDialog({
-    required Function(String? notes, int? rating) onComplete,
-    required VoidCallback onCancel,
-  }) {
-    if (!mounted) return;
-    
-    String notes = '';
-    int rating = 0;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Session Complete'),
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            return SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Distance: ${_distance.toStringAsFixed(2)} km'),
-                  Text('Duration: ${_formatDuration(_elapsed)}'),
-                  Text('Calories: ${_calculateCalories().toInt()}'),
-                  const SizedBox(height: 16),
-                  const Text('How was your ruck?'),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < rating ? Icons.star : Icons.star_border,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            rating = index + 1;
-                          });
-                        },
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Notes:'),
-                  TextField(
-                    maxLines: 3,
-                    onChanged: (value) {
-                      notes = value;
-                    },
-                    decoration: const InputDecoration(
-                      hintText: 'Optional notes about your session',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: onCancel,
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              onComplete(notes.isNotEmpty ? notes : null, rating > 0 ? rating : null);
-            },
-            child: const Text('Complete'),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Format duration as HH:MM:SS
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');

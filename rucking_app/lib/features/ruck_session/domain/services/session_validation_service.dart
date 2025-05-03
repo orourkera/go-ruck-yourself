@@ -8,7 +8,7 @@ class SessionValidationService {
   // Thresholds
   static const double minSessionDistanceMeters = 100.0; // 100 meters
   static const Duration minSessionDuration = Duration(minutes: 2);
-  static const double minInitialDistanceMeters = 100.0; // Changed from 200m to 100m for better UX
+  static const double minInitialDistanceMeters = 50.0; // Changed from 100m to 50m for faster stats display
   static const double maxSpeedKmh = 10.0; // 10 km/h max speed (walking/light jogging)
   static const Duration maxSpeedDuration = Duration(minutes: 1); // 1 minute max over speed
   static const double minMovingSpeedKmh = 0.5; // 0.5 km/h min speed to be considered moving
