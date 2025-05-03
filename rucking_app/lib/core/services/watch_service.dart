@@ -139,11 +139,13 @@ class WatchService {
       await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {});
       
       // Send event to BLoC to update UI
+      /* // Temporarily commented out - removing watch functionality
       GetIt.instance<ActiveSessionBloc>().add(SessionStarted(
         ruckId: sessionId,
         ruckWeight: ruckWeight,
         userWeight: await _getUserWeight() ?? 70.0, // Get from service or use default
       ));
+      */
       
     } catch (e) {
       debugPrint('[ERROR] Failed to process session start from Watch: $e');
