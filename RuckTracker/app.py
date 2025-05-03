@@ -18,8 +18,8 @@ from .extensions import db
 # Load environment variables
 load_dotenv()
 
-# Import get_supabase_client
-from RuckTracker.supabase_client import get_supabase_client
+# Import the supabase client
+from .supabase_client import get_supabase_client
 
 # Configure logging - Use appropriate level based on environment
 log_level = logging.INFO

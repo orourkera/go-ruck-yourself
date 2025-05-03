@@ -22,7 +22,7 @@ statistics_schema = StatisticsSchema()
 apple_health_sync_schema = AppleHealthSyncSchema()
 apple_health_status_schema = AppleHealthStatusSchema()
 from ..utils.location import calculate_distance, calculate_elevation_change
-from utils.calculations import calculate_calories
+from ..utils.calculations import calculate_calories
 
 logger = logging.getLogger(__name__)
 
