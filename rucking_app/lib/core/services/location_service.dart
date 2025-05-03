@@ -147,7 +147,8 @@ class LocationServiceImpl implements LocationService {
     final a = 0.5 - c((point2.latitude - point1.latitude) * p)/2 + 
               c(point1.latitude * p) * c(point2.latitude * p) * 
               (1 - c((point2.longitude - point1.longitude) * p))/2;
-    final d = 12742 * asin(sqrt(1 - a)); // 2 * R; R = 6371 km
+    // Corrected Haversine: use sqrt(a) instead of sqrt(1 - a)
+    final d = 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
     
     return d;
   }
