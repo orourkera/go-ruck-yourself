@@ -90,7 +90,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   bool _isEnding = false;
   String? _validationMessage;
   bool _showValidationMessage = false;
-  bool _hasAppleWatch = true; // Track if user has Apple Watch
   bool _isSessionEnded = false; // New flag
   
   // Timer variables
@@ -147,9 +146,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _validationService = SessionValidationService();
     _healthService = HealthService();
     
-    // Check if user has an Apple Watch
-    _checkHasAppleWatch();
-
     // Get user preference and weight
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
@@ -546,7 +542,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       // Stop tracking location
       await _locationService.stopLocationTracking();
       _timer?.cancel();
-      setState(() => _isTracking = false);
+      // Removed erroneous: setState(() => _isTracking = false);
 
       // Check if session is too short
       if (_elapsed.inSeconds < 60) {
@@ -570,7 +566,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
           'caloriesBurned': _calculateCalories().toInt(),
           'elevationGain': _elevationGain,
           'elevationLoss': _elevationLoss,
-          'ruckWeight': _ruckWeight,
+          'ruckWeight': widget.ruckWeight,
         },
       );
     } catch (e) {
@@ -615,7 +611,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         'caloriesBurned': caloriesBurned.toInt(),
         'elevationGain': elevationGain,
         'elevationLoss': elevationLoss,
-        'ruckWeight': _ruckWeight,
+        'ruckWeight': widget.ruckWeight,
       },
     );
   }
@@ -718,14 +714,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   void _stopHeartRateMonitoring() {
     _heartRateTimer?.cancel();
     _heartRateTimer = null;
-  }
-
-  /// Check if user has an Apple Watch
-  void _checkHasAppleWatch() async {
-    final hasWatch = await _healthService.hasAppleWatch();
-    setState(() {
-      _hasAppleWatch = hasWatch;
-    });
   }
 
   /// Get formatted weight string
@@ -1005,52 +993,51 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                       ),
                     ),
                     
-                    // Heart rate pill (only shown if user has an Apple Watch)
-                    if (_hasAppleWatch)
-                      Container(
-                        margin: const EdgeInsets.only(left: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.black 
-                            : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Theme.of(context).brightness == Brightness.dark 
-                              ? Colors.grey[800]! 
-                              : Colors.grey[300]!,
-                            width: 1,
+                    // Heart rate pill
+                    Container(
+                      margin: const EdgeInsets.only(left: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark 
+                          ? Colors.black 
+                          : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.favorite,
-                              color: Colors.red[400],
-                              size: 24,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _heartRate != null ? '${_heartRate!.toInt()}' : '--',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: Theme.of(context).brightness == Brightness.dark 
-                                  ? Colors.white
-                                  : Colors.black,
-                              ),
-                            ),
-                          ],
+                        ],
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark 
+                            ? Colors.grey[800]! 
+                            : Colors.grey[300]!,
+                          width: 1,
                         ),
                       ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.favorite,
+                            color: Colors.red[400],
+                            size: 24,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _heartRate != null ? '${_heartRate!.toInt()}' : '--',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: Theme.of(context).brightness == Brightness.dark 
+                                ? Colors.white
+                                : Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
                 
