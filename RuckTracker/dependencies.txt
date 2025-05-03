@@ -8,3 +8,8 @@ gunicorn==21.2.0
 marshmallow==3.20.1
 sqlalchemy==2.0.20
 werkzeug==2.3.7
+# Added missing dependencies
+Flask-Limiter>=3.6.0
+Flask-Migrate>=4.0.0
+psycopg2-binary>=2.9.9 # Added PostgreSQL driver
+python-dotenv>=1.0.0 # Added to load .env files

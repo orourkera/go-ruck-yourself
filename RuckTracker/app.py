@@ -3,6 +3,9 @@ import logging
 import sys
 import json
 from datetime import datetime
+from dotenv import load_dotenv # Import load_dotenv
+
+load_dotenv() # Load environment variables from .env file
 
 from flask import Flask, render_template, Blueprint, g, jsonify, request, redirect
 from flask_restful import Api
@@ -11,15 +14,10 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
+from flask_migrate import Migrate # Import Migrate
 
 # Import db from extensions
 from .extensions import db
-
-# Load environment variables
-load_dotenv()
-
-# Import the supabase client
-from .supabase_client import get_supabase_client
 
 # Configure logging - Use appropriate level based on environment
 log_level = logging.INFO
@@ -74,6 +72,7 @@ app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 
 # Initialize extensions
 db.init_app(app)
+migrate = Migrate(app, db) # Initialize Flask-Migrate
 
 # Initialize rate limiter
 limiter = Limiter(
