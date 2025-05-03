@@ -362,31 +362,24 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
         _elevationLoss += elevationChange.abs();
       }
       
-      // Calculate pace (min/km) - time taken for this segment / distance in km
-      double segmentPace = 0.0;
+      // Calculate overall average pace (seconds per km)
+      if (_distance > 0 && _elapsed.inSeconds > 0) {
+        _pace = _elapsed.inSeconds / _distance; 
+      } else {
+        _pace = 0.0;
+      }
+
+      // Calculate MET value using the correct method - based on segment pace for accuracy
+      // Need segment pace calculation here, even if not used for the main _pace variable
+      double segmentSpeedKmh = 0.0;
       if (distanceMeters > 0) {
-        segmentPace = (DateTime.now().difference(previousPoint.timestamp).inSeconds) / (distanceMeters / 1000);
-        _recentPaces.add(segmentPace);
-        // Keep only the most recent 30 paces for initial trimming
-        if (_recentPaces.length > 30) {
-          _recentPaces.removeAt(0);
-        }
-        
-        // Step 1: trimmed-mean to reduce outliers
-        final double trimmedPace =
-            _validationService.getSmoothedPace(segmentPace, _recentPaces);
-        
-        // Step 2: exponential moving average for smooth yet responsive update
-        if (_pace == 0) {
-          _pace = trimmedPace;
-        } else {
-          _pace = _pace * (1 - _paceAlpha) + trimmedPace * _paceAlpha;
+        final segmentSeconds = DateTime.now().difference(previousPoint.timestamp).inSeconds;
+        if (segmentSeconds > 0) {
+           final segmentPaceSecPerKm = segmentSeconds / (distanceMeters / 1000);
+           segmentSpeedKmh = 3600 / segmentPaceSecPerKm;
         }
       }
-      
-      // Calculate MET value using the correct method
-      final double speedKmh = segmentPace > 0 ? 3600 / segmentPace : 0.0;
-      final double speedMph = MetCalculator.kmhToMph(speedKmh);
+      final double speedMph = MetCalculator.kmhToMph(segmentSpeedKmh);
       final double ruckWeightKg = widget.ruckWeight;
       final double ruckWeightLbs = ruckWeightKg * AppConfig.kgToLbs;
 
@@ -990,52 +983,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                       _getDisplayWeight(),
                       style: AppTextStyles.headline6.copyWith(
                         color: Colors.grey.shade600,
-                      ),
-                    ),
-                    
-                    // Heart rate pill
-                    Container(
-                      margin: const EdgeInsets.only(left: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.black 
-                          : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.grey[800]! 
-                            : Colors.grey[300]!,
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.favorite,
-                            color: Colors.red[400],
-                            size: 24,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _heartRate != null ? '${_heartRate!.toInt()}' : '--',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: Theme.of(context).brightness == Brightness.dark 
-                                ? Colors.white
-                                : Colors.black,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],

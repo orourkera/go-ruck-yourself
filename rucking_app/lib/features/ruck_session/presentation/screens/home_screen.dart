@@ -196,6 +196,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       final sessionsResponse = await _apiClient.get('/rucks?limit=3');
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
 
+      // Filter out incomplete sessions
+      List<dynamic> completedSessions = processedSessions
+          .where((session) => session is Map && session['status'] == 'completed')
+          .toList();
+
       // Fetch monthly stats
       final statsResponse = await _apiClient.get('/statistics/monthly');
       debugPrint('Monthly stats response: ' + statsResponse.toString());
@@ -211,7 +216,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       if (!mounted) return;
       
       setState(() {
-        _recentSessions = processedSessions;
+        _recentSessions = completedSessions; // Use the filtered list
         _monthlySummaryStats = processedStats;
         _isLoading = false;
       });

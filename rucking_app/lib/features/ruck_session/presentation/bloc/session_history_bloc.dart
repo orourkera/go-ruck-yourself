@@ -100,10 +100,15 @@ class SessionHistoryBloc extends Bloc<SessionHistoryEvent, SessionHistoryState> 
           .map((session) => RuckSession.fromJson(session))
           .toList();
           
+      // Filter for completed sessions ONLY
+      final completedSessions = sessions
+          .where((s) => s.status == RuckStatus.completed)
+          .toList();
+          
       // Sort by date (newest first)
-      sessions.sort((a, b) => b.startTime.compareTo(a.startTime));
+      completedSessions.sort((a, b) => b.startTime.compareTo(a.startTime));
       
-      emit(SessionHistoryLoaded(sessions: sessions));
+      emit(SessionHistoryLoaded(sessions: completedSessions)); // Emit filtered list
     } catch (e) {
       AppLogger.error('Error fetching sessions: $e');
       emit(SessionHistoryError(message: e.toString()));
