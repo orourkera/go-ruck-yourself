@@ -56,6 +56,19 @@ if not os.environ.get("SESSION_SECRET"):
 # Set secret key from environment variable - no fallback in production
 app.secret_key = os.environ.get("SESSION_SECRET")
 
+# Configure database URI
+database_url = os.environ.get('DATABASE_URL')
+if not database_url:
+    logger.error("DATABASE_URL environment variable not set! Exiting.")
+    sys.exit(1) # Exit if DATABASE_URL is not set
+
+# Heroku uses postgresql://, but SQLAlchemy needs postgresql+psycopg2://
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Recommended to disable
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 
