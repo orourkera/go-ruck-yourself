@@ -132,6 +132,13 @@ rate_limit_resource(SignInResource, "5 per minute")
 # User authentication middleware
 @app.before_request
 def load_user():
+    # Skip token validation for public signup/register endpoints
+    public_paths = ['/api/auth/signup', '/api/users/register']
+    if request.path in public_paths:
+        g.user = None # Ensure g.user is None for these paths
+        logger.debug(f"Skipping token auth for public path: {request.path}")
+        return
+
     # Extract auth token from headers
     auth_header = request.headers.get('Authorization')
     g.user = None
