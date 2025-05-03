@@ -1,11 +1,13 @@
 from datetime import datetime
 from .app import db
 from flask_login import UserMixin
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 
 class User(UserMixin, db.Model):
     """User model for rucking app"""
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
@@ -31,7 +33,7 @@ class User(UserMixin, db.Model):
 class RuckSession(db.Model):
     """Model for tracking rucking sessions"""
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=False)
     ruck_weight_kg = db.Column(db.Float, nullable=False)  # Weight of the ruck in kg
     
     # Session time tracking
