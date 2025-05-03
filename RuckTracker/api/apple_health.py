@@ -2,9 +2,9 @@ import logging
 from flask import request, jsonify
 from flask_restful import Resource
 
-from app import db
-from models import User, RuckSession, LocationPoint
-from api.schemas import apple_health_sync_schema, apple_health_status_schema
+from ..app import db
+from ..models import User, RuckSession, LocationPoint
+from .schemas import apple_health_sync_schema, apple_health_status_schema
 
 logger = logging.getLogger(__name__)
 
