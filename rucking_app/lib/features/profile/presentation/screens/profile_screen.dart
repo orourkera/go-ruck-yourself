@@ -535,18 +535,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              // Capture the ScaffoldMessenger before the async gap
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context); // Capture navigator too
+
+              navigator.pop(); // Pop the dialog
+              
               // Call backend to delete account
-              final success = await _deleteAccount(userId, context);
-              if (success && mounted) {
+              // Pass context only if _deleteAccount truly needs the build context
+              // If it just needs something from context, pass that specific thing.
+              final success = await _deleteAccount(userId, context); 
+              
+              if (!mounted) return; // Early exit if widget is unmounted after await
+
+              if (success) {
                 // Log out and redirect to login
+                // Consider if context is still valid here, might need to capture AuthBloc too
                 context.read<AuthBloc>().add(AuthLogoutRequested());
               } else {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to delete account. Please try again.')),
-                  );
-                }
+                // Use the captured scaffoldMessenger
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(content: Text('Failed to delete account. Please try again.')),
+                );
               }
             },
             child: Text('Delete', style: TextStyle(color: AppColors.error)),

@@ -300,6 +300,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             caloriesBurned: currentState.calories.toInt(),
             elevationGain: currentState.elevationGain,
             elevationLoss: currentState.elevationLoss,
+            status: RuckStatus.completed, // Added missing status
             averagePace: currentState.distanceKm > 0 
                 ? (currentState.elapsedSeconds / 60) / currentState.distanceKm 
                 : 0.0,

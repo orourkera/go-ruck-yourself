@@ -14,7 +14,7 @@ class User(UserMixin, db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationship with RuckSession
-    sessions = db.relationship('RuckSession', backref='user', lazy='dynamic')
+    sessions = db.relationship('RuckSession', backref='user', lazy='dynamic', cascade='all, delete-orphan')
     
     def to_dict(self):
         """Convert user data to dictionary for API responses"""

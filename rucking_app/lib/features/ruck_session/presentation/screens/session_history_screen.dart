@@ -5,6 +5,7 @@ import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_card.dart';
 
@@ -120,7 +121,10 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.of(context).pop(); // Return to main screen to start a ruck
+                // Navigate to the screen where users create a new session
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const CreateSessionScreen()),
+                );
               },
               icon: const Icon(Icons.add),
               label: const Text('Start a New Ruck'),
