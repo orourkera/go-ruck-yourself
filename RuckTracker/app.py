@@ -71,8 +71,9 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 
 # Initialize extensions
-db.init_app(app)
-migrate = Migrate(app, db) # Initialize Flask-Migrate
+db = SQLAlchemy()
+# Initialize Flask-Migrate separately, specifying the directory
+migrate = Migrate(directory='RuckTracker/migrations')
 
 # Initialize rate limiter
 limiter = Limiter(
@@ -82,6 +83,11 @@ limiter = Limiter(
     storage_uri="memory://",
     strategy="fixed-window"
 )
+
+# Initialize extensions
+db.init_app(app)
+# Initialize Flask-Migrate with app and db *after* db.init_app
+migrate.init_app(app, db)
 
 # Define custom rate limits for specific endpoints
 @app.route("/api/auth/register", methods=["POST"])
