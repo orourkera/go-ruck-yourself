@@ -66,12 +66,6 @@ limiter = Limiter(
 )
 
 # Define custom rate limits for specific endpoints
-@app.route("/api/auth/login", methods=["POST"])
-@limiter.limit("5 per minute")
-def login_endpoint():
-    # This just defines the rate limit, actual implementation is elsewhere
-    pass
-
 @app.route("/api/auth/register", methods=["POST"])
 @limiter.limit("3 per hour")
 def register_endpoint():
