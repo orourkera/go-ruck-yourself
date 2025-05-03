@@ -7,7 +7,7 @@ from sqlalchemy import func, extract
 
 from ..extensions import db
 from ..models import User, RuckSession, LocationPoint, SessionReview
-from api.schemas import (
+from .schemas import (
     UserSchema, SessionSchema, LocationPointSchema, 
     SessionReviewSchema, StatisticsSchema, 
     AppleHealthSyncSchema, AppleHealthStatusSchema
