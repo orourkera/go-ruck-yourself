@@ -11,87 +11,84 @@ logger = logging.getLogger(__name__)
 
 class SignUpResource(Resource):
     def post(self):
-        """Register a new user and create their corresponding record in the user table"""
+        """Register a new user and create their corresponding record in the user table""" 
         try:
             data = request.get_json()
             email = data.get('email')
             password = data.get('password')
+            username = data.get('username') # Get username from request data
             
-            if not email or not password:
-                return {'message': 'Email and password are required'}, 400
+            if not email or not password or not username: # Added username check
+                return {'message': 'Username, email, and password are required'}, 400
                 
             # Create user in Supabase Auth
             supabase = get_supabase_client()
             auth_response = supabase.auth.sign_up({
                 "email": email,
                 "password": password,
+                # Supabase Auth might allow user_metadata or options for username, check docs if needed
+                # 'options': { 'data': { 'username': username } } # Example if Supabase supports it
             })
             
             if auth_response.user:
-                user_id = auth_response.user.id # Get the ID of the newly created auth user
+                user_id = auth_response.user.id
                 
                 # Prepare data for the public.user table
-                # Ensure these keys match the columns in your User model
+                # Only include columns defined in the User model
                 user_data = {
-                    'id': str(user_id), # Link to auth.users, ensure it's string if needed
-                    'email': email, # Store email in user table too (optional but can be useful)
-                    'name': data.get('name'),
+                    'id': str(user_id), 
+                    'username': username, # <<< Use username now >>>
+                    'email': email, 
                     'weight_kg': data.get('weight_kg'),
-                    'height_cm': data.get('height_cm'),
-                    'preferMetric': data.get('preferMetric', False), # Default if not provided
-                    'sex': data.get('sex'), # Assuming 'sex' column exists
-                    'date_of_birth': data.get('date_of_birth') # Assuming 'date_of_birth' column exists
+                    # Removed: name, height_cm, preferMetric, sex, date_of_birth as they are not in the User model
                 }
                 # Clean data - remove None values before insert
                 user_data_clean = {k: v for k, v in user_data.items() if v is not None}
                 
-                logger.debug(f"Inserting into user table for user {user_id}: {user_data_clean}")
+                logger.debug(f"Inserting into user table for user {user_id}: {user_data_clean}") 
                 try:
-                    admin_supabase = get_supabase_admin_client() # Get admin client
-                    # <<< Use 'user' table now >>>
+                    admin_supabase = get_supabase_admin_client()
                     user_insert_response = admin_supabase.table('user').insert(user_data_clean).execute()
                 except Exception as user_insert_err:
                     db_error_message = str(user_insert_err)
                     logger.error(f"Error inserting user record using admin client for user {user_id}: {db_error_message}", exc_info=True)
-                    # Consider deleting the auth user here for consistency?
-                    # try: supabase.auth.admin.delete_user(user_id) except: pass
-                    return {'message': f'User created in auth, but failed to create user record: {db_error_message}'}, 500 # Updated error message
+                    # Attempt to delete the auth user for consistency
+                    try:
+                        logger.warning(f"Attempting to delete auth user {user_id} due to user record creation failure.")
+                        admin_supabase.auth.admin.delete_user(user_id)
+                    except Exception as delete_err:
+                        logger.error(f"Failed to delete auth user {user_id} after insert failure: {delete_err}", exc_info=True)
+                    return {'message': f'User created in auth, but failed to create user record: {db_error_message}'}, 500 
                 
                 logger.info(f"Successfully created user record for user {user_id}")
                 
-                # Convert auth user model to a JSON-serializable dictionary
                 user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else {}
                 
                 # Merge data from the user table insert into the response
                 if user_insert_response.data:
                     user_details = user_insert_response.data[0]
-                    # Add fields from user table, avoid overwriting auth fields unless intended
-                    for key, value in user_details.items():
-                        if key not in user_response_data: # Don't overwrite id, email from auth unless necessary
-                             user_response_data[key] = value
-                    # Explicitly ensure fields are present if needed
-                    user_response_data['name'] = user_details.get('name', user_response_data.get('name'))
+                    # Add fields from user table, avoid overwriting auth fields
+                    # Ensure username from our table is included
+                    user_response_data['username'] = user_details.get('username', username) # Use inserted or passed-in
                     user_response_data['weight_kg'] = user_details.get('weight_kg')
-                    user_response_data['height_cm'] = user_details.get('height_cm')
-                    user_response_data['preferMetric'] = user_details.get('preferMetric')
-                    user_response_data['sex'] = user_details.get('sex')
-                    user_response_data['date_of_birth'] = user_details.get('date_of_birth')
+                    # Removed merging for: name, height_cm, preferMetric, sex, date_of_birth
+                else:
+                    # Ensure username is still added even if insert response is empty
+                    user_response_data['username'] = username
                 
                 return {
                     'message': 'User registered successfully',
                     'token': auth_response.session.access_token if auth_response.session else None,
-                    'user': user_response_data # Return combined auth and user table data
+                    'user': user_response_data 
                 }, 201
             else:
                 # Handle case where auth_response.user is None (e.g., email already exists)
                 error_message = "Failed to register user"
-                # Try to extract specific error from Supabase response
                 auth_error = getattr(auth_response, 'error', None) or getattr(auth_response, 'message', None)
                 if auth_error:
                      error_message += f": {str(auth_error)}"
                      
                 logger.warning(error_message)
-                # Return 409 Conflict if email likely exists
                 status_code = 409 if "user already exists" in error_message.lower() else 400
                 return {'message': error_message}, status_code
                 
@@ -268,7 +265,7 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['name', 'weight_kg', 'height_cm', 'preferMetric', 'sex', 'date_of_birth'] 
+            allowed_fields = ['username', 'weight_kg'] 
             for field in allowed_fields:
                 if field in data:
                     # Basic type validation/conversion could be added here
