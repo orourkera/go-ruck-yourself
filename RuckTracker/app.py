@@ -12,7 +12,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate # Import Migrate
-from supabase_client import get_supabase_client # Import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_client # Correct import path for get_supabase_client
 
 # Load environment variables from .env file
 load_dotenv()
