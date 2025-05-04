@@ -193,11 +193,10 @@ def load_user():
                         setattr(user_response.user, "token", token)
                     except Exception as e:
                         logger.warning(f"Could not set token on user object: {e}")
-                        # If user is a namedtuple or similar, wrap in SimpleNamespace
+                        # If user is immutable, wrap in SimpleNamespace
                         from types import SimpleNamespace
-                        user_ns = SimpleNamespace(**user_response.user.__dict__)
-                        user_ns.token = token
-                        user_response.user = user_ns
+                        user_dict = {k: v for k, v in user_response.user.__dict__.items()} if hasattr(user_response.user, '__dict__') else {}
+                        user_response.user = SimpleNamespace(**user_dict, token=token)
                     g.user = user_response.user
                     logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
                     logger.info("Token storage code is active")
