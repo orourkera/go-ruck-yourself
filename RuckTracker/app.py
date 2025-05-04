@@ -175,7 +175,7 @@ def load_user():
     is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
     
     if auth_header and auth_header.startswith('Bearer '):
-        token = auth_header[7:]  # Remove 'Bearer ' prefix
+        token = auth_header.split("Bearer ")[1]
         try:
             logger.debug(f"Setting session with token: {token[:10]}...")
             
@@ -187,22 +187,26 @@ def load_user():
                 supabase = get_supabase_client(user_jwt=token)
                 user_response = supabase.auth.get_user(token)
                 
-                if user_response and user_response.user:
-                    # Attach the token to the user object for downstream RLS
+                if user_response.user:
+                    g.user = user_response.user
+                    # Store token in g.user for use in Supabase client initialization
                     try:
-                        setattr(user_response.user, "token", token)
+                        setattr(g.user, 'token', token)
                     except Exception as e:
                         logger.warning(f"Could not set token on user object: {e}")
                         # If user is immutable, wrap in SimpleNamespace
                         from types import SimpleNamespace
-                        user_dict = {k: v for k, v in user_response.user.__dict__.items()} if hasattr(user_response.user, '__dict__') else {}
-                        user_response.user = SimpleNamespace(**user_dict, token=token)
-                    g.user = user_response.user
+                        user_dict = {}
+                        # Manually copy essential attributes if they exist
+                        for attr in ['id', 'email', 'phone', 'role']:
+                            if hasattr(g.user, attr):
+                                user_dict[attr] = getattr(g.user, attr)
+                        g.user = SimpleNamespace(**user_dict, token=token)
                     logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
                     logger.info("Token storage code is active")
                     return
                 else:
-                    logger.warning("No user found in token validation")
+                    logger.warning("No user data returned from Supabase")
                     
                     # In development, create a mock user
                     if is_development:
