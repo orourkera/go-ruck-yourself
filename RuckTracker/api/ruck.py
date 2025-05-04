@@ -50,17 +50,19 @@ class RuckSessionListResource(Resource):
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             data = request.get_json()
-            if not data or 'ruck_weight_kg' not in data:
+            if not data:
                 return {'message': 'Missing required data for session creation'}, 400
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             session_data = {
                 'user_id': g.user.id,
-                'planned_distance_meters': data.get('planned_distance_meters'),
-                'planned_duration_minutes': data.get('planned_duration_minutes'),
-                'ruck_weight_kg': data.get('ruck_weight_kg'),
                 'status': 'in_progress',
                 'started_at': datetime.now(tz.tzutc()).isoformat()
             }
+            # Only add optional fields if they exist in data
+            if 'planned_duration_minutes' in data and data.get('planned_duration_minutes') is not None:
+                session_data['planned_duration_minutes'] = data.get('planned_duration_minutes')
+            if 'ruck_weight_kg' in data and data.get('ruck_weight_kg') is not None:
+                session_data['ruck_weight_kg'] = data.get('ruck_weight_kg')
             insert_resp = supabase.table('ruck_session') \
                 .insert(session_data) \
                 .execute()
