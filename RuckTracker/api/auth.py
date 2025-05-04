@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class SignUpResource(Resource):
     def post(self):
-        """Register a new user and create their profile"""
+        """Register a new user and create their corresponding record in the user table"""
         try:
             data = request.get_json()
             email = data.get('email')
@@ -25,60 +25,71 @@ class SignUpResource(Resource):
             auth_response = supabase.auth.sign_up({
                 "email": email,
                 "password": password,
-                # Note: Supabase Auth sign_up doesn't take arbitrary options like name here
             })
             
             if auth_response.user:
                 user_id = auth_response.user.id # Get the ID of the newly created auth user
                 
-                # Create profile in the public.profiles table using ADMIN client to bypass RLS
-                profile_data = {
-                    'id': user_id, # Link to auth.users
+                # Prepare data for the public.user table
+                # Ensure these keys match the columns in your User model
+                user_data = {
+                    'id': str(user_id), # Link to auth.users, ensure it's string if needed
+                    'email': email, # Store email in user table too (optional but can be useful)
                     'name': data.get('name'),
                     'weight_kg': data.get('weight_kg'),
                     'height_cm': data.get('height_cm'),
-                    'preferMetric': data['preferMetric'] if 'preferMetric' in data else False
+                    'preferMetric': data.get('preferMetric', False), # Default if not provided
+                    'sex': data.get('sex'), # Assuming 'sex' column exists
+                    'date_of_birth': data.get('date_of_birth') # Assuming 'date_of_birth' column exists
                 }
                 # Clean data - remove None values before insert
-                profile_data_clean = {k: v for k, v in profile_data.items() if v is not None}
+                user_data_clean = {k: v for k, v in user_data.items() if v is not None}
                 
-                logger.debug(f"Inserting into profiles for user {user_id}: {profile_data_clean}")
+                logger.debug(f"Inserting into user table for user {user_id}: {user_data_clean}")
                 try:
                     admin_supabase = get_supabase_admin_client() # Get admin client
-                    profile_response = admin_supabase.table('profiles').insert(profile_data_clean).execute()
-                except Exception as profile_insert_err:
-                    logger.error(f"Error inserting profile using admin client for user {user_id}: {profile_insert_err}", exc_info=True)
+                    # <<< Use 'user' table now >>>
+                    user_insert_response = admin_supabase.table('user').insert(user_data_clean).execute()
+                except Exception as user_insert_err:
+                    db_error_message = str(user_insert_err)
+                    logger.error(f"Error inserting user record using admin client for user {user_id}: {db_error_message}", exc_info=True)
                     # Consider deleting the auth user here for consistency?
-                    # supabase.auth.admin.delete_user(user_id) # Requires admin client again
-                    return {'message': f'User created in auth, but failed to create profile: {profile_insert_err}'}, 500
+                    # try: supabase.auth.admin.delete_user(user_id) except: pass
+                    return {'message': f'User created in auth, but failed to create user record: {db_error_message}'}, 500 # Updated error message
                 
-                logger.info(f"Successfully created profile for user {user_id}")
+                logger.info(f"Successfully created user record for user {user_id}")
                 
-                # Convert user model to a JSON-serializable dictionary
-                user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else None
+                # Convert auth user model to a JSON-serializable dictionary
+                user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else {}
                 
-                # Optionally merge profile data into response if needed by client immediately
-                if user_response_data and profile_response.data:
-                    # Add profile fields to the user dict sent back
-                    # Be careful not to overwrite fields from auth like 'id', 'email', 'created_at'
-                    profile_details = profile_response.data[0]
-                    user_response_data['name'] = profile_details.get('name')
-                    user_response_data['weight_kg'] = profile_details.get('weight_kg')
-                    user_response_data['height_cm'] = profile_details.get('height_cm')
-                    user_response_data['preferMetric'] = profile_details.get('preferMetric')
+                # Merge data from the user table insert into the response
+                if user_insert_response.data:
+                    user_details = user_insert_response.data[0]
+                    # Add fields from user table, avoid overwriting auth fields unless intended
+                    for key, value in user_details.items():
+                        if key not in user_response_data: # Don't overwrite id, email from auth unless necessary
+                             user_response_data[key] = value
+                    # Explicitly ensure fields are present if needed
+                    user_response_data['name'] = user_details.get('name', user_response_data.get('name'))
+                    user_response_data['weight_kg'] = user_details.get('weight_kg')
+                    user_response_data['height_cm'] = user_details.get('height_cm')
+                    user_response_data['preferMetric'] = user_details.get('preferMetric')
+                    user_response_data['sex'] = user_details.get('sex')
+                    user_response_data['date_of_birth'] = user_details.get('date_of_birth')
                 
                 return {
                     'message': 'User registered successfully',
                     'token': auth_response.session.access_token if auth_response.session else None,
-                    'user': user_response_data
+                    'user': user_response_data # Return combined auth and user table data
                 }, 201
             else:
                 # Handle case where auth_response.user is None (e.g., email already exists)
                 error_message = "Failed to register user"
-                if hasattr(auth_response, 'error') and auth_response.error:
-                     error_message += f": {auth_response.error.message}"
-                elif hasattr(auth_response, 'message') and auth_response.message: # Sometimes error is in message
-                     error_message += f": {auth_response.message}"
+                # Try to extract specific error from Supabase response
+                auth_error = getattr(auth_response, 'error', None) or getattr(auth_response, 'message', None)
+                if auth_error:
+                     error_message += f": {str(auth_error)}"
+                     
                 logger.warning(error_message)
                 # Return 409 Conflict if email likely exists
                 status_code = 409 if "user already exists" in error_message.lower() else 400
