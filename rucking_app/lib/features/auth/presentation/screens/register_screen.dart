@@ -22,27 +22,33 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _displayNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _weightController = TextEditingController();
+  final _displayNameFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
   final _confirmPasswordFocusNode = FocusNode();
   final _weightFocusNode = FocusNode();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+  bool _preferMetric = false; // Default to Standard (lbs)
   bool _acceptTerms = false;
-  bool _preferMetric = false; // Default to standard instead of metric
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _displayNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _weightController.dispose();
-    _weightFocusNode.dispose();
+    _displayNameFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
     _confirmPasswordFocusNode.dispose();
+    _weightFocusNode.dispose();
     super.dispose();
   }
 
@@ -69,12 +75,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       context.read<AuthBloc>().add(
         AuthRegisterRequested(
-          displayName: _nameController.text.trim(),
-          name: _nameController.text.trim(), // Using same value for backend compatibility
+          username: _displayNameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           weightKg: weight,
           preferMetric: _preferMetric,
+          heightCm: null,
+          dateOfBirth: null,
         ),
       );
     }
@@ -136,18 +143,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       },
       child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: AppColors.textDark,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
+        appBar: AppBar(title: const Text('Register')),
+        body: SingleChildScrollView(
+          child: Padding(
             padding: const EdgeInsets.only(bottom: 40),
             child: Form(
               key: _formKey,
@@ -160,48 +158,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Center(
                       child: Text(
                         'CREATE ACCOUNT',
-                        style: AppTextStyles.headline6.copyWith(
-                          fontSize: 24,
-                          letterSpacing: 1.5,
-                          color: AppColors.primary,
+                        style: AppTextStyles.titleLarge.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 28),
-                    // Name field
+                    const SizedBox(height: 24),
+                    // Display Name Field
                     CustomTextField(
-                      controller: _nameController,
+                      controller: _displayNameController,
                       label: 'What should we call you, rucker?',
-                      hint: 'Name',
+                      hint: 'Enter your display name',
                       prefixIcon: Icons.person_outline,
-                      textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter your name';
+                          return 'Please enter a display name';
+                        }
+                        if (value.length < 3) {
+                          return 'Display name must be at least 3 characters';
+                        }
+                        // Basic alphanumeric check (allow underscore)
+                        if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
+                          return 'Display name can only contain letters, numbers, and underscores';
                         }
                         return null;
                       },
+                      textInputAction: TextInputAction.next,
+                      focusNode: _displayNameFocusNode,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_emailFocusNode);
+                      },
                     ),
-                    const SizedBox(height: 20),
-                    // Email field
+                    const SizedBox(height: 16),
+                    // Email Field
                     CustomTextField(
                       controller: _emailController,
                       label: 'Email',
-                      hint: 'Email',
+                      hint: 'Enter your email address',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
+                      focusNode: _emailFocusNode,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_passwordFocusNode);
+                      },
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                          return 'Please enter a valid email';
+                        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                          return 'Please enter a valid email address';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     // Password field
                     CustomTextField(
                       controller: _passwordController,
@@ -227,12 +238,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }
                         return null;
                       },
+                      focusNode: _passwordFocusNode,
                       onFieldSubmitted: (_) {
                         FocusScope.of(context).requestFocus(_confirmPasswordFocusNode);
                       },
                     ),
-                    const SizedBox(height: 20),
-                    // Confirm password field
+                    const SizedBox(height: 16),
+                    // Confirm Password field
                     CustomTextField(
                       controller: _confirmPasswordController,
                       label: 'Confirm Password',
@@ -262,35 +274,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         FocusScope.of(context).requestFocus(_weightFocusNode);
                       },
                     ),
-                    const SizedBox(height: 20),
-                    // Weight field
-                    CustomTextField(
-                      controller: _weightController,
-                      label: _preferMetric ? 'Weight (kg)' : 'Weight (lbs)',
-                      hint: _preferMetric ? 'Enter your weight in kg' : 'Enter your weight in lbs',
-                      keyboardType: TextInputType.number,
-                      prefixIcon: Icons.monitor_weight_outlined,
-                      textInputAction: TextInputAction.done,
-                      focusNode: _weightFocusNode,
-                      onFieldSubmitted: (_) {
-                        FocusScope.of(context).unfocus();
-                      },
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Measurement units
+                    const SizedBox(height: 24),
+                    // Weight unit preference
+                    Text('Preferred Units', style: AppTextStyles.titleMedium),
                     Row(
                       children: [
                         Text(
-                          'Measurement units:',
-                          style: AppTextStyles.subtitle1,
-                        ),
-                        const Spacer(),
-                        Text(
                           'Standard',
-                          style: AppTextStyles.body2.copyWith(
+                          style: AppTextStyles.bodyMedium.copyWith(
                             color: !_preferMetric ? AppColors.primary : AppColors.grey,
                           ),
                         ),
@@ -306,14 +297,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         Text(
                           'Metric',
-                          style: AppTextStyles.body2.copyWith(
+                          style: AppTextStyles.bodyMedium.copyWith(
                             color: _preferMetric ? AppColors.primary : AppColors.grey,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 30),
-                    // Terms and conditions
+                    const SizedBox(height: 16),
+                    // Weight input field
+                    CustomTextField(
+                      controller: _weightController,
+                      label: _preferMetric ? 'Weight (kg)' : 'Weight (lbs)',
+                      hint: _preferMetric ? 'Enter your weight in kg' : 'Enter your weight in lbs',
+                      keyboardType: TextInputType.number,
+                      prefixIcon: Icons.monitor_weight_outlined,
+                      textInputAction: TextInputAction.done,
+                      focusNode: _weightFocusNode,
+                      onFieldSubmitted: (_) {
+                        FocusScope.of(context).unfocus();
+                      },
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Terms and Conditions Checkbox
                     Row(
                       children: [
                         Checkbox(
@@ -328,23 +336,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Expanded(
                           child: Text(
                             'I accept the Terms and Conditions and Privacy Policy',
-                            style: AppTextStyles.body2,
+                            style: AppTextStyles.bodyMedium,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    // Register button
+                    const SizedBox(height: 24),
+                    // Register Button
                     BlocBuilder<AuthBloc, AuthState>(
                       builder: (context, state) {
                         return CustomButton(
-                          text: 'Create Account',
+                          text: 'CREATE ACCOUNT',
                           isLoading: state is AuthLoading,
                           onPressed: _register,
                         );
                       },
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 16),
+                    // Login Link
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Go back to login screen
+                        },
+                        child: Text(
+                          'Already have an account? Sign In',
+                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primary),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
