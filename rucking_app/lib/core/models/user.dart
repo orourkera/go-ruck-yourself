@@ -9,11 +9,8 @@ class User extends Equatable {
   /// User's email address
   final String email;
   
-  /// User's name
-  final String name;
-  
-  /// User's display name
-  final String displayName;
+  /// User's chosen username
+  final String username;
   
   /// User's weight in kilograms
   final double? weightKg;
@@ -32,18 +29,17 @@ class User extends Equatable {
   
   /// User stats information
   final UserStats? stats;
-  
+
   /// Creates a new user instance
   const User({
     required this.userId,
     required this.email,
-    this.name = '',
-    this.displayName = '',
+    required this.username,
     this.weightKg,
     this.heightCm,
     this.dateOfBirth,
     this.createdAt,
-    this.preferMetric = true,
+    required this.preferMetric,
     this.stats,
   });
   
@@ -51,8 +47,7 @@ class User extends Equatable {
   User copyWith({
     String? userId,
     String? email,
-    String? name,
-    String? displayName,
+    String? username,
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
@@ -63,8 +58,7 @@ class User extends Equatable {
     return User(
       userId: userId ?? this.userId,
       email: email ?? this.email,
-      name: name ?? this.name,
-      displayName: displayName ?? this.displayName,
+      username: username ?? this.username,
       weightKg: weightKg ?? this.weightKg,
       heightCm: heightCm ?? this.heightCm,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
@@ -89,17 +83,7 @@ class User extends Equatable {
     
     String email = json['email'] as String? ?? '';
     
-    // Name: Prioritize 'name' field, fallback to splitting email
-    String name = json['name'] as String? ?? '';
-    if (name.isEmpty && email.contains('@')) {
-        name = email.split('@')[0]; // Basic fallback
-    }
-    
-    // DisplayName: Prioritize 'displayName', fallback to 'name', fallback to basic name
-    String displayName = json['displayName'] as String? ?? json['display_name'] as String? ?? name;
-    if (displayName.isEmpty) {
-         displayName = name; // Ensure it's not empty if name wasn't
-    }
+    String username = json['username'] as String? ?? '';
     
     // Helper to safely parse numbers (copied from ruck_session)
     num? safeParseNum(dynamic value) {
@@ -112,14 +96,12 @@ class User extends Equatable {
     final user = User(
       userId: id,
       email: email,
-      name: name,
-      displayName: displayName,
-      // Profile fields might be missing initially
+      username: username,
       weightKg: safeParseNum(json['weight_kg'])?.toDouble(),
       heightCm: safeParseNum(json['height_cm'])?.toDouble(),
       dateOfBirth: json['date_of_birth'] as String?,
       createdAt: json['created_at'] as String?,
-      preferMetric: json['preferMetric'] as bool? ?? json['"preferMetric"'] as bool? ?? true, // Handle quoted key, default true
+      preferMetric: json['prefer_metric'] as bool? ?? true,
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
@@ -136,8 +118,7 @@ class User extends Equatable {
     final Map<String, dynamic> data = {
       'id': userId,
       'email': email,
-      'name': name,
-      'displayName': displayName,
+      'username': username,
       'preferMetric': preferMetric,
     };
     if (weightKg != null) data['weight_kg'] = weightKg;
@@ -150,7 +131,7 @@ class User extends Equatable {
   
   @override
   List<Object?> get props => [
-    userId, email, name, displayName, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, stats
+    userId, email, username, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, stats
   ];
 }
 
