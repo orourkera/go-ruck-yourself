@@ -184,7 +184,7 @@ def load_user():
             # Supabase JWT tokens don't require a refresh token in many operations
             try:
                 # Use Supabase admin API to verify the token and get user
-                supabase = get_supabase_client()
+                supabase = get_supabase_client(user_jwt=token)
                 user_response = supabase.auth.get_user(token)
                 
                 if user_response and user_response.user:
@@ -200,6 +200,7 @@ def load_user():
                         user_response.user = user_ns
                     g.user = user_response.user
                     logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
+                    return
                 else:
                     logger.warning("No user found in token validation")
                     
@@ -210,7 +211,8 @@ def load_user():
                         g.user = SimpleNamespace(
                             id="dev-user-id",
                             email="dev@example.com", 
-                            user_metadata={"name": "Development User"}
+                            user_metadata={"name": "Development User"},
+                            token=token
                         )
             except Exception as token_error:
                 logger.error(f"Token validation error: {str(token_error)}")
@@ -222,7 +224,8 @@ def load_user():
                     g.user = SimpleNamespace(
                         id="dev-user-id",
                         email="dev@example.com", 
-                        user_metadata={"name": "Development User"}
+                        user_metadata={"name": "Development User"},
+                        token=token
                     )
                 
         except Exception as e:
@@ -236,7 +239,8 @@ def load_user():
                 g.user = SimpleNamespace(
                     id="dev-user-id",
                     email="dev@example.com", 
-                    user_metadata={"name": "Development User"}
+                    user_metadata={"name": "Development User"},
+                    token=token
                 )
     else:
         logger.debug("No authorization header found")
@@ -248,7 +252,8 @@ def load_user():
             g.user = SimpleNamespace(
                 id="dev-user-id",
                 email="dev@example.com", 
-                user_metadata={"name": "Development User"}
+                user_metadata={"name": "Development User"},
+                token=None
             )
 
 # Force HTTPS redirect in production
