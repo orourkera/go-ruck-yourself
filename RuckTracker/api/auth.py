@@ -198,17 +198,16 @@ class UserProfileResource(Resource):
             response = supabase.table('user') \
                 .select('*') \
                 .eq('id', str(g.user.id)) \
-                .maybe_single() \
                 .execute()
                 
-            profile_data = {}
-            if response.data:
-                logger.debug(f"Profile data found in 'user' table: {response.data}")
-                profile_data = response.data
-            else:
+            if not response.data or len(response.data) == 0:
                 logger.warning(f"User profile not found in 'user' table for ID: {g.user.id}")
                 # Still return basic info if profile row is missing
-
+                return {'message': 'User not found'}, 404
+            
+            profile_data = response.data[0]
+            logger.debug(f"Profile data found in 'user' table: {profile_data}")
+            
             # Ensure essential auth info (like email) is present in the final response
             # Even if the profile row was missing, we return the email associated with the token
             if 'email' not in profile_data or not profile_data['email']:
@@ -283,20 +282,22 @@ class UserProfileResource(Resource):
             logger.debug(f"Update response: {response.__dict__}")
             
             # After update/insert, fetch the complete user data to return
-            fetch_response = supabase.table('user').select('*').eq('id', str(g.user.id)).maybe_single().execute()
+            fetch_response = supabase.table('user').select('*').eq('id', str(g.user.id)).execute()
 
-            if fetch_response.data:
-                logger.debug(f"Profile updated/fetched successfully: {fetch_response.data}")
-                # Ensure email from auth is included if missing
-                if 'email' not in fetch_response.data or not fetch_response.data['email']:
-                     if hasattr(g.user, 'email') and g.user.email:
-                        fetch_response.data['email'] = g.user.email
-                return fetch_response.data, 200
-            else:
-                 # This case should be less common if update worked, but handle it.
+            if not fetch_response.data or len(fetch_response.data) == 0:
                  logger.error(f"Profile update seemed successful but failed to fetch updated data for user ID {g.user.id}")
                  return {'message': 'Profile update may have succeeded, but failed to retrieve updated data.'}, 500
-
+            
+            profile_data = fetch_response.data[0]
+            logger.debug(f"Profile updated/fetched successfully: {profile_data}")
+            
+            # Ensure email from auth is included if missing
+            if 'email' not in profile_data or not profile_data['email']:
+                 if hasattr(g.user, 'email') and g.user.email:
+                    profile_data['email'] = g.user.email
+            
+            return profile_data, 200
+                
         except Exception as e:
             logger.error(f"Error updating user profile: {str(e)}", exc_info=True)
             return {'message': f'Error updating user profile: {str(e)}'}, 500
