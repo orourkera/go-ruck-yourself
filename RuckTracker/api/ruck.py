@@ -55,12 +55,12 @@ class RuckSessionListResource(Resource):
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             session_data = {
                 'user_id': g.user.id,
-                'ruck_weight_kg': data['ruck_weight_kg'],
-                'status': 'created',
-                'created_at': datetime.now(tz.tzutc()).isoformat()
+                'planned_distance_meters': data.get('planned_distance_meters'),
+                'planned_duration_minutes': data.get('planned_duration_minutes'),
+                'ruck_weight_kg': data.get('ruck_weight_kg'),
+                'status': 'in_progress',
+                'started_at': datetime.now(tz.tzutc()).isoformat()
             }
-            if 'planned_duration_minutes' in data:
-                session_data['planned_duration_minutes'] = data['planned_duration_minutes']
             insert_resp = supabase.table('ruck_session') \
                 .insert(session_data) \
                 .execute()
