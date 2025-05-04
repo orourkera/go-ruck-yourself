@@ -4,20 +4,17 @@ import sys
 import json
 from datetime import datetime
 from dotenv import load_dotenv # Import load_dotenv
-
-load_dotenv() # Load environment variables from .env file
-
 from flask import Flask, render_template, Blueprint, g, jsonify, request, redirect
 from flask_restful import Api
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate # Import Migrate
 
-# Import db from extensions
-from .extensions import db
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging - Use appropriate level based on environment
 log_level = logging.INFO
@@ -41,6 +38,10 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 # Create Flask app
 app = Flask(__name__)
+
+# Initialize SQLAlchemy and Migrate *after* imports
+db = SQLAlchemy()
+migrate = Migrate(directory='RuckTracker/migrations')
 
 # Ensure secret key is set in environment
 if not os.environ.get("SESSION_SECRET"):
@@ -70,10 +71,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Recommended to disable
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 
-# Initialize extensions
-db = SQLAlchemy()
-# Initialize Flask-Migrate separately, specifying the directory
-migrate = Migrate(directory='RuckTracker/migrations')
+# Initialize extensions *after* app configuration
+db.init_app(app)
+migrate.init_app(app, db)
 
 # Initialize rate limiter
 limiter = Limiter(
@@ -83,11 +83,7 @@ limiter = Limiter(
     storage_uri="memory://",
     strategy="fixed-window"
 )
-
-# Initialize extensions
-db.init_app(app)
-# Initialize Flask-Migrate with app and db *after* db.init_app
-migrate.init_app(app, db)
+limiter.init_app(app)
 
 # Define custom rate limits for specific endpoints
 @app.route("/api/auth/register", methods=["POST"])
@@ -130,8 +126,34 @@ CORS(app, origins=allowed_origins, supports_credentials=True)
 # Initialize API
 api = Api(app)
 
+# Import API resources after initializing db to avoid circular imports
+from .api.ruck import (
+    RuckSessionListResource, 
+    RuckSessionResource, 
+    RuckSessionStartResource,
+    RuckSessionPauseResource,
+    RuckSessionResumeResource,
+    RuckSessionCompleteResource,
+    RuckSessionLocationResource,
+    # RuckSessionDetailResource # Commented out - not found in api.ruck.py
+)
+    
+from .api.auth import (
+    SignUpResource,
+    SignInResource,
+    SignOutResource,
+    RefreshTokenResource,
+    ForgotPasswordResource,
+    UserProfileResource
+)
+    
+from .api.stats import ( # Import new stats resources
+    WeeklyStatsResource,
+    MonthlyStatsResource,
+    YearlyStatsResource
+)
+
 # Apply rate limiting to SignInResource
-from .api.auth import SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
 
 # User authentication middleware
@@ -235,89 +257,57 @@ def enforce_https():
         url = request.url.replace("http://", "https://", 1)
         return redirect(url, code=301)
 
-# Import and register API resources
-try:
-    # Import API resources
-    from .api.ruck import (
-        RuckSessionListResource, 
-        RuckSessionResource, 
-        RuckSessionStartResource,
-        RuckSessionPauseResource,
-        RuckSessionResumeResource,
-        RuckSessionCompleteResource,
-        RuckSessionLocationResource,
-        # RuckSessionDetailResource # Commented out - not found in api.ruck.py
-    )
-    
-    from .api.auth import (
-        SignUpResource,
-        SignInResource,
-        SignOutResource,
-        RefreshTokenResource,
-        ForgotPasswordResource,
-        UserProfileResource
-    )
-    
-    from .api.stats import ( # Import new stats resources
-        WeeklyStatsResource,
-        MonthlyStatsResource,
-        YearlyStatsResource
-    )
-    
-    # Auth endpoints (prefixed with /api)
-    api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
-    api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin')
-    api.add_resource(SignOutResource, '/api/auth/signout')
-    api.add_resource(RefreshTokenResource, '/api/auth/refresh')
-    api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
-    api.add_resource(UserProfileResource, '/api/users/profile') # Handles GET/PUT
-    from .api.resources import UserResource # Import UserResource
-    api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
-    
-    # Ruck session endpoints (prefixed with /api)
-    api.add_resource(RuckSessionListResource, '/api/rucks')
-    api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
-    api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
-    api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
-    api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
-    api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete')
-    api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
-    # api.add_resource(RuckSessionDetailResource, '/api/ruck-details/<string:session_id>') # Commented out
-    
-    # Statistics endpoints (prefixed with /api)
-    api.add_resource(WeeklyStatsResource, '/api/statistics/weekly')
-    api.add_resource(MonthlyStatsResource, '/api/statistics/monthly')
-    api.add_resource(YearlyStatsResource, '/api/statistics/yearly')
-    
-    # Add route for homepage (remains unprefixed)
-    @app.route('/')
-    def landing():
-        return render_template('landing.html')
+# Auth endpoints (prefixed with /api)
+api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
+api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin')
+api.add_resource(SignOutResource, '/api/auth/signout')
+api.add_resource(RefreshTokenResource, '/api/auth/refresh')
+api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
+api.add_resource(UserProfileResource, '/api/users/profile') # Handles GET/PUT
+from .api.resources import UserResource # Import UserResource
+api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
 
-    @app.route('/privacy')
-    def privacy():
-        return render_template('privacy.html')
+# Ruck session endpoints (prefixed with /api)
+api.add_resource(RuckSessionListResource, '/api/rucks')
+api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
+api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
+api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
+api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
+api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete')
+api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
+# api.add_resource(RuckSessionDetailResource, '/api/ruck-details/<string:session_id>') # Commented out
 
-    @app.route('/terms')
-    def terms():
-        return render_template('terms.html')
+# Statistics endpoints (prefixed with /api)
+api.add_resource(WeeklyStatsResource, '/api/statistics/weekly')
+api.add_resource(MonthlyStatsResource, '/api/statistics/monthly')
+api.add_resource(YearlyStatsResource, '/api/statistics/yearly')
 
-    @app.route('/support')
-    def support():
-        return render_template('support.html')
-    
-    # Add route for health check (remains unprefixed)
-    @app.route('/health')
-    def health():
-        return jsonify({
-            'status': 'ok',
-            'version': '1.0.0'
-        })
-        
-    logger.info("Application initialized successfully! All API endpoints registered.")
-except Exception as e:
-    logger.error(f"Error during application initialization: {str(e)}", exc_info=True)
-    raise
+# Add route for homepage (remains unprefixed)
+@app.route('/')
+def landing():
+    return render_template('landing.html')
+
+@app.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
+
+@app.route('/support')
+def support():
+    return render_template('support.html')
+
+# Add route for health check (remains unprefixed)
+@app.route('/health')
+def health():
+    return jsonify({
+        'status': 'ok',
+        'version': '1.0.0'
+    })
+
+logger.info("Application initialized successfully! All API endpoints registered.")
 
 # Trigger redeploy: Cascade forced comment
 
