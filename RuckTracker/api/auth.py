@@ -184,7 +184,7 @@ class ForgotPasswordResource(Resource):
 
 class UserProfileResource(Resource):
     def get(self):
-        """Get the current user's profile from the profiles table AND include email"""
+        """Get the current user's profile from the user table AND include email"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
@@ -192,18 +192,18 @@ class UserProfileResource(Resource):
             logger.debug(f"Fetching profile for user ID: {g.user.id}")
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            response = supabase.table('profiles') \
+            response = supabase.table('user') \
                 .select('*') \
-                .eq('id', g.user.id) \
-                .single() \
+                .eq('id', str(g.user.id)) \
+                .maybe_single() \
                 .execute()
                 
             profile_data = {}
             if response.data:
-                logger.debug(f"Profile data found: {response.data}")
+                logger.debug(f"Profile data found in 'user' table: {response.data}")
                 profile_data = response.data
             else:
-                logger.warning(f"User profile not found in profiles table for ID: {g.user.id}")
+                logger.warning(f"User profile not found in 'user' table for ID: {g.user.id}")
                 # Still return basic info if profile row is missing
 
             # Ensure essential auth info (like email) is present in the final response
@@ -213,16 +213,20 @@ class UserProfileResource(Resource):
                 if hasattr(g.user, 'email') and g.user.email:
                     profile_data['email'] = g.user.email
                 else:
-                    # Fallback: fetch from auth.users
+                    # Fallback: fetch from auth.users (Supabase internal table)
                     try:
-                        auth_user_resp = supabase.table('users').select('email').eq('id', g.user.id).single().execute()
-                        if auth_user_resp.data and 'email' in auth_user_resp.data:
-                            profile_data['email'] = auth_user_resp.data['email']
-                    except Exception as e:
-                        logger.warning(f"Could not fetch email from auth.users for user {g.user.id}: {e}")
+                        # Use the same Supabase client instance
+                        auth_user_resp = supabase.auth.get_user(jwt=getattr(g.user, 'token', None))
+                        if auth_user_resp.user and auth_user_resp.user.email:
+                             profile_data['email'] = auth_user_resp.user.email
+                        else:
+                             logger.warning(f"Could not fetch email from Supabase auth for user {g.user.id}")
+                    except Exception as auth_err:
+                        logger.warning(f"Error fetching email from Supabase auth for user {g.user.id}: {auth_err}")
             
             # Also ensure ID is present, using the authenticated user ID as definitive source
-            profile_data['id'] = g.user.id 
+            if 'id' not in profile_data or profile_data['id'] != str(g.user.id):
+                 profile_data['id'] = str(g.user.id)
 
             # Return the combined/ensured data
             # If profile row was missing, this will primarily contain id and email
@@ -231,10 +235,18 @@ class UserProfileResource(Resource):
                 
         except Exception as e:
             logger.error(f"Error retrieving user profile: {str(e)}", exc_info=True)
+            # Check for specific Postgrest errors if helpful
+            if hasattr(e, 'code') and e.code == 'PGRST116': # Resource Not Found
+                 logger.warning(f"User profile row likely missing for user {g.user.id} in 'user' table.")
+                 # Return minimal data even if row not found
+                 minimal_data = {'id': str(g.user.id)}
+                 if hasattr(g.user, 'email') and g.user.email:
+                     minimal_data['email'] = g.user.email
+                 return minimal_data, 200 # Return 200 OK with minimal data
             return {'message': f'Error retrieving user profile: {str(e)}'}, 500
             
     def put(self):
-        """Update the current user's profile in the profiles table"""
+        """Update the current user's profile in the user table"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
@@ -244,50 +256,41 @@ class UserProfileResource(Resource):
                  return {'message': 'No update data provided'}, 400
                  
             update_data = {}
-            allowed_fields = ['name', 'weight_kg', 'height_cm', 'preferMetric']
+            # Assuming these fields exist in the new 'user' model
+            allowed_fields = ['name', 'weight_kg', 'height_cm', 'preferMetric', 'sex', 'date_of_birth'] 
             for field in allowed_fields:
                 if field in data:
+                    # Basic type validation/conversion could be added here
                     update_data[field] = data[field]
                  
             if not update_data:
                  return {'message': 'No valid fields provided for update'}, 400
 
             logger.debug(f"Authenticated user id: {g.user.id}")
-            logger.debug(f"Attempting update on profiles where id = {g.user.id} with: {update_data}")
+            logger.debug(f"Attempting update on 'user' table where id = {g.user.id} with: {update_data}")
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             # Only allow updating the row where id = g.user.id
-            response = supabase.table('profiles') \
+            response = supabase.table('user') \
                 .update(update_data) \
-                .eq('id', g.user.id) \
+                .eq('id', str(g.user.id)) \
                 .execute()
             logger.debug(f"Update response: {response.__dict__}")
-            if response.data:
-                logger.debug(f"Profile updated successfully: {response.data[0]}")
-                # Fetch and return the full user profile (including email and all fields)
-                full_profile = supabase.table('profiles').select('*').eq('id', g.user.id).single().execute()
-                logger.debug(f"Full profile after update: {full_profile.data}")
-                return full_profile.data, 200
+            
+            # After update/insert, fetch the complete user data to return
+            fetch_response = supabase.table('user').select('*').eq('id', str(g.user.id)).maybe_single().execute()
+
+            if fetch_response.data:
+                logger.debug(f"Profile updated/fetched successfully: {fetch_response.data}")
+                # Ensure email from auth is included if missing
+                if 'email' not in fetch_response.data or not fetch_response.data['email']:
+                     if hasattr(g.user, 'email') and g.user.email:
+                        fetch_response.data['email'] = g.user.email
+                return fetch_response.data, 200
             else:
-                logger.warning(f"Profile update for user ID {g.user.id} returned no data. Checking if profile exists...")
-                profile_exists = False
-                try:
-                    check_exists_response = supabase.table('profiles').select('id', count='exact').eq('id', g.user.id).execute()
-                    if check_exists_response.count is not None and check_exists_response.count > 0:
-                        profile_exists = True
-                except Exception as check_err:
-                    logger.error(f"Error checking profile existence for user {g.user.id}: {check_err}")
-                if not profile_exists:
-                    logger.warning(f"Attempted to update non-existent profile for ID: {g.user.id}")
-                    return {'message': 'User profile not found to update'}, 404
-                else:
-                    error_message = "Profile update failed for unknown reason."
-                    if hasattr(response, 'error') and response.error:
-                         error_message = f"Profile update failed: {getattr(response.error, 'message', str(response.error))}"
-                    elif hasattr(response, 'message') and response.message:
-                         error_message = f"Profile update failed: {response.message}"
-                    logger.error(f"Profile update failed for existing profile {g.user.id}. Detail: {error_message}")
-                    return {'message': error_message}, 500
-                
+                 # This case should be less common if update worked, but handle it.
+                 logger.error(f"Profile update seemed successful but failed to fetch updated data for user ID {g.user.id}")
+                 return {'message': 'Profile update may have succeeded, but failed to retrieve updated data.'}, 500
+
         except Exception as e:
-            logger.error(f"Unhandled exception updating user profile: {str(e)}", exc_info=True)
-            return {'message': f'Error updating user profile: {str(e)}'}, 500 
+            logger.error(f"Error updating user profile: {str(e)}", exc_info=True)
+            return {'message': f'Error updating user profile: {str(e)}'}, 500
