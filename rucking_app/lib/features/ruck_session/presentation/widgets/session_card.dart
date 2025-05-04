@@ -62,7 +62,7 @@ class SessionCard extends StatelessWidget {
             children: [
               Text(
                 formattedDate,
-                style: AppTextStyles.subtitle2.copyWith(
+                style: AppTextStyles.titleSmall.copyWith(
                   color: AppColors.textDarkSecondary,
                 ),
               ),
@@ -126,13 +126,13 @@ class SessionCard extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: AppTextStyles.caption.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textDarkSecondary,
                 ),
               ),
               Text(
                 value,
-                style: AppTextStyles.subtitle1,
+                style: AppTextStyles.titleMedium,
                 overflow: TextOverflow.ellipsis,
               ),
             ],

@@ -71,7 +71,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Enter your email to receive a password reset link.', style: AppTextStyles.body1),
+              const SizedBox(height: 16),
+              Text(
+                'Enter your email to receive a password reset link.',
+                style: AppTextStyles.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
               CustomTextField(
                 controller: _emailController,
@@ -90,9 +95,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               const SizedBox(height: 24),
               if (_message != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(_message!, style: AppTextStyles.body2.copyWith(color: AppColors.success)),
+                Center(
+                  child: Text(_message!, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.success)),
                 ),
               CustomButton(
                 text: 'Send Reset Link',

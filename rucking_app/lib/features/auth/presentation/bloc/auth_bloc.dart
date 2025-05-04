@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -15,7 +16,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLoginRequested>(_onAuthLoginRequested);
     on<AuthRegisterRequested>(_onAuthRegisterRequested);
     on<AuthLogoutRequested>(_onAuthLogoutRequested);
-    on<AuthProfileUpdateRequested>(_onAuthProfileUpdateRequested);
+    on<AuthUpdateProfileRequested>(_onAuthUpdateProfileRequested);
+    on<AuthDeleteAccountRequested>(_onAuthDeleteAccountRequested);
   }
 
   /// Verify authentication status on app start
@@ -85,7 +87,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     
     try {
       final user = await _authRepository.register(
-        name: event.name,
+        username: event.username, // This is the display name
         email: event.email,
         password: event.password,
         preferMetric: event.preferMetric,
@@ -120,43 +122,63 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   /// Handle profile update request
-  Future<void> _onAuthProfileUpdateRequested(
-    AuthProfileUpdateRequested event,
+  Future<void> _onAuthUpdateProfileRequested(
+    AuthUpdateProfileRequested event,
     Emitter<AuthState> emit,
   ) async {
-    // Keep current state while updating
+    // Get current state to maintain user ID if needed
     final currentState = state;
     if (currentState is Authenticated) {
-      // Optionally show loading state, or update optimistically
-      // emit(AuthLoading()); 
-      
+      emit(AuthLoading()); // Indicate loading state
       try {
-        // Create a map of only the non-null fields to update
-        final Map<String, dynamic> updateData = {};
-        if (event.name != null) updateData['name'] = event.name;
-        if (event.weightKg != null) updateData['weight_kg'] = event.weightKg;
-        if (event.heightCm != null) updateData['height_cm'] = event.heightCm;
-        if (event.preferMetric != null) updateData['preferMetric'] = event.preferMetric;
-
-        // Only call update if there's something to update
-        if (updateData.isNotEmpty) {
-            final updatedUser = await _authRepository.updateProfile(
-              name: event.name,
-              weightKg: event.weightKg,
-              heightCm: event.heightCm,
-              preferMetric: event.preferMetric, // Pass preferMetric
-            );
-            
-            emit(Authenticated(updatedUser));
-        } else {
-             // No actual changes requested, revert to current state if loading was shown
-             emit(currentState);
-        }
+        // Call updateProfile with the fields from the event
+        final updatedUser = await _authRepository.updateProfile(
+          username: event.username,
+          weightKg: event.weightKg,
+          heightCm: event.heightCm,
+          preferMetric: event.preferMetric,
+        );
+        emit(Authenticated(updatedUser)); // Emit new state with updated user
       } catch (e) {
         emit(AuthError('Profile update failed: $e'));
-        // Revert to previous authenticated state if loading was shown
-        emit(currentState);
+        // Re-emit the previous Authenticated state on error
+        // to avoid losing the user's session in the UI
+        emit(currentState); 
+      }
+    } else {
+      // Cannot update profile if not authenticated
+      emit(AuthError('Cannot update profile: User not authenticated.'));
+    }
+  }
+
+  /// Handle delete account request
+  Future<void> _onAuthDeleteAccountRequested(
+    AuthDeleteAccountRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is Authenticated) {
+      emit(AuthLoading()); // Indicate processing
+      try {
+        final userId = currentState.user.userId;
+        AppLogger.info('AuthBloc: Deleting account for user $userId');
+        await _authRepository.deleteAccount(userId: userId);
+        AppLogger.info('AuthBloc: Account deleted successfully, emitting Unauthenticated.');
+        emit(Unauthenticated()); // Transition to Unauthenticated on successful deletion
+      } catch (e) {
+        AppLogger.error('AuthBloc: Failed to delete account: $e');
+        emit(AuthError('Failed to delete account: ${e.toString()}'));
+        // Re-emit the Authenticated state so the user isn't logged out if deletion failed
+        // The UI should handle showing the error message.
+        emit(currentState); 
+      }
+    } else {
+      // Should not happen if the delete option is only shown when authenticated
+      AppLogger.warning('AuthBloc: Delete account requested while not authenticated.');
+      emit(AuthError('Cannot delete account. User not authenticated.'));
+      if (currentState is! Authenticated) {
+           emit(Unauthenticated()); // Ensure state is Unauthenticated if it wasn't already
       }
     }
   }
-} 
+}

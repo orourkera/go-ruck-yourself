@@ -33,14 +33,21 @@ class HealthService {
       // Updated to use proper health data types from the health package v12.1.0
       final types = [
         HealthDataType.STEPS,
-        HealthDataType.DISTANCE_WALKING_RUNNING,
-        HealthDataType.ACTIVE_ENERGY_BURNED,
+        HealthDataType.DISTANCE_WALKING_RUNNING, 
+        HealthDataType.ACTIVE_ENERGY_BURNED,   
         if (Platform.isIOS) HealthDataType.WORKOUT,
-        if (Platform.isIOS) HealthDataType.HEART_RATE,
       ];
       
-      // Request authorization
-      final authorized = await _health.requestAuthorization(types);
+      // Define permissions for each type: READ for steps, READ_WRITE for others
+      final permissions = [
+        HealthDataAccess.READ,             // Steps
+        HealthDataAccess.READ_WRITE,       // Distance
+        HealthDataAccess.READ_WRITE,       // Active Energy Burned
+        if (Platform.isIOS) HealthDataAccess.READ_WRITE, // Workout (includes writing)
+      ];
+
+      // Request authorization with specific permissions
+      final authorized = await _health.requestAuthorization(types, permissions: permissions);
       AppLogger.info('Health authorization request result: $authorized');
       _isAuthorized = authorized;
       

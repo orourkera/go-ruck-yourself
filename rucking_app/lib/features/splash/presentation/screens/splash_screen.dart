@@ -93,11 +93,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               // App tagline
               Text(
                 'Track your ruck, count your calories.',
-                style: AppTextStyles.subtitle1.copyWith(
+                style: AppTextStyles.titleMedium.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
                   fontFamily: 'Bangers',
-                  fontSize: AppTextStyles.subtitle1.fontSize != null ? AppTextStyles.subtitle1.fontSize! * 1.25 : 25,
+                  fontSize: AppTextStyles.titleMedium.fontSize != null ? AppTextStyles.titleMedium.fontSize! * 1.25 : 25,
                 ),
               ),
             ],

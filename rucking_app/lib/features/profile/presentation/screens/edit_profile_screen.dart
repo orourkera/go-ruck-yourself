@@ -25,7 +25,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
+  late TextEditingController _usernameController;
   late TextEditingController _weightController;
   late TextEditingController _heightController;
   bool _isLoading = false;
@@ -37,7 +37,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.user.name);
+    _usernameController = TextEditingController(text: widget.user.username);
     
     // Initialize weight controller with display value
     double displayWeight = 0;
@@ -60,7 +60,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _usernameController.dispose();
     _weightController.dispose();
     _heightController.dispose();
     super.dispose();
@@ -91,16 +91,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
       
       context.read<AuthBloc>().add(
-            AuthProfileUpdateRequested(
-              name: _nameController.text,
+            AuthUpdateProfileRequested(
+              username: _usernameController.text,
               weightKg: weightKg,
               heightCm: heightCm,
-              // preferMetric is handled on the ProfileScreen itself
+              preferMetric: widget.preferMetric,
             ),
           );
 
       // Listen for state changes to pop or show error
-      // Using BlocListener might be cleaner here if not already wrapping the screen
       final streamSub = context.read<AuthBloc>().stream.listen((state) {
          if (state is Authenticated) {
             if (mounted) {
@@ -142,14 +141,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               // Removed profile picture circle avatar placeholder
               const SizedBox(height: 20),
               CustomTextField(
-                controller: _nameController,
-                label: 'Full Name',
-                hint: 'Enter your full name',
+                controller: _usernameController,
+                label: 'Username',
+                hint: 'Enter your username',
                 prefixIcon: Icons.person_outline,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your name';
+                    return 'Please enter your username';
                   }
+                  // Optional: Add other username validation (length, characters etc.)
                   return null;
                 },
               ),
@@ -202,7 +202,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 16),
               Text(
                 'Weight and height information help calculate calories burned during your rucking sessions more accurately.',
-                style: AppTextStyles.caption.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                 ),
                 textAlign: TextAlign.center,
@@ -219,7 +219,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                     'Cancel',
-                     style: AppTextStyles.button.copyWith(
+                     style: AppTextStyles.labelLarge.copyWith(
                        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                      ),
                  ),

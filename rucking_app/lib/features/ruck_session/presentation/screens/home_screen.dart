@@ -331,34 +331,29 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                   builder: (context, state) {
                     String userName = 'Rucker'; // Default
                     if (state is Authenticated) {
-                      // debugPrint('HomeTab: AuthState is Authenticated. User data: ${state.user.toJson()}');
-                      // Use the display name from user model
-                      if (state.user.displayName.isNotEmpty) {
-                        userName = state.user.displayName.split(' ')[0];
-                      } else if (state.user.name.isNotEmpty) { // Fallback to name
-                         userName = state.user.name.split(' ')[0];
-                      } else { // Fallback if both are empty
-                         userName = 'Rucker'; // Or maybe state.user.email?
+                      // Use the username from the user model if available
+                      if (state.user.username.isNotEmpty) {
+                        userName = state.user.username; 
+                      } else {
+                         userName = 'Rucker'; // Fallback if username is somehow empty
                       }
                     } else {
-                       // debugPrint('HomeTab: AuthState is NOT Authenticated ($state)');
+                       // Handle non-authenticated state if necessary
                     }
-                    
-                    // debugPrint('HomeTab: Setting userName to: $userName');
                     
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Welcome back,',
-                          style: AppTextStyles.body1.copyWith(
+                          style: AppTextStyles.bodyLarge.copyWith(
                             color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           userName,
-                          style: AppTextStyles.headline5.copyWith(
+                          style: AppTextStyles.titleMedium.copyWith(
                             fontWeight: FontWeight.bold,
                             color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
                           ),
@@ -392,7 +387,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                     children: [
                       Text(
                         _monthlySummaryStats['date_range'] ?? 'This Month',
-                        style: AppTextStyles.subtitle1.copyWith(
+                        style: AppTextStyles.titleMedium.copyWith(
                           color: Colors.white,
                         ),
                       ),
@@ -433,7 +428,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                     icon: const Icon(Icons.add),
                     label: Text(
                       'START NEW RUCK', 
-                      style: AppTextStyles.button.copyWith(
+                      style: AppTextStyles.labelLarge.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       )
@@ -461,7 +456,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                 // Recent sessions section
                 Text(
                   'Recent Sessions',
-                  style: AppTextStyles.headline6,
+                  style: AppTextStyles.titleLarge,
                 ),
                 const SizedBox(height: 16),
                 
@@ -488,14 +483,14 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                             const SizedBox(height: 16),
                             Text(
                               'No recent sessions',
-                              style: AppTextStyles.body1.copyWith(
+                              style: AppTextStyles.bodyLarge.copyWith(
                                 color: AppColors.grey,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Your completed sessions will appear here',
-                              style: AppTextStyles.caption.copyWith(
+                              style: AppTextStyles.bodySmall.copyWith(
                                 color: AppColors.greyDark,
                               ),
                             ),
@@ -652,14 +647,14 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                   children: [
                                     Text(
                                       formattedDate,
-                                      style: AppTextStyles.subtitle1.copyWith(
+                                      style: AppTextStyles.titleMedium.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
                                       ),
                                     ),
                                     Text(
                                       durationText,
-                                      style: AppTextStyles.body2.copyWith(
+                                      style: AppTextStyles.bodyMedium.copyWith(
                                         color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                                       ),
                                     ),
@@ -722,7 +717,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                     },
                     child: Text(
                       'View All Sessions',
-                      style: AppTextStyles.button.copyWith(
+                      style: AppTextStyles.labelLarge.copyWith(
                         color: AppColors.primary,
                       ),
                     ),
@@ -748,7 +743,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         const SizedBox(height: 8),
         Text(
           value,
-          style: AppTextStyles.headline6.copyWith(
+          style: AppTextStyles.titleLarge.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
@@ -756,7 +751,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         const SizedBox(height: 4),
         Text(
           label,
-          style: AppTextStyles.caption.copyWith(
+          style: AppTextStyles.bodySmall.copyWith(
             color: Colors.white.withOpacity(0.8),
           ),
         ),
@@ -780,7 +775,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         const SizedBox(width: 4),
         Text(
           value,
-          style: AppTextStyles.caption.copyWith(
+          style: AppTextStyles.bodySmall.copyWith(
             color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
           ),
         ),

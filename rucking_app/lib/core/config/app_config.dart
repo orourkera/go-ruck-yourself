@@ -1,7 +1,7 @@
 /// Application configuration constants
 class AppConfig {
   // API configuration
-  static const String apiBaseUrl = 'https://getrucky.com/api';
+  static const String apiBaseUrl = 'https://go-ruck-yourself-3ac314790ae6.herokuapp.com/api';
   static const int apiTimeout = 30; // seconds
   
   // App information
@@ -20,6 +20,7 @@ class AppConfig {
   static const String userProfileKey = 'user_profile';
   static const String themeKey = 'app_theme';
   static const String unitSystemKey = 'unit_system'; // metric or imperial
+  static const String refreshTokenKey = 'refresh_token';
   
   // Feature flags
   static const bool enableHealthSync = true;

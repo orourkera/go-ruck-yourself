@@ -119,7 +119,7 @@ class CustomButton extends StatelessWidget {
             child: Text(
               text,
               overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.button.copyWith(
+              style: AppTextStyles.labelLarge.copyWith(
                 color: contentColor,
               ),
             ),
@@ -130,7 +130,7 @@ class CustomButton extends StatelessWidget {
     
     return Text(
       text,
-      style: AppTextStyles.button.copyWith(
+      style: AppTextStyles.labelLarge.copyWith(
         color: contentColor,
       ),
     );

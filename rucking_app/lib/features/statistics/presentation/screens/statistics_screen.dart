@@ -152,8 +152,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
           labelColor: AppColors.secondary,
           unselectedLabelColor: AppColors.textDarkSecondary,
           indicatorColor: AppColors.primary,
-          labelStyle: AppTextStyles.button.copyWith(fontWeight: FontWeight.bold),
-          unselectedLabelStyle: AppTextStyles.button,
+          labelStyle: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+          unselectedLabelStyle: AppTextStyles.titleMedium,
           tabs: const [
             Tab(text: 'WEEKLY'),
             Tab(text: 'MONTHLY'),
@@ -222,15 +222,15 @@ class _EmptyStatsWidget extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'No ${timeframe} stats yet',
-            style: AppTextStyles.subtitle1.copyWith(
-              color: AppColors.textDarkSecondary,
+            style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
+              color: AppColors.textDarkSecondary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Complete some rucks to see your statistics',
-            style: AppTextStyles.body2.copyWith(
+            style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textDarkSecondary,
             ),
           ),
@@ -287,7 +287,7 @@ class _StatsContentWidget extends StatelessWidget {
           // Summary cards
           Text(
             'Summary',
-            style: AppTextStyles.subtitle1.copyWith(
+            style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -369,7 +369,7 @@ class _StatsContentWidget extends StatelessWidget {
         ),
         Text(
           dateRange,
-          style: AppTextStyles.headline6,
+          style: AppTextStyles.titleLarge,
         ),
         IconButton(
           icon: const Icon(Icons.chevron_right),
@@ -394,7 +394,7 @@ class _StatsContentWidget extends StatelessWidget {
         ),
         Text(
           dateRange,
-          style: AppTextStyles.headline6,
+          style: AppTextStyles.titleLarge,
         ),
         IconButton(
           icon: const Icon(Icons.chevron_right),
@@ -419,7 +419,7 @@ class _StatsContentWidget extends StatelessWidget {
         ),
         Text(
           dateRange,
-          style: AppTextStyles.headline6,
+          style: AppTextStyles.titleLarge,
         ),
         IconButton(
           icon: const Icon(Icons.chevron_right),
@@ -460,7 +460,7 @@ class _StatsContentWidget extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             value,
-            style: AppTextStyles.headline5.copyWith(
+            style: AppTextStyles.headlineMedium.copyWith(
               fontWeight: FontWeight.bold,
               color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
             ),
@@ -468,7 +468,7 @@ class _StatsContentWidget extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: AppTextStyles.caption.copyWith(
+            style: AppTextStyles.bodySmall.copyWith(
               color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
             ),
           ),
@@ -498,7 +498,7 @@ class _StatsContentWidget extends StatelessWidget {
       children: [
         Text(
           'Performance',
-          style: AppTextStyles.subtitle1.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
             color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
@@ -554,11 +554,11 @@ class _StatsContentWidget extends StatelessWidget {
       ),
       title: Text(
         label,
-        style: AppTextStyles.body2,
+        style: AppTextStyles.bodyMedium,
       ),
       trailing: Text(
         value,
-        style: AppTextStyles.subtitle1.copyWith(
+        style: AppTextStyles.titleMedium.copyWith(
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -572,7 +572,7 @@ class _StatsContentWidget extends StatelessWidget {
       children: [
         Text(
           'Daily Breakdown',
-          style: AppTextStyles.subtitle1.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
             color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
@@ -606,20 +606,20 @@ class _StatsContentWidget extends StatelessWidget {
                   children: [
                     Text(
                       dayName,
-                      style: AppTextStyles.body1.copyWith(
+                      style: AppTextStyles.bodyLarge.copyWith(
                         fontWeight: FontWeight.bold,
                         color: isDark ? Color(0xFF728C69) : AppColors.textDark,
                       ),
                     ),
                     Text(
                       distanceValue,
-                      style: AppTextStyles.body1.copyWith(
+                      style: AppTextStyles.bodyMedium.copyWith(
                         color: isDark ? Color(0xFF728C69) : AppColors.textDark,
                       ),
                     ),
                     Text(
                       '$sessionsCount ${sessionsCount == 1 ? 'ruck' : 'rucks'}',
-                      style: AppTextStyles.body2.copyWith(
+                      style: AppTextStyles.bodyMedium.copyWith(
                         color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                       ),
                     ),
@@ -680,7 +680,7 @@ class _WeeklyStatsTab extends StatelessWidget {
         ),
         Text(
           dateRange,
-          style: AppTextStyles.headline6,
+          style: AppTextStyles.titleLarge,
         ),
         IconButton(
           icon: const Icon(Icons.chevron_right),
@@ -699,7 +699,7 @@ class _WeeklyStatsTab extends StatelessWidget {
       children: [
         Text(
           'Summary',
-          style: AppTextStyles.subtitle1.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
             color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
@@ -785,7 +785,7 @@ class _WeeklyStatsTab extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             value,
-            style: AppTextStyles.headline5.copyWith(
+            style: AppTextStyles.headlineMedium.copyWith(
               fontWeight: FontWeight.bold,
               color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
             ),
@@ -793,7 +793,7 @@ class _WeeklyStatsTab extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: AppTextStyles.caption.copyWith(
+            style: AppTextStyles.bodySmall.copyWith(
               color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
             ),
           ),
@@ -809,7 +809,7 @@ class _WeeklyStatsTab extends StatelessWidget {
       children: [
         Text(
           'Daily Breakdown',
-          style: AppTextStyles.subtitle1.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
             color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
@@ -833,7 +833,7 @@ class _WeeklyStatsTab extends StatelessWidget {
           child: Center(
             child: Text(
               'Bar Chart: Daily Distance',
-              style: AppTextStyles.body2.copyWith(
+              style: AppTextStyles.bodyMedium.copyWith(
                 color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
               ),
             ),
@@ -850,7 +850,7 @@ class _WeeklyStatsTab extends StatelessWidget {
       children: [
         Text(
           'Performance',
-          style: AppTextStyles.subtitle1.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
             color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
           ),
@@ -912,14 +912,12 @@ class _WeeklyStatsTab extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: AppTextStyles.subtitle2.copyWith(
-                  color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
-                ),
+                style: AppTextStyles.bodyMedium,
               ),
               const SizedBox(height: 4),
               Text(
                 value,
-                style: AppTextStyles.subtitle1.copyWith(
+                style: AppTextStyles.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -939,7 +937,7 @@ class _WeeklyStatsTab extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 change,
-                style: AppTextStyles.caption.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: isPositive
                       ? (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.success)
                       : (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.error),

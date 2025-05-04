@@ -3,6 +3,7 @@ import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Interface for authentication operations
 abstract class AuthService {
@@ -11,7 +12,7 @@ abstract class AuthService {
   
   /// Register a new user
   Future<User> register({
-    required String name,
+    required String username, // This is the display name
     required String email,
     required String password,
     bool? preferMetric,
@@ -40,11 +41,15 @@ abstract class AuthService {
   
   /// Update the user profile
   Future<User> updateProfile({
-    String? name,
+    String? username,
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
   });
+
+  /// Delete the current user's account
+  /// Requires the user's ID to target the correct backend endpoint.
+  Future<void> deleteAccount({required String userId});
 }
 
 /// Implementation of AuthService using ApiClient and StorageService
@@ -66,13 +71,20 @@ class AuthServiceImpl implements AuthService {
       );
       
       final token = response['token'] as String;
+      final refreshToken = response['refresh_token'] as String;
       final userData = response['user'] as Map<String, dynamic>;
       final user = User.fromJson(userData);
       
+      // Debug logging to confirm token receipt
+      print('[AUTH] Login successful. Access token received: ${token.isNotEmpty}');
+      print('[AUTH] Refresh token received: ${refreshToken.isNotEmpty}');
       // Store token and user data
       await _storageService.setSecureString(AppConfig.tokenKey, token);
+      await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
       await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
       await _storageService.setString(AppConfig.userIdKey, user.userId);
+      // Confirm storage
+      print('[AUTH] Tokens and user data stored in secure storage.');
       
       // Set token in API client
       _apiClient.setAuthToken(token);
@@ -85,7 +97,7 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User> register({
-    required String name,
+    required String username, // This is the display name
     required String email,
     required String password,
     bool? preferMetric,
@@ -97,7 +109,7 @@ class AuthServiceImpl implements AuthService {
       final response = await _apiClient.post(
         '/users/register',
         {
-          'name': name,
+          'username': username, // This is the display name
           'email': email,
           'password': password,
           if (preferMetric != null) 'preferMetric': preferMetric,
@@ -109,11 +121,13 @@ class AuthServiceImpl implements AuthService {
       
       // Process the response directly
       final token = response['token'] as String;
+      final refreshToken = response['refresh_token'] as String;
       final userData = response['user'] as Map<String, dynamic>;
       final user = User.fromJson(userData);
       
       // Store token and user data
       await _storageService.setSecureString(AppConfig.tokenKey, token);
+      await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
       await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
       await _storageService.setString(AppConfig.userIdKey, user.userId);
       
@@ -130,9 +144,12 @@ class AuthServiceImpl implements AuthService {
   Future<void> signOut() async {
     // Clear token and user data
     await _storageService.removeSecure(AppConfig.tokenKey);
+    await _storageService.removeSecure(AppConfig.refreshTokenKey);
     await _storageService.remove(AppConfig.userProfileKey);
     await _storageService.remove(AppConfig.userIdKey);
     
+    // Confirm token clearing
+    print('[AUTH] Tokens and user data cleared from storage during sign out.');
     // Clear token in API client
     _apiClient.clearAuthToken();
   }
@@ -208,20 +225,33 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<String?> refreshToken() async {
-    try {
-      final response = await _apiClient.post('/auth/refresh-token', {});
-      final newToken = response['token'] as String;
-      
-      // Store new token
-      await _storageService.setSecureString(AppConfig.tokenKey, newToken);
-      
-      // Set new token in API client
-      _apiClient.setAuthToken(newToken);
-      
-      return newToken;
-    } catch (e) {
-      throw _handleAuthError(e);
+    final storedRefreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
+    // Debug logging to check if refresh token exists
+    print('[AUTH] Attempting token refresh. Refresh token available: ${storedRefreshToken != null}');
+    // Log a redacted version of the token for debugging (first few and last few characters only)
+    if (storedRefreshToken != null) {
+      String redactedToken = storedRefreshToken.length > 10 
+          ? '${storedRefreshToken.substring(0, 5)}...${storedRefreshToken.substring(storedRefreshToken.length - 5)}' 
+          : '[SHORT TOKEN]';
+      print('[AUTH] Refresh token (redacted): $redactedToken');
     }
+    if (storedRefreshToken == null) {
+      throw UnauthorizedException('Refresh token not found');
+    }
+    final response = await _apiClient.post('/auth/refresh', {'refresh_token': storedRefreshToken});
+    // Log the response from the server for debugging
+    print('[AUTH] Token refresh response: $response');
+    final newToken = response['token'] as String;
+    final newRefreshToken = response['refresh_token'] as String;
+
+    // Store new tokens
+    await _storageService.setSecureString(AppConfig.tokenKey, newToken);
+    await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
+    
+    // Set new token in API client
+    _apiClient.setAuthToken(newToken);
+    
+    return newToken;
   }
   
   @override
@@ -231,14 +261,14 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<User> updateProfile({
-    String? name,
+    String? username,
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
   }) async {
     try {
       final data = <String, dynamic>{};
-      if (name != null) data['name'] = name;
+      if (username != null) data['username'] = username;
       if (weightKg != null) data['weight_kg'] = weightKg;
       if (heightCm != null) data['height_cm'] = heightCm;
       if (preferMetric != null) data['preferMetric'] = preferMetric;
@@ -267,6 +297,36 @@ class AuthServiceImpl implements AuthService {
     }
   }
   
+  @override
+  Future<void> deleteAccount({required String userId}) async {
+    try {
+      // The ApiClient should already have the token set from previous auth checks/logins.
+      // The base URL is handled by ApiClient, we just need the path.
+      final String endpoint = '/users/$userId'; 
+      AppLogger.info("AuthService: Attempting to delete account via $endpoint");
+      
+      // Make the DELETE request
+      await _apiClient.delete(endpoint);
+      
+      AppLogger.info("AuthService: Backend account deletion successful for $userId. Signing out locally.");
+      
+      // If the API call succeeds (doesn't throw), sign out locally
+      await signOut();
+      
+    } on UnauthorizedException catch (e) {
+      // If unauthorized, token might be invalid. Sign out anyway.
+      AppLogger.warning("AuthService: Unauthorized during delete account for $userId. Signing out. Error: $e");
+      await signOut();
+      // Rethrow or handle as specific error for the UI/Bloc
+      throw e; 
+    } catch (e) {
+      // Handle other potential API errors or network issues
+      AppLogger.error("AuthService: Error during delete account API call for $userId: $e");
+      // Rethrow the error so the Bloc/UI layer knows it failed
+      throw _handleAuthError(e); 
+    }
+  }
+
   /// Convert generic exceptions to auth-specific exceptions
   Exception _handleAuthError(dynamic error) {
     if (error is ApiException) {
