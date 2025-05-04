@@ -16,10 +16,10 @@ class SignUpResource(Resource):
             data = request.get_json()
             email = data.get('email')
             password = data.get('password')
-            username = data.get('username')
+            username = data.get('username') # This contains the display name from Flutter
             
             if not email or not password or not username: 
-                return {'message': 'Username, email, and password are required'}, 400
+                return {'message': 'Email, password, and username (display name) are required'}, 400
                 
             # Create user in Supabase Auth
             supabase = get_supabase_client()
@@ -35,8 +35,8 @@ class SignUpResource(Resource):
                 # Only include columns defined in the User model, EXCLUDING email
                 user_data = {
                     'id': str(user_id), 
-                    'username': username,
-                    # 'email': email, # <<< REMOVED: Email only stored in auth.users >>>
+                    'username': username, # Save username (display name) as username
+                    'email': email, # User table needs the email column
                     'weight_kg': data.get('weight_kg'),
                     'prefer_metric': data.get('preferMetric') # Read camelCase from request
                 }
@@ -83,7 +83,7 @@ class SignUpResource(Resource):
                 if auth_error:
                      error_message += f": {str(auth_error)}"
                      
-                logger.warning(error_message)
+                logger.warning(f"{error_message} for email: {email}")
                 status_code = 409 if "user already exists" in error_message.lower() else 400
                 return {'message': error_message}, status_code
                 
