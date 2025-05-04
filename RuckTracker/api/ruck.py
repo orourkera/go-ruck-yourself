@@ -3,6 +3,7 @@ from flask_restful import Resource
 from datetime import datetime
 import uuid
 import logging
+from dateutil import tz
 
 from ..supabase_client import get_supabase_client
 
@@ -15,88 +16,72 @@ class RuckSessionListResource(Resource):
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            response = supabase.table('ruck_sessions') \
+            response = supabase.table('ruck_session') \
                 .select('*') \
                 .eq('user_id', g.user.id) \
                 .order('created_at', desc=True) \
                 .execute()
             sessions = response.data
+            if sessions is None:
+                sessions = []
             # Attach route (list of lat/lng) to each session
             for session in sessions:
-                locations_resp = supabase.table('ruck_session_locations') \
+                locations_resp = supabase.table('location_point') \
                     .select('latitude,longitude') \
                     .eq('session_id', session['id']) \
-                    .order('timestamp') \
+                    .order('timestamp', desc=True) \
                     .execute()
-                session['route'] = locations_resp.data if locations_resp.data else []
-            return sessions, 200
+                if locations_resp.data:
+                    session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+                else:
+                    session['route'] = []
+            # Get limit from query params, if provided
+            limit = request.args.get('limit', type=int)
+            if limit is not None:
+                sessions = sessions[:limit]
+            return {'sessions': sessions}, 200
         except Exception as e:
-            return {'message': f'Error retrieving sessions: {str(e)}'}, 500
-
-    def post(self):
-        """Create a new ruck session"""
-        try:
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            data = request.get_json()
-            session_data = {
-                'id': str(uuid.uuid4()),
-                'user_id': g.user.id,
-                'status': 'created',
-                # 'ruck_weight_id': data.get('ruck_weight_id'),  # Removed legacy field
-                'ruck_weight_kg': data.get('ruck_weight_kg', 0),
-                'user_weight_kg': data.get('user_weight_kg'),
-                'planned_duration_minutes': data.get('planned_duration_minutes'),
-                'notes': data.get('notes'),
-                'created_at': datetime.utcnow().isoformat()
-            }
-            logger.debug(f"Creating ruck session: user_id={g.user.id}, token={getattr(g.user, 'token', None)[:10]}...")
-            logger.info(f"DEBUG: g.user.id = {g.user.id}")
-            logger.info(f"DEBUG: session_data = {session_data}")
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            response = supabase.table('ruck_sessions') \
-                .insert(session_data) \
-                .execute()
-            logger.debug(f"Supabase insert response: {response.__dict__}")
-            return response.data[0], 201
-        except Exception as e:
-            logger.error(f"Error creating session: {str(e)}", exc_info=True)
-            return {'message': f'Error creating session: {str(e)}'}, 500
+            logger.error(f"Error fetching ruck sessions: {e}")
+            return {'message': f"Error fetching ruck sessions: {str(e)}"}, 500
 
 class RuckSessionResource(Resource):
     def get(self, ruck_id):
-        """Get a specific ruck session"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            response = supabase.table('ruck_sessions') \
-                .select('*, ruck_weights(name, weight_kg)') \
+            response = supabase.table('ruck_session') \
+                .select('*') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .single() \
                 .execute()
             if not response.data:
                 return {'message': 'Session not found'}, 404
-            locations_resp = supabase.table('ruck_session_locations') \
+            locations_resp = supabase.table('location_point') \
                 .select('latitude,longitude') \
                 .eq('session_id', ruck_id) \
-                .order('timestamp') \
+                .order('timestamp', desc=True) \
                 .execute()
-            response.data['route'] = locations_resp.data if locations_resp.data else []
-            return response.data, 200
+            session = response.data
+            if locations_resp.data:
+                session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+            else:
+                session['route'] = []
+            return session, 200
         except Exception as e:
-            return {'message': f'Error retrieving session: {str(e)}'}, 500
+            logger.error(f"Error fetching ruck session {ruck_id}: {e}")
+            return {'message': f"Error fetching ruck session: {str(e)}"}, 500
 
 class RuckSessionStartResource(Resource):
     def post(self, ruck_id):
-        """Start a ruck session"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            check = supabase.table('ruck_sessions') \
-                .select('status') \
+            # Check if session already exists
+            check = supabase.table('ruck_session') \
+                .select('id,status') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .single() \
@@ -105,41 +90,31 @@ class RuckSessionStartResource(Resource):
                 return {'message': 'Session not found'}, 404
             if check.data['status'] != 'created':
                 # Instead of error, return the existing session with 200
-                existing_session = supabase.table('ruck_sessions') \
-                    .select('*') \
-                    .eq('id', ruck_id) \
-                    .eq('user_id', g.user.id) \
-                    .single() \
-                    .execute()
-                locations_resp = supabase.table('ruck_session_locations') \
-                    .select('latitude,longitude') \
-                    .eq('session_id', ruck_id) \
-                    .order('timestamp') \
-                    .execute()
-                existing_session.data['route'] = locations_resp.data if locations_resp.data else []
-                return existing_session.data, 200
-            update_data = {
-                'status': 'in_progress',
-                'started_at': datetime.utcnow().isoformat()
-            }
-            response = supabase.table('ruck_sessions') \
-                .update(update_data) \
+                return check.data, 200
+            # Update status to in_progress
+            update_resp = supabase.table('ruck_session') \
+                .update({'status': 'in_progress', 'started_at': datetime.now(tz.tzutc()).isoformat()}) \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
+                .single() \
                 .execute()
-            return {'message': 'Session started'}, 200
+            if not update_resp.data:
+                logger.error(f"Failed to start session {ruck_id}: {update_resp.error}")
+                return {'message': 'Failed to start session'}, 500
+            return update_resp.data, 200
         except Exception as e:
-            return {'message': f'Error starting session: {str(e)}'}, 500
+            logger.error(f"Error starting ruck session {ruck_id}: {e}")
+            return {'message': f"Error starting ruck session: {str(e)}"}, 500
 
 class RuckSessionPauseResource(Resource):
     def post(self, ruck_id):
-        """Pause a ruck session"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            check = supabase.table('ruck_sessions') \
-                .select('status') \
+            # Check if session exists and is in_progress
+            check = supabase.table('ruck_session') \
+                .select('id,status') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .single() \
@@ -148,28 +123,30 @@ class RuckSessionPauseResource(Resource):
                 return {'message': 'Session not found'}, 404
             if check.data['status'] != 'in_progress':
                 return {'message': 'Session not in progress'}, 400
-            update_data = {
-                'status': 'paused',
-                'paused_at': datetime.utcnow().isoformat()
-            }
-            response = supabase.table('ruck_sessions') \
-                .update(update_data) \
+            # Update status to paused
+            update_resp = supabase.table('ruck_session') \
+                .update({'status': 'paused'}) \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
+                .single() \
                 .execute()
-            return {'message': 'Session paused'}, 200
+            if not update_resp.data:
+                logger.error(f"Failed to pause session {ruck_id}: {update_resp.error}")
+                return {'message': 'Failed to pause session'}, 500
+            return update_resp.data, 200
         except Exception as e:
-            return {'message': f'Error pausing session: {str(e)}'}, 500
+            logger.error(f"Error pausing ruck session {ruck_id}: {e}")
+            return {'message': f"Error pausing ruck session: {str(e)}"}, 500
 
 class RuckSessionResumeResource(Resource):
     def post(self, ruck_id):
-        """Resume a paused ruck session"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            check = supabase.table('ruck_sessions') \
-                .select('status') \
+            # Check if session exists and is paused
+            check = supabase.table('ruck_session') \
+                .select('id,status') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .single() \
@@ -178,29 +155,33 @@ class RuckSessionResumeResource(Resource):
                 return {'message': 'Session not found'}, 404
             if check.data['status'] != 'paused':
                 return {'message': 'Session not paused'}, 400
-            update_data = {
-                'status': 'in_progress'
-            }
-            response = supabase.table('ruck_sessions') \
-                .update(update_data) \
+            # Update status to in_progress
+            update_resp = supabase.table('ruck_session') \
+                .update({'status': 'in_progress'}) \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
+                .single() \
                 .execute()
-            return {'message': 'Session resumed'}, 200
+            if not update_resp.data:
+                logger.error(f"Failed to resume session {ruck_id}: {update_resp.error}")
+                return {'message': 'Failed to resume session'}, 500
+            return update_resp.data, 200
         except Exception as e:
-            return {'message': f'Error resuming session: {str(e)}'}, 500
+            logger.error(f"Error resuming ruck session {ruck_id}: {e}")
+            return {'message': f"Error resuming ruck session: {str(e)}"}, 500
 
 class RuckSessionCompleteResource(Resource):
     def post(self, ruck_id):
-        """Complete a ruck session and save final stats directly in the session"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
+            data = request.get_json()
+            if not data:
+                return {'message': 'No data provided'}, 400
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            logger.info(f"Complete endpoint called for ruck_id: {ruck_id}")
-            logger.info(f"Authenticated user ID (g.user.id): {g.user.id if hasattr(g, 'user') and g.user else 'Not Set'}")
-            session_check = supabase.table('ruck_sessions') \
-                .select('status, started_at') \
+            # Check if session exists
+            session_check = supabase.table('ruck_session') \
+                .select('id,status,started_at') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .single() \
@@ -209,64 +190,56 @@ class RuckSessionCompleteResource(Resource):
                 return {'message': 'Session not found'}, 404
             current_status = session_check.data['status']
             started_at_str = session_check.data.get('started_at')
-            logger.info(f"Attempting to complete session {ruck_id}. Current status from DB: {current_status}")
             if current_status not in ['in_progress', 'paused']:
-                logger.warning(f"Completion rejected for session {ruck_id} because status is '{current_status}'")
                 return {'message': 'Session not in progress or paused'}, 400
-            duration_seconds = 0
-            completed_at = datetime.utcnow()
+            # Calculate duration
             if started_at_str:
                 try:
                     started_at = datetime.fromisoformat(started_at_str.replace('Z', '+00:00'))
-                    if started_at.tzinfo:
-                         completed_at = completed_at.replace(tzinfo=started_at.tzinfo)
-                    elif completed_at.tzinfo:
-                         completed_at = completed_at.replace(tzinfo=None)
-                    duration = completed_at - started_at
-                    duration_seconds = int(duration.total_seconds())
-                    if duration_seconds < 0: duration_seconds = 0
-                except ValueError as parse_error:
-                    print(f"Warning: Could not parse started_at '{started_at_str}': {parse_error}")
+                    ended_at = datetime.now(tz.tzutc())
+                    duration_seconds = int((ended_at - started_at).total_seconds())
+                except Exception as e:
+                    logger.error(f"Error calculating duration for session {ruck_id}: {e}")
                     duration_seconds = 0
-            data = request.get_json() or {}
-            session_update_data = {
+            else:
+                duration_seconds = 0
+            # Update session status to completed with end data
+            update_data = {
                 'status': 'completed',
-                'completed_at': completed_at.isoformat(),
-                'duration_seconds': duration_seconds, 
-                'distance_km': data.get('final_distance_km'),
-                'calories_burned': data.get('final_calories_burned'),
-                'average_pace_min_km': data.get('final_average_pace'),
-                'elevation_gain_meters': data.get('final_elevation_gain'),
-                'elevation_loss_meters': data.get('final_elevation_loss'),
-                'notes': data.get('notes'),
-                'rating': data.get('rating'),
-                'perceived_exertion': data.get('perceived_exertion'),
-                'tags': data.get('tags')
+                'ended_at': datetime.now(tz.tzutc()).isoformat(),
+                'duration_seconds': duration_seconds
             }
-            session_update_data_clean = {k: v for k, v in session_update_data.items() if v is not None}
-            session_response = supabase.table('ruck_sessions') \
-                .update(session_update_data_clean) \
+            # Add optional fields if provided
+            if 'distance_meters' in data:
+                update_data['distance_meters'] = data['distance_meters']
+            if 'weight_kg' in data:
+                update_data['weight_kg'] = data['weight_kg']
+            update_resp = supabase.table('ruck_session') \
+                .update(update_data) \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
+                .single() \
                 .execute()
-            if not session_response.data:
-                 print(f"Warning: Update for session {ruck_id} returned no data.")
-            return {'message': 'Session completed', 'calculated_duration_seconds': duration_seconds}, 200
+            if not update_resp.data:
+                logger.error(f"Failed to end session {ruck_id}: {update_resp.error}")
+                return {'message': 'Failed to end session'}, 500
+            return update_resp.data, 200
         except Exception as e:
-            print(f"Error completing session {ruck_id}: {str(e)}") 
-            import traceback
-            traceback.print_exc()
-            return {'message': f'Error completing session: {str(e)}'}, 500
+            logger.error(f"Error ending ruck session {ruck_id}: {e}")
+            return {'message': f"Error ending ruck session: {str(e)}"}, 500
 
 class RuckSessionLocationResource(Resource):
     def post(self, ruck_id):
-        """Handle location update for a session, including elevation gain/loss."""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
+            data = request.get_json()
+            if not data or 'latitude' not in data or 'longitude' not in data:
+                return {'message': 'Missing location data'}, 400
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            check = supabase.table('ruck_sessions') \
-                .select('status') \
+            # Check if session exists and is in_progress
+            check = supabase.table('ruck_session') \
+                .select('id,status') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .single() \
@@ -275,50 +248,20 @@ class RuckSessionLocationResource(Resource):
                 return {'message': 'Session not found'}, 404
             if check.data['status'] != 'in_progress':
                 return {'message': 'Session not in progress'}, 400
-            data = request.get_json()
-            elevation_gain = data.get('elevation_gain_meters')
-            elevation_loss = data.get('elevation_loss_meters')
-            update_data = {}
-            if elevation_gain is not None:
-                update_data['elevation_gain_meters'] = elevation_gain
-            if elevation_loss is not None:
-                update_data['elevation_loss_meters'] = elevation_loss
-            # Update session with elevation gain/loss if present
-            if update_data:
-                supabase.table('ruck_sessions').update(update_data).eq('id', ruck_id).execute()
+            # Insert location point
             location_data = {
-                'id': str(uuid.uuid4()),
                 'session_id': ruck_id,
-                'latitude': data.get('latitude'),
-                'longitude': data.get('longitude'),
-                'elevation': data.get('elevation'),
-                'timestamp': datetime.utcnow().isoformat(),
-                'created_at': datetime.utcnow().isoformat()
+                'latitude': data['latitude'],
+                'longitude': data['longitude'],
+                'timestamp': datetime.now(tz.tzutc()).isoformat()
             }
-            location_response = supabase.table('ruck_session_locations') \
+            insert_resp = supabase.table('location_point') \
                 .insert(location_data) \
                 .execute()
-            stats_data = {
-                'distance_km': data.get('distance_km'),
-                'calories_burned': data.get('calories_burned'),
-                'duration_seconds': data.get('duration_seconds'),
-                'average_pace_min_km': data.get('average_pace_min_km')
-            }
-            stats_data = {k: v for k, v in stats_data.items() if v is not None}
-            if stats_data:
-                stats_response = supabase.table('ruck_sessions') \
-                    .update(stats_data) \
-                    .eq('id', ruck_id) \
-                    .execute()
-            return {
-                'current_stats': {
-                    'distance_km': data.get('distance_km') or 0,
-                    'elevation_gain_meters': data.get('elevation_gain_meters') or 0,
-                    'elevation_loss_meters': data.get('elevation_loss_meters') or 0,
-                    'calories_burned': data.get('calories_burned') or 0,
-                    'duration_seconds': data.get('duration_seconds') or 0,
-                    'average_pace_min_km': data.get('average_pace_min_km') or 0,
-                }
-            }, 200
+            if not insert_resp.data:
+                logger.error(f"Failed to add location point for session {ruck_id}: {insert_resp.error}")
+                return {'message': 'Failed to add location point'}, 500
+            return insert_resp.data[0], 201
         except Exception as e:
-            return {'message': f'Error updating location: {str(e)}'}, 500
+            logger.error(f"Error adding location point for ruck session {ruck_id}: {e}")
+            return {'message': f"Error adding location point: {str(e)}"}, 500
