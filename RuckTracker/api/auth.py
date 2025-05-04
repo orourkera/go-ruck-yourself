@@ -16,9 +16,9 @@ class SignUpResource(Resource):
             data = request.get_json()
             email = data.get('email')
             password = data.get('password')
-            username = data.get('username') # Get username from request data
+            username = data.get('username')
             
-            if not email or not password or not username: # Added username check
+            if not email or not password or not username: 
                 return {'message': 'Username, email, and password are required'}, 400
                 
             # Create user in Supabase Auth
@@ -26,23 +26,20 @@ class SignUpResource(Resource):
             auth_response = supabase.auth.sign_up({
                 "email": email,
                 "password": password,
-                # Supabase Auth might allow user_metadata or options for username, check docs if needed
-                # 'options': { 'data': { 'username': username } } # Example if Supabase supports it
             })
             
             if auth_response.user:
                 user_id = auth_response.user.id
                 
                 # Prepare data for the public.user table
-                # Only include columns defined in the User model
+                # Only include columns defined in the User model, EXCLUDING email
                 user_data = {
                     'id': str(user_id), 
-                    'username': username, # <<< Use username now >>>
-                    'email': email, 
+                    'username': username,
+                    # 'email': email, # <<< REMOVED: Email only stored in auth.users >>>
                     'weight_kg': data.get('weight_kg'),
-                    # Removed: name, height_cm, preferMetric, sex, date_of_birth as they are not in the User model
+                    'prefer_metric': data.get('preferMetric') # Read camelCase from request
                 }
-                # Clean data - remove None values before insert
                 user_data_clean = {k: v for k, v in user_data.items() if v is not None}
                 
                 logger.debug(f"Inserting into user table for user {user_id}: {user_data_clean}") 
@@ -52,7 +49,6 @@ class SignUpResource(Resource):
                 except Exception as user_insert_err:
                     db_error_message = str(user_insert_err)
                     logger.error(f"Error inserting user record using admin client for user {user_id}: {db_error_message}", exc_info=True)
-                    # Attempt to delete the auth user for consistency
                     try:
                         logger.warning(f"Attempting to delete auth user {user_id} due to user record creation failure.")
                         admin_supabase.auth.admin.delete_user(user_id)
@@ -67,14 +63,14 @@ class SignUpResource(Resource):
                 # Merge data from the user table insert into the response
                 if user_insert_response.data:
                     user_details = user_insert_response.data[0]
-                    # Add fields from user table, avoid overwriting auth fields
-                    # Ensure username from our table is included
-                    user_response_data['username'] = user_details.get('username', username) # Use inserted or passed-in
+                    user_response_data['username'] = user_details.get('username', username)
                     user_response_data['weight_kg'] = user_details.get('weight_kg')
-                    # Removed merging for: name, height_cm, preferMetric, sex, date_of_birth
+                    user_response_data['prefer_metric'] = user_details.get('prefer_metric')
                 else:
-                    # Ensure username is still added even if insert response is empty
                     user_response_data['username'] = username
+                    
+                # Add the email from the auth response to the final user object sent to client
+                user_response_data['email'] = email
                 
                 return {
                     'message': 'User registered successfully',
@@ -82,7 +78,6 @@ class SignUpResource(Resource):
                     'user': user_response_data 
                 }, 201
             else:
-                # Handle case where auth_response.user is None (e.g., email already exists)
                 error_message = "Failed to register user"
                 auth_error = getattr(auth_response, 'error', None) or getattr(auth_response, 'message', None)
                 if auth_error:
@@ -265,10 +260,13 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['username', 'weight_kg'] 
+            allowed_fields = ['username', 'weight_kg', 'prefer_metric'] 
             for field in allowed_fields:
-                if field in data:
-                    # Basic type validation/conversion could be added here
+                if field == 'prefer_metric': # Check for snake_case field name
+                    # Expect camelCase 'preferMetric' in the incoming JSON data for updates too
+                    if 'preferMetric' in data:
+                         update_data['prefer_metric'] = data['preferMetric'] # Use snake_case for DB update dict key
+                elif field in data:
                     update_data[field] = data[field]
                  
             if not update_data:

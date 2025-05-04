@@ -12,6 +12,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
     weight_kg = db.Column(db.Float, nullable=True)  # User's weight in kg
+    prefer_metric = db.Column(db.Boolean, nullable=False, default=True) # User's preference for metric units
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -21,10 +22,11 @@ class User(UserMixin, db.Model):
     def to_dict(self):
         """Convert user data to dictionary for API responses"""
         return {
-            'id': self.id,
+            'id': str(self.id),  # Convert UUID to string
             'username': self.username,
             'email': self.email,
             'weight_kg': self.weight_kg,
+            'prefer_metric': self.prefer_metric, # Added prefer_metric
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
