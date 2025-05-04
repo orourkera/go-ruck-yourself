@@ -99,26 +99,50 @@ class ApiClient {
   /// Makes a POST request to the specified endpoint with the given body
   Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
     try {
-      // For authenticated endpoints, verify we have a token first
-      if (endpoint.contains('/rucks') || endpoint.contains('/users')) {
+      // Require token for /rucks/* and /users/* endpoints, EXCEPT for /users/register
+      bool requiresAuth = (endpoint.startsWith('/rucks') || endpoint.startsWith('/users/')) && 
+                          endpoint != '/users/register';
+      // Explicitly do not set auth token for /auth/refresh endpoint
+      bool excludeAuth = endpoint == '/auth/refresh';
+                          
+      if (requiresAuth && !excludeAuth) {
         final hasToken = await _ensureAuthToken();
         if (!hasToken) {
           throw UnauthorizedException('Not authenticated - please log in first');
         }
       }
       
+      // Debug logging for /auth/refresh request
+      if (endpoint == '/auth/refresh') {
+        print('[API] Sending refresh token request to $endpoint');
+        print('[API] Request body: $body');
+      }
+      
       // Set timeout to prevent hanging requests
       final options = Options(
         headers: await _getHeaders(),
+        // For /auth/refresh, explicitly remove the Authorization header if it exists
+        validateStatus: (status) {
+          return status != null && status < 500;
+        },
         sendTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
       );
+      if (excludeAuth) {
+        options.headers?.remove('Authorization');
+      }
       
       final response = await _dio.post(
         endpoint,
         data: body,
         options: options,
       );
+      
+      // Debug logging for /auth/refresh response
+      if (endpoint == '/auth/refresh') {
+        print('[API] Refresh token response status: ${response.statusCode}');
+        print('[API] Refresh token response body: ${response.data}');
+      }
       
       return response.data;
     } catch (e) {
@@ -162,14 +186,9 @@ class ApiClient {
       'Accept': 'application/json',
     };
     
-    try {
-      // Check if storage service is initialized
-      final token = await _storageService.getAuthToken();
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-    } catch (e) {
-      // Storage service might not be initialized yet
+    // Use the token already set in Dio options if available
+    if (_dio.options.headers.containsKey('Authorization')) {
+      headers['Authorization'] = _dio.options.headers['Authorization'] as String;
     }
     
     return headers;

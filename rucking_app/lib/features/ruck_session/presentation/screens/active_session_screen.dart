@@ -852,7 +852,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
       appBar: AppBar(
-        title: Text('Active Session', style: AppTextStyles.headline6.copyWith(color: Colors.white)),
+        title: Text('Active Session', style: AppTextStyles.titleLarge.copyWith(color: Colors.white)),
         backgroundColor: AppColors.primary,
         centerTitle: true,
         elevation: 0,
@@ -969,7 +969,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                 // Timer display
                 Text(
                   durationDisplay,
-                  style: AppTextStyles.headline1.copyWith(
+                  style: AppTextStyles.displayLarge.copyWith(
                     fontWeight: FontWeight.bold,
                     fontStyle: FontStyle.italic,
                   ),
@@ -981,7 +981,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                     // Ruck weight
                     Text(
                       _getDisplayWeight(),
-                      style: AppTextStyles.headline6.copyWith(
+                      style: AppTextStyles.titleLarge.copyWith(
                         color: Colors.grey.shade600,
                       ),
                     ),
@@ -992,7 +992,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                 if (widget.plannedDuration != null && remainingTimeDisplay != null)
                   Text(
                     'Remaining: $remainingTimeDisplay',
-                    style: AppTextStyles.subtitle1.copyWith(
+                    style: AppTextStyles.titleMedium.copyWith(
                       color: remainingTimeDisplay == 'Completed!' ? Colors.green : Colors.grey.shade600,
                     ),
                   ),
@@ -1028,7 +1028,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                     children: [
                                       Icon(Icons.straighten, color: AppColors.primary, size: 20),
                                       SizedBox(width: 6),
-                                      Text('Distance', style: AppTextStyles.subtitle2),
+                                      Text('Distance', style: AppTextStyles.titleSmall),
                                     ],
                                   ),
                                   SizedBox(height: 8),
@@ -1036,7 +1036,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                     distanceDisplay != null
                                         ? distanceDisplay
                                         : '',
-                                    style: AppTextStyles.headline5.copyWith(
+                                    style: AppTextStyles.headlineMedium.copyWith(
                                       color: Theme.of(context).brightness == Brightness.dark 
                                           ? AppColors.primaryLight 
                                           : null,
@@ -1071,7 +1071,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                     children: [
                                       Icon(Icons.speed, color: AppColors.secondary, size: 20),
                                       SizedBox(width: 6),
-                                      Text('Pace', style: AppTextStyles.subtitle2),
+                                      Text('Pace', style: AppTextStyles.titleSmall),
                                     ],
                                   ),
                                   SizedBox(height: 8),
@@ -1079,7 +1079,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                     paceDisplay != null
                                         ? paceDisplay
                                         : '',
-                                    style: AppTextStyles.headline5.copyWith(
+                                    style: AppTextStyles.headlineMedium.copyWith(
                                       color: Theme.of(context).brightness == Brightness.dark 
                                           ? AppColors.success 
                                           : null,
@@ -1121,7 +1121,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                     children: [
                                       Icon(Icons.local_fire_department, color: AppColors.success, size: 20),
                                       SizedBox(width: 6),
-                                      Text('Calories', style: AppTextStyles.subtitle2),
+                                      Text('Calories', style: AppTextStyles.titleSmall),
                                     ],
                                   ),
                                   SizedBox(height: 8),
@@ -1131,7 +1131,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                         children: [
                                           Text(
                                             caloriesDisplay,
-                                            style: AppTextStyles.headline5.copyWith(
+                                            style: AppTextStyles.headlineMedium.copyWith(
                                               color: Theme.of(context).brightness == Brightness.dark 
                                                   ? AppColors.warning 
                                                   : null,
@@ -1140,7 +1140,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                           const SizedBox(width: 4),
                                           Text(
                                             'kCal',
-                                            style: AppTextStyles.headline5.copyWith(
+                                            style: AppTextStyles.headlineMedium.copyWith(
                                               color: Theme.of(context).brightness == Brightness.dark 
                                                   ? AppColors.warning 
                                                   : null,
@@ -1176,14 +1176,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                                     children: [
                                       Icon(Icons.terrain, color: AppColors.success, size: 20),
                                       SizedBox(width: 6),
-                                      Text('Elevation', style: AppTextStyles.subtitle2),
+                                      Text('Elevation', style: AppTextStyles.titleSmall),
                                     ],
                                   ),
                                   SizedBox(height: 8),
                                   elevationDisplay != '+0/-0'
                                     ? Text(
                                         elevationDisplay,
-                                        style: AppTextStyles.headline5.copyWith(
+                                        style: AppTextStyles.headlineMedium.copyWith(
                                           color: Theme.of(context).brightness == Brightness.dark 
                                               ? AppColors.primaryLight 
                                               : null,
@@ -1219,7 +1219,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                     icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
                     label: Text(
                       _isPaused ? 'RESUME' : 'PAUSE',
-                      style: AppTextStyles.button.copyWith(
+                      style: AppTextStyles.labelLarge.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),

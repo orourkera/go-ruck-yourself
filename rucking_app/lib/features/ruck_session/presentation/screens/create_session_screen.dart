@@ -469,19 +469,19 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 // Section title
                 Text(
                   'Session Details',
-                  style: AppTextStyles.headline6,
+                  style: AppTextStyles.titleLarge, // headline6 -> titleLarge
                 ),
                 const SizedBox(height: 24),
                 
                 // Quick ruck weight selection
                 Text(
                   'Ruck Weight ($weightUnit)',
-                  style: AppTextStyles.subtitle1.copyWith(fontWeight: FontWeight.bold),
+                  style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold), // subtitle1 -> titleMedium
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Weight is used to calculate calories burned during your ruck',
-                  style: AppTextStyles.caption.copyWith(
+                  style: AppTextStyles.bodySmall.copyWith( // caption -> bodySmall
                     color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                   ),
                 ),
@@ -567,7 +567,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     icon: const Icon(Icons.play_arrow),
                     label: Text(
                       'START SESSION', 
-                      style: AppTextStyles.button.copyWith(
+                      style: AppTextStyles.labelLarge.copyWith( // button -> labelLarge
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       )

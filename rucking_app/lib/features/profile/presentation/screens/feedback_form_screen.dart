@@ -63,7 +63,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('We value your feedback!', style: AppTextStyles.headline5),
+              Text('We value your feedback!', style: AppTextStyles.headlineMedium),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _feedbackController,
@@ -97,8 +97,9 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                   onPressed: _isSending ? null : _sendFeedback,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: AppTextStyles.button,
+                    textStyle: AppTextStyles.labelLarge,
                   ),
                 ),
               ),

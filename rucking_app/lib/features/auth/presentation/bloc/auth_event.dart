@@ -27,8 +27,7 @@ class AuthLoginRequested extends AuthEvent {
 
 /// Event to request user registration
 class AuthRegisterRequested extends AuthEvent {
-  final String displayName;
-  final String name;
+  final String username;
   final String email;
   final String password;
   final double? weightKg;
@@ -37,8 +36,7 @@ class AuthRegisterRequested extends AuthEvent {
   final bool preferMetric;
 
   const AuthRegisterRequested({
-    required this.displayName,
-    required this.name,
+    required this.username,
     required this.email,
     required this.password,
     this.weightKg,
@@ -48,26 +46,31 @@ class AuthRegisterRequested extends AuthEvent {
   });
 
   @override
-  List<Object?> get props => [displayName, name, email, password, weightKg, heightCm, dateOfBirth, preferMetric];
+  List<Object?> get props => [username, email, password, weightKg, heightCm, dateOfBirth, preferMetric];
 }
 
 /// Event to request user logout
 class AuthLogoutRequested extends AuthEvent {}
 
-/// Event to request profile update
-class AuthProfileUpdateRequested extends AuthEvent {
-  final String? name;
+/// Event to update user profile
+class AuthUpdateProfileRequested extends AuthEvent {
+  final String? username;
   final double? weightKg;
   final double? heightCm;
   final bool? preferMetric;
 
-  const AuthProfileUpdateRequested({
-    this.name,
+  const AuthUpdateProfileRequested({
+    this.username,
     this.weightKg,
     this.heightCm,
     this.preferMetric,
   });
 
   @override
-  List<Object?> get props => [name, weightKg, heightCm, preferMetric];
-} 
+  List<Object?> get props => [username, weightKg, heightCm, preferMetric];
+}
+
+/// Event triggered when the user requests to delete their account
+class AuthDeleteAccountRequested extends AuthEvent {
+  const AuthDeleteAccountRequested();
+}

@@ -51,7 +51,7 @@ class StatCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: AppTextStyles.body2.copyWith(
+                  style: AppTextStyles.bodyMedium.copyWith(
                     color: Colors.grey[700],
                   ),
                 ),
@@ -69,7 +69,7 @@ class StatCard extends StatelessWidget {
               child: Center(
                 child: Text(
                   numericPart,
-                  style: AppTextStyles.headline4.copyWith(
+                  style: AppTextStyles.headlineLarge.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                     fontSize: valueFontSize,
@@ -86,7 +86,7 @@ class StatCard extends StatelessWidget {
                 child: Center(
                   child: Text(
                     unitPart,
-                    style: AppTextStyles.body2.copyWith(
+                    style: AppTextStyles.bodyMedium.copyWith(
                       color: Colors.grey[600],
                     ),
                     textAlign: TextAlign.center,
@@ -101,7 +101,7 @@ class StatCard extends StatelessWidget {
                 child: Center(
                   child: Text(
                     secondaryValue!,
-                    style: AppTextStyles.body2.copyWith(
+                    style: AppTextStyles.bodyMedium.copyWith(
                       color: Colors.grey[600],
                     ),
                     textAlign: TextAlign.center,

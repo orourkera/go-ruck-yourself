@@ -35,289 +35,303 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<AuthBloc, AuthState>(
+    return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is Unauthenticated) {
+        if (state is AuthError) {
+          // Hide loading indicator if shown before error
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading if any
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${state.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } else if (state is Unauthenticated) {
+          // User successfully deleted or logged out elsewhere
           // Navigate to login screen if logged out
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
           );
         }
       },
-      builder: (context, state) {
-        if (state is Authenticated) {
-          final user = state.user;
-          
-          // Initialize dropdown value if not already set
-          // Do this within build or didChangeDependencies for safety with Bloc state
-          _selectedUnit ??= user.preferMetric ? 'Metric' : 'Standard';
-          
-          // Safely get initials, checking for null or empty values
-          String initials = '';
-          if (user.name.isNotEmpty) {
-            initials = _getInitials(user.name);
-          }
-          
-          // --- Calculate Display Values ---
-          String weightDisplay = 'Not set';
-          if (user.weightKg != null) {
-            if (user.preferMetric) {
-              weightDisplay = '${user.weightKg!.toStringAsFixed(1)} kg';
-            } else {
-              final lbs = user.weightKg! * kgToLbs;
-              weightDisplay = '${lbs.toStringAsFixed(1)} lbs';
+      child: BlocBuilder<AuthBloc, AuthState>(
+        builder: (context, state) {
+          if (state is Authenticated) {
+            final user = state.user;
+            
+            // Initialize dropdown value if not already set
+            // Do this within build or didChangeDependencies for safety with Bloc state
+            _selectedUnit ??= user.preferMetric ? 'Metric' : 'Standard';
+            
+            // Safely get initials, checking for null or empty values
+            String initials = '';
+            if (user.username.isNotEmpty) {
+              initials = _getInitials(user.username);
             }
-          }
+            
+            // --- Calculate Display Values ---
+            String weightDisplay = 'Not set';
+            if (user.weightKg != null) {
+              if (user.preferMetric) {
+                weightDisplay = '${user.weightKg!.toStringAsFixed(1)} kg';
+              } else {
+                final lbs = user.weightKg! * kgToLbs;
+                weightDisplay = '${lbs.toStringAsFixed(1)} lbs';
+              }
+            }
 
-          String heightDisplay = 'Not set';
-          if (user.heightCm != null) {
-            if (user.preferMetric) {
-              heightDisplay = '${user.heightCm!.toStringAsFixed(1)} cm';
-            } else {
-              final totalInches = user.heightCm! * cmToInches;
-              final feet = (totalInches / 12).floor();
-              final inches = (totalInches % 12).round(); // Round remaining inches
-              heightDisplay = '$feet\' $inches"'; // Format as 5' 11"
+            String heightDisplay = 'Not set';
+            if (user.heightCm != null) {
+              if (user.preferMetric) {
+                heightDisplay = '${user.heightCm!.toStringAsFixed(1)} cm';
+              } else {
+                final totalInches = user.heightCm! * cmToInches;
+                final feet = (totalInches / 12).floor();
+                final inches = (totalInches % 12).round(); // Round remaining inches
+                heightDisplay = '$feet\' $inches"'; // Format as 5' 11"
+              }
             }
+            // --- End Calculate Display Values ---
+            
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text('Profile'),
+                centerTitle: true,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditProfileScreen(
+                            user: user, 
+                            // Pass the preference
+                            preferMetric: user.preferMetric, 
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      user.username,
+                      style: AppTextStyles.headlineMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      user.email,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textDarkSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Personal Info section
+                    _buildSection(
+                      title: 'Personal Information',
+                      children: [
+                        _buildInfoItem(
+                          icon: Icons.email_outlined,
+                          label: 'Email',
+                          value: user.email,
+                        ),
+                        const Divider(),
+                        _buildInfoItem(
+                          icon: Icons.monitor_weight_outlined,
+                          label: 'Weight',
+                          value: weightDisplay,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // App settings section
+                    _buildSection(
+                      title: 'App Settings',
+                      children: [
+                        _buildSettingItem(
+                          icon: Icons.language_outlined,
+                          label: 'Units',
+                          trailing: DropdownButton<String>(
+                            value: _selectedUnit,
+                            underline: const SizedBox(),
+                            items: ['Metric', 'Standard']
+                                .map((String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  );
+                                })
+                                .toList(),
+                            onChanged: (String? newValue) {
+                              if (newValue != null && newValue != _selectedUnit) {
+                                setState(() {
+                                  _selectedUnit = newValue;
+                                });
+                                // Dispatch update event
+                                bool newPreferMetric = newValue == 'Metric';
+                                context.read<AuthBloc>().add(AuthUpdateProfileRequested(
+                                  preferMetric: newPreferMetric,
+                                  username: user.username,
+                                  weightKg: user.weightKg,
+                                  heightCm: user.heightCm,
+                                ));
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // About section
+                    _buildSection(
+                      title: 'About',
+                      children: [
+                        _buildClickableItem(
+                          icon: Icons.info_outline,
+                          label: 'About App',
+                          onTap: () {
+                            showAboutDialog(
+                              context: context,
+                              applicationName: 'Go Rucky Yourself App',
+                              applicationVersion: '1.0.0',
+                              applicationIcon: Image.asset(
+                                'assets/images/app_icon.png',
+                                width: 48,
+                                height: 48,
+                              ),
+                              applicationLegalese: ' 2025 Get Rucky',
+                              children: [
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Track your rucking sessions, monitor your progress, and have a great rucking time',
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Made by the Get Rucky team.',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const Divider(),
+                        _buildClickableItem(
+                          icon: Icons.privacy_tip_outlined,
+                          label: 'Privacy Policy',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                            );
+                          },
+                        ),
+                        const Divider(),
+                        _buildClickableItem(
+                          icon: Icons.description_outlined,
+                          label: 'Terms of Service',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const TermsOfServiceScreen()),
+                            );
+                          },
+                        ),
+                        const Divider(),
+                        _buildClickableItem(
+                          icon: Icons.feedback,
+                          label: 'Give Feedback',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const FeedbackFormScreen()),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Delete account section
+                    _buildSection(
+                      title: 'Danger Zone',
+                      children: [
+                        _buildClickableItem(
+                          icon: Icons.delete_forever_outlined,
+                          label: 'Delete Account',
+                          onTap: () => _showDeleteAccountDialog(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Manage Subscription button
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.subscriptions_outlined),
+                      label: const Text('Manage Subscription'),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () async {
+                        final url = Theme.of(context).platform == TargetPlatform.iOS
+                            ? 'https://apps.apple.com/account/subscriptions'
+                            : 'https://play.google.com/store/account/subscriptions';
+                        if (await canLaunch(url)) {
+                          await launch(url);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Could not open subscription management page.')),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Logout button
+                    CustomButton(
+                      text: 'Logout',
+                      icon: Icons.logout,
+                      color: AppColors.error,
+                      onPressed: () {
+                        _showLogoutConfirmationDialog(context);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            );
           }
-          // --- End Calculate Display Values ---
           
+          // Loading, error, or initial state
           return Scaffold(
             appBar: AppBar(
               title: const Text('Profile'),
               centerTitle: true,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditProfileScreen(
-                          user: user, 
-                          // Pass the preference
-                          preferMetric: user.preferMetric, 
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
             ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    user.name,
-                    style: AppTextStyles.headline5.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    user.email,
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textDarkSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Personal Info section
-                  _buildSection(
-                    title: 'Personal Information',
-                    children: [
-                      _buildInfoItem(
-                        icon: Icons.email_outlined,
-                        label: 'Email',
-                        value: user.email,
-                      ),
-                      const Divider(),
-                      _buildInfoItem(
-                        icon: Icons.monitor_weight_outlined,
-                        label: 'Weight',
-                        value: weightDisplay,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // App settings section
-                  _buildSection(
-                    title: 'App Settings',
-                    children: [
-                      _buildSettingItem(
-                        icon: Icons.language_outlined,
-                        label: 'Units',
-                        trailing: DropdownButton<String>(
-                          value: _selectedUnit,
-                          underline: const SizedBox(),
-                          items: ['Metric', 'Standard']
-                              .map((String value) {
-                                return DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(value),
-                                );
-                              })
-                              .toList(),
-                          onChanged: (String? newValue) {
-                            if (newValue != null && newValue != _selectedUnit) {
-                              setState(() {
-                                _selectedUnit = newValue;
-                              });
-                              // Dispatch update event
-                              bool newPreferMetric = newValue == 'Metric';
-                              context.read<AuthBloc>().add(AuthProfileUpdateRequested(
-                                preferMetric: newPreferMetric,
-                                name: user.name,
-                                weightKg: user.weightKg,
-                                heightCm: user.heightCm,
-                              ));
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // About section
-                  _buildSection(
-                    title: 'About',
-                    children: [
-                      _buildClickableItem(
-                        icon: Icons.info_outline,
-                        label: 'About App',
-                        onTap: () {
-                          showAboutDialog(
-                            context: context,
-                            applicationName: 'Go Rucky Yourself App',
-                            applicationVersion: '1.0.0',
-                            applicationIcon: Image.asset(
-                              'assets/images/app_icon.png',
-                              width: 48,
-                              height: 48,
-                            ),
-                            applicationLegalese: ' 2025 Get Rucky',
-                            children: [
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Track your rucking sessions, monitor your progress, and have a great rucking time',
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Made by the Get Rucky team.',
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const Divider(),
-                      _buildClickableItem(
-                        icon: Icons.privacy_tip_outlined,
-                        label: 'Privacy Policy',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
-                          );
-                        },
-                      ),
-                      const Divider(),
-                      _buildClickableItem(
-                        icon: Icons.description_outlined,
-                        label: 'Terms of Service',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const TermsOfServiceScreen()),
-                          );
-                        },
-                      ),
-                      const Divider(),
-                      _buildClickableItem(
-                        icon: Icons.feedback,
-                        label: 'Give Feedback',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const FeedbackFormScreen()),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Delete account section
-                  _buildSection(
-                    title: 'Danger Zone',
-                    children: [
-                      _buildClickableItem(
-                        icon: Icons.delete_forever_outlined,
-                        label: 'Delete Account',
-                        onTap: () => _showDeleteAccountDialog(context, user.userId),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Manage Subscription button
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.subscriptions_outlined),
-                    label: const Text('Manage Subscription'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () async {
-                      final url = Theme.of(context).platform == TargetPlatform.iOS
-                          ? 'https://apps.apple.com/account/subscriptions'
-                          : 'https://play.google.com/store/account/subscriptions';
-                      if (await canLaunch(url)) {
-                        await launch(url);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Could not open subscription management page.')),
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Logout button
-                  CustomButton(
-                    text: 'Logout',
-                    icon: Icons.logout,
-                    color: AppColors.error,
-                    onPressed: () {
-                      _showLogoutConfirmationDialog(context);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  const SizedBox(height: 32),
-                ],
-              ),
+            body: const Center(
+              child: CircularProgressIndicator(),
             ),
           );
-        }
-        
-        // Loading, error, or initial state
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Profile'),
-            centerTitle: true,
-          ),
-          body: const Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -348,7 +362,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.all(16),
             child: Text(
               title,
-              style: AppTextStyles.subtitle1.copyWith(
+              style: AppTextStyles.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
                 color: isDark ? Color(0xFF728C69) : AppColors.textDark,
               ),
@@ -358,8 +372,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (subtitle != null) ...[
             Text(
               subtitle!,
-              style: AppTextStyles.body2.copyWith(
-                color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: isDark ? Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
               ),
             ),
             const SizedBox(height: 8),
@@ -399,14 +413,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   label,
-                  style: AppTextStyles.caption.copyWith(
-                    color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: isDark ? Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: AppTextStyles.body1.copyWith(
+                  style: AppTextStyles.bodyLarge.copyWith(
                     color: isDark ? Color(0xFF728C69) : AppColors.textDark,
                   ),
                 ),
@@ -438,7 +452,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(
             child: Text(
               label,
-              style: AppTextStyles.body1.copyWith(
+              style: AppTextStyles.bodyLarge.copyWith(
                 color: isDark ? Color(0xFF728C69) : AppColors.textDark,
               ),
             ),
@@ -472,7 +486,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: Text(
                 label,
-                style: AppTextStyles.body1.copyWith(
+                style: AppTextStyles.bodyLarge.copyWith(
                   color: isDark ? Color(0xFF728C69) : AppColors.textDark,
                 ),
               ),
@@ -522,7 +536,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showDeleteAccountDialog(BuildContext context, String userId) {
+  void _showDeleteAccountDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -534,50 +548,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () async {
-              // Capture the ScaffoldMessenger before the async gap
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              final navigator = Navigator.of(context); // Capture navigator too
-
-              navigator.pop(); // Pop the dialog
-              
-              // Call backend to delete account
-              // Pass context only if _deleteAccount truly needs the build context
-              // If it just needs something from context, pass that specific thing.
-              final success = await _deleteAccount(userId, context); 
-              
-              if (!mounted) return; // Early exit if widget is unmounted after await
-
-              if (success) {
-                // Log out and redirect to login
-                // Consider if context is still valid here, might need to capture AuthBloc too
-                context.read<AuthBloc>().add(AuthLogoutRequested());
-              } else {
-                // Use the captured scaffoldMessenger
-                scaffoldMessenger.showSnackBar(
-                  const SnackBar(content: Text('Failed to delete account. Please try again.')),
-                );
-              }
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<AuthBloc>().add(const AuthDeleteAccountRequested());
             },
             child: Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
-  }
-
-  Future<bool> _deleteAccount(String userId, BuildContext context) async {
-    try {
-      final response = await http.delete(
-        Uri.parse('https://getrucky.com/api/users/$userId'),
-      );
-      if (response.statusCode == 200) {
-        return true;
-      }
-      return false;
-    } catch (e) {
-      return false;
-    }
   }
 
   /// Gets the initials from a name
@@ -595,4 +574,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     return initials.toUpperCase();
   }
-} 
+}

@@ -23,7 +23,7 @@ class AppTheme {
         elevation: 4,
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
-        titleTextStyle: AppTextStyles.headline6.copyWith(
+        titleTextStyle: AppTextStyles.titleLarge.copyWith(
           color: AppColors.white,
           fontSize: 20,
         ),
@@ -42,7 +42,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: AppTextStyles.button.copyWith(
+          textStyle: AppTextStyles.labelLarge.copyWith(
             fontFamily: 'Bangers',
             fontSize: 18,
             letterSpacing: 1.2,
@@ -52,7 +52,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.secondary, // Olive green
-          textStyle: AppTextStyles.button,
+          textStyle: AppTextStyles.labelLarge,
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -68,7 +68,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: AppTextStyles.button.copyWith(
+          textStyle: AppTextStyles.labelLarge.copyWith( // Changed from button
             fontFamily: 'Bangers',
             fontSize: 16,
             letterSpacing: 1.0,
@@ -183,9 +183,9 @@ class AppTheme {
       ),
       appBarTheme: AppBarTheme(
         elevation: 4,
-        backgroundColor: AppColors.brown,
+        backgroundColor: AppColors.brown, // Darker brown for dark theme app bar
         foregroundColor: AppColors.textLight,
-        titleTextStyle: AppTextStyles.headline6.copyWith(
+        titleTextStyle: AppTextStyles.titleLarge.copyWith( // Changed from headline6
           color: AppColors.textLight,
           fontSize: 20,
         ),
@@ -204,7 +204,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: AppTextStyles.button.copyWith(
+          textStyle: AppTextStyles.labelLarge.copyWith( // Changed from button
             fontFamily: 'Bangers',
             fontSize: 18,
             letterSpacing: 1.2,
@@ -213,8 +213,8 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.secondaryLight,
-          textStyle: AppTextStyles.button,
+          foregroundColor: AppColors.secondaryLight, // Lighter green for contrast
+          textStyle: AppTextStyles.labelLarge, // Changed from button
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -229,7 +229,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: AppTextStyles.button.copyWith(
+          textStyle: AppTextStyles.labelLarge.copyWith( // Changed from button
             fontFamily: 'Bangers',
             fontSize: 16,
             letterSpacing: 1.0,
@@ -300,19 +300,19 @@ class AppTheme {
   /// Helper to get a text theme with rustic style
   static TextTheme _getTextTheme(Color textColor) {
     return TextTheme(
-      displayLarge: AppTextStyles.headline1.copyWith(color: AppColors.primary),
-      displayMedium: AppTextStyles.headline2.copyWith(color: textColor),
-      displaySmall: AppTextStyles.headline3.copyWith(color: textColor),
-      headlineMedium: AppTextStyles.headline4.copyWith(color: textColor),
-      headlineSmall: AppTextStyles.headline5.copyWith(color: textColor),
-      titleLarge: AppTextStyles.headline6.copyWith(color: AppColors.brown),
-      titleMedium: AppTextStyles.subtitle1.copyWith(color: textColor),
-      titleSmall: AppTextStyles.subtitle2.copyWith(color: textColor),
-      bodyLarge: AppTextStyles.body1.copyWith(color: textColor),
-      bodyMedium: AppTextStyles.body2,
-      labelLarge: AppTextStyles.button.copyWith(color: textColor),
-      bodySmall: AppTextStyles.caption.copyWith(color: textColor),
-      labelSmall: AppTextStyles.overline.copyWith(color: textColor),
+      displayLarge: AppTextStyles.displayLarge.copyWith(color: AppColors.primary), // Was headline1
+      displayMedium: AppTextStyles.displayMedium.copyWith(color: textColor),      // Was headline2
+      displaySmall: AppTextStyles.displaySmall.copyWith(color: textColor),       // Was headline3
+      headlineMedium: AppTextStyles.headlineLarge.copyWith(color: textColor),    // Was headline4 (Note: Mapping MD3 headlineMedium to AppTextStyles.headlineLarge)
+      headlineSmall: AppTextStyles.headlineMedium.copyWith(color: textColor),     // Was headline5 (Note: Mapping MD3 headlineSmall to AppTextStyles.headlineMedium)
+      titleLarge: AppTextStyles.titleLarge.copyWith(color: AppColors.brown), // Was headline6
+      titleMedium: AppTextStyles.titleMedium.copyWith(color: textColor),      // Was subtitle1
+      titleSmall: AppTextStyles.titleSmall.copyWith(color: textColor),       // Was subtitle2
+      bodyLarge: AppTextStyles.bodyLarge.copyWith(color: textColor),          // Was body1
+      bodyMedium: AppTextStyles.bodyMedium.copyWith(color: textColor), // Was body2 (Added copyWith color)
+      labelLarge: AppTextStyles.labelLarge.copyWith(color: textColor),        // Was button
+      bodySmall: AppTextStyles.bodySmall.copyWith(color: textColor),        // Was caption
+      labelSmall: AppTextStyles.labelSmall.copyWith(color: textColor),      // Was overline
     );
   }
 } 

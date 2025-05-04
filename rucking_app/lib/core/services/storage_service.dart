@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 
 /// Interface for storage operations
 abstract class StorageService {
@@ -133,7 +134,7 @@ class StorageServiceImpl implements StorageService {
   
   @override
   Future<String?> getAuthToken() async {
-    return await getSecureString('auth_token');
+    return await getSecureString(AppConfig.tokenKey);
   }
   
   @override

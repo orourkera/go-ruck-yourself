@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Subtitle
                   Text(
                     'Sign in to continue tracking your ruck sessions',
-                    style: AppTextStyles.body2.copyWith(
+                    style: AppTextStyles.bodyMedium.copyWith(
                       color: Theme.of(context).brightness == Brightness.dark
                         ? Colors.white
                         : Colors.green,
@@ -185,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           Text(
                             'Remember me',
-                            style: AppTextStyles.body2,
+                            style: AppTextStyles.bodyMedium,
                           ),
                         ],
                       ),
@@ -201,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                         child: Text(
                           'Forgot password?',
-                          style: AppTextStyles.body2.copyWith(color: AppColors.primary),
+                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primary),
                         ),
                       ),
                     ],
@@ -226,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       Text(
                         "Don't have an account? ",
-                        style: AppTextStyles.body2,
+                        style: AppTextStyles.bodyMedium,
                       ),
                       GestureDetector(
                         onTap: () {

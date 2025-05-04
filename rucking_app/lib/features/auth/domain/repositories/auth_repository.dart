@@ -10,7 +10,7 @@ abstract class AuthRepository {
   
   /// Register a new user
   Future<User> register({
-    required String name,
+    required String username, // This is the display name
     required String email,
     required String password,
     required bool preferMetric,
@@ -28,11 +28,17 @@ abstract class AuthRepository {
   /// Get the current authenticated user
   Future<User?> getCurrentUser();
   
+  /// Refresh the authentication token
+  Future<String?> refreshToken();
+  
   /// Update user profile
   Future<User> updateProfile({
-    String? name,
+    String? username,
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
   });
-} 
+
+  /// Delete the current user's account
+  Future<void> deleteAccount({required String userId});
+}

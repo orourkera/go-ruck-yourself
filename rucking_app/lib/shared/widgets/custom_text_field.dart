@@ -111,7 +111,7 @@ class CustomTextField extends StatelessWidget {
         if (label.isNotEmpty) ...[
           Text(
             label,
-            style: AppTextStyles.subtitle2.copyWith(
+            style: AppTextStyles.titleSmall.copyWith(
               color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
               fontWeight: FontWeight.w500,
             ),
@@ -140,15 +140,15 @@ class CustomTextField extends StatelessWidget {
             fillColor: enabled
                 ? AppColors.surfaceLight
                 : AppColors.greyLight.withOpacity(0.5),
-            errorStyle: AppTextStyles.caption.copyWith(
+            errorStyle: AppTextStyles.bodySmall.copyWith(
               color: AppColors.error,
             ),
-            helperStyle: AppTextStyles.caption,
-            hintStyle: AppTextStyles.body1.copyWith(
+            helperStyle: AppTextStyles.bodySmall,
+            hintStyle: AppTextStyles.bodyLarge.copyWith(
               color: AppColors.textDarkSecondary.withOpacity(0.6),
             ),
           ),
-          style: AppTextStyles.body1,
+          style: AppTextStyles.bodyLarge,
           obscureText: obscureText,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,

@@ -1,6 +1,8 @@
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
+import 'package:rucking_app/core/utils/error_handler.dart';
+import 'dart:convert';
 
 /// Implementation of the AuthRepository interface
 class AuthRepositoryImpl implements AuthRepository {
@@ -15,7 +17,7 @@ class AuthRepositoryImpl implements AuthRepository {
   
   @override
   Future<User> register({
-    required String name,
+    required String username, // This is the display name
     required String email,
     required String password,
     required bool preferMetric,
@@ -24,7 +26,7 @@ class AuthRepositoryImpl implements AuthRepository {
     String? dateOfBirth,
   }) async {
     return await _authService.register(
-      name: name,
+      username: username, // This is the display name
       email: email,
       password: password,
       preferMetric: preferMetric,
@@ -51,16 +53,41 @@ class AuthRepositoryImpl implements AuthRepository {
   
   @override
   Future<User> updateProfile({
-    String? name,
+    String? username,
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
   }) async {
     return await _authService.updateProfile(
-      name: name,
+      username: username,
       weightKg: weightKg,
       heightCm: heightCm,
       preferMetric: preferMetric,
     );
+  }
+
+  @override
+  Future<void> deleteAccount({required String userId}) async {
+    await _authService.deleteAccount(userId: userId);
+  }
+
+  @override
+  Future<String?> refreshToken() async {
+    try {
+      // Call the refreshToken method on AuthService, without passing the refresh token
+      final newToken = await _authService.refreshToken();
+      return newToken;
+    } catch (e) {
+      // Utilize ErrorHandler to get a user-friendly error message
+      final userFriendlyMessage = ErrorHandler.getUserFriendlyMessage(e, 'Token Refresh');
+      // If the error is related to authentication, trigger logout to clear invalid tokens
+      if (e.toString().contains('Unauthorized') || e.toString().contains('401')) {
+        await _authService.signOut();
+        // Log a message indicating manual login is required due to persistent auth issues
+        print('[AUTH] Persistent authentication failure. Manual login required.');
+        print('[AUTH] The refresh token is invalid. Please log in again to obtain a new token.');
+      }
+      throw Exception('Failed to refresh token: $userFriendlyMessage');
+    }
   }
 } 

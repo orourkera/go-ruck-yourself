@@ -224,14 +224,14 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                       const SizedBox(height: 16),
                       Text(
                         'Great job!',
-                        style: AppTextStyles.headline4.copyWith(
+                        style: AppTextStyles.headlineLarge.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'You completed your ruck',
-                        style: AppTextStyles.headline6,
+                        style: AppTextStyles.titleLarge,
                       ),
                     ],
                   ),
@@ -306,7 +306,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 // Rating
                 Text(
                   'How would you rate this session?',
-                  style: AppTextStyles.subtitle1,
+                  style: AppTextStyles.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 Center(
@@ -334,7 +334,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 // Perceived exertion
                 Text(
                   'How difficult was this session? (1-10)',
-                  style: AppTextStyles.subtitle1,
+                  style: AppTextStyles.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 Slider(
@@ -352,8 +352,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Easy', style: AppTextStyles.body2),
-                    Text('Hard', style: AppTextStyles.body2),
+                    Text('Easy', style: AppTextStyles.bodyMedium),
+                    Text('Hard', style: AppTextStyles.bodyMedium),
                   ],
                 ),
                 
@@ -362,7 +362,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 // Tags
                 Text(
                   'Add tags',
-                  style: AppTextStyles.subtitle1,
+                  style: AppTextStyles.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -386,7 +386,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 // Notes
                 Text(
                   'Notes',
-                  style: AppTextStyles.subtitle1,
+                  style: AppTextStyles.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 CustomTextField(
