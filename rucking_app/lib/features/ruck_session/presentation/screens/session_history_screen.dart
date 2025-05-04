@@ -104,18 +104,10 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'No Ruck Sessions Yet',
+              'No rucks yet!!',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Complete your first ruck to see it here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey,
               ),
             ),
             const SizedBox(height: 24),
@@ -127,7 +119,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                 );
               },
               icon: const Icon(Icons.add),
-              label: const Text('Start a New Ruck'),
+              label: const Text('Start New Ruck'),
             ),
           ],
         ),
