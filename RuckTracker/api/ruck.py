@@ -44,6 +44,34 @@ class RuckSessionListResource(Resource):
             logger.error(f"Error fetching ruck sessions: {e}")
             return {'message': f"Error fetching ruck sessions: {str(e)}"}, 500
 
+    def post(self):
+        """Create a new ruck session for the current user"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            data = request.get_json()
+            if not data or 'ruck_weight_kg' not in data:
+                return {'message': 'Missing required data for session creation'}, 400
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            session_data = {
+                'user_id': g.user.id,
+                'ruck_weight_kg': data['ruck_weight_kg'],
+                'status': 'created',
+                'created_at': datetime.now(tz.tzutc()).isoformat()
+            }
+            if 'planned_duration_minutes' in data:
+                session_data['planned_duration_minutes'] = data['planned_duration_minutes']
+            insert_resp = supabase.table('ruck_session') \
+                .insert(session_data) \
+                .execute()
+            if not insert_resp.data:
+                logger.error(f"Failed to create session: {insert_resp.error}")
+                return {'message': 'Failed to create session'}, 500
+            return insert_resp.data[0], 201
+        except Exception as e:
+            logger.error(f"Error creating ruck session: {e}")
+            return {'message': f"Error creating ruck session: {str(e)}"}, 500
+
 class RuckSessionResource(Resource):
     def get(self, ruck_id):
         try:
