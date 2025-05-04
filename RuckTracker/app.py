@@ -200,6 +200,7 @@ def load_user():
                         user_response.user = user_ns
                     g.user = user_response.user
                     logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
+                    logger.info("Token storage code is active")
                     return
                 else:
                     logger.warning("No user found in token validation")
