@@ -33,8 +33,8 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
-import 'package:hive/hive.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import '../../data/heart_rate_sample_storage.dart';
 
 LatLng _getRouteCenter(List locationPoints) {
   if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
@@ -854,10 +854,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   }
 
   Future<void> _initHeartRateBox() async {
-    _hrBox = await Hive.openBox<List>('heart_rate_samples');
-    // Optionally load previous samples for this session
-    final sessionSamples = _hrBox?.get(widget.ruckId) as List<HeartRateSample>?;
-    if (sessionSamples != null) {
+    // Instead of Hive, load samples from SharedPreferences
+    final sessionSamples = await HeartRateSampleStorage.loadSamples();
+    if (sessionSamples.isNotEmpty) {
       setState(() {
         _heartRateSamples = List<HeartRateSample>.from(sessionSamples);
       });
@@ -880,14 +879,12 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   }
 
   Future<void> _saveHrSamples() async {
-    if (_hrBox != null) {
-      await _hrBox!.put(widget.ruckId, _heartRateSamples);
-    }
+    await HeartRateSampleStorage.saveSamples(_heartRateSamples);
   }
 
   Future<void> _finalizeHrSamples() async {
     await _saveHrSamples();
-    await _hrBox?.close();
+    // No box to close with SharedPreferences
   }
 
   @override
