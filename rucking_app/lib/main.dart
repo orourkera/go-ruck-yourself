@@ -9,6 +9,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +30,11 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   
-  runApp(const RuckingApp());
+  runApp(
+    ProviderScope(
+      child: const RuckingApp(),
+    ),
+  );
 }
 
 /// Custom BlocObserver for debugging

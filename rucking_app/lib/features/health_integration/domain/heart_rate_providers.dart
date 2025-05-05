@@ -10,3 +10,9 @@ final heartRateStreamProvider = StreamProvider<HeartRateSample>((ref) {
   final healthService = ref.watch(healthServiceProvider);
   return healthService.heartRateStream;
 });
+
+/// FutureProvider to check if health integration is enabled
+final healthIntegrationEnabledProvider = FutureProvider<bool>((ref) async {
+  final healthService = ref.watch(healthServiceProvider);
+  return await healthService.isHealthIntegrationEnabled();
+});

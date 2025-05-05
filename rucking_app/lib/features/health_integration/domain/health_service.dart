@@ -360,11 +360,11 @@ class HealthService {
   
   /// Update heart rate from Watch (called from native code)
   void updateHeartRate(double heartRate) {
-    // For now, we just log the heart rate
-    // This could be expanded to store the value or send to a health bloc
     AppLogger.info('Received heart rate update from Watch: $heartRate BPM');
-    
-    // In a future version, this could write to Health/HealthKit
-    // Or update a heart rate stream that UI components could listen to
+    // Push to the heart rate stream so UI updates
+    _heartRateController?.add(HeartRateSample(
+      timestamp: DateTime.now(),
+      bpm: heartRate.round(),
+    ));
   }
 }
