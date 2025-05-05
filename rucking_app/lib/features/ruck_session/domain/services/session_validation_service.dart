@@ -14,7 +14,7 @@ class SessionValidationService {
   static const double minMovingSpeedKmh = 0.5; // 0.5 km/h min speed to be considered moving
   static const Duration idleDuration = Duration(minutes: 1); // 1 minute without movement to auto-pause
   static const Duration longIdleDuration = Duration(minutes: 2); // 2 minutes idle to suggest ending session
-  static const double maxPositionJumpMeters = 100.0; // 100 meters max jump in position
+  static const double maxPositionJumpMeters = 20.0; // 20 meters max jump in position
   static const Duration maxPositionJumpDuration = Duration(seconds: 5); // 5 seconds between location points
   static const double minGpsAccuracyMeters = 20.0; // 20 meters minimum GPS accuracy (was 50.0)
   static const double minCaloriesPerHour = 300.0; // 300 calories minimum per hour
