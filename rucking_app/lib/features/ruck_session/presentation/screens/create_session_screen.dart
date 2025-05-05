@@ -232,7 +232,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 ruckWeight: _ruckWeight,
                 displayRuckWeight: _preferMetric ? _ruckWeight : _displayRuckWeight,
                 userWeight: double.parse(_userWeightController.text),
-                plannedDuration: _plannedDuration,
+                plannedDuration: (_plannedDuration != null && _plannedDuration! > 0) ? _plannedDuration : null,
                 preferMetric: _preferMetric,
               ),
             ),
