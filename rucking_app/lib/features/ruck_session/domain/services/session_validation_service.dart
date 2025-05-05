@@ -66,7 +66,8 @@ class SessionValidationService {
 
     // Calculate distance if not provided
     final distance = distanceMeters ?? _calculateDistanceBetweenPoints(point, previousPoint);
-    
+    final duration = point.timestamp.difference(previousPoint.timestamp);
+
     // 1. GPS accuracy check
     if (point.accuracy > minGpsAccuracyMeters) {
       if (_lowGpsStartTime == null) {
@@ -83,7 +84,6 @@ class SessionValidationService {
     }
 
     // 2. Position jump check
-    final duration = point.timestamp.difference(previousPoint.timestamp);
     if (distance > maxPositionJumpMeters && duration < maxPositionJumpDuration) {
       _validationErrorCount++;
       results['isValid'] = false;
@@ -91,10 +91,16 @@ class SessionValidationService {
       return results;
     }
 
-    // 3. Speed check (if speed data is available)
+    // 3. Speed/idle check (robust)
+    double? speedKmh;
     if (point.speed != null) {
-      final speedKmh = point.speed! * 3.6; // Convert m/s to km/h
-      
+      speedKmh = point.speed! * 3.6; // Convert m/s to km/h
+    } else if (duration.inSeconds > 0) {
+      // Fallback: calculate speed from distance/time
+      speedKmh = (distance / duration.inSeconds) * 3.6;
+    }
+
+    if (speedKmh != null) {
       // Check for too-fast movement
       if (speedKmh > maxSpeedKmh) {
         if (_overSpeedStartTime == null) {

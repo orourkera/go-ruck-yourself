@@ -231,11 +231,50 @@ class RuckSessionCompleteResource(Resource):
                 'ended_at': datetime.now(tz.tzutc()).isoformat(),
                 'duration_seconds': duration_seconds
             }
-            # Add optional fields if provided
+            # Add all relevant fields if provided
             if 'distance_meters' in data:
                 update_data['distance_meters'] = data['distance_meters']
+            if 'distance_km' in data:
+                update_data['distance_km'] = data['distance_km']
+            if 'final_distance_km' in data:
+                update_data['final_distance_km'] = data['final_distance_km']
             if 'weight_kg' in data:
                 update_data['weight_kg'] = data['weight_kg']
+            if 'ruck_weight_kg' in data:
+                update_data['ruck_weight_kg'] = data['ruck_weight_kg']
+            if 'calories_burned' in data:
+                update_data['calories_burned'] = data['calories_burned']
+            if 'final_calories_burned' in data:
+                update_data['final_calories_burned'] = data['final_calories_burned']
+            if 'elevation_gain_m' in data:
+                update_data['elevation_gain_m'] = data['elevation_gain_m']
+            if 'elevation_loss_m' in data:
+                update_data['elevation_loss_m'] = data['elevation_loss_m']
+            if 'final_elevation_gain' in data:
+                update_data['final_elevation_gain'] = data['final_elevation_gain']
+            if 'final_elevation_loss' in data:
+                update_data['final_elevation_loss'] = data['final_elevation_loss']
+            if 'completed_at' in data:
+                update_data['completed_at'] = data['completed_at']
+            if 'start_time' in data:
+                update_data['start_time'] = data['start_time']
+            if 'end_time' in data:
+                update_data['end_time'] = data['end_time']
+            if 'final_average_pace' in data:
+                update_data['final_average_pace'] = data['final_average_pace']
+            if 'average_pace' in data:
+                update_data['final_average_pace'] = data['average_pace']
+            if 'rating' in data:
+                update_data['rating'] = data['rating']
+            if 'perceived_exertion' in data:
+                update_data['perceived_exertion'] = data['perceived_exertion']
+            if 'notes' in data:
+                update_data['notes'] = data['notes']
+            if 'tags' in data:
+                update_data['tags'] = data['tags']
+            if 'planned_duration_minutes' in data:
+                update_data['planned_duration_minutes'] = data['planned_duration_minutes']
+            # Continue with update as before
             update_resp = supabase.table('ruck_session') \
                 .update(update_data) \
                 .eq('id', ruck_id) \
