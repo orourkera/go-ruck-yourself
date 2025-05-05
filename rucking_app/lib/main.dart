@@ -9,14 +9,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'features/ruck_session/domain/models/heart_rate_sample.dart';
-import 'features/ruck_session/domain/models/heart_rate_sample_adapter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-  Hive.registerAdapter(HeartRateSampleAdapter());
   // Initialize dependency injection
   await setupServiceLocator();
   // Load environment variables from .env
@@ -33,9 +28,6 @@ void main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
-  // Optionally open the heart rate samples box here, or where needed:
-  // await Hive.openBox<List>('heart_rate_samples');
   
   runApp(const RuckingApp());
 }

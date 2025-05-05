@@ -1,13 +1,6 @@
-import 'package:hive/hive.dart';
-
-part 'heart_rate_sample.g.dart';
-
-@HiveType(typeId: 1)
 class HeartRateSample {
-  @HiveField(0)
   final DateTime timestamp;
 
-  @HiveField(1)
   final int bpm;
 
   HeartRateSample({
