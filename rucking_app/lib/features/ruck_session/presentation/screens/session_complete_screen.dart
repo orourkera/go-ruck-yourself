@@ -290,9 +290,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     ),
                     StatCard(
                       title: 'Ruck Weight',
-                      value: preferMetric
-                          ? widget.ruckWeight.toStringAsFixed(1) + ' kg'
-                          : (widget.ruckWeight).toStringAsFixed(1) + ' lbs',
+                      value: MeasurementUtils.formatWeight(widget.ruckWeight, metric: preferMetric),
                       icon: Icons.fitness_center,
                       color: AppColors.secondary,
                       centerContent: true,
