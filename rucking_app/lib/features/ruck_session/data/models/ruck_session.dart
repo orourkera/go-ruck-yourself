@@ -52,6 +52,12 @@ class RuckSession extends Equatable {
   /// Final average pace of the session (optional)
   final double? finalAveragePace;
   
+  /// Final elevation gain in meters (optional, from backend)
+  final double? finalElevationGain;
+  
+  /// Final elevation loss in meters (optional, from backend)
+  final double? finalElevationLoss;
+  
   const RuckSession({
     required this.id,
     required this.status,
@@ -67,6 +73,8 @@ class RuckSession extends Equatable {
     this.completedAt,
     this.stats,
     this.finalAveragePace,
+    this.finalElevationGain,
+    this.finalElevationLoss,
   });
   
   @override
@@ -85,6 +93,8 @@ class RuckSession extends Equatable {
     completedAt,
     stats,
     finalAveragePace,
+    finalElevationGain,
+    finalElevationLoss,
   ];
   
   /// Create a copy of this RuckSession with some modified fields
@@ -103,6 +113,8 @@ class RuckSession extends Equatable {
     DateTime? completedAt,
     RuckSessionStats? stats,
     double? finalAveragePace,
+    double? finalElevationGain,
+    double? finalElevationLoss,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -119,6 +131,8 @@ class RuckSession extends Equatable {
       completedAt: completedAt ?? this.completedAt,
       stats: stats ?? this.stats,
       finalAveragePace: finalAveragePace ?? this.finalAveragePace,
+      finalElevationGain: finalElevationGain ?? this.finalElevationGain,
+      finalElevationLoss: finalElevationLoss ?? this.finalElevationLoss,
     );
   }
   
@@ -147,6 +161,8 @@ class RuckSession extends Equatable {
           ? RuckSessionStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
       finalAveragePace: (json['final_average_pace'] as num?)?.toDouble(),
+      finalElevationGain: (json['final_elevation_gain'] as num?)?.toDouble(),
+      finalElevationLoss: (json['final_elevation_loss'] as num?)?.toDouble(),
     );
   }
   
@@ -167,6 +183,8 @@ class RuckSession extends Equatable {
       'completed_at': completedAt?.toIso8601String(),
       'stats': stats?.toJson(),
       'final_average_pace': finalAveragePace,
+      'final_elevation_gain': finalElevationGain,
+      'final_elevation_loss': finalElevationLoss,
     };
   }
   
