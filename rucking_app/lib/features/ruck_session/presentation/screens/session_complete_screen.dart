@@ -12,6 +12,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -26,6 +28,7 @@ class SessionCompleteScreen extends StatefulWidget {
   final double elevationLoss;
   final double ruckWeight;
   final String? initialNotes;
+  final List<HeartRateSample>? heartRateSamples;
 
   const SessionCompleteScreen({
     required this.completedAt,
@@ -38,6 +41,7 @@ class SessionCompleteScreen extends StatefulWidget {
     required this.elevationLoss,
     required this.ruckWeight,
     this.initialNotes,
+    this.heartRateSamples,
   }) : super(key: key);
 
   @override
@@ -64,6 +68,22 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   // Form controllers and state
   final TextEditingController _notesController = TextEditingController();
   
+  List<HeartRateSample>? _heartRateSamples;
+  int? _avgHeartRate;
+  int? _maxHeartRate;
+  int? _minHeartRate;
+
+  void setHeartRateSamples(List<HeartRateSample> samples) {
+    setState(() {
+      _heartRateSamples = samples;
+      if (samples.isNotEmpty) {
+        _avgHeartRate = (samples.map((e) => e.bpm).reduce((a, b) => a + b) / samples.length).round();
+        _maxHeartRate = samples.map((e) => e.bpm).reduce((a, b) => a > b ? a : b);
+        _minHeartRate = samples.map((e) => e.bpm).reduce((a, b) => a < b ? a : b);
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +96,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     
     // Populate stats
     // _populateStats(); // This method was empty anyway
+    
+    // --- Heart Rate: get samples from arguments if present
+    if (widget.heartRateSamples != null) {
+      setHeartRateSamples(widget.heartRateSamples!);
+    }
   }
   
   /// Format duration as HH:MM:SS
@@ -188,6 +213,74 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // No need to fetch from API in this case
   }
 
+  Widget _buildHeartRateSection() {
+    if (_heartRateSamples == null || _heartRateSamples!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text('Heart Rate', style: AppTextStyles.titleMedium),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildStatCard('Avg', _avgHeartRate?.toString() ?? '--', 'bpm'),
+            _buildStatCard('Max', _maxHeartRate?.toString() ?? '--', 'bpm'),
+            _buildStatCard('Min', _minHeartRate?.toString() ?? '--', 'bpm'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 120,
+          child: LineChart(_buildHeartRateChart()),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, String unit) {
+    return Card(
+      color: AppColors.primary.withOpacity(0.08),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          children: [
+            Text(label, style: AppTextStyles.bodySmall),
+            Text(value, style: AppTextStyles.headlineMedium),
+            Text(unit, style: AppTextStyles.bodySmall),
+          ],
+        ),
+      ),
+    );
+  }
+
+  LineChartData _buildHeartRateChart() {
+    final spots = _heartRateSamples!.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final bpm = entry.value.bpm;
+      return FlSpot(idx.toDouble(), bpm.toDouble());
+    }).toList();
+    return LineChartData(
+      gridData: FlGridData(show: false),
+      titlesData: FlTitlesData(show: false),
+      borderData: FlBorderData(show: false),
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          color: AppColors.primary,
+          barWidth: 3,
+          dotData: FlDotData(show: false),
+        ),
+      ],
+      minY: _minHeartRate?.toDouble() ?? 0,
+      maxY: _maxHeartRate?.toDouble() ?? 200,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get user measurement preference
@@ -298,6 +391,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     ),
                   ],
                 ),
+                
+                _buildHeartRateSection(),
                 
                 const SizedBox(height: 24),
                 

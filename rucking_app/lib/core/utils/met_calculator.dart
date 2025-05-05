@@ -95,6 +95,39 @@ class MetCalculator {
     return finalMet;
   }
   
+  /// Calculate calories burned using heart rate-based formula (per sample)
+  /// (ACSM/Keytel et al. equations)
+  ///
+  /// Parameters:
+  /// - [samples]: List of heart rate samples (ordered by time)
+  /// - [weightKg]: User's weight in kilograms
+  /// - [age]: User's age in years (default 30)
+  /// - [gender]: 'male' or 'female' (default 'male')
+  /// Returns: Total calories burned using HR-based method
+  static double calculateCaloriesWithHeartRateSamples({
+    required List heartRateSamples,
+    required double weightKg,
+    int age = 30,
+    String gender = 'male',
+  }) {
+    if (heartRateSamples.length < 2) return 0.0;
+    double totalCalories = 0.0;
+    for (int i = 1; i < heartRateSamples.length; i++) {
+      final prev = heartRateSamples[i - 1];
+      final curr = heartRateSamples[i];
+      final durationMinutes = curr.timestamp.difference(prev.timestamp).inSeconds / 60.0;
+      final hr = curr.bpm;
+      double cals;
+      if (gender == 'female') {
+        cals = ((-20.4022 + (0.4472 * hr) - (0.1263 * weightKg) + (0.074 * age)) / 4.184) * durationMinutes;
+      } else {
+        cals = ((-55.0969 + (0.6309 * hr) + (0.1988 * weightKg) + (0.2017 * age)) / 4.184) * durationMinutes;
+      }
+      if (cals > 0) totalCalories += cals;
+    }
+    return totalCalories;
+  }
+  
   /// Convert km/h to mph
   static double kmhToMph(double kmh) {
     return kmh * 0.621371;

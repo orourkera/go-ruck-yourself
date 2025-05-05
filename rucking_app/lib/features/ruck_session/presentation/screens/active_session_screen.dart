@@ -31,6 +31,10 @@ import 'dart:typed_data';
 import 'package:rucking_app/core/error_messages.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
+import 'package:hive/hive.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 
 LatLng _getRouteCenter(List locationPoints) {
   if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
@@ -54,7 +58,7 @@ double _getFitZoom(List locationPoints) {
 }
 
 /// Screen for tracking an active ruck session
-class ActiveSessionScreen extends StatefulWidget {
+class ActiveSessionScreen extends ConsumerStatefulWidget {
   final String ruckId;
   final double ruckWeight;
   final double userWeight;
@@ -78,7 +82,7 @@ class ActiveSessionScreen extends StatefulWidget {
   State<ActiveSessionScreen> createState() => _ActiveSessionScreenState();
 }
 
-class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsBindingObserver {
+class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with WidgetsBindingObserver {
   // Services
   late LocationService _locationService;
   late ApiClient _apiClient;
@@ -129,7 +133,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
   DateTime _startTime = DateTime.now();
 
   // Map controller for centering on user
-  late final MapController _mapController = MapController();
+  late MapController _mapController;
 
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
@@ -137,6 +141,12 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
+
+  static const int _maxHeartRateSamples = 200;
+  static const Duration _hrSaveInterval = Duration(minutes: 3);
+  List<HeartRateSample> _heartRateSamples = [];
+  Timer? _hrSaveTimer;
+  Box? _hrBox;
 
   @override
   void initState() {
@@ -163,7 +173,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _stopwatch = Stopwatch();
     
     // --- MAP AND LOCATION LOAD FIRST ---
-    _mapController = MapController(); // Ensure controller is initialized
     _initLocationTracking(); // Always load map and location as first thing
 
     _distance = 0.0;
@@ -189,6 +198,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
 
     // Load custom marker icon
     _loadCustomMarker();
+
+    _initHeartRateBox();
+    _startHrAutoSave();
   }
 
   void _initializeSessionWeights() {
@@ -208,6 +220,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _stopwatch.stop();
     _stopLocationTracking(); // Explicitly stop location tracking
     _stopHeartRateMonitoring();
+    _hrSaveTimer?.cancel();
+    _finalizeHrSamples();
     super.dispose();
   }
   
@@ -550,7 +564,27 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       // Calculate final values
       final double finalDistanceKm = _distance;
       final String ruckId = widget.ruckId ?? 'temp-id';
-      
+
+      // Prepare heart rate samples for upload
+      final List<Map<String, dynamic>> hrPayload = _heartRateSamples.map((sample) => {
+        "timestamp": sample.timestamp.toIso8601String(),
+        "bpm": sample.bpm,
+      }).toList();
+      try {
+        if (hrPayload.isNotEmpty) {
+          await _apiClient.post('/rucks/${widget.ruckId}/heart_rate', {
+            "samples": hrPayload,
+          });
+        }
+      } catch (e) {
+        AppLogger.error('Failed to upload heart rate samples: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to upload heart rate data.'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+
       // Navigate to SessionCompleteScreen
       Navigator.of(context).pushNamed(
         '/session_complete',
@@ -799,23 +833,66 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
 
   /// Calculate calories based on distance, duration, and weight
   double _calculateCalories() {
-    // MET values (Metabolic Equivalent of Task):
-    // - Walking with weighted backpack (10-20kg): ~7.0 MET
-    // - Walking with very heavy backpack (>20kg): ~8.5 MET
+    // If we have enough heart rate samples, use HR-based calculation
+    if (_heartRateSamples.length > 1) {
+      // TODO: Replace with user's real age/gender if available
+      return MetCalculator.calculateCaloriesWithHeartRateSamples(
+        heartRateSamples: _heartRateSamples,
+        weightKg: widget.userWeight + widget.ruckWeight,
+        age: 30, // Default
+        gender: 'male', // Default
+      );
+    }
+    // Fallback to METs
     double metValue = widget.ruckWeight < 20 ? 7.0 : 8.5;
-    
-    // Calculate calories using the MetCalculator
-    double durationMinutes = _elapsed.inSeconds / 60.0; // Convert seconds to minutes
-    
+    double durationMinutes = _elapsed.inSeconds / 60.0;
     return MetCalculator.calculateCaloriesBurned(
-      weightKg: widget.userWeight + widget.ruckWeight, // Total weight is user + ruck
+      weightKg: widget.userWeight + widget.ruckWeight,
       durationMinutes: durationMinutes,
       metValue: metValue,
     );
   }
 
+  Future<void> _initHeartRateBox() async {
+    _hrBox = await Hive.openBox<List>('heart_rate_samples');
+    // Optionally load previous samples for this session
+    final sessionSamples = _hrBox?.get(widget.ruckId) as List<HeartRateSample>?;
+    if (sessionSamples != null) {
+      setState(() {
+        _heartRateSamples = List<HeartRateSample>.from(sessionSamples);
+      });
+    }
+  }
+
+  void _startHrAutoSave() {
+    _hrSaveTimer?.cancel();
+    _hrSaveTimer = Timer.periodic(_hrSaveInterval, (_) => _saveHrSamples());
+  }
+
+  void _addHeartRateSample(HeartRateSample sample) {
+    setState(() {
+      _heartRateSamples.add(sample);
+      if (_heartRateSamples.length > _maxHeartRateSamples) {
+        _heartRateSamples = _heartRateSamples.sublist(_heartRateSamples.length - _maxHeartRateSamples);
+      }
+    });
+    _saveHrSamples();
+  }
+
+  Future<void> _saveHrSamples() async {
+    if (_hrBox != null) {
+      await _hrBox!.put(widget.ruckId, _heartRateSamples);
+    }
+  }
+
+  Future<void> _finalizeHrSamples() async {
+    await _saveHrSamples();
+    await _hrBox?.close();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final heartRateAsync = ref.watch(heartRateStreamProvider);
     AppLogger.info('ActiveSessionScreen.build: _heartRate=$_heartRate');
     // Format display values
     final String durationDisplay = _formatDuration(_elapsed);
@@ -852,6 +929,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       }
     }
     
+    heartRateAsync.whenData((sample) {
+      if (sample != null) _addHeartRateSample(sample);
+    });
+    
+    Widget heartRateWidget = heartRateAsync.when(
+      data: (sample) => Text('${sample.bpm} bpm', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+      loading: () => const CircularProgressIndicator(),
+      error: (e, st) => const Text('HR error'),
+    );
+    
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
       appBar: AppBar(
@@ -875,6 +962,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       ),
       body: Column(
         children: [
+          SizedBox(height: 16),
+          heartRateWidget,
           // Map section
           Expanded(
             flex: 2,

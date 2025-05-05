@@ -63,6 +63,9 @@ class RuckSession(db.Model):
     # Relationship with session review
     review = db.relationship('SessionReview', uselist=False, back_populates='session')
     
+    # Relationship with heart rate samples
+    heart_rate_samples = db.relationship('HeartRateSample', backref='session', lazy='dynamic', cascade='all, delete-orphan')
+    
     def to_dict(self, include_points=False):
         """Convert session data to dictionary for API responses"""
         result = {
@@ -85,6 +88,7 @@ class RuckSession(db.Model):
         
         if include_points:
             result['location_points'] = [point.to_dict() for point in self.location_points]
+            result['heart_rate_samples'] = [sample.to_dict() for sample in self.heart_rate_samples]
             
         return result
 
@@ -111,6 +115,22 @@ class LocationPoint(db.Model):
             'longitude': self.longitude,
             'altitude': self.altitude,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
+        }
+
+
+class HeartRateSample(db.Model):
+    """Model for storing heart rate samples for a rucking session"""
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.Integer, db.ForeignKey('ruck_session.id', ondelete='CASCADE'), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    bpm = db.Column(db.Integer, nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'session_id': self.session_id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'bpm': self.bpm,
         }
 
 

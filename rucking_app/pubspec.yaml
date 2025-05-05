@@ -44,6 +44,8 @@ dependencies:
   flutter_secure_storage: ^10.0.0-beta.4
   sqflite: ^2.3.0
   path: ^1.8.3
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
   
   # Location and Maps
   geolocator: ^14.0.0
@@ -73,7 +75,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  build_runner: ^2.4.15
+  build_runner: ^2.4.7
+  hive_generator: ^1.1.3
   mockito: ^5.4.2
   flutter_launcher_icons: ^0.14.3
   pigeon: ^25.3.1
