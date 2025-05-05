@@ -203,10 +203,24 @@ class RuckSession extends Equatable {
       if (value is String) return num.tryParse(value);
       return null;
     }
-    
+
+    // Robustly parse ruckId as String regardless of int/String/null
+    String? ruckId;
+    var rawId = json['id'] ?? json['ruck_id'];
+    if (rawId != null) {
+      ruckId = rawId.toString();
+    }
+
+    // Robustly parse userId as String regardless of int/String/null
+    String userId = '';
+    var rawUserId = json['user_id'];
+    if (rawUserId != null) {
+      userId = rawUserId.toString();
+    }
+
     return RuckSession(
-      ruckId: json['id'] as String? ?? json['ruck_id'] as String?, // Allow both 'id' and 'ruck_id'
-      userId: json['user_id'] as String,
+      ruckId: ruckId,
+      userId: userId,
       status: RuckSessionStatus.fromString(json['status'] as String),
       ruckWeightKg: (safeParseNum(json['ruck_weight_kg']) ?? 0).toDouble(),
       userWeightKg: safeParseNum(json['user_weight_kg'])?.toDouble(),
@@ -232,7 +246,7 @@ class RuckSession extends Equatable {
           ? SessionReview.fromJson(json['review'] as Map<String, dynamic>) 
           : null,
       tags: json['tags'] != null && json['tags'] is List 
-          ? (json['tags'] as List<dynamic>).map((e) => e as String).toList() 
+          ? (json['tags'] as List<dynamic>).map((e) => e.toString()).toList() 
           : const <String>[],
     );
   }

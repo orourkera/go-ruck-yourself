@@ -1,60 +1,3 @@
-import 'dart:async';
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:get_it/get_it.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:rucking_app/core/models/location_point.dart';
-import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/services/location_service.dart';
-import 'package:rucking_app/core/utils/met_calculator.dart';
-import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
-import 'package:rucking_app/features/health_integration/domain/health_service.dart';
-import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
-import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
-import 'package:rucking_app/shared/theme/app_colors.dart';
-import 'package:rucking_app/shared/theme/app_text_styles.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:intl/intl.dart';
-import 'package:rucking_app/core/api/api_exceptions.dart';
-import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
-import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/core/config/app_config.dart';
-import 'package:rucking_app/core/utils/measurement_utils.dart';
-import 'dart:ui' as ui;
-import 'dart:typed_data';
-import 'package:rucking_app/core/error_messages.dart';
-import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/core/utils/error_handler.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
-
-LatLng _getRouteCenter(List locationPoints) {
-  if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
-  double avgLat = locationPoints.map((p) => p.latitude).reduce((a, b) => a + b) / locationPoints.length;
-  double avgLng = locationPoints.map((p) => p.longitude).reduce((a, b) => a + b) / locationPoints.length;
-  return LatLng(avgLat, avgLng);
-}
-
-double _getFitZoom(List locationPoints) {
-  if (locationPoints.length < 2) return 15.5;
-  final points = locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList();
-  final bounds = LatLngBounds.fromPoints(points);
-  final latDiff = (bounds.north - bounds.south).abs();
-  final lngDiff = (bounds.east - bounds.west).abs();
-  final maxDiff = [latDiff, lngDiff].reduce((a, b) => a > b ? a : b);
-  if (maxDiff < 0.001) return 17.0;
-  if (maxDiff < 0.01) return 15.0;
-  if (maxDiff < 0.05) return 13.0;
-  if (maxDiff < 0.1) return 11.0;
-  return 9.0;
-}
-
 /// Screen for tracking an active ruck session
 class ActiveSessionScreen extends ConsumerStatefulWidget {
   final String ruckId;
@@ -133,6 +76,8 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   // Map controller for centering on user
   final MapController _mapController = MapController();
 
+  bool _showHeartRate = false;
+
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -190,8 +135,22 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
 
     // Load custom marker icon
     _loadCustomMarker();
-  }
 
+    // Check if health integration is enabled and authorized
+    _healthService.isHealthIntegrationEnabled().then((enabled) async {
+      if (enabled) {
+        final authorized = await _healthService.requestAuthorization();
+        setState(() {
+          _showHeartRate = authorized;
+        });
+      } else {
+        setState(() {
+          _showHeartRate = false;
+        });
+      }
+    });
+  }
+  
   void _initializeSessionWeights() {
     // Start session in BLoC with weights
     context.read<ActiveSessionBloc>().add(
@@ -941,139 +900,29 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                           ),
                         ],
                       )
-                    : const Center(
-                        child: Text(
-                          'Start moving to see your route...',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
+                    : const Center(child: CircularProgressIndicator()),
               ),
             ),
           ),
           // Heart rate and timer row
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12.0),
-            child: Row(
-              children: [
-                // Left column: timer, weight, remaining
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        _formatDuration(_elapsed),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Bangers',
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _getDisplayWeight(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Bangers',
-                          fontSize: 18,
-                          color: Colors.grey[900],
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'REMAINING: ${_formatDuration(_getRemainingTime())}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Bangers',
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Right column: heart rate
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.favorite, color: Colors.pink, size: 40),
-                          const SizedBox(width: 8),
-                          heartRateAsync.when(
-                            data: (sample) {
-                              AppLogger.info('Heart rate stream data: $sample');
-                              return Text(
-                                (sample != null && sample.bpm != null) ? '${sample.bpm}' : '--',
-                                style: TextStyle(
-                                  fontFamily: 'Bangers',
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
-                              );
-                            },
-                            loading: () => Text(
-                              '--',
-                              style: TextStyle(
-                                fontFamily: 'Bangers',
-                                fontSize: 48,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            error: (e, st) => Text(
-                              '--',
-                              style: TextStyle(
-                                fontFamily: 'Bangers',
-                                fontSize: 48,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'BPM',
-                        style: TextStyle(
-                          fontFamily: 'Bangers',
-                          fontSize: 22,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Validation message
-          if (_showValidationMessage && _validationMessage != null)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
-              ),
+          if (_showHeartRate) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  Icon(Icons.favorite, color: AppColors.error, size: 28),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _validationMessage!,
-                      style: const TextStyle(color: Colors.deepOrange),
-                    ),
+                  Text(
+                    _heartRate != null ? '${_heartRate!.round()}' : '--',
+                    style: AppTextStyles.displayLarge.copyWith(fontFamily: 'Bangers'),
                   ),
+                  const SizedBox(width: 4),
+                  Text('bpm', style: AppTextStyles.labelLarge),
                 ],
               ),
             ),
+          ],
           // Stats section
           Expanded(
             flex: 2,
@@ -1106,22 +955,20 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                                     ],
                                   ),
                                   SizedBox(height: 8),
-                                  Text(
-                                    distanceDisplay != null
-                                        ? distanceDisplay
-                                        : '',
-                                    style: AppTextStyles.headlineMedium.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark 
-                                          ? AppColors.primaryLight 
-                                          : null,
-                                    ),
-                                  ),
-                                  if (distanceDisplay == null)
-                                    SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
-                                    ),
+                                  distanceDisplay != null
+                                    ? Text(
+                                        distanceDisplay,
+                                        style: AppTextStyles.headlineMedium.copyWith(
+                                          color: Theme.of(context).brightness == Brightness.dark 
+                                              ? AppColors.primaryLight 
+                                              : null,
+                                        ),
+                                      )
+                                    : SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
+                                      ),
                                 ],
                               ),
                             ),
@@ -1149,22 +996,20 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                                     ],
                                   ),
                                   SizedBox(height: 8),
-                                  Text(
-                                    paceDisplay != null
-                                        ? paceDisplay
-                                        : '',
-                                    style: AppTextStyles.headlineMedium.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark 
-                                          ? AppColors.success 
-                                          : null,
-                                    ),
-                                  ),
-                                  if (paceDisplay == null)
-                                    SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
-                                    ),
+                                  paceDisplay != null
+                                    ? Text(
+                                        paceDisplay,
+                                        style: AppTextStyles.headlineMedium.copyWith(
+                                          color: Theme.of(context).brightness == Brightness.dark 
+                                              ? AppColors.success 
+                                              : null,
+                                        ),
+                                      )
+                                    : SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
+                                      ),
                                 ],
                               ),
                             ),
@@ -1199,12 +1044,12 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                                     ],
                                   ),
                                   SizedBox(height: 8),
-                                  caloriesDisplay != null
+                                  _caloriesBurned > 0
                                     ? Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Text(
-                                            caloriesDisplay,
+                                            _caloriesBurned.toStringAsFixed(0),
                                             style: AppTextStyles.headlineMedium.copyWith(
                                               color: Theme.of(context).brightness == Brightness.dark 
                                                   ? AppColors.warning 
@@ -1225,7 +1070,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                                     : SizedBox(
                                         height: 20,
                                         width: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.success)),
+                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.warning)),
                                       ),
                                 ],
                               ),
@@ -1254,9 +1099,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                                     ],
                                   ),
                                   SizedBox(height: 8),
-                                  elevationDisplay != '+0/-0'
+                                  (_elevationGain > 0 || _elevationLoss > 0)
                                     ? Text(
-                                        elevationDisplay,
+                                        '+${_elevationGain.toStringAsFixed(0)}/${_elevationLoss.toStringAsFixed(0)}',
                                         style: AppTextStyles.headlineMedium.copyWith(
                                           color: Theme.of(context).brightness == Brightness.dark 
                                               ? AppColors.primaryLight 

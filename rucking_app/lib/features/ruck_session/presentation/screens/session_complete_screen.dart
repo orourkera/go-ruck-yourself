@@ -389,10 +389,31 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                       centerContent: true,
                       valueFontSize: 36,
                     ),
+                    // Heart Rate summary (if available)
+                    if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty) ...[
+                      StatCard(
+                        title: 'Avg HR',
+                        value: _avgHeartRate?.toString() ?? '--',
+                        icon: Icons.favorite,
+                        color: AppColors.error,
+                        centerContent: true,
+                        valueFontSize: 36,
+                      ),
+                      StatCard(
+                        title: 'Max HR',
+                        value: _maxHeartRate?.toString() ?? '--',
+                        icon: Icons.favorite_border,
+                        color: AppColors.error,
+                        centerContent: true,
+                        valueFontSize: 36,
+                      ),
+                    ],
                   ],
                 ),
                 
-                _buildHeartRateSection(),
+                // Insert Heart Rate Section after summary stats
+                if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty)
+                  _buildHeartRateSection(),
                 
                 const SizedBox(height: 24),
                 

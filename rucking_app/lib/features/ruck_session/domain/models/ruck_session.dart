@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 
 /// Enum representing the status of a ruck session
 enum RuckStatus {
