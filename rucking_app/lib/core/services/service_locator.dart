@@ -68,7 +68,7 @@ Future<void> setupServiceLocator() async {
 Dio _configureDio() {
   final Dio dio = Dio(
     BaseOptions(
-      baseUrl: 'https://getrucky.com/api', // Use production API
+      baseUrl: AppConfig.apiBaseUrl, // Use AppConfig for environment switching
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       sendTimeout: const Duration(seconds: 10),
