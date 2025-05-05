@@ -1,7 +1,7 @@
 /// Application configuration constants
 class AppConfig {
   // API configuration
-  static const String apiBaseUrl = 'https://go-ruck-yourself-3ac314790ae6.herokuapp.com/api';
+  static const String apiBaseUrl = 'https://get-rucky-staging-a362104b0255.herokuapp.com/api';
   static const int apiTimeout = 30; // seconds
   
   // App information

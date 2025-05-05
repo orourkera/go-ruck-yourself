@@ -63,7 +63,7 @@ class TermsOfServiceScreen extends StatelessWidget {
             ),
              _buildSection(
               '5. Location & Health Data',
-              'The App uses GPS data (with your permission) and personal metrics (such as height, weight, and age) to calculate calories burned and track ruck sessions. This data is used in accordance with our Privacy Policy.\n\nThe App is not a medical tool and does not provide medical advice. Always consult a qualified healthcare provider before starting any new fitness routine.',
+              'The App uses GPS data (with your permission) and personal metrics (such as height, weight, and age) to calculate calories burned and track ruck sessions. If you enable Health integration, the App will also access your heart rate data to provide real-time feedback, more accurate calorie estimation, and post-session analytics (average, max, min heart rate).\n\nHeart rate data is stored locally on your device and is never sold or used for advertising. It is not shared with third parties unless you enable cloud sync or backup. All health data access is subject to your explicit consent and can be revoked at any time in your device settings.\n\nThe App is not a medical tool and does not provide medical advice. Always consult a qualified healthcare provider before starting any new fitness routine.',
               context,
             ),
              _buildSection(
