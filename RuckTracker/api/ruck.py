@@ -269,11 +269,10 @@ class RuckSessionCompleteResource(Resource):
                 update_data['start_time'] = data['start_time']
             if 'end_time' in data:
                 update_data['end_time'] = data['end_time']
-            # Set calculated pace, allow client override if provided
             if 'final_average_pace' in data:
                 update_data['final_average_pace'] = data['final_average_pace']
-            elif final_average_pace is not None:
-                update_data['final_average_pace'] = final_average_pace
+            if 'average_pace' in data:
+                update_data['final_average_pace'] = data['average_pace']
             if 'rating' in data:
                 update_data['rating'] = data['rating']
             if 'perceived_exertion' in data:
