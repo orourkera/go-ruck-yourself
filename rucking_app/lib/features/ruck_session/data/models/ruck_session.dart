@@ -49,6 +49,9 @@ class RuckSession extends Equatable {
   /// Session statistics
   final RuckSessionStats? stats;
   
+  /// Final average pace of the session (optional)
+  final double? finalAveragePace;
+  
   const RuckSession({
     required this.id,
     required this.status,
@@ -63,6 +66,7 @@ class RuckSession extends Equatable {
     this.startedAt,
     this.completedAt,
     this.stats,
+    this.finalAveragePace,
   });
   
   @override
@@ -80,6 +84,7 @@ class RuckSession extends Equatable {
     startedAt,
     completedAt,
     stats,
+    finalAveragePace,
   ];
   
   /// Create a copy of this RuckSession with some modified fields
@@ -97,6 +102,7 @@ class RuckSession extends Equatable {
     DateTime? startedAt,
     DateTime? completedAt,
     RuckSessionStats? stats,
+    double? finalAveragePace,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -112,6 +118,7 @@ class RuckSession extends Equatable {
       startedAt: startedAt ?? this.startedAt,
       completedAt: completedAt ?? this.completedAt,
       stats: stats ?? this.stats,
+      finalAveragePace: finalAveragePace ?? this.finalAveragePace,
     );
   }
   
@@ -139,6 +146,7 @@ class RuckSession extends Equatable {
       stats: json['stats'] != null 
           ? RuckSessionStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
+      finalAveragePace: (json['final_average_pace'] as num?)?.toDouble(),
     );
   }
   
@@ -158,6 +166,7 @@ class RuckSession extends Equatable {
       'started_at': startedAt?.toIso8601String(),
       'completed_at': completedAt?.toIso8601String(),
       'stats': stats?.toJson(),
+      'final_average_pace': finalAveragePace,
     };
   }
   
