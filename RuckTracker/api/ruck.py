@@ -224,6 +224,16 @@ class RuckSessionCompleteResource(Resource):
                     duration_seconds = 0
             else:
                 duration_seconds = 0
+            # Calculate pace if possible
+            distance_km = None
+            if 'final_distance_km' in data and data['final_distance_km']:
+                distance_km = data['final_distance_km']
+            elif 'distance_km' in data and data['distance_km']:
+                distance_km = data['distance_km']
+            # Only calculate if both duration and distance are valid
+            final_average_pace = None
+            if distance_km and distance_km > 0 and duration_seconds > 0:
+                final_average_pace = duration_seconds / distance_km  # seconds per km
             # Update session status to completed with end data
             update_data = {
                 'status': 'completed',
@@ -259,10 +269,11 @@ class RuckSessionCompleteResource(Resource):
                 update_data['start_time'] = data['start_time']
             if 'end_time' in data:
                 update_data['end_time'] = data['end_time']
+            # Set calculated pace, allow client override if provided
             if 'final_average_pace' in data:
                 update_data['final_average_pace'] = data['final_average_pace']
-            if 'average_pace' in data:
-                update_data['final_average_pace'] = data['average_pace']
+            elif final_average_pace is not None:
+                update_data['final_average_pace'] = final_average_pace
             if 'rating' in data:
                 update_data['rating'] = data['rating']
             if 'perceived_exertion' in data:

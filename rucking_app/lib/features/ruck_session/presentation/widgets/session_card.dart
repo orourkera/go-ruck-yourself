@@ -45,6 +45,11 @@ class SessionCard extends StatelessWidget {
       session.ruckWeightKg, 
       metric: preferMetric
     );
+    
+    // Format elevation gain/loss
+    final elevationGain = session.elevationGain;
+    final elevationLoss = session.elevationLoss;
+    final elevationDisplay = '${elevationGain.toStringAsFixed(0)}↑ / ${elevationLoss.toStringAsFixed(0)}↓ m';
       
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -95,6 +100,18 @@ class SessionCard extends StatelessWidget {
                       calories,
                     ),
                   ),
+                  Expanded(
+                    child: _buildSessionStat(
+                      Icons.terrain,
+                      'Elevation',
+                      elevationDisplay,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
                   Expanded(
                     child: _buildSessionStat(
                       Icons.fitness_center,
