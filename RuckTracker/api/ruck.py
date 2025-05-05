@@ -16,10 +16,13 @@ class RuckSessionListResource(Resource):
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            limit = request.args.get('limit', type=int) or 3
             response = supabase.table('ruck_session') \
                 .select('*') \
                 .eq('user_id', g.user.id) \
-                .order('created_at', desc=True) \
+                .eq('status', 'completed') \
+                .order('completed_at', desc=True) \
+                .limit(limit) \
                 .execute()
             sessions = response.data
             if sessions is None:
@@ -35,10 +38,6 @@ class RuckSessionListResource(Resource):
                     session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
                 else:
                     session['route'] = []
-            # Get limit from query params, if provided
-            limit = request.args.get('limit', type=int)
-            if limit is not None:
-                sessions = sessions[:limit]
             return {'sessions': sessions}, 200
         except Exception as e:
             logger.error(f"Error fetching ruck sessions: {e}")
