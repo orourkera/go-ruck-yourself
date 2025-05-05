@@ -597,6 +597,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                       options: MapOptions(
                                         initialCenter: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
                                         initialZoom: routePoints.length > 1 ? _getFitZoom(routePoints) : 15.5,
+                                        bounds: routePoints.length > 1 ? LatLngBounds.fromPoints(routePoints) : null,
+                                        boundsOptions: const FitBoundsOptions(padding: EdgeInsets.all(24)),
                                         interactionOptions: const InteractionOptions(
                                           flags: InteractiveFlag.none, // Disable interactions for preview
                                         ),
