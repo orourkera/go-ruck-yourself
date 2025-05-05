@@ -27,6 +27,10 @@ class RuckSession {
   final List<Map<String, dynamic>>? locationPoints;
   final double? finalElevationGain;
   final double? finalElevationLoss;
+  final List<HeartRateSample>? heartRateSamples;
+  final int? avgHeartRate;
+  final int? maxHeartRate;
+  final int? minHeartRate;
 
   RuckSession({
     this.id,
@@ -45,6 +49,10 @@ class RuckSession {
     this.locationPoints,
     this.finalElevationGain,
     this.finalElevationLoss,
+    this.heartRateSamples,
+    this.avgHeartRate,
+    this.maxHeartRate,
+    this.minHeartRate,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -139,6 +147,14 @@ class RuckSession {
             (json['location_points'] as List).cast<Map<String, dynamic>>() : null,
         finalElevationGain: (json['final_elevation_gain'] as num?)?.toDouble(),
         finalElevationLoss: (json['final_elevation_loss'] as num?)?.toDouble(),
+        heartRateSamples: json['heart_rate_samples'] != null
+            ? (json['heart_rate_samples'] as List)
+                .map((e) => HeartRateSample.fromJson(e as Map<String, dynamic>))
+                .toList()
+            : null,
+        avgHeartRate: json['avg_heart_rate'] as int?,
+        maxHeartRate: json['max_heart_rate'] as int?,
+        minHeartRate: json['min_heart_rate'] as int?,
       );
     } catch (e) {
       AppLogger.error('Error parsing RuckSession from JSON: $e');
@@ -160,6 +176,10 @@ class RuckSession {
         locationPoints: null,
         finalElevationGain: null,
         finalElevationLoss: null,
+        heartRateSamples: null,
+        avgHeartRate: null,
+        maxHeartRate: null,
+        minHeartRate: null,
       );
     }
   }
@@ -200,6 +220,10 @@ class RuckSession {
       'location_points': locationPoints,
       'final_elevation_gain': finalElevationGain,
       'final_elevation_loss': finalElevationLoss,
+      'heart_rate_samples': heartRateSamples?.map((e) => e.toJson()).toList(),
+      'avg_heart_rate': avgHeartRate,
+      'max_heart_rate': maxHeartRate,
+      'min_heart_rate': minHeartRate,
     };
   }
 }

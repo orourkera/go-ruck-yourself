@@ -333,3 +333,29 @@ class RuckSessionLocationResource(Resource):
         except Exception as e:
             logger.error(f"Error adding location point for ruck session {ruck_id}: {e}")
             return {'message': f"Error adding location point: {str(e)}"}, 500
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from ..models import db, RuckSession, HeartRateSample
+from .schemas import HeartRateSampleIn
+from ..dependencies import get_db
+
+router = APIRouter()
+
+@router.post('/rucks/{session_id}/heart_rate')
+def upload_heart_rate(session_id: int, samples: List[HeartRateSampleIn], db: Session = Depends(get_db)):
+    session = db.query(RuckSession).filter_by(id=session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail='Session not found')
+    db_objs = [
+        HeartRateSample(
+            session_id=session_id,
+            timestamp=sample.timestamp,
+            bpm=sample.bpm
+        )
+        for sample in samples
+    ]
+    db.add_all(db_objs)
+    db.commit()
+    return {"status": "ok"}

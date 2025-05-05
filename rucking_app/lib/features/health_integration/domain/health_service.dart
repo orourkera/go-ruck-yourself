@@ -4,6 +4,8 @@ import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
+import 'dart:async';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 
 /// Implementation of health service using the health package
 class HealthService {
@@ -17,6 +19,36 @@ class HealthService {
   static const String _isHealthIntegrationEnabledKeyBase = 'health_integration_enabled';
   static const String _hasAppleWatchKeyBase = 'has_apple_watch';
   
+  // --- Heart Rate Streaming ---
+  StreamController<HeartRateSample>? _heartRateController;
+  Timer? _heartRateTimer;
+
+  /// Expose a stream of live heart rate samples (every 5 seconds)
+  Stream<HeartRateSample> get heartRateStream {
+    _heartRateController ??= StreamController<HeartRateSample>.broadcast(
+      onListen: _startHeartRatePolling,
+      onCancel: _stopHeartRatePolling,
+    );
+    return _heartRateController!.stream;
+  }
+
+  void _startHeartRatePolling() {
+    _heartRateTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      final hr = await getHeartRate();
+      if (hr != null) {
+        _heartRateController?.add(HeartRateSample(
+          timestamp: DateTime.now(),
+          bpm: hr.round(),
+        ));
+      }
+    });
+  }
+
+  void _stopHeartRatePolling() {
+    _heartRateTimer?.cancel();
+    _heartRateTimer = null;
+  }
+
   // Set the current user ID to make settings user-specific
   void setUserId(String userId) {
     _userId = userId;

@@ -1,4 +1,6 @@
 from marshmallow import Schema, fields, validate
+from datetime import datetime
+from pydantic import BaseModel
 
 class UserSchema(Schema):
     """Schema for validating user data"""
@@ -96,6 +98,10 @@ class AppleHealthStatusSchema(Schema):
     integration_enabled = fields.Bool(required=True)
     metrics_to_sync = fields.List(fields.Str(), validate=validate.ContainsOnly(['workouts', 'distance', 'elevation']))
     last_sync_time = fields.DateTime(allow_none=True)
+
+class HeartRateSampleIn(BaseModel):
+    timestamp: datetime
+    bpm: int
 
 # Create schema instances
 apple_health_sync_schema = AppleHealthSyncSchema()
