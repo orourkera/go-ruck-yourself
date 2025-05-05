@@ -33,8 +33,6 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
-import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
-import '../../data/heart_rate_sample_storage.dart';
 
 LatLng _getRouteCenter(List locationPoints) {
   if (locationPoints.isEmpty) return LatLng(40.421, -3.678);
@@ -79,7 +77,7 @@ class ActiveSessionScreen extends ConsumerStatefulWidget {
   }) : super(key: key);
 
   @override
-  State<ActiveSessionScreen> createState() => _ActiveSessionScreenState();
+  ConsumerState<ActiveSessionScreen> createState() => _ActiveSessionScreenState();
 }
 
 class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with WidgetsBindingObserver {
@@ -133,7 +131,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   DateTime _startTime = DateTime.now();
 
   // Map controller for centering on user
-  late MapController _mapController;
+  final MapController _mapController = MapController();
 
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
@@ -141,12 +139,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
-
-  static const int _maxHeartRateSamples = 200;
-  static const Duration _hrSaveInterval = Duration(minutes: 3);
-  List<HeartRateSample> _heartRateSamples = [];
-  Timer? _hrSaveTimer;
-  Box? _hrBox;
 
   @override
   void initState() {
@@ -198,9 +190,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
 
     // Load custom marker icon
     _loadCustomMarker();
-
-    _initHeartRateBox();
-    _startHrAutoSave();
   }
 
   void _initializeSessionWeights() {
@@ -220,8 +209,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     _stopwatch.stop();
     _stopLocationTracking(); // Explicitly stop location tracking
     _stopHeartRateMonitoring();
-    _hrSaveTimer?.cancel();
-    _finalizeHrSamples();
     super.dispose();
   }
   
@@ -564,27 +551,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       // Calculate final values
       final double finalDistanceKm = _distance;
       final String ruckId = widget.ruckId ?? 'temp-id';
-
-      // Prepare heart rate samples for upload
-      final List<Map<String, dynamic>> hrPayload = _heartRateSamples.map((sample) => {
-        "timestamp": sample.timestamp.toIso8601String(),
-        "bpm": sample.bpm,
-      }).toList();
-      try {
-        if (hrPayload.isNotEmpty) {
-          await _apiClient.post('/rucks/${widget.ruckId}/heart_rate', {
-            "samples": hrPayload,
-          });
-        }
-      } catch (e) {
-        AppLogger.error('Failed to upload heart rate samples: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to upload heart rate data.'), backgroundColor: AppColors.error),
-          );
-        }
-      }
-
+      
       // Navigate to SessionCompleteScreen
       Navigator.of(context).pushNamed(
         '/session_complete',
@@ -833,58 +800,27 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
 
   /// Calculate calories based on distance, duration, and weight
   double _calculateCalories() {
-    // If we have enough heart rate samples, use HR-based calculation
-    if (_heartRateSamples.length > 1) {
-      // TODO: Replace with user's real age/gender if available
-      return MetCalculator.calculateCaloriesWithHeartRateSamples(
-        heartRateSamples: _heartRateSamples,
-        weightKg: widget.userWeight + widget.ruckWeight,
-        age: 30, // Default
-        gender: 'male', // Default
-      );
-    }
-    // Fallback to METs
+    // MET values (Metabolic Equivalent of Task):
+    // - Walking with weighted backpack (10-20kg): ~7.0 MET
+    // - Walking with very heavy backpack (>20kg): ~8.5 MET
     double metValue = widget.ruckWeight < 20 ? 7.0 : 8.5;
-    double durationMinutes = _elapsed.inSeconds / 60.0;
+    
+    // Calculate calories using the MetCalculator
+    double durationMinutes = _elapsed.inSeconds / 60.0; // Convert seconds to minutes
+    
     return MetCalculator.calculateCaloriesBurned(
-      weightKg: widget.userWeight + widget.ruckWeight,
+      weightKg: widget.userWeight + widget.ruckWeight, // Total weight is user + ruck
       durationMinutes: durationMinutes,
       metValue: metValue,
     );
   }
 
-  Future<void> _initHeartRateBox() async {
-    // Instead of Hive, load samples from SharedPreferences
-    final sessionSamples = await HeartRateSampleStorage.loadSamples();
-    if (sessionSamples.isNotEmpty) {
-      setState(() {
-        _heartRateSamples = List<HeartRateSample>.from(sessionSamples);
-      });
-    }
-  }
-
-  void _startHrAutoSave() {
-    _hrSaveTimer?.cancel();
-    _hrSaveTimer = Timer.periodic(_hrSaveInterval, (_) => _saveHrSamples());
-  }
-
-  void _addHeartRateSample(HeartRateSample sample) {
-    setState(() {
-      _heartRateSamples.add(sample);
-      if (_heartRateSamples.length > _maxHeartRateSamples) {
-        _heartRateSamples = _heartRateSamples.sublist(_heartRateSamples.length - _maxHeartRateSamples);
-      }
-    });
-    _saveHrSamples();
-  }
-
-  Future<void> _saveHrSamples() async {
-    await HeartRateSampleStorage.saveSamples(_heartRateSamples);
-  }
-
-  Future<void> _finalizeHrSamples() async {
-    await _saveHrSamples();
-    // No box to close with SharedPreferences
+  /// Helper to get remaining time for planned session
+  Duration _getRemainingTime() {
+    if (widget.plannedDuration == null) return Duration.zero;
+    final totalSeconds = widget.plannedDuration! * 60;
+    final remaining = Duration(seconds: totalSeconds - _elapsed.inSeconds);
+    return remaining > Duration.zero ? remaining : Duration.zero;
   }
 
   @override
@@ -926,16 +862,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       }
     }
     
-    heartRateAsync.whenData((sample) {
-      if (sample != null) _addHeartRateSample(sample);
-    });
-    
-    Widget heartRateWidget = heartRateAsync.when(
-      data: (sample) => Text('${sample.bpm} bpm', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-      loading: () => const CircularProgressIndicator(),
-      error: (e, st) => const Text('HR error'),
-    );
-    
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
       appBar: AppBar(
@@ -959,8 +885,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       ),
       body: Column(
         children: [
-          SizedBox(height: 16),
-          heartRateWidget,
           // Map section
           Expanded(
             flex: 2,
@@ -1026,7 +950,106 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
               ),
             ),
           ),
-          
+          // Heart rate and timer row
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Timer/weight/remaining column
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        _formatDuration(_elapsed),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Bangers',
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _getDisplayWeight(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Bangers',
+                          fontSize: 18,
+                          color: Colors.grey[900],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Remaining: ${_formatDuration(_getRemainingTime())}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Bangers',
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 28),
+                // Heart rate column
+                Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.favorite, color: Colors.pink, size: 40),
+                        const SizedBox(width: 8),
+                        heartRateAsync.when(
+                          data: (sample) {
+                            AppLogger.info('Heart rate stream data: $sample');
+                            return Text(
+                              (sample != null && sample.bpm != null) ? '${sample.bpm}' : '--',
+                              style: TextStyle(
+                                fontFamily: 'Bangers',
+                                fontSize: 48,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            );
+                          },
+                          loading: () => Text(
+                            '--',
+                            style: TextStyle(
+                              fontFamily: 'Bangers',
+                              fontSize: 48,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          error: (e, st) => Text(
+                            '--',
+                            style: TextStyle(
+                              fontFamily: 'Bangers',
+                              fontSize: 48,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'bpm',
+                      style: TextStyle(
+                        fontFamily: 'Bangers',
+                        fontSize: 22,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           // Validation message
           if (_showValidationMessage && _validationMessage != null)
             Container(
@@ -1050,46 +1073,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                 ],
               ),
             ),
-            
-          // Timer and weight display
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Timer display
-                Text(
-                  durationDisplay,
-                  style: AppTextStyles.displayLarge.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Ruck weight
-                    Text(
-                      _getDisplayWeight(),
-                      style: AppTextStyles.titleLarge.copyWith(
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // Remaining time if planned duration
-                if (widget.plannedDuration != null && remainingTimeDisplay != null)
-                  Text(
-                    'Remaining: $remainingTimeDisplay',
-                    style: AppTextStyles.titleMedium.copyWith(
-                      color: remainingTimeDisplay == 'Completed!' ? Colors.green : Colors.grey.shade600,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          
           // Stats section
           Expanded(
             flex: 2,
