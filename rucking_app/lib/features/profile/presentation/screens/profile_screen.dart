@@ -252,6 +252,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const Divider(),
                         _buildClickableItem(
+                          icon: Icons.article_outlined,
+                          label: 'Terms of Use (EULA)',
+                          onTap: () async {
+                            const url = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+                            if (await canLaunch(url)) {
+                              await launch(url);
+                            }
+                          },
+                        ),
+                        const Divider(),
+                        _buildClickableItem(
                           icon: Icons.feedback,
                           label: 'Give Feedback',
                           onTap: () {

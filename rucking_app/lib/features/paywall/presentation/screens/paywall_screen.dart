@@ -6,6 +6,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Paywall screen with auto-scrolling cards to encourage subscription
 class PaywallScreen extends StatefulWidget {
@@ -63,70 +64,132 @@ class _PaywallScreenState extends State<PaywallScreen> {
             // Subscription Plans Section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Subscription Plans',
-                style: AppTextStyles.paywallHeadline.copyWith(fontSize: 20),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedPlanIndex = 0;
-                      });
-                    },
-                    child: _buildPlanCard('Weekly', r'$1.99 / week', _selectedPlanIndex == 0),
+                  Text(
+                    'SUBSCRIPTION PLANS',
+                    style: AppTextStyles.paywallHeadline.copyWith(fontSize: 20),
+                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedPlanIndex = 1;
-                      });
-                    },
-                    child: _buildPlanCard('Monthly', r'$4.99 / month', _selectedPlanIndex == 1),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedPlanIndex = 0;
+                            });
+                          },
+                          child: _buildPlanCard('Weekly', r'$1.99 / week', _selectedPlanIndex == 0),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedPlanIndex = 1;
+                            });
+                          },
+                          child: _buildPlanCard('Monthly', r'$4.99 / month', _selectedPlanIndex == 1),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedPlanIndex = 2;
+                            });
+                          },
+                          child: _buildPlanCard('Annual', r'$29.99 / year', _selectedPlanIndex == 2),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedPlanIndex = 2;
-                      });
-                    },
-                    child: _buildPlanCard('Annual', r'$29.99 / year', _selectedPlanIndex == 2),
+                  const SizedBox(height: 20),
+                  // Get Rucky Button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _handleGetRuckyPressed(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'GET RUCKY',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Bangers',
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Add legal links and subscription info at the bottom
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Go Ruck Yourself Premium\nAuto-renewing subscription',
+                          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Prices may vary by region. Subscription auto-renews unless cancelled at least 24 hours before the end of the period.',
+                          style: AppTextStyles.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () async {
+                                const url = 'https://getrucky.com/privacy';
+                                if (await canLaunch(url)) {
+                                  await launch(url);
+                                }
+                              },
+                              child: Text(
+                                'Privacy Policy',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  decoration: TextDecoration.underline,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 18),
+                            GestureDetector(
+                              onTap: () async {
+                                const url = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+                                if (await canLaunch(url)) {
+                                  await launch(url);
+                                }
+                              },
+                              child: Text(
+                                'Terms of Use',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  decoration: TextDecoration.underline,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Get Rucky Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: ElevatedButton(
-                onPressed: () async {
-                  await _handleGetRuckyPressed(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'GET RUCKY',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Bangers',
-                    color: Colors.white,
-                  ),
-                ),
               ),
             ),
           ],
@@ -169,13 +232,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
         children: [
           Text(
             title,
-            style: AppTextStyles.paywallHeadline, 
+            style: AppTextStyles.paywallHeadline.copyWith(fontSize: 32), 
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          // App Screenshot (bigger, no background)
+          // App Screenshot (smaller, no background)
           SizedBox(
-            height: 220,
+            height: 95, // Further reduced to save space
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.asset(
@@ -194,7 +257,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
+              color: Colors.black,
             ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          // Disclaimer below value prop in same style
+          Text(
+            "A subscription is required to use this app. It's by ruckers and for ruckers and that has a price.",
+            style: AppTextStyles.bodySmall,
             textAlign: TextAlign.center,
           ),
         ],
