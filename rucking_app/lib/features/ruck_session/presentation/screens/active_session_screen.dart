@@ -250,9 +250,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       AppLogger.info('Session ended. Ignoring location update.');
       return;
     }
-    
+
     if (_isPaused) return;
-    
+
     if (_locationPoints.isNotEmpty) {
       // Validate the location point
       final previousPoint = _locationPoints.last;
@@ -260,50 +260,27 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
         locationPoint, 
         previousPoint, 
       );
-      
-      // Handle invalid points
-      if (!validation['isValid']) {
-        // Show error message
+
+      // Handle auto-pause on inactivity
+      if (validation['shouldPause'] == true) {
         setState(() {
-          _validationMessage = validation['message'];
-          _showValidationMessage = true;
-        });
-        
-        // Hide message after 5 seconds
-        Future.delayed(const Duration(seconds: 5), () {
-          if (mounted) {
-            setState(() {
-              _showValidationMessage = false;
-            });
-          }
-        });
-        
-        // Don't process invalid points
-        return;
-      }
-      
-      // Check if session should end due to long idle time
-      if (validation['shouldEnd'] == true) {
-        setState(() {
-          _validationMessage = validation['message'];
-          _showValidationMessage = true;
-        });
-        
-        // Show a dialog asking the user if they want to end the session
-        _showIdleEndConfirmationDialog();
-        return;
-      }
-      
-      // Auto-pause if needed
-      if (validation['shouldPause'] && !_isPaused) {
-        setState(() {
-          _validationMessage = sessionAutoPaused;
+          _validationMessage = validation['message'] ?? 'Auto-paused due to inactivity';
           _showValidationMessage = true;
         });
         _togglePause();
         return;
       }
-      
+
+      // Handle invalid points
+      if (!validation['isValid']) {
+        setState(() {
+          _validationMessage = validation['message'];
+          _showValidationMessage = true;
+        });
+        _togglePause();
+        return;
+      }
+
       // Check if initial distance threshold has been reached
       if (validation.containsKey('initialDistanceReached') && 
           validation['initialDistanceReached'] == true && 
@@ -316,7 +293,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
         });
       }
     }
-    
+
     setState(() {
       _locationPoints.add(locationPoint);
       _canShowStats = true;
@@ -850,17 +827,13 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     AppLogger.info('ActiveSessionScreen.build: _heartRate=$_heartRate');
     // Format display values
     final String durationDisplay = _formatDuration(_elapsed);
-    final String? distanceDisplay = _canShowStats
+    final String? distanceDisplay = _canShowStats && _distance > 0
       ? MeasurementUtils.formatDistance(_distance, metric: widget.preferMetric)
       : null;
-    
-    // pace is stored as seconds per km; adjust display based on user preference
-    double _displayPaceSec = _pace; // Base pace in seconds per km
-    final String? paceDisplay = _canShowStats
-      ? MeasurementUtils.formatPace(_displayPaceSec, metric: widget.preferMetric)
+    final String? paceDisplay = _canShowStats && _pace > 0
+      ? MeasurementUtils.formatPace(_pace, metric: widget.preferMetric)
       : null;
-    
-    final String? caloriesDisplay = _canShowStats
+    final String? caloriesDisplay = _canShowStats && _caloriesBurned > 0
       ? _caloriesBurned.toStringAsFixed(0)
       : null;
     final String elevationDisplay = _canShowStats
@@ -966,25 +939,93 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
               ),
             ),
           ),
-          // Heart rate and timer row
-          if (_showHeartRate) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.favorite, color: AppColors.error, size: 28),
-                  const SizedBox(width: 8),
-                  Text(
-                    _heartRate != null ? '${_heartRate!.round()}' : '--',
-                    style: AppTextStyles.displayLarge.copyWith(fontFamily: 'Bangers'),
+          // Timer, Ruck Weight, and Heart Rate Row (two-column layout, ruck weight under timer)
+          Padding(
+            padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left column: Timer, Planned Duration, and Ruck Weight
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Timer
+                      Row(
+                        children: [
+                          Icon(Icons.timer, color: Colors.black, size: 22),
+                          const SizedBox(width: 6),
+                          Text(
+                            durationDisplay,
+                            style: AppTextStyles.displayLarge.copyWith(
+                              fontFamily: 'Bangers',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 32,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (widget.plannedDuration != null && _plannedCountdownStart != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            remainingTimeDisplay != null ? 'REMAINING: $remainingTimeDisplay' : '',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      // Ruck Weight (below timer and planned duration)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.fitness_center, color: Colors.black, size: 20),
+                            const SizedBox(width: 4),
+                            Text(
+                              _getDisplayWeight().toUpperCase(),
+                              style: AppTextStyles.titleLarge.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Text('bpm', style: AppTextStyles.labelLarge),
-                ],
-              ),
+                ),
+                // Right column: Heart Rate (if enabled)
+                if (_showHeartRate)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.favorite, color: AppColors.error, size: 22),
+                            const SizedBox(width: 4),
+                            Text(
+                              _heartRate != null ? '${_heartRate!.round()}' : '--',
+                              style: AppTextStyles.headlineMedium.copyWith(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text('BPM', style: AppTextStyles.bodySmall),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
-          ],
+          ),
           // Stats section
           Expanded(
             flex: 2,
@@ -1106,12 +1147,12 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                                     ],
                                   ),
                                   SizedBox(height: 8),
-                                  _caloriesBurned > 0
+                                  caloriesDisplay != null
                                     ? Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Text(
-                                            _caloriesBurned.toStringAsFixed(0),
+                                            caloriesDisplay,
                                             style: AppTextStyles.headlineMedium.copyWith(
                                               color: Theme.of(context).brightness == Brightness.dark 
                                                   ? AppColors.warning 
@@ -1132,7 +1173,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                                     : SizedBox(
                                         height: 20,
                                         width: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.warning)),
+                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.black)),
                                       ),
                                 ],
                               ),
