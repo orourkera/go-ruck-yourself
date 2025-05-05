@@ -19,48 +19,34 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
-  if (points.isEmpty) return LatLng(40.421, -3.678);
-  
-  // If only the start point exists
-  if (points.length == 1) return points.first;
-  
-  // Calculate the center between start and end points for better map focus
-  final startPoint = points.first;
-  final endPoint = points.last;
-  double centerLat = (startPoint.latitude + endPoint.latitude) / 2;
-  double centerLng = (startPoint.longitude + endPoint.longitude) / 2;
-  
-  return LatLng(centerLat, centerLng);
+  if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
+  double avgLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
+  double avgLng = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
+  return LatLng(avgLat, avgLng);
 }
 
+// Improved zoom calculation to fit all points with padding
 double _getFitZoom(List<LatLng> points) {
-  // Default zoom if insufficient points
-  if (points.length < 2) return 15.5;
-  
-  // Create a bounds object focusing on start and end points
-  final startPoint = points.first;
-  final endPoint = points.last;
-  
-  // Initialize bounds with the start point
-  final bounds = LatLngBounds.fromPoints([startPoint, endPoint]);
-  
-  // Calculate the span of the bounds
-  final latDiff = (bounds.north - bounds.south).abs();
-  final lngDiff = (bounds.east - bounds.west).abs();
-  
-  // Add a buffer to ensure points aren't right at the edge (15% padding)
-  final maxDiff = [latDiff, lngDiff].reduce((a, b) => a > b ? a : b) * 1.15;
-  
-  // Determine zoom level based on the distance between points
-  if (maxDiff < 0.001) return 17.0;    // Very close together
-  if (maxDiff < 0.005) return 16.0;    // Close together
-  if (maxDiff < 0.01) return 15.0;     // Somewhat close
-  if (maxDiff < 0.03) return 14.0;     // Moderate distance
-  if (maxDiff < 0.05) return 13.0;     // Further apart
-  if (maxDiff < 0.1) return 12.0;      // Distant
-  if (maxDiff < 0.2) return 11.0;      // Very distant
-  if (maxDiff < 0.5) return 10.0;      // Extremely distant
-  return 9.0;                         // Default for very large distances
+  if (points.isEmpty) return 15.0; // Default zoom
+  if (points.length == 1) return 17.0; // Closer zoom for single point
+
+  double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+  double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+  double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+  double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+
+  double latDiff = (maxLat - minLat).abs();
+  double lngDiff = (maxLng - minLng).abs();
+  double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+
+  // Add a small buffer so route isn't at the edge
+  maxDiff *= 1.15;
+
+  if (maxDiff < 0.001) return 17.0;
+  if (maxDiff < 0.01) return 15.0;
+  if (maxDiff < 0.1) return 13.0;
+  if (maxDiff < 1.0) return 10.0;
+  return 7.0;
 }
 
 /// Main home screen that serves as the central hub of the app
@@ -597,8 +583,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                       options: MapOptions(
                                         initialCenter: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
                                         initialZoom: routePoints.length > 1 ? _getFitZoom(routePoints) : 15.5,
-                                        bounds: routePoints.length > 1 ? LatLngBounds.fromPoints(routePoints) : null,
-                                        boundsOptions: const FitBoundsOptions(padding: EdgeInsets.all(24)),
                                         interactionOptions: const InteractionOptions(
                                           flags: InteractiveFlag.none, // Disable interactions for preview
                                         ),
