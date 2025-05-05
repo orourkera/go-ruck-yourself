@@ -954,10 +954,8 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Timer/weight/remaining column
+                // Left column: timer, weight, remaining
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -985,7 +983,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Remaining: ${_formatDuration(_getRemainingTime())}',
+                        'REMAINING: ${_formatDuration(_getRemainingTime())}',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: 'Bangers',
@@ -996,56 +994,59 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                     ],
                   ),
                 ),
-                const SizedBox(width: 28),
-                // Heart rate column
-                Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.favorite, color: Colors.pink, size: 40),
-                        const SizedBox(width: 8),
-                        heartRateAsync.when(
-                          data: (sample) {
-                            AppLogger.info('Heart rate stream data: $sample');
-                            return Text(
-                              (sample != null && sample.bpm != null) ? '${sample.bpm}' : '--',
+                // Right column: heart rate
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.favorite, color: Colors.pink, size: 40),
+                          const SizedBox(width: 8),
+                          heartRateAsync.when(
+                            data: (sample) {
+                              AppLogger.info('Heart rate stream data: $sample');
+                              return Text(
+                                (sample != null && sample.bpm != null) ? '${sample.bpm}' : '--',
+                                style: TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              );
+                            },
+                            loading: () => Text(
+                              '--',
                               style: TextStyle(
                                 fontFamily: 'Bangers',
                                 fontSize: 48,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
+                                color: Colors.grey,
                               ),
-                            );
-                          },
-                          loading: () => Text(
-                            '--',
-                            style: TextStyle(
-                              fontFamily: 'Bangers',
-                              fontSize: 48,
-                              color: Colors.grey,
+                            ),
+                            error: (e, st) => Text(
+                              '--',
+                              style: TextStyle(
+                                fontFamily: 'Bangers',
+                                fontSize: 48,
+                                color: Colors.red,
+                              ),
                             ),
                           ),
-                          error: (e, st) => Text(
-                            '--',
-                            style: TextStyle(
-                              fontFamily: 'Bangers',
-                              fontSize: 48,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      'bpm',
-                      style: TextStyle(
-                        fontFamily: 'Bangers',
-                        fontSize: 22,
-                        color: Colors.black,
+                        ],
                       ),
-                    ),
-                  ],
+                      Text(
+                        'BPM',
+                        style: TextStyle(
+                          fontFamily: 'Bangers',
+                          fontSize: 22,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
