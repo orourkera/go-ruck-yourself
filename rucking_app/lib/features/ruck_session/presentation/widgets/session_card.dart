@@ -46,10 +46,14 @@ class SessionCard extends StatelessWidget {
       metric: preferMetric
     );
     
-    // Format elevation gain/loss
-    final elevationGain = session.elevationGain;
-    final elevationLoss = session.elevationLoss;
-    final elevationDisplay = '${elevationGain.toStringAsFixed(0)}↑ / ${elevationLoss.toStringAsFixed(0)}↓ m';
+    // Format elevation gain/loss: use final_elevation_gain/loss if available, otherwise fallback
+    final elevationGain = session.finalElevationGain ?? session.elevationGain;
+    final elevationLoss = session.finalElevationLoss ?? session.elevationLoss;
+    final elevationDisplay = MeasurementUtils.formatElevationCompact(
+      elevationGain,
+      elevationLoss,
+      metric: preferMetric,
+    );
       
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
