@@ -58,43 +58,37 @@ class UserResource(Resource):
         return {"user": user.to_dict()}, 200
     
     def delete(self, user_id):
-        """Delete a user"""
+        """Delete a user and all associated data from Supabase and local DB"""
         # Authorization check: Ensure the authenticated user matches the user_id being deleted
         if not g.user or g.user.id != user_id:
             logger.warning(f"Unauthorized delete attempt: auth_user='{g.user.id if g.user else None}' target_user='{user_id}'")
             return {'message': 'Forbidden: You can only delete your own account'}, 403
 
+        try:
+            supabase = get_supabase_admin_client()
+            # Delete all related data from Supabase tables
+            supabase.table('location_point').delete().eq('user_id', user_id).execute()
+            supabase.table('ruck_session').delete().eq('user_id', user_id).execute()
+            # Delete from auth.users (Supabase Auth)
+            supabase.auth.admin.delete_user(user_id)
+        except Exception as e:
+            logger.error(f"Error deleting user or associated data from Supabase: {str(e)}", exc_info=True)
+            return {'message': f'Error deleting user or associated data from Supabase: {str(e)}'}, 500
+
+        # Delete from local DB (SQLAlchemy ORM)
         logger.debug(f"Attempting to find user {user_id} in local DB for deletion.")
         user = User.query.filter_by(id=user_id).first()
         if not user:
-            logger.warning(f"User {user_id} not found in local database during delete attempt.")
-            return {'message': 'User not found in local database'}, 404
-        logger.info(f"Found user {user_id} in local DB. Proceeding with deletion process.")
-            
+            logger.warning(f"User {user_id} not found in local DB.")
+            return {'message': 'User not found'}, 404
         try:
-            # 1. Delete from Supabase Auth first
-            logger.info(f"Attempting Supabase Auth deletion for user {user_id}")
-            try:
-                admin_client = get_supabase_admin_client()
-                # Ensure you have the correct method path for your supabase-py version
-                admin_client.auth.admin.delete_user(user_id)
-                logger.info(f"Successfully deleted user {user_id} from Supabase Auth.")
-            except Exception as supabase_err:
-                logger.error(f"Failed to delete user {user_id} from Supabase Auth: {str(supabase_err)}", exc_info=True)
-                # Decide if this is a fatal error. Maybe just log and continue?
-                # For now, let's make it fatal to ensure cleanup consistency.
-                return {'message': 'Failed to delete user from authentication provider'}, 500
-            
-            # 2. Delete from local database
-            logger.info(f"Attempting local DB deletion for user {user_id}")
             db.session.delete(user)
-            logger.debug(f"Local DB delete initiated for user {user_id}. Attempting commit.")
             db.session.commit()
             logger.info(f"User {user_id} deleted successfully from local DB.")
-            return {"message": "User deleted successfully"}, 200
+            return {"message": "User and all associated data deleted successfully"}, 200
         except Exception as e:
             logger.error(f"Rolling back local DB session for user {user_id} due to error.")
-            db.session.rollback() # Rollback local DB changes if any step failed
+            db.session.rollback()
             logger.error(f"Error during user deletion process for {user_id}: {str(e)}", exc_info=True)
             return {'message': 'An error occurred during deletion'}, 500
 
