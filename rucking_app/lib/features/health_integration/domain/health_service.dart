@@ -165,13 +165,6 @@ class HealthService {
             startTime: startDate,
             endTime: endDate,
             unit: HealthDataUnit.METER, // Or HealthDataUnit.MINUTE if you prefer
-            metadata: {
-              if (elevationGainMeters != null) 'elevation_gain': elevationGainMeters,
-              if (elevationLossMeters != null) 'elevation_loss': elevationLossMeters,
-              if (ruckWeightKg != null) 'ruck_weight_kg': ruckWeightKg,
-              if (heartRate != null) 'average_heart_rate': heartRate,
-              'calories_burned': caloriesBurned,
-            },
           );
         } catch (e) {
           AppLogger.error('Failed to write HealthKit WORKOUT sample: $e');

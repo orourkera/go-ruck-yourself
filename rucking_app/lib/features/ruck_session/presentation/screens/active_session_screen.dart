@@ -128,6 +128,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
 
   DateTime _startTime = DateTime.now();
 
+  // Map controller for centering on user
+  late final MapController _mapController = MapController();
+
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -160,6 +163,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
     _stopwatch = Stopwatch();
     
     // --- MAP AND LOCATION LOAD FIRST ---
+    _mapController = MapController(); // Ensure controller is initialized
     _initLocationTracking(); // Always load map and location as first thing
 
     _distance = 0.0;
@@ -322,20 +326,19 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
       }
     }
     
-    // Add point to route
-    _locationPoints.add(locationPoint);
-    _lastLocationUpdate = DateTime.now();
-    
-    // Only calculate stats if we're past initial threshold or this is first couple of points
-    if (_canShowStats || _locationPoints.length <= 2) {
-      _calculateStats(locationPoint);
+    setState(() {
+      _locationPoints.add(locationPoint);
+      _canShowStats = true;
+    });
+    _centerMapOnUser();
+  }
+
+  /// Center map on user when new location is added
+  void _centerMapOnUser() {
+    if (_locationPoints.isNotEmpty) {
+      final userLatLng = LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude);
+      _mapController.move(userLatLng, _getFitZoom(_locationPoints));
     }
-    
-    // Update the UI
-    if (mounted) setState(() {});
-    
-    // Send point to API in the background
-    _sendLocationUpdate(locationPoint);
   }
 
   /// Calculate new stats based on new location point
@@ -885,6 +888,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> with WidgetsB
                 borderRadius: BorderRadius.circular(16),
                 child: _locationPoints.length >= 2
                     ? FlutterMap(
+                        mapController: _mapController,
                         options: MapOptions(
                           initialCenter: _getRouteCenter(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
                           initialZoom: _getFitZoom(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
