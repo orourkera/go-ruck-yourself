@@ -1,3 +1,34 @@
+import 'dart:typed_data';
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:location/location.dart';
+import 'package:provider/provider.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/core/models/ruck_session.dart';
+import 'package:rucking_app/core/models/user.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/utils/error_handler.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/core/services/location_service.dart';
+import 'package:rucking_app/core/utils/met_calculator.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
+import 'package:latlong2/latlong.dart' as latlong;
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/core/error_messages.dart';
+import 'package:rucking_app/core/api/api_exceptions.dart';
+import 'package:flutter/services.dart';
+import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
+
 /// Screen for tracking an active ruck session
 class ActiveSessionScreen extends ConsumerStatefulWidget {
   final String ruckId;
@@ -782,6 +813,37 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     return remaining > Duration.zero ? remaining : Duration.zero;
   }
 
+  /// Calculates a zoom level so all points fit in the map view
+  double _getFitZoom(List<LocationPoint> points) {
+    if (points.isEmpty) return 15.0; // Default zoom
+    if (points.length == 1) return 17.0; // Closer zoom for single point
+
+    double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+    double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+    double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+    double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+
+    double latDiff = (maxLat - minLat).abs();
+    double lngDiff = (maxLng - minLng).abs();
+    double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+
+    if (maxDiff < 0.001) return 17.0;
+    if (maxDiff < 0.01) return 15.0;
+    if (maxDiff < 0.1) return 13.0;
+    if (maxDiff < 1.0) return 10.0;
+    return 7.0;
+  }
+
+  /// Returns the center point of the route as a LatLng
+  latlong.LatLng _getRouteCenter(List<LocationPoint> points) {
+    if (points.isEmpty) {
+      return latlong.LatLng(0, 0);
+    }
+    double avgLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
+    double avgLng = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
+    return latlong.LatLng(avgLat, avgLng);
+  }
+
   @override
   Widget build(BuildContext context) {
     final heartRateAsync = ref.watch(heartRateStreamProvider);
@@ -859,8 +921,8 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                     ? FlutterMap(
                         mapController: _mapController,
                         options: MapOptions(
-                          initialCenter: _getRouteCenter(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
-                          initialZoom: _getFitZoom(_locationPoints.map((p) => LatLng(p.latitude, p.longitude)).toList()),
+                          initialCenter: _getRouteCenter(_locationPoints),
+                          initialZoom: _getFitZoom(_locationPoints),
                         ),
                         children: [
                           TileLayer(
