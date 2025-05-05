@@ -135,38 +135,54 @@ class HealthService {
       // Convert km to m for health data
       final distanceMeters = (distanceKm * 1000).toInt();
       
-      // Write individual health data points instead of using workout API
-      // This is more compatible across different health package versions
       bool distanceSuccess = false;
       bool caloriesSuccess = false;
-      
-      try {
-        // Write distance data point
-        distanceSuccess = await _health.writeHealthData(
-          value: distanceMeters.toDouble(), 
-          type: HealthDataType.DISTANCE_WALKING_RUNNING,
-          startTime: startDate, 
-          endTime: endDate,
-          unit: HealthDataUnit.METER,
-        );
-        
-        // Write calories data point
-        caloriesSuccess = await _health.writeHealthData(
-          value: caloriesBurned.toDouble(),
-          type: HealthDataType.ACTIVE_ENERGY_BURNED,
-          startTime: startDate,
-          endTime: endDate,
-          unit: HealthDataUnit.KILOCALORIE,
-        );
-        
-        AppLogger.info('Health data write results - Distance: $distanceSuccess, Calories: $caloriesSuccess');
-      } catch (e) {
-        AppLogger.error('Failed to write health data: $e');
-        return false;
+      bool workoutSuccess = false;
+
+      // Write distance and calories data points as before
+      distanceSuccess = await _health.writeHealthData(
+        value: distanceMeters.toDouble(),
+        type: HealthDataType.DISTANCE_WALKING_RUNNING,
+        startTime: startDate,
+        endTime: endDate,
+        unit: HealthDataUnit.METER,
+      );
+
+      caloriesSuccess = await _health.writeHealthData(
+        value: caloriesBurned.toDouble(),
+        type: HealthDataType.ACTIVE_ENERGY_BURNED,
+        startTime: startDate,
+        endTime: endDate,
+        unit: HealthDataUnit.KILOCALORIE,
+      );
+
+      // --- NEW: Write WORKOUT sample ---
+      if (Platform.isIOS) {
+        try {
+          workoutSuccess = await _health.writeHealthData(
+            value: distanceMeters.toDouble(), // Some plugins require a value (distance or duration)
+            type: HealthDataType.WORKOUT,
+            startTime: startDate,
+            endTime: endDate,
+            unit: HealthDataUnit.METER, // Or HealthDataUnit.MINUTE if you prefer
+            metadata: {
+              if (elevationGainMeters != null) 'elevation_gain': elevationGainMeters,
+              if (elevationLossMeters != null) 'elevation_loss': elevationLossMeters,
+              if (ruckWeightKg != null) 'ruck_weight_kg': ruckWeightKg,
+              if (heartRate != null) 'average_heart_rate': heartRate,
+              'calories_burned': caloriesBurned,
+            },
+          );
+        } catch (e) {
+          AppLogger.error('Failed to write HealthKit WORKOUT sample: $e');
+          workoutSuccess = false;
+        }
       }
-      
+
+      AppLogger.info('Health data write results - Distance: $distanceSuccess, Calories: $caloriesSuccess, Workout: $workoutSuccess');
+
       // Consider success if at least one data point was written
-      final success = distanceSuccess || caloriesSuccess;
+      final success = distanceSuccess || caloriesSuccess || workoutSuccess;
       AppLogger.info('Workout data saved successfully: $success');
       return success;
     } catch (e) {

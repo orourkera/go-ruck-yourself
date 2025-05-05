@@ -25,6 +25,8 @@ class RuckSession {
   final String? notes;
   final int? rating;
   final List<Map<String, dynamic>>? locationPoints;
+  final double? finalElevationGain;
+  final double? finalElevationLoss;
 
   RuckSession({
     this.id,
@@ -41,6 +43,8 @@ class RuckSession {
     this.notes,
     this.rating,
     this.locationPoints,
+    this.finalElevationGain,
+    this.finalElevationLoss,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -109,15 +113,10 @@ class RuckSession {
       final distance = parseDistance(json['distance_km'] ?? json['distance'] ?? 0.0);
       
       // Handle status (map string to enum)
-      RuckStatus status = RuckStatus.unknown;
-      final statusString = json['status']?.toString().toLowerCase();
-      if (statusString == 'completed') {
-        status = RuckStatus.completed;
-      } else if (statusString == 'in_progress' || statusString == 'active') { // Allow 'active' as well
-        status = RuckStatus.inProgress;
-      } else if (statusString == 'cancelled') {
-        status = RuckStatus.cancelled;
-      } // else defaults to unknown
+      RuckStatus status = RuckStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == (json['status'] ?? '').toString(),
+        orElse: () => RuckStatus.unknown,
+      );
       
       // Extract other fields with sensible defaults
       return RuckSession(
@@ -138,6 +137,8 @@ class RuckSession {
         rating: json['rating'] is int ? json['rating'] : null,
         locationPoints: json['location_points'] is List ? 
             (json['location_points'] as List).cast<Map<String, dynamic>>() : null,
+        finalElevationGain: (json['final_elevation_gain'] as num?)?.toDouble(),
+        finalElevationLoss: (json['final_elevation_loss'] as num?)?.toDouble(),
       );
     } catch (e) {
       AppLogger.error('Error parsing RuckSession from JSON: $e');
@@ -157,6 +158,8 @@ class RuckSession {
         notes: null,
         rating: null,
         locationPoints: null,
+        finalElevationGain: null,
+        finalElevationLoss: null,
       );
     }
   }
@@ -195,6 +198,8 @@ class RuckSession {
       'notes': notes,
       'rating': rating,
       'location_points': locationPoints,
+      'final_elevation_gain': finalElevationGain,
+      'final_elevation_loss': finalElevationLoss,
     };
   }
 }

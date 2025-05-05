@@ -542,15 +542,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         // Get calories directly from session map
                         final calories = session['calories_burned']?.toString() ?? '0';
                         
-                        // Get average pace directly from session map (now using average_pace_min_km)
-                        final paceMinPerKm = (session['average_pace_min_km'] as num?)?.toDouble();
-                        final paceDisplay = paceMinPerKm != null ? MeasurementUtils.formatPace(paceMinPerKm * 60, metric: preferMetric) : '--';
+                        // Use final_average_pace if present, otherwise average_pace_min_km
+                        final paceSecondsPerKm = (session['final_average_pace'] as num?)?.toDouble() ?? (session['average_pace_min_km'] as num?)?.toDouble();
+                        final paceDisplay = paceSecondsPerKm != null ? MeasurementUtils.formatPace(paceSecondsPerKm, metric: preferMetric) : '--';
                         
-                        // Get elevation data from session
-                        final elevationGain = (session['elevation_gain_meters'] as num?)?.toDouble() ?? 0.0;
-                        final elevationLoss = (session['elevation_loss_meters'] as num?)?.toDouble() ?? 0.0;
-                        
-                        // Format elevation data based on user preference
+                        // Use final_elevation_gain/loss if present, otherwise elevation_gain_meters/loss_meters
+                        final elevationGain = (session['final_elevation_gain'] as num?)?.toDouble() ?? (session['elevation_gain_meters'] as num?)?.toDouble() ?? 0.0;
+                        final elevationLoss = (session['final_elevation_loss'] as num?)?.toDouble() ?? (session['elevation_loss_meters'] as num?)?.toDouble() ?? 0.0;
                         String elevationDisplay = MeasurementUtils.formatElevationCompact(elevationGain, elevationLoss, metric: preferMetric);
                         
                         // Map route points
