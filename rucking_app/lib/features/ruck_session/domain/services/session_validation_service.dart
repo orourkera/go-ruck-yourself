@@ -16,7 +16,7 @@ class SessionValidationService {
   static const Duration longIdleDuration = Duration(minutes: 2); // 2 minutes idle to suggest ending session
   static const double maxPositionJumpMeters = 100.0; // 100 meters max jump in position
   static const Duration maxPositionJumpDuration = Duration(seconds: 5); // 5 seconds between location points
-  static const double minGpsAccuracyMeters = 50.0; // 50 meters minimum GPS accuracy
+  static const double minGpsAccuracyMeters = 20.0; // 20 meters minimum GPS accuracy (was 50.0)
   static const double minCaloriesPerHour = 300.0; // 300 calories minimum per hour
   static const double maxCaloriesPerHour = 800.0; // 800 calories maximum per hour
   static const Duration lowGpsWarningDelay = Duration(seconds: 30); // 30 seconds delay before showing GPS warning
