@@ -1,0 +1,2 @@
+# Ignore environment and secret files
+RuckTracker/.env
