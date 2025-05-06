@@ -939,31 +939,39 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
               ),
             ),
           ),
-          // Timer, Ruck Weight, and Heart Rate Row (two-column layout, ruck weight under timer)
+          // Timer, Ruck Weight, and Heart Rate Row (two-column layout, no icons, centered left column)
           Padding(
             padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 4),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left column: Timer, Planned Duration, and Ruck Weight
+                // Left column: Centered timers and ruck weight, taking half the screen
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Timer
-                      Row(
-                        children: [
-                          Icon(Icons.timer, color: Colors.black, size: 22),
-                          const SizedBox(width: 6),
-                          Text(
-                            durationDisplay,
-                            style: AppTextStyles.displayLarge.copyWith(
-                              fontFamily: 'Bangers',
-                              fontWeight: FontWeight.bold,
-                              fontSize: 32,
-                            ),
+                      Text(
+                        durationDisplay,
+                        style: AppTextStyles.displayLarge.copyWith(
+                          fontFamily: 'Bangers',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 32,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          _getDisplayWeight().toUpperCase(),
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontFamily: 'Bangers',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            letterSpacing: 1.2,
                           ),
-                        ],
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                       if (widget.plannedDuration != null && _plannedCountdownStart != null)
                         Padding(
@@ -975,54 +983,51 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                               fontWeight: FontWeight.w500,
                               fontSize: 12,
                             ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                      // Ruck Weight (below timer and planned duration)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.fitness_center, color: Colors.black, size: 20),
-                            const SizedBox(width: 4),
-                            Text(
-                              _getDisplayWeight().toUpperCase(),
-                              style: AppTextStyles.titleLarge.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                letterSpacing: 1.2,
-                              ),
+                    ],
+                  ),
+                ),
+                // Right column: Centered heart rate in Bangers font
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Icon(Icons.favorite, color: AppColors.error, size: 40),
+                          const SizedBox(width: 8),
+                          Text(
+                            _heartRate != null ? '${_heartRate!.round()}' : '--',
+                            style: AppTextStyles.displayLarge.copyWith(
+                              fontFamily: 'Bangers',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 40,
+                              color: Colors.black,
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'bpm',
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontFamily: 'Bangers',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Colors.black,
+                            letterSpacing: 1.2,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Right column: Heart Rate (if enabled)
-                if (_showHeartRate)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Row(
-                          children: [
-                            Icon(Icons.favorite, color: AppColors.error, size: 22),
-                            const SizedBox(width: 4),
-                            Text(
-                              _heartRate != null ? '${_heartRate!.round()}' : '--',
-                              style: AppTextStyles.headlineMedium.copyWith(
-                                color: AppColors.error,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(width: 2),
-                            Text('BPM', style: AppTextStyles.bodySmall),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
               ],
             ),
           ),
@@ -1173,7 +1178,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                                     : SizedBox(
                                         height: 20,
                                         width: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.black)),
+                                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
                                       ),
                                 ],
                               ),
