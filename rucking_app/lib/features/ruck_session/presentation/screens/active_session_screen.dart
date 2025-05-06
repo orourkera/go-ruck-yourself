@@ -80,6 +80,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   final List<LocationPoint> _locationPoints = [];
   DateTime? _lastLocationUpdate;
   DateTime? _lastLocationUpdateTime; // Track timestamp of the last location update
+  LocationPoint? _lastLocationPoint; // Store last location point before pausing
   
   // Session stats
   double _distance = 0.0;
@@ -270,7 +271,10 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       return;
     }
 
-    if (_isPaused) return;
+    if (_isPaused) {
+      AppLogger.info('Session paused. Ignoring location update.');
+      return;
+    }
 
     if (_locationPoints.isNotEmpty) {
       // Validate the location point
@@ -525,6 +529,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       } else {
         _stopwatch.stop();
         _isPaused = true;
+        _lastLocationPoint = _locationPoints.last; // Store last location point before pausing
         // Pause location tracking
         _locationSubscription?.pause();
         // Notify API
