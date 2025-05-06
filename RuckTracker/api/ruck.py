@@ -61,13 +61,10 @@ class RuckSessionListResource(Resource):
                 'status': 'in_progress',
                 'started_at': datetime.now(tz.tzutc()).isoformat()
             }
-            # Only add optional fields if they exist in data
-            if 'planned_duration_minutes' in data and data.get('planned_duration_minutes') is not None:
-                session_data['planned_duration_minutes'] = data.get('planned_duration_minutes')
             if 'ruck_weight_kg' in data and data.get('ruck_weight_kg') is not None:
                 session_data['ruck_weight_kg'] = data.get('ruck_weight_kg')
-            if 'user_weight_kg' in data and data.get('user_weight_kg') is not None:
-                session_data['user_weight_kg'] = data.get('user_weight_kg')
+            if 'weight_kg' in data and data.get('weight_kg') is not None:
+                session_data['weight_kg'] = data.get('weight_kg')
             insert_resp = supabase.table('ruck_session') \
                 .insert(session_data) \
                 .execute()
