@@ -330,7 +330,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   void _centerMapOnUser() {
     if (_locationPoints.isNotEmpty) {
       final userLatLng = LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude);
-      _mapController.move(userLatLng, _getFitZoom(_locationPoints));
+      _mapController.move(userLatLng, 15.0);
     }
   }
 
