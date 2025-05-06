@@ -179,6 +179,16 @@ class ApiClient {
     }
   }
   
+  /// Makes a POST request to add a location point to a ruck session
+  Future<dynamic> addLocationPoint(String ruckId, Map<String, dynamic> locationData) async {
+    return await post('/rucks/$ruckId/location', locationData);
+  }
+
+  /// Makes a POST request to add heart rate samples to a ruck session
+  Future<dynamic> addHeartRateSamples(String ruckId, List<Map<String, dynamic>> heartRateSamples) async {
+    return await post('/rucks/$ruckId/heart_rate', {'samples': heartRateSamples});
+  }
+  
   /// Returns headers for API requests
   Future<Map<String, String>> _getHeaders() async {
     final headers = {
