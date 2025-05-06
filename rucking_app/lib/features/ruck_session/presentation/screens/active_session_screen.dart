@@ -559,7 +559,10 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       // Check if session is too short
       if (_elapsed.inSeconds < 60) {
         _showShortSessionDialog();
-        setState(() => _isEnding = false);
+        setState(() {
+          _isEnding = false;
+          _isSessionEnded = false;
+        });
         return;
       }
       
@@ -661,7 +664,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) => AlertDialog(
-        title: const Text('Session Too Short'),
+        title: const Text('Session Too Short, Rucker!'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -670,9 +673,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
               'Your session is too short to save.',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
-            Text('Distance: ${_distance.toStringAsFixed(2)} km (minimum 0.1 km)'),
-            Text('Duration: ${_formatDuration(_elapsed)} (minimum 2 min)'),
             const SizedBox(height: 12),
             const Text(
               'To save your workout, please make sure to ruck for at least 100 meters and 2 minutes.',
