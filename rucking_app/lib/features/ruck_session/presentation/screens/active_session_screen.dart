@@ -28,6 +28,7 @@ import 'package:rucking_app/core/error_messages.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:flutter/services.dart';
 import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 
 /// Screen for tracking an active ruck session
 class ActiveSessionScreen extends ConsumerStatefulWidget {
@@ -108,6 +109,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   final MapController _mapController = MapController();
 
   bool _showHeartRate = false;
+  double? _currentHeartRate;
 
   /// Shows an error message in a SnackBar
   void _showErrorSnackBar(String message) {
@@ -413,24 +415,19 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   /// Send location update to API
   Future<void> _sendLocationUpdate(LocationPoint locationPoint) async {
     try {
-      // Ensure all numeric values are doubles
-      final payload = {
-        'latitude': locationPoint.latitude.toDouble(),
-        'longitude': locationPoint.longitude.toDouble(),
-        'elevation_meters': locationPoint.elevation.toDouble(),
+      // Convert LocationPoint to Map for API
+      final locationData = {
+        'latitude': locationPoint.latitude,
+        'longitude': locationPoint.longitude,
+        'elevation': locationPoint.elevation,
         'timestamp': locationPoint.timestamp.toIso8601String(),
-        'accuracy_meters': locationPoint.accuracy.toDouble(),
       };
-      AppLogger.info('Sending location update payload: $payload');
-      await _apiClient.post(
-        '/rucks/${widget.ruckId}/location',
-        payload,
-      ).catchError((e) {
-        AppLogger.error('Failed to send location update: $e');
-        return; // Ensure a return even in error case
-      });
+      
+      await _apiClient.addLocationPoint(widget.ruckId, locationData);
+      AppLogger.info('Successfully sent location update for ruck ${widget.ruckId}');
     } catch (e) {
-      AppLogger.error('Error in _sendLocationUpdate: $e');
+      AppLogger.error('Failed to send location update: $e');
+      _showErrorSnackBar('Failed to send location data');
     }
   }
   
@@ -823,6 +820,53 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     double avgLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
     double avgLng = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
     return latlong.LatLng(avgLat, avgLng);
+  }
+
+  /// Start monitoring heart rate
+  Future<void> _startHeartRateMonitoring() async {
+    try {
+      // Listen to heart rate updates from HealthService
+      ref.listen(heartRateStreamProvider, (previous, current) {
+        current.when(
+          data: (heartRateSample) {
+            _currentHeartRate = heartRateSample.bpm.toDouble();
+            AppLogger.info('Heart rate update: ${_currentHeartRate} BPM');
+            
+            // Send heart rate data to backend
+            _sendHeartRateUpdate(heartRateSample);
+          },
+          error: (error, stackTrace) {
+            AppLogger.error('Error in heart rate stream: $error');
+          },
+          loading: () {
+            AppLogger.info('Heart rate stream loading');
+          },
+        );
+      });
+      
+      AppLogger.info('Started heart rate monitoring');
+    } catch (e) {
+      AppLogger.error('Failed to start heart rate monitoring: $e');
+      _showErrorSnackBar('Failed to start heart rate monitoring');
+    }
+  }
+
+  /// Send heart rate update to API
+  Future<void> _sendHeartRateUpdate(HeartRateSample heartRateSample) async {
+    try {
+      final heartRateData = [
+        {
+          'timestamp': heartRateSample.timestamp.toIso8601String(),
+          'bpm': heartRateSample.bpm,
+        }
+      ];
+      
+      await _apiClient.addHeartRateSamples(widget.ruckId, heartRateData);
+      AppLogger.info('Successfully sent heart rate update for ruck ${widget.ruckId}');
+    } catch (e) {
+      AppLogger.error('Failed to send heart rate update: $e');
+      _showErrorSnackBar('Failed to send heart rate data');
+    }
   }
 
   @override
