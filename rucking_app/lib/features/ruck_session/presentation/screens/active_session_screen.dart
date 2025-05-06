@@ -115,15 +115,39 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     );
   }
 
+  // --- Add this method to robustly reset all session state ---
+  void _resetSessionState() {
+    _distance = 0.0;
+    _uncountedDistance = 0.0;
+    _elapsed = Duration.zero;
+    _caloriesBurned = 0.0;
+    _locationPoints.clear();
+    _recentPaces.clear();
+    _canShowStats = false;
+    _lastLocationUpdate = null;
+    _lastLocationUpdateTime = null;
+    _isPaused = false;
+    _isEnding = false;
+    _validationMessage = null;
+    _showValidationMessage = false;
+    _isSessionEnded = false;
+    _stopwatch.reset();
+    _validationService.reset();
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    _stopwatch = Stopwatch(); // Initialize before using in _resetSessionState
+    _validationService = SessionValidationService(); // Initialize before using in _resetSessionState
+    // Robustly reset all session state
+    _resetSessionState();
+
     // Initialize services
     _apiClient = GetIt.instance<ApiClient>();
     _locationService = GetIt.instance<LocationService>();
-    _validationService = SessionValidationService();
     _healthService = HealthService();
     
     // Get user preference and weight
@@ -137,7 +161,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     ruckWeightKg = widget.ruckWeight;
     
     // Initialize stopwatch
-    _stopwatch = Stopwatch();
     
     // --- MAP AND LOCATION LOAD FIRST ---
     _initLocationTracking(); // Always load map and location as first thing
