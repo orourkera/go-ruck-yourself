@@ -144,7 +144,7 @@ class RuckSession {
         status: status,
         notes: json['notes']?.toString(),
         rating: json['rating'] is int ? json['rating'] : null,
-        locationPoints: (json['route'] as List<dynamic>?) ?? (json['location_points'] as List<dynamic>?) ?? [],
+        locationPoints: (json['route'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? (json['location_points'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
         finalElevationGain: json['final_elevation_gain'] != null ? parseDistance(json['final_elevation_gain']) : null,
         finalElevationLoss: json['final_elevation_loss'] != null ? parseDistance(json['final_elevation_loss']) : null,
         heartRateSamples: json['heart_rate_samples'] != null

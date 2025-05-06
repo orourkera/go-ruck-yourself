@@ -114,7 +114,24 @@ class SessionValidationService {
         _overSpeedStartTime = null;
       }
 
-      // Check for not moving (auto-pause)
+      // Check for not moving (auto-pause) - DISABLED
+      /*
+      if (speedKmh < minMovingSpeedKmh) {
+        if (_idleStartTime == null) {
+          _idleStartTime = point.timestamp;
+        } else {
+          final idleTime = point.timestamp.difference(_idleStartTime!);
+          if (idleTime > idleDuration) {
+            results['shouldPause'] = true;
+            results['message'] = 'Auto-paused: No movement detected for 1+ minute';
+          }
+        }
+      } else {
+        _idleStartTime = null;
+      }
+      */
+
+      // Check for not moving (suggest end session)
       if (speedKmh < minMovingSpeedKmh) {
         if (_idleStartTime == null) {
           _idleStartTime = point.timestamp;
@@ -123,9 +140,6 @@ class SessionValidationService {
           if (idleTime > longIdleDuration) {
             results['shouldEnd'] = true;
             results['message'] = 'Idle for 2+ minutes. Consider ending session?';
-          } else if (idleTime > idleDuration) {
-            results['shouldPause'] = true;
-            results['message'] = 'Auto-paused: No movement detected for 1+ minute';
           }
         }
       } else {
