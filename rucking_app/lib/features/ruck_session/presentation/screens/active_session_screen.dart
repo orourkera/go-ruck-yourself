@@ -160,9 +160,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     _startSession(); // Start the timers and stopwatch
     
     // Set planned countdown if provided
-    if (widget.plannedDuration != null && widget.plannedDuration! > 0) {
-      _plannedCountdownStart = Duration(minutes: widget.plannedDuration!);
-    }
+    _plannedCountdownStart = (widget.plannedDuration != null && widget.plannedDuration! > 0) ? Duration(minutes: widget.plannedDuration!) : Duration.zero;
 
     // Load custom marker icon
     _loadCustomMarker();
@@ -296,6 +294,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       _locationPoints.add(locationPoint);
       _canShowStats = true;
     });
+    _calculateStats(locationPoint);
     _centerMapOnUser();
     _lastLocationUpdateTime = DateTime.now(); // Update last location timestamp (used for inactivity detection)
   }
@@ -322,7 +321,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     // Only update stats if we're past the initial threshold or collecting initial data
     if (_canShowStats) {
       // Update distance
-      _distance += distanceMeters / 1000; // Convert to km
+      _uncountedDistance += distanceMeters;
+      _distance = _uncountedDistance / 1000;
+      AppLogger.info("Segment distance calculated: " + distanceMeters.toString() + " meters");
       
       // Calculate elevation changes
       final elevationChange = newPoint.elevation - previousPoint.elevation;

@@ -67,6 +67,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         calories: 0,
         elevationGain: 0,
         elevationLoss: 0,
+        isPaused: false,
+        pace: 0,
       ));
     } catch (e) {
       AppLogger.error('Failed to start session: $e');
@@ -133,17 +135,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final newPoint = event.locationPoint;
         
         try {
-          // Calculate distance between last two points
-          final segmentDistance = _locationService.calculateDistance(
-            previousPoint, 
-            newPoint
+          // Calculate distance between last two points (in km)
+          final segmentDistanceKm = _locationService.calculateDistance(previousPoint, newPoint);
+          final segmentDistanceMeters = segmentDistanceKm * 1000;
+
+          // Use SessionValidationService to validate the new segment
+          final validationService = SessionValidationService();
+          final validationResult = validationService.validateLocationPoint(
+            newPoint,
+            previousPoint,
+            distanceMeters: segmentDistanceMeters,
           );
-          
-          // Only add distance if it's reasonable (prevents GPS jumps)
-          if (segmentDistance < 0.5) { // Less than 500m per update
-            newDistance += segmentDistance;
+
+          if (validationResult['isValid'] == true) {
+            newDistance += segmentDistanceKm;
           } else {
-            AppLogger.warning('Ignoring large distance jump: ${segmentDistance}km');
+            AppLogger.warning('Filtered out segment: ${validationResult['message'] ?? 'Unknown reason'}');
           }
         } catch (e) {
           AppLogger.error('Error calculating distance: $e');
@@ -154,26 +161,27 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Calculate elevation changes
       double elevationGain = currentState.elevationGain;
       double elevationLoss = currentState.elevationLoss;
-      
+
       if (updatedPoints.length > 1) {
         final previousPoint = updatedPoints[updatedPoints.length - 2];
         final newPoint = event.locationPoint;
-        
-        final elevationDifference = newPoint.elevation - previousPoint.elevation;
-        
-        // Only count significant elevation changes (>1m) to filter noise
-        if (elevationDifference > 1) {
-          elevationGain += elevationDifference;
-        } else if (elevationDifference < -1) {
-          elevationLoss += elevationDifference.abs();
-        }
+        final validationService = SessionValidationService();
+        final elevationResult = validationService.validateElevationChange(previousPoint, newPoint);
+        elevationGain += elevationResult['gain'] ?? 0.0;
+        elevationLoss += elevationResult['loss'] ?? 0.0;
       }
+      
+      // Derive pace (minutes per km). If distance is zero, pace is 0 to avoid NaN/inf
+      final int newElapsedSeconds = currentState.elapsedSeconds + 1;
+      final double newPace = newDistance > 0
+          ? (newElapsedSeconds / 60) / newDistance // minutes per km
+          : 0;
       
       // Update the state with new location data
       emit(ActiveSessionRunning(
         sessionId: currentState.sessionId,
         locationPoints: updatedPoints,
-        elapsedSeconds: currentState.elapsedSeconds + 1, // Increment elapsed time
+        elapsedSeconds: newElapsedSeconds, // Increment elapsed time
         distanceKm: newDistance,
         ruckWeightKg: currentState.ruckWeightKg,
         notes: currentState.notes,
@@ -184,6 +192,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elevationGain: elevationGain,
         elevationLoss: elevationLoss,
         isPaused: currentState.isPaused,
+        pace: newPace,
       ));
       
       // Update backend with new location point
