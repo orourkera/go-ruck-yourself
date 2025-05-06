@@ -29,6 +29,8 @@ import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:flutter/services.dart';
 import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 
 /// Screen for tracking an active ruck session
 class ActiveSessionScreen extends ConsumerStatefulWidget {
@@ -540,30 +542,62 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   Future<void> _endSession() async {
     if (_isEnding) return;
     setState(() => _isEnding = true);
-
+    
     try {
       // Stop tracking location
       await _locationService.stopLocationTracking();
+      
+      // Stop timer
       _timer?.cancel();
-      // Removed erroneous: setState(() => _isTracking = false);
-
+      
+      // Mark session as ended
+      setState(() {
+        _isSessionEnded = true;
+        _isEnding = false;
+      });
+      
       // Check if session is too short
       if (_elapsed.inSeconds < 60) {
         _showShortSessionDialog();
         setState(() => _isEnding = false);
         return;
       }
-
+      
+      // Send session complete request to backend
+      await _apiClient.post('/rucks/${widget.ruckId}/complete', {
+        'duration': _elapsed.inSeconds,
+        'distance': _distance,
+        'calories_burned': _caloriesBurned,
+      });
+      
+      AppLogger.info('Ruck session ${widget.ruckId} completed');
+      
       // Calculate final values
       final double finalDistanceKm = _distance;
       final String ruckId = widget.ruckId ?? 'temp-id';
+      
+      // Save workout to HealthKit with minimal impact
+      try {
+        final healthBloc = BlocProvider.of<HealthBloc>(context);
+        healthBloc.add(SaveRuckWorkout(
+          distanceMeters: _distance,
+          caloriesBurned: _caloriesBurned.toDouble(),
+          startTime: _startTime ?? DateTime.now().subtract(_elapsed),
+          endTime: DateTime.now(),
+          ruckWeightKg: widget.ruckWeight,
+          elevationGainMeters: _elevationGain,
+          elevationLossMeters: _elevationLoss
+        ));
+      } catch (healthError) {
+        AppLogger.error('Failed to save workout to HealthKit: $healthError');
+      }
       
       // Navigate to SessionCompleteScreen
       Navigator.of(context).pushNamed(
         '/session_complete',
         arguments: {
-          'completedAt': DateTime.now(),
           'ruckId': ruckId,
+          'completedAt': DateTime.now(),
           'duration': _elapsed,
           'distance': finalDistanceKm,
           'caloriesBurned': _calculateCalories().toInt(),
@@ -575,16 +609,16 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     } catch (e) {
       AppLogger.error('Error ending session: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to end session. Please try again.'),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to end session. Please try again.'),
             duration: const Duration(seconds: 3),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: _endSession,
-            ),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: _endSession,
           ),
-        );
+        ),
+      );
       }
     } finally {
       if (_isEnding) {
