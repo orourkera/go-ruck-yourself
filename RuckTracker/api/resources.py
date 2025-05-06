@@ -67,13 +67,24 @@ class UserResource(Resource):
         try:
             supabase = get_supabase_admin_client()
             # Delete all related data from Supabase tables
-            supabase.table('location_point').delete().eq('user_id', user_id).execute()
-            supabase.table('ruck_session').delete().eq('user_id', user_id).execute()
-            # Delete from auth.users (Supabase Auth)
-            supabase.auth.admin.delete_user(user_id)
+            # First, get all ruck sessions for the user
+            sessions_resp = supabase.table('ruck_session').select('id').eq('user_id', user_id).execute()
+            if hasattr(sessions_resp, 'data') and sessions_resp.data:
+                session_ids = [session['id'] for session in sessions_resp.data]
+                if session_ids:
+                    # Delete location points associated with these sessions
+                    supabase.table('location_point').delete().in_('ruck_session_id', session_ids).execute()
+                # Delete the ruck sessions
+                supabase.table('ruck_session').delete().eq('user_id', user_id).execute()
+            # Finally, delete the user from Supabase auth
+            delete_user_resp = supabase.auth.admin.delete_user(user_id)
+            if hasattr(delete_user_resp, 'error') and delete_user_resp.error:
+                logger.error(f"Failed to delete user {user_id} from Supabase auth: {delete_user_resp.error}")
+                return {'message': 'Failed to delete user from authentication system'}, 500
+            logger.info(f"User {user_id} deleted successfully from Supabase auth.")
         except Exception as e:
-            logger.error(f"Error deleting user or associated data from Supabase: {str(e)}", exc_info=True)
-            return {'message': f'Error deleting user or associated data from Supabase: {str(e)}'}, 500
+            logger.error(f"Error deleting user {user_id} from Supabase: {str(e)}", exc_info=True)
+            return {'message': f'Error deleting user from Supabase: {str(e)}'}, 500
 
         # Delete from local DB (SQLAlchemy ORM)
         logger.debug(f"Attempting to find user {user_id} in local DB for deletion.")
