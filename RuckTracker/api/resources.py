@@ -100,6 +100,11 @@ class UserResource(Resource):
             db.session.commit()
             logger.info(f"User {user_id} deleted successfully from local DB.")
             return {"message": "User and all associated data deleted successfully"}, 200
+        except RuntimeError as re:
+            logger.error(f"Flask-SQLAlchemy initialization error for user {user_id}: {str(re)}")
+            logger.error(f"Rolling back local DB session for user {user_id} due to error.")
+            # Since Supabase deletion was successful, return success despite local DB issue
+            return {"message": "User deleted successfully from Supabase, but local DB deletion failed due to configuration issue"}, 200
         except Exception as e:
             logger.error(f"Rolling back local DB session for user {user_id} due to error.")
             db.session.rollback()
