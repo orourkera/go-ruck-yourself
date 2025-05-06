@@ -144,44 +144,21 @@ class RuckSession {
         status: status,
         notes: json['notes']?.toString(),
         rating: json['rating'] is int ? json['rating'] : null,
-        locationPoints: json['location_points'] is List ? 
-            (json['location_points'] as List).cast<Map<String, dynamic>>() : null,
-        finalElevationGain: (json['final_elevation_gain'] as num?)?.toDouble(),
-        finalElevationLoss: (json['final_elevation_loss'] as num?)?.toDouble(),
+        locationPoints: (json['route'] as List<dynamic>?) ?? (json['location_points'] as List<dynamic>?) ?? [],
+        finalElevationGain: json['final_elevation_gain'] != null ? parseDistance(json['final_elevation_gain']) : null,
+        finalElevationLoss: json['final_elevation_loss'] != null ? parseDistance(json['final_elevation_loss']) : null,
         heartRateSamples: json['heart_rate_samples'] != null
-            ? (json['heart_rate_samples'] as List)
+            ? (json['heart_rate_samples'] as List<dynamic>)
                 .map((e) => HeartRateSample.fromJson(e as Map<String, dynamic>))
                 .toList()
             : null,
-        avgHeartRate: json['avg_heart_rate'] as int?,
-        maxHeartRate: json['max_heart_rate'] as int?,
-        minHeartRate: json['min_heart_rate'] as int?,
+        avgHeartRate: json['avg_heart_rate'] != null ? (json['avg_heart_rate'] as num).toInt() : null,
+        maxHeartRate: json['max_heart_rate'] != null ? (json['max_heart_rate'] as num).toInt() : null,
+        minHeartRate: json['min_heart_rate'] != null ? (json['min_heart_rate'] as num).toInt() : null,
       );
     } catch (e) {
-      AppLogger.error('Error parsing RuckSession from JSON: $e');
-      // Return a default session with the ID if available
-      return RuckSession(
-        id: json['id']?.toString() ?? 'unknown',
-        startTime: DateTime.now().subtract(const Duration(hours: 1)),
-        endTime: DateTime.now(),
-        duration: const Duration(),
-        distance: 0,
-        elevationGain: 0,
-        elevationLoss: 0,
-        caloriesBurned: 0,
-        averagePace: 0,
-        ruckWeightKg: 0,
-        status: RuckStatus.unknown,
-        notes: null,
-        rating: null,
-        locationPoints: null,
-        finalElevationGain: null,
-        finalElevationLoss: null,
-        heartRateSamples: null,
-        avgHeartRate: null,
-        maxHeartRate: null,
-        minHeartRate: null,
-      );
+      print('Error parsing RuckSession from JSON: $e');
+      rethrow;
     }
   }
 
