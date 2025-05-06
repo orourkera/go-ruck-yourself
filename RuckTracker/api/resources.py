@@ -76,6 +76,8 @@ class UserResource(Resource):
                     supabase.table('location_point').delete().in_('ruck_session_id', session_ids).execute()
                 # Delete the ruck sessions
                 supabase.table('ruck_session').delete().eq('user_id', user_id).execute()
+            # Delete the user's profile from the profile table
+            supabase.table('profile').delete().eq('id', user_id).execute()
             # Finally, delete the user from Supabase auth
             delete_user_resp = supabase.auth.admin.delete_user(user_id)
             if hasattr(delete_user_resp, 'error') and delete_user_resp.error:
