@@ -62,6 +62,8 @@ class RuckSessionListResource(Resource):
                 session_data['planned_duration_minutes'] = data.get('planned_duration_minutes')
             if 'ruck_weight_kg' in data and data.get('ruck_weight_kg') is not None:
                 session_data['ruck_weight_kg'] = data.get('ruck_weight_kg')
+            if 'user_weight_kg' in data and data.get('user_weight_kg') is not None:
+                session_data['user_weight_kg'] = data.get('user_weight_kg')
             insert_resp = supabase.table('ruck_session') \
                 .insert(session_data) \
                 .execute()
@@ -321,7 +323,8 @@ class RuckSessionLocationResource(Resource):
                 'session_id': ruck_id,
                 'latitude': data['latitude'],
                 'longitude': data['longitude'],
-                'timestamp': datetime.now(tz.tzutc()).isoformat()
+                'altitude': data.get('elevation') or data.get('elevation_meters'),
+                'timestamp': data.get('timestamp', datetime.now(tz.tzutc()).isoformat())
             }
             insert_resp = supabase.table('location_point') \
                 .insert(location_data) \
