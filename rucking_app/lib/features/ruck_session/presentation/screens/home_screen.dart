@@ -542,14 +542,38 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         if (session['route'] is List && (session['route'] as List).isNotEmpty) {
                           try {
                             routePoints = (session['route'] as List)
-                                .where((p) => p is Map && p.containsKey('latitude') && p.containsKey('longitude'))
+                                .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
                                 .map((p) => LatLng(
-                                  (p['latitude'] as num).toDouble(),
-                                  (p['longitude'] as num).toDouble(),
+                                  (p['lat'] as num).toDouble(),
+                                  (p['lng'] as num).toDouble(),
                                 ))
                                 .toList();
                           } catch (e) {
                             debugPrint('Error parsing route for session: $e');
+                          }
+                        } else if (session['location_points'] is List && (session['location_points'] as List).isNotEmpty) {
+                          try {
+                            routePoints = (session['location_points'] as List)
+                                .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
+                                .map((p) => LatLng(
+                                  (p['lat'] as num).toDouble(),
+                                  (p['lng'] as num).toDouble(),
+                                ))
+                                .toList();
+                          } catch (e) {
+                            debugPrint('Error parsing location_points for session: $e');
+                          }
+                        } else if (session['locationPoints'] is List && (session['locationPoints'] as List).isNotEmpty) {
+                          try {
+                            routePoints = (session['locationPoints'] as List)
+                                .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
+                                .map((p) => LatLng(
+                                  (p['lat'] as num).toDouble(),
+                                  (p['lng'] as num).toDouble(),
+                                ))
+                                .toList();
+                          } catch (e) {
+                            debugPrint('Error parsing locationPoints for session: $e');
                           }
                         }
                         if (routePoints.isEmpty) {
