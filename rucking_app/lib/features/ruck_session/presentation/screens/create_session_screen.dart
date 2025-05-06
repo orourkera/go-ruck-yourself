@@ -614,6 +614,16 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     }
                     return null;
                   },
+                  onChanged: (value) {
+                    setState(() {
+                      if (value.isEmpty) {
+                        _plannedDuration = null;
+                      } else {
+                        final parsed = int.tryParse(value);
+                        _plannedDuration = (parsed != null && parsed > 0) ? parsed : null;
+                      }
+                    });
+                  },
                   onFieldSubmitted: (_) {
                     FocusScope.of(context).unfocus();
                     if (!_isCreating) _createSession();

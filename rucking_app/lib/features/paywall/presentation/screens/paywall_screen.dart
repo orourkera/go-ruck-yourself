@@ -23,8 +23,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Timer? _timer;
   int? _selectedPlanIndex;
 
-  List<dynamic> _packages = [];
-
   // Define the content for each card
   final List<Map<String, String>> _cards = [
     {
@@ -37,24 +35,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchOfferings();
     // No auto-scrolling timer needed since we have only one card
-  }
-
-  Future<void> _fetchOfferings() async {
-    final revenueCatService = GetIt.instance<RevenueCatService>();
-    final offerings = await revenueCatService.getOfferings();
-    if (offerings.isNotEmpty) {
-      final pkgs = offerings.first.availablePackages;
-      // Debug: Print identifiers and types
-      print('Available packages:');
-      for (final pkg in pkgs) {
-        print('id: ${pkg.identifier}, type: ${pkg.packageType}, price: ${pkg.storeProduct.priceString}');
-      }
-      setState(() {
-        _packages = pkgs;
-      });
-    }
   }
 
   @override
@@ -71,148 +52,152 @@ class _PaywallScreenState extends State<PaywallScreen> {
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: _buildCard(
-                title: _cards[0]['title']!,
-                screenshot: _cards[0]['screenshot']!,
-                valueProp: _cards[0]['valueProp']!,
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Subscription Plans Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  Text(
-                    'SUBSCRIPTION PLANS',
-                    style: AppTextStyles.paywallHeadline.copyWith(fontSize: 20),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPlanIndex = 0;
-                            });
-                          },
-                          child: _buildPlanCard('Weekly', getPlanPrice(0), _selectedPlanIndex == 0),
-                        ),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPlanIndex = 1;
-                            });
-                          },
-                          child: _buildPlanCard('Monthly', getPlanPrice(1), _selectedPlanIndex == 1),
-                        ),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPlanIndex = 2;
-                            });
-                          },
-                          child: _buildPlanCard('Annual', getPlanPrice(2), _selectedPlanIndex == 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Get Rucky Button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await _handleGetRuckyPressed(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildCard(
+                  title: _cards[0]['title']!,
+                  screenshot: _cards[0]['screenshot']!,
+                  valueProp: _cards[0]['valueProp']!,
+                ),
+                const SizedBox(height: 20),
+                // Subscription Plans Section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      Text(
+                        'SUBSCRIPTION PLANS',
+                        style: AppTextStyles.paywallHeadline.copyWith(fontSize: 20),
+                        textAlign: TextAlign.center,
                       ),
-                      child: const Text(
-                        'GET RUCKY',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Bangers',
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Add legal links and subscription info at the bottom
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Go Ruck Yourself Premium\nAuto-renewing subscription',
-                          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Prices may vary by region. Subscription auto-renews unless cancelled at least 24 hours before the end of the period.',
-                          style: AppTextStyles.bodySmall,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
                           children: [
                             GestureDetector(
-                              onTap: () async {
-                                const url = 'https://getrucky.com/privacy';
-                                if (await canLaunch(url)) {
-                                  await launch(url);
-                                }
+                              onTap: () {
+                                setState(() {
+                                  _selectedPlanIndex = 0;
+                                });
                               },
-                              child: Text(
-                                'Privacy Policy',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  decoration: TextDecoration.underline,
-                                  color: AppColors.primary,
-                                ),
+                              child: _buildPlanCard('Weekly', r'$1.99 / week', _selectedPlanIndex == 0),
+                            ),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedPlanIndex = 1;
+                                });
+                              },
+                              child: _buildPlanCard('Monthly', r'$4.99 / month', _selectedPlanIndex == 1),
+                            ),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedPlanIndex = 2;
+                                });
+                              },
+                              child: _buildPlanCard('Annual', r'$29.99 / year', _selectedPlanIndex == 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Move Get Rucky Button up here
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.lock_open),
+                            label: Text(
+                              'GET RUCKY',
+                              style: AppTextStyles.labelLarge.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 18),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: () {
+                              _handleGetRuckyPressed(context);
+                            },
+                          ),
+                        ),
+                      ),
+                      // Subscription Information and Legal Links
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              "Subscription Information",
+                              style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "• Title: Go Rucky Premium\n"
+                              "• Length: Weekly, Monthly, or Annual\n"
+                              "• Price: as shown above\n"
+                              "• Payment will be charged to your Apple ID account at confirmation of purchase.\n"
+                              "• Subscription automatically renews unless canceled at least 24 hours before the end of the current period.\n"
+                              "• You can manage and cancel your subscription in your App Store account settings at any time.",
+                              style: AppTextStyles.bodySmall,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
                             GestureDetector(
                               onTap: () async {
-                                const url = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
-                                if (await canLaunch(url)) {
-                                  await launch(url);
-                                }
+                                final url = Uri.parse("https://getrucky.com/terms");
+                                if (await canLaunchUrl(url)) launchUrl(url);
                               },
                               child: Text(
-                                'Terms of Use',
+                                "Terms of Use",
                                 style: AppTextStyles.bodySmall.copyWith(
-                                  decoration: TextDecoration.underline,
                                   color: AppColors.primary,
+                                  decoration: TextDecoration.underline,
                                 ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () async {
+                                final url = Uri.parse("https://getrucky.com/privacy");
+                                if (await canLaunchUrl(url)) launchUrl(url);
+                              },
+                              child: Text(
+                                "Privacy Policy",
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.primary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -222,28 +207,19 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final revenueCatService = GetIt.instance<RevenueCatService>();
     final offerings = await revenueCatService.getOfferings();
     if (offerings.isNotEmpty) {
-      final packages = offerings.first.availablePackages;
-      final selectedIndex = _selectedPlanIndex ?? 0;
-      final identifiers = ['\$rc_weekly', '\$rc_monthly', '\$rc_annual'];
-      final selectedIdentifier = identifiers[selectedIndex];
-      dynamic package;
-      try {
-        package = packages.firstWhere((pkg) => pkg.identifier == selectedIdentifier);
-      } catch (_) {
-        package = packages.first;
+      final package = offerings.first.availablePackages.first;
+      final isPurchased = await revenueCatService.makePurchase(package);
+      if (isPurchased) {
+        // After successful purchase, go directly to Home Screen
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // Handle purchase failure
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Purchase failed. Please try again.',
+          duration: const Duration(seconds: 3),
+        );
       }
-        final isPurchased = await revenueCatService.makePurchase(package);
-        if (isPurchased) {
-          // After successful purchase, go directly to Home Screen
-          Navigator.pushReplacementNamed(context, '/home');
-        } else {
-          // Handle purchase failure
-          StyledSnackBar.showError(
-            context: context,
-            message: 'Purchase failed. Please try again.',
-            duration: const Duration(seconds: 3),
-          );
-        }
     } else {
       StyledSnackBar.showError(
         context: context,
@@ -269,9 +245,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          // App Screenshot (smaller, no background)
+          // App Screenshot (larger, no background)
           SizedBox(
-            height: 95, // Further reduced to save space
+            height: 190, // doubled from 95
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.asset(
@@ -297,27 +273,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
           const SizedBox(height: 10),
           // Disclaimer below value prop in same style
           Text(
-            "A subscription is required to use this app. It's by ruckers and for ruckers and that has a price. All plans come with a free trial period so give it a shot, rucker.",
+            "A subscription is required to use this app. It's by ruckers and for ruckers and that has a price.",
             style: AppTextStyles.bodySmall,
             textAlign: TextAlign.center,
           ),
         ],
       ),
     );
-  }
-
-  String getPlanPrice(int index) {
-    // Use identifier for robust mapping
-    final identifiers = ['\$rc_weekly', '\$rc_monthly', '\$rc_annual'];
-    if (_packages.isEmpty) return '';
-    try {
-      final pkg = _packages.firstWhere(
-        (p) => p.identifier == identifiers[index],
-      );
-      return pkg.storeProduct.priceString ?? '';
-    } catch (_) {
-      return '';
-    }
   }
 
   Widget _buildPlanCard(String planName, String price, bool isSelected) {
