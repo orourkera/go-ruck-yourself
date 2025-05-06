@@ -24,8 +24,8 @@ This document lists **all validation rules and thresholds** enforced on the Acti
 - **Implementation:**
   - Controlled by `SessionValidationService.minSessionDuration`.
 
-## 4. Auto-Pause on Inactivity
-- **Rule:** If user speed drops below 0.5 km/h for more than 1 minute, the session is auto-paused.
+## 4. Auto-Pause (Disabled)
+- **Rule:** The app previously auto-paused when speed dropped below `0.5 km/h` for over `1 minute`. This feature is now disabled to prevent random pausing during sessions. Users must manually pause and resume sessions.
 - **Purpose:** Prevents false tracking when the user is idle.
 - **Implementation:**
   - Controlled by `SessionValidationService.minMovingSpeedKmh` and `longIdleDuration` (1 minute).
