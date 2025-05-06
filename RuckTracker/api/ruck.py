@@ -35,9 +35,12 @@ class RuckSessionListResource(Resource):
                     .order('timestamp') \
                     .execute()
                 if locations_resp.data:
+                    # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
                     session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+                    session['location_points'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
                 else:
                     session['route'] = []
+                    session['location_points'] = []
             return {'sessions': sessions}, 200
         except Exception as e:
             logger.error(f"Error fetching ruck sessions: {e}")
@@ -95,9 +98,12 @@ class RuckSessionResource(Resource):
                 .order('timestamp', desc=True) \
                 .execute()
             if locations_resp.data:
+                # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
                 session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+                session['location_points'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
             else:
                 session['route'] = []
+                session['location_points'] = []
             return session, 200
         except Exception as e:
             logger.error(f"Error fetching ruck session {ruck_id}: {e}")
