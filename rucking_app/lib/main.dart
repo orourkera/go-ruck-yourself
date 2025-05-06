@@ -18,8 +18,9 @@ void main() async {
   // Load environment variables from .env
   await dotenv.load();
   
-  // Configure RevenueCat
-  await Purchases.configure(PurchasesConfiguration(dotenv.env['REVENUECAT_API_KEY']!));
+  // Disable RevenueCat debug logs for production
+  Purchases.setDebugLogsEnabled(false);
+  // Removed Purchases.configure from main.dart. Now handled in RevenueCatService.
   
   // Initialize Firebase
   await Firebase.initializeApp();

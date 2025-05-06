@@ -19,6 +19,8 @@ class RevenueCatService {
     if (apiKey == null || apiKey.isEmpty) {
       throw Exception('REVENUECAT_API_KEY is missing from .env file');
     }
+    // Disable RevenueCat debug logs for production
+    Purchases.setDebugLogsEnabled(false);
     await Purchases.configure(PurchasesConfiguration(apiKey));
     _isInitialized = true;
   }
