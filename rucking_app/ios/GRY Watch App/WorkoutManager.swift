@@ -1,27 +1,32 @@
+import Foundation
 import HealthKit
 
 class WorkoutManager: NSObject {
-    
     private let healthStore = HKHealthStore()
-    private var workout: HKWorkout?
-    private var activeQueries = [HKQuery]()
+    private var workoutSession: HKWorkoutSession?
+    private var workoutBuilder: HKLiveWorkoutBuilder?
     private var heartRateHandler: ((Double) -> Void)?
     
-    // Check if HealthKit data is available on this device
     var isHealthKitAvailable: Bool {
         return HKHealthStore.isHealthDataAvailable()
     }
     
+    // Types to read and share via HealthKit
+    private let typesToRead: Set<HKObjectType> = [
+        HKObjectType.quantityType(forIdentifier: .heartRate)!,
+        HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
+        HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!
+    ]
+    
+    private let typesToShare: Set<HKSampleType> = [
+        HKObjectType.quantityType(forIdentifier: .heartRate)!,
+        HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
+        HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
+        HKObjectType.workoutType()
+    ]
+    
     // Request authorization to access HealthKit data
     func requestAuthorization(completion: @escaping (Bool, Error?) -> Void) {
-        guard isHealthKitAvailable else {
-            completion(false, NSError(domain: "WorkoutManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "HealthKit is not available on this device."]))
-            return
-        }
-        
-        let typesToShare: Set = [HKObjectType.workoutType()]
-        let typesToRead: Set = [HKObjectType.quantityType(forIdentifier: .heartRate)!]
-        
         healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead) { (success, error) in
             completion(success, error)
         }
@@ -29,40 +34,56 @@ class WorkoutManager: NSObject {
     
     // Start a workout session
     func startWorkout(completion: @escaping (Error?) -> Void) {
+        // Create a workout configuration
         let configuration = HKWorkoutConfiguration()
-        configuration.activityType = .walking // Using walking as a proxy for rucking
+        configuration.activityType = .walking
         configuration.locationType = .outdoor
         
-        healthStore.startWorkout(with: configuration) { [weak self] (workout, error) in
-            guard let self = self else { return }
-            if let error = error {
-                completion(error)
-                return
-            }
+        do {
+            // Create a workout session and builder
+            let session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
+            let builder = session.associatedWorkoutBuilder()
             
-            self.workout = workout
-            self.startHeartRateMonitoring()
-            completion(nil)
+            // Set the data source
+            builder.dataSource = HKLiveWorkoutDataSource(healthStore: healthStore, workoutConfiguration: configuration)
+            
+            // Assign delegates
+            session.delegate = self
+            builder.delegate = self
+            
+            // Store references
+            self.workoutSession = session
+            self.workoutBuilder = builder
+            
+            // Start the workout session and builder
+            session.startActivity(with: Date())
+            builder.beginCollection(withStart: Date()) { (success, error) in
+                completion(error)
+            }
+        } catch {
+            completion(error)
         }
     }
     
     // End the current workout session
     func endWorkout(completion: @escaping (Error?) -> Void) {
-        guard let workout = workout else {
-            completion(NSError(domain: "WorkoutManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "No active workout to end."]))
+        guard let session = workoutSession, let builder = workoutBuilder else {
+            completion(nil) // No active session to end
             return
         }
         
-        healthStore.end(workout) { [weak self] (error) in
-            guard let self = self else { return }
+        session.end()
+        builder.endCollection(withEnd: Date()) { (success, error) in
             if let error = error {
                 completion(error)
                 return
             }
             
-            self.workout = nil
-            self.stopAllQueries()
-            completion(nil)
+            builder.finishWorkout { (workout, error) in
+                self.workoutSession = nil
+                self.workoutBuilder = nil
+                completion(error)
+            }
         }
     }
     
@@ -70,55 +91,37 @@ class WorkoutManager: NSObject {
     func setHeartRateHandler(_ handler: @escaping (Double) -> Void) {
         self.heartRateHandler = handler
     }
-    
-    // Start monitoring heart rate
-    private func startHeartRateMonitoring() {
-        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
-        
-        let query = HKAnchoredObjectQuery(type: heartRateType, predicate: nil, anchor: nil, limit: HKObjectQueryNoLimit) { [weak self] (query, samples, deletedObjects, newAnchor, error) in
-            guard let self = self else { return }
-            if let error = error {
-                print("Heart rate query failed: \(error.localizedDescription)")
-                return
-            }
-            
-            if let heartRateSamples = samples as? [HKQuantitySample] {
-                self.processHeartRateSamples(heartRateSamples)
-            }
-        }
-        
-        query.updateHandler = { [weak self] (query, samples, deletedObjects, newAnchor, error) in
-            guard let self = self else { return }
-            if let error = error {
-                print("Heart rate update failed: \(error.localizedDescription)")
-                return
-            }
-            
-            if let heartRateSamples = samples as? [HKQuantitySample] {
-                self.processHeartRateSamples(heartRateSamples)
-            }
-        }
-        
-        activeQueries.append(query)
-        healthStore.execute(query)
+}
+
+// MARK: - HKWorkoutSessionDelegate
+extension WorkoutManager: HKWorkoutSessionDelegate {
+    func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
+        // Handle state changes if needed
     }
     
-    // Process received heart rate samples
-    private func processHeartRateSamples(_ samples: [HKQuantitySample]) {
-        guard let handler = heartRateHandler else { return }
-        
-        for sample in samples {
-            let heartRateUnit = HKUnit(from: "count/min")
-            let heartRate = sample.quantity.doubleValue(for: heartRateUnit)
-            handler(heartRate)
+    func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
+        // Handle errors if needed
+    }
+}
+
+// MARK: - HKLiveWorkoutBuilderDelegate
+extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
+    func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
+        for type in collectedTypes {
+            guard let quantityType = type as? HKQuantityType,
+                  let statistics = workoutBuilder.statistics(for: quantityType) else { continue }
+            
+            // Handle heart rate data
+            if quantityType == HKQuantityType.quantityType(forIdentifier: .heartRate) {
+                if let value = statistics.mostRecentQuantity()?.doubleValue(for: HKUnit(from: "count/min")),
+                   let handler = heartRateHandler {
+                    handler(value)
+                }
+            }
         }
     }
     
-    // Stop all active queries
-    private func stopAllQueries() {
-        for query in activeQueries {
-            healthStore.stop(query)
-        }
-        activeQueries.removeAll()
+    func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {
+        // Handle events if needed
     }
 }

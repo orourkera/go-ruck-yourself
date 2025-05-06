@@ -1,58 +1,56 @@
+import Foundation
 import WatchConnectivity
 
+protocol SessionManagerDelegate: AnyObject {
+    func sessionDidActivate()
+    func sessionDidDeactivate()
+    func didReceiveMessage(_ message: [String: Any])
+}
+
 class SessionManager: NSObject, WCSessionDelegate {
+    static let shared = SessionManager()
+    weak var delegate: SessionManagerDelegate?
+    private let session: WCSession
     
-    private var session: WCSession?
-    private var messageHandler: (([String: Any]) -> Void)?
-    
-    var isConnected: Bool {
-        return session?.activationState == .activated && session?.isReachable == true
-    }
-    
-    override init() {
+    private override init() {
+        session = WCSession.default
         super.init()
-        setupSession()
-    }
-    
-    private func setupSession() {
-        if WCSession.isSupported() {
-            session = WCSession.default
-            session?.delegate = self
-            session?.activate()
+        session.delegate = self
+        if session.activationState != .activated {
+            session.activate()
         }
     }
     
-    func setMessageHandler(_ handler: @escaping ([String: Any]) -> Void) {
-        self.messageHandler = handler
-    }
-    
-    func sendMessage(_ message: [String: Any], completion: ((Error?) -> Void)? = nil) {
-        guard let session = session, session.isActivated, session.isReachable else {
-            completion?(NSError(domain: "SessionManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Watch session is not connected."]))
+    func sendMessage(_ message: [String: Any]) {
+        guard session.activationState == .activated else {
+            print("Session not activated, message not sent.")
             return
         }
         
         session.sendMessage(message, replyHandler: nil) { error in
-            completion?(error)
+            print("Error sending message: \(error.localizedDescription)")
         }
     }
     
-    // MARK: - WCSessionDelegate Methods
+    // MARK: - WCSessionDelegate
     
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        if activationState == .activated {
+            delegate?.sessionDidActivate()
+        } else {
+            delegate?.sessionDidDeactivate()
+        }
         if let error = error {
             print("Session activation failed: \(error.localizedDescription)")
-            return
         }
-        
-        print("Session activation state: \(activationState.rawValue)")
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
-        messageHandler?(message)
+        delegate?.didReceiveMessage(message)
     }
     
-    func sessionReachabilityDidChange(_ session: WCSession) {
-        print("Session reachability changed: \(session.isReachable ? "Reachable" : "Not Reachable")")
+    func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
+        delegate?.didReceiveMessage(message)
+        replyHandler(["received": true])
     }
 }

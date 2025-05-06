@@ -36,8 +36,17 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
     override func willActivate() {
         super.willActivate()
         // Check session state when view becomes visible
-        if let session = session, session.isActivated {
-            statusLabel.setText("Connected")
+        if let session = session {
+            switch session.activationState {
+            case .activated:
+                statusLabel.setText("Connected")
+            case .inactive:
+                statusLabel.setText("Inactive")
+            case .notActivated:
+                statusLabel.setText("Not Connected")
+            @unknown default:
+                statusLabel.setText("Unknown State")
+            }
         }
     }
     
@@ -136,13 +145,18 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
     
     // Send heart rate data to iOS app
     func sendHeartRate(_ heartRate: Double) {
-        guard let session = session, session.isActivated else {
+        guard let session = session else {
             statusLabel.setText("Not Connected")
             return
         }
         
-        session.sendMessage(["heartRate": heartRate], replyHandler: nil) { error in
-            self.statusLabel.setText("Send Error: \(error.localizedDescription)")
+        switch session.activationState {
+        case .activated:
+            session.sendMessage(["heartRate": heartRate], replyHandler: nil) { error in
+                self.statusLabel.setText("Send Error: \(error.localizedDescription)")
+            }
+        default:
+            statusLabel.setText("Not Connected")
         }
     }
 }
