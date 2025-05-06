@@ -22,11 +22,49 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
         if WCSession.isSupported() {
             session = WCSession.default
             session?.delegate = self
-            session?.activate()
-            statusLabel.setText("Connecting...")
+            if session?.activationState != .activated {
+                print("Activating Watch session...")
+                session?.activate()
+            } else {
+                print("Watch session already activated with state: \(session?.activationState.rawValue ?? -1)")
+            }
+            print("Session pairing status checks are not available in watchOS")
         } else {
-            statusLabel.setText("Not Supported")
+            print("WatchConnectivity is not supported on this device.")
         }
+        
+        // Set initial UI state - attempt to set even if outlets are not connected
+        if statusLabel == nil {
+            print("statusLabel outlet is not connected in storyboard!")
+        } else {
+            statusLabel.setText("GRY Watch App: Initializing...")
+        }
+        if heartRateLabel == nil {
+            print("heartRateLabel outlet is not connected in storyboard!")
+        } else {
+            heartRateLabel.setText("Heart Rate: -- bpm")
+        }
+        if distanceLabel == nil {
+            print("distanceLabel outlet is not connected in storyboard!")
+        } else {
+            distanceLabel.setText("Distance: -- km")
+        }
+        if caloriesLabel == nil {
+            print("caloriesLabel outlet is not connected in storyboard!")
+        } else {
+            caloriesLabel.setText("Calories: --")
+        }
+        if paceLabel == nil {
+            print("paceLabel outlet is not connected in storyboard!")
+        } else {
+            paceLabel.setText("Pace: -- min/km")
+        }
+        if elevationLabel == nil {
+            print("elevationLabel outlet is not connected in storyboard!")
+        } else {
+            elevationLabel.setText("Elevation: -- m")
+        }
+        updateStatusLabel()
         
         // Initialize WorkoutManager for HealthKit
         workoutManager = WorkoutManager()
@@ -40,12 +78,13 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
             switch session.activationState {
             case .activated:
                 statusLabel.setText("Connected")
-            case .inactive:
-                statusLabel.setText("Inactive")
-            case .notActivated:
+                print("Updated UI: Session is activated.")
+            case .inactive, .notActivated:
                 statusLabel.setText("Not Connected")
+                print("Updated UI: Session is not activated. Current state: \(session.activationState.rawValue)")
             @unknown default:
                 statusLabel.setText("Unknown State")
+                print("Updated UI: Session state is unknown.")
             }
         }
     }
@@ -79,26 +118,47 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
     // MARK: - WCSessionDelegate Methods
     
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateStatusLabel()
+        }
         if let error = error {
-            statusLabel.setText("Error: \(error.localizedDescription)")
+            print("Session activation error: \(error.localizedDescription)")
+        } else {
+            print("Session activation completed with state: \(activationState.rawValue)")
+        }
+    }
+    
+    private func updateStatusLabel() {
+        guard let session = session else {
+            if statusLabel != nil {
+                statusLabel.setText("Status: Not Supported")
+            }
             return
         }
         
-        switch activationState {
+        switch session.activationState {
         case .activated:
-            statusLabel.setText("Connected")
-        case .inactive:
-            statusLabel.setText("Inactive")
-        case .notActivated:
-            statusLabel.setText("Not Connected")
+            if statusLabel != nil {
+                statusLabel.setText("Status: Connected")
+            }
+            print("Updated UI: Session is activated.")
+        case .inactive, .notActivated:
+            if statusLabel != nil {
+                statusLabel.setText("Status: Disconnected")
+            }
+            print("Updated UI: Session is not activated. Current state: \(session.activationState.rawValue)")
         @unknown default:
-            statusLabel.setText("Unknown State")
+            if statusLabel != nil {
+                statusLabel.setText("Status: Unknown")
+            }
+            print("Updated UI: Session state is unknown.")
         }
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         // Handle incoming messages from iOS app
         if let command = message["command"] as? String {
+            print("Received command from iOS app: \(command)")
             switch command {
             case "workoutStarted":
                 statusLabel.setText("Workout Active")
@@ -155,6 +215,7 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
             session.sendMessage(["heartRate": heartRate], replyHandler: nil) { error in
                 self.statusLabel.setText("Send Error: \(error.localizedDescription)")
             }
+            print("Sent heart rate to iOS app: \(heartRate) bpm")
         default:
             statusLabel.setText("Not Connected")
         }
