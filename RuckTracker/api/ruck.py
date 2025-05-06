@@ -32,7 +32,7 @@ class RuckSessionListResource(Resource):
                 locations_resp = supabase.table('location_point') \
                     .select('latitude,longitude') \
                     .eq('session_id', session['id']) \
-                    .order('timestamp', asc=True) \
+                    .order('timestamp') \
                     .execute()
                 if locations_resp.data:
                     session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
