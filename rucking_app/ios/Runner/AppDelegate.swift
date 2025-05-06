@@ -17,7 +17,9 @@ import WatchConnectivity
         if WCSession.isSupported() {
             session = WCSession.default
             session?.delegate = self
-            session?.activate()
+            if session?.activationState != .activated {
+                session?.activate()
+            }
         }
         
         // Setup Flutter Method Channel for communication with Dart
@@ -57,8 +59,8 @@ import WatchConnectivity
     
     // Send message to Watch
     private func sendMessageToWatch(_ message: [String: Any]) {
-        guard let session = session, session.isActivated, session.isReachable else {
-            print("Watch session is not connected.")
+        guard let session = session, session.activationState == .activated, session.isReachable else {
+            print("Watch session not activated or not reachable.")
             return
         }
         
