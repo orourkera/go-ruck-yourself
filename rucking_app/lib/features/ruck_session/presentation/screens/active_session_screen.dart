@@ -79,6 +79,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   StreamSubscription<LocationPoint>? _locationSubscription;
   final List<LocationPoint> _locationPoints = [];
   DateTime? _lastLocationUpdate;
+  DateTime? _lastLocationUpdateTime; // Track timestamp of the last location update
   
   // Session stats
   double _distance = 0.0;
@@ -149,6 +150,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     _elapsed = Duration.zero;
     _locationPoints.clear();
     _lastLocationUpdate = null;
+    _lastLocationUpdateTime = null;
     _recentPaces.clear();
     _canShowStats = false;
     _uncountedDistance = 0.0;
@@ -295,6 +297,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       _canShowStats = true;
     });
     _centerMapOnUser();
+    _lastLocationUpdateTime = DateTime.now(); // Update last location timestamp (used for inactivity detection)
   }
 
   /// Center map on user when new location is added
@@ -464,6 +467,21 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       setState(() {
         _elapsed = Duration(seconds: _stopwatch.elapsed.inSeconds);
       });
+      _checkInactivity(); // Check if user has been inactive for too long
+    }
+  }
+  
+  /// Checks for inactivity when no location updates have been received for a while
+  void _checkInactivity() {
+    if (_isPaused || _isSessionEnded) return;
+    if (_lastLocationUpdateTime == null) return;
+    final idleDuration = DateTime.now().difference(_lastLocationUpdateTime!);
+    if (idleDuration > const Duration(seconds: 60)) {
+      setState(() {
+        _validationMessage = 'Auto-paused: No movement detected for 1+ minute';
+        _showValidationMessage = true;
+      });
+      _togglePause();
     }
   }
   
@@ -473,6 +491,8 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       if (_isPaused) {
         _stopwatch.start();
         _isPaused = false;
+        // Update last location time to now when resuming
+        _lastLocationUpdateTime = DateTime.now();
         // Resume location tracking
         _locationSubscription?.resume();
         // Notify API
@@ -954,19 +974,43 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // Heart rate row: icon and value perfectly aligned by their midpoints
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Icon(Icons.favorite, color: AppColors.error, size: 40),
+                          // Use a Stack to align icon and value by their visual midpoints
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(Icons.favorite, color: AppColors.error, size: 40),
+                              // Invisible heart rate value for baseline alignment measurement
+                              Opacity(
+                                opacity: 0.0,
+                                child: Text(
+                                  heartRate != null ? '${heartRate}' : '--',
+                                  style: AppTextStyles.displayLarge.copyWith(
+                                    fontFamily: 'Bangers',
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 40,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(width: 8),
-                          Text(
-                            heartRate != null ? '${heartRate}' : '--',
-                            style: AppTextStyles.displayLarge.copyWith(
-                              fontFamily: 'Bangers',
-                              fontWeight: FontWeight.bold,
-                              fontSize: 40,
-                              color: Colors.black,
+                          Baseline(
+                            baselineType: TextBaseline.alphabetic,
+                            baseline: 32, // Empirically chosen for best vertical alignment
+                            child: Text(
+                              heartRate != null ? '${heartRate}' : '--',
+                              style: AppTextStyles.displayLarge.copyWith(
+                                fontFamily: 'Bangers',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 40,
+                                color: Colors.black,
+                              ),
                             ),
                           ),
                         ],
