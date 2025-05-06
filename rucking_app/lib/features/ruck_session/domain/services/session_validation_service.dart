@@ -150,6 +150,24 @@ class SessionValidationService {
     return results;
   }
 
+  /// Validates and returns elevation gain/loss for a segment
+  /// Returns a map: { 'gain': double, 'loss': double }
+  Map<String, double> validateElevationChange(
+    LocationPoint previousPoint,
+    LocationPoint newPoint,
+    {double minChangeMeters = 1.0}
+  ) {
+    final elevationDifference = newPoint.elevation - previousPoint.elevation;
+    double gain = 0.0;
+    double loss = 0.0;
+    if (elevationDifference > minChangeMeters) {
+      gain = elevationDifference;
+    } else if (elevationDifference < -minChangeMeters) {
+      loss = elevationDifference.abs();
+    }
+    return {'gain': gain, 'loss': loss};
+  }
+
   /// Check if the session is valid before saving it
   Map<String, dynamic> validateSessionForSave({
     required double distanceMeters,

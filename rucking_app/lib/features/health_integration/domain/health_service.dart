@@ -67,6 +67,7 @@ class HealthService {
         HealthDataType.STEPS,
         HealthDataType.DISTANCE_WALKING_RUNNING, 
         HealthDataType.ACTIVE_ENERGY_BURNED,   
+        HealthDataType.HEART_RATE, // Added permission to read Heart Rate samples
         if (Platform.isIOS) HealthDataType.WORKOUT,
       ];
       
@@ -75,6 +76,7 @@ class HealthService {
         HealthDataAccess.READ,             // Steps
         HealthDataAccess.READ_WRITE,       // Distance
         HealthDataAccess.READ_WRITE,       // Active Energy Burned
+        HealthDataAccess.READ,             // Heart Rate (read only)
         if (Platform.isIOS) HealthDataAccess.READ_WRITE, // Workout (includes writing)
       ];
 
