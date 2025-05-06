@@ -103,7 +103,7 @@ class ApiClient {
   }
   
   /// Makes a POST request to the specified endpoint with the given body
-  Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
+  Future<dynamic> post(String endpoint, dynamic body) async {
     try {
       // Require token for /rucks/* and /users/* endpoints, EXCEPT for /users/register
       bool requiresAuth = (endpoint.startsWith('/rucks') || endpoint.startsWith('/users/')) && 

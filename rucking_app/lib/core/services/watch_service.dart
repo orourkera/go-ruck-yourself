@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,9 +7,8 @@ import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/api/rucking_api.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
-import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
-import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/features/ruck_session/data/heart_rate_sample_storage.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 
 /// Service for managing communication with Apple Watch companion app
@@ -34,14 +34,12 @@ class WatchService {
   // Stream controllers for watch events
   final _sessionEventController = StreamController<Map<String, dynamic>>.broadcast();
   final _healthDataController = StreamController<Map<String, dynamic>>.broadcast();
+  final _heartRateController = StreamController<double>.broadcast();
   
-  // Public streams
-  Stream<Map<String, dynamic>> get sessionEvents => _sessionEventController.stream;
-  Stream<Map<String, dynamic>> get healthData => _healthDataController.stream;
+  // Heart rate samples list
+  List<HeartRateSample> _currentSessionHeartRateSamples = [];
   
-  WatchService(this._locationService, this._healthService, this._authService) {
-    _initPlatformChannels();
-  }
+  WatchService(this._locationService, this._healthService, this._authService);
   
   void _initPlatformChannels() {
     // Set up method channels
@@ -98,6 +96,12 @@ class WatchService {
           // If session is active, send to health service
           if (_isSessionActive) {
             _healthService.updateHeartRate(_currentHeartRate!);
+            // Store heart rate sample with timestamp
+            final sample = HeartRateSample(
+              timestamp: DateTime.now(),
+              bpm: _currentHeartRate!.toInt(),
+            );
+            _currentSessionHeartRateSamples.add(sample);
           }
         }
         
@@ -117,7 +121,7 @@ class WatchService {
     
     try {
       // Get current user
-      final authState = await _authService.getCurrentUser();
+      final authState = _authService.currentUser;
       if (authState == null) {
         debugPrint('[ERROR] No authenticated user found - cannot create session from Watch');
         return;
@@ -141,6 +145,11 @@ class WatchService {
       // Start session on backend
       await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {});
       
+      // Update app state
+      _isSessionActive = true;
+      _ruckWeight = ruckWeight;
+      _currentSessionHeartRateSamples = [];
+      
       // Send event to BLoC to update UI
       /* // Temporarily commented out - removing watch functionality
       GetIt.instance<ActiveSessionBloc>().add(SessionStarted(
@@ -158,8 +167,11 @@ class WatchService {
   /// Handle a session ended from the watch
   Future<void> _handleSessionEndedFromWatch(Map<String, dynamic> data) async {
     try {
+      // Save heart rate samples to storage
+      await HeartRateSampleStorage.saveSamples(_currentSessionHeartRateSamples);
+      
       final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionRunning) {
+      if (bloc.state is ActiveSessionInProgress || bloc.state is ActiveSessionPaused) {
         bloc.add(const SessionCompleted());
       }
     } catch (e) {
@@ -171,7 +183,7 @@ class WatchService {
   Future<void> _handlePauseSessionFromWatch(Map<String, dynamic> data) async {
     try {
       final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionRunning && !(bloc.state as ActiveSessionRunning).isPaused) {
+      if (bloc.state is ActiveSessionInProgress) {
         bloc.add(const SessionPaused());
       }
     } catch (e) {
@@ -183,7 +195,7 @@ class WatchService {
   Future<void> _handleResumeSessionFromWatch(Map<String, dynamic> data) async {
     try {
       final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionRunning && (bloc.state as ActiveSessionRunning).isPaused) {
+      if (bloc.state is ActiveSessionPaused) {
         bloc.add(const SessionResumed());
       }
     } catch (e) {
@@ -264,6 +276,9 @@ class WatchService {
     _isSessionActive = false;
     
     try {
+      // Save heart rate samples to storage
+      await HeartRateSampleStorage.saveSamples(_currentSessionHeartRateSamples);
+      
       final api = FlutterRuckingApi();
       await api.endSessionOnWatch();
       return true;
@@ -279,67 +294,40 @@ class WatchService {
     // Notify health service if needed
     if (_isSessionActive) {
       _healthService.updateHeartRate(heartRate);
-    }
-  }
-  
-  /// Sync user preferences to the watch
-  Future<bool> syncUserPreferencesToWatch({
-    required String userId,
-    required bool useMetricUnits,
-  }) async {
-    try {
-      // Define the method channel for user preferences
-      const methodChannel = MethodChannel('com.getrucky.gfy/user_preferences');
-      
-      // Call the native method to sync preferences
-      final result = await methodChannel.invokeMethod<bool>(
-        'syncUserPreferences',
-        {
-          'userId': userId,
-          'useMetricUnits': useMetricUnits,
-        },
+      // Store heart rate sample with timestamp
+      final sample = HeartRateSample(
+        timestamp: DateTime.now(),
+        bpm: heartRate.toInt(),
       );
-      
-      debugPrint('[INFO] Sync user preferences to watch result: $result');
-      return result ?? false;
-    } catch (e) {
-      debugPrint('[ERROR] Failed to sync user preferences to watch: $e');
-      return false;
+      _currentSessionHeartRateSamples.add(sample);
     }
+    // Broadcast to listeners
+    _heartRateController.add(heartRate);
   }
   
-  /// Send the backend session ID to the watch so that it can include it
-  /// in subsequent API calls originating from the watch.
-  Future<void> sendSessionIdToWatch(String sessionId) async {
-    await _sendMessageToWatch({
-      'command': 'setSessionId',
-      'sessionId': sessionId,
-    });
-  }
+  /// Stream to listen for heart rate updates from the Watch
+  Stream<double> get onHeartRateUpdate => _heartRateController.stream;
   
-  /// Low-level helper to deliver a JSON-like map to the watch via the
-  /// session MethodChannel. All higher-level watch messages should flow
-  /// through this utility so that we have a single point for error handling.
-  Future<void> _sendMessageToWatch(Map<String, dynamic> message) async {
+  /// Get current heart rate
+  double? getCurrentHeartRate() => _currentHeartRate;
+  
+  /// Get current session heart rate samples
+  List<HeartRateSample> getCurrentSessionHeartRateSamples() => _currentSessionHeartRateSamples;
+  
+  /// Helper to get user weight from preferences
+  Future<double?> _getUserWeight() async {
     try {
-      await _watchSessionChannel.invokeMethod('message', message);
-    } on PlatformException catch (e) {
-      debugPrint('[ERROR] Failed to send message to Watch: $e – $message');
+      return await _userPrefsChannel.invokeMethod('getUserWeight');
+    } catch (e) {
+      debugPrint('Error getting user weight: $e');
+      return null;
     }
   }
-  
-  /// Get current state values
-  bool get isSessionActive => _isSessionActive;
-  bool get isPaused => _isPaused;
-  double get currentDistance => _currentDistance;
-  Duration get currentDuration => _currentDuration;
-  double get currentPace => _currentPace;
-  double? get currentHeartRate => _currentHeartRate;
-  double get ruckWeight => _ruckWeight;
   
   void dispose() {
     _sessionEventController.close();
     _healthDataController.close();
+    _heartRateController.close();
   }
 }
 
