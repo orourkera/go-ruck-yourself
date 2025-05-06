@@ -34,6 +34,7 @@ class RuckSessionListResource(Resource):
                     .eq('session_id', session['id']) \
                     .order('timestamp') \
                     .execute()
+                logger.info(f"Location response data for session {session['id']}: {locations_resp.data}")
                 if locations_resp.data:
                     # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
                     session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
@@ -97,6 +98,7 @@ class RuckSessionResource(Resource):
                 .eq('session_id', ruck_id) \
                 .order('timestamp', desc=True) \
                 .execute()
+            logger.info(f"Location response data for session {ruck_id}: {locations_resp.data}")
             if locations_resp.data:
                 # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
                 session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
