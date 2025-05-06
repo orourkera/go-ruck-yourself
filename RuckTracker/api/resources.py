@@ -91,8 +91,11 @@ class UserResource(Resource):
         user = User.query.filter_by(id=user_id).first()
         if not user:
             logger.warning(f"User {user_id} not found in local DB.")
-            return {'message': 'User not found'}, 404
+            # Since Supabase deletion was successful, we can still return success
+            return {"message": "User deleted successfully from Supabase, but not found in local DB"}, 200
         try:
+            # Merge the user object into the current session to avoid session conflicts
+            user = db.session.merge(user)
             db.session.delete(user)
             db.session.commit()
             logger.info(f"User {user_id} deleted successfully from local DB.")
