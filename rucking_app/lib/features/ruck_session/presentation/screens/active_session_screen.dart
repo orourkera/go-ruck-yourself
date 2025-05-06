@@ -71,7 +71,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   // Timer variables
   late Stopwatch _stopwatch;
   Timer? _timer;
-  Timer? _heartRateTimer;
   Duration _elapsed = Duration.zero;
   // Countdown for planned duration
   Duration? _plannedCountdownStart;
@@ -87,7 +86,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   double _caloriesBurned = 0.0;
   double _elevationGain = 0.0;
   double _elevationLoss = 0.0;
-  double? _heartRate; // Current heart rate from health kit
   List<double> _recentPaces = [];
   // Exponential moving-average smoothing factor for pace (0 = no smoothing, 1 = no lag)
   static const double _paceAlpha = 0.05;
@@ -166,7 +164,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
 
     // Load custom marker icon
     _loadCustomMarker();
-
     // Check if health integration is enabled and authorized
     _healthService.isHealthIntegrationEnabled().then((enabled) async {
       if (enabled) {
@@ -198,7 +195,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     _timer?.cancel();
     _stopwatch.stop();
     _stopLocationTracking(); // Explicitly stop location tracking
-    _stopHeartRateMonitoring();
     super.dispose();
   }
   
@@ -412,9 +408,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     // Start stopwatch
     _stopwatch.start();
     _timer = Timer.periodic(const Duration(seconds: 1), _updateTime);
-    
-    // Start heart rate monitoring if health integration is available
-    _startHeartRateMonitoring();
     
     // Request location permissions if needed
     bool hasPermission = await _locationService.hasLocationPermission();
@@ -642,44 +635,6 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     }
   }
 
-  /// Start heart rate monitoring
-  void _startHeartRateMonitoring() async {
-    // Check if health integration is enabled
-    final isEnabled = await _healthService.isHealthIntegrationEnabled();
-    if (!isEnabled) {
-      return;
-    }
-    
-    // Request authorization for heart rate monitoring
-    await _healthService.requestAuthorization();
-    
-    // Start periodic heart rate updates every 15 seconds
-    _heartRateTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
-      if (_isPaused) return; // Don't update during pause
-      
-      final heartRate = await _healthService.getHeartRate();
-      if (heartRate != null) {
-        setState(() {
-          _heartRate = heartRate;
-        });
-      }
-    });
-    
-    // Fetch initial heart rate
-    final initialHeartRate = await _healthService.getHeartRate();
-    if (initialHeartRate != null) {
-      setState(() {
-        _heartRate = initialHeartRate;
-      });
-    }
-  }
-
-  /// Stop heart rate monitoring
-  void _stopHeartRateMonitoring() {
-    _heartRateTimer?.cancel();
-    _heartRateTimer = null;
-  }
-
   /// Get formatted weight string
   String _getDisplayWeight() {
     if (widget.preferMetric) {
@@ -823,8 +778,12 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
 
   @override
   Widget build(BuildContext context) {
-    final heartRateAsync = ref.watch(heartRateStreamProvider);
-    AppLogger.info('ActiveSessionScreen.build: _heartRate=$_heartRate');
+    final heartRateSampleAsync = ref.watch(heartRateStreamProvider);
+    final int? heartRate = heartRateSampleAsync.when(
+      data: (sample) => sample.bpm,
+      loading: () => null,
+      error: (_, __) => null,
+    );
     // Format display values
     final String durationDisplay = _formatDuration(_elapsed);
     final String? distanceDisplay = _canShowStats && _distance > 0
@@ -1002,7 +961,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
                           Icon(Icons.favorite, color: AppColors.error, size: 40),
                           const SizedBox(width: 8),
                           Text(
-                            _heartRate != null ? '${_heartRate!.round()}' : '--',
+                            heartRate != null ? '${heartRate}' : '--',
                             style: AppTextStyles.displayLarge.copyWith(
                               fontFamily: 'Bangers',
                               fontWeight: FontWeight.bold,
