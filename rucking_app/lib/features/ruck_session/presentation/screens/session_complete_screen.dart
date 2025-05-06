@@ -169,14 +169,23 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     final Map<String, dynamic> completionData = {
       'completed_at': widget.completedAt.toIso8601String(),
       'notes': _notesController.text,
-      'final_distance_km': widget.distance,
+      // Backend expects these exact keys:
+      'distance_km': widget.distance, // always send for compatibility
+      'final_distance_km': widget.distance, // for final summary
+      'distance_meters': (widget.distance * 1000).round(),
+      'calories_burned': widget.caloriesBurned,
       'final_calories_burned': widget.caloriesBurned,
+      'elevation_gain_m': widget.elevationGain,
+      'elevation_loss_m': widget.elevationLoss,
       'final_elevation_gain': widget.elevationGain,
       'final_elevation_loss': widget.elevationLoss,
-      'final_average_pace': widget.distance > 0 ? (widget.duration.inSeconds / 60 / widget.distance) : null,
+      'final_average_pace': (widget.distance > 0) ? (widget.duration.inSeconds / widget.distance) : null, // seconds per km
       'rating': _rating,
       'perceived_exertion': _perceivedExertion,
       'tags': _selectedTags,
+      'ruck_weight_kg': widget.ruckWeight,
+      // Add heart rate if available
+      if (_avgHeartRate != null) 'avg_heart_rate': _avgHeartRate,
     };
 
     // Remove null values (especially if average pace is not computable)
