@@ -29,13 +29,11 @@ class RuckSessionListResource(Resource):
                 sessions = []
             # Attach route (list of lat/lng) to each session
             for session in sessions:
-                print(f"[DEBUG] Fetching locations for session {session['id']}")
                 locations_resp = supabase.table('location_point') \
                     .select('latitude,longitude') \
                     .eq('session_id', session['id']) \
-                    .order('timestamp', desc=True) \
+                    .order('timestamp', asc=True) \
                     .execute()
-                print(f"[DEBUG] Locations found for session {session['id']}: {locations_resp.data}")
                 if locations_resp.data:
                     session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
                 else:
