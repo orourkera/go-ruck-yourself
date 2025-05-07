@@ -52,6 +52,9 @@ class HeartRateUpdated extends ActiveSessionEvent {
   List<Object?> get props => [sample];
 }
 
+/// Internal ticker (1-second) to update elapsed time & derived metrics
+class Tick extends ActiveSessionEvent {}
+
 class SessionFailed extends ActiveSessionEvent {
   final String errorMessage;
   

@@ -22,6 +22,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final HealthService _healthService;
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
+  Timer? _ticker;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -38,6 +39,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<SessionCompleted>(_onSessionCompleted);
     on<SessionFailed>(_onSessionFailed);
     on<HeartRateUpdated>(_onHeartRateUpdated);
+    on<Tick>(_onTick);
   }
 
   Future<void> _onSessionStarted(
@@ -57,11 +59,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       });
       
       // Extract session ID from response
-      final String sessionId = response['id'];
+      final String sessionId = response['id'].toString();
       AppLogger.info('Created new session with ID: $sessionId');
       
       // Start location tracking
       _startLocationTracking(emit);
+      _startTicker();
       
       // Emit success state with session ID
       emit(ActiveSessionRunning(
@@ -129,6 +132,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         ));
       }
     }
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => add(Tick()));
+  }
+
+  void _stopTicker() {
+    _ticker?.cancel();
+    _ticker = null;
   }
 
   Future<void> _onLocationUpdated(
@@ -209,7 +222,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       // Update backend with new location point
       try {
-        await _apiClient.post('/rucks/${currentState.sessionId}/locations', {
+        await _apiClient.post('/rucks/${currentState.sessionId}/location', {
           'latitude': event.locationPoint.latitude,
           'longitude': event.locationPoint.longitude,
           'elevation': event.locationPoint.elevation,
@@ -323,6 +336,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _locationSubscription = null;
         await _heartRateSubscription?.cancel();
         _heartRateSubscription = null;
+        _stopTicker();
         
         // Save workout to HealthKit
         try {
@@ -369,6 +383,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _locationSubscription = null;
         await _heartRateSubscription?.cancel();
         _heartRateSubscription = null;
+        _stopTicker();
         
         // Check if the error is a network issue
         final errorMessage = e is ApiException && e.statusCode == 503
@@ -393,6 +408,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _locationSubscription = null;
     _heartRateSubscription?.cancel();
     _heartRateSubscription = null;
+    _stopTicker();
     
     // Emit failure state
     emit(ActiveSessionFailure(
@@ -416,10 +432,29 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             }
           ],
         );
+        emit(current.copyWith(latestHeartRate: event.sample.bpm));
       } catch (e) {
         AppLogger.error('Failed to send heart rate sample: $e');
       }
     }
+  }
+
+  Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
+    if (state is! ActiveSessionRunning) return;
+    final current = state as ActiveSessionRunning;
+    if (current.isPaused) return;
+
+    final newElapsed = current.elapsedSeconds + 1;
+    final newPace = current.distanceKm > 0
+        ? (newElapsed / 60) / current.distanceKm
+        : 0.0;
+    final newCalories = _calculateCalories(current.distanceKm, current.ruckWeightKg);
+
+    emit(current.copyWith(
+      elapsedSeconds: newElapsed,
+      pace: newPace,
+      calories: newCalories.toDouble(),
+    ));
   }
 
   /// Calculate calories burned based on distance, weight, and MET value
@@ -446,6 +481,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   Future<void> close() {
     _locationSubscription?.cancel();
     _heartRateSubscription?.cancel();
+    _ticker?.cancel();
     return super.close();
   }
 }

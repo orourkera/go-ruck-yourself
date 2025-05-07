@@ -159,7 +159,7 @@ This document maps the data model for a rucking session across all layers:
 |-------------|-----------------------------|----------|----------------------------------------------|
 | id          | integer                     | NO       | nextval('heart_rate_sample_id_seq'::regclass) |
 | session_id  | integer                     | NO       |                                              |
-| timestamp   | timestamp without time zone | NO       |                                              |
+| timestamp   | timestamp with time zone    | NO       |                                              |
 | bpm         | integer                     | NO       |                                              |
 
 ### Property/API/DB Mapping: Heart Rate Sample
@@ -170,6 +170,15 @@ This document maps the data model for a rucking session across all layers:
 | Session ID    | `sessionId`          | `session_id`   | `session_id`    |
 | Timestamp     | `timestamp`          | `timestamp`    | `timestamp`     |
 | BPM           | `bpm`                | `bpm`          | `bpm`           |
+
++**Real-time Streaming**: Heart rate samples are streamed from the Flutter client using POST `/rucks/{session_id}/heart_rate`. Each sample (timestamp + BPM) is stored individually in `heart_rate_sample`. Aggregations (e.g., average heart rate) are computed server-side or via SQL queries.
++
++**Client-side Rounding**: Numeric session metrics (distance, pace, calories, elevation, weight) are rounded client-side before sending: 
++- Distance values to 3 decimal places
++- Pace to 2 decimal places
++- Calories to nearest integer
++- Elevation gains/losses to nearest integer
++- Weights to one decimal place
 
 ---
 
