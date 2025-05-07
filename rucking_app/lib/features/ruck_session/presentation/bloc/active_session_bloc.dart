@@ -324,6 +324,23 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         await _heartRateSubscription?.cancel();
         _heartRateSubscription = null;
         
+        // Save workout to HealthKit
+        try {
+          final startTime = DateTime.now().subtract(Duration(seconds: currentState.elapsedSeconds));
+          final endTime = DateTime.now();
+          await _healthService.saveWorkout(
+            startDate: startTime,
+            endDate: endTime,
+            distanceKm: currentState.distanceKm,
+            caloriesBurned: currentState.calories.round(),
+            ruckWeightKg: currentState.ruckWeightKg,
+            elevationGainMeters: currentState.elevationGain,
+            elevationLossMeters: currentState.elevationLoss,
+          );
+        } catch (e) {
+          AppLogger.error('Failed to save workout to HealthKit: $e');
+        }
+        
         // Emit completion state
         emit(ActiveSessionComplete(
           session: RuckSession(
