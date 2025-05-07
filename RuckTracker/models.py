@@ -80,7 +80,7 @@ class RuckSession(db.Model):
             'distance_km': self.distance_km,
             'elevation_gain_m': self.elevation_gain_m,
             'elevation_loss_m': self.elevation_loss_m,
-            'calories_burned': self.calories_burned,
+            'calories_burned': int(round(self.calories_burned)) if self.calories_burned is not None else 0, 
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'review': self.review.to_dict() if self.review else None
