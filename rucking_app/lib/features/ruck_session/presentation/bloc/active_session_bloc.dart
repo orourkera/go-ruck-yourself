@@ -23,6 +23,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
   Timer? _ticker;
+  // Reuse one validation service instance to keep state between points
+  final SessionValidationService _validationService = SessionValidationService();
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -155,6 +157,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       // Calculate new distance
       double newDistance = currentState.distanceKm;
+      Map<String, dynamic>? validationResult; // capture validation info
       if (updatedPoints.length > 1) {
         final previousPoint = updatedPoints[updatedPoints.length - 2];
         final newPoint = event.locationPoint;
@@ -164,9 +167,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           final segmentDistanceKm = _locationService.calculateDistance(previousPoint, newPoint);
           final segmentDistanceMeters = segmentDistanceKm * 1000;
 
-          // Use SessionValidationService to validate the new segment
-          final validationService = SessionValidationService();
-          final validationResult = validationService.validateLocationPoint(
+          // Validate the new segment & track session behaviour
+          validationResult = _validationService.validateLocationPoint(
             newPoint,
             previousPoint,
             distanceMeters: segmentDistanceMeters,
@@ -190,8 +192,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       if (updatedPoints.length > 1) {
         final previousPoint = updatedPoints[updatedPoints.length - 2];
         final newPoint = event.locationPoint;
-        final validationService = SessionValidationService();
-        final elevationResult = validationService.validateElevationChange(previousPoint, newPoint);
+        final elevationResult = _validationService.validateElevationChange(previousPoint, newPoint);
         elevationGain += elevationResult['gain'] ?? 0.0;
         elevationLoss += elevationResult['loss'] ?? 0.0;
       }
@@ -231,6 +232,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } catch (e) {
         // Only log the error, don't disrupt the session for location updates
         AppLogger.error('Failed to send location to backend: $e');
+      }
+      
+      // Handle auto-pause / auto-end based on validation flags
+      if (validationResult != null) {
+        if (validationResult['shouldPause'] == true && !currentState.isPaused) {
+          add(SessionPaused());
+        }
+        if (validationResult['shouldEnd'] == true) {
+          add(const SessionCompleted());
+        }
       }
     }
   }

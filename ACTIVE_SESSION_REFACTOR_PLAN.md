@@ -13,7 +13,7 @@ Guiding goal: move all business logic (timers, API calls, validation, HealthKit,
   - [x] `SessionStarted`
   - [x] `LocationUpdated` (validation + batching + API)
   - [x] `HeartRateUpdated` (avg HR + API)
-  - [x] `Tick` (elapsed time updates) ✅
+  - [x] `Tick` (elapsed time updates) 
   - [x] `SessionPaused` / `SessionResumed`
   - [x] `SessionCompleted` (final validation, `/complete`, HealthKit)
 - [ ] Remove duplicated code now handled by Bloc.
@@ -23,15 +23,15 @@ Guiding goal: move all business logic (timers, API calls, validation, HealthKit,
   - [x] Provides the Bloc (with dependencies) via `BlocProvider`.
   - [x] Pushes `SessionStarted` in `initState`.
 - [ ] Extract small widgets:
-  - [x] `MapWidget` (route display) ✅
+  - [x] `MapWidget` (route display) 
   - [ ] `SessionStatsOverlay` (distance, pace, HR …)
   - [ ] `SessionControls` (pause/resume/end buttons)
   - [ ] `ValidationBanner` (GPS/idle warnings)
 - [x] Use `BlocConsumer` to react to state changes & errors.
 
 ### 3. Validation Integration
-- [ ] Call `SessionValidationService.validateLocationPoint` inside Bloc.
-- [ ] Auto-pause / auto-end based on `shouldPause` / `shouldEnd` flags.
+- [x] Call `SessionValidationService.validateLocationPoint` inside Bloc. 
+- [x] Auto-pause / auto-end based on `shouldPause` / `shouldEnd` flags. 
 - [ ] Call `validateSessionForSave` before `SessionCompleted` POST.
 
 ### 4. Watch & HealthKit
