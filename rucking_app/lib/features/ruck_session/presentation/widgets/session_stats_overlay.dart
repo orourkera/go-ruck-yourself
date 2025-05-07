@@ -88,19 +88,20 @@ class SessionStatsOverlay extends StatelessWidget {
             Expanded(
                 flex: 2,
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Timer and info (left)
+                    // Left half: Timer (centered)
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          SizedBox(height: 4),
                           Text(
                             _format(Duration(seconds: state.elapsedSeconds)),
                             style: AppTextStyles.timerDisplay.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
-                              fontSize: 48,
+                              fontSize: 32,
                             ),
                           ),
                           if (state.plannedDuration != null)
@@ -111,65 +112,62 @@ class SessionStatsOverlay extends StatelessWidget {
                                 style: AppTextStyles.statLabel.copyWith(color: Colors.grey[700]),
                               ),
                             ),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              preferMetric
-                                  ? '${state.ruckWeightKg.toStringAsFixed(0)} KG'
-                                  : '${(state.ruckWeightKg * 2.20462).toStringAsFixed(0)} LBS',
-                              style: AppTextStyles.statLabel.copyWith(color: Colors.grey[700]),
+                          
+                        ],
+                      ),
+                    ),
+                    // Right half: Heart rate (centered)
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Icon(Icons.favorite, color: Colors.red, size: 36),
+                              SizedBox(width: 8),
+                              Text(
+                                state.latestHeartRate != null ? '${state.latestHeartRate}' : '--',
+                                style: AppTextStyles.timerDisplay.copyWith(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 36,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'BPM',
+                            style: AppTextStyles.labelLarge.copyWith(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Heart rate (right)
-                    if (state.latestHeartRate != null)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 16.0, bottom: 4.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Icon(Icons.favorite, color: _hrColor(state.latestHeartRate!), size: 44),
-                            Text(
-                              '${state.latestHeartRate}',
-                              style: AppTextStyles.timerDisplay.copyWith(
-                                color: _hrColor(state.latestHeartRate!),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 36,
-                              ),
-                            ),
-                            Text(
-                              'BPM',
-                              style: AppTextStyles.labelLarge.copyWith(
-                                color: _hrColor(state.latestHeartRate!),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                   ],
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 0),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
           physics: const NeverScrollableScrollPhysics(),
           children: statTiles
               .map((tile) => Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     color: Colors.white,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                       child: tile,
                     ),
                   ))
@@ -205,12 +203,12 @@ class _StatTile extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (icon != null) ...[
-          Icon(icon, color: color ?? AppColors.primary, size: 24),
-          const SizedBox(height: 4),
+          Icon(icon, color: color ?? AppColors.primary, size: 18),
+          const SizedBox(height: 2),
         ],
-        Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary)),
-        const SizedBox(height: 4),
-        Text(value, style: AppTextStyles.titleLarge.copyWith(color: color)),
+        Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(fontSize: 11, color: AppColors.primary)),
+        const SizedBox(height: 2),
+        Text(value, style: AppTextStyles.titleLarge.copyWith(fontSize: 17, color: color)), 
       ],
     );
   }
