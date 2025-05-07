@@ -9,11 +9,9 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
-import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_event.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_state.dart';
-import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 
 part 'active_session_event.dart';
 part 'active_session_state.dart';
