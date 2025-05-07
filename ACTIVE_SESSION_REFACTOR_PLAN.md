@@ -13,7 +13,7 @@ Guiding goal: move all business logic (timers, API calls, validation, HealthKit,
   - [x] `SessionStarted`
   - [x] `LocationUpdated` (validation + batching + API)
   - [x] `HeartRateUpdated` (avg HR + API)
-  - [ ] `Tick` (elapsed time updates)
+  - [x] `Tick` (elapsed time updates) ✅
   - [x] `SessionPaused` / `SessionResumed`
   - [x] `SessionCompleted` (final validation, `/complete`, HealthKit)
 - [ ] Remove duplicated code now handled by Bloc.
@@ -23,7 +23,7 @@ Guiding goal: move all business logic (timers, API calls, validation, HealthKit,
   - [x] Provides the Bloc (with dependencies) via `BlocProvider`.
   - [x] Pushes `SessionStarted` in `initState`.
 - [ ] Extract small widgets:
-  - [ ] `MapWidget` (route display)
+  - [x] `MapWidget` (route display) ✅
   - [ ] `SessionStatsOverlay` (distance, pace, HR …)
   - [ ] `SessionControls` (pause/resume/end buttons)
   - [ ] `ValidationBanner` (GPS/idle warnings)
