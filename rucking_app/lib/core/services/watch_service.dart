@@ -7,6 +7,7 @@ import 'package:rucking_app/core/api/rucking_api.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 
@@ -38,7 +39,9 @@ class WatchService {
   Stream<Map<String, dynamic>> get sessionEvents => _sessionEventController.stream;
   Stream<Map<String, dynamic>> get healthData => _healthDataController.stream;
   
-  WatchService(this._locationService, this._healthService, this._authService);
+  WatchService(this._locationService, this._healthService, this._authService) {
+    _initPlatformChannels();
+  }
   
   void _initPlatformChannels() {
     // Set up method channels
@@ -114,7 +117,7 @@ class WatchService {
     
     try {
       // Get current user
-      final authState = _authService.currentUser;
+      final authState = await _authService.getCurrentUser();
       if (authState == null) {
         debugPrint('[ERROR] No authenticated user found - cannot create session from Watch');
         return;
@@ -156,7 +159,7 @@ class WatchService {
   Future<void> _handleSessionEndedFromWatch(Map<String, dynamic> data) async {
     try {
       final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionInProgress || bloc.state is ActiveSessionPaused) {
+      if (bloc.state is ActiveSessionRunning) {
         bloc.add(const SessionCompleted());
       }
     } catch (e) {
@@ -168,7 +171,7 @@ class WatchService {
   Future<void> _handlePauseSessionFromWatch(Map<String, dynamic> data) async {
     try {
       final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionInProgress) {
+      if (bloc.state is ActiveSessionRunning && !(bloc.state as ActiveSessionRunning).isPaused) {
         bloc.add(const SessionPaused());
       }
     } catch (e) {
@@ -180,7 +183,7 @@ class WatchService {
   Future<void> _handleResumeSessionFromWatch(Map<String, dynamic> data) async {
     try {
       final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionPaused) {
+      if (bloc.state is ActiveSessionRunning && (bloc.state as ActiveSessionRunning).isPaused) {
         bloc.add(const SessionResumed());
       }
     } catch (e) {
@@ -302,6 +305,26 @@ class WatchService {
     } catch (e) {
       debugPrint('[ERROR] Failed to sync user preferences to watch: $e');
       return false;
+    }
+  }
+  
+  /// Send the backend session ID to the watch so that it can include it
+  /// in subsequent API calls originating from the watch.
+  Future<void> sendSessionIdToWatch(String sessionId) async {
+    await _sendMessageToWatch({
+      'command': 'setSessionId',
+      'sessionId': sessionId,
+    });
+  }
+  
+  /// Low-level helper to deliver a JSON-like map to the watch via the
+  /// session MethodChannel. All higher-level watch messages should flow
+  /// through this utility so that we have a single point for error handling.
+  Future<void> _sendMessageToWatch(Map<String, dynamic> message) async {
+    try {
+      await _watchSessionChannel.invokeMethod('message', message);
+    } on PlatformException catch (e) {
+      debugPrint('[ERROR] Failed to send message to Watch: $e – $message');
     }
   }
   

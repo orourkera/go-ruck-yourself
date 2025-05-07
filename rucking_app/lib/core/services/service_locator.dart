@@ -6,6 +6,7 @@ import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
+import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/security/ssl_pinning.dart';
 import 'package:rucking_app/core/security/token_refresh_interceptor.dart';
 import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl.dart';
@@ -49,6 +50,15 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<HealthService>(HealthService());
   getIt.registerSingleton<RevenueCatService>(RevenueCatService());
   
+  // Watch service depends on location, health, auth
+  getIt.registerSingleton<WatchService>(
+    WatchService(
+      getIt<LocationService>(),
+      getIt<HealthService>(),
+      getIt<AuthService>(),
+    ),
+  );
+  
   // Repositories
   getIt.registerSingleton<AuthRepository>(
     AuthRepositoryImpl(getIt<AuthService>())
@@ -60,10 +70,11 @@ Future<void> setupServiceLocator() async {
     apiClient: getIt<ApiClient>(),
   ));
   getIt.registerFactory<ActiveSessionBloc>(() => ActiveSessionBloc(
-    apiClient: getIt<ApiClient>(),
-    locationService: getIt<LocationService>(),
-    healthService: getIt<HealthService>(),
-  ));
+        apiClient: getIt<ApiClient>(),
+        locationService: getIt<LocationService>(),
+        healthService: getIt<HealthService>(),
+        watchService: getIt<WatchService>(),
+      ));
 }
 
 /// Configures Dio with base options and interceptors

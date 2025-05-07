@@ -24,6 +24,7 @@ class ActiveSessionRunning extends ActiveSessionState {
   final bool isPaused;
   final double pace;
   final int? latestHeartRate;
+  final String? validationMessage;
   
   const ActiveSessionRunning({
     required this.sessionId,
@@ -38,6 +39,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     required this.pace,
     this.notes,
     this.latestHeartRate,
+    this.validationMessage,
   });
   
   @override
@@ -54,6 +56,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     isPaused,
     pace,
     latestHeartRate,
+    validationMessage,
   ];
   
   ActiveSessionRunning copyWith({
@@ -69,6 +72,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool? isPaused,
     double? pace,
     int? latestHeartRate,
+    String? validationMessage,
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -83,6 +87,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       isPaused: isPaused ?? this.isPaused,
       pace: pace ?? this.pace,
       latestHeartRate: latestHeartRate ?? this.latestHeartRate,
+      validationMessage: validationMessage ?? this.validationMessage,
     );
   }
 }

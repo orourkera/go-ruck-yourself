@@ -12,6 +12,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dar
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/core/services/watch_service.dart';
 
 part 'active_session_event.dart';
 part 'active_session_state.dart';
@@ -20,6 +21,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final ApiClient _apiClient;
   final LocationService _locationService;
   final HealthService _healthService;
+  final WatchService _watchService;
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
   Timer? _ticker;
@@ -30,9 +32,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required ApiClient apiClient,
     required LocationService locationService,
     required HealthService healthService,
+    required WatchService watchService,
   }) : _apiClient = apiClient,
        _locationService = locationService,
        _healthService = healthService,
+       _watchService = watchService,
        super(ActiveSessionInitial()) {
     on<SessionStarted>(_onSessionStarted);
     on<LocationUpdated>(_onLocationUpdated);
@@ -219,6 +223,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elevationLoss: elevationLoss,
         isPaused: currentState.isPaused,
         pace: newPace,
+        validationMessage: (validationResult != null && validationResult['isValid'] == false)
+          ? validationResult['message'] as String?
+          : null,
       ));
       
       // Update backend with new location point
@@ -255,6 +262,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       AppLogger.info('Pausing session ${currentState.sessionId}');
       
+      // Tell watch to pause
+      _watchService.pauseSessionOnWatch();
+      
       // Update backend about pause
       try {
         await _apiClient.post('/rucks/${currentState.sessionId}/pause', {});
@@ -276,6 +286,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final currentState = state as ActiveSessionRunning;
       
       AppLogger.info('Resuming session ${currentState.sessionId}');
+      
+      // Tell watch to resume
+      _watchService.resumeSessionOnWatch();
       
       // Update backend about resume
       try {
@@ -300,26 +313,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       try {
         AppLogger.info('Completing session ${currentState.sessionId}');
         
-        // Validate session meets minimum requirements
-        if (currentState.locationPoints.isEmpty ||
-            currentState.distanceKm < SessionValidationService.minSessionDistanceMeters / 1000 ||
-            currentState.elapsedSeconds < SessionValidationService.minSessionDuration.inSeconds) {
-          
-          AppLogger.warning('Session too short to save: ${currentState.distanceKm}km, ${currentState.elapsedSeconds}s');
-          
-          // Try to delete the session from the backend
-          try {
-            await _apiClient.delete('/rucks/${currentState.sessionId}');
-            AppLogger.info('Deleted short session from backend');
-          } catch (e) {
-            AppLogger.error('Failed to delete short session: $e');
-          }
-          
-          emit(ActiveSessionFailure(
-            errorMessage: 'Session too short to save. Please ruck for at least 100m and 2 minutes.',
-          ));
+        // Validate session before saving
+        final validationSave = _validationService.validateSessionForSave(
+          distanceMeters: currentState.distanceKm * 1000,
+          duration: Duration(seconds: currentState.elapsedSeconds),
+          caloriesBurned: currentState.calories,
+        );
+        if (validationSave['isValid'] == false) {
+          emit(ActiveSessionFailure(errorMessage: validationSave['message'] ?? 'Session invalid.'));
           return;
         }
+        
+        // Tell watch to end
+        _watchService.endSessionOnWatch();
         
         // Update backend about session completion
         await _apiClient.post(

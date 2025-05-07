@@ -1365,56 +1365,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
           ),
           
           // Control buttons
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Pause/Resume Button
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _togglePause,
-                    icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-                    label: Text(
-                      _isPaused ? 'RESUME' : 'PAUSE',
-                      style: AppTextStyles.labelLarge.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // End session button
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isEnding ? null : _showEndConfirmationDialog,
-                    icon: const Icon(Icons.stop),
-                    label: const Text(
-                      'END SESSION',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: SessionControls(),
           ),
         ],
       ),

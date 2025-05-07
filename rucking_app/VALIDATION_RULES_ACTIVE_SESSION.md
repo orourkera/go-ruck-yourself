@@ -87,4 +87,8 @@ If you change any validation logic or thresholds, update this file and `SessionV
 
 ---
 
-_Last updated: 2025-05-05_
+### ⚙️ Code Refactor Note (2025-05-07)
+- Internally, the `SessionPaused`, `SessionResumed`, and `Tick` event classes now have explicit `const` constructors.
+- This change fixes build-time "non-const constructor" errors and does **not** alter validation logic or thresholds.
+
+_Last updated: 2025-05-07_
