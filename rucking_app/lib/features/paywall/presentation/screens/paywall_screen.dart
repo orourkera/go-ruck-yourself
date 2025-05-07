@@ -223,12 +223,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
     if (offerings.isNotEmpty) {
       final packages = offerings.first.availablePackages;
       final selectedIndex = _selectedPlanIndex ?? 0;
-      final types = [PackageType.weekly, PackageType.monthly, PackageType.annual];
-      final selectedType = types[selectedIndex];
-      final package = packages.firstWhere(
-        (pkg) => pkg.packageType == selectedType,
-        orElse: () => packages.first,
-      );
+      final identifiers = ['\$rc_weekly', '\$rc_monthly', '\$rc_annual'];
+      final selectedIdentifier = identifiers[selectedIndex];
+      dynamic package;
+      try {
+        package = packages.firstWhere((pkg) => pkg.identifier == selectedIdentifier);
+      } catch (_) {
+        package = packages.first;
+      }
       final isPurchased = await revenueCatService.makePurchase(package);
       if (isPurchased) {
         // After successful purchase, go directly to Home Screen
@@ -300,14 +302,17 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   String getPlanPrice(int index) {
-    // Use packageType for robust mapping
-    final types = [PackageType.weekly, PackageType.monthly, PackageType.annual];
+    // Use identifier for robust mapping
+    final identifiers = ['\$rc_weekly', '\$rc_monthly', '\$rc_annual'];
     if (_packages.isEmpty) return '';
-    final pkg = _packages.firstWhere(
-      (p) => p.packageType == types[index],
-      orElse: () => null,
-    );
-    return pkg?.storeProduct.priceString ?? '';
+    try {
+      final pkg = _packages.firstWhere(
+        (p) => p.identifier == identifiers[index],
+      );
+      return pkg.storeProduct.priceString ?? '';
+    } catch (_) {
+      return '';
+    }
   }
 
   Widget _buildPlanCard(String planName, String price, bool isSelected) {
