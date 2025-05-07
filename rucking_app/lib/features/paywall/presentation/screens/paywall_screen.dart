@@ -231,16 +231,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
       } catch (_) {
         package = packages.first;
       }
-      final isPurchased = await revenueCatService.makePurchase(package);
-      if (isPurchased) {
-        // After successful purchase, go directly to Home Screen
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        // Handle purchase failure
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Purchase failed. Please try again.')),
-        );
-      }
+        final isPurchased = await revenueCatService.makePurchase(package);
+        if (isPurchased) {
+          // After successful purchase, go directly to Home Screen
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          // Handle purchase failure
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Purchase failed. Please try again.')),
+          );
+        }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No subscription offerings available.')),

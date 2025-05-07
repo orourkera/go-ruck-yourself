@@ -87,9 +87,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  String _friendlyErrorMessage(String? error) {
-    return mapFriendlyErrorMessage(error);
+  String _friendlyErrorMessage(dynamic error) {
+  // Always convert error to a String safely, even if it's null or not a String
+  if (error == null) return 'An unknown error occurred.';
+  if (error is String) return mapFriendlyErrorMessage(error);
+  // If error has a message property, try to use it
+  if (error is Exception && error.toString().isNotEmpty) {
+    return mapFriendlyErrorMessage(error.toString());
   }
+  return mapFriendlyErrorMessage(error.toString());
+}
 
   @override
   Widget build(BuildContext context) {
