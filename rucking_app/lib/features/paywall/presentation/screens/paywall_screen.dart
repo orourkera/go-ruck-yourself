@@ -22,6 +22,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Timer? _timer;
   int? _selectedPlanIndex;
 
+  List<dynamic> _packages = [];
+
   // Define the content for each card
   final List<Map<String, String>> _cards = [
     {
@@ -34,7 +36,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchOfferings();
     // No auto-scrolling timer needed since we have only one card
+  }
+
+  Future<void> _fetchOfferings() async {
+    final revenueCatService = GetIt.instance<RevenueCatService>();
+    final offerings = await revenueCatService.getOfferings();
+    if (offerings.isNotEmpty) {
+      setState(() {
+        _packages = offerings.first.availablePackages;
+      });
+    }
   }
 
   @override
@@ -82,7 +95,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               _selectedPlanIndex = 0;
                             });
                           },
-                          child: _buildPlanCard('Weekly', r'$1.99 / week', _selectedPlanIndex == 0),
+                          child: _buildPlanCard('Weekly', getPlanPrice(0), _selectedPlanIndex == 0),
                         ),
                         const SizedBox(height: 8),
                         GestureDetector(
@@ -91,7 +104,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               _selectedPlanIndex = 1;
                             });
                           },
-                          child: _buildPlanCard('Monthly', r'$4.99 / month', _selectedPlanIndex == 1),
+                          child: _buildPlanCard('Monthly', getPlanPrice(1), _selectedPlanIndex == 1),
                         ),
                         const SizedBox(height: 8),
                         GestureDetector(
@@ -100,7 +113,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               _selectedPlanIndex = 2;
                             });
                           },
-                          child: _buildPlanCard('Annual', r'$29.99 / year', _selectedPlanIndex == 2),
+                          child: _buildPlanCard('Annual', getPlanPrice(2), _selectedPlanIndex == 2),
                         ),
                       ],
                     ),
@@ -275,13 +288,27 @@ class _PaywallScreenState extends State<PaywallScreen> {
           const SizedBox(height: 10),
           // Disclaimer below value prop in same style
           Text(
-            "A subscription is required to use this app. It's by ruckers and for ruckers and that has a price.",
+            "A subscription is required to use this app. It's by ruckers and for ruckers and that has a price. All plans come with a free trial period so give it a shot, rucker.",
             style: AppTextStyles.bodySmall,
             textAlign: TextAlign.center,
           ),
         ],
       ),
     );
+  }
+
+  String getPlanPrice(int index) {
+    const planIdentifierMap = {
+      0: 'com.getrucky.gfy.Weekly',
+      1: 'com.getrucky.gfy.Monthly',
+      2: 'com.getrucky.gfy.Annual',
+    };
+    final id = planIdentifierMap[index];
+    final pkg = _packages.firstWhere(
+      (p) => p.identifier == id,
+      orElse: () => null,
+    );
+    return pkg?.product?.priceString ?? '';
   }
 
   Widget _buildPlanCard(String planName, String price, bool isSelected) {
