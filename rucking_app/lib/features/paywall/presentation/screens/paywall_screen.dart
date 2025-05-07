@@ -44,8 +44,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final revenueCatService = GetIt.instance<RevenueCatService>();
     final offerings = await revenueCatService.getOfferings();
     if (offerings.isNotEmpty) {
+      final pkgs = offerings.first.availablePackages;
+      // Debug: Print identifiers and types
+      print('Available packages:');
+      for (final pkg in pkgs) {
+        print('id: ${pkg.identifier}, type: ${pkg.packageType}, price: ${pkg.storeProduct.priceString}');
+      }
       setState(() {
-        _packages = offerings.first.availablePackages;
+        _packages = pkgs;
       });
     }
   }
@@ -217,14 +223,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
     if (offerings.isNotEmpty) {
       final packages = offerings.first.availablePackages;
       final selectedIndex = _selectedPlanIndex ?? 0;
-      const planIdentifierMap = {
-        0: 'com.getrucky.gfy.Weekly',
-        1: 'com.getrucky.gfy.Monthly',
-        2: 'com.getrucky.gfy.Annual',
-      };
-      final selectedIdentifier = planIdentifierMap[selectedIndex];
+      final types = [PackageType.weekly, PackageType.monthly, PackageType.annual];
+      final selectedType = types[selectedIndex];
       final package = packages.firstWhere(
-        (pkg) => pkg.identifier == selectedIdentifier,
+        (pkg) => pkg.packageType == selectedType,
         orElse: () => packages.first,
       );
       final isPurchased = await revenueCatService.makePurchase(package);
@@ -298,17 +300,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   String getPlanPrice(int index) {
-    const planIdentifierMap = {
-      0: 'com.getrucky.gfy.Weekly',
-      1: 'com.getrucky.gfy.Monthly',
-      2: 'com.getrucky.gfy.Annual',
-    };
-    final id = planIdentifierMap[index];
+    // Use packageType for robust mapping
+    final types = [PackageType.weekly, PackageType.monthly, PackageType.annual];
+    if (_packages.isEmpty) return '';
     final pkg = _packages.firstWhere(
-      (p) => p.identifier == id,
+      (p) => p.packageType == types[index],
       orElse: () => null,
     );
-    return pkg?.product?.priceString ?? '';
+    return pkg?.storeProduct.priceString ?? '';
   }
 
   Widget _buildPlanCard(String planName, String price, bool isSelected) {
