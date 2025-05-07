@@ -43,6 +43,15 @@ class SessionCompleted extends ActiveSessionEvent {
   List<Object?> get props => [notes, rating];
 }
 
+/// Event for live heart-rate samples
+class HeartRateUpdated extends ActiveSessionEvent {
+  final HeartRateSample sample;
+  const HeartRateUpdated(this.sample);
+
+  @override
+  List<Object?> get props => [sample];
+}
+
 class SessionFailed extends ActiveSessionEvent {
   final String errorMessage;
   

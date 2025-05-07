@@ -62,6 +62,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<ActiveSessionBloc>(() => ActiveSessionBloc(
     apiClient: getIt<ApiClient>(),
     locationService: getIt<LocationService>(),
+    healthService: getIt<HealthService>(),
   ));
 }
 

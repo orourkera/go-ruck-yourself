@@ -10,6 +10,10 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_event.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_state.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 
 part 'active_session_event.dart';
 part 'active_session_state.dart';
@@ -17,13 +21,17 @@ part 'active_session_state.dart';
 class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final ApiClient _apiClient;
   final LocationService _locationService;
+  final HealthService _healthService;
   StreamSubscription<LocationPoint>? _locationSubscription;
-  
+  StreamSubscription<HeartRateSample>? _heartRateSubscription;
+
   ActiveSessionBloc({
     required ApiClient apiClient,
     required LocationService locationService,
+    required HealthService healthService,
   }) : _apiClient = apiClient,
        _locationService = locationService,
+       _healthService = healthService,
        super(ActiveSessionInitial()) {
     on<SessionStarted>(_onSessionStarted);
     on<LocationUpdated>(_onLocationUpdated);
@@ -31,8 +39,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<SessionResumed>(_onSessionResumed);
     on<SessionCompleted>(_onSessionCompleted);
     on<SessionFailed>(_onSessionFailed);
+    on<HeartRateUpdated>(_onHeartRateUpdated);
   }
-  
+
   Future<void> _onSessionStarted(
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
@@ -79,13 +88,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       ));
     }
   }
-  
+
   void _startLocationTracking(Emitter<ActiveSessionState> emit) {
     try {
       _locationSubscription?.cancel();
-      
+      _heartRateSubscription?.cancel();
+
       final locationStream = _locationService.startLocationTracking();
-      
       _locationSubscription = locationStream.listen(
         (locationPoint) {
           add(LocationUpdated(locationPoint));
@@ -104,6 +113,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           }
         },
       );
+
+      _heartRateSubscription = _healthService.heartRateStream.listen(
+        (sample) => add(HeartRateUpdated(sample)),
+        onError: (e) => AppLogger.error('Heart rate stream error: $e'),
+      );
     } catch (e) {
       AppLogger.error('Failed to start location tracking: $e');
       
@@ -118,7 +132,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
     }
   }
-  
+
   Future<void> _onLocationUpdated(
     LocationUpdated event, 
     Emitter<ActiveSessionState> emit
@@ -209,7 +223,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
     }
   }
-  
+
   Future<void> _onSessionPaused(
     SessionPaused event, 
     Emitter<ActiveSessionState> emit
@@ -231,7 +245,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       emit(currentState.copyWith(isPaused: true));
     }
   }
-  
+
   Future<void> _onSessionResumed(
     SessionResumed event, 
     Emitter<ActiveSessionState> emit
@@ -253,7 +267,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       emit(currentState.copyWith(isPaused: false));
     }
   }
-  
+
   Future<void> _onSessionCompleted(
     SessionCompleted event, 
     Emitter<ActiveSessionState> emit
@@ -286,14 +300,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         }
         
         // Update backend about session completion
-        await _apiClient.post('/rucks/${currentState.sessionId}/complete', {
-          'notes': event.notes,
-          'rating': event.rating,
-        });
+        await _apiClient.post(
+          '/rucks/${currentState.sessionId}/complete',
+          {
+            'notes': event.notes,
+            'rating': event.rating,
+            'distance_km': currentState.distanceKm,
+            'distance_meters': (currentState.distanceKm * 1000).toInt(),
+            'final_distance_km': currentState.distanceKm,
+            'duration_seconds': currentState.elapsedSeconds,
+            'final_average_pace': currentState.distanceKm > 0 ? currentState.elapsedSeconds / currentState.distanceKm : null,
+            'calories_burned': currentState.calories.toInt(),
+            'elevation_gain_m': currentState.elevationGain,
+            'elevation_loss_m': currentState.elevationLoss,
+            'ruck_weight_kg': currentState.ruckWeightKg,
+          },
+        );
         
         // Cancel location subscription
         await _locationSubscription?.cancel();
         _locationSubscription = null;
+        await _heartRateSubscription?.cancel();
+        _heartRateSubscription = null;
         
         // Emit completion state
         emit(ActiveSessionComplete(
@@ -321,6 +349,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Try fallback - complete locally even if backend fails
         await _locationSubscription?.cancel();
         _locationSubscription = null;
+        await _heartRateSubscription?.cancel();
+        _heartRateSubscription = null;
         
         // Check if the error is a network issue
         final errorMessage = e is ApiException && e.statusCode == 503
@@ -333,7 +363,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
     }
   }
-  
+
   void _onSessionFailed(
     SessionFailed event, 
     Emitter<ActiveSessionState> emit
@@ -343,13 +373,37 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     // Cancel location subscription
     _locationSubscription?.cancel();
     _locationSubscription = null;
+    _heartRateSubscription?.cancel();
+    _heartRateSubscription = null;
     
     // Emit failure state
     emit(ActiveSessionFailure(
       errorMessage: event.errorMessage,
     ));
   }
-  
+
+  Future<void> _onHeartRateUpdated(
+    HeartRateUpdated event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    if (state is ActiveSessionRunning) {
+      final current = state as ActiveSessionRunning;
+      try {
+        await _apiClient.addHeartRateSamples(
+          current.sessionId,
+          [
+            {
+              'timestamp': event.sample.timestamp.toIso8601String(),
+              'bpm': event.sample.bpm,
+            }
+          ],
+        );
+      } catch (e) {
+        AppLogger.error('Failed to send heart rate sample: $e');
+      }
+    }
+  }
+
   /// Calculate calories burned based on distance, weight, and MET value
   int _calculateCalories(double distanceKm, double ruckWeightKg) {
     // MET values (Metabolic Equivalent of Task):
@@ -369,10 +423,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     // Calculate calories
     return (metValue * averageWeightKg * durationHours).round();
   }
-  
+
   @override
   Future<void> close() {
     _locationSubscription?.cancel();
+    _heartRateSubscription?.cancel();
     return super.close();
   }
 }
