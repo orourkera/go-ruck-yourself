@@ -202,7 +202,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final revenueCatService = GetIt.instance<RevenueCatService>();
     final offerings = await revenueCatService.getOfferings();
     if (offerings.isNotEmpty) {
-      final package = offerings.first.availablePackages.first;
+      final packages = offerings.first.availablePackages;
+      final selectedIndex = _selectedPlanIndex ?? 0;
+      final package = (selectedIndex < packages.length) ? packages[selectedIndex] : packages.first;
       final isPurchased = await revenueCatService.makePurchase(package);
       if (isPurchased) {
         // After successful purchase, go directly to Home Screen
