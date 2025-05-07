@@ -299,7 +299,7 @@ class _WeightChip extends StatelessWidget {
         ? '${weightKg.toStringAsFixed(0)} kg'
         : '${(weightKg * 2.20462).toStringAsFixed(0)} lb';
     return Chip(
-      backgroundColor: AppColors.primary.withOpacity(0.9),
+      backgroundColor: AppColors.secondary,
       label: Text(
         display,
         style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
