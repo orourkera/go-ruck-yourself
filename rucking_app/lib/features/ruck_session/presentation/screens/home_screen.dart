@@ -179,7 +179,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     try {
       // Fetch recent sessions
       // debugPrint('Fetching recent sessions from /rucks?limit=3');
-      final sessionsResponse = await _apiClient.get('/rucks?limit=3');
+      final sessionsResponse = await _apiClient.get('/rucks?limit=20');
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
 
       // Filter out incomplete sessions
@@ -390,7 +390,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                            final rucks = _monthlySummaryStats['total_sessions']?.toString() ?? '0';
                            final distanceKm = (_monthlySummaryStats['total_distance_km'] ?? 0.0).toDouble();
                            final distance = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
-                           final calories = _monthlySummaryStats['total_calories']?.toString() ?? '0';
+                           final calories = (_monthlySummaryStats['total_calories'] ?? 0).round().toString();
                             
                            return Row(
                              mainAxisAlignment: MainAxisAlignment.spaceAround,
