@@ -204,7 +204,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
     if (offerings.isNotEmpty) {
       final packages = offerings.first.availablePackages;
       final selectedIndex = _selectedPlanIndex ?? 0;
-      final package = (selectedIndex < packages.length) ? packages[selectedIndex] : packages.first;
+      const planIdentifierMap = {
+        0: 'com.getrucky.gfy.Weekly',
+        1: 'com.getrucky.gfy.Monthly',
+        2: 'com.getrucky.gfy.Annual',
+      };
+      final selectedIdentifier = planIdentifierMap[selectedIndex];
+      final package = packages.firstWhere(
+        (pkg) => pkg.identifier == selectedIdentifier,
+        orElse: () => packages.first,
+      );
       final isPurchased = await revenueCatService.makePurchase(package);
       if (isPurchased) {
         // After successful purchase, go directly to Home Screen
