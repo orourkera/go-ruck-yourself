@@ -28,6 +28,7 @@ import 'package:rucking_app/core/error_messages.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:flutter/services.dart';
 import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -582,7 +583,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
         'elevation_loss_m': _elevationLoss,
         'final_elevation_gain': _elevationGain,
         'final_elevation_loss': _elevationLoss,
-        if (_currentHeartRate != null) 'avg_heart_rate': _currentHeartRate.toInt(),
+        if (_currentHeartRate != null) 'avg_heart_rate': _currentHeartRate!.toInt(),
         'final_average_pace': _pace,
         'weight_kg': widget.userWeight,
         'ruck_weight_kg': widget.ruckWeight,
