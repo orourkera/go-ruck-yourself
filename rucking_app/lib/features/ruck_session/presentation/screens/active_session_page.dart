@@ -15,17 +15,20 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/validation_banner.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Arguments passed to the ActiveSessionPage
 class ActiveSessionArgs {
   final double ruckWeight;
   final String? notes;
   final latlong.LatLng? initialCenter;
+  final int? plannedDuration;
 
   const ActiveSessionArgs({
     required this.ruckWeight,
     this.notes,
     this.initialCenter,
+    this.plannedDuration,
   });
 }
 
@@ -45,7 +48,8 @@ class ActiveSessionPage extends StatelessWidget {
         locationService: locator<LocationService>(),
         healthService: locator<HealthService>(),
         watchService: locator<WatchService>(),
-      )..add(SessionStarted(ruckWeightKg: args.ruckWeight, notes: args.notes)),
+      )..add(SessionStarted(ruckWeightKg: args.ruckWeight, notes: args.notes, plannedDuration: args.plannedDuration)),
+
       child: const _ActiveSessionView(),
     );
   }
@@ -57,8 +61,34 @@ class _ActiveSessionView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
+      body: Column(
+        children: [
+          // Header fills all the way to the top (behind status bar)
+          Builder(
+            builder: (context) {
+              final double topPadding = MediaQuery.of(context).padding.top;
+              return Container(
+                width: double.infinity,
+                padding: EdgeInsets.only(top: topPadding, bottom: 18.0),
+                color: AppColors.primary,
+                child: Center(
+                  child: Text(
+                    'ACTIVE SESSION',
+                    style: AppTextStyles.headlineLarge.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          // Rest of content in SafeArea
+          Expanded(
+            child: SafeArea(
+              top: false,
+              child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
           listenWhen: (prev, curr) => prev is ActiveSessionFailure != (curr is ActiveSessionFailure),
           listener: (ctx, state) {
             if (state is ActiveSessionFailure) {
@@ -77,40 +107,80 @@ class _ActiveSessionView extends StatelessWidget {
                   .map((p) => latlong.LatLng(p.latitude, p.longitude))
                   .toList();
 
-              return Stack(
+              return Column(
                 children: [
-                  // Map layer
-                  Positioned.fill(
-                    child: _RouteMap(
-                      route: route,
-                      initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
-                    ),
-                  ),
-                  // Stats overlay at the top
-                  Positioned(
-                    top: 16,
-                    left: 16,
-                    right: 16,
-                    child: SessionStatsOverlay(state: state),
-                  ),
-                  // Validation banner directly below stats
-                  const Positioned(
-                    top: 80,
-                    left: 16,
-                    right: 16,
-                    child: ValidationBanner(),
-                  ),
-                  // Control buttons at the bottom
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: const SessionControls(),
+                  // Header
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18.0),
+                    color: AppColors.primary,
+                    child: Center(
+                      child: Text(
+                        'ACTIVE SESSION',
+                        style: AppTextStyles.headlineLarge.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
                       ),
                     ),
+                  ),
+                  // Map with weight chip overlay
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.27,
+                            width: double.infinity,
+                            child: _RouteMap(
+                              route: route,
+                              initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: _WeightChip(weightKg: state.ruckWeightKg),
+                        ),
+                        if (state.isPaused)
+                          const Positioned.fill(child: _PauseOverlay()),
+                      ],
+                    ),
+                  ),
+                  // Stats overlay as cards
+                  Padding(
+                    padding: const EdgeInsets.only(top: 18.0, left: 16.0, right: 16.0),
+                    child: Builder(
+                      builder: (context) {
+                        final preferMetric = context.select<AuthBloc, bool>((bloc) {
+                          final st = bloc.state;
+                          if (st is Authenticated) {
+                            return st.user.preferMetric;
+                          }
+                          return true;
+                        });
+                        return SessionStatsOverlay(
+                          state: state,
+                          preferMetric: preferMetric,
+                          useCardLayout: true,
+                        );
+                      },
+                    ),
+                  ),
+                  // Validation banner
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0),
+                    child: ValidationBanner(),
+                  ),
+                  const Spacer(),
+                  // Controls at bottom
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 18.0, top: 8.0),
+                    child: SessionControls(),
                   ),
                 ],
               );
@@ -197,16 +267,64 @@ class _RouteMapState extends State<_RouteMap> {
             ],
           ),
         if (widget.route.isNotEmpty)
-          CircleLayer(
-            circles: [
-              CircleMarker(
+          MarkerLayer(
+            markers: [
+              Marker(
                 point: widget.route.last,
-                color: AppColors.primary,
-                radius: 6,
+                width: 40,
+                height: 40,
+                child: Image.asset('assets/images/map marker.png'),
               ),
             ],
           ),
       ],
+    );
+  }
+}
+
+class _WeightChip extends StatelessWidget {
+  const _WeightChip({required this.weightKg});
+
+  final double weightKg;
+
+  @override
+  Widget build(BuildContext context) {
+    final preferMetric = context.select<AuthBloc, bool>((bloc) {
+      final st = bloc.state;
+      if (st is Authenticated) return st.user.preferMetric;
+      return true;
+    });
+
+    final display = preferMetric
+        ? '${weightKg.toStringAsFixed(0)} kg'
+        : '${(weightKg * 2.20462).toStringAsFixed(0)} lb';
+    return Chip(
+      backgroundColor: AppColors.primary.withOpacity(0.9),
+      label: Text(
+        display,
+        style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _PauseOverlay extends StatelessWidget {
+  const _PauseOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black45,
+        alignment: Alignment.center,
+        child: Text(
+          'PAUSED',
+          style: AppTextStyles.headlineLarge.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 }
