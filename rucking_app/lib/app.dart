@@ -8,6 +8,7 @@ import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/app_theme.dart';
 
 /// Main application widget
@@ -65,6 +66,19 @@ class RuckingApp extends StatelessWidget {
                   ),
                 );
               }
+            case '/active_session':
+              final args = settings.arguments;
+              if (args is ActiveSessionArgs) {
+                return MaterialPageRoute(
+                  builder: (_) => ActiveSessionPage(args: args),
+                );
+              }
+              return MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Error')),
+                  body: const Center(child: Text('Invalid arguments for active session')),
+                ),
+              );
             default:
               // Optionally handle unknown routes
               return MaterialPageRoute(

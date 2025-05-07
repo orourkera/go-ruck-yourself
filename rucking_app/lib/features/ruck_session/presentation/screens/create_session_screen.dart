@@ -9,6 +9,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_screen.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -219,23 +220,11 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         debugPrint('Creating session with selected weight: $_selectedRuckWeight');
         // Delay and then navigate without resetting chip state
         await Future.delayed(Duration(milliseconds: 500));
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BlocProvider(
-              create: (_) => ActiveSessionBloc(
-                apiClient: GetIt.instance<ApiClient>(),
-                locationService: GetIt.instance<LocationService>(),
-              ),
-              child: ActiveSessionScreen(
-                ruckId: ruckId!,
-                ruckWeight: _ruckWeight,
-                displayRuckWeight: _preferMetric ? _ruckWeight : _displayRuckWeight,
-                userWeight: double.parse(_userWeightController.text),
-                plannedDuration: (_plannedDuration != null && _plannedDuration! > 0) ? _plannedDuration : null,
-                preferMetric: _preferMetric,
-              ),
-            ),
+        Navigator.of(context).pushNamed(
+          '/active_session',
+          arguments: ActiveSessionArgs(
+            ruckWeight: _ruckWeight,
+            notes: _userWeightController.text.isNotEmpty ? _userWeightController.text : null,
           ),
         );
       } catch (e) {
