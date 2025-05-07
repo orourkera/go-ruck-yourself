@@ -7,10 +7,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
+import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/validation_banner.dart';
 
 /// Arguments passed to the ActiveSessionPage
 class ActiveSessionArgs {
@@ -40,6 +44,7 @@ class ActiveSessionPage extends StatelessWidget {
         apiClient: locator<ApiClient>(),
         locationService: locator<LocationService>(),
         healthService: locator<HealthService>(),
+        watchService: locator<WatchService>(),
       )..add(SessionStarted(ruckWeightKg: args.ruckWeight, notes: args.notes)),
       child: const _ActiveSessionView(),
     );
@@ -68,18 +73,45 @@ class _ActiveSessionView extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (state is ActiveSessionRunning) {
-              return Column(
+              final route = state.locationPoints
+                  .map((p) => latlong.LatLng(p.latitude, p.longitude))
+                  .toList();
+
+              return Stack(
                 children: [
-                  _StatsHeader(state: state),
-                  Expanded(
+                  // Map layer
+                  Positioned.fill(
                     child: _RouteMap(
-                      route: state.locationPoints
-                          .map((p) => latlong.LatLng(p.latitude, p.longitude))
-                          .toList(),
+                      route: route,
                       initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
                     ),
                   ),
-                  _SessionControls(state: state),
+                  // Stats overlay at the top
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    right: 16,
+                    child: SessionStatsOverlay(state: state),
+                  ),
+                  // Validation banner directly below stats
+                  const Positioned(
+                    top: 80,
+                    left: 16,
+                    right: 16,
+                    child: ValidationBanner(),
+                  ),
+                  // Control buttons at the bottom
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: const SessionControls(),
+                      ),
+                    ),
+                  ),
                 ],
               );
             }
@@ -99,74 +131,54 @@ class _ActiveSessionView extends StatelessWidget {
   }
 }
 
-/// Very basic stats header – shows distance, elapsed, pace.
-class _StatsHeader extends StatelessWidget {
-  const _StatsHeader({required this.state});
-
-  final ActiveSessionRunning state;
-
-  String _format(Duration d) {
-    final h = d.inHours.toString().padLeft(2, '0');
-    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$h:$m:$s';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _StatTile(label: 'DIST', value: '${state.distanceKm.toStringAsFixed(2)} km'),
-          _StatTile(label: 'PACE', value: state.pace.toStringAsFixed(1)),
-          _StatTile(label: 'TIME', value: _format(Duration(seconds: state.elapsedSeconds))),
-          if (state.latestHeartRate != null)
-            _StatTile(label: 'HR', value: '${state.latestHeartRate} bpm'),
-          _StatTile(label: 'CAL', value: state.calories.toStringAsFixed(0)),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(label, style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary)),
-        const SizedBox(height: 4),
-        Text(value, style: AppTextStyles.titleLarge),
-      ],
-    );
-  }
-}
-
 /// Real map – replace with FlutterMap or GoogleMap.
-class _RouteMap extends StatelessWidget {
+class _RouteMap extends StatefulWidget {
   const _RouteMap({required this.route, this.initialCenter});
 
   final List<latlong.LatLng> route;
   final latlong.LatLng? initialCenter;
 
   @override
+  State<_RouteMap> createState() => _RouteMapState();
+}
+
+class _RouteMapState extends State<_RouteMap> {
+  late final MapController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = MapController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RouteMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.route.isNotEmpty) {
+      final latest = widget.route.last;
+      final prevLatest = oldWidget.route.isNotEmpty ? oldWidget.route.last : null;
+      if (prevLatest == null || (latest.latitude != prevLatest.latitude || latest.longitude != prevLatest.longitude)) {
+        // Move map center smoothly to latest position
+        final currentZoom = _controller.camera.zoom;
+        _controller.move(latest, currentZoom);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final center = route.isNotEmpty
-        ? route.last
-        : (initialCenter ?? latlong.LatLng(0, 0));
+    final center = widget.route.isNotEmpty
+        ? widget.route.last
+        : (widget.initialCenter ?? latlong.LatLng(0, 0));
 
     return FlutterMap(
+      mapController: _controller,
       options: MapOptions(
-        center: center,
-        zoom: 15,
-        interactiveFlags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+        initialCenter: center,
+        initialZoom: 15,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+        ),
       ),
       children: [
         TileLayer(
@@ -174,65 +186,27 @@ class _RouteMap extends StatelessWidget {
               'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
           userAgentPackageName: 'com.ruckingapp',
         ),
-        if (route.isNotEmpty)
+        if (widget.route.isNotEmpty)
           PolylineLayer(
             polylines: [
               Polyline(
-                points: route,
+                points: widget.route,
                 strokeWidth: 4.0,
                 color: AppColors.primary,
               ),
             ],
           ),
-        if (route.isNotEmpty)
+        if (widget.route.isNotEmpty)
           CircleLayer(
             circles: [
               CircleMarker(
-                point: route.last,
+                point: widget.route.last,
                 color: AppColors.primary,
                 radius: 6,
               ),
             ],
           ),
       ],
-    );
-  }
-}
-
-class _SessionControls extends StatelessWidget {
-  const _SessionControls({required this.state});
-
-  final ActiveSessionRunning state;
-
-  @override
-  Widget build(BuildContext context) {
-    final bloc = context.read<ActiveSessionBloc>();
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                if (state.isPaused) {
-                  bloc.add(SessionResumed());
-                } else {
-                  bloc.add(SessionPaused());
-                }
-              },
-              child: Text(state.isPaused ? 'RESUME' : 'PAUSE'),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () => bloc.add(const SessionCompleted()),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-              child: const Text('END'),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

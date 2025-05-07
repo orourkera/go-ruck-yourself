@@ -29,9 +29,13 @@ class LocationUpdated extends ActiveSessionEvent {
   List<Object?> get props => [locationPoint];
 }
 
-class SessionPaused extends ActiveSessionEvent {}
+class SessionPaused extends ActiveSessionEvent {
+  const SessionPaused();
+}
 
-class SessionResumed extends ActiveSessionEvent {}
+class SessionResumed extends ActiveSessionEvent {
+  const SessionResumed();
+}
 
 class SessionCompleted extends ActiveSessionEvent {
   final String? notes;
@@ -53,7 +57,9 @@ class HeartRateUpdated extends ActiveSessionEvent {
 }
 
 /// Internal ticker (1-second) to update elapsed time & derived metrics
-class Tick extends ActiveSessionEvent {}
+class Tick extends ActiveSessionEvent {
+  const Tick();
+}
 
 class SessionFailed extends ActiveSessionEvent {
   final String errorMessage;
