@@ -305,15 +305,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           {
             'notes': event.notes,
             'rating': event.rating,
-            'distance_km': currentState.distanceKm,
+            'distance_km': double.parse(currentState.distanceKm.toStringAsFixed(3)),
             'distance_meters': (currentState.distanceKm * 1000).toInt(),
-            'final_distance_km': currentState.distanceKm,
+            'final_distance_km': double.parse(currentState.distanceKm.toStringAsFixed(3)),
             'duration_seconds': currentState.elapsedSeconds,
-            'final_average_pace': currentState.distanceKm > 0 ? currentState.elapsedSeconds / currentState.distanceKm : null,
-            'calories_burned': currentState.calories.toInt(),
-            'elevation_gain_m': currentState.elevationGain,
-            'elevation_loss_m': currentState.elevationLoss,
-            'ruck_weight_kg': currentState.ruckWeightKg,
+            'final_average_pace': currentState.distanceKm > 0
+                ? double.parse((currentState.elapsedSeconds / currentState.distanceKm)
+                    .toStringAsFixed(2))
+                : null,
+            'calories_burned': currentState.calories.round(),
+            'elevation_gain_m': currentState.elevationGain.round(),
+            'elevation_loss_m': currentState.elevationLoss.round(),
+            'ruck_weight_kg': currentState.ruckWeightKg.roundToDouble(),
           },
         );
         
