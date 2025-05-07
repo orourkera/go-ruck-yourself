@@ -37,8 +37,8 @@ class SessionCard extends StatelessWidget {
       metric: preferMetric
     );
     
-    // Format calories
-    final calories = session.caloriesBurned.toString();
+    // Format calories as whole numbers for display
+    final calories = session.caloriesBurned.round().toString();
     
     // Format weight
     final weightDisplay = MeasurementUtils.formatWeight(
