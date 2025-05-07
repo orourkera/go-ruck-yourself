@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:latlong2/latlong.dart' as latlong;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
@@ -70,10 +72,11 @@ class _ActiveSessionView extends StatelessWidget {
                 children: [
                   _StatsHeader(state: state),
                   Expanded(
-                    child: _PlaceholderMap(
+                    child: _RouteMap(
                       route: state.locationPoints
                           .map((p) => latlong.LatLng(p.latitude, p.longitude))
                           .toList(),
+                      initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
                     ),
                   ),
                   _SessionControls(state: state),
@@ -119,6 +122,9 @@ class _StatsHeader extends StatelessWidget {
           _StatTile(label: 'DIST', value: '${state.distanceKm.toStringAsFixed(2)} km'),
           _StatTile(label: 'PACE', value: state.pace.toStringAsFixed(1)),
           _StatTile(label: 'TIME', value: _format(Duration(seconds: state.elapsedSeconds))),
+          if (state.latestHeartRate != null)
+            _StatTile(label: 'HR', value: '${state.latestHeartRate} bpm'),
+          _StatTile(label: 'CAL', value: state.calories.toStringAsFixed(0)),
         ],
       ),
     );
@@ -143,17 +149,52 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-/// Placeholder map – replace with FlutterMap or GoogleMap.
-class _PlaceholderMap extends StatelessWidget {
-  const _PlaceholderMap({required this.route});
+/// Real map – replace with FlutterMap or GoogleMap.
+class _RouteMap extends StatelessWidget {
+  const _RouteMap({required this.route, this.initialCenter});
 
   final List<latlong.LatLng> route;
+  final latlong.LatLng? initialCenter;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.grey.shade200,
-      child: const Center(child: Text('Map coming soon')),
+    final center = route.isNotEmpty
+        ? route.last
+        : (initialCenter ?? latlong.LatLng(0, 0));
+
+    return FlutterMap(
+      options: MapOptions(
+        center: center,
+        zoom: 15,
+        interactiveFlags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate:
+              'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
+          userAgentPackageName: 'com.ruckingapp',
+        ),
+        if (route.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: route,
+                strokeWidth: 4.0,
+                color: AppColors.primary,
+              ),
+            ],
+          ),
+        if (route.isNotEmpty)
+          CircleLayer(
+            circles: [
+              CircleMarker(
+                point: route.last,
+                color: AppColors.primary,
+                radius: 6,
+              ),
+            ],
+          ),
+      ],
     );
   }
 }
