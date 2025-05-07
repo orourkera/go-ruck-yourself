@@ -30,7 +30,6 @@ import 'package:flutter/services.dart';
 import 'package:rucking_app/features/health_integration/domain/heart_rate_providers.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 
 /// Screen for tracking an active ruck session
 class ActiveSessionScreen extends ConsumerStatefulWidget {
@@ -328,6 +327,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     _calculateStats(locationPoint);
     _centerMapOnUser();
     _lastLocationUpdateTime = DateTime.now(); // Update last location timestamp (used for inactivity detection)
+    _sendLocationUpdate(locationPoint);
   }
 
   /// Center map on user when new location is added
@@ -566,12 +566,31 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
         return;
       }
       
-      // Send session complete request to backend
-      await _apiClient.post('/rucks/${widget.ruckId}/complete', {
-        'duration': _elapsed.inSeconds,
-        'distance': _distance,
+      // Prepare full session data according to data-model spec
+      final Map<String, dynamic> completionData = {
+        if (widget.plannedDuration != null) 'planned_duration_minutes': widget.plannedDuration,
+        if (_startTime != null) 'started_at': _startTime!.toIso8601String(),
+        'ended_at': DateTime.now().toIso8601String(),
+        'completed_at': DateTime.now().toIso8601String(),
+        'status': 'completed',
+        'distance_km': _distance,
+        'distance_meters': (_distance * 1000).round(),
+        'final_distance_km': _distance,
         'calories_burned': _caloriesBurned,
-      });
+        'final_calories_burned': _caloriesBurned.round(),
+        'elevation_gain_m': _elevationGain,
+        'elevation_loss_m': _elevationLoss,
+        'final_elevation_gain': _elevationGain,
+        'final_elevation_loss': _elevationLoss,
+        if (_currentHeartRate != null) 'avg_heart_rate': _currentHeartRate.toInt(),
+        'final_average_pace': _pace,
+        'weight_kg': widget.userWeight,
+        'ruck_weight_kg': widget.ruckWeight,
+        // notes, tags, rating handled in SessionCompleteScreen
+      };
+      // Remove null entries
+      completionData.removeWhere((_, v) => v == null);
+      await _apiClient.post('/rucks/${widget.ruckId}/complete', completionData);
       
       AppLogger.info('Ruck session ${widget.ruckId} completed');
       
