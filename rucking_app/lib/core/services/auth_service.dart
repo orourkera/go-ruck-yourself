@@ -119,15 +119,22 @@ class AuthServiceImpl implements AuthService {
         },
       );
       
-      // Process the response directly
-      final token = response['token'] as String;
-      final refreshToken = response['refresh_token'] as String;
-      final userData = response['user'] as Map<String, dynamic>;
-      final user = User.fromJson(userData);
+      final token = response['token'] as String?;
+      if (token == null || token.isEmpty) {
+        throw Exception('Registration failed: No token returned from server.');
+      }
+      final refreshToken = response['refresh_token'] as String?;
+      final userData = response['user'];
+      if (userData == null) {
+        throw Exception('Registration failed: No user data returned from server.');
+      }
+      final user = User.fromJson(userData as Map<String, dynamic>);
       
       // Store token and user data
       await _storageService.setSecureString(AppConfig.tokenKey, token);
-      await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
+      }
       await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
       await _storageService.setString(AppConfig.userIdKey, user.userId);
       
