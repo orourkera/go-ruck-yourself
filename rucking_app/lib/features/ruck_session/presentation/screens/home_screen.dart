@@ -28,8 +28,8 @@ LatLng _getRouteCenter(List<LatLng> points) {
 
 // Improved zoom calculation to fit all points with padding
 double _getFitZoom(List<LatLng> points) {
-  if (points.isEmpty) return 15.0; // Default zoom
-  if (points.length == 1) return 17.0; // Closer zoom for single point
+  if (points.isEmpty) return 16.0; // Default zoom closer
+  if (points.length == 1) return 17.5; // Even closer for single point
 
   double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
   double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
@@ -40,14 +40,14 @@ double _getFitZoom(List<LatLng> points) {
   double lngDiff = (maxLng - minLng).abs();
   double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
 
-  // Add a small buffer so route isn't at the edge
-  maxDiff *= 1.15;
+  // Smaller buffer for a tighter fit
+  maxDiff *= 1.05;
 
-  if (maxDiff < 0.001) return 17.0;
-  if (maxDiff < 0.01) return 15.0;
-  if (maxDiff < 0.1) return 13.0;
-  if (maxDiff < 1.0) return 10.0;
-  return 7.0;
+  if (maxDiff < 0.001) return 17.5;
+  if (maxDiff < 0.01) return 16.0;
+  if (maxDiff < 0.1) return 14.0;
+  if (maxDiff < 1.0) return 11.0;
+  return 8.0;
 }
 
 /// Main home screen that serves as the central hub of the app
