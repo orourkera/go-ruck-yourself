@@ -140,7 +140,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                     // Remove any SnackBar before navigating home
                     ScaffoldMessenger.of(context).clearSnackBars();
                     // Reset error state so SnackBar won't show on home
-                    context.read<ActiveSessionBloc>().add(const SessionErrorCleared());
+                    // Removed: context.read<ActiveSessionBloc>().add(const SessionErrorCleared());
                     Navigator.of(context).popUntil((route) => route.isFirst); // Go home
                     context.read<ActiveSessionBloc>().add(const SessionCompleted());
                   },
@@ -200,8 +200,19 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                     );
                   } else if (state is ActiveSessionComplete) {
                     Navigator.of(ctx).pushReplacementNamed(
-                      '/session-complete', 
-                      arguments: state.session.id, 
+                      '/session_complete',
+                      arguments: {
+                        'endTime': state.session.endTime,
+                        'ruckId': state.session.id,
+                        'duration': state.session.duration,
+                        'distance': state.session.distance,
+                        'caloriesBurned': state.session.caloriesBurned,
+                        'elevationGain': state.session.elevationGain,
+                        'elevationLoss': state.session.elevationLoss,
+                        'ruckWeightKg': state.session.ruckWeightKg,
+                        'notes': state.session.notes,
+                        'heartRateSamples': state.session.heartRateSamples,
+                      },
                     );
                   }
                 },

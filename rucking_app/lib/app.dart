@@ -8,6 +8,7 @@ import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/app_theme.dart';
 
@@ -55,14 +56,16 @@ class RuckingApp extends StatelessWidget {
                     elevationGain: args['elevationGain'] as double,
                     elevationLoss: args['elevationLoss'] as double,
                     ruckWeight: args['ruckWeight'] as double,
+                    initialNotes: args['initialNotes'] as String?,
+                    heartRateSamples: args['heartRateSamples'] as List<HeartRateSample>?,
                   ),
                 );
               } else {
                 // Handle error: arguments are required for this route
                 return MaterialPageRoute(
                   builder: (_) => Scaffold(
-                    appBar: AppBar(title: Text('Error')),
-                    body: Center(child: Text('Missing session data.')),
+                    appBar: AppBar(title: const Text('Error')),
+                    body: const Center(child: Text('Missing session data.')),
                   ),
                 );
               }
