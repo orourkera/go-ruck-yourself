@@ -23,12 +23,14 @@ class ActiveSessionRunning extends ActiveSessionState {
   final double elevationGain;
   final double elevationLoss;
   final bool isPaused;
-  final double pace;
+  final double? pace;
   final int? latestHeartRate;
   final String? validationMessage;
   final DateTime originalSessionStartTimeUtc; // Tracks when the session originally started
   final Duration totalPausedDuration;      // Accumulates total time paused
   final DateTime? currentPauseStartTimeUtc; // Tracks when the current pause began
+
+  static const _unset = Object();
 
   bool get isLongEnough => elapsedSeconds >= 60;
 
@@ -84,7 +86,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     double? elevationGain,
     double? elevationLoss,
     bool? isPaused,
-    double? pace,
+    Object? pace = _unset,
     int? latestHeartRate,
     String? validationMessage,
     bool clearValidationMessage = false,
@@ -104,7 +106,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       elevationGain: elevationGain ?? this.elevationGain,
       elevationLoss: elevationLoss ?? this.elevationLoss,
       isPaused: isPaused ?? this.isPaused,
-      pace: pace ?? this.pace,
+      pace: identical(pace, _unset) ? this.pace : pace as double?,
       latestHeartRate: latestHeartRate ?? this.latestHeartRate,
       validationMessage: clearValidationMessage ? null : validationMessage ?? this.validationMessage,
       plannedDuration: plannedDuration ?? this.plannedDuration,

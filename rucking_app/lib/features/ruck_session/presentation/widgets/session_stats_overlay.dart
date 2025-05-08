@@ -39,7 +39,7 @@ class SessionStatsOverlay extends StatelessWidget {
             ),
             _StatTile(
               label: 'PACE',
-              value: MeasurementUtils.formatPaceSeconds(state.pace * 60, metric: preferMetric),
+              value: state.pace != null ? MeasurementUtils.formatPaceSeconds(state.pace! * 60, metric: preferMetric) : '--',
             ),
             _StatTile(label: 'TIME', value: _formatMinutesSeconds(Duration(seconds: state.elapsedSeconds))),
             if (state.latestHeartRate != null)
@@ -72,7 +72,7 @@ class SessionStatsOverlay extends StatelessWidget {
       ),
       _StatTile(
         label: 'Pace',
-        value: MeasurementUtils.formatPaceSeconds(state.pace * 60, metric: preferMetric),
+        value: state.pace != null ? MeasurementUtils.formatPaceSeconds(state.pace! * 60, metric: preferMetric) : '--',
         icon: Icons.speed,
       ),
       _StatTile(
