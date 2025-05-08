@@ -101,29 +101,33 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Session Too Short'),
-          content: const Text('This session is very short. Are you sure you want to end it and save? Alternatively, you can discard it.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Discard Session'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(); // Dismiss dialog
-                // Navigate to home/root screen
-                Navigator.of(context).popUntil((route) => route.isFirst);
-                // Still tell BLoC to clean up its "running" state
-                context.read<ActiveSessionBloc>().add(const SessionCompleted());
-              },
-            ),
-            TextButton(
-              child: const Text('Save Anyway'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.read<ActiveSessionBloc>().add(const SessionCompleted());
-              },
-            ),
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
+          title: const Text(
+            "Your session is too short to save. We don't want bad data, rucker.",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "Your session is too short to be saved. Please keep rucking for a bit longer, or discard this session if it was a mistake.",
+          ),
+          actionsPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 4),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  child: const Text('Discard Session'),
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // Dismiss dialog
+                    Navigator.of(context).popUntil((route) => route.isFirst); // Go home
+                    context.read<ActiveSessionBloc>().add(const SessionCompleted());
+                  },
+                ),
+                TextButton(
+                  child: const Text('Continue Rucking'),
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // Just close dialog
+                  },
+                ),
+              ],
             ),
           ],
         );
@@ -191,7 +195,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       children: [
                         // Map with weight chip overlay
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          padding: const EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0),
                           child: Stack(
                             children: [
                               ClipRRect(
