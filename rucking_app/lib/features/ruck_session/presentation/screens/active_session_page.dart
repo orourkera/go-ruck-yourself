@@ -579,10 +579,13 @@ class _CountdownOverlayState extends State<CountdownOverlay> with SingleTickerPr
         });
         _controller.forward(from: 0.0);
       } else {
-        timer.cancel();
-        setState(() {
-          _count = 0;
+        // Wait a full second before hiding overlay
+        Future.delayed(const Duration(seconds: 1), () {
+          setState(() {
+            _count = 0;
+          });
         });
+        timer.cancel();
       }
     });
   }
@@ -599,13 +602,19 @@ class _CountdownOverlayState extends State<CountdownOverlay> with SingleTickerPr
     if (_count == 0) return const SizedBox.shrink();
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.5),
+        color: AppColors.primary,
         child: Center(
           child: FadeTransition(
             opacity: _opacityAnimation,
             child: Text(
               _count.toString(),
-              style: const TextStyle(fontSize: 72, color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 96,
+                color: Colors.white,
+                fontFamily: 'Bangers',
+                fontWeight: FontWeight.normal,
+                letterSpacing: 2.0,
+              ),
             ),
           ),
         ),
