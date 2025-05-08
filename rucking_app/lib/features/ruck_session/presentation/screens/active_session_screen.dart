@@ -336,9 +336,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   /// Center map on user when new location is added
   void _centerMapOnUser() {
     if (_locationPoints.isNotEmpty) {
-      final center = _getRouteCenter(_locationPoints);
-      final zoom = min(_getFitZoom(_locationPoints), 16.0); // Clamp zoom to maximum 16.0
-      _mapController.move(center, zoom);
+      final userLatLng = LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude);
+      // Use a lower fixed zoom value for all location updates to prevent excessive zooming
+      _mapController.move(userLatLng, 14.5);
     }
   }
 
@@ -350,72 +350,72 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     // Get previous point for calculations
     final previousPoint = _locationPoints[_locationPoints.length - 2];
     
-    // Calculate distance between points in kilometers
-    final distanceMeters = _locationService.calculateDistance(previousPoint, newPoint) * 1000;
-    
-    // Only update stats if we're past the initial threshold or collecting initial data
-    if (_canShowStats) {
-      // Update distance
-      _uncountedDistance += distanceMeters;
-      _distance = _uncountedDistance / 1000;
-      AppLogger.info("Segment distance calculated: " + distanceMeters.toString() + " meters");
-      
-      // Calculate elevation changes
-      final elevationChange = newPoint.elevation - previousPoint.elevation;
-      if (elevationChange > 0) {
-        _elevationGain += elevationChange;
-      } else {
-        _elevationLoss += elevationChange.abs();
-      }
-      
-      // Calculate overall average pace (seconds per km)
-      if (_distance > 0 && _elapsed.inSeconds > 0) {
-        _pace = _elapsed.inSeconds / _distance; 
-      } else {
-        _pace = 0.0;
-      }
-
-      // Calculate MET value using the correct method - based on segment pace for accuracy
-      // Need segment pace calculation here, even if not used for the main _pace variable
-      double segmentSpeedKmh = 0.0;
-      if (distanceMeters > 0) {
-        final segmentSeconds = DateTime.now().difference(previousPoint.timestamp).inSeconds;
-        if (segmentSeconds > 0) {
-           final segmentPaceSecPerKm = segmentSeconds / (distanceMeters / 1000);
-           segmentSpeedKmh = 3600 / segmentPaceSecPerKm;
-        }
-      }
-      final double speedMph = MetCalculator.kmhToMph(segmentSpeedKmh);
-      final double ruckWeightKg = widget.ruckWeight;
-      final double ruckWeightLbs = ruckWeightKg * AppConfig.kgToLbs;
-
-      final grade = MetCalculator.calculateGrade(
-        elevationChangeMeters: elevationChange,
-        distanceMeters: distanceMeters,
-      );
-
-      final metValue = MetCalculator.calculateRuckingMetByGrade(
-        speedMph: speedMph,
-        grade: grade,
-        ruckWeightLbs: ruckWeightLbs, 
-      );
-
-      // Calculate segment time in minutes
-      final segmentTimeMinutes = DateTime.now().difference(previousPoint.timestamp).inSeconds / 60;
-
-      // Calculate calories burned for this segment
-      final segmentCalories = MetCalculator.calculateCaloriesBurned(
-        weightKg: _userWeightKg + (ruckWeightKg * 0.75), // Count 75% of ruck weight
-        durationMinutes: segmentTimeMinutes, // Use fractional minutes
-        metValue: metValue,
-      );
-      
-      _caloriesBurned += segmentCalories;
-      
+    // Calculate elevation changes
+    final elevationChange = newPoint.elevation - previousPoint.elevation;
+    if (elevationChange > 0) {
+      _elevationGain += elevationChange;
     } else {
-      // Still in initial distance collection phase
-      _uncountedDistance = _validationService.getAccumulatedDistanceMeters();
+      _elevationLoss += elevationChange.abs();
     }
+
+    // Calculate segment distance and update overall distance
+    final Distance distanceCalc = Distance();
+    final double segmentDistanceMeters = distanceCalc(
+      LatLng(previousPoint.latitude, previousPoint.longitude),
+      LatLng(newPoint.latitude, newPoint.longitude)
+    );
+    setState(() {
+      _distance += segmentDistanceMeters / 1000; // convert meters to km
+    });
+
+    // Calculate overall average pace (seconds per km)
+    setState(() {
+      if (_distance < 0.05) {
+        _pace = 0;
+      } else {
+        double paceSecondsPerKm = _elapsed.inSeconds / _distance;
+        double paceMinutesPerKm = paceSecondsPerKm / 60;
+        // If the calculated pace is unreasonably high, default to 0 (to render as a dash)
+        _pace = (paceMinutesPerKm > 20) ? 0 : paceMinutesPerKm;
+      }
+    });
+
+    // Calculate MET value using the correct method - based on segment pace for accuracy
+    // Need segment pace calculation here, even if not used for the main _pace variable
+    double segmentSpeedKmh = 0.0;
+    if (segmentDistanceMeters > 0) {
+      final segmentSeconds = DateTime.now().difference(previousPoint.timestamp).inSeconds;
+      if (segmentSeconds > 0) {
+         final segmentPaceSecPerKm = segmentSeconds / (segmentDistanceMeters / 1000);
+         segmentSpeedKmh = 3600 / segmentPaceSecPerKm;
+      }
+    }
+    final double speedMph = MetCalculator.kmhToMph(segmentSpeedKmh);
+    final double ruckWeightKg = widget.ruckWeight;
+    final double ruckWeightLbs = ruckWeightKg * AppConfig.kgToLbs;
+
+    final grade = MetCalculator.calculateGrade(
+      elevationChangeMeters: elevationChange,
+      distanceMeters: segmentDistanceMeters,
+    );
+
+    final metValue = MetCalculator.calculateRuckingMetByGrade(
+      speedMph: speedMph,
+      grade: grade,
+      ruckWeightLbs: ruckWeightLbs, 
+    );
+
+    // Calculate segment time in minutes
+    final segmentTimeMinutes = DateTime.now().difference(previousPoint.timestamp).inSeconds / 60;
+
+    // Calculate calories burned for this segment
+    final segmentCalories = MetCalculator.calculateCaloriesBurned(
+      weightKg: _userWeightKg + (ruckWeightKg * 0.75), // Count 75% of ruck weight
+      durationMinutes: segmentTimeMinutes, // Use fractional minutes
+      metValue: metValue,
+    );
+    
+    _caloriesBurned += segmentCalories;
   }
   
   /// Send location update to API
