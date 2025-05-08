@@ -7,12 +7,28 @@ protocol SessionManagerDelegate: AnyObject {
     func didReceiveMessage(_ message: [String: Any])
 }
 
-class SessionManager: NSObject, WCSessionDelegate {
+class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
+    // Published properties for SwiftUI
+    @Published var status: String = "Connecting..."
+    @Published var heartRate: Int = 0
+
+    var statusText: String {
+        status
+    }
+    var heartRateText: String {
+        heartRate > 0 ? "\(heartRate) BPM" : "--"
+    }
+
+    func startSession() {
+        status = "Connected"
+        // Add additional session start logic if needed
+    }
+
     static let shared = SessionManager()
     weak var delegate: SessionManagerDelegate?
     private let session: WCSession
     
-    private override init() {
+    override init() {
         session = WCSession.default
         super.init()
         session.delegate = self
