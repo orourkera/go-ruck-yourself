@@ -123,12 +123,36 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
             : true;
         
         return AlertDialog(
-          title: const Text('Session Too Short'),
-          content: Text('Your session did not accumulate enough data to be saved.'),
+          title: const Text('Session Too Short, Rucker.'),
+          content: const Text('Your session did not accumulate enough data to be saved.'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('OK'),
+              onPressed: () {
+                // Discard Session: pop all the way to home
+                Navigator.of(dialogContext).popUntil((route) => route.isFirst);
+              },
+              child: const Text(
+                'Discard Session',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w300,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                // Keep Rucking: just close the dialog
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text(
+                'Keep Rucking',
+                style: TextStyle(
+                  color: Color(0xFFB86F1B), // Optional: match your accent color
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
             ),
           ],
         );
@@ -203,43 +227,44 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         .map((p) => latlong.LatLng(p.latitude, p.longitude))
                         .toList();
                     // DEBUG: Print route length and points
-                    debugPrint('Route length: [32m[1m[4m[7m${route.length}[0m');
+                    debugPrint('Route length:  [32m [1m [4m [7m${route.length} [0m');
                     for (var i = 0; i <route.length; i++) {
-                      debugPrint('Route[$i]: Lat: [36m${route[i].latitude}[0m, Lng: [36m${route[i].longitude}[0m');
+                      debugPrint('Route[$i]: Lat:  [36m${route[i].latitude} [0m, Lng:  [36m${route[i].longitude} [0m');
                     }
 
-                    return Column(
-                      children: [
-                        // Map with weight chip overlay
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0),
-                          child: Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(18),
-                                child: SizedBox(
-                                  height: MediaQuery.of(context).size.height * 0.27,
-                                  width: double.infinity,
-                                  child: _RouteMap(
-                                    route: route,
-                                    initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                    return SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          // Map with weight chip overlay
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0, left: 8.0, right: 8.0),
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: SizedBox(
+                                    height: MediaQuery.of(context).size.height * 0.27,
+                                    width: double.infinity,
+                                    child: _RouteMap(
+                                      route: route,
+                                      initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Positioned(
-                                top: 12,
-                                right: 12,
-                                child: _WeightChip(weightKg: state.ruckWeightKg),
-                              ),
-                              if (state.isPaused)
-                                const Positioned.fill(child: _PauseOverlay()),
-                            ],
+                                Positioned(
+                                  top: 12,
+                                  right: 12,
+                                  child: _WeightChip(weightKg: state.ruckWeightKg),
+                                ),
+                                if (state.isPaused)
+                                  const Positioned.fill(child: _PauseOverlay()),
+                              ],
+                            ),
                           ),
-                        ),
-                        // Stats overlay or spinner
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
+                          const SizedBox(height: 8.0), // Added for spacing
+                          // Stats overlay or spinner
+                          Padding(
+                            padding: const EdgeInsets.all(16.0), // This was the padding inside the Expanded
                             child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
                               key: const ValueKey('stats_overlay_builder'),
                               buildWhen: (prev, curr) {
@@ -272,24 +297,25 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               },
                             ),
                           ),
-                        ),
-                        const Spacer(),
-                        // Controls at bottom
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 18.0, top: 8.0),
-                          child: SessionControls(
-                            isPaused: state.isPaused,
-                            onTogglePause: () {
-                              if (state.isPaused) {
-                                context.read<ActiveSessionBloc>().add(const SessionResumed());
-                              } else {
-                                context.read<ActiveSessionBloc>().add(const SessionPaused());
-                              }
-                            },
-                            onEndSession: () => _handleEndSession(context, state),
+                          const SizedBox(height: 8.0), // Added for spacing
+                          // Controls at bottom
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 10.0, top: 4.0),
+                            child: SessionControls(
+                              isPaused: state.isPaused,
+                              onTogglePause: () {
+                                if (state.isPaused) {
+                                  context.read<ActiveSessionBloc>().add(const SessionResumed());
+                                } else {
+                                  context.read<ActiveSessionBloc>().add(const SessionPaused());
+                                }
+                              },
+                              onEndSession: () => _handleEndSession(context, state),
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 16.0), // Added for bottom padding within scroll view
+                        ],
+                      ),
                     );
                   }
                   if (state is ActiveSessionComplete) {
@@ -337,7 +363,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
         Expanded(
           flex: 1,
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
             child: state is ActiveSessionRunning
                 ? SessionStatsOverlay(
                     state: state as ActiveSessionRunning,
@@ -389,39 +415,56 @@ class _RouteMap extends StatefulWidget {
 }
 
 class _RouteMapState extends State<_RouteMap> {
-  late final MapController _controller;
+  final MapController _controller = MapController();
 
   @override
   void initState() {
     super.initState();
-    _controller = MapController();
+    // Schedule a microtask to fit bounds after the first frame if route is available.
+    // This ensures the map is laid out before we try to fit bounds.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fitBoundsToRoute();
+    });
   }
 
   @override
   void didUpdateWidget(covariant _RouteMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.route.isNotEmpty) {
-      final latest = widget.route.last;
-      final prevLatest = oldWidget.route.isNotEmpty ? oldWidget.route.last : null;
-      if (prevLatest == null || (latest.latitude != prevLatest.latitude || latest.longitude != prevLatest.longitude)) {
-        // Move map center smoothly to latest position
-        final currentZoom = _controller.camera.zoom;
-        _controller.move(latest, currentZoom);
-      }
+    if (widget.route.isNotEmpty && widget.route != oldWidget.route) {
+      // Use a microtask to ensure that mapController is ready and avoid conflicts
+      // if FlutterMap is rebuilding.
+      Future.microtask(() => _fitBoundsToRoute());
+    }
+  }
+
+  void _fitBoundsToRoute() {
+    if (mounted && widget.route.length > 1) {
+      final bounds = LatLngBounds.fromPoints(widget.route);
+      _controller.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(40.0),
+        ),
+      );
+    } else if (mounted && widget.route.isNotEmpty) {
+      // If only one point, center on it with a fixed zoom
+      _controller.move(widget.route.last, 16.5);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final center = widget.route.isNotEmpty
+    // Determine initial center for when the map is first built or route is empty.
+    // If fitBounds is called, this initialCenter will be overridden.
+    final latlong.LatLng initialMapCenter = widget.route.isNotEmpty
         ? widget.route.last
         : (widget.initialCenter ?? latlong.LatLng(0, 0));
 
     return FlutterMap(
       mapController: _controller,
       options: MapOptions(
-        initialCenter: center,
-        initialZoom: 15,
+        initialCenter: initialMapCenter, // Use calculated initial center
+        initialZoom: 16.5, // Default zoom if no route or only one point
         interactionOptions: const InteractionOptions(
           flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
         ),
