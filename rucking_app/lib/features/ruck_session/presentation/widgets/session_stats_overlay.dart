@@ -19,14 +19,10 @@ class SessionStatsOverlay extends StatelessWidget {
   }
 
   String _formatHoursMinutesSeconds(Duration d) {
-    final h = d.inHours;
+    final h = d.inHours.toString().padLeft(2, '0');
     final m = (d.inMinutes % 60).toString().padLeft(2, '0');
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    if (h > 0) {
-      return '$h:$m:$s';
-    } else {
-      return '$m:$s';
-    }
+    return '$h:$m:$s';
   }
 
   @override

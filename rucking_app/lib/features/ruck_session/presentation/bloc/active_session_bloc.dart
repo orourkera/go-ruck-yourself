@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -27,6 +28,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   Timer? _ticker;
   // Reuse one validation service instance to keep state between points
   final SessionValidationService _validationService = SessionValidationService();
+  LocationPoint? _lastValidLocation;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -46,6 +48,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<SessionFailed>(_onSessionFailed);
     on<HeartRateUpdated>(_onHeartRateUpdated);
     on<Tick>(_onTick);
+    on<SessionErrorCleared>(_onSessionErrorCleared);
   }
 
   Future<void> _onSessionStarted(
@@ -203,12 +206,41 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _ticker = null;
   }
 
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double R = 6371000; // Earth radius in meters
+    final double dLat = (lat2 - lat1) * (pi / 180);
+    final double dLon = (lon2 - lon1) * (pi / 180);
+    final double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * (pi / 180)) * cos(lat2 * (pi / 180)) *
+        sin(dLon / 2) * sin(dLon / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return R * c;
+  }
+
   Future<void> _onLocationUpdated(
     LocationUpdated event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    final currentPoint = event.locationPoint;
+    const double thresholdMeters = 10.0;
+    
+    if (_lastValidLocation != null) {
+      final last = _lastValidLocation!;
+      final double distance = _calculateDistance(
+          last.latitude, last.longitude,
+          currentPoint.latitude, currentPoint.longitude);
+
+      if (distance < thresholdMeters) {
+        AppLogger.info('Ignoring minimal location update; distance $distance m is below threshold.');
+        return;
+      }
+    }
+
+    _lastValidLocation = currentPoint;
+
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
+      
       AppLogger.info('LocationUpdated event: ${event.locationPoint}');
 
       // Validate the incoming point
@@ -239,9 +271,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         if (diff < 0) newElevationLoss += diff.abs();
       }
 
-      // Pace (minutes per km). Use current elapsed time, not incremented here.
+      // Pace (seconds per km). Use current elapsed time, not incremented here.
       final double newPace = newDistance > 0
-          ? (currentState.elapsedSeconds / 60) / newDistance
+          ? (currentState.elapsedSeconds / newDistance)
           : 0;
       
       // Update the state with new location data using copyWith
@@ -429,7 +461,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             elevationLoss: currentState.elevationLoss,
             status: RuckStatus.completed, // Added missing status
             averagePace: currentState.distanceKm > 0 
-                ? (currentState.elapsedSeconds / 60) / currentState.distanceKm 
+                ? (currentState.elapsedSeconds / currentState.distanceKm) 
                 : 0.0,
           ),
         ));
@@ -507,36 +539,39 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
-    if (state is! ActiveSessionRunning) return;
-    final current = state as ActiveSessionRunning;
-    if (current.isPaused) return; // Don't update elapsed time if paused
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      final double currentDistance = currentState.distanceKm; // in km
+      const double minDistanceThreshold = 0.02; // threshold in km (20 meters)
+      double? newPace;
 
-    final nowUtc = DateTime.now().toUtc();
-    final grossDuration = nowUtc.difference(current.originalSessionStartTimeUtc);
-    final netDuration = grossDuration - current.totalPausedDuration;
-    int newElapsed = netDuration.inSeconds;
+      if (currentDistance < minDistanceThreshold) {
+        newPace = null;
+      } else {
+        // Calculate pace in seconds per km
+        newPace = currentState.elapsedSeconds / currentDistance;
+      }
 
-    // Sanity check to ensure elapsed time doesn't go negative
-    if (newElapsed < 0) newElapsed = 0;
+      final nowUtc = DateTime.now().toUtc();
+      final grossDuration = nowUtc.difference(currentState.originalSessionStartTimeUtc);
+      final netDuration = grossDuration - currentState.totalPausedDuration;
+      int newElapsed = netDuration.inSeconds;
 
-    // If newElapsed is somehow less than current.elapsedSeconds (e.g. clock changed backwards significantly)
-    // and it's not the very start (where current.elapsedSeconds might be 0 and newElapsed is also 0 after a tiny fraction of a second)
-    // then it might be more robust to just increment. However, relying on wall clock is generally better for background robustness.
-    // For now, we'll trust the wall clock calculation.
-    // if (newElapsed < current.elapsedSeconds && current.elapsedSeconds > 0) { 
-    //   newElapsed = current.elapsedSeconds + 1;
-    // }
+      // Sanity check to ensure elapsed time doesn't go negative
+      if (newElapsed < 0) newElapsed = 0;
 
-    final newPace = current.distanceKm > 0
-        ? (newElapsed / 60) / current.distanceKm // Pace in min/km
-        : 0.0;
-    final newCalories = _calculateCalories(current.distanceKm, current.ruckWeightKg);
+      final newCalories = _calculateCalories(currentState.distanceKm, currentState.ruckWeightKg);
 
-    emit(current.copyWith(
-      elapsedSeconds: newElapsed,
-      pace: newPace,
-      calories: newCalories,
-    ));
+      emit(currentState.copyWith(
+        elapsedSeconds: newElapsed,
+        pace: newPace,
+        calories: newCalories,
+      ));
+    }
+  }
+
+  void _onSessionErrorCleared(SessionErrorCleared event, Emitter<ActiveSessionState> emit) {
+    emit(ActiveSessionInitial());
   }
 
   /// Calculate calories burned based on distance, weight, and MET value
