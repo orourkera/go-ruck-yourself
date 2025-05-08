@@ -376,29 +376,22 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     }
   }
 
-  /// Builds a chip for quick ruck weight selection
   Widget _buildWeightChip(double weightValue, bool isMetric) {
     double weightInKg = isMetric ? weightValue : weightValue / AppConfig.kgToLbs;
-    // For imperial weights, we need to be more forgiving due to conversion precision issues
     final bool isSelected = isMetric
         ? (weightInKg - _selectedRuckWeight).abs() < 0.01
-        : (weightInKg - _selectedRuckWeight).abs() < 0.1;  // Use a larger tolerance for imperial
-
-    // Log for debugging
+        : (weightInKg - _selectedRuckWeight).abs() < 0.1;
     debugPrint('Building chip for weightInKg: $weightInKg, current _ruckWeight: $_ruckWeight');
     debugPrint('Chip for weight $weightInKg isSelected: $isSelected');
-
     return ChoiceChip(
       label: Container(
-        height: 36, // match chip height
+        height: 36,
         alignment: Alignment.center,
         child: Text(
-          isMetric
-              ? '${weightValue.toStringAsFixed(1)} kg'
-              : '${weightValue.round()} lbs',
+          isMetric ? '${weightValue.toStringAsFixed(1)} kg' : '${weightValue.round()} lbs',
           textAlign: TextAlign.center,
           style: AppTextStyles.statValue.copyWith(
-            color: isSelected ? Colors.white : Colors.black,
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : (isSelected ? Colors.white : Colors.black),
             height: 1.0,
           ),
         ),
@@ -411,7 +404,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             _displayRuckWeight = isMetric ? weightValue : weightValue;
             _selectedRuckWeight = weightInKg;
           });
-          // Persist selected weight
           final prefs = await SharedPreferences.getInstance();
           await prefs.setDouble('lastRuckWeightKg', weightInKg);
         }
@@ -422,6 +414,17 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         : (Theme.of(context).brightness == Brightness.dark ? AppColors.error : AppColors.backgroundLight),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
+      ),
+      labelStyle: TextStyle(
+        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : null,
+        fontWeight: FontWeight.bold,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final String weightUnit = _preferMetric ? 'kg' : 'lbs';
     // Determine the correct list for the chips
     final List<double> currentWeightOptions = _preferMetric 
