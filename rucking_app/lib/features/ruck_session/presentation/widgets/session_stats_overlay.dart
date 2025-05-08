@@ -35,7 +35,7 @@ class SessionStatsOverlay extends StatelessWidget {
           children: [
             _StatTile(
               label: 'DIST',
-              value: MeasurementUtils.formatDistance(state.distanceKm, metric: preferMetric),
+              value: state.pace != null ? MeasurementUtils.formatDistance(state.distanceKm, metric: preferMetric) : '--',
             ),
             _StatTile(
               label: 'PACE',
