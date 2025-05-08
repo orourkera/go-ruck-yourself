@@ -240,38 +240,37 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: state.locationPoints.length < 2
-                                ? const Center(child: CircularProgressIndicator())
-                                : BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
-                                    key: const ValueKey('stats_overlay_builder'),
-                                    buildWhen: (prev, curr) {
-                                      if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
-                                        return prev.distanceKm != curr.distanceKm ||
-                                               prev.pace != curr.pace ||
-                                               prev.elapsedSeconds != curr.elapsedSeconds ||
-                                               prev.latestHeartRate != curr.latestHeartRate ||
-                                               prev.calories != curr.calories ||
-                                               prev.elevationGain != curr.elevationGain ||
-                                               prev.elevationLoss != curr.elevationLoss ||
-                                               prev.plannedDuration != curr.plannedDuration;
-                                      }
-                                      return true;
-                                    },
-                                    builder: (context, state) {
-                                      if (state is ActiveSessionRunning) {
-                                        final authBloc = Provider.of<AuthBloc>(context, listen: false);
-                                        final bool preferMetric = authBloc.state is Authenticated
-                                            ? (authBloc.state as Authenticated).user.preferMetric
-                                            : true;
-                                        return SessionStatsOverlay(
-                                          state: state,
-                                          preferMetric: preferMetric,
-                                          useCardLayout: true,
-                                        );
-                                      }
-                                      return const Center(child: CircularProgressIndicator());
-                                    },
-                                  ),
+                            child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                              key: const ValueKey('stats_overlay_builder'),
+                              buildWhen: (prev, curr) {
+                                if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
+                                  return prev.distanceKm != curr.distanceKm ||
+                                         prev.pace != curr.pace ||
+                                         prev.elapsedSeconds != curr.elapsedSeconds ||
+                                         prev.latestHeartRate != curr.latestHeartRate ||
+                                         prev.calories != curr.calories ||
+                                         prev.elevationGain != curr.elevationGain ||
+                                         prev.elevationLoss != curr.elevationLoss ||
+                                         prev.plannedDuration != curr.plannedDuration;
+                                }
+                                return true;
+                              },
+                              builder: (context, state) {
+                                if (state is ActiveSessionRunning) {
+                                  final authBloc = Provider.of<AuthBloc>(context, listen: false);
+                                  final bool preferMetric = authBloc.state is Authenticated
+                                      ? (authBloc.state as Authenticated).user.preferMetric
+                                      : true;
+                                  return SessionStatsOverlay(
+                                    state: state,
+                                    preferMetric: preferMetric,
+                                    useCardLayout: true,
+                                  );
+                                }
+                                // Fallback: show placeholder stats instead of spinner
+                                return SessionStatsOverlay.placeholder();
+                              },
+                            ),
                           ),
                         ),
                         const Spacer(),
