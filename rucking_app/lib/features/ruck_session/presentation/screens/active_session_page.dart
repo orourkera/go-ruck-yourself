@@ -460,43 +460,48 @@ class _RouteMapState extends State<_RouteMap> {
         ? widget.route.last
         : (widget.initialCenter ?? latlong.LatLng(0, 0));
 
-    return FlutterMap(
-      mapController: _controller,
-      options: MapOptions(
-        initialCenter: initialMapCenter, // Use calculated initial center
-        initialZoom: 16.5, // Default zoom if no route or only one point
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-        ),
-      ),
+    return Stack(
       children: [
-        TileLayer(
-          urlTemplate:
-              'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
-          userAgentPackageName: 'com.ruckingapp',
-          retinaMode: RetinaMode.isHighDensity(context),
+        FlutterMap(
+          mapController: _controller,
+          options: MapOptions(
+            initialCenter: initialMapCenter,
+            initialZoom: 16.5,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+            ),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate:
+                  'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
+              userAgentPackageName: 'com.ruckingapp',
+              retinaMode: RetinaMode.isHighDensity(context),
+            ),
+            if (widget.route.isNotEmpty)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: widget.route,
+                    strokeWidth: 4.0,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
+            if (widget.route.isNotEmpty)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: widget.route.last,
+                    width: 40,
+                    height: 40,
+                    child: Image.asset('assets/images/map marker.png'),
+                  ),
+                ],
+              ),
+          ],
         ),
-        if (widget.route.isNotEmpty)
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: widget.route,
-                strokeWidth: 4.0,
-                color: AppColors.primary,
-              ),
-            ],
-          ),
-        if (widget.route.isNotEmpty)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: widget.route.last,
-                width: 40,
-                height: 40,
-                child: Image.asset('assets/images/map marker.png'),
-              ),
-            ],
-          ),
+        const CountdownOverlay(),
       ],
     );
   }
@@ -538,6 +543,70 @@ class _PauseOverlay extends StatelessWidget {
           style: AppTextStyles.headlineLarge.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class CountdownOverlay extends StatefulWidget {
+  const CountdownOverlay({Key? key}) : super(key: key);
+
+  @override
+  _CountdownOverlayState createState() => _CountdownOverlayState();
+}
+
+class _CountdownOverlayState extends State<CountdownOverlay> with SingleTickerProviderStateMixin {
+  int _count = 3;
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1));
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(_controller);
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_count > 1) {
+        setState(() {
+          _count--;
+        });
+        _controller.forward(from: 0.0);
+      } else {
+        timer.cancel();
+        setState(() {
+          _count = 0;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_count == 0) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withOpacity(0.5),
+        child: Center(
+          child: FadeTransition(
+            opacity: _opacityAnimation,
+            child: Text(
+              _count.toString(),
+              style: const TextStyle(fontSize: 72, color: Colors.white, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
       ),
