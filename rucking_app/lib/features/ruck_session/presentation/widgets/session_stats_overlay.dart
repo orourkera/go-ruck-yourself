@@ -80,7 +80,10 @@ class SessionStatsOverlay extends StatelessWidget {
       ),
     ];
     return Column(
+      mainAxisSize: MainAxisSize.max,
+      mainAxisAlignment: MainAxisAlignment.start,
       children: [
+        const SizedBox(height: 16.0), 
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -101,7 +104,7 @@ class SessionStatsOverlay extends StatelessWidget {
                             style: AppTextStyles.timerDisplay.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
-                              fontSize: 32,
+                              fontSize: 36, // Changed to 36 to match HR value
                             ),
                           ),
                           if (state.plannedDuration != null)
@@ -122,13 +125,14 @@ class SessionStatsOverlay extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          SizedBox(height: 4),
+                          // Removed extra vertical space here
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Icon(Icons.favorite, color: Colors.red, size: 36),
                               SizedBox(width: 8),
+                              // Removed Baseline widget for simpler vertical centering
                               Text(
                                 state.latestHeartRate != null ? '${state.latestHeartRate}' : '--',
                                 style: AppTextStyles.timerDisplay.copyWith(
@@ -140,11 +144,10 @@ class SessionStatsOverlay extends StatelessWidget {
                             ],
                           ),
                           Text(
-                            'BPM',
-                            style: AppTextStyles.labelLarge.copyWith(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            state.latestHeartRate != null 
+                              ? 'BPM'
+                              : '', 
+                            style: AppTextStyles.labelSmall.copyWith(fontSize: 10, color: AppColors.primary)
                           ),
                         ],
                       ),
@@ -154,13 +157,15 @@ class SessionStatsOverlay extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 0),
+        const SizedBox(height: 0.0), 
         GridView.count(
           crossAxisCount: 2,
-          shrinkWrap: true,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
+          shrinkWrap: true, // Added shrinkWrap back
           physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 1.2, // Adjusted for taller tiles
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), 
           children: statTiles
               .map((tile) => Card(
                     elevation: 1,
@@ -208,7 +213,7 @@ class _StatTile extends StatelessWidget {
         ],
         Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(fontSize: 11, color: AppColors.primary)),
         const SizedBox(height: 2),
-        Text(value, style: AppTextStyles.titleLarge.copyWith(fontSize: 17, color: color)), 
+        Text(value, style: AppTextStyles.titleLarge.copyWith(fontSize: 22, color: color)), 
       ],
     );
   }

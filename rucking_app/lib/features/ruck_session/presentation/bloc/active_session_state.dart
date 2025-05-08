@@ -12,6 +12,7 @@ class ActiveSessionInitial extends ActiveSessionState {}
 class ActiveSessionLoading extends ActiveSessionState {}
 
 class ActiveSessionRunning extends ActiveSessionState {
+  final int? plannedDuration; // in seconds
   final String sessionId;
   final List<LocationPoint> locationPoints;
   final int elapsedSeconds;
@@ -25,9 +26,12 @@ class ActiveSessionRunning extends ActiveSessionState {
   final double pace;
   final int? latestHeartRate;
   final String? validationMessage;
-  
+
+  bool get isLongEnough => elapsedSeconds >= 60;
+
   const ActiveSessionRunning({
     required this.sessionId,
+    this.plannedDuration,
     required this.locationPoints,
     required this.elapsedSeconds,
     required this.distanceKm,
@@ -57,6 +61,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     pace,
     latestHeartRate,
     validationMessage,
+    plannedDuration,
   ];
   
   ActiveSessionRunning copyWith({
@@ -73,6 +78,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     double? pace,
     int? latestHeartRate,
     String? validationMessage,
+    bool clearValidationMessage = false,
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -87,7 +93,8 @@ class ActiveSessionRunning extends ActiveSessionState {
       isPaused: isPaused ?? this.isPaused,
       pace: pace ?? this.pace,
       latestHeartRate: latestHeartRate ?? this.latestHeartRate,
-      validationMessage: validationMessage ?? this.validationMessage,
+      validationMessage: clearValidationMessage ? null : validationMessage ?? this.validationMessage,
+      plannedDuration: plannedDuration ?? this.plannedDuration,
     );
   }
 }

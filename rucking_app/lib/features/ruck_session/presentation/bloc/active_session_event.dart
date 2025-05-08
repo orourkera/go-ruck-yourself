@@ -8,16 +8,18 @@ abstract class ActiveSessionEvent extends Equatable {
 }
 
 class SessionStarted extends ActiveSessionEvent {
+  final int? plannedDuration; // in seconds
   final double ruckWeightKg;
   final String? notes;
   
   const SessionStarted({
     required this.ruckWeightKg,
     this.notes,
+    this.plannedDuration,
   });
   
   @override
-  List<Object?> get props => [ruckWeightKg, notes];
+  List<Object?> get props => [ruckWeightKg, notes, plannedDuration];
 }
 
 class LocationUpdated extends ActiveSessionEvent {
