@@ -324,6 +324,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
     setState(() {
       _locationPoints.add(locationPoint);
       _canShowStats = true;
+      _caloriesBurned = MetCalculator.calculateCalories(_userWeightKg, _elapsed, _pace);
     });
     _calculateStats(locationPoint);
     _centerMapOnUser();
