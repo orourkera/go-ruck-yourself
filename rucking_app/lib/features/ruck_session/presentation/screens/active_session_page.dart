@@ -128,6 +128,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
             ),
             TextButton(
               onPressed: () {
+                // Only complete session if valid (already checked)
                 context.read<ActiveSessionBloc>().add(const SessionCompleted());
                 Navigator.of(dialogContext).pop();
               },
@@ -155,7 +156,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
           actions: [
             TextButton(
               onPressed: () {
-                // Discard Session: pop all the way to home
+                // Discard Session: pop all the way to home, DO NOT save/call Bloc
                 Navigator.of(dialogContext).popUntil((route) => route.isFirst);
               },
               child: const Text(
