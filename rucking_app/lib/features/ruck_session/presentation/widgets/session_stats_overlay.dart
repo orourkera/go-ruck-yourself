@@ -142,7 +142,7 @@ class SessionStatsOverlay extends StatelessWidget {
                             children: [
                               Icon(
                                 Icons.favorite,
-                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.red,
+                                color: Colors.red,
                                 size: 36,
                               ),
                               SizedBox(width: 8),

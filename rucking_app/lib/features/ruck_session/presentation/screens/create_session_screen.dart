@@ -422,22 +422,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         : (Theme.of(context).brightness == Brightness.dark ? AppColors.error : AppColors.backgroundLight),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
-        ),
-      ),
-      labelStyle: TextStyle(
-        color: (Theme.of(context).brightness == Brightness.dark && !isSelected)
-          ? Colors.white
-          : null,
-        fontWeight: FontWeight.bold,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
     final String weightUnit = _preferMetric ? 'kg' : 'lbs';
     // Determine the correct list for the chips
     final List<double> currentWeightOptions = _preferMetric 
