@@ -4,49 +4,49 @@
       "idiom": "watch",
       "size": "24x24",
       "scale": "2x",
-      "filename": "Icon-48.png"
+      "filename": "AppIcon-24x24@2x.png"
     },
     {
       "idiom": "watch",
       "size": "27.5x27.5",
       "scale": "2x",
-      "filename": "Icon-55.png"
+      "filename": "AppIcon-27.5x27.5@2x.png"
     },
     {
       "idiom": "watch",
       "size": "29x29",
       "scale": "2x",
-      "filename": "Icon-58.png"
+      "filename": "AppIcon-29x29@2x.png"
     },
     {
       "idiom": "watch",
       "size": "40x40",
       "scale": "2x",
-      "filename": "Icon-80.png"
+      "filename": "AppIcon-40x40@2x.png"
     },
     {
       "idiom": "watch",
       "size": "29x29",
       "scale": "3x",
-      "filename": "Icon-87.png"
+      "filename": "AppIcon-29x29@3x.png"
     },
     {
       "idiom": "watch",
       "size": "44x44",
       "scale": "2x",
-      "filename": "Icon-88.png"
+      "filename": "AppIcon-44x44@2x.png"
     },
     {
       "idiom": "watch",
       "size": "86x86",
       "scale": "2x",
-      "filename": "Icon-172.png"
+      "filename": "AppIcon-86x86@2x.png"
     },
     {
       "idiom": "watch",
       "size": "98x98",
       "scale": "2x",
-      "filename": "Icon-196.png"
+      "filename": "AppIcon-98x98@2x.png"
     }
   ],
   "info": {
