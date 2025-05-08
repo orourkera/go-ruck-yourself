@@ -65,14 +65,32 @@ class _ActiveSessionView extends StatefulWidget {
   State<_ActiveSessionView> createState() => _ActiveSessionViewState();
 }
 
-class _ActiveSessionViewState extends State<_ActiveSessionView> {
+class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProviderStateMixin {
   bool countdownComplete = false;
   bool mapReady = false;
   bool sessionRunning = false;
+  late final AnimationController _overlayController;
+
+  void _checkAnimateOverlay() {
+    if (countdownComplete && mapReady && sessionRunning) {
+      _overlayController.reverse();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _overlayController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+      value: 1.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _overlayController.dispose();
+    super.dispose();
   }
 
   void _handleEndSession(BuildContext context, ActiveSessionRunning currentState) {
@@ -233,6 +251,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         setState(() {
                           sessionRunning = true;
                         });
+                        _checkAnimateOverlay();
                       }
                     },
                     buildWhen: (prev, curr) => prev != curr,
@@ -271,6 +290,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                               setState(() {
                                                 mapReady = true;
                                               });
+                                              _checkAnimateOverlay();
                                             }
                                           },
                                         ),
@@ -358,12 +378,14 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
               ),
             ],
           ),
-          // Overlay
-          if (overlayVisible)
-            Positioned.fill(
+          // Overlay fade via FadeTransition
+          Positioned.fill(
+            child: FadeTransition(
+              opacity: _overlayController,
               child: Container(
+                key: const ValueKey('overlayContainer'),
                 color: AppColors.primary,
-                child: (!countdownComplete)
+                child: !countdownComplete
                     ? CountdownOverlay(
                         onCountdownComplete: () {
                           setState(() {
@@ -376,11 +398,13 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               plannedDuration: widget.args.plannedDuration,
                             ),
                           );
+                          _checkAnimateOverlay();
                         },
                       )
                     : const SizedBox.shrink(),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -412,6 +436,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                 setState(() {
                   mapReady = true;
                 });
+                _checkAnimateOverlay();
               }
             },
           ),
@@ -699,17 +724,14 @@ class _CountdownOverlayState extends State<CountdownOverlay> with SingleTickerPr
       child: Container(
         color: AppColors.primary,
         child: Center(
-          child: FadeTransition(
-            opacity: _opacityAnimation,
-            child: Text(
-              _count.toString(),
-              style: const TextStyle(
-                fontSize: 96,
-                color: Colors.white,
-                fontFamily: 'Bangers',
-                fontWeight: FontWeight.normal,
-                letterSpacing: 2.0,
-              ),
+          child: Text(
+            _count.toString(),
+            style: const TextStyle(
+              fontSize: 96,
+              color: Colors.white,
+              fontFamily: 'Bangers',
+              fontWeight: FontWeight.normal,
+              letterSpacing: 2.0,
             ),
           ),
         ),
