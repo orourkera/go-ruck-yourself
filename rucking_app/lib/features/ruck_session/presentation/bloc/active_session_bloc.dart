@@ -29,6 +29,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   // Reuse one validation service instance to keep state between points
   final SessionValidationService _validationService = SessionValidationService();
   LocationPoint? _lastValidLocation;
+  int _validLocationCount = 0;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -230,6 +231,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           last.latitude, last.longitude,
           currentPoint.latitude, currentPoint.longitude);
 
+      if (state is ActiveSessionRunning) {
+        final currentState = state as ActiveSessionRunning;
+        if (currentState.distanceKm * 1000 < 10 && distance > 15) {
+          debugPrint("Ignoring GPS update due to drift: distance = $distance");
+          return;
+        }
+      }
+
+      _validLocationCount++;
       if (distance < thresholdMeters) {
         AppLogger.info('Ignoring minimal location update; distance $distance m is below threshold.');
         return;
@@ -550,6 +560,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } else {
         // Calculate pace in seconds per km
         newPace = currentState.elapsedSeconds / currentDistance;
+      }
+
+      const double maxPaceSecPerKm = 3352; // approx. 90 minutes per mile in seconds per km
+      if (_validLocationCount < 3 || (newPace != null && newPace > maxPaceSecPerKm)) {
+        newPace = null;
       }
 
       final nowUtc = DateTime.now().toUtc();
