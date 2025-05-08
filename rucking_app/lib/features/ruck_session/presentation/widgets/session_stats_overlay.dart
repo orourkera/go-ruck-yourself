@@ -45,7 +45,7 @@ class SessionStatsOverlay extends StatelessWidget {
             _StatTile(
               label: 'CAL',
               value: state.calories.toStringAsFixed(0),
-              color: _calColor(state.calories),
+              color: _calColor(state.calories.toDouble()),
             ),
             _StatTile(
               label: 'ELEV',
@@ -70,7 +70,7 @@ class SessionStatsOverlay extends StatelessWidget {
       _StatTile(
         label: 'Calories',
         value: '${state.calories.toStringAsFixed(0)} KCAL',
-        color: _calColor(state.calories),
+        color: _calColor(state.calories.toDouble()),
         icon: Icons.local_fire_department,
       ),
       _StatTile(

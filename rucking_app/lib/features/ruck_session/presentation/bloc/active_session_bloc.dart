@@ -52,60 +52,77 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    try {
-      emit(ActiveSessionLoading());
-      AppLogger.info('Starting a new ruck session with weight: ${event.ruckWeightKg}kg');
+    AppLogger.info('SessionStarted event received. Weight: ${event.ruckWeightKg}kg, Notes: ${event.notes}');
+    emit(ActiveSessionLoading());
+    String? sessionId; // Declare sessionId here to be accessible in catch block if needed
 
-      // Check for location permission first
+    try {
+      // Location permissions check
+      AppLogger.info('Checking location permission...');
       bool hasPermission = await _locationService.hasLocationPermission();
       if (!hasPermission) {
-        AppLogger.info('Location permission not granted. Requesting...');
+        AppLogger.info('Requesting location permission.');
         hasPermission = await _locationService.requestLocationPermission();
       }
 
       if (!hasPermission) {
-        AppLogger.warning('Location permission denied by user.');
+        AppLogger.warning('Location permission denied.');
         emit(const ActiveSessionFailure(
-          errorMessage: 'Location permission is required to start a session. Please enable it in your device settings and try again.',
+          errorMessage: 'Location permission is required to start a ruck session. Please enable it in settings.',
         ));
         return;
       }
-      
       AppLogger.info('Location permission granted.');
 
       // Create a new session in the backend
-      final response = await _apiClient.post('/rucks', {
+      AppLogger.info('Creating new ruck session in backend...');
+      final createResponse = await _apiClient.post('/rucks', {
         'ruck_weight_kg': event.ruckWeightKg,
         'notes': event.notes,
+        // 'planned_duration_seconds': event.plannedDuration, // Add if backend supports this
       });
       
-      // Extract session ID from response
-      final String sessionId = response['id'].toString();
+      sessionId = createResponse['id']?.toString();
+      if (sessionId == null || sessionId.isEmpty) {
+        AppLogger.error('Failed to create session: No ID received from backend.');
+        throw Exception('Failed to create session: No ID received from backend.');
+      }
       AppLogger.info('Created new session with ID: $sessionId');
-      
-      // Start location tracking
-      _startLocationTracking(emit);
-      _startTicker();
-      
-      // Emit success state with session ID
-      emit(ActiveSessionRunning(
+
+      // Explicitly start the session on the backend
+      AppLogger.info('Attempting to start session with ruck ID: $sessionId');
+      await _apiClient.post('/rucks/$sessionId/start', {});
+      AppLogger.info('Backend notified of session start for ruck ID: $sessionId');
+
+      final initialSessionState = ActiveSessionRunning(
         sessionId: sessionId,
-        plannedDuration: event.plannedDuration,
-        locationPoints: [],
+        locationPoints: const [],
         elapsedSeconds: 0,
         distanceKm: 0.0,
         ruckWeightKg: event.ruckWeightKg,
         notes: event.notes,
         calories: 0,
-        elevationGain: 0,
-        elevationLoss: 0,
+        elevationGain: 0.0,
+        elevationLoss: 0.0,
         isPaused: false,
-        pace: 0,
-      ));
-    } catch (e) {
-      AppLogger.error('Failed to start session: $e');
-      
-      // Emit failure state with user-friendly error message
+        pace: 0.0,
+        latestHeartRate: null,
+        plannedDuration: event.plannedDuration, // This is in seconds already from event
+        originalSessionStartTimeUtc: DateTime.now().toUtc(),
+        totalPausedDuration: Duration.zero,
+        currentPauseStartTimeUtc: null,
+      );
+      emit(initialSessionState);
+      AppLogger.info('ActiveSessionRunning state emitted for session $sessionId');
+
+      _startLocationTracking(emit); 
+      _startHeartRateMonitoring();
+      _startTicker();
+      AppLogger.info('Location, heart rate, and ticker started for session $sessionId');
+
+    } catch (e, stackTrace) {
+      final String RuckIdForError = sessionId ?? "unknown";
+      AppLogger.error('Failed to start session $RuckIdForError: $e. StackTrace: $stackTrace');
       emit(ActiveSessionFailure(
         errorMessage: ErrorHandler.getUserFriendlyMessage(e, 'Session Start'),
       ));
@@ -149,6 +166,32 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
   }
 
+  void _startHeartRateMonitoring() {
+    AppLogger.info('Starting heart rate monitoring...');
+    if (state is! ActiveSessionRunning) return; // Only monitor if session is running
+
+    _heartRateSubscription?.cancel(); // Cancel previous subscription if any
+    _heartRateSubscription = _healthService.heartRateStream.listen(
+      (HeartRateSample sample) {
+        AppLogger.info('Heart rate sample received: ${sample.bpm} BPM at ${sample.timestamp}');
+        add(HeartRateUpdated(sample));
+      },
+      onError: (error) {
+        AppLogger.error('Error in heart rate stream: $error');
+        // Optionally, dispatch an error event to the BLoC state
+      },
+      onDone: () {
+        AppLogger.info('Heart rate stream closed.');
+      },
+    );
+  }
+
+  void _stopHeartRateMonitoring() {
+    AppLogger.info('Stopping heart rate monitoring...');
+    _heartRateSubscription?.cancel();
+    _heartRateSubscription = null;
+  }
+
   void _startTicker() {
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => add(Tick()));
@@ -165,79 +208,53 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      final List<LocationPoint> updatedPoints = List.from(currentState.locationPoints)
-        ..add(event.locationPoint);
-      
-      // Calculate new distance
+      AppLogger.info('LocationUpdated event: ${event.locationPoint}');
+
+      // Validate the incoming point
+      final previousPoint = currentState.locationPoints.isNotEmpty ? currentState.locationPoints.last : null;
+      final validationResult = _validationService.validateLocationPoint(event.locationPoint, previousPoint);
+      if (!validationResult['isValid']) {
+        AppLogger.warning('Invalid location point: ${validationResult['reason']}');
+        // Optionally, emit a specific state or handle the error, for now, we just log and ignore it.
+        return;
+      }
+
+      List<LocationPoint> updatedPoints = List.from(currentState.locationPoints)..add(event.locationPoint);
+
+      // Calculate new total distance
       double newDistance = currentState.distanceKm;
-      Map<String, dynamic>? validationResult; // capture validation info
       if (updatedPoints.length > 1) {
-        final previousPoint = updatedPoints[updatedPoints.length - 2];
-        final newPoint = event.locationPoint;
-        
-        try {
-          // Calculate distance between last two points (in km)
-          final segmentDistanceKm = _locationService.calculateDistance(previousPoint, newPoint);
-          final segmentDistanceMeters = segmentDistanceKm * 1000;
-
-          // Validate the new segment & track session behaviour
-          validationResult = _validationService.validateLocationPoint(
-            newPoint,
-            previousPoint,
-            distanceMeters: segmentDistanceMeters,
-          );
-
-          if (validationResult['isValid'] == true) {
-            newDistance += segmentDistanceKm;
-          } else {
-            AppLogger.warning('Filtered out segment: ${validationResult['message'] ?? 'Unknown reason'}');
-          }
-        } catch (e) {
-          AppLogger.error('Error calculating distance: $e');
-          // Don't update distance on error, keep previous value
-        }
+        final prevPoint = updatedPoints[updatedPoints.length - 2];
+        newDistance += _locationService.calculateDistance(prevPoint, event.locationPoint);
       }
-      
-      // Calculate elevation changes
-      double elevationGain = currentState.elevationGain;
-      double elevationLoss = currentState.elevationLoss;
 
+      // Calculate new elevation gain/loss
+      double newElevationGain = currentState.elevationGain;
+      double newElevationLoss = currentState.elevationLoss;
       if (updatedPoints.length > 1) {
-        final previousPoint = updatedPoints[updatedPoints.length - 2];
-        final newPoint = event.locationPoint;
-        final elevationResult = _validationService.validateElevationChange(previousPoint, newPoint);
-        elevationGain += elevationResult['gain'] ?? 0.0;
-        elevationLoss += elevationResult['loss'] ?? 0.0;
+        final prevPoint = updatedPoints[updatedPoints.length - 2];
+        final diff = event.locationPoint.elevation - prevPoint.elevation;
+        if (diff > 0) newElevationGain += diff;
+        if (diff < 0) newElevationLoss += diff.abs();
       }
-      
-      // Derive pace (minutes per km). If distance is zero, pace is 0 to avoid NaN/inf
-      final int newElapsedSeconds = currentState.elapsedSeconds + 1;
+
+      // Pace (minutes per km). Use current elapsed time, not incremented here.
       final double newPace = newDistance > 0
-          ? (newElapsedSeconds / 60) / newDistance // minutes per km
+          ? (currentState.elapsedSeconds / 60) / newDistance
           : 0;
       
-      // Update the state with new location data
-      emit(ActiveSessionRunning(
-        sessionId: currentState.sessionId,
+      // Update the state with new location data using copyWith
+      emit(currentState.copyWith(
         locationPoints: updatedPoints,
-        elapsedSeconds: newElapsedSeconds, // Increment elapsed time
         distanceKm: newDistance,
-        ruckWeightKg: currentState.ruckWeightKg,
-        notes: currentState.notes,
-        calories: _calculateCalories(
-          newDistance, 
-          currentState.ruckWeightKg
-        ).toDouble(),
-        elevationGain: elevationGain,
-        elevationLoss: elevationLoss,
-        isPaused: currentState.isPaused,
         pace: newPace,
-        validationMessage: (validationResult != null && validationResult['isValid'] == false)
-          ? validationResult['message'] as String?
-          : null,
+        calories: _calculateCalories(newDistance, currentState.ruckWeightKg),
+        elevationGain: newElevationGain.toDouble(),
+        elevationLoss: newElevationLoss.toDouble(),
+        // elapsedSeconds will be taken from currentState via copyWith, _onTick handles its progression
       ));
-      
-      // Update backend with new location point
+
+      // Send location update to backend
       try {
         await _apiClient.post('/rucks/${currentState.sessionId}/location', {
           'latitude': event.locationPoint.latitude,
@@ -283,7 +300,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
       
       // Emit paused state
-      emit(currentState.copyWith(isPaused: true));
+      emit(currentState.copyWith(
+        isPaused: true,
+        currentPauseStartTimeUtc: DateTime.now().toUtc(), // Record when pause started
+      ));
     }
   }
 
@@ -293,8 +313,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
+      Duration newTotalPausedDuration = currentState.totalPausedDuration;
+
+      if (currentState.currentPauseStartTimeUtc != null) {
+        final pauseEndedUtc = DateTime.now().toUtc();
+        final currentPauseLength = pauseEndedUtc.difference(currentState.currentPauseStartTimeUtc!);
+        newTotalPausedDuration += currentPauseLength;
+      } // else: was not properly in a timed pause state, resume without adding to pause duration
       
-      AppLogger.info('Resuming session ${currentState.sessionId}');
+      AppLogger.info('Resuming session ${currentState.sessionId}. Total paused duration: $newTotalPausedDuration');
       
       // Tell watch to resume
       _watchService.resumeSessionOnWatch();
@@ -308,7 +335,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
       
       // Emit resumed state
-      emit(currentState.copyWith(isPaused: false));
+      emit(currentState.copyWith(
+        isPaused: false,
+        totalPausedDuration: newTotalPausedDuration, // Update total paused duration
+        clearCurrentPauseStartTimeUtc: true, // Clear the specific pause start time
+      ));
     }
   }
 
@@ -326,7 +357,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final validationSave = _validationService.validateSessionForSave(
           distanceMeters: currentState.distanceKm * 1000,
           duration: Duration(seconds: currentState.elapsedSeconds),
-          caloriesBurned: currentState.calories,
+          caloriesBurned: currentState.calories.toDouble(),
         );
         if (validationSave['isValid'] == false) {
           emit(ActiveSessionFailure(errorMessage: validationSave['message'] ?? 'Session invalid.'));
@@ -372,7 +403,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             startDate: startTime,
             endDate: endTime,
             distanceKm: currentState.distanceKm,
-            caloriesBurned: currentState.calories.round(),
+            caloriesBurned: currentState.calories,
             ruckWeightKg: currentState.ruckWeightKg,
             elevationGainMeters: currentState.elevationGain,
             elevationLossMeters: currentState.elevationLoss,
@@ -443,43 +474,67 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onHeartRateUpdated(
-    HeartRateUpdated event,
-    Emitter<ActiveSessionState> emit,
+    HeartRateUpdated event, 
+    Emitter<ActiveSessionState> emit
   ) async {
-    if (state is ActiveSessionRunning) {
-      final current = state as ActiveSessionRunning;
-      try {
-        await _apiClient.addHeartRateSamples(
-          current.sessionId,
-          [
+    final currentState = state;
+    if (currentState is ActiveSessionRunning) {
+      AppLogger.info('HeartRateUpdated event: ${event.sample.bpm} BPM at ${event.sample.timestamp}');
+      // Send heart rate to backend
+      if (currentState.sessionId.isNotEmpty) {
+        try {
+          await _apiClient.post(
+            '/rucks/${currentState.sessionId}/heart_rate',
             {
-              'timestamp': event.sample.timestamp.toIso8601String(),
-              'bpm': event.sample.bpm,
+              'samples': [
+                {
+                  'timestamp': event.sample.timestamp.toIso8601String(),
+                  'bpm': event.sample.bpm,
+                }
+              ]
             }
-          ],
-        );
-        emit(current.copyWith(latestHeartRate: event.sample.bpm));
-      } catch (e) {
-        AppLogger.error('Failed to send heart rate sample: $e');
+          );
+
+          emit(currentState.copyWith(latestHeartRate: event.sample.bpm));
+        } catch (e) {
+          AppLogger.error('Failed to send heart rate sample: $e');
+        }
       }
+    } else {
+      AppLogger.warning('HeartRateUpdated event received but session is not running. Current state: $currentState');
     }
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
     if (state is! ActiveSessionRunning) return;
     final current = state as ActiveSessionRunning;
-    if (current.isPaused) return;
+    if (current.isPaused) return; // Don't update elapsed time if paused
 
-    final newElapsed = current.elapsedSeconds + 1;
+    final nowUtc = DateTime.now().toUtc();
+    final grossDuration = nowUtc.difference(current.originalSessionStartTimeUtc);
+    final netDuration = grossDuration - current.totalPausedDuration;
+    int newElapsed = netDuration.inSeconds;
+
+    // Sanity check to ensure elapsed time doesn't go negative
+    if (newElapsed < 0) newElapsed = 0;
+
+    // If newElapsed is somehow less than current.elapsedSeconds (e.g. clock changed backwards significantly)
+    // and it's not the very start (where current.elapsedSeconds might be 0 and newElapsed is also 0 after a tiny fraction of a second)
+    // then it might be more robust to just increment. However, relying on wall clock is generally better for background robustness.
+    // For now, we'll trust the wall clock calculation.
+    // if (newElapsed < current.elapsedSeconds && current.elapsedSeconds > 0) { 
+    //   newElapsed = current.elapsedSeconds + 1;
+    // }
+
     final newPace = current.distanceKm > 0
-        ? (newElapsed / 60) / current.distanceKm
+        ? (newElapsed / 60) / current.distanceKm // Pace in min/km
         : 0.0;
     final newCalories = _calculateCalories(current.distanceKm, current.ruckWeightKg);
 
     emit(current.copyWith(
       elapsedSeconds: newElapsed,
       pace: newPace,
-      calories: newCalories.toDouble(),
+      calories: newCalories,
     ));
   }
 

@@ -19,13 +19,16 @@ class ActiveSessionRunning extends ActiveSessionState {
   final double distanceKm;
   final double ruckWeightKg;
   final String? notes;
-  final double calories;
+  final int calories;
   final double elevationGain;
   final double elevationLoss;
   final bool isPaused;
   final double pace;
   final int? latestHeartRate;
   final String? validationMessage;
+  final DateTime originalSessionStartTimeUtc; // Tracks when the session originally started
+  final Duration totalPausedDuration;      // Accumulates total time paused
+  final DateTime? currentPauseStartTimeUtc; // Tracks when the current pause began
 
   bool get isLongEnough => elapsedSeconds >= 60;
 
@@ -41,6 +44,9 @@ class ActiveSessionRunning extends ActiveSessionState {
     required this.elevationLoss,
     required this.isPaused,
     required this.pace,
+    required this.originalSessionStartTimeUtc,
+    required this.totalPausedDuration,
+    this.currentPauseStartTimeUtc,
     this.notes,
     this.latestHeartRate,
     this.validationMessage,
@@ -62,6 +68,9 @@ class ActiveSessionRunning extends ActiveSessionState {
     latestHeartRate,
     validationMessage,
     plannedDuration,
+    originalSessionStartTimeUtc,
+    totalPausedDuration,
+    currentPauseStartTimeUtc,
   ];
   
   ActiveSessionRunning copyWith({
@@ -71,7 +80,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     double? distanceKm,
     double? ruckWeightKg,
     String? notes,
-    double? calories,
+    int? calories,
     double? elevationGain,
     double? elevationLoss,
     bool? isPaused,
@@ -79,6 +88,10 @@ class ActiveSessionRunning extends ActiveSessionState {
     int? latestHeartRate,
     String? validationMessage,
     bool clearValidationMessage = false,
+    DateTime? originalSessionStartTimeUtc,
+    Duration? totalPausedDuration,
+    DateTime? currentPauseStartTimeUtc,
+    bool clearCurrentPauseStartTimeUtc = false,
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -95,6 +108,9 @@ class ActiveSessionRunning extends ActiveSessionState {
       latestHeartRate: latestHeartRate ?? this.latestHeartRate,
       validationMessage: clearValidationMessage ? null : validationMessage ?? this.validationMessage,
       plannedDuration: plannedDuration ?? this.plannedDuration,
+      originalSessionStartTimeUtc: originalSessionStartTimeUtc ?? this.originalSessionStartTimeUtc,
+      totalPausedDuration: totalPausedDuration ?? this.totalPausedDuration,
+      currentPauseStartTimeUtc: clearCurrentPauseStartTimeUtc ? null : currentPauseStartTimeUtc ?? this.currentPauseStartTimeUtc,
     );
   }
 }
