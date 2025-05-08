@@ -51,21 +51,30 @@ class ActiveSessionPage extends StatelessWidget {
         locationService: locator<LocationService>(),
         healthService: locator<HealthService>(),
         watchService: locator<WatchService>(),
-      )..add(SessionStarted(ruckWeightKg: args.ruckWeight, notes: args.notes, plannedDuration: args.plannedDuration)),
-
-      child: const _ActiveSessionView(),
+      ),
+      child: _ActiveSessionView(args: args),
     );
   }
 }
 
 class _ActiveSessionView extends StatefulWidget {
-  const _ActiveSessionView();
+  final ActiveSessionArgs args;
+  const _ActiveSessionView({Key? key, required this.args}) : super(key: key);
 
   @override
   State<_ActiveSessionView> createState() => _ActiveSessionViewState();
 }
 
 class _ActiveSessionViewState extends State<_ActiveSessionView> {
+  bool countdownComplete = false;
+  bool mapReady = false;
+  bool sessionRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
   void _handleEndSession(BuildContext context, ActiveSessionRunning currentState) {
     // Use the SessionValidationService to check all requirements
     final validator = SessionValidationService();
@@ -162,175 +171,216 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          // Header fills all the way to the top (behind status bar)
-          Builder(
-            builder: (context) {
-              final double topPadding = MediaQuery.of(context).padding.top;
-              return Container(
-                width: double.infinity,
-                padding: EdgeInsets.only(top: topPadding, bottom: 18.0),
-                color: AppColors.primary,
-                child: Center(
-                  child: Text(
-                    'ACTIVE SESSION',
-                    style: AppTextStyles.headlineLarge.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          // Rest of content in SafeArea
-          Expanded(
-            child: SafeArea(
-              top: false,
-              child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
-                listenWhen: (prev, curr) => 
-                  (prev is ActiveSessionFailure != curr is ActiveSessionFailure) || 
-                  (curr is ActiveSessionComplete),
-                listener: (ctx, state) {
-                  if (state is ActiveSessionFailure) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(content: Text(state.errorMessage)),
-                    );
-                  } else if (state is ActiveSessionComplete) {
-                    Navigator.of(ctx).pushReplacementNamed(
-                      '/session_complete',
-                      arguments: {
-                        'endTime': state.session.endTime,
-                        'ruckId': state.session.id,
-                        'duration': state.session.duration,
-                        'distance': state.session.distance,
-                        'caloriesBurned': state.session.caloriesBurned,
-                        'elevationGain': state.session.elevationGain,
-                        'elevationLoss': state.session.elevationLoss,
-                        'ruckWeightKg': state.session.ruckWeightKg,
-                        'notes': state.session.notes,
-                        'heartRateSamples': state.session.heartRateSamples,
-                      },
-                    );
-                  }
-                },
-                buildWhen: (prev, curr) => prev != curr,
-                builder: (ctx, state) {
-                  if (state is ActiveSessionInitial || state is ActiveSessionLoading) {
-                    return _buildSessionContent(state);
-                  }
-                  if (state is ActiveSessionRunning) {
-                    final route = state.locationPoints
-                        .map((p) => latlong.LatLng(p.latitude, p.longitude))
-                        .toList();
-                    // DEBUG: Print route length and points
-                    debugPrint('Route length:  [32m [1m [4m [7m${route.length} [0m');
-                    for (var i = 0; i <route.length; i++) {
-                      debugPrint('Route[$i]: Lat:  [36m${route[i].latitude} [0m, Lng:  [36m${route[i].longitude} [0m');
-                    }
+    final overlayVisible = !(countdownComplete && mapReady && sessionRunning);
 
-                    return SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          // Map with weight chip overlay
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0, left: 8.0, right: 8.0),
-                            child: Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(18),
-                                  child: SizedBox(
-                                    height: MediaQuery.of(context).size.height * 0.27,
-                                    width: double.infinity,
-                                    child: _RouteMap(
-                                      route: route,
-                                      initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 12,
-                                  right: 12,
-                                  child: _WeightChip(weightKg: state.ruckWeightKg),
-                                ),
-                                if (state.isPaused)
-                                  const Positioned.fill(child: _PauseOverlay()),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8.0), // Added for spacing
-                          // Stats overlay or spinner
-                          Padding(
-                            padding: const EdgeInsets.all(16.0), // This was the padding inside the Expanded
-                            child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
-                              key: const ValueKey('stats_overlay_builder'),
-                              buildWhen: (prev, curr) {
-                                if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
-                                  return prev.distanceKm != curr.distanceKm ||
-                                         prev.pace != curr.pace ||
-                                         prev.elapsedSeconds != curr.elapsedSeconds ||
-                                         prev.latestHeartRate != curr.latestHeartRate ||
-                                         prev.calories != curr.calories ||
-                                         prev.elevationGain != curr.elevationGain ||
-                                         prev.elevationLoss != curr.elevationLoss ||
-                                         prev.plannedDuration != curr.plannedDuration;
-                                }
-                                return true;
-                              },
-                              builder: (context, state) {
-                                if (state is ActiveSessionRunning) {
-                                  final authBloc = Provider.of<AuthBloc>(context, listen: false);
-                                  final bool preferMetric = authBloc.state is Authenticated
-                                      ? (authBloc.state as Authenticated).user.preferMetric
-                                      : true;
-                                  return SessionStatsOverlay(
-                                    state: state,
-                                    preferMetric: preferMetric,
-                                    useCardLayout: true,
-                                  );
-                                }
-                                // Fallback: show placeholder stats instead of spinner
-                                return SessionStatsOverlay.placeholder();
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 8.0), // Added for spacing
-                          // Controls at bottom
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 10.0, top: 4.0),
-                            child: SessionControls(
-                              isPaused: state.isPaused,
-                              onTogglePause: () {
-                                if (state.isPaused) {
-                                  context.read<ActiveSessionBloc>().add(const SessionResumed());
-                                } else {
-                                  context.read<ActiveSessionBloc>().add(const SessionPaused());
-                                }
-                              },
-                              onEndSession: () => _handleEndSession(context, state),
-                            ),
-                          ),
-                          const SizedBox(height: 16.0), // Added for bottom padding within scroll view
-                        ],
-                      ),
-                    );
-                  }
-                  if (state is ActiveSessionComplete) {
-                    return Center(
+    return Scaffold(
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              // Header fills all the way to the top (behind status bar)
+              Builder(
+                builder: (context) {
+                  final double topPadding = MediaQuery.of(context).padding.top;
+                  return Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.only(top: topPadding, bottom: 18.0),
+                    color: AppColors.primary,
+                    child: Center(
                       child: Text(
-                        'Session Completed — Distance: ${state.session.distance.toStringAsFixed(2)} km',
-                        style: AppTextStyles.titleMedium,
+                        'ACTIVE SESSION',
+                        style: AppTextStyles.headlineLarge.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
                       ),
-                    );
-                  }
-                  return const SizedBox();
+                    ),
+                  );
                 },
               ),
-            ),
+              // Rest of content in SafeArea
+              Expanded(
+                child: SafeArea(
+                  top: false,
+                  child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
+                    listenWhen: (prev, curr) => 
+                      (prev is ActiveSessionFailure != curr is ActiveSessionFailure) || 
+                      (curr is ActiveSessionComplete) ||
+                      (curr is ActiveSessionRunning && !sessionRunning),
+                    listener: (ctx, state) {
+                      if (state is ActiveSessionFailure) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text(state.errorMessage)),
+                        );
+                      } else if (state is ActiveSessionComplete) {
+                        Navigator.of(ctx).pushReplacementNamed(
+                          '/session_complete',
+                          arguments: {
+                            'endTime': state.session.endTime,
+                            'ruckId': state.session.id,
+                            'duration': state.session.duration,
+                            'distance': state.session.distance,
+                            'caloriesBurned': state.session.caloriesBurned,
+                            'elevationGain': state.session.elevationGain,
+                            'elevationLoss': state.session.elevationLoss,
+                            'ruckWeightKg': state.session.ruckWeightKg,
+                            'notes': state.session.notes,
+                            'heartRateSamples': state.session.heartRateSamples,
+                          },
+                        );
+                      } else if (state is ActiveSessionRunning && !sessionRunning) {
+                        setState(() {
+                          sessionRunning = true;
+                        });
+                      }
+                    },
+                    buildWhen: (prev, curr) => prev != curr,
+                    builder: (ctx, state) {
+                      if (state is ActiveSessionInitial || state is ActiveSessionLoading) {
+                        return _buildSessionContent(state);
+                      }
+                      if (state is ActiveSessionRunning) {
+                        final route = state.locationPoints
+                            .map((p) => latlong.LatLng(p.latitude, p.longitude))
+                            .toList();
+                        // DEBUG: Print route length and points
+                        debugPrint('Route length:  [32m [1m [4m [7m${route.length} [0m');
+                        for (var i = 0; i <route.length; i++) {
+                          debugPrint('Route[$i]: Lat:  [36m${route[i].latitude} [0m, Lng:  [36m${route[i].longitude} [0m');
+                        }
+
+                        return SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              // Map with weight chip overlay
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0, left: 8.0, right: 8.0),
+                                child: Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(18),
+                                      child: SizedBox(
+                                        height: MediaQuery.of(context).size.height * 0.27,
+                                        width: double.infinity,
+                                        child: _RouteMap(
+                                          route: route,
+                                          initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                                          onMapReady: () {
+                                            if (!mapReady) {
+                                              setState(() {
+                                                mapReady = true;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 12,
+                                      right: 12,
+                                      child: _WeightChip(weightKg: state.ruckWeightKg),
+                                    ),
+                                    if (state.isPaused)
+                                      const Positioned.fill(child: _PauseOverlay()),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8.0), // Added for spacing
+                              // Stats overlay or spinner
+                              Padding(
+                                padding: const EdgeInsets.all(16.0), // This was the padding inside the Expanded
+                                child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                                  key: const ValueKey('stats_overlay_builder'),
+                                  buildWhen: (prev, curr) {
+                                    if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
+                                      return prev.distanceKm != curr.distanceKm ||
+                                             prev.pace != curr.pace ||
+                                             prev.elapsedSeconds != curr.elapsedSeconds ||
+                                             prev.latestHeartRate != curr.latestHeartRate ||
+                                             prev.calories != curr.calories ||
+                                             prev.elevationGain != curr.elevationGain ||
+                                             prev.elevationLoss != curr.elevationLoss ||
+                                             prev.plannedDuration != curr.plannedDuration;
+                                    }
+                                    return true;
+                                  },
+                                  builder: (context, state) {
+                                    if (state is ActiveSessionRunning) {
+                                      final authBloc = Provider.of<AuthBloc>(context, listen: false);
+                                      final bool preferMetric = authBloc.state is Authenticated
+                                          ? (authBloc.state as Authenticated).user.preferMetric
+                                          : true;
+                                      return SessionStatsOverlay(
+                                        state: state,
+                                        preferMetric: preferMetric,
+                                        useCardLayout: true,
+                                      );
+                                    }
+                                    // Fallback: show placeholder stats instead of spinner
+                                    return SessionStatsOverlay.placeholder();
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 8.0), // Added for spacing
+                              // Controls at bottom
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 10.0, top: 4.0),
+                                child: SessionControls(
+                                  isPaused: state.isPaused,
+                                  onTogglePause: () {
+                                    if (state.isPaused) {
+                                      context.read<ActiveSessionBloc>().add(const SessionResumed());
+                                    } else {
+                                      context.read<ActiveSessionBloc>().add(const SessionPaused());
+                                    }
+                                  },
+                                  onEndSession: () => _handleEndSession(context, state),
+                                ),
+                              ),
+                              const SizedBox(height: 16.0), // Added for bottom padding within scroll view
+                            ],
+                          ),
+                        );
+                      }
+                      if (state is ActiveSessionComplete) {
+                        return Center(
+                          child: Text(
+                            'Session Completed — Distance: ${state.session.distance.toStringAsFixed(2)} km',
+                            style: AppTextStyles.titleMedium,
+                          ),
+                        );
+                      }
+                      return const SizedBox();
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
+          // Overlay
+          if (overlayVisible)
+            Positioned.fill(
+              child: Container(
+                color: AppColors.primary,
+                child: (!countdownComplete)
+                    ? CountdownOverlay(
+                        onCountdownComplete: () {
+                          setState(() {
+                            countdownComplete = true;
+                          });
+                          context.read<ActiveSessionBloc>().add(
+                            SessionStarted(
+                              ruckWeightKg: widget.args.ruckWeight,
+                              notes: widget.args.notes,
+                              plannedDuration: widget.args.plannedDuration,
+                            ),
+                          );
+                        },
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
         ],
       ),
     );
@@ -357,6 +407,13 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
           child: _RouteMap(
             route: route,
             initialCenter: route.isNotEmpty ? route.last : null,
+            onMapReady: () {
+              if (!mapReady) {
+                setState(() {
+                  mapReady = true;
+                });
+              }
+            },
           ),
         ),
         // Stats area or spinner below the map
@@ -405,7 +462,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
 
 /// Real map – replace with FlutterMap or GoogleMap.
 class _RouteMap extends StatefulWidget {
-  const _RouteMap({required this.route, this.initialCenter});
+  final VoidCallback? onMapReady;
+  const _RouteMap({required this.route, this.initialCenter, this.onMapReady});
 
   final List<latlong.LatLng> route;
   final latlong.LatLng? initialCenter;
@@ -415,11 +473,27 @@ class _RouteMap extends StatefulWidget {
 }
 
 class _RouteMapState extends State<_RouteMap> {
+  bool _mapReadyCalled = false;
+  void _signalMapReady() {
+    if (!_mapReadyCalled && widget.onMapReady != null) {
+      _mapReadyCalled = true;
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) widget.onMapReady!();
+      });
+    }
+  }
+  Timer? _fallbackTimer;
   final MapController _controller = MapController();
 
   @override
   void initState() {
     super.initState();
+    _fallbackTimer = Timer(const Duration(seconds: 5), () {
+      if (!_mapReadyCalled) {
+        print("Fallback timer triggered: calling onMapReady");
+        _signalMapReady();
+      }
+    });
     // Schedule a microtask to fit bounds after the first frame if route is available.
     // This ensures the map is laid out before we try to fit bounds.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -462,48 +536,65 @@ class _RouteMapState extends State<_RouteMap> {
 
     return Stack(
       children: [
-        FlutterMap(
-          mapController: _controller,
-          options: MapOptions(
-            initialCenter: initialMapCenter,
-            initialZoom: 16.5,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+        Container(
+          color: AppColors.primary,
+          child: FlutterMap(
+            mapController: _controller,
+            options: MapOptions(
+              initialCenter: initialMapCenter,
+              initialZoom: 16.5,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+              ),
             ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
+                userAgentPackageName: 'com.ruckingapp',
+                retinaMode: RetinaMode.isHighDensity(context),
+                tileBuilder: (context, tileWidget, tile) {
+                  // Call onMapReady the first time a tile is built
+                  if (!_mapReadyCalled) {
+                    print("Tile loaded: triggering onMapReady (delayed)");
+                    _signalMapReady();
+                  }
+                  return tileWidget;
+                },
+              ),
+              if (widget.route.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: widget.route,
+                      strokeWidth: 4.0,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+              if (widget.route.isNotEmpty)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: widget.route.last,
+                      width: 40,
+                      height: 40,
+                      child: Image.asset('assets/images/map marker.png'),
+                    ),
+                  ],
+                ),
+            ],
           ),
-          children: [
-            TileLayer(
-              urlTemplate:
-                  'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
-              userAgentPackageName: 'com.ruckingapp',
-              retinaMode: RetinaMode.isHighDensity(context),
-            ),
-            if (widget.route.isNotEmpty)
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: widget.route,
-                    strokeWidth: 4.0,
-                    color: AppColors.primary,
-                  ),
-                ],
-              ),
-            if (widget.route.isNotEmpty)
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: widget.route.last,
-                    width: 40,
-                    height: 40,
-                    child: Image.asset('assets/images/map marker.png'),
-                  ),
-                ],
-              ),
-          ],
         ),
-        const CountdownOverlay(),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _fallbackTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
   }
 }
 
@@ -551,7 +642,8 @@ class _PauseOverlay extends StatelessWidget {
 }
 
 class CountdownOverlay extends StatefulWidget {
-  const CountdownOverlay({Key? key}) : super(key: key);
+  final VoidCallback? onCountdownComplete;
+  const CountdownOverlay({Key? key, this.onCountdownComplete}) : super(key: key);
 
   @override
   _CountdownOverlayState createState() => _CountdownOverlayState();
@@ -584,6 +676,9 @@ class _CountdownOverlayState extends State<CountdownOverlay> with SingleTickerPr
           setState(() {
             _count = 0;
           });
+          if (widget.onCountdownComplete != null) {
+            widget.onCountdownComplete!();
+          }
         });
         timer.cancel();
       }
