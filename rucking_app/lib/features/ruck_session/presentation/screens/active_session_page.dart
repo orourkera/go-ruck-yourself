@@ -15,6 +15,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Arguments passed to the ActiveSessionPage
@@ -64,7 +65,14 @@ class _ActiveSessionView extends StatefulWidget {
 
 class _ActiveSessionViewState extends State<_ActiveSessionView> {
   void _handleEndSession(BuildContext context, ActiveSessionRunning currentState) {
-    if (currentState.isLongEnough) {
+    // Use the SessionValidationService to check all requirements
+    final validator = SessionValidationService();
+    final validation = validator.validateSessionForSave(
+      distanceMeters: currentState.distanceKm * 1000,
+      duration: Duration(seconds: currentState.elapsedSeconds),
+      caloriesBurned: currentState.calories.toDouble(),
+    );
+    if (validation['isValid'] == true) {
       _showConfirmEndSessionDialog(context);
     } else {
       _showSessionTooShortDialog(context);
