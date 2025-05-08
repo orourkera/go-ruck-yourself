@@ -347,16 +347,35 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
                               // Controls at bottom
                               Padding(
                                 padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 10.0, top: 4.0),
-                                child: SessionControls(
-                                  isPaused: state.isPaused,
-                                  onTogglePause: () {
-                                    if (state.isPaused) {
-                                      context.read<ActiveSessionBloc>().add(const SessionResumed());
-                                    } else {
-                                      context.read<ActiveSessionBloc>().add(const SessionPaused());
+                                child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                                  buildWhen: (prev, curr) {
+                                    // Rebuild when the state type changes (e.g. Initial -> Running) or when
+                                    // the paused flag toggles within a running session.
+                                    if (prev.runtimeType != curr.runtimeType) return true;
+                                    if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
+                                      return prev.isPaused != curr.isPaused;
                                     }
+                                    return false;
                                   },
-                                  onEndSession: () => _handleEndSession(context, state),
+                                  builder: (context, state) {
+                                    bool isPaused = state is ActiveSessionRunning ? state.isPaused : false;
+                                    return SessionControls(
+                                      isPaused: isPaused,
+                                      onTogglePause: () {
+                                        if (state is! ActiveSessionRunning) return; // Ignore if not running
+                                        if (isPaused) {
+                                          context.read<ActiveSessionBloc>().add(const SessionResumed());
+                                        } else {
+                                          context.read<ActiveSessionBloc>().add(const SessionPaused());
+                                        }
+                                      },
+                                      onEndSession: () {
+                                        if (state is ActiveSessionRunning) {
+                                          _handleEndSession(context, state);
+                                        }
+                                      },
+                                    );
+                                  },
                                 ),
                               ),
                               const SizedBox(height: 16.0), // Added for bottom padding within scroll view
@@ -381,8 +400,17 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
           ),
           // Overlay fade via FadeTransition
           Positioned.fill(
-            child: FadeTransition(
-              opacity: _overlayController,
+            child: AnimatedBuilder(
+              animation: _overlayController,
+              builder: (context, child) {
+                return IgnorePointer(
+                  ignoring: _overlayController.value == 0,
+                  child: FadeTransition(
+                    opacity: _overlayController,
+                    child: child,
+                  ),
+                );
+              },
               child: Container(
                 key: const ValueKey('overlayContainer'),
                 color: AppColors.primary,
@@ -528,27 +556,64 @@ class _RouteMapState extends State<_RouteMap> {
   }
 
   @override
+  // Keep track of when we last did a bounds fit to avoid doing it too frequently
+  DateTime? _lastBoundsFitTime;
+  
   void didUpdateWidget(covariant _RouteMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.route.isNotEmpty && widget.route != oldWidget.route) {
-      // Use a microtask to ensure that mapController is ready and avoid conflicts
-      // if FlutterMap is rebuilding.
-      Future.microtask(() => _fitBoundsToRoute());
+      // Only do a bounds fit if:
+      // 1. We've never done one before (_lastBoundsFitTime is null)
+      // 2. We have multiple points and it's been at least 10 seconds since the last fit
+      // 3. We've gone from 0 to 1 point (first location update)
+      bool shouldFitBounds = _lastBoundsFitTime == null || 
+                            (widget.route.length > 1 && 
+                             oldWidget.route.isEmpty) ||
+                            (_lastBoundsFitTime != null && 
+                             DateTime.now().difference(_lastBoundsFitTime!).inSeconds > 10);
+      
+      if (shouldFitBounds) {
+        // Use a microtask to ensure that mapController is ready and avoid conflicts
+        Future.microtask(() {
+          _fitBoundsToRoute();
+          _lastBoundsFitTime = DateTime.now();
+        });
+      } else {
+        // For regular updates, just center on the last point without changing zoom
+        if (widget.route.isNotEmpty && widget.route.length > oldWidget.route.length) {
+          Future.microtask(() {
+            _centerOnLastPoint();
+          });
+        }
+      }
     }
   }
 
   void _fitBoundsToRoute() {
     if (mounted && widget.route.length > 1) {
       final bounds = LatLngBounds.fromPoints(widget.route);
+      // Get current zoom before fitting bounds
+      final currentZoom = _controller.camera.zoom;
+      
+      // Fit the bounds but limit maximum zoom to prevent excessive zooming
       _controller.fitCamera(
         CameraFit.bounds(
           bounds: bounds,
           padding: const EdgeInsets.all(40.0),
+          maxZoom: 15.0, // Limit max zoom when fitting bounds
         ),
       );
     } else if (mounted && widget.route.isNotEmpty) {
       // If only one point, center on it with a fixed zoom
-      _controller.move(widget.route.last, 16.5);
+      _controller.move(widget.route.last, 15.0);
+    }
+  }
+  
+  // Method to just center on last point without zoom changes
+  void _centerOnLastPoint() {
+    if (mounted && widget.route.isNotEmpty) {
+      final currentZoom = _controller.camera.zoom;
+      _controller.move(widget.route.last, currentZoom);
     }
   }
 
