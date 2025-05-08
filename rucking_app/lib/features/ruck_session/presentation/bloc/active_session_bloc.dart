@@ -209,14 +209,25 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const double R = 6371000; // Earth radius in meters
-    final double dLat = (lat2 - lat1) * (pi / 180);
-    final double dLon = (lon2 - lon1) * (pi / 180);
-    final double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1 * (pi / 180)) * cos(lat2 * (pi / 180)) *
-        sin(dLon / 2) * sin(dLon / 2);
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    return R * c;
+    var p = 0.017453292519943295;
+    var c = cos;
+    var a = 0.5 - c((lat2 - lat1) * p) / 2 + 
+            c(lat1 * p) * c(lat2 * p) * 
+            (1 - c((lon2 - lon1) * p)) / 2;
+    return 12742 * asin(sqrt(a)) * 1000; // 2 * R; R = 6371 km, returns meters
+  }
+  
+  double _getUserWeightKg() {
+    try {
+      final userProfile = GetIt.instance<UserProfile>();
+      if (userProfile.weightKg != null && userProfile.weightKg! > 0) {
+        return userProfile.weightKg!;
+      }
+    } catch (e) {
+      AppLogger.info('Could not get user weight from profile: $e');
+    }
+    
+    return 70.0; // ~154 lbs
   }
 
   Future<void> _onLocationUpdated(
@@ -224,8 +235,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     Emitter<ActiveSessionState> emit
   ) async {
     final currentPoint = event.locationPoint;
-    const double thresholdMeters = 10.0; // existing threshold for minimal update
-    const double driftIgnoreJumpMeters = 15.0; // new threshold to ignore sudden jump early in session
+    const double thresholdMeters = 10.0; 
+    const double driftIgnoreJumpMeters = 15.0; 
 
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
@@ -233,22 +244,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final last = _lastValidLocation!;
         final double distance = _calculateDistance(last.latitude, last.longitude, currentPoint.latitude, currentPoint.longitude);
 
-        // Ignore update if session hasn't really started moving and the jump is too large (likely drift)
         if (currentState.distanceKm * 1000 < 10 && distance > driftIgnoreJumpMeters) {
           debugPrint("Ignoring GPS update due to drift: distance = " + distance.toString());
           return;
         }
 
-        // Ignore update if movement is minimal
         if (distance < thresholdMeters) {
           AppLogger.info('Ignoring minimal location update; distance ' + distance.toString() + ' m is below threshold.');
           return;
         }
 
-        // Only increment the valid location count after passing the above checks
         _validLocationCount++;
       } else {
-        // If no previous valid location exists, consider this as the first valid update if any movement is detected
         _validLocationCount = 1;
       }
     }
@@ -260,25 +267,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       AppLogger.info('LocationUpdated event: ${event.locationPoint}');
 
-      // Validate the incoming point
       final previousPoint = currentState.locationPoints.isNotEmpty ? currentState.locationPoints.last : null;
       final validationResult = _validationService.validateLocationPoint(event.locationPoint, previousPoint);
       if (!validationResult['isValid']) {
         AppLogger.warning('Invalid location point: ${validationResult['reason']}');
-        // Optionally, emit a specific state or handle the error, for now, we just log and ignore it.
         return;
       }
 
       List<LocationPoint> updatedPoints = List.from(currentState.locationPoints)..add(event.locationPoint);
 
-      // Calculate new total distance
       double newDistance = currentState.distanceKm;
       if (updatedPoints.length > 1) {
         final prevPoint = updatedPoints[updatedPoints.length - 2];
         newDistance += _locationService.calculateDistance(prevPoint, event.locationPoint);
       }
 
-      // Calculate new elevation gain/loss
       double newElevationGain = currentState.elevationGain;
       double newElevationLoss = currentState.elevationLoss;
       if (updatedPoints.length > 1) {
@@ -288,23 +291,67 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         if (diff < 0) newElevationLoss += diff.abs();
       }
 
-      // Pace (seconds per km). Use current elapsed time, not incremented here.
       final double newPace = newDistance > 0
           ? (currentState.elapsedSeconds / newDistance)
           : 0;
+        
+      int newCalories = currentState.calories;
       
-      // Update the state with new location data using copyWith
+      if (updatedPoints.length > 1) {
+        final prevPoint = updatedPoints[updatedPoints.length - 2];
+        final currentPoint = event.locationPoint;
+        
+        final double segmentDistanceMeters = _locationService.calculateDistance(prevPoint, currentPoint) * 1000;
+        
+        final double elevationChange = currentPoint.elevation - prevPoint.elevation;
+        
+        double segmentSpeedKmh = 0.0;
+        if (segmentDistanceMeters > 0) {
+          final segmentSeconds = currentPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
+          if (segmentSeconds > 0) {
+            final segmentPaceSecPerKm = segmentSeconds / (segmentDistanceMeters / 1000);
+            segmentSpeedKmh = 3600 / segmentPaceSecPerKm;
+          }
+        }
+        
+        final double speedMph = MetCalculator.kmhToMph(segmentSpeedKmh);
+        
+        final double ruckWeightKg = currentState.ruckWeightKg;
+        final double ruckWeightLbs = ruckWeightKg * 2.20462; // kg to lbs
+        
+        final double grade = MetCalculator.calculateGrade(
+          elevationChangeMeters: elevationChange,
+          distanceMeters: segmentDistanceMeters,
+        );
+        
+        final double metValue = MetCalculator.calculateRuckingMetByGrade(
+          speedMph: speedMph,
+          grade: grade,
+          ruckWeightLbs: ruckWeightLbs,
+        );
+        
+        final double segmentTimeMinutes = currentPoint.timestamp.difference(prevPoint.timestamp).inSeconds / 60.0;
+        
+        final userWeight = _getUserWeightKg();
+        
+        final double segmentCalories = MetCalculator.calculateCaloriesBurned(
+          weightKg: userWeight + (ruckWeightKg * 0.75), // Count 75% of ruck weight
+          durationMinutes: segmentTimeMinutes,
+          metValue: metValue,
+        );
+        
+        newCalories += segmentCalories.round();
+      }
+    
       emit(currentState.copyWith(
         locationPoints: updatedPoints,
         distanceKm: newDistance,
         pace: newPace,
-        calories: 0, // Removed calorie calculation
+        calories: newCalories,
         elevationGain: newElevationGain.toDouble(),
         elevationLoss: newElevationLoss.toDouble(),
-        // elapsedSeconds will be taken from currentState via copyWith, _onTick handles its progression
       ));
 
-      // Send location update to backend
       try {
         await _apiClient.post('/rucks/${currentState.sessionId}/location', {
           'latitude': event.locationPoint.latitude,
