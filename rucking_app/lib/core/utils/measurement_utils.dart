@@ -46,8 +46,8 @@ class MeasurementUtils {
     // For conversion: seconds/mile = seconds/km * 0.621371 (km to mile factor)
     final pace = metric ? paceSeconds : paceSeconds * 0.621371;
     
-    // Cap extremely slow paces (>30min/km or mile) to avoid UI glitches
-    if (pace > 1800) return '--';
+    // Cap extremely slow paces (>60min/km or mile) to avoid UI glitches
+    if (pace > 3600) return '--';
     
     // Format pace as minutes:seconds
     final minutes = (pace / 60).floor();
