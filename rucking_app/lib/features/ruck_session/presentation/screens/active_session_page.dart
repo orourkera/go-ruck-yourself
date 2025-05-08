@@ -15,7 +15,6 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
-import 'package:rucking_app/features/ruck_session/presentation/widgets/validation_banner.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Arguments passed to the ActiveSessionPage
@@ -165,16 +164,16 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
               child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
                 listenWhen: (prev, curr) => 
                   (prev is ActiveSessionFailure != curr is ActiveSessionFailure) || 
-                  (curr is ActiveSessionSuccess), 
+                  (curr is ActiveSessionComplete),
                 listener: (ctx, state) {
                   if (state is ActiveSessionFailure) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
                       SnackBar(content: Text(state.errorMessage)),
                     );
-                  } else if (state is ActiveSessionSuccess) {
+                  } else if (state is ActiveSessionComplete) {
                     Navigator.of(ctx).pushReplacementNamed(
                       '/session-complete', 
-                      arguments: state.sessionId, 
+                      arguments: state.session.id, 
                     );
                   }
                 },
@@ -252,11 +251,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               );
                             },
                           ),
-                        // Validation banner
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0),
-                          child: ValidationBanner(),
-                        ),
                         const Spacer(),
                         // Controls at bottom
                         Padding(
