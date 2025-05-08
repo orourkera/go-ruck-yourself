@@ -139,6 +139,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                     Navigator.of(dialogContext).pop(); // Dismiss dialog
                     // Remove any SnackBar before navigating home
                     ScaffoldMessenger.of(context).clearSnackBars();
+                    // Reset error state so SnackBar won't show on home
+                    context.read<ActiveSessionBloc>().add(const SessionErrorCleared());
                     Navigator.of(context).popUntil((route) => route.isFirst); // Go home
                     context.read<ActiveSessionBloc>().add(const SessionCompleted());
                   },
