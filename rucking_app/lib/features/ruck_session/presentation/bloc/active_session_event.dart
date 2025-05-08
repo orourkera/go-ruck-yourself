@@ -78,3 +78,10 @@ class SessionErrorCleared extends ActiveSessionEvent {
   @override
   List<Object?> get props => [];
 }
+
+class TimerStarted extends ActiveSessionEvent {
+  const TimerStarted();
+
+  @override
+  List<Object?> get props => [];
+}

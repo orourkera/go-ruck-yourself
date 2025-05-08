@@ -34,6 +34,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final SessionValidationService _validationService = SessionValidationService();
   LocationPoint? _lastValidLocation;
   int _validLocationCount = 0;
+  int _latestHeartRate = 0;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -54,6 +55,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<HeartRateUpdated>(_onHeartRateUpdated);
     on<Tick>(_onTick);
     on<SessionErrorCleared>(_onSessionErrorCleared);
+    on<TimerStarted>(_onTimerStarted);
   }
 
   Future<void> _onSessionStarted(
@@ -127,9 +129,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       _startLocationTracking(emit); 
       _startHeartRateMonitoring();
-      _startTicker();
-      AppLogger.info('Location, heart rate, and ticker started for session $sessionId');
-
+      AppLogger.info('Location, heart rate started for session $sessionId');
     } catch (e, stackTrace) {
       final String RuckIdForError = sessionId ?? "unknown";
       AppLogger.error('Failed to start session $RuckIdForError: $e. StackTrace: $stackTrace');
@@ -178,8 +178,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   void _startHeartRateMonitoring() {
     AppLogger.info('Starting heart rate monitoring...');
-    if (state is! ActiveSessionRunning) return; // Only monitor if session is running
-
     _heartRateSubscription?.cancel(); // Cancel previous subscription if any
     _heartRateSubscription = _healthService.heartRateStream.listen(
       (HeartRateSample sample) {
@@ -594,12 +592,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     HeartRateUpdated event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    _latestHeartRate = event.sample.bpm;
     final currentState = state;
     if (currentState is ActiveSessionRunning) {
       AppLogger.info('HeartRateUpdated event: ${event.sample.bpm} BPM at ${event.sample.timestamp}');
       _hrBuffer.add(event.sample);
-      emit(currentState.copyWith(latestHeartRate: event.sample.bpm));
-      // Optionally flush immediately if buffer is large (e.g., >10)
+      emit(currentState.copyWith(latestHeartRate: _latestHeartRate));
       if (_hrBuffer.length > 10) {
         await _flushHeartRateBuffer(currentState);
       }
@@ -670,6 +668,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     ));
   }
 }
+
+  Future<void> _onTimerStarted(
+    TimerStarted event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      // Update the session start time so that elapsed time resets to 0
+      final updatedState = currentState.copyWith(originalSessionStartTimeUtc: DateTime.now());
+      emit(updatedState);
+      _startTicker();
+      AppLogger.info('Timer started at: ${DateTime.now()}');
+    }
+  }
 
   void _onSessionErrorCleared(SessionErrorCleared event, Emitter<ActiveSessionState> emit) {
     emit(ActiveSessionInitial());

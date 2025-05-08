@@ -42,11 +42,11 @@ class SessionStatsOverlay extends StatelessWidget {
               value: state.pace != null ? MeasurementUtils.formatPaceSeconds(state.pace! * 60, metric: preferMetric) : '--',
             ),
             _StatTile(label: 'TIME', value: _formatMinutesSeconds(Duration(seconds: state.elapsedSeconds))),
-            if (state.latestHeartRate != null)
+            if ((state.latestHeartRate ?? 0) > 0)
               _StatTile(
                 label: 'HR',
                 value: '${state.latestHeartRate} bpm',
-                color: _hrColor(state.latestHeartRate!),
+                color: _hrColor(state.latestHeartRate ?? 0),
               ),
             _StatTile(
               label: 'CAL',
@@ -148,7 +148,7 @@ class SessionStatsOverlay extends StatelessWidget {
                               SizedBox(width: 8),
                               // Removed Baseline widget for simpler vertical centering
                               Text(
-                                state.latestHeartRate != null ? '${state.latestHeartRate}' : '--',
+                                (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
                                 style: AppTextStyles.timerDisplay.copyWith(
                                   color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                   fontWeight: FontWeight.bold,
@@ -158,9 +158,7 @@ class SessionStatsOverlay extends StatelessWidget {
                             ],
                           ),
                           Text(
-                            state.latestHeartRate != null 
-                              ? 'BPM'
-                              : '', 
+                            (state.latestHeartRate ?? 0) > 0 ? 'BPM' : '',
                             style: AppTextStyles.labelSmall.copyWith(fontSize: 10, color: AppColors.primary)
                           ),
                         ],
