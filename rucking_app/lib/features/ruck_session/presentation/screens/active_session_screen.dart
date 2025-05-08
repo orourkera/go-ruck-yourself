@@ -519,6 +519,8 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       if (_isPaused) {
         _stopwatch.start();
         _isPaused = false;
+        // Restart timer if not running
+        _timer ??= Timer.periodic(const Duration(seconds: 1), _updateTime);
         // Update last location time to now when resuming
         _lastLocationUpdateTime = DateTime.now();
         // Resume location tracking
@@ -529,13 +531,16 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       } else {
         _stopwatch.stop();
         _isPaused = true;
+        // Stop timer so elapsed time does not update
+        _timer?.cancel();
+        _timer = null;
         _lastLocationPoint = _locationPoints.last; // Store last location point before pausing
         // Pause location tracking
         _locationSubscription?.pause();
         // Notify API
         _apiClient.post('/rucks/${widget.ruckId}/pause', {})
             .catchError((e) => AppLogger.error('Failed to pause session: $e'));
-      }
+      }  
     });
   }
   
