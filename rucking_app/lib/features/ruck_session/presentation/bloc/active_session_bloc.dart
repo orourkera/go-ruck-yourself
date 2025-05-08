@@ -52,6 +52,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    AppLogger.info('SessionStarted event received. plannedDuration: \u001B[33m${event.plannedDuration}\u001B[0m seconds');
     AppLogger.info('SessionStarted event received. Weight: ${event.ruckWeightKg}kg, Notes: ${event.notes}');
     emit(ActiveSessionLoading());
     String? sessionId; // Declare sessionId here to be accessible in catch block if needed
@@ -113,7 +114,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         currentPauseStartTimeUtc: null,
       );
       emit(initialSessionState);
-      AppLogger.info('ActiveSessionRunning state emitted for session $sessionId');
+      AppLogger.info('ActiveSessionRunning state emitted for session $sessionId with plannedDuration: \u001B[33m${initialSessionState.plannedDuration}\u001B[0m seconds');
 
       _startLocationTracking(emit); 
       _startHeartRateMonitoring();

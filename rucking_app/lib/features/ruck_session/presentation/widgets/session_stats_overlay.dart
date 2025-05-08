@@ -51,6 +51,8 @@ class SessionStatsOverlay extends StatelessWidget {
               label: 'ELEV',
               value: '${state.elevationGain.toStringAsFixed(0)}/${state.elevationLoss.toStringAsFixed(0)} m',
             ),
+            // Removed duplicate 'remaining' display from row layout
+
           ],
         ),
       );
@@ -107,14 +109,6 @@ class SessionStatsOverlay extends StatelessWidget {
                               fontSize: 36, // Changed to 36 to match HR value
                             ),
                           ),
-                          if (state.plannedDuration != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                'REMAINING: ' + _format(Duration(seconds: (state.plannedDuration! - state.elapsedSeconds).clamp(0, state.plannedDuration!).toInt())),
-                                style: AppTextStyles.statLabel.copyWith(color: Colors.grey[700]),
-                              ),
-                            ),
                           if (state.plannedDuration != null && state.plannedDuration! > state.elapsedSeconds)
                             Padding(
                               padding: const EdgeInsets.only(top: 4.0),
