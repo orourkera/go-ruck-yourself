@@ -53,11 +53,26 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     Emitter<ActiveSessionState> emit
   ) async {
     try {
-      // Start a new session
       emit(ActiveSessionLoading());
-      
       AppLogger.info('Starting a new ruck session with weight: ${event.ruckWeightKg}kg');
+
+      // Check for location permission first
+      bool hasPermission = await _locationService.hasLocationPermission();
+      if (!hasPermission) {
+        AppLogger.info('Location permission not granted. Requesting...');
+        hasPermission = await _locationService.requestLocationPermission();
+      }
+
+      if (!hasPermission) {
+        AppLogger.warning('Location permission denied by user.');
+        emit(const ActiveSessionFailure(
+          errorMessage: 'Location permission is required to start a session. Please enable it in your device settings and try again.',
+        ));
+        return;
+      }
       
+      AppLogger.info('Location permission granted.');
+
       // Create a new session in the backend
       final response = await _apiClient.post('/rucks', {
         'ruck_weight_kg': event.ruckWeightKg,
@@ -75,6 +90,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Emit success state with session ID
       emit(ActiveSessionRunning(
         sessionId: sessionId,
+        plannedDuration: event.plannedDuration,
         locationPoints: [],
         elapsedSeconds: 0,
         distanceKm: 0.0,
@@ -107,17 +123,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           add(LocationUpdated(locationPoint));
         },
         onError: (error) {
-          AppLogger.error('Location error: $error');
-          
-          // Only send location errors that are critical to the session
-          if (state is ActiveSessionRunning) {
-            add(SessionFailed(
-              errorMessage: ErrorHandler.getUserFriendlyMessage(
-                error, 
-                'Location Tracking'
-              ),
-            ));
-          }
+          AppLogger.error('Location error during active session: $error');
+          // Removed: add(SessionFailed(...)) to avoid abrupt session termination for all location errors.
+          // Permission errors should be caught before starting the session.
+          // Other mid-session errors will be logged for now.
         },
       );
 

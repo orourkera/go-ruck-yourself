@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -55,8 +56,81 @@ class ActiveSessionPage extends StatelessWidget {
   }
 }
 
-class _ActiveSessionView extends StatelessWidget {
+class _ActiveSessionView extends StatefulWidget {
   const _ActiveSessionView();
+
+  @override
+  State<_ActiveSessionView> createState() => _ActiveSessionViewState();
+}
+
+class _ActiveSessionViewState extends State<_ActiveSessionView> {
+  void _handleEndSession(BuildContext context, ActiveSessionRunning currentState) {
+    if (currentState.isLongEnough) {
+      _showConfirmEndSessionDialog(context);
+    } else {
+      _showSessionTooShortDialog(context);
+    }
+  }
+
+  void _showConfirmEndSessionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('End Session?'),
+          content: const Text('Are you sure you want to end this ruck session?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            TextButton(
+              child: const Text('End Session'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.read<ActiveSessionBloc>().add(const SessionCompleted());
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSessionTooShortDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Session Too Short'),
+          content: const Text('This session is very short. Are you sure you want to end it and save? Alternatively, you can discard it.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Discard Session'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(); // Dismiss dialog
+                // Navigate to home/root screen
+                Navigator.of(context).popUntil((route) => route.isFirst);
+                // Still tell BLoC to clean up its "running" state
+                context.read<ActiveSessionBloc>().add(const SessionCompleted());
+              },
+            ),
+            TextButton(
+              child: const Text('Save Anyway'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.read<ActiveSessionBloc>().add(const SessionCompleted());
+              },
+            ),
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,113 +163,126 @@ class _ActiveSessionView extends StatelessWidget {
             child: SafeArea(
               top: false,
               child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
-          listenWhen: (prev, curr) => prev is ActiveSessionFailure != (curr is ActiveSessionFailure),
-          listener: (ctx, state) {
-            if (state is ActiveSessionFailure) {
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                SnackBar(content: Text(state.errorMessage)),
-              );
-            }
-          },
-          buildWhen: (prev, curr) => prev != curr,
-          builder: (ctx, state) {
-            if (state is ActiveSessionInitial || state is ActiveSessionLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (state is ActiveSessionRunning) {
-              final route = state.locationPoints
-                  .map((p) => latlong.LatLng(p.latitude, p.longitude))
-                  .toList();
+                listenWhen: (prev, curr) => prev is ActiveSessionFailure != (curr is ActiveSessionFailure),
+                listener: (ctx, state) {
+                  if (state is ActiveSessionFailure) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text(state.errorMessage)),
+                    );
+                  }
+                },
+                buildWhen: (prev, curr) => prev != curr,
+                builder: (ctx, state) {
+                  if (state is ActiveSessionInitial || state is ActiveSessionLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (state is ActiveSessionRunning) {
+                    final route = state.locationPoints
+                        .map((p) => latlong.LatLng(p.latitude, p.longitude))
+                        .toList();
 
-              return Column(
-                children: [
-                  // Header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 18.0),
-                    color: AppColors.primary,
-                    child: Center(
-                      child: Text(
-                        'ACTIVE SESSION',
-                        style: AppTextStyles.headlineLarge.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Map with weight chip overlay
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Stack(
+                    return Column(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.27,
-                            width: double.infinity,
-                            child: _RouteMap(
-                              route: route,
-                              initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
-                            ),
+                        // Map with weight chip overlay
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(18),
+                                child: SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.27,
+                                  width: double.infinity,
+                                  child: _RouteMap(
+                                    route: route,
+                                    initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 12,
+                                right: 12,
+                                child: _WeightChip(weightKg: state.ruckWeightKg),
+                              ),
+                              if (state.isPaused)
+                                const Positioned.fill(child: _PauseOverlay()),
+                            ],
                           ),
                         ),
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: _WeightChip(weightKg: state.ruckWeightKg),
+                        // Stats overlay or spinner
+                        if (state.locationPoints.length < 2)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 0.0),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else
+                          BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                            key: const ValueKey('stats_overlay_builder'),
+                            buildWhen: (prev, curr) {
+                              if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
+                                return prev.distanceKm != curr.distanceKm ||
+                                       prev.pace != curr.pace ||
+                                       prev.elapsedSeconds != curr.elapsedSeconds ||
+                                       prev.latestHeartRate != curr.latestHeartRate ||
+                                       prev.calories != curr.calories ||
+                                       prev.elevationGain != curr.elevationGain ||
+                                       prev.elevationLoss != curr.elevationLoss ||
+                                       prev.plannedDuration != curr.plannedDuration;
+                              }
+                              return true;
+                            },
+                            builder: (context, state) {
+                              if (state is! ActiveSessionRunning) return const SizedBox.shrink();
+                              final preferMetric = context.select<AuthBloc, bool>((bloc) {
+                                final authState = bloc.state;
+                                if (authState is Authenticated) return authState.user.preferMetric;
+                                return true;
+                              });
+                              return SessionStatsOverlay(
+                                state: state,
+                                preferMetric: preferMetric,
+                                useCardLayout: true,
+                              );
+                            },
+                          ),
+                        // Validation banner
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0),
+                          child: ValidationBanner(),
                         ),
-                        if (state.isPaused)
-                          const Positioned.fill(child: _PauseOverlay()),
+                        const Spacer(),
+                        // Controls at bottom
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 18.0, top: 8.0),
+                          child: SessionControls(
+                            isPaused: state.isPaused,
+                            onTogglePause: () {
+                              if (state.isPaused) {
+                                context.read<ActiveSessionBloc>().add(const SessionResumed());
+                              } else {
+                                context.read<ActiveSessionBloc>().add(const SessionPaused());
+                              }
+                            },
+                            onEndSession: () => _handleEndSession(context, state),
+                          ),
+                        ),
                       ],
-                    ),
-                  ),
-                  // Stats overlay as cards
-                  Padding(
-                    padding: const EdgeInsets.only(top: 18.0, left: 16.0, right: 16.0),
-                    child: Builder(
-                      builder: (context) {
-                        final preferMetric = context.select<AuthBloc, bool>((bloc) {
-                          final st = bloc.state;
-                          if (st is Authenticated) {
-                            return st.user.preferMetric;
-                          }
-                          return true;
-                        });
-                        return SessionStatsOverlay(
-                          state: state,
-                          preferMetric: preferMetric,
-                          useCardLayout: true,
-                        );
-                      },
-                    ),
-                  ),
-                  // Validation banner
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0),
-                    child: ValidationBanner(),
-                  ),
-                  const Spacer(),
-                  // Controls at bottom
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 18.0, top: 8.0),
-                    child: SessionControls(),
-                  ),
-                ],
-              );
-            }
-            if (state is ActiveSessionComplete) {
-              return Center(
-                child: Text(
-                  'Session Completed — Distance: ${state.session.distance.toStringAsFixed(2)} km',
-                  style: AppTextStyles.titleMedium,
-                ),
-              );
-            }
-            return const SizedBox();
-          },
-        ),
+                    );
+                  }
+                  if (state is ActiveSessionComplete) {
+                    return Center(
+                      child: Text(
+                        'Session Completed — Distance: ${state.session.distance.toStringAsFixed(2)} km',
+                        style: AppTextStyles.titleMedium,
+                      ),
+                    );
+                  }
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
