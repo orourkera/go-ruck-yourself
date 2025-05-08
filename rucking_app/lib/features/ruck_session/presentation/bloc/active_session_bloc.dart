@@ -88,9 +88,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       });
       
       sessionId = createResponse['id']?.toString();
+      
       if (sessionId == null || sessionId.isEmpty) {
-        AppLogger.error('Failed to create session: No ID received from backend.');
-        throw Exception('Failed to create session: No ID received from backend.');
+        AppLogger.error('Failed to create session: No session ID received from backend.');
+        throw Exception('Failed to create session: No session ID received from backend.');
       }
       AppLogger.info('Created new session with ID: $sessionId');
 
@@ -297,7 +298,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         locationPoints: updatedPoints,
         distanceKm: newDistance,
         pace: newPace,
-        calories: _calculateCalories(newDistance, currentState.ruckWeightKg),
+        calories: 0, // Removed calorie calculation
         elevationGain: newElevationGain.toDouble(),
         elevationLoss: newElevationLoss.toDouble(),
         // elapsedSeconds will be taken from currentState via copyWith, _onTick handles its progression
@@ -334,8 +335,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
+      if (currentState.sessionId.isEmpty) {
+        AppLogger.error('Invalid session ID for pausing session.');
+        emit(ActiveSessionFailure(errorMessage: 'Session ID is missing. Please try again.'));
+        return;
+      }
       
       AppLogger.info('Pausing session ${currentState.sessionId}');
+      
+      // Stop the timer when pausing
+      _stopTicker();
       
       // Tell watch to pause
       _watchService.pauseSessionOnWatch();
@@ -370,7 +379,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         newTotalPausedDuration += currentPauseLength;
       } // else: was not properly in a timed pause state, resume without adding to pause duration
       
-      AppLogger.info('Resuming session ${currentState.sessionId}. Total paused duration: $newTotalPausedDuration');
+      AppLogger.info('Resuming session ${currentState.sessionId}');
+      
+      // Restart the timer when resuming
+      _startTicker();
       
       // Tell watch to resume
       _watchService.resumeSessionOnWatch();
@@ -398,6 +410,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
+      if (currentState.sessionId.isEmpty) {
+        AppLogger.error('Invalid session ID for completing session.');
+        emit(ActiveSessionFailure(errorMessage: 'Session ID is missing. Please try again.'));
+        return;
+      }
       
       try {
         AppLogger.info('Completing session ${currentState.sessionId}');
@@ -555,74 +572,51 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
-    // Heart rate batching: flush every 5 seconds if buffer not empty
-    if (state is ActiveSessionRunning) {
-      final currentState = state as ActiveSessionRunning;
-      if (_hrBuffer.isNotEmpty && (_lastHrFlush == null || DateTime.now().difference(_lastHrFlush!) > Duration(seconds: 5))) {
-        await _flushHeartRateBuffer(currentState);
-      }
+  // Heart rate batching: flush every 5 seconds if buffer not empty
+  if (state is ActiveSessionRunning) {
+    final currentState = state as ActiveSessionRunning;
     if (_hrBuffer.isNotEmpty && (_lastHrFlush == null || DateTime.now().difference(_lastHrFlush!) > Duration(seconds: 5))) {
       await _flushHeartRateBuffer(currentState);
     }
   }
-    if (state is ActiveSessionRunning) {
-      final currentState = state as ActiveSessionRunning;
-      final double currentDistance = currentState.distanceKm; // in km
-      const double minDistanceThreshold = 0.02; // threshold in km (20 meters)
-      double? newPace;
+  if (state is ActiveSessionRunning) {
+    final currentState = state as ActiveSessionRunning;
+    final double currentDistance = currentState.distanceKm; // in km
+    double? newPace;
 
-      if (currentDistance < minDistanceThreshold) {
+    // Only show pace/distance if at least 3 valid points
+    if (_validLocationCount < 3 || currentDistance < 0.02) {
+      newPace = null;
+    } else {
+      // Calculate pace in seconds per km
+      newPace = currentState.elapsedSeconds / currentDistance;
+      // Filter out absurd pace values (e.g. < 5 min/km or > 20 min/km)
+      // 5 min/km = 300 sec/km, 20 min/km = 1200 sec/km
+      if (newPace < 300 || newPace > 1200) {
         newPace = null;
-      } else {
-        // Calculate pace in seconds per km
-        newPace = currentState.elapsedSeconds / currentDistance;
       }
-
-      const double maxPaceSecPerKm = 3352; // approx. 90 minutes per mile in seconds per km
-      if (_validLocationCount < 3 || (newPace != null && newPace > maxPaceSecPerKm)) {
-        newPace = null;
-      }
-
-      final nowUtc = DateTime.now().toUtc();
-      final grossDuration = nowUtc.difference(currentState.originalSessionStartTimeUtc);
-      final netDuration = grossDuration - currentState.totalPausedDuration;
-      int newElapsed = netDuration.inSeconds;
-
-      // Sanity check to ensure elapsed time doesn't go negative
-      if (newElapsed < 0) newElapsed = 0;
-
-      final newCalories = _calculateCalories(currentState.distanceKm, currentState.ruckWeightKg);
-
-      emit(currentState.copyWith(
-        elapsedSeconds: newElapsed,
-        pace: newPace,
-        calories: newCalories,
-      ));
     }
+
+    final nowUtc = DateTime.now().toUtc();
+    final grossDuration = nowUtc.difference(currentState.originalSessionStartTimeUtc);
+    final netDuration = grossDuration - currentState.totalPausedDuration;
+    int newElapsed = netDuration.inSeconds;
+
+    // Sanity check to ensure elapsed time doesn't go negative
+    if (newElapsed < 0) newElapsed = 0;
+
+    final newCalories = 0; // Removed calorie calculation
+
+    emit(currentState.copyWith(
+      elapsedSeconds: newElapsed,
+      pace: newPace,
+      calories: newCalories,
+    ));
   }
+}
 
   void _onSessionErrorCleared(SessionErrorCleared event, Emitter<ActiveSessionState> emit) {
     emit(ActiveSessionInitial());
-  }
-
-  /// Calculate calories burned based on distance, weight, and MET value
-  int _calculateCalories(double distanceKm, double ruckWeightKg) {
-    // MET values (Metabolic Equivalent of Task):
-    // - Walking with weighted backpack (10-20kg): ~7.0 MET
-    // - Walking with very heavy backpack (>20kg): ~8.5 MET
-    double metValue = ruckWeightKg < 20 ? 7.0 : 8.5;
-    
-    // Average weight of a person in kg (adjust if needed)
-    const double averageWeightKg = 70.0;
-    
-    // Standard formula for calories burned:
-    // Calories = MET × Weight (kg) × Duration (hours)
-    
-    // Estimate duration based on distance and average walking speed (4.5 km/h with ruck)
-    double durationHours = distanceKm / 4.5;
-    
-    // Calculate calories
-    return (metValue * averageWeightKg * durationHours).round();
   }
 
   @override
