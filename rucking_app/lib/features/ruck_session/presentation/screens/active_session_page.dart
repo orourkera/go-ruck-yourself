@@ -224,7 +224,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                 buildWhen: (prev, curr) => prev != curr,
                 builder: (ctx, state) {
                   if (state is ActiveSessionInitial || state is ActiveSessionLoading) {
-                    return const Center(child: CircularProgressIndicator());
+                    return _buildSessionContent(state);
                   }
                   if (state is ActiveSessionRunning) {
                     final route = state.locationPoints
@@ -232,7 +232,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         .toList();
                     // DEBUG: Print route length and points
                     debugPrint('Route length: [32m[1m[4m[7m${route.length}[0m');
-                    for (var i = 0; i < route.length; i++) {
+                    for (var i = 0; i <route.length; i++) {
                       debugPrint('Route[$i]: Lat: [36m${route[i].latitude}[0m, Lng: [36m${route[i].longitude}[0m');
                     }
 
@@ -265,41 +265,43 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           ),
                         ),
                         // Stats overlay or spinner
-                        if (state.locationPoints.length < 2)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 0.0),
-                            child: Center(child: CircularProgressIndicator()),
-                          )
-                        else
-                          BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
-                            key: const ValueKey('stats_overlay_builder'),
-                            buildWhen: (prev, curr) {
-                              if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
-                                return prev.distanceKm != curr.distanceKm ||
-                                       prev.pace != curr.pace ||
-                                       prev.elapsedSeconds != curr.elapsedSeconds ||
-                                       prev.latestHeartRate != curr.latestHeartRate ||
-                                       prev.calories != curr.calories ||
-                                       prev.elevationGain != curr.elevationGain ||
-                                       prev.elevationLoss != curr.elevationLoss ||
-                                       prev.plannedDuration != curr.plannedDuration;
-                              }
-                              return true;
-                            },
-                            builder: (context, state) {
-                              if (state is! ActiveSessionRunning) return const SizedBox.shrink();
-                              final preferMetric = context.select<AuthBloc, bool>((bloc) {
-                                final authState = bloc.state;
-                                if (authState is Authenticated) return authState.user.preferMetric;
-                                return true;
-                              });
-                              return SessionStatsOverlay(
-                                state: state,
-                                preferMetric: preferMetric,
-                                useCardLayout: true,
-                              );
-                            },
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: state.locationPoints.length < 2
+                                ? const Center(child: CircularProgressIndicator())
+                                : BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                                    key: const ValueKey('stats_overlay_builder'),
+                                    buildWhen: (prev, curr) {
+                                      if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
+                                        return prev.distanceKm != curr.distanceKm ||
+                                               prev.pace != curr.pace ||
+                                               prev.elapsedSeconds != curr.elapsedSeconds ||
+                                               prev.latestHeartRate != curr.latestHeartRate ||
+                                               prev.calories != curr.calories ||
+                                               prev.elevationGain != curr.elevationGain ||
+                                               prev.elevationLoss != curr.elevationLoss ||
+                                               prev.plannedDuration != curr.plannedDuration;
+                                      }
+                                      return true;
+                                    },
+                                    builder: (context, state) {
+                                      if (state is ActiveSessionRunning) {
+                                        return SessionStatsOverlay(
+                                          state: state,
+                                          preferMetric: context.select<AuthBloc, bool>((bloc) {
+                                            final authState = bloc.state;
+                                            if (authState is Authenticated) return authState.user.preferMetric;
+                                            return true;
+                                          }),
+                                          useCardLayout: true,
+                                        );
+                                      }
+                                      return const Center(child: CircularProgressIndicator());
+                                    },
+                                  ),
                           ),
+                        ),
                         const Spacer(),
                         // Controls at bottom
                         Padding(
@@ -337,14 +339,55 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     );
   }
 
-  Widget _buildPaceDisplay(ActiveSessionState state) {
+  Widget _buildSessionContent(ActiveSessionState state) {
     final preferMetric = context.select<AuthBloc, bool>((bloc) {
       final authState = bloc.state;
       if (authState is Authenticated) return authState.user.preferMetric;
       return true;
     });
     
-    // Extract pace only if state is ActiveSessionRunning
+    List<latlong.LatLng> route = [];
+    if (state is ActiveSessionRunning) {
+      route = state.locationPoints
+          .map((point) => latlong.LatLng(point.latitude, point.longitude))
+          .toList();
+    }
+    
+    return Column(
+      children: [
+        // Map section always visible
+        Expanded(
+          flex: 2,
+          child: _RouteMap(
+            route: route,
+            initialCenter: route.isNotEmpty ? route.last : null,
+          ),
+        ),
+        // Stats area or spinner below the map
+        Expanded(
+          flex: 1,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: state is ActiveSessionRunning
+                ? SessionStatsOverlay(
+                    state: state as ActiveSessionRunning,
+                    preferMetric: preferMetric,
+                    useCardLayout: true,
+                  )
+                : const Center(child: CircularProgressIndicator()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaceDisplay(ActiveSessionState state) {
+    final preferMetric = context.select<AuthBloc, bool>((bloc) {
+      final st = bloc.state;
+      if (st is Authenticated) return st.user.preferMetric;
+      return true;
+    });
+
     final pace = state is ActiveSessionRunning ? (state as ActiveSessionRunning).pace : null;
     
     return Column(
