@@ -163,11 +163,18 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
             child: SafeArea(
               top: false,
               child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
-                listenWhen: (prev, curr) => prev is ActiveSessionFailure != (curr is ActiveSessionFailure),
+                listenWhen: (prev, curr) => 
+                  (prev is ActiveSessionFailure != curr is ActiveSessionFailure) || 
+                  (curr is ActiveSessionSuccess), 
                 listener: (ctx, state) {
                   if (state is ActiveSessionFailure) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
                       SnackBar(content: Text(state.errorMessage)),
+                    );
+                  } else if (state is ActiveSessionSuccess) {
+                    Navigator.of(ctx).pushReplacementNamed(
+                      '/session-complete', 
+                      arguments: state.sessionId, 
                     );
                   }
                 },

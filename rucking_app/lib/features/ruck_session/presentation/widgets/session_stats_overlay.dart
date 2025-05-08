@@ -115,7 +115,14 @@ class SessionStatsOverlay extends StatelessWidget {
                                 style: AppTextStyles.statLabel.copyWith(color: Colors.grey[700]),
                               ),
                             ),
-                          
+                          if (state.plannedDuration != null && state.plannedDuration! > state.elapsedSeconds)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(
+                                '${_format(Duration(seconds: state.plannedDuration! - state.elapsedSeconds))} remaining',
+                                style: AppTextStyles.bodyMedium.copyWith(color: Colors.black54),
+                              ),
+                            ),
                         ],
                       ),
                     ),
