@@ -420,16 +420,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         await _apiClient.post(
           '/rucks/${currentState.sessionId}/complete',
           {
-            'notes': event.notes,
-            'rating': event.rating,
             'distance_km': double.parse(currentState.distanceKm.toStringAsFixed(3)),
-            'distance_meters': (currentState.distanceKm * 1000).toInt(),
-            'final_distance_km': double.parse(currentState.distanceKm.toStringAsFixed(3)),
             'duration_seconds': currentState.elapsedSeconds,
-            'final_average_pace': currentState.distanceKm > 0
-                ? double.parse((currentState.elapsedSeconds / currentState.distanceKm)
-                    .toStringAsFixed(2))
-                : null,
             'calories_burned': currentState.calories.round(),
             'elevation_gain_m': currentState.elevationGain.round(),
             'elevation_loss_m': currentState.elevationLoss.round(),
@@ -465,20 +457,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         emit(ActiveSessionComplete(
           session: RuckSession(
             id: currentState.sessionId,
-            ruckWeightKg: currentState.ruckWeightKg,
-            distance: currentState.distanceKm,
-            duration: Duration(seconds: currentState.elapsedSeconds),
             startTime: DateTime.now().subtract(Duration(seconds: currentState.elapsedSeconds)),
             endTime: DateTime.now(),
-            notes: event.notes,
-            rating: event.rating,
-            caloriesBurned: currentState.calories.toInt(),
+            duration: Duration(seconds: currentState.elapsedSeconds),
+            distance: currentState.distanceKm,
             elevationGain: currentState.elevationGain,
             elevationLoss: currentState.elevationLoss,
-            status: RuckStatus.completed, // Added missing status
-            averagePace: currentState.distanceKm > 0 
-                ? (currentState.elapsedSeconds / currentState.distanceKm) 
+            caloriesBurned: currentState.calories.toInt(),
+            averagePace: currentState.distanceKm > 0
+                ? (currentState.elapsedSeconds / currentState.distanceKm)
                 : 0.0,
+            ruckWeightKg: currentState.ruckWeightKg,
+            status: RuckStatus.completed,
+            notes: null,
+            rating: null,
           ),
         ));
       } catch (e) {
