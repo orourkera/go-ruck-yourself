@@ -202,6 +202,47 @@ class SessionStatsOverlay extends StatelessWidget {
     if (cal < 100) return AppColors.warning;
     return Colors.white;
   }
+
+  // Placeholder widget to show when no session data is yet available
+  static Widget placeholder() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: const [
+          _PlaceholderTile(label: 'DIST'),
+          _PlaceholderTile(label: 'PACE'),
+          _PlaceholderTile(label: 'TIME'),
+          _PlaceholderTile(label: 'HR'),
+          _PlaceholderTile(label: 'CAL'),
+          _PlaceholderTile(label: 'ELEV'),
+        ],
+      ),
+    );
+  }
+}
+
+// Simple placeholder tile used by the placeholder overlay
+class _PlaceholderTile extends StatelessWidget {
+  const _PlaceholderTile({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(label, style: AppTextStyles.labelSmall.copyWith(color: Colors.black45)),
+        const SizedBox(height: 4),
+        const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ],
+    );
+  }
 }
 
 class _StatTile extends StatelessWidget {
