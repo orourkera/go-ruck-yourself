@@ -223,26 +223,32 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     Emitter<ActiveSessionState> emit
   ) async {
     final currentPoint = event.locationPoint;
-    const double thresholdMeters = 10.0;
-    
-    if (_lastValidLocation != null) {
-      final last = _lastValidLocation!;
-      final double distance = _calculateDistance(
-          last.latitude, last.longitude,
-          currentPoint.latitude, currentPoint.longitude);
+    const double thresholdMeters = 10.0; // existing threshold for minimal update
+    const double driftIgnoreJumpMeters = 15.0; // new threshold to ignore sudden jump early in session
 
-      if (state is ActiveSessionRunning) {
-        final currentState = state as ActiveSessionRunning;
-        if (currentState.distanceKm * 1000 < 10 && distance > 15) {
-          debugPrint("Ignoring GPS update due to drift: distance = $distance");
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      if (_lastValidLocation != null) {
+        final last = _lastValidLocation!;
+        final double distance = _calculateDistance(last.latitude, last.longitude, currentPoint.latitude, currentPoint.longitude);
+
+        // Ignore update if session hasn't really started moving and the jump is too large (likely drift)
+        if (currentState.distanceKm * 1000 < 10 && distance > driftIgnoreJumpMeters) {
+          debugPrint("Ignoring GPS update due to drift: distance = " + distance.toString());
           return;
         }
-      }
 
-      _validLocationCount++;
-      if (distance < thresholdMeters) {
-        AppLogger.info('Ignoring minimal location update; distance $distance m is below threshold.');
-        return;
+        // Ignore update if movement is minimal
+        if (distance < thresholdMeters) {
+          AppLogger.info('Ignoring minimal location update; distance ' + distance.toString() + ' m is below threshold.');
+          return;
+        }
+
+        // Only increment the valid location count after passing the above checks
+        _validLocationCount++;
+      } else {
+        // If no previous valid location exists, consider this as the first valid update if any movement is detected
+        _validLocationCount = 1;
       }
     }
 

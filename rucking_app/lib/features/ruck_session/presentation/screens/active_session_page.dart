@@ -474,6 +474,7 @@ class _RouteMapState extends State<_RouteMap> {
           urlTemplate:
               'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
           userAgentPackageName: 'com.ruckingapp',
+          retinaMode: RetinaMode.isHighDensity(context),
         ),
         if (widget.route.isNotEmpty)
           PolylineLayer(
