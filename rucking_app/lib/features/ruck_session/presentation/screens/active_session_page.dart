@@ -359,18 +359,16 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
         : true;
     
     final pace = state is ActiveSessionRunning ? (state as ActiveSessionRunning).pace : null;
-    
+    // 60 min/km = 3600 seconds/km (or seconds/mi)
+    final bool paceTooHigh = pace != null && pace > 3600;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Text('Pace', style: TextStyle(fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 4),
-        pace == null
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
+        pace == null || paceTooHigh
+            ? const Text('--', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))
             : Text(
                 MeasurementUtils.formatPace(pace, metric: preferMetric),
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
