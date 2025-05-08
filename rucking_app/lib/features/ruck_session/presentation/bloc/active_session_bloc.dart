@@ -522,6 +522,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     ));
   }
 
+  List<HeartRateSample> _hrBuffer = [];
+  DateTime? _lastHrFlush;
+
   Future<void> _onHeartRateUpdated(
     HeartRateUpdated event, 
     Emitter<ActiveSessionState> emit
@@ -529,32 +532,47 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     final currentState = state;
     if (currentState is ActiveSessionRunning) {
       AppLogger.info('HeartRateUpdated event: ${event.sample.bpm} BPM at ${event.sample.timestamp}');
-      // Send heart rate to backend
-      if (currentState.sessionId.isNotEmpty) {
-        try {
-          await _apiClient.post(
-            '/rucks/${currentState.sessionId}/heart_rate',
-            {
-              'samples': [
-                {
-                  'timestamp': event.sample.timestamp.toIso8601String(),
-                  'bpm': event.sample.bpm,
-                }
-              ]
-            }
-          );
-
-          emit(currentState.copyWith(latestHeartRate: event.sample.bpm));
-        } catch (e) {
-          AppLogger.error('Failed to send heart rate sample: $e');
-        }
+      _hrBuffer.add(event.sample);
+      emit(currentState.copyWith(latestHeartRate: event.sample.bpm));
+      // Optionally flush immediately if buffer is large (e.g., >10)
+      if (_hrBuffer.length > 10) {
+        await _flushHeartRateBuffer(currentState);
       }
     } else {
       AppLogger.warning('HeartRateUpdated event received but session is not running. Current state: $currentState');
     }
   }
 
+  Future<void> _flushHeartRateBuffer(ActiveSessionRunning currentState) async {
+    if (_hrBuffer.isEmpty || currentState.sessionId.isEmpty) return;
+    try {
+      await _apiClient.post(
+        '/rucks/${currentState.sessionId}/heart_rate',
+        {
+          'samples': _hrBuffer.map((s) => {
+            'timestamp': s.timestamp.toIso8601String(),
+            'bpm': s.bpm,
+          }).toList(),
+        },
+      );
+      _hrBuffer.clear();
+      _lastHrFlush = DateTime.now();
+    } catch (e) {
+      AppLogger.error('Failed to send heart rate samples: $e');
+    }
+  }
+
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
+    // Heart rate batching: flush every 5 seconds if buffer not empty
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      if (_hrBuffer.isNotEmpty && (_lastHrFlush == null || DateTime.now().difference(_lastHrFlush!) > Duration(seconds: 5))) {
+        await _flushHeartRateBuffer(currentState);
+      }
+    if (_hrBuffer.isNotEmpty && (_lastHrFlush == null || DateTime.now().difference(_lastHrFlush!) > Duration(seconds: 5))) {
+      await _flushHeartRateBuffer(currentState);
+    }
+  }
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
       final double currentDistance = currentState.distanceKm; // in km
