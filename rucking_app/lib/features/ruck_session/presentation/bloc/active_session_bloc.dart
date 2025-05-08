@@ -3,12 +3,16 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/models/api_exception.dart';
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
+import 'package:rucking_app/core/utils/met_calculator.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
@@ -217,17 +221,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     return 12742 * asin(sqrt(a)) * 1000; // 2 * R; R = 6371 km, returns meters
   }
   
+  // Get user weight from current user state
   double _getUserWeightKg() {
     try {
-      final userProfile = GetIt.instance<UserProfile>();
-      if (userProfile.weightKg != null && userProfile.weightKg! > 0) {
-        return userProfile.weightKg!;
+      // Try to get from auth bloc state, which should have the User
+      final authBloc = GetIt.instance<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        final User user = (authBloc.state as Authenticated).user;
+        if (user.weightKg != null && user.weightKg! > 0) {
+          return user.weightKg!;
+        }
       }
     } catch (e) {
       AppLogger.info('Could not get user weight from profile: $e');
     }
     
-    return 70.0; // ~154 lbs
+    return 70.0; // Default to ~154 lbs
   }
 
   Future<void> _onLocationUpdated(
