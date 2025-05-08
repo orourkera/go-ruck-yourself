@@ -220,11 +220,25 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         debugPrint('Creating session with selected weight: $_selectedRuckWeight');
         // Delay and then navigate without resetting chip state
         await Future.delayed(Duration(milliseconds: 500));
-        Navigator.of(context).pushNamed(
-          '/active_session',
-          arguments: ActiveSessionArgs(
-            ruckWeight: _ruckWeight,
-            notes: _userWeightController.text.isNotEmpty ? _userWeightController.text : null,
+        // Parse duration from controller, fallback to 30 min if not set
+        int? plannedDuration;
+        if (_durationController.text.isNotEmpty) {
+          final minutes = int.tryParse(_durationController.text);
+          if (minutes != null && minutes > 0) {
+            plannedDuration = minutes * 60;
+          }
+        }
+        plannedDuration ??= 1800; // Default to 30 minutes if not set
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ActiveSessionPage(
+              args: ActiveSessionArgs(
+                ruckWeight: _ruckWeight,
+                notes: _userWeightController.text.isNotEmpty ? _userWeightController.text : null,
+                plannedDuration: plannedDuration,
+              ),
+            ),
           ),
         );
       } catch (e) {
