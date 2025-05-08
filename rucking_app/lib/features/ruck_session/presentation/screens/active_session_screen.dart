@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -335,8 +336,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
   /// Center map on user when new location is added
   void _centerMapOnUser() {
     if (_locationPoints.isNotEmpty) {
-      final userLatLng = LatLng(_locationPoints.last.latitude, _locationPoints.last.longitude);
-      _mapController.move(userLatLng, 15.0);
+      final center = _getRouteCenter(_locationPoints);
+      final zoom = min(_getFitZoom(_locationPoints), 16.0); // Clamp zoom to maximum 16.0
+      _mapController.move(center, zoom);
     }
   }
 
