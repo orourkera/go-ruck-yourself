@@ -137,6 +137,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                   ),
                   onPressed: () {
                     Navigator.of(dialogContext).pop(); // Dismiss dialog
+                    // Remove any SnackBar before navigating home
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     Navigator.of(context).popUntil((route) => route.isFirst); // Go home
                     context.read<ActiveSessionBloc>().add(const SessionCompleted());
                   },
@@ -210,6 +212,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                     final route = state.locationPoints
                         .map((p) => latlong.LatLng(p.latitude, p.longitude))
                         .toList();
+                    // DEBUG: Print route length and points
+                    debugPrint('Route length: [32m[1m[4m[7m${route.length}[0m');
+                    for (var i = 0; i < route.length; i++) {
+                      debugPrint('Route[$i]: Lat: [36m${route[i].latitude}[0m, Lng: [36m${route[i].longitude}[0m');
+                    }
 
                     return Column(
                       children: [
