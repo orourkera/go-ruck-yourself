@@ -44,6 +44,25 @@ class ActiveSessionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // If an ActiveSessionBloc is already provided higher up in the widget tree
+    // (e.g. by the CountdownPage for pre-loading), reuse that instead of creating
+    // a new one. This ensures the session continues seamlessly once the
+    // countdown finishes and avoids restarting any logic inside the bloc.
+
+    ActiveSessionBloc? existingBloc;
+    try {
+      existingBloc = BlocProvider.of<ActiveSessionBloc>(context, listen: false);
+    } catch (_) {
+      existingBloc = null;
+    }
+
+    if (existingBloc != null) {
+      // Bloc already exists – simply build the view.
+      return _ActiveSessionView(args: args);
+    }
+
+    // No existing bloc – create a fresh one (e.g. when user lands here
+    // directly without going through the countdown page).
     final locator = GetIt.I;
     return BlocProvider(
       create: (_) => ActiveSessionBloc(
@@ -65,31 +84,42 @@ class _ActiveSessionView extends StatefulWidget {
   State<_ActiveSessionView> createState() => _ActiveSessionViewState();
 }
 
-class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProviderStateMixin {
-  bool countdownComplete = false;
+class _ActiveSessionViewState extends State<_ActiveSessionView> {
   bool mapReady = false;
   bool sessionRunning = false;
-  late final AnimationController _overlayController;
+  bool uiInitialized = false;
 
   void _checkAnimateOverlay() {
-    if (countdownComplete && mapReady && sessionRunning) {
-      _overlayController.reverse();
-    }
+    // No animation needed anymore since we removed the gray overlay
+    // This method is kept for compatibility but doesn't do anything
   }
 
   @override
   void initState() {
     super.initState();
-    _overlayController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-      value: 1.0,
-    );
+    
+    // Wait a short moment for UI to render before initializing the session
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Set UI as initialized to allow conditional rendering
+      setState(() {
+        uiInitialized = true;
+      });
+    });
+    
+    // Listen for session state changes
+    final bloc = context.read<ActiveSessionBloc>();
+    bloc.stream.listen((state) {
+      if (state is ActiveSessionRunning && !sessionRunning) {
+        // When session first starts running, mark it
+        setState(() {
+          sessionRunning = true;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
-    _overlayController.dispose();
     super.dispose();
   }
 
@@ -153,31 +183,34 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
         return AlertDialog(
           title: const Text('Session Too Short, Rucker.'),
           content: const Text('Your session did not accumulate enough data to be saved.'),
+          actionsAlignment: MainAxisAlignment.spaceBetween, // Ensure buttons are spaced across dialog width
           actions: [
+            // DISCARD SESSION - Left side with lighter font weight
             TextButton(
               onPressed: () {
                 // Discard Session: pop all the way to home, DO NOT save/call Bloc
                 Navigator.of(dialogContext).popUntil((route) => route.isFirst);
               },
               child: const Text(
-                'Discard Session',
+                'DISCARD SESSION',
                 style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w300,
-                  fontSize: 16,
+                  color: Colors.black54, // Lighter color
+                  fontWeight: FontWeight.w300, // Light font weight
+                  fontSize: 14,
                 ),
               ),
             ),
+            // KEEP RUCKING - Right side with bold styling
             TextButton(
               onPressed: () {
                 // Keep Rucking: just close the dialog
                 Navigator.of(dialogContext).pop();
               },
               child: const Text(
-                'Keep Rucking',
+                'KEEP RUCKING',
                 style: TextStyle(
-                  color: Color(0xFFB86F1B), // Optional: match your accent color
-                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFB86F1B), // Accent color
+                  fontWeight: FontWeight.bold, // Bold font weight
                   fontSize: 16,
                 ),
               ),
@@ -190,11 +223,10 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
 
   @override
   Widget build(BuildContext context) {
-    final overlayVisible = !(countdownComplete && mapReady && sessionRunning);
-
     return Scaffold(
       body: Stack(
         children: [
+          // Base UI - Map and Stats
           Column(
             children: [
               // Header fills all the way to the top (behind status bar)
@@ -252,8 +284,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
                         setState(() {
                           sessionRunning = true;
                         });
-                        _checkAnimateOverlay();
-                      }
+                        // Session just started running - DON'T animate overlay away yet
+                        // The countdown completion will trigger this later
+                      }  
                     },
                     buildWhen: (prev, curr) => prev != curr,
                     builder: (ctx, state) {
@@ -283,18 +316,25 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
                                       child: SizedBox(
                                         height: MediaQuery.of(context).size.height * 0.27,
                                         width: double.infinity,
-                                        child: _RouteMap(
-                                          route: route,
-                                          initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
-                                          onMapReady: () {
-                                            if (!mapReady) {
-                                              setState(() {
-                                                mapReady = true;
-                                              });
-                                              _checkAnimateOverlay();
-                                            }
-                                          },
-                                        ),
+                                        child: sessionRunning && uiInitialized
+                                        ? _RouteMap(
+                                            route: route,
+                                            initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                                            onMapReady: () {
+                                              if (!mapReady) {
+                                                setState(() {
+                                                  mapReady = true;
+                                                });
+                                                _checkAnimateOverlay();
+                                              }
+                                            },
+                                          )
+                                        : Container(
+                                            color: const Color(0xFFE5E3DF), // Match map color
+                                            child: const Center(
+                                              child: CircularProgressIndicator(),
+                                            ),
+                                          ),
                                       ),
                                     ),
                                     Positioned(
@@ -398,41 +438,19 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> with TickerProvi
               ),
             ],
           ),
-          // Overlay fade via FadeTransition
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _overlayController,
-              builder: (context, child) {
-                return IgnorePointer(
-                  ignoring: _overlayController.value == 0,
-                  child: FadeTransition(
-                    opacity: _overlayController,
-                    child: child,
-                  ),
-                );
-              },
-              child: Container(
-                key: const ValueKey('overlayContainer'),
-                color: AppColors.primary,
-                child: !countdownComplete
-                    ? CountdownOverlay(
-                        onCountdownComplete: () {
-                          setState(() {
-                            countdownComplete = true;
-                          });
-                          context.read<ActiveSessionBloc>().add(
-                            SessionStarted(
-                              ruckWeightKg: widget.args.ruckWeight,
-                              notes: widget.args.notes,
-                              plannedDuration: widget.args.plannedDuration,
-                            ),
-                          );
-                          _checkAnimateOverlay();
-                        },
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
+          // Removed duplicate countdown overlay - now positioned at top of stack
+          
+          // Show pause overlay if session is paused
+          BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+            buildWhen: (prev, curr) =>
+              (prev is ActiveSessionRunning && curr is ActiveSessionRunning &&
+               prev.isPaused != curr.isPaused),
+            builder: (context, state) {
+              if (state is ActiveSessionRunning && state.isPaused) {
+                return const _PauseOverlay();
+              }
+              return const SizedBox.shrink();
+            },
           ),
         ],
       ),
@@ -528,16 +546,27 @@ class _RouteMap extends StatefulWidget {
 
 class _RouteMapState extends State<_RouteMap> {
   bool _mapReadyCalled = false;
+  bool _tilesLoaded = false; // Track if map tiles have loaded
+  Timer? _fallbackTimer;
+  final MapController _controller = MapController();
+  
   void _signalMapReady() {
     if (!_mapReadyCalled && widget.onMapReady != null) {
       _mapReadyCalled = true;
-      Future.delayed(const Duration(milliseconds: 800), () {
+      Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) widget.onMapReady!();
       });
     }
   }
-  Timer? _fallbackTimer;
-  final MapController _controller = MapController();
+  
+  // This method will be called when map tiles are loaded
+  void _onTilesLoaded() {
+    if (!_tilesLoaded && mounted) {
+      setState(() {
+        _tilesLoaded = true;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -620,64 +649,83 @@ class _RouteMapState extends State<_RouteMap> {
   @override
   Widget build(BuildContext context) {
     // Determine initial center for when the map is first built or route is empty.
-    // If fitBounds is called, this initialCenter will be overridden.
-    final latlong.LatLng initialMapCenter = widget.route.isNotEmpty
-        ? widget.route.last
-        : (widget.initialCenter ?? latlong.LatLng(0, 0));
+    final latlong.LatLng initialMapCenter;
+    if (widget.initialCenter != null) {
+      initialMapCenter = widget.initialCenter!;
+    } else if (widget.route.isNotEmpty) {
+      initialMapCenter = widget.route.last;
+    } else {
+      initialMapCenter = latlong.LatLng(48.8566, 2.3522);
+    }
 
-    return Stack(
-      children: [
-        Container(
-          color: AppColors.primary,
-          child: FlutterMap(
-            mapController: _controller,
-            options: MapOptions(
-              initialCenter: initialMapCenter,
-              initialZoom: 16.5,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16.0),
+      child: Stack(
+        children: [
+          // Placeholder with exact map background color - shown until tiles load
+          Positioned.fill(
+            child: Container(
+              color: const Color(0xFFE8E0D8), // Exact match to Stadia Maps terrain style background
+              child: Center(
+                child: _tilesLoaded ? null : const CircularProgressIndicator(),
               ),
             ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
-                userAgentPackageName: 'com.ruckingapp',
-                retinaMode: RetinaMode.isHighDensity(context),
-                tileBuilder: (context, tileWidget, tile) {
-                  // Call onMapReady the first time a tile is built
-                  if (!_mapReadyCalled) {
-                    print("Tile loaded: triggering onMapReady (delayed)");
-                    _signalMapReady();
-                  }
-                  return tileWidget;
+          ),
+          
+          // Invisible until tiles load - prevents blue flash
+          Opacity(
+            opacity: _tilesLoaded ? 1.0 : 0.0,
+            child: FlutterMap(
+              mapController: _controller,
+              options: MapOptions(
+                backgroundColor: const Color(0xFFE8E0D8), // Match Stadia Maps terrain style
+                initialCenter: initialMapCenter,
+                initialZoom: 16.5,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+                ),
+                onMapReady: () {
+                  print("Map has signaled ready");
+                  _signalMapReady();
                 },
               ),
-              if (widget.route.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: widget.route,
-                      strokeWidth: 4.0,
-                      color: AppColors.primary,
-                    ),
-                  ],
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
+                  userAgentPackageName: 'com.ruckingapp',
+                  retinaMode: RetinaMode.isHighDensity(context),
+                  tileBuilder: (context, tileWidget, tile) {
+                    // Set tiles as loaded on first tile
+                    _onTilesLoaded();
+                    return tileWidget;
+                  },
                 ),
-              if (widget.route.isNotEmpty)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: widget.route.last,
-                      width: 40,
-                      height: 40,
-                      child: Image.asset('assets/images/map marker.png'),
-                    ),
-                  ],
-                ),
-            ],
+                if (widget.route.isNotEmpty)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: widget.route,
+                        strokeWidth: 4.0,
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                if (widget.route.isNotEmpty)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: widget.route.last,
+                        width: 40,
+                        height: 40,
+                        child: Image.asset('assets/images/map marker.png'),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -732,76 +780,4 @@ class _PauseOverlay extends StatelessWidget {
   }
 }
 
-class CountdownOverlay extends StatefulWidget {
-  final VoidCallback? onCountdownComplete;
-  const CountdownOverlay({Key? key, this.onCountdownComplete}) : super(key: key);
-
-  @override
-  _CountdownOverlayState createState() => _CountdownOverlayState();
-}
-
-class _CountdownOverlayState extends State<CountdownOverlay> with SingleTickerProviderStateMixin {
-  int _count = 3;
-  late AnimationController _controller;
-  late Animation<double> _opacityAnimation;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1));
-    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(_controller);
-    _startCountdown();
-  }
-
-  void _startCountdown() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_count > 1) {
-        setState(() {
-          _count--;
-        });
-        _controller.forward(from: 0.0);
-      } else {
-        // Wait a full second before hiding overlay
-        Future.delayed(const Duration(seconds: 1), () {
-          setState(() {
-            _count = 0;
-          });
-          if (widget.onCountdownComplete != null) {
-            widget.onCountdownComplete!();
-          }
-        });
-        timer.cancel();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_count == 0) return const SizedBox.shrink();
-    return Positioned.fill(
-      child: Container(
-        color: AppColors.primary,
-        child: Center(
-          child: Text(
-            _count.toString(),
-            style: const TextStyle(
-              fontSize: 96,
-              color: Colors.white,
-              fontFamily: 'Bangers',
-              fontWeight: FontWeight.normal,
-              letterSpacing: 2.0,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// CountdownOverlay has been moved to a dedicated CountdownPage

@@ -7,6 +7,7 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/countdown_page.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
@@ -230,15 +231,17 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         }
         plannedDuration ??= 1800; // Default to 30 minutes if not set
 
+        // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
+        final sessionArgs = ActiveSessionArgs(
+          ruckWeight: _ruckWeight,
+          notes: _userWeightController.text.isNotEmpty ? _userWeightController.text : null,
+          plannedDuration: plannedDuration,
+        );
+        
+        // Navigate to CountdownPage which will handle the countdown and transition
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => ActiveSessionPage(
-              args: ActiveSessionArgs(
-                ruckWeight: _ruckWeight,
-                notes: _userWeightController.text.isNotEmpty ? _userWeightController.text : null,
-                plannedDuration: plannedDuration,
-              ),
-            ),
+            builder: (context) => CountdownPage(args: sessionArgs),
           ),
         );
       } catch (e) {
