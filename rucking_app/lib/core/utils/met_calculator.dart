@@ -148,4 +148,54 @@ class MetCalculator {
     // Calculate grade percentage
     return (elevationChangeMeters / distanceMeters) * 100;
   }
+
+  /// Calculate calories burned for a rucking session using all relevant parameters.
+  ///
+  /// Parameters:
+  /// - [userWeightKg]: User's body weight in kilograms
+  /// - [ruckWeightKg]: Weight of the rucksack in kilograms
+  /// - [distanceKm]: Total distance covered in kilometers
+  /// - [elapsedSeconds]: Total elapsed time in seconds
+  /// - [elevationGain]: Total elevation gain in meters
+  /// - [elevationLoss]: Total elevation loss in meters
+  ///
+  /// Returns: Calories burned as a double
+  static double calculateRuckingCalories({
+    required double userWeightKg,
+    required double ruckWeightKg,
+    required double distanceKm,
+    required int elapsedSeconds,
+    double elevationGain = 0.0,
+    double elevationLoss = 0.0,
+  }) {
+    // Calculate average speed (km/h)
+    double durationHours = elapsedSeconds / 3600.0;
+    double avgSpeedKmh = (durationHours > 0) ? (distanceKm / durationHours) : 0.0;
+    double avgSpeedMph = kmhToMph(avgSpeedKmh);
+
+    // Estimate average grade (if available)
+    double avgGrade = 0.0;
+    if (distanceKm > 0) {
+      avgGrade = calculateGrade(
+        elevationChangeMeters: elevationGain - elevationLoss,
+        distanceMeters: distanceKm * 1000,
+      );
+    }
+    double ruckWeightLbs = ruckWeightKg * 2.20462;
+
+    // Calculate MET dynamically
+    final metValue = calculateRuckingMetByGrade(
+      speedMph: avgSpeedMph,
+      grade: avgGrade,
+      ruckWeightLbs: ruckWeightLbs,
+    );
+
+    double durationMinutes = elapsedSeconds / 60.0;
+    return calculateCaloriesBurned(
+      weightKg: userWeightKg + ruckWeightKg,
+      durationMinutes: durationMinutes,
+      metValue: metValue,
+    );
+  }
 }
+

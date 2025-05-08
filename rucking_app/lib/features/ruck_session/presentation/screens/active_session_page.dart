@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
@@ -123,26 +124,30 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
               children: [
                 TextButton(
                   style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size(0, 0),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    minimumSize: const Size(48, 48),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Discard Session',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.black,
-                      fontWeight: FontWeight.normal,
+                      color: Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w300,
                     ),
                   ),
                   onPressed: () {
                     Navigator.of(dialogContext).pop(); // Dismiss dialog
-                    // Remove any SnackBar before navigating home
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    // Reset error state so SnackBar won't show on home
-                    // Removed: context.read<ActiveSessionBloc>().add(const SessionErrorCleared());
-                    Navigator.of(context).popUntil((route) => route.isFirst); // Go home
-                    context.read<ActiveSessionBloc>().add(const SessionCompleted());
+
+                    // Navigate home
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+
+                    // Clear snackbars with a longer delay to ensure the home screen is fully loaded
+                    Future.delayed(const Duration(milliseconds: 500), () {
+                      ScaffoldMessenger.of(context).clearSnackBars();
+                    });
+
+                    // Reset error state
+                    context.read<ActiveSessionBloc>().add(const SessionErrorCleared());
                   },
                 ),
                 TextButton(
@@ -329,6 +334,35 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPaceDisplay(ActiveSessionState state) {
+    final preferMetric = context.select<AuthBloc, bool>((bloc) {
+      final authState = bloc.state;
+      if (authState is Authenticated) return authState.user.preferMetric;
+      return true;
+    });
+    
+    // Extract pace only if state is ActiveSessionRunning
+    final pace = state is ActiveSessionRunning ? (state as ActiveSessionRunning).pace : null;
+    
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text('Pace', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 4),
+        pace == null
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(
+                MeasurementUtils.formatPace(pace, metric: preferMetric),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+      ],
     );
   }
 }

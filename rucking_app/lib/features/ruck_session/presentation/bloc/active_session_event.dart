@@ -71,3 +71,10 @@ class SessionFailed extends ActiveSessionEvent {
   @override
   List<Object?> get props => [errorMessage];
 }
+
+class SessionErrorCleared extends ActiveSessionEvent {
+  const SessionErrorCleared();
+
+  @override
+  List<Object?> get props => [];
+}

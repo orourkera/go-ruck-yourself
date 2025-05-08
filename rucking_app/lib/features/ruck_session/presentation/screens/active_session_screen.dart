@@ -822,18 +822,13 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
 
   /// Calculate calories based on distance, duration, and weight
   double _calculateCalories() {
-    // MET values (Metabolic Equivalent of Task):
-    // - Walking with weighted backpack (10-20kg): ~7.0 MET
-    // - Walking with very heavy backpack (>20kg): ~8.5 MET
-    double metValue = widget.ruckWeight < 20 ? 7.0 : 8.5;
-    
-    // Calculate calories using the MetCalculator
-    double durationMinutes = _elapsed.inSeconds / 60.0; // Convert seconds to minutes
-    
-    return MetCalculator.calculateCaloriesBurned(
-      weightKg: widget.userWeight + widget.ruckWeight, // Total weight is user + ruck
-      durationMinutes: durationMinutes,
-      metValue: metValue,
+    return MetCalculator.calculateRuckingCalories(
+      userWeightKg: widget.userWeight,
+      ruckWeightKg: widget.ruckWeight,
+      distanceKm: _distance,
+      elapsedSeconds: _elapsed.inSeconds,
+      elevationGain: _elevationGain,
+      elevationLoss: _elevationLoss,
     );
   }
 
@@ -954,9 +949,10 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> with 
       final remainingSeconds = plannedSeconds - elapsedSeconds;
       
       if (remainingSeconds > 0) {
-        final remainingMinutes = (remainingSeconds / 60).floor();
-        final secondsLeft = remainingSeconds % 60;
-        remainingTimeDisplay = '$remainingMinutes:${secondsLeft.toString().padLeft(2, '0')}';
+        final minutes = (remainingSeconds / 60).floor();
+        final seconds = remainingSeconds % 60;
+        // Only show MM:SS (no hours) for countdown
+        remainingTimeDisplay = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
       } else {
         remainingTimeDisplay = 'Completed!';
       }
