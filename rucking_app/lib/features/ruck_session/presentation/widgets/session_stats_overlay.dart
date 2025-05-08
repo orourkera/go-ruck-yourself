@@ -12,11 +12,10 @@ class SessionStatsOverlay extends StatelessWidget {
   final bool preferMetric;
   final bool useCardLayout;
 
-  String _format(Duration d) {
-    final h = d.inHours.toString().padLeft(2, '0');
-    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+  String _formatMinutesSeconds(Duration d) {
+    final m = d.inMinutes;
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$h:$m:$s';
+    return '$m:$s';
   }
 
   @override
@@ -35,7 +34,7 @@ class SessionStatsOverlay extends StatelessWidget {
               label: 'PACE',
               value: MeasurementUtils.formatPaceSeconds(state.pace * 60, metric: preferMetric),
             ),
-            _StatTile(label: 'TIME', value: _format(Duration(seconds: state.elapsedSeconds))),
+            _StatTile(label: 'TIME', value: _formatMinutesSeconds(Duration(seconds: state.elapsedSeconds))),
             if (state.latestHeartRate != null)
               _StatTile(
                 label: 'HR',
@@ -85,7 +84,7 @@ class SessionStatsOverlay extends StatelessWidget {
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        const SizedBox(height: 16.0), 
+        const SizedBox(height: 8.0), // Reduce vertical space at top
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -102,7 +101,7 @@ class SessionStatsOverlay extends StatelessWidget {
                         children: [
                           SizedBox(height: 4),
                           Text(
-                            _format(Duration(seconds: state.elapsedSeconds)),
+                            _formatMinutesSeconds(Duration(seconds: state.elapsedSeconds)),
                             style: AppTextStyles.timerDisplay.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
@@ -111,10 +110,13 @@ class SessionStatsOverlay extends StatelessWidget {
                           ),
                           if (state.plannedDuration != null && state.plannedDuration! > state.elapsedSeconds)
                             Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
-                              child: Text(
-                                '${_format(Duration(seconds: state.plannedDuration! - state.elapsedSeconds))} remaining',
-                                style: AppTextStyles.bodyMedium.copyWith(color: Colors.black54),
+                              padding: const EdgeInsets.only(top: 2.0), // Reduce padding
+                              child: Center(
+                                child: Text(
+                                  '${_formatMinutesSeconds(Duration(seconds: state.plannedDuration! - state.elapsedSeconds))} remaining',
+                                  style: AppTextStyles.bodyMedium.copyWith(color: Colors.black54, fontSize: 15),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             ),
                         ],
@@ -161,19 +163,19 @@ class SessionStatsOverlay extends StatelessWidget {
         const SizedBox(height: 0.0), 
         GridView.count(
           crossAxisCount: 2,
-          shrinkWrap: true, // Added shrinkWrap back
+          shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.2, // Adjusted for taller tiles
-          mainAxisSpacing: 8,
+          childAspectRatio: 1.2,
+          mainAxisSpacing: 4,
           crossAxisSpacing: 8,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), 
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 5), // Reduce bottom padding
           children: statTiles
               .map((tile) => Card(
                     elevation: 1,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     color: Colors.white,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2), // Reduce vertical padding
                       child: tile,
                     ),
                   ))
