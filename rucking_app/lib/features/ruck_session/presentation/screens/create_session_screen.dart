@@ -417,12 +417,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         }
       },
       selectedColor: Theme.of(context).primaryColor,
-      backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor: isSelected
+        ? Theme.of(context).primaryColor
+        : (Theme.of(context).brightness == Brightness.dark ? AppColors.error : AppColors.backgroundLight),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade400,
+          color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
         ),
+      ),
+      labelStyle: TextStyle(
+        color: (Theme.of(context).brightness == Brightness.dark && !isSelected)
+          ? Colors.white
+          : null,
+        fontWeight: FontWeight.bold,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
     );

@@ -111,7 +111,7 @@ class SessionStatsOverlay extends StatelessWidget {
                             _formatHoursMinutesSeconds(Duration(seconds: state.elapsedSeconds)),
                             style: AppTextStyles.timerDisplay.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                               fontSize: 36, // Changed to 36 to match HR value
                             ),
                           ),
@@ -140,13 +140,17 @@ class SessionStatsOverlay extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Icon(Icons.favorite, color: Colors.red, size: 36),
+                              Icon(
+                                Icons.favorite,
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.red,
+                                size: 36,
+                              ),
                               SizedBox(width: 8),
                               // Removed Baseline widget for simpler vertical centering
                               Text(
                                 state.latestHeartRate != null ? '${state.latestHeartRate}' : '--',
                                 style: AppTextStyles.timerDisplay.copyWith(
-                                  color: Colors.black,
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 36,
                                 ),
