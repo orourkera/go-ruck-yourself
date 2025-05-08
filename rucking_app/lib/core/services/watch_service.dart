@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/api/rucking_api.dart';
+import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/data/heart_rate_sample_storage.dart';
@@ -121,7 +122,7 @@ class WatchService {
     
     try {
       // Get current user
-      final authState = _authService.currentUser;
+      final authState = await _authService.getCurrentUser();
       if (authState == null) {
         debugPrint('[ERROR] No authenticated user found - cannot create session from Watch');
         return;
@@ -151,13 +152,6 @@ class WatchService {
       _currentSessionHeartRateSamples = [];
       
       // Send event to BLoC to update UI
-      /* // Temporarily commented out - removing watch functionality
-      GetIt.instance<ActiveSessionBloc>().add(SessionStarted(
-        ruckId: sessionId,
-        ruckWeight: ruckWeight,
-        userWeight: await _getUserWeight() ?? 70.0, // Get from service or use default
-      ));
-      */
       
     } catch (e) {
       debugPrint('[ERROR] Failed to process session start from Watch: $e');
@@ -170,10 +164,6 @@ class WatchService {
       // Save heart rate samples to storage
       await HeartRateSampleStorage.saveSamples(_currentSessionHeartRateSamples);
       
-      final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionInProgress || bloc.state is ActiveSessionPaused) {
-        bloc.add(const SessionCompleted());
-      }
     } catch (e) {
       debugPrint('[ERROR] Failed to handle session end from Watch: $e');
     }
@@ -182,10 +172,6 @@ class WatchService {
   /// Handle a session pause from the watch
   Future<void> _handlePauseSessionFromWatch(Map<String, dynamic> data) async {
     try {
-      final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionInProgress) {
-        bloc.add(const SessionPaused());
-      }
     } catch (e) {
       debugPrint('[ERROR] Failed to pause session from Watch: $e');
     }
@@ -194,10 +180,6 @@ class WatchService {
   /// Handle a session resume from the watch
   Future<void> _handleResumeSessionFromWatch(Map<String, dynamic> data) async {
     try {
-      final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionPaused) {
-        bloc.add(const SessionResumed());
-      }
     } catch (e) {
       debugPrint('[ERROR] Failed to resume session from Watch: $e');
     }
@@ -212,6 +194,27 @@ class WatchService {
       });
     } catch (e) {
       debugPrint('[ERROR] Failed to start session on Watch: $e');
+    }
+  }
+  
+  /// Send the session ID to the watch so it can include it in API calls
+  Future<void> sendSessionIdToWatch(String sessionId) async {
+    try {
+      await _sendMessageToWatch({
+        'command': 'setSessionId',
+        'sessionId': sessionId,
+      });
+    } catch (e) {
+      debugPrint('[ERROR] Failed to send session ID to Watch: $e');
+    }
+  }
+  
+  /// Private helper to send a message to the watch via the session channel
+  Future<void> _sendMessageToWatch(Map<String, dynamic> message) async {
+    try {
+      await _watchSessionChannel.invokeMethod('sendMessage', message);
+    } catch (e) {
+      debugPrint('[ERROR] Failed to send message to Watch: $e');
     }
   }
   
