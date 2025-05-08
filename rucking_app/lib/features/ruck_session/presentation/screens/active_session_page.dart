@@ -102,7 +102,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text(
-            "Your session is too short to save. We don't want bad data, rucker.",
+            "Too short, rucker. We don't want bad data.",
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: const Text(
@@ -114,7 +114,19 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 TextButton(
-                  child: const Text('Discard Session'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Discard Session',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.black,
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
                   onPressed: () {
                     Navigator.of(dialogContext).pop(); // Dismiss dialog
                     Navigator.of(context).popUntil((route) => route.isFirst); // Go home
