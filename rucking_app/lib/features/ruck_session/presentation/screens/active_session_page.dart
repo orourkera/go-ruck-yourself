@@ -18,6 +18,7 @@ import 'package:rucking_app/features/ruck_session/presentation/widgets/session_s
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:provider/provider.dart';
 
 /// Arguments passed to the ActiveSessionPage
 class ActiveSessionArgs {
@@ -74,30 +75,36 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
       caloriesBurned: currentState.calories.toDouble(),
     );
     if (validation['isValid'] == true) {
-      _showConfirmEndSessionDialog(context);
+      _showConfirmEndSessionDialog(context, currentState);
     } else {
       _showSessionTooShortDialog(context);
     }
   }
 
-  void _showConfirmEndSessionDialog(BuildContext context) {
+  void _showConfirmEndSessionDialog(BuildContext context, ActiveSessionState state) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (dialogContext) {
+        // Now inside the builder, safe to use Provider.of or context.select
+        final authBloc = Provider.of<AuthBloc>(dialogContext, listen: false);
+        final bool preferMetric = authBloc.state is Authenticated
+            ? (authBloc.state as Authenticated).user.preferMetric
+            : true;
+        
         return AlertDialog(
-          title: const Text('End Session?'),
-          content: const Text('Are you sure you want to end this ruck session?'),
-          actions: <Widget>[
+          title: const Text('Confirm End Session'),
+          content: Text('Are you sure you want to end the session?'),
+          actions: [
             TextButton(
-              child: const Text('Cancel'),
               onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
             ),
             TextButton(
-              child: const Text('End Session'),
               onPressed: () {
-                Navigator.of(dialogContext).pop();
                 context.read<ActiveSessionBloc>().add(const SessionCompleted());
+                Navigator.of(dialogContext).pop();
               },
+              child: const Text('End Session'),
             ),
           ],
         );
@@ -131,7 +138,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                     'Discard Session',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Theme.of(context).colorScheme.error,
+                      color: Theme.of(dialogContext).colorScheme.error,
                       fontWeight: FontWeight.w300,
                     ),
                   ),
@@ -492,25 +499,21 @@ class _RouteMapState extends State<_RouteMap> {
 }
 
 class _WeightChip extends StatelessWidget {
-  const _WeightChip({required this.weightKg});
+  const _WeightChip({Key? key, required this.weightKg}) : super(key: key);
 
   final double weightKg;
 
   @override
   Widget build(BuildContext context) {
-    final preferMetric = context.select<AuthBloc, bool>((bloc) {
-      final st = bloc.state;
-      if (st is Authenticated) return st.user.preferMetric;
-      return true;
-    });
-
-    final display = preferMetric
-        ? '${weightKg.toStringAsFixed(0)} kg'
-        : '${(weightKg * 2.20462).toStringAsFixed(0)} lb';
+    final authBloc = Provider.of<AuthBloc>(context, listen: false);
+    final bool preferMetric = authBloc.state is Authenticated
+        ? (authBloc.state as Authenticated).user.preferMetric
+        : true;
+    final String weightDisplay = preferMetric ? '${weightKg.toStringAsFixed(0)} kg' : '${(weightKg * 2.20462).toStringAsFixed(0)} lb';
     return Chip(
       backgroundColor: AppColors.secondary,
       label: Text(
-        display,
+        weightDisplay,
         style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
       ),
     );
