@@ -21,7 +21,7 @@ This document maps the data model for a rucking session across all layers:
 | Session ID             | `id`                        | `id`                       | `id` (PK, integer)            |
 | User ID                | `userId`                    | `user_id`                  | `user_id` (FK, uuid)          |
 | Start Time             | `startTime`                 | `start_time`               | `start_time` (timestamp)      |
-| End Time               | `endTime`                   | `end_time`                 | `end_time` (timestamp)        |
+| End Time (completion)  | `endTime`                   | `end_time`                 | `end_time` (timestamp)        |
 | Duration (s)           | `durationSeconds`           | `duration_seconds`         | `duration_seconds` (int)      |
 | Paused Duration (s)    | `pausedDurationSeconds`     | `paused_duration_seconds`  | `paused_duration_seconds` (int)|
 | Planned Duration (min) | `plannedDurationMinutes`    | `planned_duration_minutes` | `planned_duration_minutes` (int)|
@@ -44,11 +44,31 @@ This document maps the data model for a rucking session across all layers:
 | Weight (kg)            | `weightKg`                  | `weight_kg`                | `weight_kg` (numeric)         |
 | Ruck Weight (kg)       | `ruckWeightKg`              | `ruck_weight_kg`           | `ruck_weight_kg` (float)      |
 | Notes                  | `notes`                     | `notes`                    | `notes` (text)                |
+| Heart Rate Samples     | `heartRateSamples`          | `heart_rate_samples`        | `heart_rate_samples` (jsonb)  |
 | Tags                   | `tags`                      | `tags`                     | `tags` (array)                |
 | Rating                 | `rating`                    | `rating`                   | `rating` (int)                |
 | Perceived Exertion     | `perceivedExertion`         | `perceived_exertion`       | `perceived_exertion` (int)    |
 | Created At             | `createdAt`                 | `created_at`               | `created_at` (timestamp)      |
 | Updated At             | `updatedAt`                 | `updated_at`               | `updated_at` (timestamp)      |
+
+---
+
+## SessionCompleteScreen Navigation Arguments
+
+When navigating to the session completion screen, the following argument mapping is used from the Dart RuckSession model:
+
+| Argument           | Dart Property           | Notes                                   |
+|--------------------|------------------------|-----------------------------------------|
+| completedAt        | `endTime`              | DateTime when session ended             |
+| ruckId             | `id`                   | Session ID                              |
+| duration           | `duration`             | Duration of session (Duration)          |
+| distance           | `distance`             | Distance in km (double)                 |
+| caloriesBurned     | `caloriesBurned`       | Calories burned (int)                   |
+| elevationGain      | `elevationGain`        | Elevation gain in meters (double)       |
+| elevationLoss      | `elevationLoss`        | Elevation loss in meters (double)       |
+| ruckWeight         | `ruckWeightKg`         | Ruck weight in kg (double)              |
+| initialNotes       | `notes`                | User notes (String?)                    |
+| heartRateSamples   | `heartRateSamples`     | List of HeartRateSample (optional)      |
 
 ---
 
