@@ -115,55 +115,20 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   void _showSessionTooShortDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (dialogContext) {
+        // Retrieve provider data safely inside the build method
+        final authBloc = Provider.of<AuthBloc>(dialogContext, listen: false);
+        final bool preferMetric = authBloc.state is Authenticated
+            ? (authBloc.state as Authenticated).user.preferMetric
+            : true;
+        
         return AlertDialog(
-          title: const Text(
-            "Too short, rucker. We don't want bad data.",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            "Your session is too short to be saved. Please keep rucking for a bit longer, or discard this session if it was a mistake.",
-          ),
-          actionsPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 4),
+          title: const Text('Session Too Short'),
+          content: Text('Your session did not accumulate enough data to be saved.'),
           actions: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    minimumSize: const Size(48, 48),
-                  ),
-                  child: Text(
-                    'Discard Session',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(dialogContext).colorScheme.error,
-                      fontWeight: FontWeight.w300,
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop(); // Dismiss dialog
-
-                    // Navigate home
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-
-                    // Clear snackbars with a longer delay to ensure the home screen is fully loaded
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      ScaffoldMessenger.of(context).clearSnackBars();
-                    });
-
-                    // Reset error state
-                    context.read<ActiveSessionBloc>().add(const SessionErrorCleared());
-                  },
-                ),
-                TextButton(
-                  child: const Text('Continue Rucking'),
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop(); // Just close dialog
-                  },
-                ),
-              ],
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -294,13 +259,13 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                     },
                                     builder: (context, state) {
                                       if (state is ActiveSessionRunning) {
+                                        final authBloc = Provider.of<AuthBloc>(context, listen: false);
+                                        final bool preferMetric = authBloc.state is Authenticated
+                                            ? (authBloc.state as Authenticated).user.preferMetric
+                                            : true;
                                         return SessionStatsOverlay(
                                           state: state,
-                                          preferMetric: context.select<AuthBloc, bool>((bloc) {
-                                            final authState = bloc.state;
-                                            if (authState is Authenticated) return authState.user.preferMetric;
-                                            return true;
-                                          }),
+                                          preferMetric: preferMetric,
                                           useCardLayout: true,
                                         );
                                       }
@@ -347,11 +312,10 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   }
 
   Widget _buildSessionContent(ActiveSessionState state) {
-    final preferMetric = context.select<AuthBloc, bool>((bloc) {
-      final authState = bloc.state;
-      if (authState is Authenticated) return authState.user.preferMetric;
-      return true;
-    });
+    final authBloc = Provider.of<AuthBloc>(context, listen: false);
+    final bool preferMetric = authBloc.state is Authenticated
+        ? (authBloc.state as Authenticated).user.preferMetric
+        : true;
     
     List<latlong.LatLng> route = [];
     if (state is ActiveSessionRunning) {
@@ -389,12 +353,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   }
 
   Widget _buildPaceDisplay(ActiveSessionState state) {
-    final preferMetric = context.select<AuthBloc, bool>((bloc) {
-      final st = bloc.state;
-      if (st is Authenticated) return st.user.preferMetric;
-      return true;
-    });
-
+    final authBloc = Provider.of<AuthBloc>(context, listen: false);
+    final bool preferMetric = authBloc.state is Authenticated
+        ? (authBloc.state as Authenticated).user.preferMetric
+        : true;
+    
     final pace = state is ActiveSessionRunning ? (state as ActiveSessionRunning).pace : null;
     
     return Column(
