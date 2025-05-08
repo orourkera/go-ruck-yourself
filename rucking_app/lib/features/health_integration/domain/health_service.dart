@@ -25,10 +25,20 @@ class HealthService {
 
   /// Expose a stream of live heart rate samples (every 5 seconds)
   Stream<HeartRateSample> get heartRateStream {
-    _heartRateController ??= StreamController<HeartRateSample>.broadcast(
-      onListen: _startHeartRatePolling,
-      onCancel: _stopHeartRatePolling,
-    );
+    // Always create a new controller if it doesn't exist or is closed
+    if (_heartRateController == null || _heartRateController!.isClosed) {
+      _heartRateController = StreamController<HeartRateSample>.broadcast();
+      _startHeartRatePolling();
+      
+      // Send an initial fake heart rate to kick start the stream
+      // Remove in production, this is just for testing
+      Future.delayed(Duration(milliseconds: 500), () {
+        _heartRateController?.add(HeartRateSample(
+          timestamp: DateTime.now(),
+          bpm: 75, // Default starting value
+        ));
+      });
+    }
     return _heartRateController!.stream;
   }
 
