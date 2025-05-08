@@ -29,15 +29,7 @@ class HealthService {
     if (_heartRateController == null || _heartRateController!.isClosed) {
       _heartRateController = StreamController<HeartRateSample>.broadcast();
       _startHeartRatePolling();
-      
-      // Send an initial fake heart rate to kick start the stream
-      // Remove in production, this is just for testing
-      Future.delayed(Duration(milliseconds: 500), () {
-        _heartRateController?.add(HeartRateSample(
-          timestamp: DateTime.now(),
-          bpm: 75, // Default starting value
-        ));
-      });
+      // No default/dummy value - only send actual heart rate readings
     }
     return _heartRateController!.stream;
   }
