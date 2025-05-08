@@ -18,6 +18,17 @@ class SessionStatsOverlay extends StatelessWidget {
     return '$m:$s';
   }
 
+  String _formatHoursMinutesSeconds(Duration d) {
+    final h = d.inHours;
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    if (h > 0) {
+      return '$h:$m:$s';
+    } else {
+      return '$m:$s';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!useCardLayout) {
@@ -101,7 +112,7 @@ class SessionStatsOverlay extends StatelessWidget {
                         children: [
                           SizedBox(height: 4),
                           Text(
-                            _formatMinutesSeconds(Duration(seconds: state.elapsedSeconds)),
+                            _formatHoursMinutesSeconds(Duration(seconds: state.elapsedSeconds)),
                             style: AppTextStyles.timerDisplay.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
