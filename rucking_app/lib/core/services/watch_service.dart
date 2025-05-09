@@ -142,17 +142,24 @@ class WatchService {
       
       // Send session ID to watch so it can include it in API calls
       await sendSessionIdToWatch(sessionId);
-      
+
       // Start session on backend
       await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {});
-      
+
+      // Notify the watch that the workout has started (so it updates UI and starts tracking)
+      await _sendMessageToWatch({
+        'command': 'workoutStarted',
+        'sessionId': sessionId,
+        'ruckWeight': ruckWeight,
+      });
+
       // Update app state
       _isSessionActive = true;
       _ruckWeight = ruckWeight;
       _currentSessionHeartRateSamples = [];
-      
+
       // Send event to BLoC to update UI
-      
+
     } catch (e) {
       debugPrint('[ERROR] Failed to process session start from Watch: $e');
     }
@@ -189,7 +196,7 @@ class WatchService {
   Future<void> startSessionOnWatch(double ruckWeight) async {
     try {
       await _sendMessageToWatch({
-        'command': 'startSession',
+        'command': 'workoutStarted',
         'ruckWeight': ruckWeight,
       });
     } catch (e) {
