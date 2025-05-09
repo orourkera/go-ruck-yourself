@@ -207,11 +207,9 @@ class SessionValidationService {
       return results;
     }
 
-    // 3. Minimum calories check (block if zero or negative)
-    if (caloriesBurned <= 0.0) {
-      results['isValid'] = false;
-      results['message'] = sessionCaloriesTooLowError;
-      return results;
+    // 3. Calories value can be zero; just warn if negative
+    if (caloriesBurned < 0.0) {
+      debugPrint('WARNING: Negative calorie value: $caloriesBurned');
     }
 
     // 4. Calories sanity check (warn, but don't block)
