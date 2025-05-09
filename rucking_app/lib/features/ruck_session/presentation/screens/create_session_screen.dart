@@ -41,6 +41,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   bool _isLoading = true;
   double _selectedRuckWeight = 0.0;
 
+  late final VoidCallback _durationListener;
+
   /// Loads preferences and last used values (ruck weight and duration)
   Future<void> _loadDefaults() async {
     setState(() { _isLoading = true; });
@@ -173,8 +175,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         // --- Ensure planned duration is included ---
         if (_plannedDuration != null && _plannedDuration! > 0) {
           createRequestData['planned_duration_minutes'] = _plannedDuration;
-        } else if (_durationController.text.isNotEmpty && int.tryParse(_durationController.text) != null) {
-          createRequestData['planned_duration_minutes'] = int.parse(_durationController.text);
         }
         // --- End planned duration addition ---
 
@@ -221,16 +221,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         debugPrint('Creating session with selected weight: $_selectedRuckWeight');
         // Delay and then navigate without resetting chip state
         await Future.delayed(Duration(milliseconds: 500));
-        // Parse duration from controller, fallback to 30 min if not set
-        int? plannedDuration;
-        if (_durationController.text.isNotEmpty) {
-          final minutes = int.tryParse(_durationController.text);
-          if (minutes != null && minutes > 0) {
-            plannedDuration = minutes * 60;
-          }
-        }
-        plannedDuration ??= 1800; // Default to 30 minutes if not set
-
+        // Convert planned duration (minutes) to seconds; null means no planned duration
+        final int? plannedDuration = _plannedDuration != null ? _plannedDuration! * 60 : null;
+        
         // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
         final sessionArgs = ActiveSessionArgs(
           ruckWeight: _ruckWeight,
@@ -311,6 +304,21 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         debugPrint('No last ruck weight found in SharedPreferences');
       }
     });
+    // Attach listener after controllers are ready
+    _durationListener = () {
+      final text = _durationController.text;
+      if (text.isEmpty) {
+        setState(() {
+          _plannedDuration = null;
+        });
+      } else {
+        final minutes = int.tryParse(text);
+        setState(() {
+          _plannedDuration = (minutes != null && minutes > 0) ? minutes : null;
+        });
+      }
+    };
+    _durationController.addListener(_durationListener);
   }
 
   // Load last saved ruck weight from SharedPreferences
@@ -330,6 +338,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   @override
   void dispose() {
     _userWeightController.dispose();
+    _durationController.removeListener(_durationListener);
     _durationController.dispose();
     _durationFocusNode.dispose();
     super.dispose();
