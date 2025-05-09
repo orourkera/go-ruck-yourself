@@ -12,6 +12,11 @@ class ActiveSessionInitial extends ActiveSessionState {}
 class ActiveSessionLoading extends ActiveSessionState {}
 
 class ActiveSessionRunning extends ActiveSessionState {
+  final List<String>? tags;
+  final int? perceivedExertion;
+  final double? weightKg;
+  final int? plannedDurationMinutes;
+  final int? pausedDurationSeconds;
   final int? plannedDuration; // in seconds
   final String sessionId;
   final List<LocationPoint> locationPoints;
@@ -36,6 +41,11 @@ class ActiveSessionRunning extends ActiveSessionState {
 
   const ActiveSessionRunning({
     required this.sessionId,
+    this.tags,
+    this.perceivedExertion,
+    this.weightKg,
+    this.plannedDurationMinutes,
+    this.pausedDurationSeconds,
     this.plannedDuration,
     required this.locationPoints,
     required this.elapsedSeconds,
@@ -57,6 +67,11 @@ class ActiveSessionRunning extends ActiveSessionState {
   @override
   List<Object?> get props => [
     sessionId,
+    tags,
+    perceivedExertion,
+    weightKg,
+    plannedDurationMinutes,
+    pausedDurationSeconds,
     locationPoints,
     elapsedSeconds,
     distanceKm,
@@ -77,6 +92,11 @@ class ActiveSessionRunning extends ActiveSessionState {
   
   ActiveSessionRunning copyWith({
     String? sessionId,
+    List<String>? tags,
+    int? perceivedExertion,
+    double? weightKg,
+    int? plannedDurationMinutes,
+    int? pausedDurationSeconds,
     List<LocationPoint>? locationPoints,
     int? elapsedSeconds,
     double? distanceKm,
@@ -97,6 +117,11 @@ class ActiveSessionRunning extends ActiveSessionState {
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
+      tags: tags ?? this.tags,
+      perceivedExertion: perceivedExertion ?? this.perceivedExertion,
+      weightKg: weightKg ?? this.weightKg,
+      plannedDurationMinutes: plannedDurationMinutes ?? this.plannedDurationMinutes,
+      pausedDurationSeconds: pausedDurationSeconds ?? this.pausedDurationSeconds,
       locationPoints: locationPoints ?? this.locationPoints,
       elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
       distanceKm: distanceKm ?? this.distanceKm,

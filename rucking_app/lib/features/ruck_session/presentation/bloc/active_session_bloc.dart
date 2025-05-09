@@ -520,8 +520,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             ? 0
             : actualDuration.inSeconds;
 
-
-        
         // Tell watch to end
         _watchService.endSessionOnWatch();
         
@@ -535,6 +533,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'elevation_gain_m': currentState.elevationGain.round(),
             'elevation_loss_m': currentState.elevationLoss.round(),
             'ruck_weight_kg': currentState.ruckWeightKg.roundToDouble(),
+            'notes': event.notes,
+            'rating': event.rating,
+            'tags': event.tags,
+            'perceived_exertion': event.perceivedExertion,
+            'weight_kg': event.weightKg ?? currentState.weightKg,
+            'planned_duration_minutes': event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null),
+            'paused_duration_seconds': event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds,
           },
         );
         
@@ -597,8 +602,13 @@ emit(ActiveSessionComplete(
         : 0.0,
     ruckWeightKg: currentState.ruckWeightKg,
     status: RuckStatus.completed,
-    notes: null,
-    rating: null,
+    notes: event.notes,
+    rating: event.rating,
+    tags: event.tags ?? currentState.tags,
+    perceivedExertion: event.perceivedExertion ?? currentState.perceivedExertion,
+    weightKg: event.weightKg ?? currentState.weightKg,
+    plannedDurationMinutes: event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null),
+    pausedDurationSeconds: event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds,
   ),
 ));
       } catch (e) {
