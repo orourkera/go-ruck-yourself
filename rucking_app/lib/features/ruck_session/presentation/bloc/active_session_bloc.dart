@@ -127,8 +127,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       emit(initialSessionState);
       AppLogger.info('ActiveSessionRunning state emitted for session $sessionId with plannedDuration: \u001B[33m${initialSessionState.plannedDuration}\u001B[0m seconds');
 
-      _startLocationTracking(emit); 
-      _startHeartRateMonitoring();
+      // Before starting location tracking, reset the validator state
+      _validationService.reset();
+
+      // Start location tracking and heart rate monitoring
+      _startLocationTracking(emit);
+      await _startHeartRateMonitoring();
       AppLogger.info('Location, heart rate started for session $sessionId');
     } catch (e, stackTrace) {
       final String RuckIdForError = sessionId ?? "unknown";
@@ -153,14 +157,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           AppLogger.error('Location error during active session: $error');
           // Removed: add(SessionFailed(...)) to avoid abrupt session termination for all location errors.
           // Permission errors should be caught before starting the session.
-          // Other mid-session errors will be logged for now.
         },
       );
 
-      _heartRateSubscription = _healthService.heartRateStream.listen(
-        (sample) => add(HeartRateUpdated(sample)),
-        onError: (e) => AppLogger.error('Heart rate stream error: $e'),
-      );
+      // Heart-rate subscription handled in _startHeartRateMonitoring to avoid duplicates
     } catch (e) {
       AppLogger.error('Failed to start location tracking: $e');
       
@@ -176,8 +176,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
   }
 
-  void _startHeartRateMonitoring() {
+  Future<void> _startHeartRateMonitoring() async {
     AppLogger.info('Starting heart rate monitoring...');
+    
+    // Ensure HealthKit permissions are granted once per app session
+    if (!_healthService.isAuthorized) {
+      final granted = await _healthService.requestAuthorization();
+      if (!granted) {
+        AppLogger.warning('Health authorization denied – heart-rate stream disabled');
+        return; // Do not start subscription without permission
+      }
+    }
+    
     _heartRateSubscription?.cancel(); // Cancel previous subscription if any
     _heartRateSubscription = _healthService.heartRateStream.listen(
       (HeartRateSample sample) {
@@ -186,12 +196,27 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       },
       onError: (error) {
         AppLogger.error('Error in heart rate stream: $error');
-        // Optionally, dispatch an error event to the BLoC state
       },
       onDone: () {
         AppLogger.info('Heart rate stream closed.');
       },
     );
+
+    // Seed with immediate reading in case stream takes a few seconds
+    try {
+      final initialHr = await _healthService.getHeartRate();
+      if (initialHr != null && initialHr > 0) {
+        AppLogger.info('Initial heart rate fetched: $initialHr BPM');
+        add(HeartRateUpdated(HeartRateSample(
+          timestamp: DateTime.now(),
+          bpm: initialHr.round(),
+        )));
+      } else {
+        AppLogger.info('Initial heart rate not available');
+      }
+    } catch (e) {
+      AppLogger.error('Error fetching initial heart rate: $e');
+    }
   }
 
   void _stopHeartRateMonitoring() {
@@ -476,7 +501,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Validate session before saving
         final validationSave = _validationService.validateSessionForSave(
           distanceMeters: currentState.distanceKm * 1000,
-          duration: Duration(seconds: currentState.elapsedSeconds),
+          duration: Duration(seconds: currentState.elapsedSeconds) - currentState.totalPausedDuration, // Use active (unpaused) duration
           caloriesBurned: currentState.calories.toDouble(),
         );
         if (validationSave['isValid'] == false) {
@@ -518,8 +543,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             caloriesBurned: currentState.calories,
             ruckWeightKg: currentState.ruckWeightKg,
             elevationGainMeters: currentState.elevationGain,
-            elevationLossMeters: currentState.elevationLoss,
-          );
+            elevationLossMeters: currentState.elevationLoss,          );
         } catch (e) {
           AppLogger.error('Failed to save workout to HealthKit: $e');
         }
@@ -530,7 +554,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             id: currentState.sessionId,
             startTime: DateTime.now().subtract(Duration(seconds: currentState.elapsedSeconds)),
             endTime: DateTime.now(),
-            duration: Duration(seconds: currentState.elapsedSeconds),
+            duration: Duration(seconds: currentState.elapsedSeconds) - currentState.totalPausedDuration,
             distance: currentState.distanceKm,
             elevationGain: currentState.elevationGain,
             elevationLoss: currentState.elevationLoss,
@@ -638,28 +662,35 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     final double currentDistance = currentState.distanceKm; // in km
     double? newPace;
 
-    // Only show pace/distance if at least 3 valid points
-    if (_validLocationCount < 3 || currentDistance < 0.02) {
+    // Only compute pace after 10 valid location points and ≥0.1 km to avoid extreme noise at start
+    if (_validLocationCount < 10 || currentDistance < 0.1) {
       newPace = null;
     } else {
       // Calculate pace in seconds per km
       newPace = currentState.elapsedSeconds / currentDistance;
-      // Filter out absurd pace values (e.g. < 5 min/km or > 20 min/km)
-      // 5 min/km = 300 sec/km, 20 min/km = 1200 sec/km
-      if (newPace < 300 || newPace > 1200) {
+      // Filter out absurdly slow paces (> 20 min/km)
+      // 20 min/km = 1200 sec/km
+      if (newPace > 1200) {
         newPace = null;
       }
     }
 
-    final nowUtc = DateTime.now().toUtc();
-    final grossDuration = nowUtc.difference(currentState.originalSessionStartTimeUtc);
-    final netDuration = grossDuration - currentState.totalPausedDuration;
-    int newElapsed = netDuration.inSeconds;
+    final effectiveElapsed = DateTime.now().difference(currentState.originalSessionStartTimeUtc) - currentState.totalPausedDuration;
+    int newElapsed = effectiveElapsed.inSeconds;
 
     // Sanity check to ensure elapsed time doesn't go negative
-    if (newElapsed < 0) newElapsed = 0;
+    if(newElapsed < 0) newElapsed = 0;
 
-    final newCalories = 0; // Removed calorie calculation
+    // Calculate calories burned using MET-based rucking formula
+    final double calculatedCalories = MetCalculator.calculateRuckingCalories(
+      userWeightKg: _getUserWeightKg(),
+      ruckWeightKg: currentState.ruckWeightKg,
+      distanceKm: currentDistance,
+      elapsedSeconds: newElapsed,
+      elevationGain: currentState.elevationGain,
+      elevationLoss: currentState.elevationLoss,
+    );
+    final int newCalories = calculatedCalories.round();
 
     emit(currentState.copyWith(
       elapsedSeconds: newElapsed,
