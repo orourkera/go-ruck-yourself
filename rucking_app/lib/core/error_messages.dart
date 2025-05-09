@@ -18,21 +18,24 @@ const String serverNotFound = 'Requested resource not found on the server.';
 const String serverGenericError = 'An unexpected server error occurred. Please try again.';
 
 // Session Error Messages (Active Session Screen)
+const String sessionUserWeightRequired = 'User weight is required, rucker. We need it to accurately count calories.';
+const String sessionInvalidWeight = 'Please enter a valid weight greater than 0, rucker.';
+const String sessionInvalidDuration = 'Please enter a valid duration greater than 0, rucker.';
 const String sessionLocationPermissionDenied = 'Location permission denied, rucker. Please enable location services to track your ruck session.';
 const String sessionLocationServiceDisabled = 'Location services are disabled, rucker. Please enable location services to start tracking.';
-const String sessionStartError = 'Failed to start the session. Please try again.';
-const String sessionUpdateError = 'Failed to update session data. Data may not be saved correctly.';
-const String sessionEndError = 'Failed to end the session. Please try again.';
+const String sessionStartError = 'Failed to start the session, rucker. Please try again.';
+const String sessionUpdateError = 'Failed to update session data, rucker. Data may not be saved correctly.';
+const String sessionEndError = 'Failed to end the session, rucker. Please try again.';
 const String sessionIdleTimeout = 'Session ended due to inactivity, rucker. You stood around for too long.';
-const String sessionValidationError = 'Session data is invalid. Please check your inputs and try again.';
+const String sessionValidationError = 'Session data is invalid, rucker. Please check your inputs and try again.';
 const String sessionTooShortError = 'Not long enough, rucker. Minimum duration is {minutes} minutes.';
 const String sessionDistanceTooShortError = 'Distance too short, rucker. Minimum distance is 100 meters.';
 const String sessionCaloriesTooLowError = 'Not enough calories burned to save this session, rucker. Move more!';
-const String sessionGenericError = 'An error occurred during the session. Please try again.';
+const String sessionGenericError = 'An error occurred during the session, rucker. Please try again.';
 const String sessionAutoPaused = 'Auto-paused, rucker. No movement detected for 1+ minute. Get moving!';
 
 // RevenueCat Service Error Messages
 const String revenueCatApiKeyMissing = 'RevenueCat API Key is missing. Please configure your .env file with REVENUECAT_API_KEY.';
-const String revenueCatPurchaseError = 'Failed to complete purchase. Please try again later.';
-const String revenueCatSubscriptionStatusError = 'Unable to check subscription status. Please try again.';
-const String revenueCatRestorePurchasesError = 'Failed to restore purchases. Please try again.';
+const String revenueCatPurchaseError = 'Failed to complete purchase, rucker. Please try again later.';
+const String revenueCatSubscriptionStatusError = 'Unable to check subscription status, rucker. Please try again.';
+const String revenueCatRestorePurchasesError = 'Failed to restore purchases, rucker. Please try again.';

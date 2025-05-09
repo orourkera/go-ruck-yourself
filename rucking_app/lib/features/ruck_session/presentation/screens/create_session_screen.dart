@@ -14,6 +14,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/core/error_messages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 
@@ -165,7 +166,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         // Add user's weight (required)
         final userWeightRaw = _userWeightController.text;
         if (userWeightRaw.isEmpty) {
-            throw Exception('User weight is required'); // Or handle validation earlier
+            throw Exception(sessionUserWeightRequired); // Use centralized error message
         }
         double userWeightKg = _preferMetric 
             ? double.parse(userWeightRaw) 
@@ -242,7 +243,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to create/start session: $e'),
+              content: Text(e.toString().contains(sessionUserWeightRequired)
+                ? sessionUserWeightRequired
+                : 'Failed to create/start session: $e'),
               backgroundColor: AppColors.error,
             ),
           );
@@ -531,10 +534,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                       return null;
                     }
                     if (double.tryParse(value) == null) {
-                      return 'Please enter a valid number';
+                      return sessionInvalidWeight;
                     }
                     if (double.parse(value) <= 0) {
-                      return 'Weight must be greater than 0';
+                      return sessionInvalidWeight;
                     }
                     return null;
                   },
@@ -555,10 +558,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   validator: (value) {
                     if (value != null && value.isNotEmpty) {
                       if (int.tryParse(value) == null) {
-                        return 'Please enter a valid number';
+                        return sessionInvalidDuration;
                       }
                       if (int.parse(value) <= 0) {
-                        return 'Duration must be greater than 0';
+                        return sessionInvalidDuration;
                       }
                     }
                     return null;

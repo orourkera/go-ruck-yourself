@@ -64,6 +64,11 @@ This document lists **all validation rules and thresholds** enforced on the Acti
 - **Purpose:** Ensure users understand why a session is paused, not saved, or ended.
 - **Implementation:**
   - Uses `ErrorHandler` and `_validationMessage` in the UI.
+  - **Session Creation Form Validation:**
+    - User weight ("Your Weight") and planned duration ("Planned Duration") fields are validated in the UI.
+    - If the user enters a non-numeric or non-positive value for weight, the error message from `sessionInvalidWeight` in `error_messages.dart` is displayed: _Please enter a valid weight greater than 0._
+    - If the user enters a non-numeric or non-positive value for planned duration, the error message from `sessionInvalidDuration` in `error_messages.dart` is displayed: _Please enter a valid duration greater than 0._
+    - These constants are defined in `lib/core/error_messages.dart` and are used directly in form field validators for consistency and maintainability.
 
 ## 9. GPS and Location Validation Rules
 - **Minimum GPS Accuracy:** Only accept location points with sufficient accuracy (implementation-specific, e.g., < 20 meters HDOP or accuracy).
