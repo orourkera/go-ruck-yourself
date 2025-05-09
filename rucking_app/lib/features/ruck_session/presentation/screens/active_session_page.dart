@@ -134,7 +134,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     if (validation['isValid'] == true) {
       _showConfirmEndSessionDialog(context, currentState);
     } else {
-      _showSessionTooShortDialog(context);
+      _showSessionTooShortDialog(context, reason: validation['message'] as String?);
     }
   }
 
@@ -170,7 +170,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     );
   }
 
-  void _showSessionTooShortDialog(BuildContext context) {
+  void _showSessionTooShortDialog(BuildContext context, {String? reason}) {
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -182,20 +182,22 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
         
         return AlertDialog(
           title: const Text('Session Too Short, Rucker.'),
-          content: const Text('Your session did not accumulate enough data to be saved.'),
+          content: Text(
+            reason ?? 'Your session did not accumulate enough data to be saved.',
+          ),
           actionsAlignment: MainAxisAlignment.spaceBetween, // Ensure buttons are spaced across dialog width
           actions: [
             // DISCARD SESSION - Left side with lighter font weight
             TextButton(
               onPressed: () {
                 // Discard Session: pop all the way to home, DO NOT save/call Bloc
-                Navigator.of(dialogContext).popUntil((route) => route.isFirst);
+                Navigator.of(dialogContext).pop();
+                Navigator.of(context).pop();
               },
               child: const Text(
-                'DISCARD SESSION',
+                'DELETE',
                 style: TextStyle(
-                  color: Colors.black54, // Lighter color
-                  fontWeight: FontWeight.w300, // Light font weight
+                  color: Colors.grey,
                   fontSize: 14,
                 ),
               ),
@@ -343,7 +345,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       child: _WeightChip(weightKg: state.ruckWeightKg),
                                     ),
                                     if (state.isPaused)
-                                      const Positioned.fill(child: _PauseOverlay()),
+  const Positioned.fill(child: IgnorePointer(
+    ignoring: true, // Let touch events pass through
+    child: _PauseOverlay(),
+  )),
+
                                   ],
                                 ),
                               ),
@@ -440,18 +446,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
           ),
           // Removed duplicate countdown overlay - now positioned at top of stack
           
-          // Show pause overlay if session is paused
-          BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
-            buildWhen: (prev, curr) =>
-              (prev is ActiveSessionRunning && curr is ActiveSessionRunning &&
-               prev.isPaused != curr.isPaused),
-            builder: (context, state) {
-              if (state is ActiveSessionRunning && state.isPaused) {
-                return const _PauseOverlay();
-              }
-              return const SizedBox.shrink();
-            },
-          ),
+          // Pause overlay logic handled in map Stack above. Removed duplicate overlay here.
         ],
       ),
     );
@@ -629,12 +624,12 @@ class _RouteMapState extends State<_RouteMap> {
         CameraFit.bounds(
           bounds: bounds,
           padding: const EdgeInsets.all(40.0),
-          maxZoom: 15.0, // Limit max zoom when fitting bounds
+          maxZoom: 16.0, // Allow slightly closer zoom when fitting bounds
         ),
       );
     } else if (mounted && widget.route.isNotEmpty) {
       // If only one point, center on it with a fixed zoom
-      _controller.move(widget.route.last, 15.0);
+      _controller.move(widget.route.last, 16.0);
     }
   }
   
@@ -706,7 +701,7 @@ class _RouteMapState extends State<_RouteMap> {
                       Polyline(
                         points: widget.route.isNotEmpty ? widget.route : [widget.initialCenter!],
                         strokeWidth: 4.0,
-                        color: AppColors.primary,
+                        color: AppColors.secondary, // Changed to orange for better visibility
                       ),
                     ],
                   ),
