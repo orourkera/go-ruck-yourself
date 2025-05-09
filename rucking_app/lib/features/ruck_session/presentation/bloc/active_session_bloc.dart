@@ -496,18 +496,31 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
       
       try {
+        AppLogger.info('Session start time (before computation): ${currentState.originalSessionStartTimeUtc}');
+        AppLogger.info('Total paused duration (before computation): ${currentState.totalPausedDuration}');
+        
         AppLogger.info('Completing session ${currentState.sessionId}');
         
-        // Validate session before saving
-        final validationSave = _validationService.validateSessionForSave(
-          distanceMeters: currentState.distanceKm * 1000,
-          duration: Duration(seconds: currentState.elapsedSeconds) - currentState.totalPausedDuration, // Use active (unpaused) duration
-          caloriesBurned: currentState.calories.toDouble(),
-        );
-        if (validationSave['isValid'] == false) {
-          emit(ActiveSessionFailure(errorMessage: validationSave['message'] ?? 'Session invalid.'));
-          return;
+        Duration actualDuration;
+        try {
+          final DateTime sessionStart = currentState.originalSessionStartTimeUtc;
+          // Defensive: this should never be null. If it is, something is critically wrong.
+          assert(sessionStart != null, 'originalSessionStartTimeUtc should never be null!');
+          final Duration pausedDuration = currentState.totalPausedDuration;
+          // Defensive: this should never be null. If it is, something is critically wrong.
+          assert(pausedDuration != null, 'totalPausedDuration should never be null!');
+          actualDuration = DateTime.now().difference(sessionStart) - pausedDuration;
+        } catch (e) {
+          AppLogger.error('Error computing actualDuration in _onSessionCompleted: $e');
+          actualDuration = Duration.zero;
         }
+
+        // Ensure duration is at least 0 seconds
+        final int finalElapsedSeconds = actualDuration.inSeconds < 0
+            ? 0
+            : actualDuration.inSeconds;
+
+
         
         // Tell watch to end
         _watchService.endSessionOnWatch();
@@ -517,7 +530,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           '/rucks/${currentState.sessionId}/complete',
           {
             'distance_km': double.parse(currentState.distanceKm.toStringAsFixed(3)),
-            'duration_seconds': currentState.elapsedSeconds,
+            'duration_seconds': finalElapsedSeconds,
             'calories_burned': currentState.calories.round(),
             'elevation_gain_m': currentState.elevationGain.round(),
             'elevation_loss_m': currentState.elevationLoss.round(),
@@ -534,7 +547,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         
         // Save workout to HealthKit
         try {
-          final startTime = DateTime.now().subtract(Duration(seconds: currentState.elapsedSeconds));
+          final startTime = DateTime.now().subtract(actualDuration);
           final endTime = DateTime.now();
           await _healthService.saveWorkout(
             startDate: startTime,
@@ -549,25 +562,45 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         }
         
         // Emit completion state
-        emit(ActiveSessionComplete(
-          session: RuckSession(
-            id: currentState.sessionId,
-            startTime: DateTime.now().subtract(Duration(seconds: currentState.elapsedSeconds)),
-            endTime: DateTime.now(),
-            duration: Duration(seconds: currentState.elapsedSeconds) - currentState.totalPausedDuration,
-            distance: currentState.distanceKm,
-            elevationGain: currentState.elevationGain,
-            elevationLoss: currentState.elevationLoss,
-            caloriesBurned: currentState.calories.toInt(),
-            averagePace: currentState.distanceKm > 0
-                ? (currentState.elapsedSeconds / currentState.distanceKm)
-                : 0.0,
-            ruckWeightKg: currentState.ruckWeightKg,
-            status: RuckStatus.completed,
-            notes: null,
-            rating: null,
-          ),
-        ));
+        AppLogger.info('[COMPLETE] Emitting ActiveSessionComplete with values:');
+AppLogger.info('  id: ${currentState.sessionId}');
+AppLogger.info('  startTime: [32m${DateTime.now().subtract(actualDuration)}[0m');
+AppLogger.info('  endTime: [32m${DateTime.now()}[0m');
+AppLogger.info('  duration: [32m$actualDuration[0m');
+AppLogger.info('  distance: ${currentState.distanceKm}');
+AppLogger.info('  elevationGain: ${currentState.elevationGain}');
+AppLogger.info('  elevationLoss: ${currentState.elevationLoss}');
+AppLogger.info('  caloriesBurned: ${currentState.calories}');
+AppLogger.info('  averagePace: ${currentState.distanceKm > 0 ? (currentState.elapsedSeconds / currentState.distanceKm) : 0.0}');
+AppLogger.info('  ruckWeightKg: ${currentState.ruckWeightKg}');
+
+assert(currentState.sessionId != null, 'sessionId should never be null');
+assert(actualDuration != null, 'actualDuration should never be null');
+assert(currentState.distanceKm != null, 'distanceKm should never be null');
+assert(currentState.elevationGain != null, 'elevationGain should never be null');
+assert(currentState.elevationLoss != null, 'elevationLoss should never be null');
+assert(currentState.calories != null, 'calories should never be null');
+assert(currentState.ruckWeightKg != null, 'ruckWeightKg should never be null');
+
+emit(ActiveSessionComplete(
+  session: RuckSession(
+    id: currentState.sessionId,
+    startTime: DateTime.now().subtract(actualDuration),
+    endTime: DateTime.now(),
+    duration: actualDuration,
+    distance: currentState.distanceKm,
+    elevationGain: currentState.elevationGain,
+    elevationLoss: currentState.elevationLoss,
+    caloriesBurned: currentState.calories.toInt(),
+    averagePace: currentState.distanceKm > 0
+        ? (currentState.elapsedSeconds / currentState.distanceKm)
+        : 0.0,
+    ruckWeightKg: currentState.ruckWeightKg,
+    status: RuckStatus.completed,
+    notes: null,
+    rating: null,
+  ),
+));
       } catch (e) {
         AppLogger.error('Failed to complete session: $e');
         
