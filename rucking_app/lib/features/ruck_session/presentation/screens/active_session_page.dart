@@ -158,7 +158,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
             ),
             TextButton(
               onPressed: () {
-                // Only complete session if valid (already checked)
+                // Emit a final Tick event to ensure state is up to date before ending session
+                context.read<ActiveSessionBloc>().add(const Tick());
                 context.read<ActiveSessionBloc>().add(const SessionCompleted());
                 Navigator.of(dialogContext).pop();
               },
