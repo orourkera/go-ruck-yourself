@@ -12,6 +12,12 @@ enum RuckStatus {
 
 /// Model representing a completed ruck session
 class RuckSession {
+  // ...existing fields...
+  final List<String>? tags;
+  final int? perceivedExertion;
+  final double? weightKg;
+  final int? plannedDurationMinutes;
+  final int? pausedDurationSeconds;
   final String? id;
   final DateTime startTime;
   final DateTime endTime;
@@ -54,6 +60,11 @@ class RuckSession {
     this.avgHeartRate,
     this.maxHeartRate,
     this.minHeartRate,
+    this.tags,
+    this.perceivedExertion,
+    this.weightKg,
+    this.plannedDurationMinutes,
+    this.pausedDurationSeconds,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -87,25 +98,23 @@ class RuckSession {
 
   /// Create a RuckSession from a JSON map
   /// Handles various API response formats
-  factory RuckSession.fromJson(Map<String, dynamic> json) {
-    try {
-      // Handle created_at or start_time fields for start time
-      final startTimeStr = json['start_time'] ?? json['created_at'] ?? json['startTime'];
-      final startTime = startTimeStr != null 
-          ? DateTime.tryParse(startTimeStr is String ? startTimeStr : startTimeStr.toString()) ?? DateTime.now()
-          : DateTime.now();
-      
-      // Handle end_time or completed_at fields for end time
-      final endTimeStr = json['end_time'] ?? json['completed_at'] ?? json['endTime'];
-      final endTime = endTimeStr != null 
-          ? DateTime.tryParse(endTimeStr is String ? endTimeStr : endTimeStr.toString()) ?? 
-              startTime.add(Duration(seconds: json['duration_seconds'] as int? ?? 0))
-          : startTime.add(Duration(seconds: json['duration_seconds'] as int? ?? 0));
-      
-      // Calculate duration from start/end time or use duration_seconds field
-      final duration = json['duration_seconds'] != null
-          ? Duration(seconds: (json['duration_seconds'] as num).toInt())
-          : endTime.difference(startTime);
+  static DateTime? parseDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  return DateTime.tryParse(value.toString());
+}
+
+factory RuckSession.fromJson(Map<String, dynamic> json) {
+  try {
+    // Handle created_at or start_time fields for start time
+    final startTime = RuckSession.parseDateTime(json['start_time'] ?? json['created_at'] ?? json['startTime']) ?? DateTime.now();
+    // Handle end_time or completed_at fields for end time
+    final endTime = RuckSession.parseDateTime(json['end_time'] ?? json['completed_at'] ?? json['endTime']) ??
+        startTime.add(Duration(seconds: json['duration_seconds'] as int? ?? 0));
+    // Calculate duration from start/end time or use duration_seconds field
+    final duration = json['duration_seconds'] != null
+        ? Duration(seconds: (json['duration_seconds'] as num).toInt())
+        : endTime.difference(startTime);
       
       // Handle various ways distance might be stored
       double parseDistance(dynamic value) {
@@ -155,6 +164,11 @@ class RuckSession {
         avgHeartRate: json['avg_heart_rate'] != null ? (json['avg_heart_rate'] as num).toInt() : null,
         maxHeartRate: json['max_heart_rate'] != null ? (json['max_heart_rate'] as num).toInt() : null,
         minHeartRate: json['min_heart_rate'] != null ? (json['min_heart_rate'] as num).toInt() : null,
+        tags: (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+        perceivedExertion: json['perceived_exertion'] != null ? (json['perceived_exertion'] as num).toInt() : null,
+        weightKg: json['weight_kg'] != null ? parseDistance(json['weight_kg']) : null,
+        plannedDurationMinutes: json['planned_duration_minutes'] != null ? (json['planned_duration_minutes'] as num).toInt() : null,
+        pausedDurationSeconds: json['paused_duration_seconds'] != null ? (json['paused_duration_seconds'] as num).toInt() : null,
       );
     } catch (e) {
       print('Error parsing RuckSession from JSON: $e');
@@ -202,6 +216,11 @@ class RuckSession {
       'avg_heart_rate': avgHeartRate,
       'max_heart_rate': maxHeartRate,
       'min_heart_rate': minHeartRate,
+      'tags': tags,
+      'perceived_exertion': perceivedExertion,
+      'weight_kg': weightKg,
+      'planned_duration_minutes': plannedDurationMinutes,
+      'paused_duration_seconds': pausedDurationSeconds,
     };
   }
 }
