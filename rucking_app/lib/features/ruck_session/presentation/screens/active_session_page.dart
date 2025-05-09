@@ -700,21 +700,21 @@ class _RouteMapState extends State<_RouteMap> {
                     return tileWidget;
                   },
                 ),
-                if (widget.route.isNotEmpty)
+                if (widget.route.isNotEmpty || widget.initialCenter != null)
                   PolylineLayer(
                     polylines: [
                       Polyline(
-                        points: widget.route,
+                        points: widget.route.isNotEmpty ? widget.route : [widget.initialCenter!],
                         strokeWidth: 4.0,
                         color: AppColors.primary,
                       ),
                     ],
                   ),
-                if (widget.route.isNotEmpty)
+                if (widget.route.isNotEmpty || widget.initialCenter != null)
                   MarkerLayer(
                     markers: [
                       Marker(
-                        point: widget.route.last,
+                        point: widget.route.isNotEmpty ? widget.route.last : widget.initialCenter!,
                         width: 40,
                         height: 40,
                         child: Image.asset('assets/images/map marker.png'),

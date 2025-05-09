@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
@@ -32,6 +33,9 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
   // Preload the bloc to start session initialization while countdown runs
   late ActiveSessionBloc _sessionBloc;
   StreamSubscription? _blocSubscription;
+
+  // Last known location to pass to the map for faster centering
+  latlong.LatLng? _initialCenter;
 
   @override
   void initState() {
@@ -130,8 +134,18 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     // Preload map tiles for current location if available
     // This helps avoid the blue map flash
     
-    // Simulate resource loading with a minimum delay
-    // Even if everything loads quickly, we want to ensure the countdown finishes
+    // Try to fetch the user's last known location quickly
+    try {
+      final locationService = GetIt.instance<LocationService>();
+      final last = await locationService.getCurrentLocation();
+      if (last != null) {
+        _initialCenter = latlong.LatLng(last.latitude, last.longitude);
+      }
+    } catch (_) {
+      // Silent failure – fallback to default center in ActiveSessionPage
+    }
+    
+    // Simulate resource loading with a minimum delay so the countdown animation isn't cut short
     await Future.delayed(const Duration(seconds: 3));
     
     setState(() {
@@ -149,6 +163,14 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       // Start the session timer before navigating
       _sessionBloc.add(TimerStarted());
 
+      // Inject initialCenter into args to ensure the map centers immediately
+      final argsWithCenter = ActiveSessionArgs(
+        ruckWeight: widget.args.ruckWeight,
+        notes: widget.args.notes,
+        plannedDuration: widget.args.plannedDuration,
+        initialCenter: _initialCenter ?? widget.args.initialCenter,
+      );
+
       // Navigate to the actual session with a brief fade transition
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
@@ -158,7 +180,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
               opacity: animation,
               child: BlocProvider.value(
                 value: _sessionBloc,
-                child: ActiveSessionPage(args: widget.args),
+                child: ActiveSessionPage(args: argsWithCenter),
               ),
             ),
         ),
