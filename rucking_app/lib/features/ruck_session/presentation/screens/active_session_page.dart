@@ -16,7 +16,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
-import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
+
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:provider/provider.dart';
 
@@ -124,18 +124,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   }
 
   void _handleEndSession(BuildContext context, ActiveSessionRunning currentState) {
-    // Use the SessionValidationService to check all requirements
-    final validator = SessionValidationService();
-    final validation = validator.validateSessionForSave(
-      distanceMeters: currentState.distanceKm * 1000,
-      duration: Duration(seconds: currentState.elapsedSeconds),
-      caloriesBurned: currentState.calories.toDouble(),
-    );
-    if (validation['isValid'] == true) {
-      _showConfirmEndSessionDialog(context, currentState);
-    } else {
-      _showSessionTooShortDialog(context, reason: validation['message'] as String?);
-    }
+    // Always allow session to be ended and saved, regardless of distance/duration
+    _showConfirmEndSessionDialog(context, currentState);
   }
 
   void _showConfirmEndSessionDialog(BuildContext context, ActiveSessionState state) {
@@ -171,44 +161,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     );
   }
 
-  void _showSessionTooShortDialog(BuildContext context, {String? reason}) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        // Retrieve provider data safely inside the build method
-        final authBloc = Provider.of<AuthBloc>(dialogContext, listen: false);
-        final bool preferMetric = authBloc.state is Authenticated
-            ? (authBloc.state as Authenticated).user.preferMetric
-            : true;
-        
-        return AlertDialog(
-          title: const Text('Session Too Short, Rucker.'),
-          content: Text(
-            reason ?? 'Your session did not accumulate enough data to be saved.',
-          ),
-          actionsAlignment: MainAxisAlignment.spaceBetween, // Ensure buttons are spaced across dialog width
-          actions: [
-            // DISCARD SESSION - Left side with lighter font weight
-            TextButton(
-              onPressed: () {
-                // Discard Session: pop all the way to home, DO NOT save/call Bloc
-                Navigator.of(dialogContext).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text(
-                'DELETE',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            // KEEP RUCKING - Right side with bold styling
-            TextButton(
-              onPressed: () {
-                // Keep Rucking: just close the dialog
-                Navigator.of(dialogContext).pop();
-              },
               child: const Text(
                 'KEEP RUCKING',
                 style: TextStyle(
