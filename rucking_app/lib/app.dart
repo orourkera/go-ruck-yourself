@@ -71,6 +71,13 @@ class RuckingApp extends StatelessWidget {
               }
             case '/active_session':
               final args = settings.arguments;
+              // --- BEGIN EXTRA DIAGNOSTIC LOGGING (remove after bug fixed) ---
+              debugPrint('[Route] /active_session args runtimeType: ${args.runtimeType}');
+              // If this is not ActiveSessionArgs, log its content for inspection
+              if (args is Map) {
+                (args as Map).forEach((k, v) => debugPrint('  $k => $v (type: ${v.runtimeType})'));
+              }
+              // --- END EXTRA DIAGNOSTIC LOGGING ---
               if (args is ActiveSessionArgs) {
                 return MaterialPageRoute(
                   builder: (_) => ActiveSessionPage(args: args),
