@@ -37,6 +37,7 @@ class HealthService {
   void _startHeartRatePolling() {
     _heartRateTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       final hr = await getHeartRate();
+      AppLogger.info('[HealthService] polled HR → ${hr?.toString() ?? 'null'}');
       if (hr != null) {
         _heartRateController?.add(HeartRateSample(
           timestamp: DateTime.now(),
@@ -192,15 +193,15 @@ class HealthService {
         unit: HealthDataUnit.KILOCALORIE,
       );
 
-      // --- NEW: Write WORKOUT sample ---
+      // --- Write WORKOUT sample (legacy approach) ---
       if (Platform.isIOS) {
         try {
           workoutSuccess = await _health.writeHealthData(
-            value: distanceMeters.toDouble(), // Some plugins require a value (distance or duration)
+            value: distanceMeters.toDouble(), // Some platforms require a numeric value
             type: HealthDataType.WORKOUT,
             startTime: startDate,
             endTime: endDate,
-            unit: HealthDataUnit.METER, // Or HealthDataUnit.MINUTE if you prefer
+            unit: HealthDataUnit.METER, // Metric placeholder
           );
         } catch (e) {
           AppLogger.error('Failed to write HealthKit WORKOUT sample: $e');
@@ -315,9 +316,9 @@ class HealthService {
     }
     
     try {
-      // Get heart rate data from the last 5 minutes
+      // Get heart rate data from the last 30 minutes (some watches batch-sync)
       final now = DateTime.now();
-      final window = const Duration(minutes: 5);
+      final window = const Duration(minutes: 30);
       final startTime = now.subtract(window);
       AppLogger.info('Fetching heart rate from $startTime to $now');
       
@@ -330,7 +331,7 @@ class HealthService {
       
       AppLogger.info('Fetched heart rate data points: ${heartRateData.length}');
       if (heartRateData.isEmpty) {
-        AppLogger.info('No heart rate data available in the last 5 minutes');
+        AppLogger.info('No heart rate data available in the last 30 minutes');
         return null;
       }
       
@@ -371,4 +372,7 @@ class HealthService {
       bpm: heartRate.round(),
     ));
   }
+
+  // Add public getter so callers can check auth status without breaking encapsulation
+  bool get isAuthorized => _isAuthorized;
 }
