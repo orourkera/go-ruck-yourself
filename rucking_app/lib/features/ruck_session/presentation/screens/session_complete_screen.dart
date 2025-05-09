@@ -74,6 +74,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   int? _minHeartRate;
 
   void setHeartRateSamples(List<HeartRateSample> samples) {
+    if (!mounted) return;
     setState(() {
       _heartRateSamples = samples;
       if (samples.isNotEmpty) {
@@ -141,37 +142,15 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       _isSaving = true;
     });
     
-    // Prevent saving if session distance is below minimum
-    final distanceMeters = widget.distance * 1000;
-    if (distanceMeters < SessionValidationService.minSessionDistanceMeters) {
-      // Delete the short session
-      try {
-        _apiClient.delete('/rucks/${widget.ruckId}');
-        debugPrint('Deleted short distance session ${widget.ruckId}');
-      } catch (e) {
-        debugPrint('Failed to delete short distance session: $e');
-      }
-      // Inform user and navigate home
-      
-        const SnackBar(
-          
-          backgroundColor: Colors.red,
-        ),
-      );
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
-      );
-      return;
-    }
+
     
     // Prepare data for the /complete endpoint
     final Map<String, dynamic> completionData = {
+      // Canonical fields from DATA_MODEL_REFERENCE.md
       'completed_at': widget.completedAt.toIso8601String(),
       'notes': _notesController.text,
-      // Backend expects these exact keys:
-      'distance_km': widget.distance, // always send for compatibility
-      'final_distance_km': widget.distance, // for final summary
+      'distance_km': widget.distance,
+      'final_distance_km': widget.distance,
       'distance_meters': (widget.distance * 1000).round(),
       'calories_burned': widget.caloriesBurned,
       'final_calories_burned': widget.caloriesBurned,
@@ -179,14 +158,24 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       'elevation_loss_m': widget.elevationLoss,
       'final_elevation_gain': widget.elevationGain,
       'final_elevation_loss': widget.elevationLoss,
-      'final_average_pace': (widget.distance > 0) ? (widget.duration.inSeconds / widget.distance) : null, // seconds per km
+      'final_average_pace': (widget.distance > 0) ? (widget.duration.inSeconds / widget.distance) : null,
       'rating': _rating,
       'perceived_exertion': _perceivedExertion,
       'tags': _selectedTags,
       'ruck_weight_kg': widget.ruckWeight,
-      // Add heart rate if available
+      // Canonical field for total body weight if available
+      if ((widget as dynamic).weightKg != null) 'weight_kg': (widget as dynamic).weightKg,
+      // Canonical field for avg heart rate
       if (_avgHeartRate != null) 'avg_heart_rate': _avgHeartRate,
+  
+      // If planned duration is available from widget
+      if ((widget as dynamic).plannedDurationMinutes != null) 'planned_duration_minutes': (widget as dynamic).plannedDurationMinutes,
+      // If paused duration is available from widget
+      if ((widget as dynamic).pausedDurationSeconds != null) 'paused_duration_seconds': (widget as dynamic).pausedDurationSeconds,
     };
+
+    // Debug print for outgoing payload
+    debugPrint('Session completionData payload: ' + completionData.toString());
 
     // Remove null values (especially if average pace is not computable)
     completionData.removeWhere((key, value) => value == null);
@@ -202,13 +191,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         }
     }).catchError((e) {
       debugPrint("Error completing session: $e");
+      if (!mounted) return;
+      debugPrint('Failed to complete session: $e');
       if (mounted) {
-        
-          SnackBar(
-            content: Text('Failed to complete session: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
         setState(() {
           _isSaving = false;
         });
