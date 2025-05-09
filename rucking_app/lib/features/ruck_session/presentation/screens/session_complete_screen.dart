@@ -152,9 +152,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         debugPrint('Failed to delete short distance session: $e');
       }
       // Inform user and navigate home
-      ScaffoldMessenger.of(context).showSnackBar(
+      
         const SnackBar(
-          content: Text('Distance too short. Session not saved.'),
+          
           backgroundColor: Colors.red,
         ),
       );
@@ -203,7 +203,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     }).catchError((e) {
       debugPrint("Error completing session: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        
           SnackBar(
             content: Text('Failed to complete session: $e'),
             backgroundColor: AppColors.error,
