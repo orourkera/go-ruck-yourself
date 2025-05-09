@@ -1,4 +1,6 @@
 // Shared error message mapper for user-friendly errors
+import 'package:rucking_app/core/error_messages.dart';
+
 String mapFriendlyErrorMessage(String? error) {
   if (error == null) return 'An unexpected error occurred.';
   final e = error.toLowerCase();
@@ -8,6 +10,9 @@ String mapFriendlyErrorMessage(String? error) {
   if (e.contains('404')) return 'Resource not found.';
   if (e.contains('timeout')) return 'Network timeout. Please check your connection, rucker.';
   if (e.contains('network')) return 'Network error. Please check your connection, rucker.';
+  if (e.contains('invalid credentials') || e.contains('invalid login credentials') || e.contains('serverexception: error during signin: invalid login credentials')) {
+    return authInvalidCredentials;
+  }
   if (e.contains('already exists') || e.contains('Rucker already registered')) {
     return 'An account already exists for this email. Please sign in instead.';
   }
