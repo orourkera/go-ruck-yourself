@@ -40,13 +40,34 @@ class SessionResumed extends ActiveSessionEvent {
 }
 
 class SessionCompleted extends ActiveSessionEvent {
+  final List<String>? tags;
+  final int? perceivedExertion;
+  final double? weightKg;
+  final int? plannedDurationMinutes;
+  final int? pausedDurationSeconds;
   final String? notes;
   final int? rating;
   
-  const SessionCompleted({this.notes, this.rating});
+  const SessionCompleted({
+    this.notes,
+    this.rating,
+    this.tags,
+    this.perceivedExertion,
+    this.weightKg,
+    this.plannedDurationMinutes,
+    this.pausedDurationSeconds,
+  });
   
   @override
-  List<Object?> get props => [notes, rating];
+  List<Object?> get props => [
+    notes,
+    rating,
+    tags,
+    perceivedExertion,
+    weightKg,
+    plannedDurationMinutes,
+    pausedDurationSeconds,
+  ];
 }
 
 /// Event for live heart-rate samples
