@@ -507,30 +507,42 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : true;
-    
+
+    int elapsedSeconds = 0;
+    double distanceKm = 0.0;
     final pace = state is ActiveSessionRunning ? (state as ActiveSessionRunning).pace : null;
+    if (state is ActiveSessionRunning) {
+      elapsedSeconds = state.elapsedSeconds;
+      distanceKm = state.distanceKm;
+    }
+
+    // Thresholds
+    const int minTimeSeconds = 60; // 1 minute
+    const double minDistanceKm = 0.2; // 200 meters
+
     // 60 min/km = 3600 seconds/km (or seconds/mi)
     final bool paceTooHigh = pace != null && pace > 3600;
+    final bool showPace = elapsedSeconds >= minTimeSeconds && distanceKm >= minDistanceKm && pace != null && !paceTooHigh;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Text('Pace', style: TextStyle(fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 4),
-        pace == null || paceTooHigh
-            ? const Text('--', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))
-            : Text(
-                MeasurementUtils.formatPace(pace, metric: preferMetric),
+        showPace
+            ? Text(
+                MeasurementUtils.formatPace(pace!, metric: preferMetric),
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
+              )
+            : const Text('--', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       ],
     );
   }
-}
 
-/// Real map – replace with FlutterMap or GoogleMap.
-class _RouteMap extends StatefulWidget {
-  final VoidCallback? onMapReady;
+  /// Real map – replace with FlutterMap or GoogleMap.
+  class _RouteMap extends StatefulWidget {
+    final VoidCallback? onMapReady;
+    const _RouteMap({required this.route, this.initialCenter, this.onMapReady});
   const _RouteMap({required this.route, this.initialCenter, this.onMapReady});
 
   final List<latlong.LatLng> route;
