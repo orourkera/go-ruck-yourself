@@ -268,19 +268,55 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           SnackBar(content: Text(state.errorMessage)),
                         );
                       } else if (state is ActiveSessionComplete) {
+                        final endTime = state.session.endTime ?? DateTime.now();
+                        final ruckId = state.session.id ?? '';
+                        final duration = state.session.duration ?? Duration.zero;
+                        final distance = state.session.distance ?? 0.0;
+                        final caloriesBurned = state.session.caloriesBurned ?? 0;
+                        final elevationGain = state.session.elevationGain ?? 0.0;
+                        final elevationLoss = state.session.elevationLoss ?? 0.0;
+                        final ruckWeightKg = state.session.ruckWeightKg ?? 0.0;
+                        final notes = state.session.notes;
+                        final heartRateSamples = state.session.heartRateSamples;
+
+                        if (state.session.endTime == null) {
+                          debugPrint('[SessionCompleteScreen] endTime was null, using DateTime.now()');
+                        }
+                        if (state.session.id == null) {
+                          debugPrint('[SessionCompleteScreen] ruckId was null, using empty string');
+                        }
+                        if (state.session.duration == null) {
+                          debugPrint('[SessionCompleteScreen] duration was null, using Duration.zero');
+                        }
+                        if (state.session.distance == null) {
+                          debugPrint('[SessionCompleteScreen] distance was null, using 0.0');
+                        }
+                        if (state.session.caloriesBurned == null) {
+                          debugPrint('[SessionCompleteScreen] caloriesBurned was null, using 0');
+                        }
+                        if (state.session.elevationGain == null) {
+                          debugPrint('[SessionCompleteScreen] elevationGain was null, using 0.0');
+                        }
+                        if (state.session.elevationLoss == null) {
+                          debugPrint('[SessionCompleteScreen] elevationLoss was null, using 0.0');
+                        }
+                        if (state.session.ruckWeightKg == null) {
+                          debugPrint('[SessionCompleteScreen] ruckWeightKg was null, using 0.0');
+                        }
+
                         Navigator.of(ctx).pushReplacementNamed(
                           '/session_complete',
                           arguments: {
-                            'endTime': state.session.endTime,
-                            'ruckId': state.session.id,
-                            'duration': state.session.duration,
-                            'distance': state.session.distance,
-                            'caloriesBurned': state.session.caloriesBurned,
-                            'elevationGain': state.session.elevationGain,
-                            'elevationLoss': state.session.elevationLoss,
-                            'ruckWeightKg': state.session.ruckWeightKg,
-                            'notes': state.session.notes,
-                            'heartRateSamples': state.session.heartRateSamples,
+                            'completedAt': endTime,
+                            'ruckId': ruckId,
+                            'duration': duration,
+                            'distance': distance,
+                            'caloriesBurned': caloriesBurned,
+                            'elevationGain': elevationGain,
+                            'elevationLoss': elevationLoss,
+                            'ruckWeight': ruckWeightKg,
+                            'initialNotes': notes,
+                            'heartRateSamples': heartRateSamples,
                           },
                         );
                       } else if (state is ActiveSessionRunning && !sessionRunning) {
@@ -538,11 +574,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
       ],
     );
   }
+}
 
-  /// Real map – replace with FlutterMap or GoogleMap.
-  class _RouteMap extends StatefulWidget {
-    final VoidCallback? onMapReady;
-    const _RouteMap({required this.route, this.initialCenter, this.onMapReady});
+/// Real map – replace with FlutterMap or GoogleMap.
+class _RouteMap extends StatefulWidget {
+  final VoidCallback? onMapReady;
   const _RouteMap({required this.route, this.initialCenter, this.onMapReady});
 
   final List<latlong.LatLng> route;
