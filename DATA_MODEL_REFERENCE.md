@@ -57,18 +57,23 @@ This document maps the data model for a rucking session across all layers:
 
 When navigating to the session completion screen, the following argument mapping is used from the Dart RuckSession model:
 
-| Argument           | Dart Property           | Notes                                   |
-|--------------------|------------------------|-----------------------------------------|
-| completedAt        | `endTime`              | DateTime when session ended             |
-| ruckId             | `id`                   | Session ID                              |
-| duration           | `duration`             | Duration of session (Duration)          |
-| distance           | `distance`             | Distance in km (double)                 |
-| caloriesBurned     | `caloriesBurned`       | Calories burned (int)                   |
-| elevationGain      | `elevationGain`        | Elevation gain in meters (double)       |
-| elevationLoss      | `elevationLoss`        | Elevation loss in meters (double)       |
-| ruckWeight         | `ruckWeightKg`         | Ruck weight in kg (double)              |
-| initialNotes       | `notes`                | User notes (String?)                    |
-| heartRateSamples   | `heartRateSamples`     | List of HeartRateSample (optional)      |
+| Argument           | Dart Property             | Type                        | Notes                                   |
+|--------------------|--------------------------|-----------------------------|-----------------------------------------|
+| completedAt        | session.endTime           | DateTime                    | Required. Must be non-null.             |
+| ruckId             | session.id                | String                      | Required. Must be non-null.             |
+| duration           | session.duration          | Duration                    | Required. Must be non-null.             |
+| distance           | session.distance          | double                      | Required. Must be non-null.             |
+| caloriesBurned     | session.caloriesBurned    | int                         | Required. Must be non-null.             |
+| elevationGain      | session.elevationGain     | double                      | Required. Must be non-null.             |
+| elevationLoss      | session.elevationLoss     | double                      | Required. Must be non-null.             |
+| ruckWeight         | session.ruckWeightKg      | double                      | Required. Must be non-null.             |
+| initialNotes       | session.notes             | String?                     | Optional. Can be null.                  |
+| heartRateSamples   | session.heartRateSamples  | List<HeartRateSample>?      | Optional. Can be null.                  |
+
+> **Important:**
+> - All argument keys must match exactly between navigation and the `SessionCompleteScreen` constructor.
+> - Mismatches or missing required arguments will cause runtime errors or missing data.
+> - See `active_session_page.dart` and `app.dart` for the current, canonical argument list.
 
 ---
 

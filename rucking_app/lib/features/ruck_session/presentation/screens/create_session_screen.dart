@@ -274,11 +274,22 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     debugPrint('CreateSessionScreen: User metric preference is $_preferMetric');
     _loadDefaults();
     _selectedRuckWeight = _ruckWeight; // initialize with default selected weight
-    // Load metric preference from AuthBloc state
+    // Load metric preference and **body weight** from AuthBloc state
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       setState(() {
         _preferMetric = authState.user.preferMetric;
+        // NEW: Pre-populate user weight from profile if available
+        final double? profileWeightKg = authState.user.weightKg;
+        if (profileWeightKg != null) {
+          final String weightText = _preferMetric
+              ? profileWeightKg.toStringAsFixed(1)
+              : (profileWeightKg * 2.20462).toStringAsFixed(1);
+          // Only assign if controller is empty so we don't override SharedPrefs load
+          if (_userWeightController.text.isEmpty) {
+            _userWeightController.text = weightText;
+          }
+        }
         // Update display weight based on new preference
         _displayRuckWeight = _preferMetric ? _ruckWeight : (_ruckWeight * AppConfig.kgToLbs);
         debugPrint('CreateSessionScreen: Weight display updated to $_displayRuckWeight');

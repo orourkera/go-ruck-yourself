@@ -164,7 +164,21 @@ class ApiClient {
       throw _handleError(e);
     }
   }
-  
+
+  /// Makes a PATCH request to the specified endpoint with the given body
+  Future<dynamic> patch(String endpoint, Map<String, dynamic> body) async {
+    try {
+      final response = await _dio.patch(
+        endpoint,
+        data: body,
+        options: Options(headers: await _getHeaders()),
+      );
+      return response.data;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// Makes a DELETE request to the specified endpoint
   Future<dynamic> delete(String endpoint) async {
     try {
@@ -172,12 +186,12 @@ class ApiClient {
         endpoint,
         options: Options(headers: await _getHeaders()),
       );
-      
       return response.data;
     } catch (e) {
       throw _handleError(e);
     }
   }
+
   
   /// Makes a POST request to add a location point to a ruck session
   Future<dynamic> addLocationPoint(String ruckId, Map<String, dynamic> locationData) async {

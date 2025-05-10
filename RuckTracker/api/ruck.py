@@ -1,6 +1,6 @@
 from flask import request, g
 from flask_restful import Resource
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 import logging
 from dateutil import tz
@@ -56,6 +56,17 @@ class RuckSessionListResource(Resource):
             if not data:
                 return {'message': 'Missing required data for session creation'}, 400
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+
+            # Deduplication: Check for any active (in_progress) session for the current user
+            active_sessions = supabase.table('ruck_session') \
+                .select('id,status') \
+                .eq('user_id', g.user.id) \
+                .eq('status', 'in_progress') \
+                .execute()
+            if active_sessions.data and len(active_sessions.data) > 0:
+                logger.info(f"Reusing active session {active_sessions.data[0]['id']}")
+                return active_sessions.data[0], 200
+
             session_data = {
                 'user_id': g.user.id,
                 'status': 'in_progress',

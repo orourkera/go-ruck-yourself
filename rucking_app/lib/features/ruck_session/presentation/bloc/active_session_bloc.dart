@@ -524,6 +524,43 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _watchService.endSessionOnWatch();
         
         // Update backend about session completion
+        // DEBUG: Log all outgoing values for session completion
+        AppLogger.info('[SESSION COMPLETE PAYLOAD]');
+        AppLogger.info('  distance_km: [36m${double.parse(currentState.distanceKm.toStringAsFixed(3))}[0m');
+        AppLogger.info('  duration_seconds: ${finalElapsedSeconds}');
+        AppLogger.info('  calories_burned: ${currentState.calories.round()}');
+        AppLogger.info('  elevation_gain_m: ${currentState.elevationGain.round()}');
+        AppLogger.info('  elevation_loss_m: ${currentState.elevationLoss.round()}');
+        AppLogger.info('  ruck_weight_kg: ${currentState.ruckWeightKg.roundToDouble()}');
+        AppLogger.info('  notes: ${event.notes}');
+        AppLogger.info('  rating: ${event.rating}');
+        AppLogger.info('  tags: ${event.tags}');
+        AppLogger.info('  perceived_exertion: ${event.perceivedExertion}');
+        AppLogger.info('  weight_kg: ${event.weightKg ?? currentState.weightKg}');
+        AppLogger.info('  planned_duration_minutes: ${event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null)}');
+        AppLogger.info('  paused_duration_seconds: ${event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds}');
+        
+        // DEBUG: Log all values used to construct the RuckSession emitted in ActiveSessionComplete
+        AppLogger.info('[ACTIVE SESSION COMPLETE]');
+        AppLogger.info('  id: ${currentState.sessionId}');
+        AppLogger.info('  startTime: [32m${DateTime.now().subtract(actualDuration)}[0m');
+        AppLogger.info('  endTime: [32m${DateTime.now()}[0m');
+        AppLogger.info('  duration: [32m$actualDuration[0m');
+        AppLogger.info('  distance: ${currentState.distanceKm}');
+        AppLogger.info('  elevationGain: ${currentState.elevationGain}');
+        AppLogger.info('  elevationLoss: ${currentState.elevationLoss}');
+        AppLogger.info('  caloriesBurned: ${currentState.calories}');
+        AppLogger.info('  averagePace: ${currentState.distanceKm > 0 ? (currentState.elapsedSeconds / currentState.distanceKm) : 0.0}');
+        AppLogger.info('  ruckWeightKg: ${currentState.ruckWeightKg}');
+        AppLogger.info('  status: RuckStatus.completed');
+        AppLogger.info('  notes: ${event.notes}');
+        AppLogger.info('  rating: ${event.rating}');
+        AppLogger.info('  tags: ${event.tags ?? currentState.tags}');
+        AppLogger.info('  perceivedExertion: ${event.perceivedExertion ?? currentState.perceivedExertion}');
+        AppLogger.info('  weightKg: ${event.weightKg ?? currentState.weightKg}');
+        AppLogger.info('  plannedDurationMinutes: ${event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null)}');
+        AppLogger.info('  pausedDurationSeconds: ${event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds}');
+        
         await _apiClient.post(
           '/rucks/${currentState.sessionId}/complete',
           {

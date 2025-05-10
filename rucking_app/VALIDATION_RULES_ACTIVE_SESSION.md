@@ -11,18 +11,23 @@ This document lists **all validation rules and thresholds** enforced on the Acti
   - Controlled by `SessionValidationService.minInitialDistanceMeters`.
   - `_canShowStats` is set to `true` after this threshold is reached.
 
-## 2. Minimum Session Distance for Saving
-- **Threshold:** 100 meters
-- **Purpose:** A session cannot be saved unless the user has moved at least 100 meters.
-- **Implementation:**
-  - Controlled by `SessionValidationService.minSessionDistanceMeters`.
-  - Used in session completion and save validation.
+## 2. Session Save Validation (Updated 2025-05-09)
 
-## 3. Minimum Session Duration for Saving
-- **Threshold:** 2 minutes
-- **Purpose:** A session cannot be saved unless it lasts at least 2 minutes.
+The app **no longer enforces** a minimum distance or duration to save a workout. Users may save sessions with *any* distance or time, including zero. Historical constants `minSessionDistanceMeters` and `minSessionDuration` remain in the codebase but are **ignored** during `validateSessionForSave`.
+
+> **Rationale:** Allow recording equipment-only or indoor workouts where GPS and time thresholds are not applicable.
+
+### Implementation Details
+* The checks for `duration < minSessionDuration` and `distanceMeters < minSessionDistanceMeters` have been removed from `SessionValidationService.validateSessionForSave`.
+* UI and BLoC no longer display “session too short” or “distance too short” errors.
+* Other validations (calorie sanity, GPS, speed, etc.) remain unchanged.
+
+## 3. Minimum Initial Distance for Stats Display
+- **Threshold:** 50 meters
+- **Purpose:** Stats (Distance, Pace, Calories, Elevation) are only shown after the user has moved at least 50 meters. Until then, spinners are displayed.
 - **Implementation:**
-  - Controlled by `SessionValidationService.minSessionDuration`.
+  - Controlled by `SessionValidationService.minInitialDistanceMeters`.
+  - `_canShowStats` is set to `true` after this threshold is reached.
 
 ## 4. Auto-Pause (Disabled)
 - **Rule:** The app previously auto-paused when speed dropped below `0.5 km/h` for over `1 minute`. This feature is now disabled to prevent random pausing during sessions. Users must manually pause and resume sessions.
@@ -48,7 +53,6 @@ This document lists **all validation rules and thresholds** enforced on the Acti
     - **Speed:** Segments with speed >10 km/h (for >1 min) are auto-paused.
     - **Idle:** Speed <0.5 km/h for >2 min triggers session end suggestion.
     - **Initial Distance:** Cumulative distance must reach 50m for stats to display.
-    - **Session Save:** Cumulative distance must reach 100m to allow saving.
 - **Elevation Gain/Loss Validation:**
   - Elevation gain/loss is only counted if the change between two points exceeds 1 meter.
   - This is handled by `validateElevationChange(previousPoint, newPoint, minChangeMeters=1.0)`.
@@ -96,4 +100,4 @@ If you change any validation logic or thresholds, update this file and `SessionV
 - Internally, the `SessionPaused`, `SessionResumed`, and `Tick` event classes now have explicit `const` constructors.
 - This change fixes build-time "non-const constructor" errors and does **not** alter validation logic or thresholds.
 
-_Last updated: 2025-05-07_
+_Last updated: 2025-05-09_
