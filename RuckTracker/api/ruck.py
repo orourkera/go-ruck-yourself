@@ -108,8 +108,6 @@ class RuckSessionResource(Resource):
             logger.error(f"Error fetching ruck session {ruck_id}: {e}")
             return {'message': f"Error fetching ruck session: {str(e)}"}, 500
 
-    def patch(self, ruck_id):
-
     def delete(self, ruck_id):
         """Hard delete a ruck session and all associated location_point records for the authenticated user."""
         try:
