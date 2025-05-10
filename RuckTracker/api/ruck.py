@@ -108,6 +108,91 @@ class RuckSessionResource(Resource):
             logger.error(f"Error fetching ruck session {ruck_id}: {e}")
             return {'message': f"Error fetching ruck session: {str(e)}"}, 500
 
+    def patch(self, ruck_id):
+
+    def delete(self, ruck_id):
+        """Hard delete a ruck session and all associated location_point records for the authenticated user."""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            # First, delete all associated location_point records
+            loc_del_resp = supabase.table('location_point') \
+                .delete() \
+                .eq('session_id', ruck_id) \
+                .execute()
+            # Then, delete the ruck_session itself
+            session_del_resp = supabase.table('ruck_session') \
+                .delete() \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+            if not session_del_resp.data or len(session_del_resp.data) == 0:
+                return {'message': 'Session not found or failed to delete'}, 404
+            return {'message': 'Session deleted successfully'}, 200
+        except Exception as e:
+            logger.error(f"Error deleting ruck session {ruck_id}: {e}")
+            return {'message': f"Error deleting ruck session: {str(e)}"}, 500
+
+        """Allow updating notes, rating, perceived_exertion, and tags on any session."""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            data = request.get_json()
+            if not data:
+                return {'message': 'No data provided'}, 400
+
+            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags']
+            update_data = {k: v for k, v in data.items() if k in allowed_fields}
+
+            if not update_data:
+                return {'message': 'No valid fields to update'}, 400
+
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            update_resp = supabase.table('ruck_session') \
+                .update(update_data) \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+
+            if not update_resp.data or len(update_resp.data) == 0:
+                return {'message': 'Failed to update session'}, 500
+
+            return update_resp.data[0], 200
+        except Exception as e:
+            logger.error(f"Error updating ruck session {ruck_id}: {e}")
+            return {'message': f"Error updating ruck session: {str(e)}"}, 500
+
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            response = supabase.table('ruck_session') \
+                .select('*') \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+            if not response.data or len(response.data) == 0:
+                return {'message': 'Session not found'}, 404
+            session = response.data[0]
+            locations_resp = supabase.table('location_point') \
+                .select('latitude,longitude') \
+                .eq('session_id', ruck_id) \
+                .order('timestamp', desc=True) \
+                .execute()
+            logger.info(f"Location response data for session {ruck_id}: {locations_resp.data}")
+            if locations_resp.data:
+                # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
+                session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+                session['location_points'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+            else:
+                session['route'] = []
+                session['location_points'] = []
+            return session, 200
+        except Exception as e:
+            logger.error(f"Error fetching ruck session {ruck_id}: {e}")
+            return {'message': f"Error fetching ruck session: {str(e)}"}, 500
+
 class RuckSessionStartResource(Resource):
     def post(self, ruck_id):
         try:
