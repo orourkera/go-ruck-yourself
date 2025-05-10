@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -14,6 +15,7 @@ import 'package:rucking_app/features/ruck_session/domain/services/session_valida
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -67,6 +69,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   
   // Form controllers and state
   final TextEditingController _notesController = TextEditingController();
+
   
   List<HeartRateSample>? _heartRateSamples;
   int? _avgHeartRate;
@@ -138,67 +141,49 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   
   /// Saves the session review/notes and navigates home
   void _saveAndContinue() {
+    if (_isSaving) return; // Prevent multiple submissions
+  
     setState(() {
       _isSaving = true;
     });
-    
 
-    
-    // Prepare data for the /complete endpoint
-    final Map<String, dynamic> completionData = {
-      // Canonical fields from DATA_MODEL_REFERENCE.md
-      'completed_at': widget.completedAt.toIso8601String(),
-      'notes': _notesController.text,
-      'distance_km': widget.distance,
-      'final_distance_km': widget.distance,
-      'distance_meters': (widget.distance * 1000).round(),
-      'calories_burned': widget.caloriesBurned,
-      'final_calories_burned': widget.caloriesBurned,
-      'elevation_gain_m': widget.elevationGain,
-      'elevation_loss_m': widget.elevationLoss,
-      'final_elevation_gain': widget.elevationGain,
-      'final_elevation_loss': widget.elevationLoss,
-      'final_average_pace': (widget.distance > 0) ? (widget.duration.inSeconds / widget.distance) : null,
+    // Prepare the data for updating
+    final Map<String, dynamic> updateData = {
+      'notes': _notesController.text.trim(),
       'rating': _rating,
       'perceived_exertion': _perceivedExertion,
-      'tags': _selectedTags,
-      'ruck_weight_kg': widget.ruckWeight,
-      // Canonical field for total body weight if available
-      if ((widget as dynamic).weightKg != null) 'weight_kg': (widget as dynamic).weightKg,
-      // Canonical field for avg heart rate
-      if (_avgHeartRate != null) 'avg_heart_rate': _avgHeartRate,
-  
-      // If planned duration is available from widget
-      if ((widget as dynamic).plannedDurationMinutes != null) 'planned_duration_minutes': (widget as dynamic).plannedDurationMinutes,
-      // If paused duration is available from widget
-      if ((widget as dynamic).pausedDurationSeconds != null) 'paused_duration_seconds': (widget as dynamic).pausedDurationSeconds,
+      'tags': _selectedTags.isNotEmpty ? _selectedTags : null,
     };
 
-    // Debug print for outgoing payload
-    debugPrint('Session completionData payload: ' + completionData.toString());
+    // Log the values being sent
+    print('[SESSION_UPDATE] Sending values:');
+    print('[SESSION_UPDATE]   notes: ${updateData['notes']}');
+    print('[SESSION_UPDATE]   rating: ${updateData['rating']}');
+    print('[SESSION_UPDATE]   perceived_exertion: ${updateData['perceived_exertion']}');
+    print('[SESSION_UPDATE]   tags: ${updateData['tags']}');
 
-    // Remove null values (especially if average pace is not computable)
-    completionData.removeWhere((key, value) => value == null);
-
-    _apiClient.post('/rucks/${widget.ruckId}/complete', completionData)
-      .then((response) {
-        debugPrint("Session completed successfully: $response");
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (route) => false,
-          );
-        }
-    }).catchError((e) {
-      debugPrint("Error completing session: $e");
-      if (!mounted) return;
-      debugPrint('Failed to complete session: $e');
-      if (mounted) {
+    // Make a PATCH request to update notes, rating, perceived exertion, and tags after completion
+    _apiClient.patch('/rucks/${widget.ruckId}', updateData)
+      .then((_) {
+        // Navigate home on success
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      })
+      .catchError((error) {
+        print('[SESSION_UPDATE] Error: $error');
+        // Show error and reset saving state
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving session details: ${error.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
         setState(() {
           _isSaving = false;
         });
-      }
-    });
+      });
   }
 
   /// Populate stats from widget parameters
@@ -499,6 +484,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 const SizedBox(height: 8),
                 CustomTextField(
                   controller: _notesController,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
                   label: 'Add notes about this session',
                   hint: 'How did it feel? What went well? What could be improved?',
                   maxLines: 4,
