@@ -161,21 +161,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     );
   }
 
-              child: const Text(
-                'KEEP RUCKING',
-                style: TextStyle(
-                  color: Color(0xFFB86F1B), // Accent color
-                  fontWeight: FontWeight.bold, // Bold font weight
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

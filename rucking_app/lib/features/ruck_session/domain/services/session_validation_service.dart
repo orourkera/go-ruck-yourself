@@ -193,19 +193,8 @@ class SessionValidationService {
       'message': null,
     };
 
-    // 1. Minimum session duration check
-    if (duration < minSessionDuration) {
-      results['isValid'] = false;
-      results['message'] = sessionTooShortError.replaceFirst('{minutes}', minSessionDuration.inMinutes.toString());
-      return results;
-    }
-
-    // 2. Minimum distance check
-    if (distanceMeters < minSessionDistanceMeters || distanceMeters <= 0.0) {
-      results['isValid'] = false;
-      results['message'] = sessionDistanceTooShortError;
-      return results;
-    }
+    // NOTE: Minimum session duration and minimum distance checks have been DISABLED.
+    // Users can now save workouts with any duration or distance, including zero.
 
     // 3. Calories value can be zero; just warn if negative
     if (caloriesBurned < 0.0) {
