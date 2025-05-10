@@ -94,6 +94,7 @@ class SessionStatsOverlay extends StatelessWidget {
         const SizedBox(height: 8.0), // Reduce vertical space at top
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center, // Added for vertical alignment
           children: [
             // Time (big)
             Expanded(
@@ -106,7 +107,7 @@ class SessionStatsOverlay extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          SizedBox(height: 4),
+                          // Removed SizedBox to align with heart rate display
                           Text(
                             _formatHoursMinutesSeconds(Duration(seconds: state.elapsedSeconds)),
                             style: AppTextStyles.timerDisplay.copyWith(
@@ -131,37 +132,40 @@ class SessionStatsOverlay extends StatelessWidget {
                     ),
                     // Right half: Heart rate (centered)
                     Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Removed extra vertical space here
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.favorite,
-                                color: Colors.red,
-                                size: 36,
-                              ),
-                              SizedBox(width: 8),
-                              // Removed Baseline widget for simpler vertical centering
-                              Text(
-                                (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
-                                style: AppTextStyles.timerDisplay.copyWith(
-                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 36,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 14.0), // Align with timer
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Removed extra vertical space here
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.favorite,
+                                  color: Colors.red,
+                                  size: 36,
                                 ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            (state.latestHeartRate ?? 0) > 0 ? 'BPM' : '',
-                            style: AppTextStyles.labelSmall.copyWith(fontSize: 10, color: AppColors.primary)
-                          ),
-                        ],
+                                SizedBox(width: 8),
+                                // Removed Baseline widget for simpler vertical centering
+                                Text(
+                                  (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
+                                  style: AppTextStyles.timerDisplay.copyWith(
+                                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 36,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              (state.latestHeartRate ?? 0) > 0 ? 'BPM' : '',
+                              style: AppTextStyles.labelSmall.copyWith(fontSize: 10, color: AppColors.primary)
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
