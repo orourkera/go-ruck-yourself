@@ -295,7 +295,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Great job!',
+                        'Great job rucker!',
                         style: AppTextStyles.headlineLarge.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
