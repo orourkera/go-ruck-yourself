@@ -4,6 +4,10 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatelessWidget {
@@ -33,16 +37,17 @@ class SessionDetailScreen extends StatelessWidget {
         : '${(session.distance * 0.621371).toStringAsFixed(2)} mi';
     
     // Format pace
-    final paceValue = session.formattedPace;
+    final paceValue = MeasurementUtils.formatPace(
+      session.averagePace,
+      metric: preferMetric,
+    );
     
     // Format elevation
-    final elevationGain = preferMetric
-        ? '${session.elevationGain.toStringAsFixed(0)} m'
-        : '${(session.elevationGain * 3.28084).toStringAsFixed(0)} ft';
-    
-    final elevationLoss = preferMetric
-        ? '${session.elevationLoss.toStringAsFixed(0)} m'
-        : '${(session.elevationLoss * 3.28084).toStringAsFixed(0)} ft';
+    final elevationDisplay = MeasurementUtils.formatElevation(
+      session.elevationGain,
+      session.elevationLoss,
+      metric: preferMetric,
+    );
     
     // Format weight
     final weight = preferMetric
@@ -52,12 +57,6 @@ class SessionDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Session Details'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () => _shareSession(context),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -99,14 +98,20 @@ class SessionDetailScreen extends StatelessWidget {
                         context, 
                         Icons.speed, 
                         'Pace', 
-                        '$paceValue min/km',
+                        paceValue,
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            
+
+            // Route map preview
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              child: _SessionRouteMap(session: session),
+            ),
+
             // Detail stats
             Padding(
               padding: const EdgeInsets.all(16),
@@ -130,20 +135,28 @@ class SessionDetailScreen extends StatelessWidget {
                     weight,
                     Icons.fitness_center,
                   ),
-                  _buildDetailRow(
-                    context,
-                    'Elevation Gain',
-                    elevationGain,
-                    Icons.trending_up,
-                  ),
-                  _buildDetailRow(
-                    context,
-                    'Elevation Loss',
-                    elevationLoss,
-                    Icons.trending_down,
-                  ),
-                  
-                  // Rating display if available
+                  // Elevation Gain/Loss rows
+                  if (session.elevationGain > 0)
+                    _buildDetailRow(
+                      context,
+                      'Elevation Gain',
+                      MeasurementUtils.formatElevation(session.elevationGain, 0, metric: preferMetric),
+                      Icons.trending_up,
+                    ),
+                  if (session.elevationLoss > 0)
+                    _buildDetailRow(
+                      context,
+                      'Elevation Loss',
+                      MeasurementUtils.formatElevation(0, session.elevationLoss, metric: preferMetric),
+                      Icons.trending_down,
+                    ),
+                  if (session.elevationGain == 0.0 && session.elevationLoss == 0.0)
+                    _buildDetailRow(
+                      context,
+                      'Elevation',
+                      '--',
+                      Icons.landscape,
+                    ),   
                   if (session.rating != null) ...[
                     const SizedBox(height: 24),
                     Text(
@@ -163,8 +176,6 @@ class SessionDetailScreen extends StatelessWidget {
                       }),
                     ),
                   ],
-                  
-                  // Notes display if available
                   if (session.notes?.isNotEmpty == true) ...[
                     const SizedBox(height: 24),
                     Text(
@@ -278,6 +289,113 @@ Download Go Rucky Yourself from the App Store!
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Sharing not implemented in this version'),
+      ),
+    );
+  }
+}
+
+// Route map preview widget for session details
+class _SessionRouteMap extends StatelessWidget {
+  final RuckSession session;
+  const _SessionRouteMap({required this.session});
+
+  List<LatLng> _getRoutePoints() {
+    final points = <LatLng>[];
+    // Try locationPoints (preferred in model)
+    if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
+      for (final p in session.locationPoints!) {
+        if (p.containsKey('lat') && p.containsKey('lng')) {
+          points.add(LatLng((p['lat'] as num).toDouble(), (p['lng'] as num).toDouble()));
+        }
+      }
+    }
+    return points;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final points = _getRoutePoints();
+    final center = points.isNotEmpty
+        ? LatLng(
+            points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length,
+            points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
+          )
+        : LatLng(40.421, -3.678); // Default center
+    final zoom = points.length > 1
+        ? (() {
+            double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+            double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+            double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+            double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+            double latDiff = (maxLat - minLat).abs();
+            double lngDiff = (maxLng - minLng).abs();
+            double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+            maxDiff *= 1.05;
+            if (maxDiff < 0.001) return 17.5;
+            if (maxDiff < 0.01) return 16.0;
+            if (maxDiff < 0.1) return 14.0;
+            if (maxDiff < 1.0) return 11.0;
+            return 8.0;
+          })()
+        : 15.5;
+
+    if (points.isEmpty) {
+      return Container(
+        height: 180,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.center,
+        child: Text('No route data available', style: Theme.of(context).textTheme.bodyMedium),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 180,
+        width: double.infinity,
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: zoom,
+            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+              userAgentPackageName: 'com.getrucky.gfy',
+              retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+            ),
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: points,
+                  color: Theme.of(context).primaryColor,
+                  strokeWidth: 4,
+                ),
+              ],
+            ),
+            if (points.isNotEmpty)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: points.first,
+                    width: 20,
+                    height: 20,
+                    child: const Icon(Icons.trip_origin, color: Colors.green, size: 20),
+                  ),
+                  Marker(
+                    point: points.last,
+                    width: 20,
+                    height: 20,
+                    child: const Icon(Icons.location_pin, color: Colors.red, size: 20),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
