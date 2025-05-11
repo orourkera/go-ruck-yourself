@@ -459,7 +459,6 @@ from flask import request, g
 from flask_restful import Resource
 
 from flask_limiter.util import get_remote_address
-from RuckTracker.app import limiter
 
 class HeartRateSampleUploadResource(Resource):
     def post(self, ruck_id):
