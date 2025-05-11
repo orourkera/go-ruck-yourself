@@ -198,17 +198,13 @@ class HealthService {
         try {
           // If the health package provides writeWorkoutData (>=5.0.0)
           workoutSuccess = await _health.writeWorkoutData(
+            activityType: HealthWorkoutActivityType.HIKING,
             start: startDate,
             end: endDate,
-            workoutActivityType: WorkoutActivityType.hiking,
-            totalEnergyBurned: caloriesBurned.toDouble(),
-            totalDistance: distanceMeters.toDouble(),
-            metadata: {
-              if (ruckWeightKg != null) 'ruckWeightKg': ruckWeightKg,
-              if (elevationGainMeters != null) 'elevationGainMeters': elevationGainMeters,
-              if (elevationLossMeters != null) 'elevationLossMeters': elevationLossMeters,
-              if (heartRate != null) 'averageHeartRate': heartRate,
-            },
+            totalEnergyBurned: caloriesBurned,
+            totalEnergyBurnedUnit: HealthDataUnit.KILOCALORIE,
+            totalDistance: distanceMeters,
+            totalDistanceUnit: HealthDataUnit.METER,
           );
         } catch (e) {
           AppLogger.error('Failed to write HealthKit WORKOUT sample: $e');
