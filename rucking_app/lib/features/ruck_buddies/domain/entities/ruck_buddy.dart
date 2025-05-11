@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:rucking_app/features/ruck_buddies/data/models/ruck_buddy_model.dart';
+import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 
 class RuckBuddy extends Equatable {
   final String id;

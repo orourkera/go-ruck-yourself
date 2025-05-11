@@ -433,7 +433,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                       style: AppTextStyles.labelLarge.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                      )
+                      ),
+                    ),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -442,10 +443,14 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         ),
                       );
                     },
-                    color: AppColors.secondary,
-                    textColor: Colors.white,
-                    borderRadius: 10,
-                    height: 56,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      minimumSize: const Size.fromHeight(56),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),

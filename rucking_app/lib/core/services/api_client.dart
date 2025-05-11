@@ -67,7 +67,7 @@ class ApiClient {
   }
   
   /// Makes a GET request to the API
-  Future<dynamic> get(String endpoint) async {
+  Future<dynamic> get(String endpoint, {Map<String, dynamic>? queryParams}) async {
     try {
       // For authenticated endpoints, verify we have a token first
       if (endpoint.contains('/rucks') || endpoint.contains('/users')) {
@@ -87,6 +87,7 @@ class ApiClient {
       // Make API call
       final response = await _dio.get(
         endpoint,
+        queryParameters: queryParams,
         options: options,
       );
       

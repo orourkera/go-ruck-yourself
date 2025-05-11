@@ -34,6 +34,7 @@ dependencies:
   flutter_bloc: ^9.1.0
   equatable: ^2.0.5
   flutter_riverpod: ^2.4.0
+  dartz: ^0.10.1
   
   # Network
   dio: ^5.3.2

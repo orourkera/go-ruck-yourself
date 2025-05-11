@@ -24,6 +24,7 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
         offset: offset,
         filter: filter,
       );
+      // Model class extends entity, so this is safe
       return Right(ruckBuddies);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));

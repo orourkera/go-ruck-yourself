@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
+import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -45,8 +46,8 @@ class RuckBuddyCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ruckBuddy.user.displayNameOrUsername,
-                        style: AppTextStyles.titleMedium.copyWith(
+                        ruckBuddy.user.displayName,
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -131,14 +132,14 @@ class RuckBuddyCard extends StatelessWidget {
   }
   
   Widget _buildAvatar(UserInfo user) {
-    if (user.avatarUrl != null && user.avatarUrl!.isNotEmpty) {
+    if (user.photoUrl != null && user.photoUrl!.isNotEmpty) {
       return CircleAvatar(
         radius: 20,
-        backgroundImage: NetworkImage(user.avatarUrl!),
+        backgroundImage: NetworkImage(user.photoUrl!),
       );
     } else {
-      final String initial = user.displayNameOrUsername.isNotEmpty 
-        ? user.displayNameOrUsername[0].toUpperCase() 
+      final String initial = user.displayName.isNotEmpty 
+        ? user.displayName[0].toUpperCase() 
         : 'R';
       
       return CircleAvatar(
