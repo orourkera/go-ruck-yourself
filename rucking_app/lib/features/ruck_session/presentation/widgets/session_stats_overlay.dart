@@ -141,7 +141,8 @@ class SessionStatsOverlay extends StatelessWidget {
                             // Removed extra vertical space here
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.baseline, // Changed to baseline
+                              textBaseline: TextBaseline.alphabetic, // Specify the baseline
                               mainAxisSize: MainAxisSize.min, // Add this line
                               children: [
                                 Icon(
