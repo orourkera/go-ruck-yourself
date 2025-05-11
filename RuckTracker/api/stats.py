@@ -155,10 +155,11 @@ class MonthlyStatsResource(Resource):
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             response = supabase.table('ruck_session') \
-                .select('distance_km, duration_seconds, calories_burned, created_at') \
+                .select('distance_km, duration_seconds, calories_burned, completed_at') \
                 .eq('user_id', g.user.id) \
-                .gte('created_at', start_iso) \
-                .lte('created_at', end_iso) \
+                .gte('completed_at', start_iso) \
+                .lte('completed_at', end_iso) \
+                .eq('status', 'completed') \
                 .execute()
 
             if response.data is None:
