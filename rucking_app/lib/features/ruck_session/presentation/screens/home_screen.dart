@@ -4,7 +4,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
-
+import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_history_screen.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
@@ -18,6 +18,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -592,127 +593,141 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                             LatLng(40.424, -3.676),
                           ];
                         }
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          elevation: 1,
-                          color: Theme.of(context).cardColor, // Use theme card color (tan in dark mode)
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // MAP PREVIEW
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: SizedBox(
-                                    height: 180, // reduced from 240 by 25%
-                                    width: double.infinity,
-                                    child: FlutterMap(
-                                      options: MapOptions(
-                                        initialCenter: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
-                                        initialZoom: routePoints.length > 1 ? _getFitZoom(routePoints) : 15.5,
-                                        interactionOptions: const InteractionOptions(
-                                          flags: InteractiveFlag.none, // Disable interactions for preview
+                        return GestureDetector(
+                          onTap: () {
+                            try {
+                              final sessionModel = RuckSession.fromJson(session);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => SessionDetailScreen(session: sessionModel),
+                                ),
+                              );
+                            } catch (e) {
+                              debugPrint('Error navigating to session detail: $e');
+                            }
+                          },
+                          child: Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            elevation: 1,
+                            color: Theme.of(context).cardColor, // Use theme card color (tan in dark mode)
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // MAP PREVIEW
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: SizedBox(
+                                      height: 180, // reduced from 240 by 25%
+                                      width: double.infinity,
+                                      child: FlutterMap(
+                                        options: MapOptions(
+                                          initialCenter: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
+                                          initialZoom: routePoints.length > 1 ? _getFitZoom(routePoints) : 15.5,
+                                          interactionOptions: const InteractionOptions(
+                                            flags: InteractiveFlag.none, // Disable interactions for preview
+                                          ),
                                         ),
-                                      ),
-                                      children: [
-                                        TileLayer(
-                                          urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-                                          userAgentPackageName: 'com.getrucky.gfy',
-                                          retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-                                        ),
-                                        PolylineLayer(
-                                          polylines: [
-                                            Polyline(
-                                              points: routePoints,
-                                              color: AppColors.secondary,
-                                              strokeWidth: 4,
-                                            ),
-                                          ],
-                                        ),
-                                        if (routePoints.isNotEmpty)
-                                          MarkerLayer(
-                                            markers: [
-                                              // Start marker (green)
-                                              Marker(
-                                                point: routePoints.first,
-                                                width: 20,
-                                                height: 20,
-                                                child: const Icon(Icons.trip_origin, color: Colors.green, size: 20),
-                                              ),
-                                              // End marker (red)
-                                              Marker(
-                                                point: routePoints.last,
-                                                width: 20,
-                                                height: 20,
-                                                child: const Icon(Icons.location_pin, color: Colors.red, size: 20),
+                                        children: [
+                                          TileLayer(
+                                            urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+                                            userAgentPackageName: 'com.getrucky.gfy',
+                                            retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+                                          ),
+                                          PolylineLayer(
+                                            polylines: [
+                                              Polyline(
+                                                points: routePoints,
+                                                color: AppColors.secondary,
+                                                strokeWidth: 4,
                                               ),
                                             ],
                                           ),
-                                      ],
+                                          if (routePoints.isNotEmpty)
+                                            MarkerLayer(
+                                              markers: [
+                                                // Start marker (green)
+                                                Marker(
+                                                  point: routePoints.first,
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: const Icon(Icons.trip_origin, color: Colors.green, size: 20),
+                                                ),
+                                                // End marker (red)
+                                                Marker(
+                                                  point: routePoints.last,
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: const Icon(Icons.location_pin, color: Colors.red, size: 20),
+                                                ),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      formattedDate,
-                                      style: AppTextStyles.titleMedium.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        formattedDate,
+                                        style: AppTextStyles.titleMedium.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      durationText,
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                                      Text(
+                                        durationText,
+                                        style: AppTextStyles.bodyMedium.copyWith(
+                                          color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _buildSessionStat(
-                                            Icons.straighten,
-                                            distanceValue,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          _buildSessionStat(
-                                            Icons.timer,
-                                            paceDisplay,
-                                          ),
-                                        ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _buildSessionStat(
+                                              Icons.straighten,
+                                              distanceValue,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            _buildSessionStat(
+                                              Icons.timer,
+                                              paceDisplay,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _buildSessionStat(
-                                            Icons.local_fire_department,
-                                            '$calories cal',
-                                          ),
-                                          const SizedBox(height: 4),
-                                          _buildSessionStat(
-                                            Icons.landscape,
-                                            elevationDisplay,
-                                          ),
-                                        ],
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _buildSessionStat(
+                                              Icons.local_fire_department,
+                                              '$calories cal',
+                                            ),
+                                            const SizedBox(height: 4),
+                                            _buildSessionStat(
+                                              Icons.landscape,
+                                              elevationDisplay,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         );
