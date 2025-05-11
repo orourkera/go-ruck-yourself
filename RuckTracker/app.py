@@ -285,6 +285,7 @@ api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
 api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
 api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete')
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
+api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<string:ruck_id>/heart_rate')
 # api.add_resource(RuckSessionDetailResource, '/api/ruck-details/<string:session_id>') # Commented out
 
 # Statistics endpoints (prefixed with /api)
