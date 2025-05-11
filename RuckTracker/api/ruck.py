@@ -461,7 +461,6 @@ from flask_restful import Resource
 from flask_limiter.util import get_remote_address
 from RuckTracker.app import limiter
 
-@limiter.limit("360 per hour", key_func=get_remote_address)
 class HeartRateSampleUploadResource(Resource):
     def post(self, ruck_id):
         """Upload heart rate samples to a ruck session (POST /api/rucks/<ruck_id>/heart_rate)"""

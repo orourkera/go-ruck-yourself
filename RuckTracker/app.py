@@ -14,6 +14,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate # Import Migrate
 from RuckTracker.supabase_client import get_supabase_client # Correct import path for get_supabase_client
 from RuckTracker.api.ruck import HeartRateSampleUploadResource
+from flask_limiter.util import get_remote_address
+
+# Apply rate limit to HeartRateSampleUploadResource after import to avoid circular import
+limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
 
 # Load environment variables from .env file
 load_dotenv()
