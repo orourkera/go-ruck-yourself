@@ -751,51 +751,52 @@ emit(ActiveSessionComplete(
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
-  _paceTickCounter++;
-  // Heart rate batching: flush every 5 seconds if buffer not empty
-  if (state is ActiveSessionRunning) {
+    _paceTickCounter++; // Increment local pace counter
+
+    if (state is! ActiveSessionRunning) return;
     final currentState = state as ActiveSessionRunning;
-    if (_hrBuffer.isNotEmpty && (_lastHrFlush == null || DateTime.now().difference(_lastHrFlush!) > Duration(seconds: 5))) {
+
+    // Flush heart-rate buffer every 5 seconds
+    if (_hrBuffer.isNotEmpty &&
+        (_lastHrFlush == null ||
+            DateTime.now().difference(_lastHrFlush!) > const Duration(seconds: 5))) {
       await _flushHeartRateBuffer(currentState);
     }
-  }
-  if (state is ActiveSessionRunning) {
-    final currentState = state as ActiveSessionRunning;
-    final double currentDistance = currentState.distanceKm; // in km
-    double? newPace = currentState.pace; // Default to previous pace; only update every 15s with safety checks
 
-      int newElapsed = currentState.elapsedSeconds + 1;
-      if (newElapsed < 0) newElapsed = 0;
+    // Derive elapsed time from wall-clock
+    int newElapsed = DateTime.now()
+            .toUtc()
+            .difference(currentState.originalSessionStartTimeUtc)
+            .inSeconds -
+        currentState.totalPausedDuration.inSeconds;
+    if (newElapsed < 0) newElapsed = 0;
 
-      // Only update pace every 15 seconds, and only if safety checks pass
-      if (_paceTickCounter % 15 == 0) {
-        // Wait for at least 10 valid location points before showing pace
-        if (_validLocationCount < 10 || currentDistance < 0.1) {
-          newPace = null;
-        } else {
-          double candidatePace = currentDistance > 0 ? (newElapsed / currentDistance) : 0.0;
-          // Filter out absurdly slow paces (> 20 min/km = 1200 sec/km)
-          newPace = (candidatePace > 1200) ? null : candidatePace;
-        }
+    // Pace calculation
+    double? newPace = currentState.pace;
+    if (newElapsed % 15 == 0) {
+      if (_validLocationCount < 10 || currentState.distanceKm < 0.1) {
+        newPace = null;
+      } else {
+        final candidate = newElapsed / currentState.distanceKm;
+        newPace = (candidate > 1200) ? null : candidate;
       }
-
-      // Calculate calories burned using MET-based rucking formula
-      final double calculatedCalories = MetCalculator.calculateRuckingCalories(
-        userWeightKg: _getUserWeightKg(),
-        ruckWeightKg: currentState.ruckWeightKg,
-        distanceKm: currentDistance,
-        elapsedSeconds: newElapsed,
-        elevationGain: currentState.elevationGain,
-        elevationLoss: currentState.elevationLoss,
-      );
-      final int newCalories = calculatedCalories.round();
-
-      emit(currentState.copyWith(
-        elapsedSeconds: newElapsed,
-        pace: newPace,
-        calories: newCalories,
-      ));
     }
+
+    // Calories
+    final double calculatedCalories = MetCalculator.calculateRuckingCalories(
+      userWeightKg: _getUserWeightKg(),
+      ruckWeightKg: currentState.ruckWeightKg,
+      distanceKm: currentState.distanceKm,
+      elapsedSeconds: newElapsed,
+      elevationGain: currentState.elevationGain,
+      elevationLoss: currentState.elevationLoss,
+    );
+
+    emit(currentState.copyWith(
+      elapsedSeconds: newElapsed,
+      pace: newPace,
+      calories: calculatedCalories.round(),
+    ));
   }
 
   Future<void> _onTimerStarted(

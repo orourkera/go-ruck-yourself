@@ -142,6 +142,7 @@ class SessionStatsOverlay extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min, // Add this line
                               children: [
                                 Icon(
                                   Icons.favorite,
