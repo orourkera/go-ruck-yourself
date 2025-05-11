@@ -357,9 +357,7 @@ class RuckSessionCompleteResource(Resource):
                 duration_seconds = 0
             # Calculate pace if possible
             distance_km = None
-            if 'final_distance_km' in data and data['final_distance_km']:
-                distance_km = data['final_distance_km']
-            elif 'distance_km' in data and data['distance_km']:
+            if 'distance_km' in data and data['distance_km']:
                 distance_km = data['distance_km']
             # Only calculate if both duration and distance are valid
             final_average_pace = None
@@ -368,32 +366,21 @@ class RuckSessionCompleteResource(Resource):
             # Update session status to completed with end data
             update_data = {
                 'status': 'completed',
-                'ended_at': datetime.now(tz.tzutc()).isoformat(),
                 'duration_seconds': duration_seconds
             }
             # Add all relevant fields if provided
-            if 'distance_meters' in data:
-                update_data['distance_meters'] = data['distance_meters']
             if 'distance_km' in data:
                 update_data['distance_km'] = data['distance_km']
-            if 'final_distance_km' in data:
-                update_data['final_distance_km'] = data['final_distance_km']
             if 'weight_kg' in data:
                 update_data['weight_kg'] = data['weight_kg']
             if 'ruck_weight_kg' in data:
                 update_data['ruck_weight_kg'] = data['ruck_weight_kg']
             if 'calories_burned' in data:
                 update_data['calories_burned'] = data['calories_burned']
-            if 'final_calories_burned' in data:
-                update_data['final_calories_burned'] = data['final_calories_burned']
             if 'elevation_gain_m' in data:
                 update_data['elevation_gain_m'] = data['elevation_gain_m']
             if 'elevation_loss_m' in data:
                 update_data['elevation_loss_m'] = data['elevation_loss_m']
-            if 'final_elevation_gain' in data:
-                update_data['final_elevation_gain'] = data['final_elevation_gain']
-            if 'final_elevation_loss' in data:
-                update_data['final_elevation_loss'] = data['final_elevation_loss']
             if 'completed_at' in data:
                 update_data['completed_at'] = data['completed_at']
             if 'start_time' in data:
@@ -466,28 +453,44 @@ class RuckSessionLocationResource(Resource):
             logger.error(f"Error adding location point for ruck session {ruck_id}: {e}")
             return {'message': f"Error adding location point: {str(e)}"}, 500
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from ..models import db, RuckSession, HeartRateSample
-from .schemas import HeartRateSampleIn
-from ..dependencies import get_db
+from flask import request, g
+from flask_restful import Resource
 
-router = APIRouter()
-
-@router.post('/rucks/{session_id}/heart_rate')
-def upload_heart_rate(session_id: int, samples: List[HeartRateSampleIn], db: Session = Depends(get_db)):
-    session = db.query(RuckSession).filter_by(id=session_id).first()
-    if not session:
-        raise HTTPException(status_code=404, detail='Session not found')
-    db_objs = [
-        HeartRateSample(
-            session_id=session_id,
-            timestamp=sample.timestamp,
-            bpm=sample.bpm
-        )
-        for sample in samples
-    ]
-    db.add_all(db_objs)
-    db.commit()
-    return {"status": "ok"}
+class HeartRateSampleUploadResource(Resource):
+    def post(self, ruck_id):
+        """Upload heart rate samples to a ruck session (POST /api/rucks/<ruck_id>/heart_rate)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            data = request.get_json()
+            if not data or 'samples' not in data or not isinstance(data['samples'], list):
+                return {'message': 'Missing or invalid samples'}, 400
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            # Check if session exists and belongs to user
+            session_resp = supabase.table('ruck_session') \
+                .select('id,user_id') \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .single() \
+                .execute()
+            if not session_resp.data:
+                return {'message': 'Session not found'}, 404
+            # Insert heart rate samples
+            heart_rate_rows = []
+            for sample in data['samples']:
+                if 'timestamp' not in sample or 'bpm' not in sample:
+                    continue
+                heart_rate_rows.append({
+                    'session_id': ruck_id,
+                    'timestamp': sample['timestamp'],
+                    'bpm': sample['bpm'],
+                    'user_id': g.user.id
+                })
+            if not heart_rate_rows:
+                return {'message': 'No valid heart rate samples'}, 400
+            insert_resp = supabase.table('heart_rate_sample').insert(heart_rate_rows).execute()
+            if not insert_resp.data:
+                return {'message': 'Failed to insert heart rate samples'}, 500
+            return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
+        except Exception as e:
+            return {'message': f'Error uploading heart rate samples: {str(e)}'}, 500
