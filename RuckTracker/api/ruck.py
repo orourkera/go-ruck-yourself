@@ -383,8 +383,8 @@ class RuckSessionCompleteResource(Resource):
                 update_data['elevation_gain_m'] = data['elevation_gain_m']
             if 'elevation_loss_m' in data:
                 update_data['elevation_loss_m'] = data['elevation_loss_m']
-            if 'completed_at' in data:
-                update_data['completed_at'] = data['completed_at']
+            # Always set completed_at to now (UTC) when completing session
+            update_data['completed_at'] = datetime.now(tz.tzutc()).isoformat()
             if 'start_time' in data:
                 update_data['start_time'] = data['start_time']
             if 'end_time' in data:
