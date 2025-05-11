@@ -32,6 +32,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   final _durationController = TextEditingController();
   final FocusNode _durationFocusNode = FocusNode();
 
+  final ScrollController _weightScrollController = ScrollController();
+
   double _ruckWeight = AppConfig.defaultRuckWeight;
   double _displayRuckWeight = 0.0; // Will be set in kg or lbs based on preference
   int? _plannedDuration; // Default is now empty
@@ -298,6 +300,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       // Ensure the last ruck weight is loaded and set as selected
       _loadLastRuckWeight();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelectedWeight());
     _durationFocusNode.addListener(() {
     });
     // Restore last selected ruck weight and ensure UI reflects it
@@ -312,7 +315,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         });
         // Force a UI rebuild to ensure the chip is selected
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          
+          _scrollToSelectedWeight();
         });
       } else {
         
@@ -335,6 +338,24 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     _durationController.addListener(_durationListener);
   }
 
+  void _scrollToSelectedWeight() {
+    final List<double> currentWeightOptions = _preferMetric 
+        ? AppConfig.metricWeightOptions 
+        : AppConfig.standardWeightOptions;
+    final selectedIndex = currentWeightOptions.indexWhere((w) {
+      final weightInKg = _preferMetric ? w : w / AppConfig.kgToLbs;
+      return (weightInKg - _selectedRuckWeight).abs() < (_preferMetric ? 0.01 : 0.1);
+    });
+    if (selectedIndex != -1 && _weightScrollController.hasClients) {
+      final offset = (selectedIndex * 60.0).clamp(0.0, _weightScrollController.position.maxScrollExtent); // approx chip width
+      _weightScrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   // Load last saved ruck weight from SharedPreferences
   Future<void> _loadLastRuckWeight() async {
     final prefs = await SharedPreferences.getInstance();
@@ -351,6 +372,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
   @override
   void dispose() {
+    _weightScrollController.dispose();
     _userWeightController.dispose();
     _durationController.removeListener(_durationListener);
     _durationController.dispose();
@@ -432,6 +454,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           });
           final prefs = await SharedPreferences.getInstance();
           await prefs.setDouble('lastRuckWeightKg', weightInKg);
+          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelectedWeight());
         }
       },
       selectedColor: Theme.of(context).primaryColor,
@@ -517,6 +540,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                           child: CircularProgressIndicator(),
                         )
                       : ListView.separated(
+                          controller: _weightScrollController,
                           scrollDirection: Axis.horizontal,
                           clipBehavior: Clip.none,
                           itemCount: currentWeightOptions.length,

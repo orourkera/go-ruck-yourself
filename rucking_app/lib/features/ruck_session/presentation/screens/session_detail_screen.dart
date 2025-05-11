@@ -8,6 +8,7 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatelessWidget {
@@ -372,7 +373,7 @@ class _SessionRouteMap extends StatelessWidget {
               polylines: [
                 Polyline(
                   points: points,
-                  color: Theme.of(context).primaryColor,
+                  color: AppColors.secondary,
                   strokeWidth: 4,
                 ),
               ],
