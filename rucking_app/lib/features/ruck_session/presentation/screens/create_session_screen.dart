@@ -66,7 +66,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         _displayRuckWeight = _ruckWeight * AppConfig.kgToLbs;
       }
       
-      debugPrint('Loaded weight from prefs: _ruckWeight=$_ruckWeight kg, _selectedRuckWeight=$_selectedRuckWeight kg');
+      
       
       // Load last used duration (might be null if not previously set)
       int? lastDurationMinutes = prefs.getInt('lastSessionDurationMinutes');
@@ -82,7 +82,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       }
 
     } catch (e) {
-      debugPrint('Error loading defaults: $e');
+      
       // Fallback to defaults on error
       _ruckWeight = AppConfig.defaultRuckWeight;
       _durationController.text = '30'; // Default duration on error
@@ -96,7 +96,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           setState(() {
             // Force synchronization
             _selectedRuckWeight = _ruckWeight;
-            debugPrint('UI rebuild triggered to reflect loaded weight: $_ruckWeight kg');
+            
           });
         }
       });
@@ -107,21 +107,21 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   Future<void> _saveLastWeight(double weightKg) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('lastRuckWeightKg', weightKg);
-    debugPrint('Saved last ruck weight (KG): $weightKg');
+    
   }
 
   /// Saves the last used session duration to SharedPreferences
   Future<void> _saveLastDuration(int durationMinutes) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('lastSessionDurationMinutes', durationMinutes);
-    debugPrint('Saved last session duration (minutes): $durationMinutes');
+    
   }
   
   /// Saves the user's body weight to SharedPreferences
   Future<void> _saveUserWeight(String weight) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('lastUserWeight', weight);
-    debugPrint('Saved user body weight: $weight');
+    
   }
 
   /// Creates and starts a new ruck session
@@ -156,7 +156,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         double weightForApiKg = _ruckWeight;
         
         // Log the weight value being saved to the database
-        debugPrint('Saving ruck weight in kg: $weightForApiKg');
+        
         
         // Prepare request data for creation
         Map<String, dynamic> createRequestData = {
@@ -184,7 +184,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         // --- End user_id ---
         
         // ---- Step 1: Create session in the backend ----
-        debugPrint('Creating session via POST /rucks...');
+        
         final apiClient = GetIt.instance<ApiClient>();
         final createResponse = await apiClient.post('/rucks', createRequestData);
 
@@ -192,14 +192,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         
         // Check if response has the correct ID key
         if (createResponse == null || createResponse['id'] == null) {
-          debugPrint('Invalid response from POST /rucks: $createResponse');
+          
           throw Exception('Invalid response from server when creating session');
         }
         
         // Extract ruck ID from response
         ruckId = createResponse['id'].toString();
-        debugPrint('Extracted ruckId: $ruckId');
-        debugPrint('Session created successfully with ID: $ruckId');
+        
+        
 
         // Save the used weight (always in KG) to SharedPreferences on success
         final prefs = await SharedPreferences.getInstance();
@@ -217,9 +217,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         
         // Perform session preparation/validation without resetting _ruckWeight or _displayRuckWeight
         // Log current state for debugging
-        debugPrint('Creating session with weight: $_ruckWeight, display: $_displayRuckWeight');
+        
 
-        debugPrint('Creating session with selected weight: $_selectedRuckWeight');
+        
         // Delay and then navigate without resetting chip state
         await Future.delayed(Duration(milliseconds: 500));
         // Convert planned duration (minutes) to seconds; null means no planned duration
@@ -239,7 +239,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           ),
         );
       } catch (e) {
-        debugPrint('Error during session creation/start: $e');
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -271,7 +271,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   void initState() {
     super.initState();
     // Log the metric preference to verify it's set correctly
-    debugPrint('CreateSessionScreen: User metric preference is $_preferMetric');
+    
     _loadDefaults();
     _selectedRuckWeight = _ruckWeight; // initialize with default selected weight
     // Load metric preference and **body weight** from AuthBloc state
@@ -292,9 +292,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         }
         // Update display weight based on new preference
         _displayRuckWeight = _preferMetric ? _ruckWeight : (_ruckWeight * AppConfig.kgToLbs);
-        debugPrint('CreateSessionScreen: Weight display updated to $_displayRuckWeight');
+        
       });
-      debugPrint('CreateSessionScreen: Updated metric preference from AuthBloc to $_preferMetric');
+      
       // Ensure the last ruck weight is loaded and set as selected
       _loadLastRuckWeight();
     }
@@ -308,14 +308,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           _ruckWeight = lastWeightKg;
           _displayRuckWeight = _preferMetric ? _ruckWeight : (_ruckWeight * AppConfig.kgToLbs);
           // Explicitly log to verify state update
-          debugPrint('Restored ruck weight: $_ruckWeight kg, display: $_displayRuckWeight');
+          
         });
         // Force a UI rebuild to ensure the chip is selected
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          debugPrint('UI rebuild triggered to reflect restored weight: $_ruckWeight kg');
+          
         });
       } else {
-        debugPrint('No last ruck weight found in SharedPreferences');
+        
       }
     });
     // Attach listener after controllers are ready
@@ -344,7 +344,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         _ruckWeight = lastWeightKg;
         _selectedRuckWeight = lastWeightKg;
         _displayRuckWeight = _preferMetric ? lastWeightKg : (lastWeightKg * AppConfig.kgToLbs);
-        debugPrint('Loaded last ruck weight: $_ruckWeight kg');
+        
       });
     }
   }
@@ -397,7 +397,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         // Make sure _selectedRuckWeight is also updated
         _selectedRuckWeight = _ruckWeight;
         
-        debugPrint('Snapped to nearest weight: $_ruckWeight kg (display: $_displayRuckWeight)');
+        
       });
     }
   }
@@ -407,8 +407,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     final bool isSelected = isMetric
         ? (weightInKg - _selectedRuckWeight).abs() < 0.01
         : (weightInKg - _selectedRuckWeight).abs() < 0.1;
-    debugPrint('Building chip for weightInKg: $weightInKg, current _ruckWeight: $_ruckWeight');
-    debugPrint('Chip for weight $weightInKg isSelected: $isSelected');
+    
+    
     return ChoiceChip(
       label: Container(
         height: 36,
@@ -456,7 +456,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     final List<double> currentWeightOptions = _preferMetric 
         ? AppConfig.metricWeightOptions 
         : AppConfig.standardWeightOptions;
-    debugPrint('CreateSessionScreen: Building UI at ${DateTime.now().millisecondsSinceEpoch}, Metric preference: $_preferMetric, Weight options: $currentWeightOptions');
+    
     
     final keyboardActionsConfig = KeyboardActionsConfig(
       actions: [
