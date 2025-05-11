@@ -47,6 +47,7 @@ def get_ruck_buddies():
     
     # Get supabase client
     supabase = get_supabase_client(g.user.token if hasattr(g.user, 'token') else None)
+
     
     # Base query getting public ruck sessions that aren't from the current user
     # Also join with users table to get user display info and check allow_ruck_sharing
@@ -66,7 +67,6 @@ def get_ruck_buddies():
             avg_heart_rate,
             users:user_id (
                 username,
-                display_name,
                 avatar_url
             ),
             location_points:location_point (
@@ -75,6 +75,8 @@ def get_ruck_buddies():
                 longitude,
                 altitude,
                 timestamp
+=======
+>>>>>>> 0789ed16 (feat: Implement Ruck Buddies feature)
             )
         ''') \
         .eq('is_public', True) \

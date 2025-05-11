@@ -46,8 +46,10 @@ class RuckBuddyCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ruckBuddy.user.displayName,
+                        ruckBuddy.user.username,
                         style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -138,8 +140,9 @@ class RuckBuddyCard extends StatelessWidget {
         backgroundImage: NetworkImage(user.photoUrl!),
       );
     } else {
-      final String initial = user.displayName.isNotEmpty 
-        ? user.displayName[0].toUpperCase() 
+      final String initial = user.username.isNotEmpty 
+        ? user.username[0].toUpperCase() 
+        : 'R';
         : 'R';
       
       return CircleAvatar(
