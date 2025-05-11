@@ -109,7 +109,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       });
       
     } catch (e) {
-      debugPrint('Error fetching statistics: $e');
+      
       setState(() {
         _isLoadingWeekly = false;
         _isLoadingMonthly = false;

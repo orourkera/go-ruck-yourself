@@ -81,8 +81,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
   }
   
   void _navigateToSessionDetail(RuckSession session) {
-    AppLogger.info('Navigating to session detail for session ${session.id}');
-    
+    AppLogger.info('Navigating to session detail for session ${session.id}');    
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => SessionDetailScreen(session: session),
