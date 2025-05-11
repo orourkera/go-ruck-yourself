@@ -388,9 +388,9 @@ class RuckSessionCompleteResource(Resource):
             if 'end_time' in data:
                 update_data['end_time'] = data['end_time']
             if 'final_average_pace' in data:
-                update_data['final_average_pace'] = data['final_average_pace']
+                update_data['average_pace'] = data['final_average_pace']
             if 'average_pace' in data:
-                update_data['final_average_pace'] = data['average_pace']
+                update_data['average_pace'] = data['average_pace']
             if 'rating' in data:
                 update_data['rating'] = data['rating']
             if 'perceived_exertion' in data:
