@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/features/ruck_buddies/di/ruck_buddies_injection_container.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -75,6 +76,9 @@ Future<void> setupServiceLocator() async {
         healthService: getIt<HealthService>(),
         watchService: getIt<WatchService>(),
       ));
+  
+  // Initialize Ruck Buddies feature
+  initRuckBuddiesFeature(getIt);
 }
 
 /// Configures Dio with base options and interceptors
