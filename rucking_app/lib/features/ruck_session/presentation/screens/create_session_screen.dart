@@ -347,12 +347,28 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       return (weightInKg - _selectedRuckWeight).abs() < (_preferMetric ? 0.01 : 0.1);
     });
     if (selectedIndex != -1 && _weightScrollController.hasClients) {
-      final offset = (selectedIndex * 60.0).clamp(0.0, _weightScrollController.position.maxScrollExtent); // approx chip width
-      _weightScrollController.animateTo(
-        offset,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
-      );
+      // Width of each chip item including separator spacing
+      const double itemExtent = 60.0; // 52 chip + 8 separator – keep in sync with separatorBuilder
+
+      double offset;
+      if (selectedIndex == currentWeightOptions.length - 1) {
+        // Ensure we scroll completely to the end so last chip is fully visible
+        offset = _weightScrollController.position.maxScrollExtent;
+      } else {
+        offset = (selectedIndex * itemExtent)
+            .clamp(0.0, _weightScrollController.position.maxScrollExtent);
+      }
+
+      // Animate after current frame to avoid "jump" during first build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_weightScrollController.hasClients) {
+          _weightScrollController.animateTo(
+            offset,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
     }
   }
 
