@@ -1,71 +1,74 @@
-import 'package:equatable/equatable.dart';
+import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
+import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 
-class RuckBuddyModel extends Equatable {
-  final String id;
-  final String userId;
-  final double ruckWeightKg;
-  final int durationSeconds;
-  final double distanceKm;
-  final int caloriesBurned;
-  final double elevationGainM;
-  final double elevationLossM;
-  final DateTime? startedAt;
-  final DateTime? completedAt;
-  final DateTime createdAt;
-  final int? avgHeartRate;
-  final UserInfo user;
+class RuckBuddyModel extends RuckBuddy {
 
   const RuckBuddyModel({
-    required this.id,
-    required this.userId,
-    required this.ruckWeightKg,
-    required this.durationSeconds,
-    required this.distanceKm,
-    required this.caloriesBurned,
-    required this.elevationGainM,
-    required this.elevationLossM,
-    this.startedAt,
-    this.completedAt,
-    required this.createdAt,
-    this.avgHeartRate,
-    required this.user,
-  });
+    required String id,
+    required String userId,
+    required double ruckWeightKg,
+    required int durationSeconds,
+    required double distanceKm,
+    required int caloriesBurned,
+    required double elevationGainM,
+    required double elevationLossM,
+    DateTime? startedAt,
+    DateTime? completedAt,
+    required DateTime createdAt,
+    int? avgHeartRate,
+    required UserInfo user,
+  }) : super(
+    id: id,
+    userId: userId,
+    ruckWeightKg: ruckWeightKg,
+    durationSeconds: durationSeconds,
+    distanceKm: distanceKm,
+    caloriesBurned: caloriesBurned,
+    elevationGainM: elevationGainM,
+    elevationLossM: elevationLossM,
+    startedAt: startedAt,
+    completedAt: completedAt,
+    createdAt: createdAt,
+    avgHeartRate: avgHeartRate,
+    user: user,
+  );
 
   factory RuckBuddyModel.fromJson(Map<String, dynamic> json) {
-    Map<String, dynamic>? userJson = json['users'];
+    // Handle conversion of dates from strings to DateTime objects
+    DateTime? startedAtDate;
+    if (json['started_at'] != null) {
+      startedAtDate = DateTime.parse(json['started_at']);
+    }
+    
+    DateTime? completedAtDate;
+    if (json['completed_at'] != null) {
+      completedAtDate = DateTime.parse(json['completed_at']);
+    }
+    
+    DateTime createdAtDate = DateTime.parse(json['created_at']);
+
+    // Extract user data
+    Map<String, dynamic> userData = json['user'] ?? {};
     
     return RuckBuddyModel(
       id: json['id'].toString(),
       userId: json['user_id'].toString(),
-      ruckWeightKg: json['ruck_weight_kg']?.toDouble() ?? 0.0,
+      ruckWeightKg: (json['ruck_weight_kg'] ?? 0).toDouble(),
       durationSeconds: json['duration_seconds'] ?? 0,
-      distanceKm: json['distance_km']?.toDouble() ?? 0.0,
-      caloriesBurned: json['calories_burned']?.toInt() ?? 0,
-      elevationGainM: json['elevation_gain_m']?.toDouble() ?? 0.0,
-      elevationLossM: json['elevation_loss_m']?.toDouble() ?? 0.0,
-      startedAt: json['started_at'] != null ? DateTime.parse(json['started_at']) : null,
-      completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at']) : null,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
+      distanceKm: (json['distance_km'] ?? 0).toDouble(),
+      caloriesBurned: json['calories_burned'] ?? 0,
+      elevationGainM: (json['elevation_gain_m'] ?? 0).toDouble(),
+      elevationLossM: (json['elevation_loss_m'] ?? 0).toDouble(),
+      startedAt: startedAtDate,
+      completedAt: completedAtDate,
+      createdAt: createdAtDate,
       avgHeartRate: json['avg_heart_rate'],
-      user: UserInfo.fromJson(userJson ?? {}),
+      user: UserInfo.fromJson(userData),
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'user_id': userId,
-    'ruck_weight_kg': ruckWeightKg,
-    'duration_seconds': durationSeconds,
-    'distance_km': distanceKm,
-    'calories_burned': caloriesBurned,
-    'elevation_gain_m': elevationGainM,
-    'elevation_loss_m': elevationLossM,
-    'started_at': startedAt?.toIso8601String(),
-    'completed_at': completedAt?.toIso8601String(),
-    'created_at': createdAt.toIso8601String(),
-    'avg_heart_rate': avgHeartRate,
-    'users': user.toJson(),
-  };
+  // We don't need toJson for this model since it's only used for data fetching
+  // If needed later, we would implement it with proper handling of the user object
 
   @override
   List<Object?> get props => [
@@ -74,35 +77,4 @@ class RuckBuddyModel extends Equatable {
     elevationLossM, startedAt, completedAt, createdAt, 
     avgHeartRate, user
   ];
-}
-
-class UserInfo extends Equatable {
-  final String? username;
-  final String? displayName;
-  final String? avatarUrl;
-
-  const UserInfo({
-    this.username,
-    this.displayName,
-    this.avatarUrl,
-  });
-
-  factory UserInfo.fromJson(Map<String, dynamic> json) {
-    return UserInfo(
-      username: json['username'],
-      displayName: json['display_name'],
-      avatarUrl: json['avatar_url'],
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'username': username,
-    'display_name': displayName,
-    'avatar_url': avatarUrl,
-  };
-  
-  String get displayNameOrUsername => displayName ?? username ?? 'Anonymous Rucker';
-
-  @override
-  List<Object?> get props => [username, displayName, avatarUrl];
 }

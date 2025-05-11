@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:rucking_app/core/error/exceptions.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/ruck_buddies/data/models/ruck_buddy_model.dart';
@@ -28,24 +27,23 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
     required int offset, 
     required String filter
   }) async {
-    final response = await apiClient.get(
-      '/api/ruck-buddies',
-      queryParameters: {
-        'limit': limit.toString(),
-        'offset': offset.toString(),
-        'filter': filter,
-      },
-    );
+    try {
+      final response = await apiClient.get(
+        '/ruck-buddies',
+        queryParams: {
+          'limit': limit.toString(),
+          'offset': offset.toString(),
+          'filter': filter,
+        },
+      );
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      final Map<String, dynamic> jsonResponse = json.decode(response);
       final List<dynamic> data = jsonResponse['ruck_sessions'] ?? [];
       
       return data.map((item) => RuckBuddyModel.fromJson(item)).toList();
-    } else {
+    } catch (e) {
       throw ServerException(
-        message: 'Failed to load ruck buddies data',
-        statusCode: response.statusCode,
+        message: 'Failed to load ruck buddies data: ${e.toString()}',
       );
     }
   }

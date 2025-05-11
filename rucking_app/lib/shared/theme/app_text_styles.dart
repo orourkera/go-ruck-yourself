@@ -111,6 +111,13 @@ class AppTextStyles {
     fontSize: 18,
     letterSpacing: 1.2,
   );
+
+  static const TextStyle labelMedium = TextStyle(
+    fontFamily: 'Inter',
+    fontWeight: FontWeight.w500,
+    fontSize: 14,
+    letterSpacing: 0.5,
+  );
   
   static const TextStyle bodySmall = TextStyle( // Renamed from caption
     fontFamily: 'Inter',
