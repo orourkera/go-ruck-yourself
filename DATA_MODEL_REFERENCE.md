@@ -118,6 +118,11 @@ When navigating to the session completion screen, the following argument mapping
 | perceived_exertion        | integer                      | YES      |                                              |
 | tags                      | ARRAY                        | YES      |                                              |
 
+#### Timestamp Field Explanations:
+*   **`created_at`**: Timestamp (without time zone) indicating when the session record was first created in the database. While present, its direct use in application logic is minimal. For all logical session timing and statistical bucketing, prefer `started_at` and `completed_at`.
+*   **`started_at`**: Timestamp (with time zone) indicating when the user actively started the ruck. This is set by the application when the session begins.
+*   **`completed_at`**: Timestamp (with time zone) indicating when the user actively completed or finalized the ruck. This is set by the application upon session completion. This is the primary timestamp used for all statistics aggregation (monthly, weekly, yearly) to determine which period a session falls into.
+
 > **Note:** As of 2025-05-10, the following columns were removed from the schema because they are unused in the frontend and backend:
 > - final_calories_burned
 > - final_distance_km
