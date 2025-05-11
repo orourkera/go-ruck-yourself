@@ -23,6 +23,7 @@ part 'active_session_event.dart';
 part 'active_session_state.dart';
 
 class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
+  int _paceTickCounter = 0;
   final ApiClient _apiClient;
   final LocationService _locationService;
   final HealthService _healthService;
@@ -274,6 +275,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final currentState = state as ActiveSessionRunning;
       if (_lastValidLocation != null) {
         final last = _lastValidLocation!;
+        // DEDUPLICATION: Ignore if lat/lng and timestamp match last valid location
+        if (last.latitude == currentPoint.latitude &&
+            last.longitude == currentPoint.longitude &&
+            last.timestamp == currentPoint.timestamp) {
+          AppLogger.info('Ignoring duplicate location point.');
+          return;
+        }
         final double distance = _calculateDistance(last.latitude, last.longitude, currentPoint.latitude, currentPoint.longitude);
 
         if (currentState.distanceKm * 1000 < 10 && distance > driftIgnoreJumpMeters) {
@@ -731,6 +739,7 @@ emit(ActiveSessionComplete(
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
+  _paceTickCounter++;
   // Heart rate batching: flush every 5 seconds if buffer not empty
   if (state is ActiveSessionRunning) {
     final currentState = state as ActiveSessionRunning;
@@ -741,45 +750,41 @@ emit(ActiveSessionComplete(
   if (state is ActiveSessionRunning) {
     final currentState = state as ActiveSessionRunning;
     final double currentDistance = currentState.distanceKm; // in km
-    double? newPace;
+    double? newPace = currentState.pace; // Default to previous pace; only update every 15s with safety checks
 
-    // Only compute pace after 10 valid location points and ≥0.1 km to avoid extreme noise at start
-    if (_validLocationCount < 10 || currentDistance < 0.1) {
-      newPace = null;
-    } else {
-      // Calculate pace in seconds per km
-      newPace = currentState.elapsedSeconds / currentDistance;
-      // Filter out absurdly slow paces (> 20 min/km)
-      // 20 min/km = 1200 sec/km
-      if (newPace > 1200) {
-        newPace = null;
+      int newElapsed = currentState.elapsedSeconds + 1;
+      if (newElapsed < 0) newElapsed = 0;
+
+      // Only update pace every 15 seconds, and only if safety checks pass
+      if (_paceTickCounter % 15 == 0) {
+        // Wait for at least 10 valid location points before showing pace
+        if (_validLocationCount < 10 || currentDistance < 0.1) {
+          newPace = null;
+        } else {
+          double candidatePace = currentDistance > 0 ? (newElapsed / currentDistance) : 0.0;
+          // Filter out absurdly slow paces (> 20 min/km = 1200 sec/km)
+          newPace = (candidatePace > 1200) ? null : candidatePace;
+        }
       }
+
+      // Calculate calories burned using MET-based rucking formula
+      final double calculatedCalories = MetCalculator.calculateRuckingCalories(
+        userWeightKg: _getUserWeightKg(),
+        ruckWeightKg: currentState.ruckWeightKg,
+        distanceKm: currentDistance,
+        elapsedSeconds: newElapsed,
+        elevationGain: currentState.elevationGain,
+        elevationLoss: currentState.elevationLoss,
+      );
+      final int newCalories = calculatedCalories.round();
+
+      emit(currentState.copyWith(
+        elapsedSeconds: newElapsed,
+        pace: newPace,
+        calories: newCalories,
+      ));
     }
-
-    final effectiveElapsed = DateTime.now().difference(currentState.originalSessionStartTimeUtc) - currentState.totalPausedDuration;
-    int newElapsed = effectiveElapsed.inSeconds;
-
-    // Sanity check to ensure elapsed time doesn't go negative
-    if(newElapsed < 0) newElapsed = 0;
-
-    // Calculate calories burned using MET-based rucking formula
-    final double calculatedCalories = MetCalculator.calculateRuckingCalories(
-      userWeightKg: _getUserWeightKg(),
-      ruckWeightKg: currentState.ruckWeightKg,
-      distanceKm: currentDistance,
-      elapsedSeconds: newElapsed,
-      elevationGain: currentState.elevationGain,
-      elevationLoss: currentState.elevationLoss,
-    );
-    final int newCalories = calculatedCalories.round();
-
-    emit(currentState.copyWith(
-      elapsedSeconds: newElapsed,
-      pace: newPace,
-      calories: newCalories,
-    ));
   }
-}
 
   Future<void> _onTimerStarted(
     TimerStarted event,
