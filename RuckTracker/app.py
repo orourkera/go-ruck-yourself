@@ -89,6 +89,7 @@ limiter.init_app(app)
 
 # Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
 from RuckTracker.api.ruck import HeartRateSampleUploadResource
+from RuckTracker.api.ruck_buddies import ruck_buddies_bp
 limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
 
 # Define custom rate limits for specific endpoints
@@ -127,10 +128,13 @@ if os.environ.get("FLASK_ENV") == "development":
         "http://127.0.0.1:8080"
     ])
 
-CORS(app, origins=allowed_origins, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
 # Initialize API
 api = Api(app)
+
+# Register blueprints
+app.register_blueprint(ruck_buddies_bp)
 
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (

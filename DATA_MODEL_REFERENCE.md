@@ -42,7 +42,8 @@ This document maps the data model for a rucking session across all layers:
 | Notes                  | `notes`                     | `notes`                    | `notes` (text)                |
 | Heart Rate Samples     | `heartRateSamples`          | `heart_rate_samples`        | `heart_rate_samples` (jsonb)  |
 | Tags                   | `tags`                      | `tags`                     | `tags` (array)                |
-| Rating                 | `rating`                    | `rating`                   | `rating` (int)                |
+| Public Session         | `isPublic`                 | `is_public`               | `is_public` (boolean, default false) |
+| Rating                 | `rating`                   | `rating`                  | `rating` (int)              |
 | Perceived Exertion     | `perceivedExertion`         | `perceived_exertion`       | `perceived_exertion` (int)    |
 | Created At             | `createdAt`                 | `created_at`               | `created_at` (timestamp)      |
 | Updated At             | `updatedAt`                 | `updated_at`               | `updated_at` (timestamp)      |
@@ -150,6 +151,7 @@ When navigating to the session completion screen, the following argument mapping
 
 | Concept            | Dart/Flutter Property | API Field         | Database Column |
 |--------------------|----------------------|-------------------|-----------------|
+| Allow Ruck Sharing | `allowRuckSharing`   | `allow_ruck_sharing` | `allow_ruck_sharing` (boolean, default false) |
 | Average Pace (s/km)| `averagePace`        | `average_pace`    | `average_pace`  |
 | User ID            | `id`                 | `id`              | `id`            |
 | Username           | `username`           | `username`        | `username`      |
