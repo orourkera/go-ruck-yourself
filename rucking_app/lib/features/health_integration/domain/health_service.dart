@@ -193,15 +193,22 @@ class HealthService {
         unit: HealthDataUnit.KILOCALORIE,
       );
 
-      // --- Write WORKOUT sample (legacy approach) ---
+      // --- Write full Workout sample (iOS only) ---
       if (Platform.isIOS) {
         try {
-          workoutSuccess = await _health.writeHealthData(
-            value: distanceMeters.toDouble(), // Some platforms require a numeric value
-            type: HealthDataType.WORKOUT,
-            startTime: startDate,
-            endTime: endDate,
-            unit: HealthDataUnit.METER, // Metric placeholder
+          // If the health package provides writeWorkoutData (>=5.0.0)
+          workoutSuccess = await _health.writeWorkoutData(
+            start: startDate,
+            end: endDate,
+            workoutActivityType: WorkoutActivityType.hiking,
+            totalEnergyBurned: caloriesBurned.toDouble(),
+            totalDistance: distanceMeters.toDouble(),
+            metadata: {
+              if (ruckWeightKg != null) 'ruckWeightKg': ruckWeightKg,
+              if (elevationGainMeters != null) 'elevationGainMeters': elevationGainMeters,
+              if (elevationLossMeters != null) 'elevationLossMeters': elevationLossMeters,
+              if (heartRate != null) 'averageHeartRate': heartRate,
+            },
           );
         } catch (e) {
           AppLogger.error('Failed to write HealthKit WORKOUT sample: $e');
