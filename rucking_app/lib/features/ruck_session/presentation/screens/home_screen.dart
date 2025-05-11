@@ -180,7 +180,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     
     try {
       // Fetch recent sessions
-      // debugPrint('Fetching recent sessions from /rucks?limit=3');
+      
       final sessionsResponse = await _apiClient.get('/rucks?limit=20');
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
 
@@ -191,13 +191,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
 
       // Fetch monthly stats
       final statsResponse = await _apiClient.get('/statistics/monthly');
-      debugPrint('Monthly stats response: ' + statsResponse.toString());
+      
       Map<String, dynamic> processedStats = {};
       if (statsResponse is Map && statsResponse.containsKey('data') && statsResponse['data'] is Map) {
           processedStats = statsResponse['data'] as Map<String, dynamic>;
-          // debugPrint('Monthly stats fetched: $processedStats');
+          
       } else {
-          // debugPrint('Unexpected monthly stats format: $statsResponse');
+          
       }
 
       // Add another safety check in case widget is disposed during the async operation
@@ -209,8 +209,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         _isLoading = false;
       });
     } catch (e, stack) {
-      debugPrint('Error fetching home screen data: $e');
-      debugPrint('Stack: $stack');
+      
+      
       
       // Final safety check before setState
       if (!mounted) return;
@@ -227,7 +227,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   List<dynamic> _processSessionResponse(dynamic response) {
     List<dynamic> processedSessions = [];
     if (response == null) {
-      // debugPrint('Session response is null');
+      
     } else if (response is List) {
       processedSessions = response;
     } else if (response is Map && response.containsKey('data') && response['data'] is List) {
@@ -247,7 +247,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         }
      }
      
-    // debugPrint('Processed ${processedSessions.length} sessions');
+    
     return processedSessions;
   }
   
@@ -264,7 +264,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           routeObserver?.subscribe(this, route);
         }
       } catch (e) {
-        debugPrint('Error in didChangeDependencies: $e');
+        
       }
     }
   }
@@ -280,7 +280,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           routeObserver?.unsubscribe(this);
         }
       } catch (e) {
-        debugPrint('Error in dispose: $e');
+        
       }
     }
     super.dispose();
@@ -495,7 +495,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         
                         // Ensure session is a Map
                         if (session is! Map<String, dynamic>) {
-                          // debugPrint('Skipping invalid session data: $session');
+                          
                           return const SizedBox.shrink(); // Skip non-map items
                         }
                         
@@ -557,7 +557,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                 ))
                                 .toList();
                           } catch (e) {
-                            debugPrint('Error parsing route for session: $e');
+                            
                           }
                         } else if (session['location_points'] is List && (session['location_points'] as List).isNotEmpty) {
                           try {
@@ -569,7 +569,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                 ))
                                 .toList();
                           } catch (e) {
-                            debugPrint('Error parsing location_points for session: $e');
+                            
                           }
                         } else if (session['locationPoints'] is List && (session['locationPoints'] as List).isNotEmpty) {
                           try {
@@ -581,11 +581,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                 ))
                                 .toList();
                           } catch (e) {
-                            debugPrint('Error parsing locationPoints for session: $e');
+                            
                           }
                         }
                         if (routePoints.isEmpty) {
-                          debugPrint('No route data for session on $formattedDate, using mock polyline.');
+                          
                           routePoints = [
                             LatLng(40.421, -3.678),
                             LatLng(40.422, -3.678),
@@ -603,7 +603,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                 ),
                               );
                             } catch (e) {
-                              debugPrint('Error navigating to session detail: $e');
+                              
                             }
                           },
                           child: Card(
