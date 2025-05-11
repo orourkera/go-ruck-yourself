@@ -143,8 +143,8 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         endTime: endTime,
         duration: duration,
         distance: distance,
-        elevationGain: parseDistance(json['elevation_gain_meters'] ?? json['elevationGain'] ?? 0.0),
-        elevationLoss: parseDistance(json['elevation_loss_meters'] ?? json['elevationLoss'] ?? 0.0),
+        elevationGain: parseDistance(json['elevation_gain_meters'] ?? json['elevation_gain_m'] ?? json['elevationGain'] ?? 0.0),
+        elevationLoss: parseDistance(json['elevation_loss_meters'] ?? json['elevation_loss_m'] ?? json['elevationLoss'] ?? 0.0),
         caloriesBurned: (json['calories_burned'] ?? json['caloriesBurned'] ?? 0) is int
             ? (json['calories_burned'] ?? json['caloriesBurned'] ?? 0)
             : (json['calories_burned'] ?? json['caloriesBurned'] ?? 0).toInt(),
@@ -198,6 +198,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
     return {
       'id': id,
       'start_time': dateFormat.format(startTime),
+      'average_pace': averagePace,
       'end_time': dateFormat.format(endTime),
       'duration_seconds': duration.inSeconds,
       'distance_km': distance,

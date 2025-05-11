@@ -171,7 +171,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         double userWeightKg = _preferMetric 
             ? double.parse(userWeightRaw) 
             : double.parse(userWeightRaw) / 2.20462; // Convert lbs to kg
-        createRequestData['user_weight_kg'] = userWeightKg;
+        createRequestData['weight_kg'] = userWeightKg;
         
         // --- Ensure planned duration is included ---
         if (_plannedDuration != null && _plannedDuration! > 0) {
