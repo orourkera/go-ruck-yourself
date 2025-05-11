@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:rucking_app/core/error/exceptions.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/ruck_buddies/data/models/ruck_buddy_model.dart';
@@ -29,7 +30,7 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
   }) async {
     try {
       final response = await apiClient.get(
-        '/ruck-buddies',
+        '/api/ruck-buddies',
         queryParams: {
           'limit': limit.toString(),
           'offset': offset.toString(),
