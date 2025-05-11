@@ -528,14 +528,21 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         // Get calories directly from session map
                         final calories = session['calories_burned']?.toString() ?? '0';
                         
-                        // Use final_average_pace if present, otherwise average_pace_min_km
-                        final paceSecondsPerKm = (session['final_average_pace'] as num?)?.toDouble() ?? (session['average_pace_min_km'] as num?)?.toDouble();
-                        final paceDisplay = paceSecondsPerKm != null ? MeasurementUtils.formatPace(paceSecondsPerKm, metric: preferMetric) : '--';
+                        // Pace display (use exact API field name from data model)
+                        final paceRaw = session['average_pace'] ?? 0.0;
+                        final pace = paceRaw is int ? paceRaw.toDouble() : paceRaw;
+                        final paceDisplay = (pace != null && pace > 0)
+                            ? MeasurementUtils.formatPace(pace, metric: preferMetric)
+                            : '--';
                         
-                        // Use final_elevation_gain/loss if present, otherwise elevation_gain_meters/loss_meters
-                        final elevationGain = (session['final_elevation_gain'] as num?)?.toDouble() ?? (session['elevation_gain_meters'] as num?)?.toDouble() ?? 0.0;
-                        final elevationLoss = (session['final_elevation_loss'] as num?)?.toDouble() ?? (session['elevation_loss_meters'] as num?)?.toDouble() ?? 0.0;
-                        String elevationDisplay = MeasurementUtils.formatElevationCompact(elevationGain, elevationLoss, metric: preferMetric);
+                        // Elevation display (use exact API field names from data model)
+                        final elevationGainRaw = session['elevation_gain_m'] ?? 0.0;
+                        double elevationGain = elevationGainRaw is int ? elevationGainRaw.toDouble() : elevationGainRaw;
+                        final elevationLossRaw = session['elevation_loss_m'] ?? 0.0;
+                        double elevationLoss = elevationLossRaw is int ? elevationLossRaw.toDouble() : elevationLossRaw;
+                        String elevationDisplay = (elevationGain == 0.0 && elevationLoss == 0.0)
+                          ? '--'
+                          : MeasurementUtils.formatElevationCompact(elevationGain, elevationLoss, metric: preferMetric);
                         
                         // Map route points
                         List<LatLng> routePoints = [];
