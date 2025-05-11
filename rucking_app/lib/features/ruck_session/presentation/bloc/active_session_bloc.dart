@@ -569,6 +569,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'calories_burned': currentState.calories.round(),
             'elevation_gain_m': currentState.elevationGain.round(),
             'elevation_loss_m': currentState.elevationLoss.round(),
+            'average_pace': currentState.distanceKm > 0 ? (currentState.elapsedSeconds / currentState.distanceKm) : 0.0,
             'ruck_weight_kg': currentState.ruckWeightKg.roundToDouble(),
             'notes': event.notes,
             'rating': event.rating,
