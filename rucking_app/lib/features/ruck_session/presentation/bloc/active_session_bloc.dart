@@ -156,8 +156,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         },
         onError: (error) {
           AppLogger.error('Location error during active session: $error');
-          // Removed: add(SessionFailed(...)) to avoid abrupt session termination for all location errors.
-          // Permission errors should be caught before starting the session.
+          // Instead of giving up, attempt a graceful retry after a short delay.
+          if (state is ActiveSessionRunning) {
+            // Cancel the faulty subscription first.
+            _locationSubscription?.cancel();
+            _locationSubscription = null;
+            // Schedule a retry only if we are still in a running session after 5 seconds.
+            Future.delayed(const Duration(seconds: 5), () {
+              if (state is ActiveSessionRunning) {
+                AppLogger.info('Retrying location tracking after error...');
+                _startLocationTracking(emit);
+              }
+            });
+          }
+          // Note: do **not** emit a SessionFailed here to avoid aborting the session.
         },
       );
 
