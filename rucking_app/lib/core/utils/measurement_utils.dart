@@ -6,6 +6,18 @@ import 'package:rucking_app/core/models/location_point.dart';
 /// formatting rules so that every widget in the app shows data with
 /// identical precision and wording.
 class MeasurementUtils {
+  /// Format a single elevation value (gain or loss) to 0 decimals with correct sign and unit.
+  static String formatSingleElevation(double meters, {required bool metric}) {
+    if (metric) {
+      final prefix = meters >= 0 ? '+' : '-';
+      return '$prefix${meters.abs().round()}m';
+    } else {
+      final feet = meters * _mToFt;
+      final prefix = feet >= 0 ? '+' : '-';
+      return '$prefix${feet.abs().round()}ft';
+    }
+  }
+
   // ===== Conversion factors =====
   static const double _kmToMi = 0.621371; // 1 km in miles
   static const double _mToFt = 3.28084;   // 1 metre in feet
