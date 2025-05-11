@@ -34,13 +34,9 @@ This document maps the data model for a rucking session across all layers:
 | Elevation Gain (m)     | `elevationGain`             | `elevation_gain_m`         | `elevation_gain_m` (float)    |
 | Elevation Loss (m)     | `elevationLoss`             | `elevation_loss_m`         | `elevation_loss_m` (float)    |
 | Calories Burned        | `caloriesBurned`            | `calories_burned`          | `calories_burned` (float)     |
-| Avg Heart Rate         | `avgHeartRate`              | `avg_heart_rate`           | `avg_heart_rate` (int)        |
+| Avg Heart Rate         | `avgHeartRate`              | `avg_heart_rate`           | `avg_heart_rate` (integer, nullable)        |
 
-| Final Avg Pace         | `finalAveragePace`          | `final_average_pace`       | `final_average_pace` (numeric)|
-| Final Distance (km)    | `finalDistanceKm`           | `final_distance_km`        | `final_distance_km` (numeric) |
-| Final Calories Burned  | `finalCaloriesBurned`       | `final_calories_burned`    | `final_calories_burned` (int) |
-| Final Elevation Gain   | `finalElevationGain`        | `final_elevation_gain`     | `final_elevation_gain` (numeric)|
-| Final Elevation Loss   | `finalElevationLoss`        | `final_elevation_loss`     | `final_elevation_loss` (numeric)|
+| Average Pace (s/km)    | `averagePace`               | `average_pace`             | `average_pace` (numeric)      |
 | Weight (kg)            | `weightKg`                  | `weight_kg`                | `weight_kg` (numeric)         |
 | Ruck Weight (kg)       | `ruckWeightKg`              | `ruck_weight_kg`           | `ruck_weight_kg` (float)      |
 | Notes                  | `notes`                     | `notes`                    | `notes` (text)                |
@@ -88,41 +84,47 @@ When navigating to the session completion screen, the following argument mapping
 #### Example for Calories Burned
 - **Frontend:** `session.caloriesBurned`
 - **API Request/Response:** `"calories_burned": 1950`
-- **Database:** `calories_burned` column in `ruck_sessions` table
+- **Database:** `calories_burned` column in `ruck_session` table
 
 ---
 
-## Detailed Database Schema: `ruck_sessions`
+> **Note:**
+> - The `average_pace` value (seconds per kilometer) is now always included in the API and DB when saving a session, matching the Dart property `averagePace`.
+
+## Detailed Database Schema: `ruck_session`
 
 | Column Name                | Data Type                    | Nullable | Default                                      |
-|----------------------------|------------------------------|----------|----------------------------------------------|
-| id                         | integer                      | NO       | nextval('ruck_session_id_seq'::regclass)     |
-| user_id                    | uuid                         | NO       |                                              |
-| ruck_weight_kg             | double precision             | NO       |                                              |
-| duration_seconds           | integer                      | YES      |                                              |
-| paused_duration_seconds    | integer                      | YES      |                                              |
-| final_average_pace         | numeric                      | YES      |                                              |
-| rating                     | integer                      | YES      |                                              |
-| perceived_exertion         | integer                      | YES      |                                              |
-| distance_km                | double precision             | YES      |                                              |
-| elevation_gain_m           | double precision             | YES      |                                              |
-| elevation_loss_m           | double precision             | YES      |                                              |
-| calories_burned            | double precision             | YES      |                                              |
-| created_at                 | timestamp without time zone  | YES      |                                              |
-| updated_at                 | timestamp without time zone  | YES      |                                              |
-| planned_duration_minutes   | integer                      | YES      |                                              |
-| started_at                 | timestamp with time zone     | YES      |                                              |
-| ended_at                   | timestamp with time zone     | YES      |                                              |
-| distance_meters            | numeric                      | YES      |                                              |
-| weight_kg                  | numeric                      | YES      |                                              |
-| completed_at               | timestamp with time zone     | YES      |                                              |
-| final_distance_km          | numeric                      | YES      |                                              |
-| final_calories_burned      | integer                      | YES      |                                              |
-| final_elevation_gain       | numeric                      | YES      |                                              |
-| final_elevation_loss       | numeric                      | YES      |                                              |
-| status                     | character varying            | YES      |                                              |
-| notes                      | text                         | YES      |                                              |
-| tags                       | ARRAY                        | YES      |                                              |
+|---------------------------|------------------------------|----------|----------------------------------------------|
+| id                        | integer                      | NO       | nextval('ruck_session_id_seq'::regclass)     |
+| user_id                   | uuid                         | NO       |                                              |
+| ruck_weight_kg            | double precision             | NO       |                                              |
+| duration_seconds          | integer                      | YES      |                                              |
+| paused_duration_seconds   | integer                      | YES      |                                              |
+| status                    | character varying            | YES      |                                              |
+| distance_km               | double precision             | YES      |                                              |
+| elevation_gain_m          | double precision             | YES      |                                              |
+| elevation_loss_m          | double precision             | YES      |                                              |
+| calories_burned           | double precision             | YES      |                                              |
+| created_at                | timestamp without time zone  | YES      |                                              |
+| planned_duration_minutes  | integer                      | YES      |                                              |
+| started_at                | timestamp with time zone     | YES      |                                              |
+| distance_meters           | numeric                      | YES      |                                              |
+| weight_kg                 | numeric                      | YES      |                                              |
+| completed_at              | timestamp with time zone     | YES      |                                              |
+| notes                     | text                         | YES      |                                              |
+| average_pace              | numeric                      | YES      |                                              |
+| avg_heart_rate            | integer                      | YES      |                                              |
+| rating                    | integer                      | YES      |                                              |
+| perceived_exertion        | integer                      | YES      |                                              |
+| tags                      | ARRAY                        | YES      |                                              |
+
+> **Note:** As of 2025-05-10, the following columns were removed from the schema because they are unused in the frontend and backend:
+> - final_calories_burned
+> - final_distance_km
+> - final_elevation_gain
+> - final_elevation_loss
+> - ended_at
+> - updated_at
 
 ---
 
@@ -143,6 +145,7 @@ When navigating to the session completion screen, the following argument mapping
 
 | Concept            | Dart/Flutter Property | API Field         | Database Column |
 |--------------------|----------------------|-------------------|-----------------|
+| Average Pace (s/km)| `averagePace`        | `average_pace`    | `average_pace`  |
 | User ID            | `id`                 | `id`              | `id`            |
 | Username           | `username`           | `username`        | `username`      |
 | Email              | `email`              | `email`           | `email`         |
