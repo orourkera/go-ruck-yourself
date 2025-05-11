@@ -77,22 +77,22 @@ def calculate_aggregates(sessions):
         }
     }
     
-def get_daily_breakdown(sessions, start_date, end_date):
+def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at'):
     """Calculates daily breakdown for weekly view."""
     daily_data = {i: {'sessions_count': 0, 'distance_km': 0.0} for i in range(7)}
     day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     
     for s in sessions:
-        created_at_str = s.get('created_at')
-        if created_at_str:
+        session_time_str = s.get(date_field)
+        if session_time_str:
             try:
-                created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00')).astimezone(timezone.utc)
-                if start_date <= created_at <= end_date:
-                    day_index = created_at.weekday()
+                session_time_dt = datetime.fromisoformat(session_time_str.replace('Z', '+00:00')).astimezone(timezone.utc)
+                if start_date <= session_time_dt <= end_date:
+                    day_index = session_time_dt.weekday()
                     daily_data[day_index]['sessions_count'] += 1
                     daily_data[day_index]['distance_km'] += s.get('distance_km', 0) or 0
             except ValueError:
-                logger.warning(f"Could not parse date for daily breakdown: {created_at_str}")
+                logger.warning(f"Could not parse date for daily breakdown: {session_time_str}")
                 
     return [
         {'day_name': day_names[i], **data} 
@@ -115,10 +115,11 @@ class WeeklyStatsResource(Resource):
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
             response = supabase.table('ruck_session') \
-                .select('distance_km, duration_seconds, calories_burned, created_at') \
+                .select('distance_km, duration_seconds, calories_burned, completed_at') \
                 .eq('user_id', g.user.id) \
-                .gte('created_at', start_iso) \
-                .lte('created_at', end_iso) \
+                .gte('completed_at', start_iso) \
+                .lte('completed_at', end_iso) \
+                .eq('status', 'completed') \
                 .execute()
 
             if response.data is None:
@@ -131,7 +132,7 @@ class WeeklyStatsResource(Resource):
             sessions = response.data
             stats = calculate_aggregates(sessions)
             stats['date_range'] = date_range_str
-            stats['daily_breakdown'] = get_daily_breakdown(sessions, start_dt, end_dt)
+            stats['daily_breakdown'] = get_daily_breakdown(sessions, start_dt, end_dt, date_field='completed_at')
 
             return {'data': stats}, 200
 
