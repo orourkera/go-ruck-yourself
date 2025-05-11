@@ -14,7 +14,7 @@ String mapFriendlyErrorMessage(String? error) {
     return authInvalidCredentials;
   }
   if (e.contains('already exists') || e.contains('Rucker already registered')) {
-    return 'An account already exists for this email. Please sign in instead.';
+    return "You're already registered rucker. Please sign in instead.";
   }
   if (e.contains('invalid email')) return 'Please enter a valid email address, rucker.';
   if (e.contains('password too short')) return 'Your password must be at least 8 characters, rucker.';

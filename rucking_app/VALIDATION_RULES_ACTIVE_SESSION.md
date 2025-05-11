@@ -36,7 +36,15 @@ The app **no longer enforces** a minimum distance or duration to save a workout.
   - Controlled by `SessionValidationService.minMovingSpeedKmh` and `longIdleDuration` (1 minute).
   - UI sets `_isPaused = true` and displays a pause message.
 
-## 5. Maximum Speed Validation
+## 5. Heart Rate Sample Table
+
+- Columns: session_id, timestamp, bpm
+- Each heart rate sample must be associated with a valid ruck session (session_id).
+- timestamp must be an ISO8601 string.
+- bpm must be an integer.
+- **Note:** There is no user_id column in heart_rate_sample. Do not attempt to insert user_id for heart rate samples.
+
+## 6. Maximum Speed Validation
 - **Threshold:** 10 km/h
 - **Purpose:** Prevents tracking if the user is moving too fast (e.g., in a car or running).
 - **Implementation:**
