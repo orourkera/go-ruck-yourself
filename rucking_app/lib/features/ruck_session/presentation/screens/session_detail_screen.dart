@@ -140,14 +140,14 @@ class SessionDetailScreen extends StatelessWidget {
                     _buildDetailRow(
                       context,
                       'Elevation Gain',
-                      MeasurementUtils.formatElevation(session.elevationGain, 0, metric: preferMetric),
+                      MeasurementUtils.formatSingleElevation(session.elevationGain, metric: preferMetric),
                       Icons.trending_up,
                     ),
                   if (session.elevationLoss > 0)
                     _buildDetailRow(
                       context,
                       'Elevation Loss',
-                      MeasurementUtils.formatElevation(0, session.elevationLoss, metric: preferMetric),
+                      MeasurementUtils.formatSingleElevation(-session.elevationLoss, metric: preferMetric),
                       Icons.trending_down,
                     ),
                   if (session.elevationGain == 0.0 && session.elevationLoss == 0.0)
