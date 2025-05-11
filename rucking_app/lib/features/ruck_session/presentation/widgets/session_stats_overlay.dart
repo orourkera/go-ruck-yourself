@@ -160,10 +160,6 @@ class SessionStatsOverlay extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            Text(
-                              (state.latestHeartRate ?? 0) > 0 ? 'BPM' : '',
-                              style: AppTextStyles.labelSmall.copyWith(fontSize: 10, color: AppColors.primary)
-                            ),
                           ],
                         ),
                       ),
