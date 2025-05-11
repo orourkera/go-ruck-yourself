@@ -485,8 +485,7 @@ class HeartRateSampleUploadResource(Resource):
                 heart_rate_rows.append({
                     'session_id': ruck_id,
                     'timestamp': sample['timestamp'],
-                    'bpm': sample['bpm'],
-                    'user_id': g.user.id
+                    'bpm': sample['bpm']
                 })
             if not heart_rate_rows:
                 return {'message': 'No valid heart rate samples'}, 400
