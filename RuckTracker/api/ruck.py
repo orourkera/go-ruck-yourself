@@ -16,14 +16,16 @@ class RuckSessionListResource(Resource):
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
-            limit = request.args.get('limit', type=int) or 3
-            response = supabase.table('ruck_session') \
+            limit = request.args.get('limit', type=int)
+        # If limit is None, do not apply limit
+            response_query = supabase.table('ruck_session') \
                 .select('*') \
                 .eq('user_id', g.user.id) \
                 .eq('status', 'completed') \
-                .order('completed_at', desc=True) \
-                .limit(limit) \
-                .execute()
+                .order('completed_at', desc=True)
+            if limit:
+                response_query = response_query.limit(limit)
+            response = response_query.execute()
             sessions = response.data
             if sessions is None:
                 sessions = []
