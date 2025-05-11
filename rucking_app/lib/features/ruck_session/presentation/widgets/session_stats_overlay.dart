@@ -201,8 +201,8 @@ class SessionStatsOverlay extends StatelessWidget {
   }
 
   Color _calColor(double cal) {
-    if (cal < 100) return AppColors.warning;
-    return Colors.white;
+    if (cal < 100) return AppColors.warning; // Yellow when calories are low
+    return AppColors.primary; // Use primary color for better contrast instead of white
   }
 
   // Placeholder widget to show when no session data is yet available
