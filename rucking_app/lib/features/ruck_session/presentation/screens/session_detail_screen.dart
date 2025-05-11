@@ -322,23 +322,26 @@ class _SessionRouteMap extends StatelessWidget {
             points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
           )
         : LatLng(40.421, -3.678); // Default center
-    final zoom = points.length > 1
-        ? (() {
-            double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-            double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-            double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
-            double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
-            double latDiff = (maxLat - minLat).abs();
-            double lngDiff = (maxLng - minLng).abs();
-            double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
-            maxDiff *= 1.05;
-            if (maxDiff < 0.001) return 17.5;
-            if (maxDiff < 0.01) return 16.0;
-            if (maxDiff < 0.1) return 14.0;
-            if (maxDiff < 1.0) return 11.0;
-            return 8.0;
-          })()
-        : 15.5;
+    final zoom = points.isEmpty
+        ? 16.0
+        : (points.length == 1
+            ? 17.5
+            : (() {
+                double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+                double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+                double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+                double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+                double latDiff = (maxLat - minLat).abs();
+                double lngDiff = (maxLng - minLng).abs();
+                double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+                maxDiff *= 1.05;
+                if (maxDiff < 0.001) return 17.5;
+                if (maxDiff < 0.01) return 16.0;
+                if (maxDiff < 0.1) return 14.0;
+                if (maxDiff < 1.0) return 11.0;
+                return 8.0;
+              })()
+          );
 
     if (points.isEmpty) {
       return Container(
