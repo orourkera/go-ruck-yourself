@@ -19,6 +19,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/features/ruck_buddies/di/ruck_buddies_injection_container.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -87,6 +88,9 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<SessionBloc>(() => SessionBloc(
     sessionRepository: getIt<SessionRepository>(),
   ));
+  
+  // Initialize Ruck Buddies feature
+  initRuckBuddiesFeature(getIt);
 }
 
 /// Configures Dio with base options and interceptors

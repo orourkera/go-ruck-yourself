@@ -12,6 +12,8 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/session_c
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/app_theme.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatelessWidget {
@@ -33,6 +35,9 @@ class RuckingApp extends StatelessWidget {
         BlocProvider<SessionBloc>(
           create: (context) => getIt<SessionBloc>(),
         ),
+        BlocProvider<RuckBuddiesBloc>(
+          create: (context) => getIt<RuckBuddiesBloc>(),
+        ),
       ],
       child: MaterialApp(
         title: 'GRY',
@@ -47,6 +52,8 @@ class RuckingApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const HomeScreen());
             case '/paywall':
               return MaterialPageRoute(builder: (_) => const PaywallScreen());
+            case '/ruck_buddies':
+              return MaterialPageRoute(builder: (_) => const RuckBuddiesScreen());
             case '/session_complete':
               final args = settings.arguments as Map<String, dynamic>?;
               if (args != null) {

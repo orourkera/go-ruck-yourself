@@ -37,6 +37,7 @@ abstract class AuthRepository {
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
+    bool? allowRuckSharing,
   });
 
   /// Delete the current user's account

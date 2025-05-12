@@ -98,6 +98,21 @@ class MeasurementUtils {
       return '${lbs.round()} lbs'; // Round to whole number for standard
     }
   }
+  
+  /// Format a duration into a readable string (e.g., "1h 23m" or "45m")
+  static String formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else if (minutes > 0) {
+      return '${minutes}m ${seconds}s';
+    } else {
+      return '${seconds}s';
+    }
+  }
 
   /// Calories formatted as integer string.
   static String formatCalories(int calories) => calories.toString();

@@ -8,6 +8,7 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/create_se
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_history_screen.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
@@ -67,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     const _HomeTab(),
     const SessionHistoryScreen(),
+    const RuckBuddiesScreen(),
     const StatisticsScreen(),
     const ProfileScreen(),
   ];
@@ -111,6 +113,19 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 48,
             ),
             label: 'History',
+          ),
+          BottomNavigationBarItem(
+            icon: Image.asset(
+              'assets/images/ruckbuddies.png',
+              width: 48,
+              height: 48,
+            ),
+            activeIcon: Image.asset(
+              'assets/images/ruckbuddies_active.png',
+              width: 48,
+              height: 48,
+            ),
+            label: 'Buddies',
           ),
           BottomNavigationBarItem(
             icon: Image.asset(
@@ -419,14 +434,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                       style: AppTextStyles.labelLarge.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                      )
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     onPressed: () {
@@ -437,9 +444,17 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         ),
                       );
                     },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      minimumSize: const Size.fromHeight(56),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 
                 // Recent sessions section
                 Text(

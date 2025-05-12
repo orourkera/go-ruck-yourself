@@ -1,13 +1,29 @@
-from flask import request, g
+from flask import request, g, jsonify
 from flask_restful import Resource
 import uuid
 from datetime import datetime, timedelta
 import sys
 import logging
+from functools import wraps
 
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
+
+# Auth decorators
+def auth_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not hasattr(g, 'user') or g.user is None:
+            return jsonify({'message': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+def get_user_id():
+    """Helper function to get the current user's ID"""
+    if hasattr(g, 'user') and g.user and hasattr(g.user, 'id'):
+        return g.user.id
+    return None
 
 class SignUpResource(Resource):
     def post(self):
@@ -259,12 +275,21 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['username', 'weight_kg', 'prefer_metric'] 
+            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing'] 
             for field in allowed_fields:
                 if field == 'prefer_metric': # Check for snake_case field name
                     # Expect camelCase 'preferMetric' in the incoming JSON data for updates too
                     if 'preferMetric' in data:
                          update_data['prefer_metric'] = data['preferMetric'] # Use snake_case for DB update dict key
+                # Handle camelCase for height_cm
+                elif field == 'height_cm' and 'heightCm' in data:
+                    update_data['height_cm'] = data['heightCm']
+                # Handle allow_ruck_sharing - check for both camelCase and snake_case versions
+                elif field == 'allow_ruck_sharing':
+                    if 'allowRuckSharing' in data:  # Check for camelCase version from mobile app
+                        update_data['allow_ruck_sharing'] = data['allowRuckSharing']
+                    elif 'allow_ruck_sharing' in data:  # Also check for snake_case
+                        update_data['allow_ruck_sharing'] = data['allow_ruck_sharing']
                 elif field in data:
                     update_data[field] = data[field]
                  
