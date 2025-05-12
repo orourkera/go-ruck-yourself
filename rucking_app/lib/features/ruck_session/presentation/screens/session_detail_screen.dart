@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
-import 'package:rucking_app/core/utils/measurement_utils.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 
@@ -64,30 +66,27 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     return BlocListener<SessionBloc, SessionState>(
       listener: (context, state) {
         if (state is SessionOperationInProgress) {
-          // Show loading indicator
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Deleting session...'),
-              duration: Duration(seconds: 1),
-            ),
+          // Show loading indicator with styled snackbar
+          StyledSnackBar.show(
+            context: context,
+            message: 'Deleting session...',
+            duration: const Duration(seconds: 1),
           );
         } else if (state is SessionDeleteSuccess) {
-          // Show success message and navigate back
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('The session is gone, rucker. Gone forever.'),
-              duration: Duration(seconds: 2),
-            ),
+          // Show success message and navigate back with refresh result
+          StyledSnackBar.showSuccess(
+            context: context,
+            message: 'The session is gone, rucker. Gone forever.',
+            duration: const Duration(seconds: 2),
           );
-          Navigator.of(context).pop();
+          // Pop with result to trigger refresh on the home screen
+          Navigator.of(context).pop(true); // true indicates refresh needed
         } else if (state is SessionOperationFailure) {
           // Show error message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${state.message}'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
+          StyledSnackBar.showError(
+            context: context,
+            message: 'Error: ${state.message}',
+            duration: const Duration(seconds: 3),
           );
         }
       },
@@ -378,11 +377,10 @@ Download Go Rucky Yourself from the App Store!
   void _deleteSession(BuildContext context) {
     // Verify session has an ID
     if (widget.session.id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error: Session ID is missing'),
-          backgroundColor: Colors.red,
-        ),
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error: Session ID is missing',
+        duration: const Duration(seconds: 3),
       );
       return;
     }
