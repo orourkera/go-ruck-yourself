@@ -825,14 +825,18 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           child: Icon(
             icon,
             size: 14,
+<<<<<<< HEAD
             color: AppColors.secondary, // Use app secondary color for consistency across light/dark themes
+=======
+            color: AppColors.secondary,
+>>>>>>> f6072f44 (Consistent stat icon color: use AppColors.secondary for all session/stat icons (home screen, session card, ruck buddies map). Also improved map route parsing for robustness against varied backend formats.)
           ),
         ),
         const SizedBox(width: 4),
         Text(
           value,
           style: AppTextStyles.bodySmall.copyWith(
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+            color: AppColors.secondary,
           ),
         ),
       ],
