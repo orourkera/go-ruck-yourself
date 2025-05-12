@@ -7,6 +7,9 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class RuckBuddyCard extends StatelessWidget {
   final RuckBuddy ruckBuddy;
@@ -77,6 +80,11 @@ class RuckBuddyCard extends StatelessWidget {
               ],
             ),
             
+            const SizedBox(height: 12),
+
+            // Map snippet
+            _RouteMapPreview(ruckBuddy: ruckBuddy),
+
             const Divider(height: 24),
             
             // Stats Grid (2x2)
@@ -224,6 +232,121 @@ class RuckBuddyCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _RouteMapPreview extends StatelessWidget {
+  final RuckBuddy ruckBuddy;
+  const _RouteMapPreview({required this.ruckBuddy});
+
+  // Convert dynamic numeric or string to double, return null if not parseable
+  double? _parseCoord(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  List<LatLng> _getRoutePoints() {
+    final pts = <LatLng>[];
+    final lp = ruckBuddy.locationPoints;
+    if (lp == null) return pts;
+    for (final p in lp) {
+      double? lat;
+      double? lng;
+
+      if (p is Map) {
+        // attempt to handle multiple possible key names and value types
+        lat = _parseCoord(p['lat']) ?? _parseCoord(p['latitude']);
+        lng = _parseCoord(p['lng']) ?? _parseCoord(p['lon']) ?? _parseCoord(p['longitude']);
+      } else if (p is List && p.length >= 2) {
+        lat = _parseCoord(p[0]);
+        lng = _parseCoord(p[1]);
+      }
+
+      if (lat != null && lng != null) {
+        pts.add(LatLng(lat, lng));
+      }
+    }
+    return pts;
+  }
+
+  LatLng _getRouteCenter(List<LatLng> points) {
+    if (points.isEmpty) return LatLng(40.421, -3.678);
+    double avgLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
+    double avgLng = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
+    return LatLng(avgLat, avgLng);
+  }
+
+  double _getFitZoom(List<LatLng> points) {
+    if (points.isEmpty) return 16.0;
+    if (points.length == 1) return 17.5;
+    double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+    double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+    double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+    double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+    double latDiff = (maxLat - minLat).abs();
+    double lngDiff = (maxLng - minLng).abs();
+    double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+    maxDiff *= 1.05;
+    if (maxDiff < 0.001) return 17.5;
+    if (maxDiff < 0.01) return 16.0;
+    if (maxDiff < 0.1) return 14.0;
+    if (maxDiff < 1.0) return 11.0;
+    return 8.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final routePoints = _getRoutePoints();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        height: 140,
+        width: double.infinity,
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: _getRouteCenter(routePoints),
+            initialZoom: _getFitZoom(routePoints),
+            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+              userAgentPackageName: 'com.getrucky.gfy',
+              retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+            ),
+            if (routePoints.isNotEmpty)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: routePoints,
+                    color: AppColors.secondary,
+                    strokeWidth: 4,
+                  )
+                ],
+              ),
+            if (routePoints.isNotEmpty)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: routePoints.first,
+                    width: 16,
+                    height: 16,
+                    child: const Icon(Icons.trip_origin, color: Colors.green, size: 16),
+                  ),
+                  Marker(
+                    point: routePoints.last,
+                    width: 16,
+                    height: 16,
+                    child: const Icon(Icons.location_pin, color: Colors.red, size: 16),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
