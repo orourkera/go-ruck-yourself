@@ -61,6 +61,7 @@ def get_ruck_buddies():
             calories_burned,
             elevation_gain_m,
             elevation_loss_m,
+            route,
             started_at,
             completed_at,
             created_at,
