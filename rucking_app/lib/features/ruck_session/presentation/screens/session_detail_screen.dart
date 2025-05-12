@@ -9,9 +9,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 
 /// Screen that displays detailed information about a completed session
-class SessionDetailScreen extends StatelessWidget {
+class SessionDetailScreen extends StatefulWidget {
   final RuckSession session;
   
   const SessionDetailScreen({
@@ -28,36 +29,74 @@ class SessionDetailScreen extends StatelessWidget {
     // Format date
     final dateFormat = DateFormat('MMMM d, yyyy');
     final timeFormat = DateFormat('h:mm a');
-    final formattedDate = dateFormat.format(session.startTime);
-    final formattedStartTime = timeFormat.format(session.startTime);
-    final formattedEndTime = timeFormat.format(session.endTime);
+    final formattedDate = dateFormat.format(widget.session.startTime);
+    final formattedStartTime = timeFormat.format(widget.session.startTime);
+    final formattedEndTime = timeFormat.format(widget.session.endTime);
     
     // Format distance
     final distanceValue = preferMetric 
-        ? '${session.distance.toStringAsFixed(2)} km'
-        : '${(session.distance * 0.621371).toStringAsFixed(2)} mi';
+        ? '${widget.session.distance.toStringAsFixed(2)} km'
+        : '${(widget.session.distance * 0.621371).toStringAsFixed(2)} mi';
     
     // Format pace
     final paceValue = MeasurementUtils.formatPace(
-      session.averagePace,
+      widget.session.averagePace,
       metric: preferMetric,
     );
     
     // Format elevation
     final elevationDisplay = MeasurementUtils.formatElevation(
-      session.elevationGain,
-      session.elevationLoss,
+      widget.session.elevationGain,
+      widget.session.elevationLoss,
       metric: preferMetric,
     );
     
     // Format weight
     final weight = preferMetric
-        ? '${session.ruckWeightKg.toStringAsFixed(1)} kg'
-        : '${(session.ruckWeightKg * 2.20462).toStringAsFixed(1)} lb';
+        ? '${widget.session.ruckWeightKg.toStringAsFixed(1)} kg'
+        : '${(widget.session.ruckWeightKg * 2.20462).toStringAsFixed(1)} lb';
     
-    return Scaffold(
+    return BlocListener<SessionBloc, SessionState>(
+      listener: (context, state) {
+        if (state is SessionOperationInProgress) {
+          // Show loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Deleting session...'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        } else if (state is SessionDeleteSuccess) {
+          // Show success message and navigate back
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('The session is gone, rucker. Gone forever.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          Navigator.of(context).pop();
+        } else if (state is SessionOperationFailure) {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${state.message}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Session Details'),
+        actions: [
+          // Delete session button
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Delete session',
+            onPressed: () => _showDeleteConfirmationDialog(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -93,7 +132,7 @@ class SessionDetailScreen extends StatelessWidget {
                         context, 
                         Icons.timer, 
                         'Duration', 
-                        session.formattedDuration,
+                        widget.session.formattedDuration,
                       ),
                       _buildHeaderStat(
                         context, 
@@ -127,7 +166,7 @@ class SessionDetailScreen extends StatelessWidget {
                   _buildDetailRow(
                     context,
                     'Calories Burned',
-                    '${session.caloriesBurned}',
+                    '${widget.session.caloriesBurned}',
                     Icons.local_fire_department,
                   ),
                   _buildDetailRow(
@@ -137,28 +176,28 @@ class SessionDetailScreen extends StatelessWidget {
                     Icons.fitness_center,
                   ),
                   // Elevation Gain/Loss rows
-                  if (session.elevationGain > 0)
+                  if (widget.session.elevationGain > 0)
                     _buildDetailRow(
                       context,
                       'Elevation Gain',
-                      MeasurementUtils.formatSingleElevation(session.elevationGain, metric: preferMetric),
+                      MeasurementUtils.formatSingleElevation(widget.session.elevationGain, metric: preferMetric),
                       Icons.trending_up,
                     ),
-                  if (session.elevationLoss > 0)
+                  if (widget.session.elevationLoss > 0)
                     _buildDetailRow(
                       context,
                       'Elevation Loss',
-                      MeasurementUtils.formatSingleElevation(-session.elevationLoss, metric: preferMetric),
+                      MeasurementUtils.formatSingleElevation(-widget.session.elevationLoss, metric: preferMetric),
                       Icons.trending_down,
                     ),
-                  if (session.elevationGain == 0.0 && session.elevationLoss == 0.0)
+                  if (widget.session.elevationGain == 0.0 && widget.session.elevationLoss == 0.0)
                     _buildDetailRow(
                       context,
                       'Elevation',
                       '--',
                       Icons.landscape,
                     ),   
-                  if (session.rating != null) ...[
+                  if (widget.session.rating != null) ...[
                     const SizedBox(height: 24),
                     Text(
                       'Rating',
@@ -168,7 +207,7 @@ class SessionDetailScreen extends StatelessWidget {
                     Row(
                       children: List.generate(5, (index) {
                         return Icon(
-                          index < (session.rating ?? 0) 
+                          index < (widget.session.rating ?? 0) 
                               ? Icons.star 
                               : Icons.star_border,
                           color: Theme.of(context).primaryColor,
@@ -177,7 +216,7 @@ class SessionDetailScreen extends StatelessWidget {
                       }),
                     ),
                   ],
-                  if (session.notes?.isNotEmpty == true) ...[
+                  if (widget.session.notes?.isNotEmpty == true) ...[
                     const SizedBox(height: 24),
                     Text(
                       'Notes',
@@ -192,7 +231,7 @@ class SessionDetailScreen extends StatelessWidget {
                         border: Border.all(color: Colors.grey[300]!),
                       ),
                       child: Text(
-                        session.notes!,
+                        widget.session.notes!,
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
@@ -269,19 +308,20 @@ class SessionDetailScreen extends StatelessWidget {
   }
   
   void _shareSession(BuildContext context) {
-    AppLogger.info('Sharing session ${session.id}');
+    // Log session sharing
+    AppLogger.info('Sharing session ${widget.session.id}');
     
-    // Format a shareable text
+    // Create shareable text
     final dateFormat = DateFormat('MMMM d, yyyy');
-    final formattedDate = dateFormat.format(session.startTime);
+    final formattedDate = dateFormat.format(widget.session.startTime);
     
-    final shareText = '''
-🏋️ Go Rucky Yourself - Session Completed!
+    // Create message with emoji for style points
+    final shareText = '''🏋️ Go Rucky Yourself - Session Completed!
 📅 $formattedDate
-🔄 ${session.formattedDuration}
-📏 ${session.distance.toStringAsFixed(2)} km
-🔥 ${session.caloriesBurned} calories
-⚖️ ${session.ruckWeightKg.toStringAsFixed(1)} kg weight
+🔄 ${widget.session.formattedDuration}
+📏 ${widget.session.distance.toStringAsFixed(2)} km
+🔥 ${widget.session.caloriesBurned} calories
+⚖️ ${widget.session.ruckWeightKg.toStringAsFixed(1)} kg weight
 
 Download Go Rucky Yourself from the App Store!
 ''';
@@ -293,13 +333,65 @@ Download Go Rucky Yourself from the App Store!
       ),
     );
   }
+  
+  /// Shows a confirmation dialog before deleting a session
+  void _showDeleteConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Session?'),
+          content: const Text(
+            'Are you sure you want to delete this session? This action cannot be undone and all session data will be permanently removed.'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(), // Cancel
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                // Close the dialog
+                Navigator.of(dialogContext).pop();
+                
+                // Execute the delete operation
+                _deleteSession(context);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Handles the actual deletion of the session
+  void _deleteSession(BuildContext context) {
+    // Verify session has an ID
+    if (widget.session.id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Session ID is missing'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Dispatch the delete event to the SessionBloc
+    context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.session.id!));
+  }
 }
 
 // Route map preview widget for session details
 class _SessionRouteMap extends StatelessWidget {
   final RuckSession session;
+  
   const _SessionRouteMap({required this.session});
-
+  
   List<LatLng> _getRoutePoints() {
     final points = <LatLng>[];
     // Try locationPoints (preferred in model)

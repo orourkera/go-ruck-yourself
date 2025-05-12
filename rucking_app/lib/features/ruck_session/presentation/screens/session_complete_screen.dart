@@ -16,6 +16,9 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_state.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_event.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -260,6 +263,52 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     );
   }
 
+  // Show delete confirmation dialog
+  void _showDeleteConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard Ruck?'),
+        content: const Text(
+          'This will delete this ruck session and all associated data including heart rate and location points. This action cannot be undone, rucker.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(true);
+              _discardSession(context);
+            },
+            child: Text(
+              'Discard',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Handle session discard/deletion
+  void _discardSession(BuildContext context) {
+    // Verify session has an ID
+    if (widget.ruckId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Session ID is missing'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Dispatch delete event to SessionBloc
+    context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.ruckId));
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get user measurement preference
@@ -269,29 +318,59 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       preferMetric = authState.user.preferMetric;
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Session Complete'),
-        centerTitle: true,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        automaticallyImplyLeading: false,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Congratulations header
-                Center(
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 72,
+    return BlocListener<SessionBloc, SessionState>(
+      listener: (context, state) {
+        if (state is SessionOperationInProgress) {
+          // Show loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Discarding session...'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        } else if (state is SessionDeleteSuccess) {
+          // Show success message and navigate back to home
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('The session is gone, rucker. Gone forever.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        } else if (state is SessionOperationFailure) {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${state.message}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Session Complete'),
+          centerTitle: true,
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          automaticallyImplyLeading: false,
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Congratulations header
+                  Center(
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 72,
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -507,6 +586,22 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     color: AppColors.primary,
                     isLoading: _isSaving,
                     width: 250,
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Discard this ruck option (red text, centered)
+                Center(
+                  child: TextButton(
+                    onPressed: () => _showDeleteConfirmationDialog(context),
+                    child: const Text(
+                      'Discard this ruck',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
                 

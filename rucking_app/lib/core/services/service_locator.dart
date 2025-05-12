@@ -16,6 +16,8 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 
 // Global service locator instance
@@ -64,6 +66,11 @@ Future<void> setupServiceLocator() async {
     AuthRepositoryImpl(getIt<AuthService>())
   );
   
+  // Session repository for operations like delete
+  getIt.registerSingleton<SessionRepository>(
+    SessionRepository(apiClient: getIt<ApiClient>())
+  );
+  
   // Blocs
   getIt.registerFactory<AuthBloc>(() => AuthBloc(getIt<AuthRepository>()));
   getIt.registerFactory<SessionHistoryBloc>(() => SessionHistoryBloc(
@@ -75,6 +82,11 @@ Future<void> setupServiceLocator() async {
         healthService: getIt<HealthService>(),
         watchService: getIt<WatchService>(),
       ));
+      
+  // Register session bloc for operations like delete
+  getIt.registerFactory<SessionBloc>(() => SessionBloc(
+    sessionRepository: getIt<SessionRepository>(),
+  ));
 }
 
 /// Configures Dio with base options and interceptors
