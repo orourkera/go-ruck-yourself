@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required
 import os
 from datetime import datetime, timedelta
 
-from ..config import supabase
+from ..supabase_client import get_supabase_client
 from ..auth.auth import auth_required, get_user_id
 
 ruck_buddies_bp = Blueprint('ruck_buddies', __name__)
@@ -18,21 +18,35 @@ def get_ruck_buddies():
     Query params:
     - limit: Number of sessions to return (default: 20)
     - offset: Pagination offset (default: 0)
-    - filter: 'recent' (default), 'popular', 'distance' (longest), 'duration' (longest)
+    - filter: 'closest' (default), 'calories', 'distance' (furthest), 'duration' (longest), 'elevation' (most elevation)
     """
     limit = request.args.get('limit', 20, type=int)
     offset = request.args.get('offset', 0, type=int)
-    filter_type = request.args.get('filter', 'recent')
+    filter_type = request.args.get('filter', 'closest')
+    
+    # Get latitude and longitude for closest filter if provided
+    latitude = request.args.get('latitude', type=float)
+    longitude = request.args.get('longitude', type=float)
     
     # Define ordering based on filter type
-    if filter_type == 'popular':
-        order_by = "likes_count.desc()"
+    if filter_type == 'calories':
+        order_by = "calories_burned.desc()"
     elif filter_type == 'distance':
         order_by = "distance_km.desc()"
     elif filter_type == 'duration':
         order_by = "duration_seconds.desc()"
-    else:  # 'recent' is default
-        order_by = "completed_at.desc()"
+    elif filter_type == 'elevation':
+        order_by = "elevation_gain_m.desc()"
+    else:  # 'closest' is default, but fallback to completed_at if no coordinates provided
+        if latitude is not None and longitude is not None:
+            # For proximity, we'll need to handle this separately
+            # This is a placeholder - in a real implementation, we would use geospatial functions
+            order_by = "completed_at.desc()"  # Fallback ordering
+        else:
+            order_by = "completed_at.desc()"  # Default if no coordinates
+    
+    # Get supabase client
+    supabase = get_supabase_client(g.user.token if hasattr(g.user, 'token') else None)
     
     # Base query getting public ruck sessions that aren't from the current user
     # Also join with users table to get user display info and check allow_ruck_sharing
