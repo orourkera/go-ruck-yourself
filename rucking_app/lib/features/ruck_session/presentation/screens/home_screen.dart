@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
@@ -597,11 +598,17 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           onTap: () {
                             try {
                               final sessionModel = RuckSession.fromJson(session);
-                              Navigator.of(context).push(
+                              // Navigate to detail screen and handle the result
+                              Navigator.of(context).push<bool>(
                                 MaterialPageRoute(
                                   builder: (context) => SessionDetailScreen(session: sessionModel),
                                 ),
-                              );
+                              ).then((refreshNeeded) {
+                                // If returned with true (session deleted), refresh the data
+                                if (refreshNeeded == true) {
+                                  _fetchData();
+                                }
+                              });
                             } catch (e) {
                               
                             }

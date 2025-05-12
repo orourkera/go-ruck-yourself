@@ -15,26 +15,19 @@ class SessionRepository {
     try {
       AppLogger.info('Deleting session with ID: $sessionId');
       
-      // Call the Supabase RPC function to delete the session
-      // This handles the cascade deletion of associated records
-      final response = await _apiClient.post(
-        '/rpc/delete_user_ruck_session',
-        {'session_id': sessionId}
-      );
-      
-      // Check if the deletion was successful
-      // The RPC function should return a success flag
-      if (response != null && response['success'] == true) {
-        AppLogger.info('Successfully deleted session: $sessionId');
-        return true;
+      // Verify sessionId is not empty
+      if (sessionId.isEmpty) {
+        AppLogger.error('Session ID is empty');
+        return false;
       }
       
-      // Alternative implementation if using direct DELETE operation:
-      // final response = await _apiClient.delete('/rucks/$sessionId');
-      // return response != null; // Success if response is not null
+      // Use direct DELETE operation with the correct endpoint pattern
+      final response = await _apiClient.delete('/rucks/$sessionId');
       
-      AppLogger.warning('Failed to delete session: $sessionId. Response: $response');
-      return false;
+      // The API returns the response data directly, not a Response object
+      // If we get here without an exception, the deletion was successful
+      AppLogger.info('Successfully deleted session: $sessionId. Response: $response');
+      return true;
     } catch (e) {
       AppLogger.error('Error deleting session: $e');
       return false;
