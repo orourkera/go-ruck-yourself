@@ -480,17 +480,19 @@ class _SessionRouteMap extends StatelessWidget {
             if (points.isNotEmpty)
               MarkerLayer(
                 markers: [
+                  // Start marker
                   Marker(
                     point: points.first,
-                    width: 20,
-                    height: 20,
-                    child: const Icon(Icons.trip_origin, color: Colors.green, size: 20),
+                    width: 32,
+                    height: 32,
+                    child: Image.asset('assets/images/map marker.png'),
                   ),
+                  // End marker
                   Marker(
                     point: points.last,
-                    width: 20,
-                    height: 20,
-                    child: const Icon(Icons.location_pin, color: Colors.red, size: 20),
+                    width: 32,
+                    height: 32,
+                    child: Image.asset('assets/images/home pin.png'),
                   ),
                 ],
               ),

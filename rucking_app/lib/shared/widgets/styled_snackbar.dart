@@ -209,7 +209,7 @@ class StyledSnackBar {
     });
   }
   
-  /// Shows a success-styled SnackBar (green color)
+  /// Shows a success-styled SnackBar (slate grey color)
   static void showSuccess({
     required BuildContext context,
     required String message,

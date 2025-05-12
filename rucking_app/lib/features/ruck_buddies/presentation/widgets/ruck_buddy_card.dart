@@ -311,17 +311,19 @@ class _RouteMapPreview extends StatelessWidget {
             if (routePoints.isNotEmpty)
               MarkerLayer(
                 markers: [
+                  // Start marker
                   Marker(
                     point: routePoints.first,
-                    width: 16,
-                    height: 16,
-                    child: const Icon(Icons.trip_origin, color: Colors.green, size: 16),
+                    width: 24,
+                    height: 24,
+                    child: Image.asset('assets/images/map marker.png'),
                   ),
+                  // End marker
                   Marker(
                     point: routePoints.last,
-                    width: 16,
-                    height: 16,
-                    child: const Icon(Icons.location_pin, color: Colors.red, size: 16),
+                    width: 24,
+                    height: 24,
+                    child: Image.asset('assets/images/home pin.png'),
                   ),
                 ],
               ),
