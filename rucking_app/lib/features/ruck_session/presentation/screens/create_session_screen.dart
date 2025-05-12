@@ -14,6 +14,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/error_messages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -131,19 +132,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     if (_formKey.currentState!.validate()) {
       final authState = context.read<AuthBloc>().state;
       if (authState is! Authenticated) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('You must be logged in to create a session'),
-            backgroundColor: AppColors.error,
-            action: SnackBarAction(
-              label: 'Log In',
-              onPressed: () {
-                // Navigate to login screen
-                Navigator.of(context).pushNamed('/login');
-              },
-            ),
-          ),
+        StyledSnackBar.showError(
+          context: context,
+          message: 'You must be logged in to create a session',
+          duration: const Duration(seconds: 3),
         );
+        // Navigate to login screen after a brief delay
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          Navigator.of(context).pushNamed('/login');
+        });
         return;
       }
       
@@ -243,13 +240,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       } catch (e) {
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().contains(sessionUserWeightRequired)
-                ? sessionUserWeightRequired
-                : 'Failed to create/start session: $e'),
-              backgroundColor: AppColors.error,
-            ),
+          StyledSnackBar.showError(
+            context: context,
+            message: e.toString().contains(sessionUserWeightRequired)
+              ? sessionUserWeightRequired
+              : 'Failed to create/start session: $e',
+            duration: const Duration(seconds: 3),
           );
           // Only set creating to false on error, success leads to navigation
           setState(() {

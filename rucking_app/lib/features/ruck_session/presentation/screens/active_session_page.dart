@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:latlong2/latlong.dart' as latlong;
@@ -202,8 +203,10 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       (curr is ActiveSessionRunning && !sessionRunning),
                     listener: (ctx, state) {
                       if (state is ActiveSessionFailure) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(content: Text(state.errorMessage)),
+                        StyledSnackBar.showError(
+                          context: ctx,
+                          message: state.errorMessage,
+                          duration: const Duration(seconds: 3),
                         );
                       } else if (state is ActiveSessionComplete) {
                         final endTime = state.session.endTime ?? DateTime.now();
