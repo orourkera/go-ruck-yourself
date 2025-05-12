@@ -8,6 +8,7 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -199,19 +200,26 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       children: [
         const SizedBox(height: 16),
         Text('Heart Rate', style: AppTextStyles.titleMedium),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildStatCard('Avg', _avgHeartRate?.toString() ?? '--', 'bpm'),
-            _buildStatCard('Max', _maxHeartRate?.toString() ?? '--', 'bpm'),
-            _buildStatCard('Min', _minHeartRate?.toString() ?? '--', 'bpm'),
-          ],
-        ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 120,
-          child: LineChart(_buildHeartRateChart()),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: HeartRateGraph(
+            samples: _heartRateSamples!,
+            height: 160,
+            showLabels: true,
+            showTooltips: true,
+          ),
         ),
       ],
     );
@@ -231,30 +239,6 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  LineChartData _buildHeartRateChart() {
-    final spots = _heartRateSamples!.asMap().entries.map((entry) {
-      final idx = entry.key;
-      final bpm = entry.value.bpm;
-      return FlSpot(idx.toDouble(), bpm.toDouble());
-    }).toList();
-    return LineChartData(
-      gridData: FlGridData(show: false),
-      titlesData: FlTitlesData(show: false),
-      borderData: FlBorderData(show: false),
-      lineBarsData: [
-        LineChartBarData(
-          spots: spots,
-          isCurved: true,
-          color: AppColors.primary,
-          barWidth: 3,
-          dotData: FlDotData(show: false),
-        ),
-      ],
-      minY: _minHeartRate?.toDouble() ?? 0,
-      maxY: _maxHeartRate?.toDouble() ?? 200,
     );
   }
 
