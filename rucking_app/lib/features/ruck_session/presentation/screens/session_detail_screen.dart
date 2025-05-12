@@ -7,11 +7,12 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -27,6 +28,17 @@ class SessionDetailScreen extends StatefulWidget {
 }
 
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
+  // Heart rate calculation helper methods
+  int _calculateAvgHeartRate(List<HeartRateSample> samples) {
+    if (samples.isEmpty) return 0;
+    final sum = samples.fold(0, (sum, sample) => sum + sample.bpm);
+    return (sum / samples.length).round();
+  }
+
+  int _calculateMaxHeartRate(List<HeartRateSample> samples) {
+    if (samples.isEmpty) return 0;
+    return samples.map((e) => e.bpm).reduce((max, bpm) => bpm > max ? bpm : max);
+  }
   @override
   Widget build(BuildContext context) {
     // Get user preferences for metric/imperial
@@ -113,14 +125,40 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      formattedDate,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$formattedStartTime - $formattedEndTime',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    // Date, time and rating on same row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Date and time column
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              formattedDate,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '$formattedStartTime - $formattedEndTime',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        // Rating display (moved from below)
+                        if (widget.session.rating != null)
+                          Row(
+                            children: List.generate(5, (index) {
+                              return Icon(
+                                index < (widget.session.rating ?? 0) 
+                                    ? Icons.star 
+                                    : Icons.star_border,
+                                color: Colors.amber,
+                                size: 24,
+                              );
+                            }),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -201,23 +239,49 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                         '--',
                         Icons.landscape,
                       ),   
-                    if (widget.session.rating != null) ...[
+                    // Heart Rate Section (added after stats)
+                    if (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       Text(
-                        'Rating',
+                        'Heart Rate',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: List.generate(5, (index) {
-                          return Icon(
-                            index < (widget.session.rating ?? 0) 
-                                ? Icons.star 
-                                : Icons.star_border,
-                            color: Theme.of(context).primaryColor,
-                            size: 28,
-                          );
-                        }),
+                      const SizedBox(height: 16),
+                      // Average Heart Rate
+                      _buildDetailRow(
+                        context,
+                        'Average Heart Rate',
+                        '${_calculateAvgHeartRate(widget.session.heartRateSamples!)} bpm',
+                        Icons.favorite,
+                      ),
+                      // Maximum Heart Rate
+                      _buildDetailRow(
+                        context,
+                        'Maximum Heart Rate',
+                        '${_calculateMaxHeartRate(widget.session.heartRateSamples!)} bpm',
+                        Icons.favorite_border,
+                      ),
+                      const SizedBox(height: 16),
+                      // Heart Rate Graph
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        child: HeartRateGraph(
+                          samples: widget.session.heartRateSamples!,
+                          height: 160,
+                          showLabels: true,
+                          showTooltips: true,
+                        ),
                       ),
                     ],
                     if (widget.session.notes?.isNotEmpty == true) ...[
