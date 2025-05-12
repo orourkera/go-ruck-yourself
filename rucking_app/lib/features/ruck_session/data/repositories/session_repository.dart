@@ -19,7 +19,7 @@ class SessionRepository {
       // This handles the cascade deletion of associated records
       final response = await _apiClient.post(
         '/rpc/delete_user_ruck_session',
-        body: {'session_id': sessionId},
+        {'session_id': sessionId}
       );
       
       // Check if the deletion was successful

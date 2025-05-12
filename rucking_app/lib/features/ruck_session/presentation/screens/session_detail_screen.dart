@@ -21,6 +21,11 @@ class SessionDetailScreen extends StatefulWidget {
   }) : super(key: key);
   
   @override
+  State<SessionDetailScreen> createState() => _SessionDetailScreenState();
+}
+
+class _SessionDetailScreenState extends State<SessionDetailScreen> {
+  @override
   Widget build(BuildContext context) {
     // Get user preferences for metric/imperial
     final authState = context.read<AuthBloc>().state;
@@ -87,159 +92,160 @@ class SessionDetailScreen extends StatefulWidget {
         }
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Session Details'),
-        actions: [
-          // Delete session button
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Delete session',
-            onPressed: () => _showDeleteConfirmationDialog(context),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header section with date and overview
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    formattedDate,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '$formattedStartTime - $formattedEndTime',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildHeaderStat(
-                        context, 
-                        Icons.straighten, 
-                        'Distance', 
-                        distanceValue,
-                      ),
-                      _buildHeaderStat(
-                        context, 
-                        Icons.timer, 
-                        'Duration', 
-                        widget.session.formattedDuration,
-                      ),
-                      _buildHeaderStat(
-                        context, 
-                        Icons.speed, 
-                        'Pace', 
-                        paceValue,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Route map preview
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              child: _SessionRouteMap(session: session),
-            ),
-
-            // Detail stats
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Stats',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDetailRow(
-                    context,
-                    'Calories Burned',
-                    '${widget.session.caloriesBurned}',
-                    Icons.local_fire_department,
-                  ),
-                  _buildDetailRow(
-                    context,
-                    'Ruck Weight',
-                    weight,
-                    Icons.fitness_center,
-                  ),
-                  // Elevation Gain/Loss rows
-                  if (widget.session.elevationGain > 0)
-                    _buildDetailRow(
-                      context,
-                      'Elevation Gain',
-                      MeasurementUtils.formatSingleElevation(widget.session.elevationGain, metric: preferMetric),
-                      Icons.trending_up,
-                    ),
-                  if (widget.session.elevationLoss > 0)
-                    _buildDetailRow(
-                      context,
-                      'Elevation Loss',
-                      MeasurementUtils.formatSingleElevation(-widget.session.elevationLoss, metric: preferMetric),
-                      Icons.trending_down,
-                    ),
-                  if (widget.session.elevationGain == 0.0 && widget.session.elevationLoss == 0.0)
-                    _buildDetailRow(
-                      context,
-                      'Elevation',
-                      '--',
-                      Icons.landscape,
-                    ),   
-                  if (widget.session.rating != null) ...[
-                    const SizedBox(height: 24),
-                    Text(
-                      'Rating',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: List.generate(5, (index) {
-                        return Icon(
-                          index < (widget.session.rating ?? 0) 
-                              ? Icons.star 
-                              : Icons.star_border,
-                          color: Theme.of(context).primaryColor,
-                          size: 28,
-                        );
-                      }),
-                    ),
-                  ],
-                  if (widget.session.notes?.isNotEmpty == true) ...[
-                    const SizedBox(height: 24),
-                    Text(
-                      'Notes',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Text(
-                        widget.session.notes!,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+        appBar: AppBar(
+          title: const Text('Session Details'),
+          actions: [
+            // Delete session button
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete session',
+              onPressed: () => _showDeleteConfirmationDialog(context),
             ),
           ],
+        ),
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header section with date and overview
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      formattedDate,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$formattedStartTime - $formattedEndTime',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildHeaderStat(
+                          context, 
+                          Icons.straighten, 
+                          'Distance', 
+                          distanceValue,
+                        ),
+                        _buildHeaderStat(
+                          context, 
+                          Icons.timer, 
+                          'Duration', 
+                          widget.session.formattedDuration,
+                        ),
+                        _buildHeaderStat(
+                          context, 
+                          Icons.speed, 
+                          'Pace', 
+                          paceValue,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Route map preview
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                child: _SessionRouteMap(session: widget.session),
+              ),
+
+              // Detail stats
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Stats',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildDetailRow(
+                      context,
+                      'Calories Burned',
+                      '${widget.session.caloriesBurned}',
+                      Icons.local_fire_department,
+                    ),
+                    _buildDetailRow(
+                      context,
+                      'Ruck Weight',
+                      weight,
+                      Icons.fitness_center,
+                    ),
+                    // Elevation Gain/Loss rows
+                    if (widget.session.elevationGain > 0)
+                      _buildDetailRow(
+                        context,
+                        'Elevation Gain',
+                        MeasurementUtils.formatSingleElevation(widget.session.elevationGain, metric: preferMetric),
+                        Icons.trending_up,
+                      ),
+                    if (widget.session.elevationLoss > 0)
+                      _buildDetailRow(
+                        context,
+                        'Elevation Loss',
+                        MeasurementUtils.formatSingleElevation(-widget.session.elevationLoss, metric: preferMetric),
+                        Icons.trending_down,
+                      ),
+                    if (widget.session.elevationGain == 0.0 && widget.session.elevationLoss == 0.0)
+                      _buildDetailRow(
+                        context,
+                        'Elevation',
+                        '--',
+                        Icons.landscape,
+                      ),   
+                    if (widget.session.rating != null) ...[
+                      const SizedBox(height: 24),
+                      Text(
+                        'Rating',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: List.generate(5, (index) {
+                          return Icon(
+                            index < (widget.session.rating ?? 0) 
+                                ? Icons.star 
+                                : Icons.star_border,
+                            color: Theme.of(context).primaryColor,
+                            size: 28,
+                          );
+                        }),
+                      ),
+                    ],
+                    if (widget.session.notes?.isNotEmpty == true) ...[
+                      const SizedBox(height: 24),
+                      Text(
+                        'Notes',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Text(
+                          widget.session.notes!,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

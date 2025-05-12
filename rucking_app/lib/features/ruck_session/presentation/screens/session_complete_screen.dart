@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -11,14 +10,10 @@ import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/session_state.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/session_event.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -611,6 +606,6 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
-} 
+}
