@@ -69,8 +69,7 @@ def get_ruck_buddies():
             user:user_id (
                 id,
                 username,
-                avatar_url,
-                allow_ruck_sharing
+                avatar_url
             ),
             location_points:location_point (
                 id,
@@ -81,7 +80,6 @@ def get_ruck_buddies():
             )
         ''') \
         .eq('is_public', True) \
-        .eq('user.allow_ruck_sharing', True) \
         .neq('user_id', g.user.id) \
         .order(order_by) \
         .limit(limit) \
