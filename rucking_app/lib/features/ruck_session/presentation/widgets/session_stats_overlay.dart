@@ -132,38 +132,29 @@ class SessionStatsOverlay extends StatelessWidget {
                     ),
                     // Right half: Heart rate (centered)
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 14.0), // Align with timer
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Removed extra vertical space here
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.baseline, // Changed to baseline
-                              textBaseline: TextBaseline.alphabetic, // Specify the baseline
-                              mainAxisSize: MainAxisSize.min, // Add this line
-                              children: [
-                                Icon(
-                                  Icons.favorite,
-                                  color: Colors.red,
-                                  size: 36,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.favorite,
+                                color: Colors.red,
+                                size: 36,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
+                                style: AppTextStyles.timerDisplay.copyWith(
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 36,
                                 ),
-                                SizedBox(width: 8),
-                                // Removed Baseline widget for simpler vertical centering
-                                Text(
-                                  (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
-                                  style: AppTextStyles.timerDisplay.copyWith(
-                                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 36,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
