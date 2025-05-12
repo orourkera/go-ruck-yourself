@@ -134,11 +134,7 @@ CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 # Initialize API
 api = Api(app)
 
-# Import blueprints
-from .api.ruck_buddies import ruck_buddies_bp
-
-# Register blueprints
-app.register_blueprint(ruck_buddies_bp)
+# ruck_buddies blueprint already registered above; duplicate import removed
 
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (
