@@ -137,6 +137,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           weightKg: event.weightKg,
           heightCm: event.heightCm,
           preferMetric: event.preferMetric,
+          allowRuckSharing: event.allowRuckSharing,
         );
         emit(Authenticated(updatedUser)); // Emit new state with updated user
       } catch (e) {

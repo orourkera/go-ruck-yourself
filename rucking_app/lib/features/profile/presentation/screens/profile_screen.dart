@@ -191,6 +191,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             },
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        _buildSettingItem(
+                          icon: Icons.people_outline,
+                          label: 'Share Rucks with Others',
+                          trailing: Switch(
+                            value: user.allowRuckSharing,
+                            activeColor: AppColors.primary,
+                            onChanged: (bool newValue) {
+                              // Dispatch update event
+                              context.read<AuthBloc>().add(AuthUpdateProfileRequested(
+                                allowRuckSharing: newValue,
+                                preferMetric: user.preferMetric,
+                                username: user.username,
+                                weightKg: user.weightKg,
+                                heightCm: user.heightCm,
+                              ));
+                            },
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
