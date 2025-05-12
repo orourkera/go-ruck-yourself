@@ -36,6 +36,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   LocationPoint? _lastValidLocation;
   int _validLocationCount = 0;
   int _latestHeartRate = 0;
+  // Watchdog: track time of last valid location to auto-restart GPS if stalled
+  DateTime _lastLocationTimestamp = DateTime.now();
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -313,6 +315,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
 
     _lastValidLocation = currentPoint;
+    _lastLocationTimestamp = DateTime.now();
 
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
@@ -790,6 +793,13 @@ emit(ActiveSessionComplete(
       elevationGain: currentState.elevationGain,
       elevationLoss: currentState.elevationLoss,
     );
+
+    // Inactivity watchdog: if no GPS fix for >15s, restart location tracking
+    if (DateTime.now().difference(_lastLocationTimestamp) > const Duration(seconds: 15)) {
+      AppLogger.warning('No GPS fix for 15s – restarting location stream');
+      _startLocationTracking(emit);
+      _lastLocationTimestamp = DateTime.now();
+    }
 
     emit(currentState.copyWith(
       elapsedSeconds: newElapsed,
