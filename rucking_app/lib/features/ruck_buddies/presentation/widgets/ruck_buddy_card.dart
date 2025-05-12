@@ -151,7 +151,6 @@ class RuckBuddyCard extends StatelessWidget {
       final String initial = user.username.isNotEmpty 
         ? user.username[0].toUpperCase() 
         : 'R';
-        : 'R';
       
       return CircleAvatar(
         radius: 20,
