@@ -19,9 +19,9 @@ class StyledSnackBar {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     
     // Main and border colors based on type
-    final Color mainColor = isError ? AppColors.error : AppColors.secondary;
-    final Color borderColor = isError ? AppColors.errorDark : AppColors.secondaryDark;
-    final Color shadowColor = isError ? AppColors.errorDark.withOpacity(0.5) : AppColors.secondaryDarkest.withOpacity(0.5);
+    final Color mainColor = isError ? AppColors.error : AppColors.success;
+    final Color borderColor = isError ? AppColors.errorDark : AppColors.primaryDark;
+    final Color shadowColor = isError ? AppColors.errorDark.withOpacity(0.5) : AppColors.primaryDark.withOpacity(0.5);
     
     // Create and show the styled SnackBar
     ScaffoldMessenger.of(context).showSnackBar(
@@ -62,13 +62,6 @@ class StyledSnackBar {
         dismissDirection: DismissDirection.down, // Flow off the bottom
         elevation: 12,
         clipBehavior: Clip.antiAlias,
-        action: SnackBarAction( // Subtle dismiss button
-          label: 'DISMISS',
-          textColor: AppColors.white.withOpacity(0.8),
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
         animation: CurvedAnimation(
           parent: AnimationController(
             vsync: ScaffoldMessenger.of(context),
