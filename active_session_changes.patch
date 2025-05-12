@@ -1,0 +1,346 @@
+From 33903a9647ad45a873cc7043af6c45bd457d6f41 Mon Sep 17 00:00:00 2001
+From: Rory <orourkera@gmail.com>
+Date: Mon, 12 May 2025 18:13:00 +0200
+Subject: [PATCH] Fix active session issues: 1) Keep timer running when screen
+ locked, 2) Add smooth map animations, 3) Display weight with 1 decimal place,
+ 4) Fix pause overlay appearance, 5) Prevent calories from decreasing
+
+---
+ .../bloc/active_session_bloc.dart             |  55 +++++-
+ .../screens/active_session_page.dart          | 157 +++++++++++++-----
+ 2 files changed, 166 insertions(+), 46 deletions(-)
+
+diff --git a/rucking_app/lib/features/ruck_session/presentation/bloc/active_session_bloc.dart b/rucking_app/lib/features/ruck_session/presentation/bloc/active_session_bloc.dart
+index 1d3c61c1..f23c2fe1 100644
+--- a/rucking_app/lib/features/ruck_session/presentation/bloc/active_session_bloc.dart
++++ b/rucking_app/lib/features/ruck_session/presentation/bloc/active_session_bloc.dart
+@@ -1,4 +1,4 @@
+-import 'dart:math';
++import 'dart:math' as math;
+ import 'dart:async';
+ import 'package:bloc/bloc.dart';
+ import 'package:equatable/equatable.dart';
+@@ -31,6 +31,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
+   StreamSubscription<LocationPoint>? _locationSubscription;
+   StreamSubscription<HeartRateSample>? _heartRateSubscription;
+   Timer? _ticker;
++  Timer? _watchdogTimer;
++  DateTime _lastTickTime = DateTime.now();
+   // Reuse one validation service instance to keep state between points
+   final SessionValidationService _validationService = SessionValidationService();
+   LocationPoint? _lastValidLocation;
+@@ -247,21 +249,49 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
+ 
+   void _startTicker() {
+     _ticker?.cancel();
+-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => add(Tick()));
++    _watchdogTimer?.cancel();
++    
++    // Record the start time for this ticker
++    _lastTickTime = DateTime.now();
++    
++    // Main timer that fires every second normally
++    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
++      add(Tick());
++    });
++    
++    // Watchdog timer that checks for missed ticks every 5 seconds
++    // This helps recover from background/lock screen situations
++    _watchdogTimer = Timer.periodic(const Duration(seconds: 5), (_) {
++      final now = DateTime.now();
++      final elapsed = now.difference(_lastTickTime).inSeconds;
++      
++      // If we've missed more than 2 seconds, catch up by adding the missed ticks
++      if (elapsed > 2) {
++        AppLogger.info('Watchdog caught $elapsed seconds of missed ticks, catching up');
++        for (int i = 0; i < elapsed; i++) {
++          add(Tick());
++        }
++        _lastTickTime = now;
++      }
++    });
+   }
+ 
+   void _stopTicker() {
+     _ticker?.cancel();
+     _ticker = null;
++    _watchdogTimer?.cancel();
++    _watchdogTimer = null;
+   }
+ 
+   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+-    var p = 0.017453292519943295;
+-    var c = cos;
+-    var a = 0.5 - c((lat2 - lat1) * p) / 2 + 
+-            c(lat1 * p) * c(lat2 * p) * 
+-            (1 - c((lon2 - lon1) * p)) / 2;
+-    return 12742 * asin(sqrt(a)) * 1000; // 2 * R; R = 6371 km, returns meters
++    const double earthRadius = 6371000; // meters
++    double dLat = (lat2 - lat1) * (math.pi / 180);
++    double dLon = (lon2 - lon1) * (math.pi / 180);
++    double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
++               math.cos(lat1 * (math.pi / 180)) * math.cos(lat2 * (math.pi / 180)) *
++               math.sin(dLon / 2) * math.sin(dLon / 2);
++    double c = 2 * math.asin(math.sqrt(a));
++    return earthRadius * c / 1000; // Convert to km
+   }
+   
+   // Get user weight from current user state
+@@ -762,6 +792,8 @@ emit(ActiveSessionComplete(
+   }
+ 
+   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
++    // Update last tick time to track when ticks happen
++    _lastTickTime = DateTime.now();
+     _paceTickCounter++; // Increment local pace counter
+ 
+     if (state is! ActiveSessionRunning) return;
+@@ -814,6 +846,10 @@ emit(ActiveSessionComplete(
+       elevationGain: currentState.elevationGain,
+       elevationLoss: currentState.elevationLoss,
+     );
++    
++    // Never allow calories to decrease during a session
++    // This prevents the drops when timer is trued up
++    final int finalCalories = math.max(calculatedCalories.round(), currentState.calories);
+ 
+     // Inactivity watchdog: if no GPS fix for >15s, restart location tracking
+     if (DateTime.now().difference(_lastLocationTimestamp) > const Duration(seconds: 15)) {
+@@ -825,7 +861,7 @@ emit(ActiveSessionComplete(
+     emit(currentState.copyWith(
+       elapsedSeconds: newElapsed,
+       pace: newPace,
+-      calories: calculatedCalories.round(),
++      calories: finalCalories,
+     ));
+   }
+ 
+@@ -852,6 +888,7 @@ emit(ActiveSessionComplete(
+     _locationSubscription?.cancel();
+     _heartRateSubscription?.cancel();
+     _ticker?.cancel();
++    _watchdogTimer?.cancel();
+     return super.close();
+   }
+ }
+\ No newline at end of file
+diff --git a/rucking_app/lib/features/ruck_session/presentation/screens/active_session_page.dart b/rucking_app/lib/features/ruck_session/presentation/screens/active_session_page.dart
+index 5db992b6..1f581603 100644
+--- a/rucking_app/lib/features/ruck_session/presentation/screens/active_session_page.dart
++++ b/rucking_app/lib/features/ruck_session/presentation/screens/active_session_page.dart
+@@ -1,4 +1,5 @@
+ import 'dart:async';
++import 'dart:math' as math;
+ import 'package:flutter/material.dart';
+ import 'package:flutter_bloc/flutter_bloc.dart';
+ import 'package:get_it/get_it.dart';
+@@ -319,10 +320,10 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
+                                       child: _WeightChip(weightKg: state.ruckWeightKg),
+                                     ),
+                                     if (state.isPaused)
+-  const Positioned.fill(child: IgnorePointer(
+-    ignoring: true, // Let touch events pass through
+-    child: _PauseOverlay(),
+-  )),
++                                      const Positioned.fill(child: IgnorePointer(
++                                        ignoring: true, // Let touch events pass through
++                                        child: _PauseOverlay(),
++                                      )),
+ 
+                                   ],
+                                 ),
+@@ -571,48 +572,74 @@ class _RouteMapState extends State<_RouteMap> {
+   
+   void didUpdateWidget(covariant _RouteMap oldWidget) {
+     super.didUpdateWidget(oldWidget);
++    
++    // Only process if we have a route and it has changed
+     if (widget.route.isNotEmpty && widget.route != oldWidget.route) {
+-      // Only do a bounds fit if:
+-      // 1. We've never done one before (_lastBoundsFitTime is null)
+-      // 2. We have multiple points and it's been at least 10 seconds since the last fit
+-      // 3. We've gone from 0 to 1 point (first location update)
+-      bool shouldFitBounds = _lastBoundsFitTime == null || 
+-                            (widget.route.length > 1 && 
+-                             oldWidget.route.isEmpty) ||
+-                            (_lastBoundsFitTime != null && 
+-                             DateTime.now().difference(_lastBoundsFitTime!).inSeconds > 10);
++      // Check if this is the first point or a new point was added
++      bool isNewPoint = widget.route.length > oldWidget.route.length;
++      if (!isNewPoint) return; // Skip if no new points (avoid redundant updates)
++      
++      // Determine if we should do a full bounds fit
++      bool shouldFitBounds = 
++          // First location update ever
++          _lastBoundsFitTime == null || 
++          // First location point
++          (widget.route.length == 1 && oldWidget.route.isEmpty) ||
++          // Do a bounds fit every 30 seconds instead of 10 to reduce jumpy behavior
++          (_lastBoundsFitTime != null && 
++           DateTime.now().difference(_lastBoundsFitTime!).inSeconds > 30);
+       
+-      if (shouldFitBounds) {
+-        // Use a microtask to ensure that mapController is ready and avoid conflicts
+-        Future.microtask(() {
++      // Use a short delay to batch updates that might come in rapid succession
++      Future.delayed(const Duration(milliseconds: 50), () {
++        if (!mounted) return;
++        
++        if (shouldFitBounds) {
+           _fitBoundsToRoute();
+           _lastBoundsFitTime = DateTime.now();
+-        });
+-      } else {
+-        // For regular updates, just center on the last point without changing zoom
+-        if (widget.route.isNotEmpty && widget.route.length > oldWidget.route.length) {
+-          Future.microtask(() {
+-            _centerOnLastPoint();
+-          });
++        } else {
++          // For most updates, just smoothly center on the user's location
++          _centerOnLastPoint();
+         }
+-      }
++      });
+     }
+   }
+ 
+   void _fitBoundsToRoute() {
+     if (mounted && widget.route.length > 1) {
+-      final bounds = LatLngBounds.fromPoints(widget.route);
+-      // Get current zoom before fitting bounds
+-      final currentZoom = _controller.camera.zoom;
++      // Calculate bounds manually
++      double minLat = 90.0;
++      double maxLat = -90.0;
++      double minLng = 180.0;
++      double maxLng = -180.0;
+       
+-      // Fit the bounds but limit maximum zoom to prevent excessive zooming
+-      _controller.fitCamera(
+-        CameraFit.bounds(
+-          bounds: bounds,
+-          padding: const EdgeInsets.all(40.0),
+-          maxZoom: 16.0, // Allow slightly closer zoom when fitting bounds
+-        ),
+-      );
++      // Find the min/max bounds
++      for (final point in widget.route) {
++        minLat = math.min(minLat, point.latitude);
++        maxLat = math.max(maxLat, point.latitude);
++        minLng = math.min(minLng, point.longitude);
++        maxLng = math.max(maxLng, point.longitude);
++      }
++      
++      // Add padding
++      final padding = 0.01; // roughly equivalent to padding of 40px
++      minLat -= padding;
++      maxLat += padding;
++      minLng -= padding;
++      maxLng += padding;
++      
++      // Calculate center
++      final centerLat = (minLat + maxLat) / 2;
++      final centerLng = (minLng + maxLng) / 2;
++      
++      // Calculate appropriate zoom level
++      // Using log base 2: log2(x) = log(x)/log(2)
++      final logBase2 = math.log(2);
++      final latZoom = math.log(360 / (maxLat - minLat)) / logBase2;
++      final lngZoom = math.log(360 / (maxLng - minLng)) / logBase2;
++      final zoom = math.min(math.min(latZoom, lngZoom), 16.0); // cap at 16.0
++      
++      // Move to this center and zoom
++      _controller.move(latlong.LatLng(centerLat, centerLng), zoom);
+     } else if (mounted && widget.route.isNotEmpty) {
+       // If only one point, center on it with a fixed zoom
+       _controller.move(widget.route.last, 16.0);
+@@ -620,12 +647,67 @@ class _RouteMapState extends State<_RouteMap> {
+   }
+   
+   // Method to just center on last point without zoom changes
++  // Animation controller for smooth map movements
++  Timer? _animationTimer;
++  
+   void _centerOnLastPoint() {
+     if (mounted && widget.route.isNotEmpty) {
+       final currentZoom = _controller.camera.zoom;
+-      _controller.move(widget.route.last, currentZoom);
++      
++      // Cancel any existing animation
++      _animationTimer?.cancel();
++      
++      // For small movements (< 10 meters), just move directly to avoid jitter
++      final distance = _calculateDistance(
++        _controller.camera.center.latitude, 
++        _controller.camera.center.longitude,
++        widget.route.last.latitude,
++        widget.route.last.longitude
++      );
++      
++      if (distance < 10) {
++        _controller.move(widget.route.last, currentZoom);
++        return;
++      }
++      
++      // For larger movements, animate smoothly
++      final startCenter = _controller.camera.center;
++      final endCenter = widget.route.last;
++      int step = 0;
++      const totalSteps = 8;
++      
++      _animationTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
++        if (!mounted) {
++          timer.cancel();
++          return;
++        }
++        
++        step++;
++        final progress = step / totalSteps;
++        
++        if (step >= totalSteps) {
++          _controller.move(endCenter, currentZoom);
++          timer.cancel();
++        } else {
++          final lat = startCenter.latitude + (endCenter.latitude - startCenter.latitude) * progress;
++          final lng = startCenter.longitude + (endCenter.longitude - startCenter.longitude) * progress;
++          _controller.move(latlong.LatLng(lat, lng), currentZoom);
++        }
++      });
+     }
+   }
++  
++  // Calculate distance between points in meters
++  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
++    const double earthRadius = 6371000; // meters
++    final dLat = (lat2 - lat1) * (math.pi / 180);
++    final dLon = (lon2 - lon1) * (math.pi / 180);
++    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
++             math.cos(lat1 * (math.pi / 180)) * math.cos(lat2 * (math.pi / 180)) *
++             math.sin(dLon / 2) * math.sin(dLon / 2);
++    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a));
++    return earthRadius * c;
++  }
+ 
+   @override
+   Widget build(BuildContext context) {
+@@ -713,6 +795,7 @@ class _RouteMapState extends State<_RouteMap> {
+   @override
+   void dispose() {
+     _fallbackTimer?.cancel();
++    _animationTimer?.cancel();
+     _controller.dispose();
+     super.dispose();
+   }
+@@ -729,7 +812,7 @@ class _WeightChip extends StatelessWidget {
+     final bool preferMetric = authBloc.state is Authenticated
+         ? (authBloc.state as Authenticated).user.preferMetric
+         : true;
+-    final String weightDisplay = preferMetric ? '${weightKg.toStringAsFixed(0)} kg' : '${(weightKg * 2.20462).toStringAsFixed(0)} lb';
++    final String weightDisplay = preferMetric ? '${weightKg.toStringAsFixed(1)} kg' : '${(weightKg * 2.20462).toStringAsFixed(1)} lb';
+     return Chip(
+       backgroundColor: AppColors.secondary,
+       label: Text(
+-- 
+2.39.5 (Apple Git-154)
+
