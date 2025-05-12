@@ -142,7 +142,7 @@ class SessionCard extends StatelessWidget {
         Icon(
           icon,
           size: 16,
-          color: AppColors.primary,
+          color: AppColors.secondary,
         ),
         const SizedBox(width: 4),
         Expanded(
