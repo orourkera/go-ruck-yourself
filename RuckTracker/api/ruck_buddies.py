@@ -65,9 +65,11 @@ def get_ruck_buddies():
             completed_at,
             created_at,
             avg_heart_rate,
-            users:user_id (
+            user:user_id (
+                id,
                 username,
-                avatar_url
+                avatar_url,
+                allow_ruck_sharing
             ),
             location_points:location_point (
                 id,
@@ -75,11 +77,10 @@ def get_ruck_buddies():
                 longitude,
                 altitude,
                 timestamp
-=======
->>>>>>> 0789ed16 (feat: Implement Ruck Buddies feature)
             )
         ''') \
         .eq('is_public', True) \
+        .eq('user.allow_ruck_sharing', True) \
         .neq('user_id', g.user.id) \
         .order(order_by) \
         .limit(limit) \
