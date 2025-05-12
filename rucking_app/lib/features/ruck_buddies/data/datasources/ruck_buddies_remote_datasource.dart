@@ -37,7 +37,7 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
         },
       );
 
-      final Map<String, dynamic> jsonResponse = json.decode(response);
+      final Map<String, dynamic> jsonResponse = response;
       final List<dynamic> data = jsonResponse['ruck_sessions'] ?? [];
       
       return data.map((item) => RuckBuddyModel.fromJson(item)).toList();
