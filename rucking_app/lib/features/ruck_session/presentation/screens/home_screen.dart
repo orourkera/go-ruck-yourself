@@ -814,7 +814,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           child: Icon(
             icon,
             size: 14,
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+            color: AppColors.secondary, // Use app secondary color for consistency across light/dark themes
           ),
         ),
         const SizedBox(width: 4),
