@@ -284,7 +284,7 @@ class _RouteMapPreview extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: SizedBox(
-        height: 140,
+        height: 175,
         width: double.infinity,
         child: FlutterMap(
           options: MapOptions(

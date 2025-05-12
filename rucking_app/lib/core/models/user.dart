@@ -27,6 +27,9 @@ class User extends Equatable {
   /// Whether the user prefers metric units
   final bool preferMetric;
   
+  /// Whether the user allows their rucks to be shared in the Ruck Buddies feed
+  final bool allowRuckSharing;
+  
   /// User stats information
   final UserStats? stats;
 
@@ -40,6 +43,7 @@ class User extends Equatable {
     this.dateOfBirth,
     this.createdAt,
     required this.preferMetric,
+    this.allowRuckSharing = true,
     this.stats,
   });
   
@@ -53,6 +57,7 @@ class User extends Equatable {
     String? dateOfBirth,
     String? createdAt,
     bool? preferMetric,
+    bool? allowRuckSharing,
     UserStats? stats,
   }) {
     return User(
@@ -64,6 +69,7 @@ class User extends Equatable {
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       createdAt: createdAt ?? this.createdAt,
       preferMetric: preferMetric ?? this.preferMetric,
+      allowRuckSharing: allowRuckSharing ?? this.allowRuckSharing,
       stats: stats ?? this.stats,
     );
   }
@@ -102,6 +108,7 @@ class User extends Equatable {
       dateOfBirth: json['date_of_birth'] as String?,
       createdAt: json['created_at'] as String?,
       preferMetric: json['prefer_metric'] as bool? ?? true,
+      allowRuckSharing: json['allow_ruck_sharing'] as bool? ?? true,
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
@@ -120,6 +127,7 @@ class User extends Equatable {
       'email': email,
       'username': username,
       'preferMetric': preferMetric,
+      'allow_ruck_sharing': allowRuckSharing,
     };
     if (weightKg != null) data['weight_kg'] = weightKg;
     if (heightCm != null) data['height_cm'] = heightCm;

@@ -58,16 +58,18 @@ class AuthUpdateProfileRequested extends AuthEvent {
   final double? weightKg;
   final double? heightCm;
   final bool? preferMetric;
+  final bool? allowRuckSharing;
 
   const AuthUpdateProfileRequested({
     this.username,
     this.weightKg,
     this.heightCm,
     this.preferMetric,
+    this.allowRuckSharing,
   });
 
   @override
-  List<Object?> get props => [username, weightKg, heightCm, preferMetric];
+  List<Object?> get props => [username, weightKg, heightCm, preferMetric, allowRuckSharing];
 }
 
 /// Event triggered when the user requests to delete their account
