@@ -672,19 +672,19 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                           if (routePoints.isNotEmpty)
                                             MarkerLayer(
                                               markers: [
-                                                // Start marker (green)
+                                                // Start marker
                                                 Marker(
                                                   point: routePoints.first,
-                                                  width: 20,
-                                                  height: 20,
-                                                  child: const Icon(Icons.trip_origin, color: Colors.green, size: 20),
+                                                  width: 28,
+                                                  height: 28,
+                                                  child: Image.asset('assets/images/map marker.png'),
                                                 ),
-                                                // End marker (red)
+                                                // End marker
                                                 Marker(
                                                   point: routePoints.last,
-                                                  width: 20,
-                                                  height: 20,
-                                                  child: const Icon(Icons.location_pin, color: Colors.red, size: 20),
+                                                  width: 28,
+                                                  height: 28,
+                                                  child: Image.asset('assets/images/home pin.png'),
                                                 ),
                                               ],
                                             ),
