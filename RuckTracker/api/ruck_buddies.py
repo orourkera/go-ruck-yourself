@@ -1,4 +1,4 @@
-2from flask import Blueprint, jsonify, g, request
+from flask import Blueprint, jsonify, g, request
 from flask_jwt_extended import jwt_required
 import os
 from datetime import datetime, timedelta
