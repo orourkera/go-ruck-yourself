@@ -275,12 +275,21 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['username', 'weight_kg', 'prefer_metric'] 
+            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing'] 
             for field in allowed_fields:
                 if field == 'prefer_metric': # Check for snake_case field name
                     # Expect camelCase 'preferMetric' in the incoming JSON data for updates too
                     if 'preferMetric' in data:
                          update_data['prefer_metric'] = data['preferMetric'] # Use snake_case for DB update dict key
+                # Handle camelCase for height_cm
+                elif field == 'height_cm' and 'heightCm' in data:
+                    update_data['height_cm'] = data['heightCm']
+                # Handle allow_ruck_sharing - check for both camelCase and snake_case versions
+                elif field == 'allow_ruck_sharing':
+                    if 'allowRuckSharing' in data:  # Check for camelCase version from mobile app
+                        update_data['allow_ruck_sharing'] = data['allowRuckSharing']
+                    elif 'allow_ruck_sharing' in data:  # Also check for snake_case
+                        update_data['allow_ruck_sharing'] = data['allow_ruck_sharing']
                 elif field in data:
                     update_data[field] = data[field]
                  
