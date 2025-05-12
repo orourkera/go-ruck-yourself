@@ -36,6 +36,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   LocationPoint? _lastValidLocation;
   int _validLocationCount = 0;
   int _latestHeartRate = 0;
+  // Local dumb timer counters
+  int _elapsedCounter = 0; // seconds since session start minus pauses
+  int _ticksSinceTruth = 0;
   // Watchdog: track time of last valid location to auto-restart GPS if stalled
   DateTime _lastLocationTimestamp = DateTime.now();
 
@@ -135,6 +138,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       // Start location tracking and heart rate monitoring
       _startLocationTracking(emit);
+      _elapsedCounter = 0;
+      _ticksSinceTruth = 0;
       await _startHeartRateMonitoring();
       AppLogger.info('Location, heart rate started for session $sessionId');
     } catch (e, stackTrace) {
@@ -500,6 +505,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         totalPausedDuration: newTotalPausedDuration, // Update total paused duration
         clearCurrentPauseStartTimeUtc: true, // Clear the specific pause start time
       ));
+      
+      // Re-sync elapsed counter on resume
+      _elapsedCounter = DateTime.now().toUtc().difference(currentState.originalSessionStartTimeUtc).inSeconds - newTotalPausedDuration.inSeconds;
+      _ticksSinceTruth = 0;
     }
   }
 
@@ -765,13 +774,25 @@ emit(ActiveSessionComplete(
       await _flushHeartRateBuffer(currentState);
     }
 
-    // Derive elapsed time from wall-clock
-    int newElapsed = DateTime.now()
-            .toUtc()
-            .difference(currentState.originalSessionStartTimeUtc)
-            .inSeconds -
-        currentState.totalPausedDuration.inSeconds;
-    if (newElapsed < 0) newElapsed = 0;
+    _elapsedCounter++;
+    _ticksSinceTruth++;
+
+    int newElapsed = _elapsedCounter;
+
+    // periodic truth-up every 5 minutes (300 ticks)
+    if (_ticksSinceTruth >= 300) {
+      final trueElapsed = DateTime.now()
+              .toUtc()
+              .difference(currentState.originalSessionStartTimeUtc)
+              .inSeconds -
+          currentState.totalPausedDuration.inSeconds;
+      if ((trueElapsed - _elapsedCounter).abs() > 2) {
+        _elapsedCounter = trueElapsed;
+        newElapsed = trueElapsed;
+        AppLogger.info('Elapsed counter synced to wall-clock (diff ${(trueElapsed - _elapsedCounter).abs()}s)');
+      }
+      _ticksSinceTruth = 0;
+    }
 
     // Pace calculation
     double? newPace = currentState.pace;
