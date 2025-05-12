@@ -45,7 +45,15 @@ class RuckBuddyModel extends RuckBuddy {
       completedAtDate = DateTime.parse(json['completed_at']);
     }
     
-    DateTime createdAtDate = DateTime.parse(json['created_at']);
+    // created_at can be null for old rows; fall back to started_at or now()
+    DateTime createdAtDate;
+    if (json['created_at'] != null) {
+      createdAtDate = DateTime.parse(json['created_at']);
+    } else if (json['started_at'] != null) {
+      createdAtDate = DateTime.parse(json['started_at']);
+    } else {
+      createdAtDate = DateTime.now();
+    }
 
     // Extract user data
     Map<String, dynamic> userData = json['user'] ?? {};
