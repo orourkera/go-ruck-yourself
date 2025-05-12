@@ -80,7 +80,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                 builder: (context, state) {
                   final String currentFilter = state is RuckBuddiesLoaded 
                       ? state.filter 
-                      : 'recent';
+                      : 'closest';
                   
                   return FilterChipGroup(
                     selectedFilter: currentFilter,

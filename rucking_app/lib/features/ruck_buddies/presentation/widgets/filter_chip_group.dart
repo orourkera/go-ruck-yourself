@@ -18,13 +18,15 @@ class FilterChipGroup extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _buildFilterChip('recent', 'Recent', Icons.access_time),
+          _buildFilterChip('closest', 'Closest', Icons.location_on),
           const SizedBox(width: 8),
-          _buildFilterChip('popular', 'Popular', Icons.favorite),
+          _buildFilterChip('calories', 'Most Calories', Icons.local_fire_department),
           const SizedBox(width: 8),
-          _buildFilterChip('distance', 'Distance', Icons.straighten),
+          _buildFilterChip('distance', 'Furthest', Icons.straighten),
           const SizedBox(width: 8),
-          _buildFilterChip('duration', 'Duration', Icons.timer),
+          _buildFilterChip('duration', 'Longest', Icons.timer),
+          const SizedBox(width: 8),
+          _buildFilterChip('elevation', 'Most Elevation', Icons.terrain),
         ],
       ),
     );
