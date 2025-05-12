@@ -68,6 +68,13 @@ def get_ruck_buddies():
                 username,
                 display_name,
                 avatar_url
+            ),
+            location_points:location_point (
+                id,
+                latitude,
+                longitude,
+                altitude,
+                timestamp
             )
         ''') \
         .eq('is_public', True) \
