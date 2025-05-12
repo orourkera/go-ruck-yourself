@@ -7,6 +7,7 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/home_scre
 import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
@@ -28,6 +29,9 @@ class RuckingApp extends StatelessWidget {
         ),
         BlocProvider<ActiveSessionBloc>(
           create: (context) => getIt<ActiveSessionBloc>(),
+        ),
+        BlocProvider<SessionBloc>(
+          create: (context) => getIt<SessionBloc>(),
         ),
       ],
       child: MaterialApp(
