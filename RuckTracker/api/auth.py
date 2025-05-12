@@ -1,13 +1,29 @@
-from flask import request, g
+from flask import request, g, jsonify
 from flask_restful import Resource
 import uuid
 from datetime import datetime, timedelta
 import sys
 import logging
+from functools import wraps
 
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
+
+# Auth decorators
+def auth_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not hasattr(g, 'user') or g.user is None:
+            return jsonify({'message': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+def get_user_id():
+    """Helper function to get the current user's ID"""
+    if hasattr(g, 'user') and g.user and hasattr(g.user, 'id'):
+        return g.user.id
+    return None
 
 class SignUpResource(Resource):
     def post(self):
