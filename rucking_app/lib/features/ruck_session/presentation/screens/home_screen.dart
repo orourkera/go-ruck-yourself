@@ -805,9 +805,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         const SizedBox(width: 4),
         Text(
           value,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
-          ),
+          style: AppTextStyles.bodySmall,
         ),
       ],
     );
