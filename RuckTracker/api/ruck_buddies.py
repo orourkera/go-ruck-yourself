@@ -30,20 +30,20 @@ def get_ruck_buddies():
     
     # Define ordering based on filter type
     if filter_type == 'calories':
-        order_by = "calories_burned.desc()"
+        order_by = "calories_burned.desc"
     elif filter_type == 'distance':
-        order_by = "distance_km.desc()"
+        order_by = "distance_km.desc"
     elif filter_type == 'duration':
-        order_by = "duration_seconds.desc()"
+        order_by = "duration_seconds.desc"
     elif filter_type == 'elevation':
-        order_by = "elevation_gain_m.desc()"
+        order_by = "elevation_gain_m.desc"
     else:  # 'closest' is default, but fallback to completed_at if no coordinates provided
         if latitude is not None and longitude is not None:
             # For proximity, we'll need to handle this separately
             # This is a placeholder - in a real implementation, we would use geospatial functions
-            order_by = "completed_at.desc()"  # Fallback ordering
+            order_by = "completed_at.desc"  # Fallback ordering
         else:
-            order_by = "completed_at.desc()"  # Default if no coordinates
+            order_by = "completed_at.desc"  # Default if no coordinates
     
     # Get supabase client
     supabase = get_supabase_client(g.user.token if hasattr(g.user, 'token') else None)
