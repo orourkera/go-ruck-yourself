@@ -637,7 +637,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(10),
                                     child: SizedBox(
-                                      height: 180, // reduced from 240 by 25%
+                                      height: 220, // Increased size to match ruck buddies
                                       width: double.infinity,
                                       child: FlutterMap(
                                         options: MapOptions(
@@ -705,36 +705,46 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                     ],
                                   ),
                                   const SizedBox(height: 8),
+                                  const Divider(height: 24),
+                                  
+                                  // Stats grid (2x2) - matches Ruck Buddies layout
                                   Row(
                                     children: [
+                                      // Left column
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             _buildSessionStat(
                                               Icons.straighten,
                                               distanceValue,
+                                              label: 'Distance',
                                             ),
-                                            const SizedBox(height: 4),
+                                            const SizedBox(height: 16),
                                             _buildSessionStat(
-                                              Icons.timer,
-                                              paceDisplay,
+                                              Icons.local_fire_department,
+                                              '$calories cal',
+                                              label: 'Calories',
                                             ),
                                           ],
                                         ),
                                       ),
+                                      
+                                      const SizedBox(width: 24),
+                                      
+                                      // Right column
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             _buildSessionStat(
-                                              Icons.local_fire_department,
-                                              '$calories cal',
+                                              Icons.timer,
+                                              paceDisplay,
+                                              label: 'Pace',
                                             ),
-                                            const SizedBox(height: 4),
+                                            const SizedBox(height: 16),
                                             _buildSessionStat(
                                               Icons.landscape,
                                               elevationDisplay,
+                                              label: 'Elevation',
                                             ),
                                           ],
                                         ),
@@ -804,23 +814,37 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     );
   }
 
-  /// Builds a session stat item
-  Widget _buildSessionStat(IconData icon, String value) {
+  /// Builds a session stat item - updated to match ruck buddies style
+  Widget _buildSessionStat(IconData icon, String value, {String? label}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 18, // fixed width for all icons for perfect column alignment
-          child: Icon(
-            icon,
-            size: 14,
-            color: AppColors.secondary,
-          ),
+        Icon(
+          icon,
+          size: 20,
+          color: AppColors.secondary,
         ),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: AppTextStyles.bodySmall,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (label != null)
+                Text(
+                  label,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                ),
+              Text(
+                value,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ],
     );
