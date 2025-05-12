@@ -53,8 +53,6 @@ class RuckBuddyCard extends StatelessWidget {
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                         ),
-                          fontWeight: FontWeight.bold,
-                        ),
                       ),
                       Text(
                         _formatCompletedDate(ruckBuddy.completedAt),
@@ -168,23 +166,7 @@ class RuckBuddyCard extends StatelessWidget {
   
   String _formatCompletedDate(DateTime? completedAt) {
     if (completedAt == null) return 'Unknown date';
-    
-    final now = DateTime.now();
-    final difference = now.difference(completedAt);
-    
-    if (difference.inDays == 0) {
-      // Today
-      return 'Today, ${DateFormat.jm().format(completedAt)}';
-    } else if (difference.inDays == 1) {
-      // Yesterday
-      return 'Yesterday, ${DateFormat.jm().format(completedAt)}';
-    } else if (difference.inDays < 7) {
-      // Within last week
-      return '${difference.inDays} days ago';
-    } else {
-      // More than a week ago
-      return DateFormat.MMMd().format(completedAt);
-    }
+    return DateFormat.yMMMd().format(completedAt);
   }
   
   String _formatWeight(double weightKg, bool preferMetric) {
