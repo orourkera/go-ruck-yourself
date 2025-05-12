@@ -15,6 +15,7 @@ class RuckBuddy extends Equatable {
   final DateTime createdAt;
   final int? avgHeartRate;
   final UserInfo user;
+  final List<dynamic>? locationPoints;
 
   const RuckBuddy({
     required this.id,
@@ -30,6 +31,7 @@ class RuckBuddy extends Equatable {
     required this.createdAt,
     this.avgHeartRate,
     required this.user,
+    this.locationPoints,
   });
 
   @override
@@ -37,6 +39,6 @@ class RuckBuddy extends Equatable {
     id, userId, ruckWeightKg, durationSeconds, 
     distanceKm, caloriesBurned, elevationGainM, 
     elevationLossM, startedAt, completedAt, createdAt, 
-    avgHeartRate, user
+    avgHeartRate, user, locationPoints
   ];
 }
