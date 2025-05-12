@@ -30,7 +30,7 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
   }) async {
     try {
       final response = await apiClient.get(
-        '/api/ruck-buddies',
+        '/ruck-buddies',
         queryParams: {
           'limit': limit.toString(),
           'offset': offset.toString(),

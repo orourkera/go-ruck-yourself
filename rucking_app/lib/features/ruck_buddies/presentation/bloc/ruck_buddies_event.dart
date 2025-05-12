@@ -13,7 +13,6 @@ class FetchRuckBuddiesEvent extends RuckBuddiesEvent {
 
   const FetchRuckBuddiesEvent({
     this.limit = 20,
-<<<<<<< HEAD
     this.filter = 'closest',
   });
 

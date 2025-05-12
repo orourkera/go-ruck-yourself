@@ -433,12 +433,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                       style: AppTextStyles.labelLarge.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-<<<<<<< HEAD
                       ),
                     ),
-=======
-                      )
->>>>>>> 0789ed16 (feat: Implement Ruck Buddies feature)
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -447,7 +443,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         ),
                       );
                     },
-<<<<<<< HEAD
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.secondary,
                       foregroundColor: Colors.white,
@@ -456,12 +451,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                       ),
                       minimumSize: const Size.fromHeight(56),
                     ),
-=======
-                    color: AppColors.secondary,
-                    textColor: Colors.white,
-                    borderRadius: 10,
-                    height: 56,
->>>>>>> 0789ed16 (feat: Implement Ruck Buddies feature)
                   ),
                 ),
                 const SizedBox(height: 24),
