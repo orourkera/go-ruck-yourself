@@ -24,6 +24,7 @@ class AppColors {
   static final Color grey = Color(0xFF9E9E9E);
   static final Color greyLight = Color(0xFFE0E0E0);
   static final Color greyDark = Color(0xFF616161);
+  static final Color slateGrey = Color(0xFF3E4A59); // Slate grey for messages
   
   // Brown color
   static final Color brown = Color(0xFF4B3621);
