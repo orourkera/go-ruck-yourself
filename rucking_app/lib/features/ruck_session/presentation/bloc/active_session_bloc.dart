@@ -343,10 +343,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         if (diff < 0) newElevationLoss += diff.abs();
       }
 
-      final double newPace = newDistance > 0
-          ? (currentState.elapsedSeconds / newDistance)
-          : 0;
-        
+      // Removed inline pace calculation here; pace updates every 15 seconds in _onTick.
       int newCalories = currentState.calories;
       
       if (updatedPoints.length > 1) {
@@ -398,7 +395,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       emit(currentState.copyWith(
         locationPoints: updatedPoints,
         distanceKm: newDistance,
-        pace: newPace,
+        // pace: newPace, // pace now managed by _onTick every 15 seconds
         calories: newCalories,
         elevationGain: newElevationGain.toDouble(),
         elevationLoss: newElevationLoss.toDouble(),
@@ -589,7 +586,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'calories_burned': currentState.calories.round(),
             'elevation_gain_m': currentState.elevationGain.round(),
             'elevation_loss_m': currentState.elevationLoss.round(),
-            'average_pace': currentState.distanceKm > 0 ? (currentState.elapsedSeconds / currentState.distanceKm) : 0.0,
+            'average_pace': currentState.distanceKm > 0
+                ? (currentState.elapsedSeconds / currentState.distanceKm)
+                : 0.0,
             'ruck_weight_kg': currentState.ruckWeightKg.roundToDouble(),
             'notes': event.notes,
             'rating': event.rating,
