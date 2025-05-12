@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -319,10 +320,10 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       child: _WeightChip(weightKg: state.ruckWeightKg),
                                     ),
                                     if (state.isPaused)
-  const Positioned.fill(child: IgnorePointer(
-    ignoring: true, // Let touch events pass through
-    child: _PauseOverlay(),
-  )),
+                                      const Positioned.fill(child: IgnorePointer(
+                                        ignoring: true, // Let touch events pass through
+                                        child: _PauseOverlay(),
+                                      )),
 
                                   ],
                                 ),
@@ -571,48 +572,74 @@ class _RouteMapState extends State<_RouteMap> {
   
   void didUpdateWidget(covariant _RouteMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+    
+    // Only process if we have a route and it has changed
     if (widget.route.isNotEmpty && widget.route != oldWidget.route) {
-      // Only do a bounds fit if:
-      // 1. We've never done one before (_lastBoundsFitTime is null)
-      // 2. We have multiple points and it's been at least 10 seconds since the last fit
-      // 3. We've gone from 0 to 1 point (first location update)
-      bool shouldFitBounds = _lastBoundsFitTime == null || 
-                            (widget.route.length > 1 && 
-                             oldWidget.route.isEmpty) ||
-                            (_lastBoundsFitTime != null && 
-                             DateTime.now().difference(_lastBoundsFitTime!).inSeconds > 10);
+      // Check if this is the first point or a new point was added
+      bool isNewPoint = widget.route.length > oldWidget.route.length;
+      if (!isNewPoint) return; // Skip if no new points (avoid redundant updates)
       
-      if (shouldFitBounds) {
-        // Use a microtask to ensure that mapController is ready and avoid conflicts
-        Future.microtask(() {
+      // Determine if we should do a full bounds fit
+      bool shouldFitBounds = 
+          // First location update ever
+          _lastBoundsFitTime == null || 
+          // First location point
+          (widget.route.length == 1 && oldWidget.route.isEmpty) ||
+          // Do a bounds fit every 30 seconds instead of 10 to reduce jumpy behavior
+          (_lastBoundsFitTime != null && 
+           DateTime.now().difference(_lastBoundsFitTime!).inSeconds > 30);
+      
+      // Use a short delay to batch updates that might come in rapid succession
+      Future.delayed(const Duration(milliseconds: 50), () {
+        if (!mounted) return;
+        
+        if (shouldFitBounds) {
           _fitBoundsToRoute();
           _lastBoundsFitTime = DateTime.now();
-        });
-      } else {
-        // For regular updates, just center on the last point without changing zoom
-        if (widget.route.isNotEmpty && widget.route.length > oldWidget.route.length) {
-          Future.microtask(() {
-            _centerOnLastPoint();
-          });
+        } else {
+          // For most updates, just smoothly center on the user's location
+          _centerOnLastPoint();
         }
-      }
+      });
     }
   }
 
   void _fitBoundsToRoute() {
     if (mounted && widget.route.length > 1) {
-      final bounds = LatLngBounds.fromPoints(widget.route);
-      // Get current zoom before fitting bounds
-      final currentZoom = _controller.camera.zoom;
+      // Calculate bounds manually
+      double minLat = 90.0;
+      double maxLat = -90.0;
+      double minLng = 180.0;
+      double maxLng = -180.0;
       
-      // Fit the bounds but limit maximum zoom to prevent excessive zooming
-      _controller.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(40.0),
-          maxZoom: 16.0, // Allow slightly closer zoom when fitting bounds
-        ),
-      );
+      // Find the min/max bounds
+      for (final point in widget.route) {
+        minLat = math.min(minLat, point.latitude);
+        maxLat = math.max(maxLat, point.latitude);
+        minLng = math.min(minLng, point.longitude);
+        maxLng = math.max(maxLng, point.longitude);
+      }
+      
+      // Add padding
+      final padding = 0.01; // roughly equivalent to padding of 40px
+      minLat -= padding;
+      maxLat += padding;
+      minLng -= padding;
+      maxLng += padding;
+      
+      // Calculate center
+      final centerLat = (minLat + maxLat) / 2;
+      final centerLng = (minLng + maxLng) / 2;
+      
+      // Calculate appropriate zoom level
+      // Using log base 2: log2(x) = log(x)/log(2)
+      final logBase2 = math.log(2);
+      final latZoom = math.log(360 / (maxLat - minLat)) / logBase2;
+      final lngZoom = math.log(360 / (maxLng - minLng)) / logBase2;
+      final zoom = math.min(math.min(latZoom, lngZoom), 16.0); // cap at 16.0
+      
+      // Move to this center and zoom
+      _controller.move(latlong.LatLng(centerLat, centerLng), zoom);
     } else if (mounted && widget.route.isNotEmpty) {
       // If only one point, center on it with a fixed zoom
       _controller.move(widget.route.last, 16.0);
@@ -620,11 +647,66 @@ class _RouteMapState extends State<_RouteMap> {
   }
   
   // Method to just center on last point without zoom changes
+  // Animation controller for smooth map movements
+  Timer? _animationTimer;
+  
   void _centerOnLastPoint() {
     if (mounted && widget.route.isNotEmpty) {
       final currentZoom = _controller.camera.zoom;
-      _controller.move(widget.route.last, currentZoom);
+      
+      // Cancel any existing animation
+      _animationTimer?.cancel();
+      
+      // For small movements (< 10 meters), just move directly to avoid jitter
+      final distance = _calculateDistance(
+        _controller.camera.center.latitude, 
+        _controller.camera.center.longitude,
+        widget.route.last.latitude,
+        widget.route.last.longitude
+      );
+      
+      if (distance < 10) {
+        _controller.move(widget.route.last, currentZoom);
+        return;
+      }
+      
+      // For larger movements, animate smoothly
+      final startCenter = _controller.camera.center;
+      final endCenter = widget.route.last;
+      int step = 0;
+      const totalSteps = 8;
+      
+      _animationTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        
+        step++;
+        final progress = step / totalSteps;
+        
+        if (step >= totalSteps) {
+          _controller.move(endCenter, currentZoom);
+          timer.cancel();
+        } else {
+          final lat = startCenter.latitude + (endCenter.latitude - startCenter.latitude) * progress;
+          final lng = startCenter.longitude + (endCenter.longitude - startCenter.longitude) * progress;
+          _controller.move(latlong.LatLng(lat, lng), currentZoom);
+        }
+      });
     }
+  }
+  
+  // Calculate distance between points in meters
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371000; // meters
+    final dLat = (lat2 - lat1) * (math.pi / 180);
+    final dLon = (lon2 - lon1) * (math.pi / 180);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+             math.cos(lat1 * (math.pi / 180)) * math.cos(lat2 * (math.pi / 180)) *
+             math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a));
+    return earthRadius * c;
   }
 
   @override
@@ -713,6 +795,7 @@ class _RouteMapState extends State<_RouteMap> {
   @override
   void dispose() {
     _fallbackTimer?.cancel();
+    _animationTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -729,7 +812,7 @@ class _WeightChip extends StatelessWidget {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : true;
-    final String weightDisplay = preferMetric ? '${weightKg.toStringAsFixed(0)} kg' : '${(weightKg * 2.20462).toStringAsFixed(0)} lb';
+    final String weightDisplay = preferMetric ? '${weightKg.toStringAsFixed(1)} kg' : '${(weightKg * 2.20462).toStringAsFixed(1)} lb';
     return Chip(
       backgroundColor: AppColors.secondary,
       label: Text(

@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -31,6 +31,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
   Timer? _ticker;
+  Timer? _watchdogTimer;
+  DateTime _lastTickTime = DateTime.now();
   // Reuse one validation service instance to keep state between points
   final SessionValidationService _validationService = SessionValidationService();
   LocationPoint? _lastValidLocation;
@@ -247,21 +249,49 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   void _startTicker() {
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => add(Tick()));
+    _watchdogTimer?.cancel();
+    
+    // Record the start time for this ticker
+    _lastTickTime = DateTime.now();
+    
+    // Main timer that fires every second normally
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      add(Tick());
+    });
+    
+    // Watchdog timer that checks for missed ticks every 5 seconds
+    // This helps recover from background/lock screen situations
+    _watchdogTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      final now = DateTime.now();
+      final elapsed = now.difference(_lastTickTime).inSeconds;
+      
+      // If we've missed more than 2 seconds, catch up by adding the missed ticks
+      if (elapsed > 2) {
+        AppLogger.info('Watchdog caught $elapsed seconds of missed ticks, catching up');
+        for (int i = 0; i < elapsed; i++) {
+          add(Tick());
+        }
+        _lastTickTime = now;
+      }
+    });
   }
 
   void _stopTicker() {
     _ticker?.cancel();
     _ticker = null;
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
   }
 
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    var p = 0.017453292519943295;
-    var c = cos;
-    var a = 0.5 - c((lat2 - lat1) * p) / 2 + 
-            c(lat1 * p) * c(lat2 * p) * 
-            (1 - c((lon2 - lon1) * p)) / 2;
-    return 12742 * asin(sqrt(a)) * 1000; // 2 * R; R = 6371 km, returns meters
+    const double earthRadius = 6371000; // meters
+    double dLat = (lat2 - lat1) * (math.pi / 180);
+    double dLon = (lon2 - lon1) * (math.pi / 180);
+    double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+               math.cos(lat1 * (math.pi / 180)) * math.cos(lat2 * (math.pi / 180)) *
+               math.sin(dLon / 2) * math.sin(dLon / 2);
+    double c = 2 * math.asin(math.sqrt(a));
+    return earthRadius * c / 1000; // Convert to km
   }
   
   // Get user weight from current user state
@@ -762,6 +792,8 @@ emit(ActiveSessionComplete(
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
+    // Update last tick time to track when ticks happen
+    _lastTickTime = DateTime.now();
     _paceTickCounter++; // Increment local pace counter
 
     if (state is! ActiveSessionRunning) return;
@@ -814,6 +846,10 @@ emit(ActiveSessionComplete(
       elevationGain: currentState.elevationGain,
       elevationLoss: currentState.elevationLoss,
     );
+    
+    // Never allow calories to decrease during a session
+    // This prevents the drops when timer is trued up
+    final int finalCalories = math.max(calculatedCalories.round(), currentState.calories);
 
     // Inactivity watchdog: if no GPS fix for >15s, restart location tracking
     if (DateTime.now().difference(_lastLocationTimestamp) > const Duration(seconds: 15)) {
@@ -825,7 +861,7 @@ emit(ActiveSessionComplete(
     emit(currentState.copyWith(
       elapsedSeconds: newElapsed,
       pace: newPace,
-      calories: calculatedCalories.round(),
+      calories: finalCalories,
     ));
   }
 
@@ -852,6 +888,7 @@ emit(ActiveSessionComplete(
     _locationSubscription?.cancel();
     _heartRateSubscription?.cancel();
     _ticker?.cancel();
+    _watchdogTimer?.cancel();
     return super.close();
   }
 }
