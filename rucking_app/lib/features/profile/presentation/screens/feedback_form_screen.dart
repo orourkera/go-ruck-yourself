@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:email_launcher/email_launcher.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -33,15 +34,19 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
     try {
       await EmailLauncher.launch(email);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Feedback sent! Thank you.')),
+        StyledSnackBar.showSuccess(
+          context: context,
+          message: 'Feedback sent! Thank you.',
+          duration: const Duration(seconds: 2),
         );
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send feedback: $e')),
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Failed to send feedback: $e',
+          duration: const Duration(seconds: 3),
         );
       }
     }

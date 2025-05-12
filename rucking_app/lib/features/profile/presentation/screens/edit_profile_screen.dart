@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/models/user.dart';
@@ -107,9 +108,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             }
          } else if (state is AuthError) {
              if (mounted) {
-               ScaffoldMessenger.of(context).showSnackBar(
-                 SnackBar(content: Text("Update failed: ${state.message}"), backgroundColor: AppColors.error),
-               );
+                StyledSnackBar.showError(
+                  context: context,
+                  message: "Update failed: ${state.message}",
+                  duration: const Duration(seconds: 3),
+                );
                setState(() {
                  _isLoading = false; // Re-enable button on error
                });

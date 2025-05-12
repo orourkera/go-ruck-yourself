@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
@@ -42,11 +43,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (Navigator.of(context, rootNavigator: true).canPop()) {
             Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading if any
           }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${state.message}'),
-              backgroundColor: Colors.red,
-            ),
+          StyledSnackBar.showError(
+            context: context,
+            message: 'Error: ${state.message}',
+            duration: const Duration(seconds: 3),
           );
         } else if (state is Unauthenticated) {
           // User successfully deleted or logged out elsewhere
@@ -306,8 +306,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (await canLaunch(url)) {
                           await launch(url);
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Could not open subscription management page.')),
+                          StyledSnackBar.showError(
+                            context: context,
+                            message: 'Could not open subscription management page.',
+                            duration: const Duration(seconds: 3),
                           );
                         }
                       },

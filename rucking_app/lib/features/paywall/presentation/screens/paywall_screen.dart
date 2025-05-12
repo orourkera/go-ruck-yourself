@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -237,13 +238,17 @@ class _PaywallScreenState extends State<PaywallScreen> {
           Navigator.pushReplacementNamed(context, '/home');
         } else {
           // Handle purchase failure
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Purchase failed. Please try again.')),
+          StyledSnackBar.showError(
+            context: context,
+            message: 'Purchase failed. Please try again.',
+            duration: const Duration(seconds: 3),
           );
         }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No subscription offerings available.')),
+      StyledSnackBar.showError(
+        context: context,
+        message: 'No subscription offerings available.',
+        duration: const Duration(seconds: 3),
       );
     }
   }

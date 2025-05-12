@@ -7,6 +7,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -172,11 +173,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       .catchError((error) {
         print('[SESSION_UPDATE] Error: $error');
         // Show error and reset saving state
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving session details: ${error.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Error saving session details: ${error.toString()}',
+          duration: const Duration(seconds: 3),
         );
         setState(() {
           _isSaving = false;
@@ -317,29 +317,25 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       listener: (context, state) {
         if (state is SessionOperationInProgress) {
           // Show loading indicator
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Discarding session...'),
-              duration: Duration(seconds: 1),
-            ),
+          StyledSnackBar.show(
+            context: context,
+            message: 'Discarding session...',
+            duration: const Duration(seconds: 1),
           );
         } else if (state is SessionDeleteSuccess) {
           // Show success message and navigate back to home
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('The session is gone, rucker. Gone forever.'),
-              duration: Duration(seconds: 2),
-            ),
+          StyledSnackBar.showSuccess(
+            context: context,
+            message: 'The session is gone, rucker. Gone forever.',
+            duration: const Duration(seconds: 2),
           );
           Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
         } else if (state is SessionOperationFailure) {
           // Show error message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${state.message}'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
+          StyledSnackBar.showError(
+            context: context,
+            message: 'Error: ${state.message}',
+            duration: const Duration(seconds: 3),
           );
         }
       },
