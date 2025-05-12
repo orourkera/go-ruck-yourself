@@ -57,12 +57,14 @@ class AuthRepositoryImpl implements AuthRepository {
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
+    bool? allowRuckSharing,
   }) async {
     return await _authService.updateProfile(
       username: username,
       weightKg: weightKg,
       heightCm: heightCm,
       preferMetric: preferMetric,
+      allowRuckSharing: allowRuckSharing,
     );
   }
 

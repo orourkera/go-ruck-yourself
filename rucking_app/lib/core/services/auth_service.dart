@@ -45,6 +45,7 @@ abstract class AuthService {
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
+    bool? allowRuckSharing,
   });
 
   /// Delete the current user's account
@@ -272,6 +273,7 @@ class AuthServiceImpl implements AuthService {
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
+    bool? allowRuckSharing,
   }) async {
     try {
       final data = <String, dynamic>{};
@@ -279,6 +281,7 @@ class AuthServiceImpl implements AuthService {
       if (weightKg != null) data['weight_kg'] = weightKg;
       if (heightCm != null) data['height_cm'] = heightCm;
       if (preferMetric != null) data['preferMetric'] = preferMetric;
+      if (allowRuckSharing != null) data['allow_ruck_sharing'] = allowRuckSharing;
       
       // Only send request if there is data to update
       if (data.isEmpty) {

@@ -63,12 +63,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
              _buildSection(
               '5. Data Sharing',
-              'We do not sell or rent your personal data.\n\nWe may share limited information with:\nThird-party providers who help us operate the app (e.g., cloud services, analytics)\nLaw enforcement or legal authorities, when required\nProtect against fraud or security threats\n\nAll third parties must agree to keep your data confidential.',
+              'We do not sell or rent your personal data.\n\nWe share data in the following ways:\n\na. Third-Party Services\nThird-party providers who help us operate the app (e.g., cloud services, analytics)\nLaw enforcement or legal authorities, when required\nProtect against fraud or security threats\n\nb. Ruck Buddies Feature\nOur app includes a social feature called "Ruck Buddies" that allows users to view ruck sessions completed by other users. By default, your completed ruck sessions will be visible to other users in the Ruck Buddies feed, including your username and session details (distance, duration, calories burned, elevation gain, and an approximate route map). Your exact start/end locations are not shared for privacy reasons.\n\nAll third parties must agree to keep your data confidential.',
               context,
             ),
              _buildSection(
               '6. Your Rights & Choices',
-              'You have control over your data. You can:\n\nUpdate your profile info\nAccess or export your ruck history\nDelete your account and all stored data\nTurn off location and health permissions in your device settings\nOpt out of heart rate data collection by disabling Health integration in the app settings. Disabling heart rate will revert calorie estimation to a standard MET-based calculation.\n\nTo exercise any of these rights, email us at rory@getrucky.com.',
+              'You have control over your data. You can:\n\nUpdate your profile info\nAccess or export your ruck history\nDelete your account and all stored data\nTurn off location and health permissions in your device settings\nOpt out of heart rate data collection by disabling Health integration in the app settings. Disabling heart rate will revert calorie estimation to a standard MET-based calculation.\nControl Ruck Sharing Privacy by toggling the "Allow Ruck Sharing" option in your profile settings. Additionally, you can choose to make individual ruck sessions private even if sharing is enabled globally.\n\nTo exercise any of these rights, email us at rory@getrucky.com.',
               context,
             ),
              _buildSection(

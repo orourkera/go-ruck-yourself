@@ -106,11 +106,10 @@ class RuckSession {
 
 factory RuckSession.fromJson(Map<String, dynamic> json) {
   try {
-    // Handle created_at or start_time fields for start time
-    final startTime = RuckSession.parseDateTime(json['start_time'] ?? json['created_at'] ?? json['startTime']) ?? DateTime.now();
-    // Handle end_time or completed_at fields for end time
-    final endTime = RuckSession.parseDateTime(json['end_time'] ?? json['completed_at'] ?? json['endTime']) ??
-        startTime.add(Duration(seconds: json['duration_seconds'] as int? ?? 0));
+    // Only use 'started_at' for startTime
+    final startTime = RuckSession.parseDateTime(json['started_at']) ?? DateTime.now();
+    // Only use 'completed_at' for endTime
+    final endTime = RuckSession.parseDateTime(json['completed_at']) ?? startTime.add(Duration(seconds: json['duration_seconds'] as int? ?? 0));
     // Calculate duration from start/end time or use duration_seconds field
     final duration = json['duration_seconds'] != null
         ? Duration(seconds: (json['duration_seconds'] as num).toInt())
