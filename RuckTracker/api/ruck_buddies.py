@@ -3,8 +3,8 @@ from flask_jwt_extended import jwt_required
 import os
 from datetime import datetime, timedelta
 
-from ..supabase_client import get_supabase_client
-from ..auth.auth import auth_required, get_user_id
+from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.api.auth import auth_required, get_user_id
 
 ruck_buddies_bp = Blueprint('ruck_buddies', __name__)
 
