@@ -16,6 +16,7 @@ class RuckBuddyModel extends RuckBuddy {
     required DateTime createdAt,
     int? avgHeartRate,
     required UserInfo user,
+    List<dynamic>? locationPoints,
   }) : super(
     id: id,
     userId: userId,
@@ -30,6 +31,7 @@ class RuckBuddyModel extends RuckBuddy {
     createdAt: createdAt,
     avgHeartRate: avgHeartRate,
     user: user,
+    locationPoints: locationPoints,
   );
 
   factory RuckBuddyModel.fromJson(Map<String, dynamic> json) {
@@ -87,6 +89,14 @@ class RuckBuddyModel extends Equatable {
     Map<String, dynamic>? userJson = json['users'];
 >>>>>>> 0789ed16 (feat: Implement Ruck Buddies feature)
     
+    // Handle location points (could be list of maps or list of [lat,lng])
+    List<dynamic>? locationPoints;
+    if (json['location_points'] != null) {
+      locationPoints = json['location_points'] as List<dynamic>;
+    } else if (json['route'] != null) {
+      locationPoints = json['route'] as List<dynamic>;
+    }
+    
     return RuckBuddyModel(
       id: json['id'].toString(),
       userId: json['user_id'].toString(),
@@ -102,6 +112,7 @@ class RuckBuddyModel extends Equatable {
       createdAt: createdAtDate,
       avgHeartRate: json['avg_heart_rate'],
       user: UserInfo.fromJson(userData),
+      locationPoints: locationPoints,
     );
   }
 
@@ -154,6 +165,15 @@ class UserInfo extends Equatable {
   String get displayNameOrUsername => displayName ?? username ?? 'Anonymous Rucker';
 
   @override
+<<<<<<< HEAD
   List<Object?> get props => [username, displayName, avatarUrl];
+=======
+  List<Object?> get props => [
+    id, userId, ruckWeightKg, durationSeconds, 
+    distanceKm, caloriesBurned, elevationGainM, 
+    elevationLossM, startedAt, completedAt, createdAt, 
+    avgHeartRate, user, locationPoints
+  ];
+>>>>>>> 2cc471e4 (Commit uncommitted changes before switching branches (api_client, ruck_buddy model/entity).)
 }
 >>>>>>> 0789ed16 (feat: Implement Ruck Buddies feature)
