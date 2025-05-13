@@ -170,12 +170,8 @@ class RuckBuddyCard extends StatelessWidget {
   }
   
   String _formatWeight(double weightKg, bool preferMetric) {
-    if (preferMetric) {
-      return '${weightKg.toStringAsFixed(1)} kg';
-    } else {
-      final double weightLbs = weightKg * 2.20462;
-      return '${weightLbs.toStringAsFixed(0)} lb';
-    }
+    if (weightKg == 0) return 'HIKE';
+    return MeasurementUtils.formatWeight(weightKg, metric: preferMetric);
   }
   
   Widget _buildStatTile({
@@ -308,25 +304,7 @@ class _RouteMapPreview extends StatelessWidget {
                   )
                 ],
               ),
-            if (routePoints.isNotEmpty)
-              MarkerLayer(
-                markers: [
-                  // Start marker
-                  Marker(
-                    point: routePoints.first,
-                    width: 24,
-                    height: 24,
-                    child: Image.asset('assets/images/map marker.png'),
-                  ),
-                  // End marker
-                  Marker(
-                    point: routePoints.last,
-                    width: 24,
-                    height: 24,
-                    child: Image.asset('assets/images/home pin.png'),
-                  ),
-                ],
-              ),
+
           ],
         ),
       ),
