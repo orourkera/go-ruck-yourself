@@ -43,6 +43,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   int _ticksSinceTruth = 0;
   // Watchdog: track time of last valid location to auto-restart GPS if stalled
   DateTime _lastLocationTimestamp = DateTime.now();
+  // Store all heart rate samples for this session
+  final List<HeartRateSample> _allHeartRateSamples = [];
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -620,6 +622,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.info('  plannedDurationMinutes: ${event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null)}');
         AppLogger.info('  pausedDurationSeconds: ${event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds}');
         
+        // Calculate heart rate statistics
+        int? avgHeartRate;
+        if (_allHeartRateSamples.isNotEmpty) {
+          // Calculate average heart rate
+          final sum = _allHeartRateSamples.fold(0, (prev, sample) => prev + sample.bpm);
+          avgHeartRate = (sum / _allHeartRateSamples.length).round();
+          
+          AppLogger.info('  Heart rate stats calculated:');
+          AppLogger.info('    Samples count: ${_allHeartRateSamples.length}');
+          AppLogger.info('    Min heart rate: $_minHeartRate BPM');
+          AppLogger.info('    Max heart rate: $_maxHeartRate BPM');
+          AppLogger.info('    Avg heart rate: $avgHeartRate BPM');
+        }
+        
         await _apiClient.post(
           '/rucks/${currentState.sessionId}/complete',
           {
@@ -639,6 +655,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'weight_kg': event.weightKg ?? currentState.weightKg,
             'planned_duration_minutes': event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null),
             'paused_duration_seconds': event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds,
+            // Add heart rate statistics
+            'min_heart_rate': _minHeartRate,
+            'max_heart_rate': _maxHeartRate,
+            'avg_heart_rate': avgHeartRate,
           },
         );
         
@@ -686,6 +706,12 @@ assert(currentState.elevationLoss != null, 'elevationLoss should never be null')
 assert(currentState.calories != null, 'calories should never be null');
 assert(currentState.ruckWeightKg != null, 'ruckWeightKg should never be null');
 
+// Use the already calculated avgHeartRate or calculate it now if needed
+        if (_allHeartRateSamples.isNotEmpty && avgHeartRate == null) {
+          final sum = _allHeartRateSamples.fold(0, (prev, sample) => prev + sample.bpm);
+          avgHeartRate = (sum / _allHeartRateSamples.length).round();
+        }
+
 emit(ActiveSessionComplete(
   session: RuckSession(
     id: currentState.sessionId,
@@ -708,6 +734,12 @@ emit(ActiveSessionComplete(
     weightKg: event.weightKg ?? currentState.weightKg,
     plannedDurationMinutes: event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null),
     pausedDurationSeconds: event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds,
+    // Add heart rate statistics for the completed session state
+    minHeartRate: _minHeartRate,
+    maxHeartRate: _maxHeartRate,
+    avgHeartRate: avgHeartRate,
+    // Include heart rate samples for graph visualization
+    heartRateSamples: _allHeartRateSamples.isNotEmpty ? [..._allHeartRateSamples] : null,
   ),
 ));
       } catch (e) {
@@ -753,12 +785,28 @@ emit(ActiveSessionComplete(
 
   List<HeartRateSample> _hrBuffer = [];
   DateTime? _lastHrFlush;
+  // Track min, max, and avg heart rates
+  int? _minHeartRate;
+  int? _maxHeartRate;
 
   Future<void> _onHeartRateUpdated(
     HeartRateUpdated event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    _latestHeartRate = event.sample.bpm;
+    final bpm = event.sample.bpm;
+    _latestHeartRate = bpm;
+    
+    // Update min/max heart rates
+    if (_minHeartRate == null || bpm < _minHeartRate!) {
+      _minHeartRate = bpm;
+    }
+    if (_maxHeartRate == null || bpm > _maxHeartRate!) {
+      _maxHeartRate = bpm;
+    }
+    
+    // Keep track of all samples for aggregate calculations
+    _allHeartRateSamples.add(event.sample);
+    
     final currentState = state;
     if (currentState is ActiveSessionRunning) {
       AppLogger.info('HeartRateUpdated event: ${event.sample.bpm} BPM at ${event.sample.timestamp}');

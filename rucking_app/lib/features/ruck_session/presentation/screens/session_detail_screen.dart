@@ -240,7 +240,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                         Icons.landscape,
                       ),   
                     // Heart Rate Section (added after stats)
-                    if (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty) ...[
+                    if (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty ||
+                        widget.session.avgHeartRate != null ||
+                        widget.session.maxHeartRate != null ||
+                        widget.session.minHeartRate != null) ...[
                       const SizedBox(height: 24),
                       Text(
                         'Heart Rate',
@@ -251,38 +254,53 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                       _buildDetailRow(
                         context,
                         'Average Heart Rate',
-                        '${_calculateAvgHeartRate(widget.session.heartRateSamples!)} bpm',
+                        '${widget.session.avgHeartRate ?? 
+                           (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty 
+                            ? _calculateAvgHeartRate(widget.session.heartRateSamples!) 
+                            : 0)} bpm',
                         Icons.favorite,
                       ),
                       // Maximum Heart Rate
                       _buildDetailRow(
                         context,
                         'Maximum Heart Rate',
-                        '${_calculateMaxHeartRate(widget.session.heartRateSamples!)} bpm',
+                        '${widget.session.maxHeartRate ?? 
+                           (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty 
+                            ? _calculateMaxHeartRate(widget.session.heartRateSamples!) 
+                            : 0)} bpm',
                         Icons.favorite_border,
                       ),
+                      // Minimum Heart Rate (if available)
+                      if (widget.session.minHeartRate != null)
+                        _buildDetailRow(
+                          context,
+                          'Minimum Heart Rate',
+                          '${widget.session.minHeartRate} bpm',
+                          Icons.trending_down,
+                        ),
                       const SizedBox(height: 16),
-                      // Heart Rate Graph
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+                      // Heart Rate Graph - only show if we have samples
+                      if (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty)
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(16),
+                          child: HeartRateGraph(
+                            samples: widget.session.heartRateSamples!,
+                            height: 160,
+                            showLabels: true,
+                            showTooltips: true,
+                          ),
                         ),
-                        padding: const EdgeInsets.all(16),
-                        child: HeartRateGraph(
-                          samples: widget.session.heartRateSamples!,
-                          height: 160,
-                          showLabels: true,
-                          showTooltips: true,
-                        ),
-                      ),
                     ],
                     if (widget.session.notes?.isNotEmpty == true) ...[
                       const SizedBox(height: 24),
