@@ -9,6 +9,7 @@ import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 
@@ -58,6 +59,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       locationService: locator<LocationService>(),
       healthService: locator<HealthService>(),
       watchService: locator<WatchService>(),
+      splitTrackingService: locator<SplitTrackingService>(),
     );
     
     // Start countdown after a brief delay to ensure screen is visible

@@ -3,9 +3,18 @@ import 'package:flutter/foundation.dart';
 /// A utility class for handling logging throughout the app
 /// Automatically disables detailed logs in production builds
 class AppLogger {
+  static const String _debugPrefix = '[DEBUG]';
   static const String _infoPrefix = '[INFO]';
   static const String _warningPrefix = '[WARNING]';
   static const String _errorPrefix = '[ERROR]';
+
+  /// Logs detailed debug messages only in debug mode
+  /// These are more verbose than info messages and mainly used for development
+  static void debug(String message) {
+    if (kDebugMode) {
+      debugPrint('$_debugPrefix $message');
+    }
+  }
 
   /// Logs information messages only in debug mode
   static void info(String message) {

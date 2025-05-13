@@ -16,6 +16,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 
@@ -43,16 +44,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   int _ticksSinceTruth = 0;
   // Watchdog: track time of last valid location to auto-restart GPS if stalled
   DateTime _lastLocationTimestamp = DateTime.now();
+  
+  // Service for tracking distance milestones/splits
+  final SplitTrackingService _splitTrackingService;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
     required LocationService locationService,
     required HealthService healthService,
     required WatchService watchService,
+    required SplitTrackingService splitTrackingService,
   }) : _apiClient = apiClient,
        _locationService = locationService,
        _healthService = healthService,
        _watchService = watchService,
+       _splitTrackingService = splitTrackingService,
        super(ActiveSessionInitial()) {
     on<SessionStarted>(_onSessionStarted);
     on<LocationUpdated>(_onLocationUpdated);
@@ -70,6 +76,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    // Reset split tracking for new session
+    _splitTrackingService.reset();
     AppLogger.info('SessionStarted event received. plannedDuration: \u001B[33m${event.plannedDuration}\u001B[0m seconds');
     AppLogger.info('SessionStarted event received. Weight: ${event.ruckWeightKg}kg, Notes: ${event.notes}');
     emit(ActiveSessionLoading());
@@ -458,6 +466,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Only log the error, don't disrupt the session for location updates
         AppLogger.error('Failed to send location to backend: $e');
       }
+      
+      // Check for distance milestones via service
+      await _splitTrackingService.checkForMilestone(
+        currentDistanceKm: currentState.distanceKm,
+        sessionStartTime: currentState.originalSessionStartTimeUtc,
+        elapsedSeconds: currentState.elapsedSeconds,
+        isPaused: currentState.isPaused,
+      );
       
       // Handle auto-pause / auto-end based on validation flags
       if (validationResult != null) {
@@ -871,6 +887,14 @@ emit(ActiveSessionComplete(
       pace: newPace,
       calories: finalCalories,
     ));
+    
+    // Check for distance milestones via service on ticks too
+    await _splitTrackingService.checkForMilestone(
+      currentDistanceKm: currentState.distanceKm,
+      sessionStartTime: currentState.originalSessionStartTimeUtc,
+      elapsedSeconds: newElapsed,
+      isPaused: currentState.isPaused,
+    );
   }
 
   Future<void> _onTimerStarted(
@@ -886,6 +910,8 @@ emit(ActiveSessionComplete(
       AppLogger.info('Timer started at: ${DateTime.now()}');
     }
   }
+  
+
 
   void _onSessionErrorCleared(SessionErrorCleared event, Emitter<ActiveSessionState> emit) {
     emit(ActiveSessionInitial());

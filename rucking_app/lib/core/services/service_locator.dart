@@ -8,6 +8,7 @@ import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/security/ssl_pinning.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/core/security/token_refresh_interceptor.dart';
 import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
@@ -62,6 +63,11 @@ Future<void> setupServiceLocator() async {
     ),
   );
   
+  // Register SplitTrackingService which depends on WatchService
+  getIt.registerSingleton<SplitTrackingService>(
+    SplitTrackingService(watchService: getIt<WatchService>()),
+  );
+  
   // Repositories
   getIt.registerSingleton<AuthRepository>(
     AuthRepositoryImpl(getIt<AuthService>())
@@ -82,6 +88,7 @@ Future<void> setupServiceLocator() async {
         locationService: getIt<LocationService>(),
         healthService: getIt<HealthService>(),
         watchService: getIt<WatchService>(),
+        splitTrackingService: getIt<SplitTrackingService>(),
       ));
       
   // Register session bloc for operations like delete
