@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -95,18 +96,17 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
       final fullSession = await repo.fetchSessionById(session.id!);
       Navigator.of(context).pop(); // Remove loading dialog
       if (fullSession != null) {
-        Navigator.of(context).push(
+        // Use direct navigation without MultiBlocProvider (same approach as home screen)
+        Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => MultiBlocProvider(
-              providers: [
-                BlocProvider.value(value: context.read<AuthBloc>()),
-                BlocProvider.value(value: context.read<SessionHistoryBloc>()),
-                BlocProvider.value(value: context.read<SessionBloc>()),
-              ],
-              child: SessionDetailScreen(session: fullSession),
-            ),
+            builder: (context) => SessionDetailScreen(session: fullSession),
           ),
-        );
+        ).then((refreshNeeded) {
+          // If returned with true (session deleted), refresh the data
+          if (refreshNeeded == true) {
+            context.read<SessionHistoryBloc>().add(const LoadSessionHistory());
+          }
+        });
       } else {
         StyledSnackBar.showError(
           context: context,

@@ -13,31 +13,45 @@ class SessionRepository {
   /// Fetch a ruck session by its ID, including all heart rate samples.
   Future<RuckSession?> fetchSessionById(String sessionId) async {
     try {
-      AppLogger.info('Fetching session with ID: $sessionId');
+      AppLogger.info('DEBUGGING: Fetching session with ID: $sessionId');
       if (sessionId.isEmpty) {
         AppLogger.error('Session ID is empty');
         return null;
       }
       final response = await _apiClient.get('/rucks/$sessionId');
-      AppLogger.info('Raw session response: $response');
+      AppLogger.info('DEBUGGING: Raw session response keys: ${response?.keys.toList()}');
+      
       if (response == null) {
         AppLogger.error('No response from backend for session $sessionId');
         return null;
       }
       // Parse RuckSession
-      final session = RuckSession.fromJson(response as Map<String, dynamic>);
-      // Parse heart rate samples if present
+      final session = RuckSession.fromJson(response);
+      AppLogger.info('DEBUGGING: Parsed session ${session.id} with start time ${session.startTime}');
+      
+      // Check if there are heart rate samples and parse them
       List<HeartRateSample> heartRateSamples = [];
-      if (response['heart_rate_samples'] != null) {
-        heartRateSamples = (response['heart_rate_samples'] as List)
+      if (response.containsKey('heart_rate_samples') && response['heart_rate_samples'] != null) {
+        var hrSamples = response['heart_rate_samples'] as List;
+        AppLogger.info('DEBUGGING: Found ${hrSamples.length} raw heart rate samples in response');
+        
+        heartRateSamples = hrSamples
             .map((e) => HeartRateSample.fromJson(e as Map<String, dynamic>))
             .toList();
-        AppLogger.info('Parsed ${heartRateSamples.length} heart rate samples');
+        AppLogger.info('DEBUGGING: Successfully parsed ${heartRateSamples.length} heart rate samples');
+        
+        // Add sample timestamps debug
+        if (heartRateSamples.isNotEmpty) {
+          AppLogger.info('DEBUGGING: First sample: ${heartRateSamples.first.timestamp}, bpm: ${heartRateSamples.first.bpm}');
+          AppLogger.info('DEBUGGING: Last sample: ${heartRateSamples.last.timestamp}, bpm: ${heartRateSamples.last.bpm}');
+        }
       } else {
-        AppLogger.warn('No heart_rate_samples field in session response');
+        AppLogger.info('DEBUGGING: No heart_rate_samples field in session response');
       }
-      // Return a session with samples attached (assumes RuckSession has a field for this)
-      return session.copyWith(heartRateSamples: heartRateSamples);
+      // Return a session with samples attached
+      final resultSession = session.copyWith(heartRateSamples: heartRateSamples);
+      AppLogger.info('DEBUGGING: Returning session with ${resultSession.heartRateSamples?.length ?? 0} heart rate samples');
+      return resultSession;
     } catch (e) {
       AppLogger.error('Error fetching session: $e');
       return null;

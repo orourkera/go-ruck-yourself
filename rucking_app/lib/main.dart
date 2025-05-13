@@ -16,6 +16,9 @@ import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Attach Bloc observer for detailed logging of state changes & errors
+  Bloc.observer = AppBlocObserver();
+  
   // Initialize dependency injection
   await setupServiceLocator();
   
