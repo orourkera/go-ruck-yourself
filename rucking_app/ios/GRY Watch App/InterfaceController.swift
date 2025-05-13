@@ -156,31 +156,75 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
-        // Handle incoming messages from iOS app
-        if let command = message["command"] as? String {
-            print("Received command from iOS app: \(command)")
-            switch command {
-            case "workoutStarted":
-                statusLabel.setText("Workout Active")
-                workoutManager?.startWorkout { error in
-                    if let error = error {
-                        self.statusLabel.setText("Workout Start Error: \(error.localizedDescription)")
+        print("🔔 [WATCH] Received message from iOS: \(message)")
+        // Make sure we're on the main thread for UI updates
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Update the status label regardless of command to show activity
+            self.statusLabel.setText("Message received: \(Date().timeIntervalSince1970)")
+            
+            // Handle incoming messages from iOS app
+            if let command = message["command"] as? String {
+                print("🔔 [WATCH] Received command: \(command)")
+                
+                // Make all text labels show we received communication
+                self.heartRateLabel.setText("HR Update: \(command)")
+                
+                switch command {
+                case "workoutStarted":
+                    self.statusLabel.setText("Workout Active")
+                    self.workoutManager?.startWorkout { error in
+                        if let error = error {
+                            self.statusLabel.setText("Workout Error: \(error.localizedDescription)")
+                        }
                     }
-                }
-            case "workoutStopped":
-                statusLabel.setText("Workout Ended")
-                workoutManager?.endWorkout { error in
-                    if let error = error {
-                        self.statusLabel.setText("Workout End Error: \(error.localizedDescription)")
+                case "workoutStopped":
+                    self.statusLabel.setText("Workout Ended")
+                    self.workoutManager?.endWorkout { error in
+                        if let error = error {
+                            self.statusLabel.setText("Workout End Error: \(error.localizedDescription)")
+                        }
                     }
+                case "updateMetrics":
+                    if let metrics = message["metrics"] as? [String: Any] {
+                        self.updateMetrics(metrics)
+                    }
+                case "ping":
+                    // Special ping command to test communication
+                    self.statusLabel.setText("Ping received!")
+                    // Reply back to confirm receipt
+                    self.session?.sendMessage(["response": "pong"], replyHandler: nil, errorHandler: { error in
+                        print("🔴 [WATCH] Error sending pong: \(error.localizedDescription)")
+                    })
+                default:
+                    self.statusLabel.setText("Unknown: \(command)")
                 }
-            case "updateMetrics":
-                if let metrics = message["metrics"] as? [String: Any] {
-                    updateMetrics(metrics)
-                }
-            default:
-                break
+            } else {
+                self.statusLabel.setText("Received: \(message)")
             }
+        }
+    }
+    
+    // Implement application context receiver as well
+    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
+        print("🔔 [WATCH] Received application context: \(applicationContext)")
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.statusLabel.setText("Context Rcvd")
+            // Process like a regular message
+            if let command = applicationContext["command"] as? String {
+                print("🔔 [WATCH] App context command: \(command)")
+            }
+        }
+    }
+    
+    // Implement user info receiver as another fallback
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any] = [:]) {
+        print("🔔 [WATCH] Received user info: \(userInfo)")
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.statusLabel.setText("UserInfo Rcvd")
         }
     }
     
