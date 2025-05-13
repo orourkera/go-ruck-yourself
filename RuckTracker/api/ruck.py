@@ -120,7 +120,6 @@ class RuckSessionResource(Resource):
             hr_resp = supabase.table('heart_rate_sample') \
                 .select('*') \
                 .eq('session_id', ruck_id) \
-                .eq('user_id', g.user.id) \
                 .order('timestamp') \
                 .execute()
             session['heart_rate_samples'] = hr_resp.data if hr_resp.data else []
