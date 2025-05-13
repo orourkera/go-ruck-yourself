@@ -815,7 +815,9 @@ class _WeightChip extends StatelessWidget {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : true;
-    final String weightDisplay = preferMetric ? '${weightKg.toStringAsFixed(1)} kg' : '${(weightKg * 2.20462).toStringAsFixed(1)} lb';
+    final String weightDisplay = weightKg == 0
+        ? 'HIKE'
+        : (preferMetric ? '${weightKg.toStringAsFixed(1)} kg' : '${(weightKg * 2.20462).toStringAsFixed(1)} lb');
     return Chip(
       backgroundColor: AppColors.secondary,
       label: Text(
