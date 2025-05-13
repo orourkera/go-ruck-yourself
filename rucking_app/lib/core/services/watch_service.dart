@@ -274,9 +274,8 @@ class WatchService {
     }
   }
 
-  /// Send updated session metrics to the watch using Pigeon.
-  /// This method also calls updateMetricsOnWatch to ensure both communication
-  /// channels receive the data.
+  /// Send updated session metrics to the watch.
+  /// Primary method uses WatchConnectivity which is the reliable channel.
   Future<bool> updateSessionOnWatch({
     required double distance,
     required Duration duration,
@@ -293,8 +292,9 @@ class WatchService {
     
     bool success = false;
     
-    // First send via WatchConnectivity which is the channel the watch is actually using
+    // Send via WatchConnectivity which is the channel that's working reliably
     try {
+      AppLogger.info('[WATCH] Sending updated metrics to watch');
       // Use the enhanced updateMetricsOnWatch that includes both elevation gain and loss
       await updateMetricsOnWatch(
         distance: distance,
@@ -306,45 +306,23 @@ class WatchService {
         elevationLoss: elevationLoss, // Pass elevation loss directly
       );
       
-      // Also log detailed debug information to help diagnose any remaining issues
+      // Successfully sent metrics via WatchConnectivity
+      success = true;
+      
+      // Log detailed debug information
       AppLogger.debug('[WATCH_SERVICE] Sent metrics update with:');
       AppLogger.debug('[WATCH_SERVICE] - calories: ${calories.toInt()}');
       AppLogger.debug('[WATCH_SERVICE] - elevationGain: $elevationGain');
       AppLogger.debug('[WATCH_SERVICE] - elevationLoss: $elevationLoss');
     } catch (e) {
       AppLogger.error('[WATCH_SERVICE] Failed to send metrics via WatchConnectivity: $e');
-      // Continue to try Pigeon anyway
-    }
-    
-    // Also send via Pigeon for future compatibility
-    try {
-      // Create the API instance
-      final api = FlutterRuckingApi();
-      
-      // Convert the duration to seconds as double
-      final durationSeconds = duration.inSeconds.toDouble();
-      
-      // Make the API call separately
-      await api.updateSessionOnWatch(
-        distance,
-        durationSeconds,
-        pace,
-        isPaused,
-        calories,
-        elevationGain,
-        elevationLoss,
-      );
-      
-      // Set success flag if no exceptions
-      success = true;
-      AppLogger.info('[WATCH_SERVICE] Successfully updated session on watch');
-    } catch (e) {
-      // Log the error
-      AppLogger.error('[WATCH_SERVICE] Failed to update session via Pigeon: $e');
       success = false;
     }
     
-    // Return success true if either method worked
+    // Note: We're intentionally not using the Pigeon API channel for now
+    // as it's consistently failing with connection errors. When that's fixed,
+    // this method can be updated to utilize both channels again.
+    
     return success;
   }
 
