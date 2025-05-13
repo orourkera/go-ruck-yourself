@@ -9,7 +9,7 @@ protocol SessionManagerDelegate: AnyObject {
 
 class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     // Published properties for SwiftUI
-    @Published var status: String = "00:00"
+    @Published var status: String = "--"
     @Published var heartRate: Int = 0
     @Published var calories: Int = 0
     @Published var elevationGain: Double = 0.0
