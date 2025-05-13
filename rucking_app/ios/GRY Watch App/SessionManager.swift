@@ -11,12 +11,21 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     // Published properties for SwiftUI
     @Published var status: String = "Connecting..."
     @Published var heartRate: Int = 0
+    @Published var calories: Int = 0
+    @Published var elevationGain: Double = 0.0
+    @Published var elevationLoss: Double = 0.0
 
     var statusText: String {
         status
     }
     var heartRateText: String {
         heartRate > 0 ? "\(heartRate) BPM" : "--"
+    }
+    var caloriesText: String {
+        calories > 0 ? "\(calories) kcal" : "--"
+    }
+    var elevationText: String {
+        elevationGain > 0 ? "+\(Int(elevationGain))m / -\(Int(elevationLoss))m" : "--"
     }
 
     func startSession() {
@@ -95,9 +104,19 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 self.status = "Received: \(command)"
             }
             
-            if let metrics = applicationContext["metrics"] as? [String: Any], 
-               let hr = metrics["heartRate"] as? Double {
-                self.heartRate = Int(hr)
+            if let metrics = applicationContext["metrics"] as? [String: Any] {
+                if let hr = metrics["heartRate"] as? Double {
+                    self.heartRate = Int(hr)
+                }
+                if let cal = metrics["calories"] as? Double {
+                    self.calories = Int(cal)
+                }
+                if let elGain = metrics["elevationGain"] as? Double {
+                    self.elevationGain = elGain
+                }
+                if let elLoss = metrics["elevationLoss"] as? Double {
+                    self.elevationLoss = elLoss
+                }
             }
         }
     }
@@ -114,9 +133,19 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 self.status = "User Info: \(command)"
             }
             // Potentially update other @Published properties based on userInfo
-            if let metrics = userInfo["metrics"] as? [String: Any],
-               let hr = metrics["heartRate"] as? Double {
-                self.heartRate = Int(hr)
+            if let metrics = userInfo["metrics"] as? [String: Any] {
+                if let hr = metrics["heartRate"] as? Double {
+                    self.heartRate = Int(hr)
+                }
+                if let cal = metrics["calories"] as? Double {
+                    self.calories = Int(cal)
+                }
+                if let elGain = metrics["elevationGain"] as? Double {
+                    self.elevationGain = elGain
+                }
+                if let elLoss = metrics["elevationLoss"] as? Double {
+                    self.elevationLoss = elLoss
+                }
             }
         }
     }

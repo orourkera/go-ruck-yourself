@@ -15,16 +15,26 @@ struct ContentView: View {
         VStack {
             Text("GRY Watch App")
                 .font(.headline)
-                .padding(.bottom, 10)
+                .padding(.bottom, 5)
             
             Text(sessionManager.statusText)
-                .font(.subheadline)
+                .font(.caption)
                 .foregroundColor(sessionManager.statusText.contains("Connected") ? .green : .red)
-                .padding(.bottom, 5)
+                .padding(.bottom, 3)
             
             Text(sessionManager.heartRateText)
-                .font(.title2)
-                .padding(.bottom, 5)
+                .font(.title3)
+                .padding(.bottom, 3)
+            
+            Text(sessionManager.caloriesText)
+                .font(.body)
+                .foregroundColor(.orange)
+                .padding(.bottom, 3)
+            
+            Text(sessionManager.elevationText)
+                .font(.caption)
+                .foregroundColor(.cyan)
+                .padding(.bottom, 3)
             
             Spacer()
         }

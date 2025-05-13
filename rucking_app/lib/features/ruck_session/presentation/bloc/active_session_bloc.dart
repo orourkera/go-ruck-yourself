@@ -909,6 +909,9 @@ emit(ActiveSessionComplete(
       duration: Duration(seconds: newElapsed),
       pace: newPace ?? 0.0, // Pass 0.0 if newPace is null
       isPaused: currentState.isPaused,
+      calories: finalCalories.toDouble(),
+      elevationGain: currentState.elevationGain,
+      elevationLoss: currentState.elevationLoss,
     );
 
     // Check for distance milestones via service on ticks too
