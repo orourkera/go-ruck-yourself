@@ -323,6 +323,7 @@ class WatchService {
     required double pace,
     required bool isPaused,
   }) async {
+    AppLogger.debug('[WATCH] updateSessionOnWatch called with: distance: $distance, duration: ${duration.inSeconds}, pace: $pace, isPaused: $isPaused, heartRate: $_currentHeartRate');
     // Update local state
     _currentDistance = distance;
     _currentDuration = duration;

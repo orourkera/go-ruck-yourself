@@ -118,88 +118,43 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
     // MARK: - WCSessionDelegate Methods
     
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        DispatchQueue.main.async { [weak self] in
-            self?.updateStatusLabel()
-        }
         if let error = error {
-            print("Session activation error: \(error.localizedDescription)")
-        } else {
-            print("Session activation completed with state: \(activationState.rawValue)")
+            print("WCSession activation failed with error: \(error.localizedDescription)")
+            return
+        }
+        print("WCSession activated with state: \(activationState.rawValue)")
+    }
+    
+    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
+        print("[WATCH] SessionManager received application context: \(applicationContext)")
+        
+        if let command = applicationContext["command"] as? String {
+            processCommand(command, data: applicationContext)
         }
     }
     
-    private func updateStatusLabel() {
-        guard let session = session else {
-            if statusLabel != nil {
-                statusLabel.setText("Status: Not Supported")
-            }
-            return
-        }
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any]) {
+        print("[WATCH] SessionManager received user info: \(userInfo)")
         
-        switch session.activationState {
-        case .activated:
-            if statusLabel != nil {
-                statusLabel.setText("Status: Connected")
-            }
-            print("Updated UI: Session is activated.")
-        case .inactive, .notActivated:
-            if statusLabel != nil {
-                statusLabel.setText("Status: Disconnected")
-            }
-            print("Updated UI: Session is not activated. Current state: \(session.activationState.rawValue)")
-        @unknown default:
-            if statusLabel != nil {
-                statusLabel.setText("Status: Unknown")
-            }
-            print("Updated UI: Session state is unknown.")
+        if let command = userInfo["command"] as? String {
+            processCommand(command, data: userInfo)
         }
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         print("🔔 [WATCH] Received message from iOS: \(message)")
+        
         // Make sure we're on the main thread for UI updates
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            // Update the status label regardless of command to show activity
-            self.statusLabel.setText("Message received: \(Date().timeIntervalSince1970)")
+            // Update the status label to show activity
+            self.statusLabel.setText("Message received")
             
             // Handle incoming messages from iOS app
             if let command = message["command"] as? String {
                 print("🔔 [WATCH] Received command: \(command)")
-                
-                // Make all text labels show we received communication
-                self.heartRateLabel.setText("HR Update: \(command)")
-                
-                switch command {
-                case "workoutStarted":
-                    self.statusLabel.setText("Workout Active")
-                    self.workoutManager?.startWorkout { error in
-                        if let error = error {
-                            self.statusLabel.setText("Workout Error: \(error.localizedDescription)")
-                        }
-                    }
-                case "workoutStopped":
-                    self.statusLabel.setText("Workout Ended")
-                    self.workoutManager?.endWorkout { error in
-                        if let error = error {
-                            self.statusLabel.setText("Workout End Error: \(error.localizedDescription)")
-                        }
-                    }
-                case "updateMetrics":
-                    if let metrics = message["metrics"] as? [String: Any] {
-                        self.updateMetrics(metrics)
-                    }
-                case "ping":
-                    // Special ping command to test communication
-                    self.statusLabel.setText("Ping received!")
-                    // Reply back to confirm receipt
-                    self.session?.sendMessage(["response": "pong"], replyHandler: nil, errorHandler: { error in
-                        print("🔴 [WATCH] Error sending pong: \(error.localizedDescription)")
-                    })
-                default:
-                    self.statusLabel.setText("Unknown: \(command)")
-                }
+                self.processCommand(command, from: message)
             } else {
                 self.statusLabel.setText("Received: \(message)")
             }
@@ -211,24 +166,69 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
         print("🔔 [WATCH] Received application context: \(applicationContext)")
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.statusLabel.setText("Context Rcvd")
-            // Process like a regular message
+            self.statusLabel.setText("Context Received")
+            
+            // Process application context the same way as regular messages
             if let command = applicationContext["command"] as? String {
                 print("🔔 [WATCH] App context command: \(command)")
+                self.processCommand(command, from: applicationContext)
             }
         }
     }
     
-    // Implement user info receiver as another fallback
-    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any] = [:]) {
-        print("🔔 [WATCH] Received user info: \(userInfo)")
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.statusLabel.setText("UserInfo Rcvd")
+    // Update UI with received metrics
+    // Common command processing helper
+    private func processCommand(_ command: String, from data: [String: Any]) {
+        switch command {
+        case "workoutStarted":
+            self.statusLabel.setText("Workout Active")
+            // Extract ruck weight if present
+            if let ruckWeight = data["ruckWeight"] as? Double {
+                print("🔔 [WATCH] Ruck weight: \(ruckWeight)")
+            }
+            
+            self.workoutManager?.startWorkout { error in
+                if let error = error {
+                    self.statusLabel.setText("Workout Error: \(error.localizedDescription)")
+                }
+            }
+            
+        case "workoutStopped":
+            self.statusLabel.setText("Workout Ended")
+            self.workoutManager?.endWorkout { error in
+                if let error = error {
+                    self.statusLabel.setText("Workout End Error: \(error.localizedDescription)")
+                }
+            }
+            
+        case "updateMetrics":
+            print("🔔 [WATCH] processCommand: Handling 'updateMetrics'")
+            print("🔔 [WATCH] processCommand: Raw data for 'updateMetrics': \(data)")
+            if let metrics = data["metrics"] as? [String: Any] {
+                print("🔔 [WATCH] processCommand updateMetrics received: \(metrics)")
+                self.updateMetrics(metrics)
+            } else {
+                print("🔴 [WATCH] processCommand: Failed to cast 'metrics' from data: \(data)")
+            }
+            
+        case "setSessionId":
+            if let sessionId = data["sessionId"] as? Int {
+                self.statusLabel.setText("Session: \(sessionId)")
+            }
+            
+        case "ping":
+            // Special ping command to test communication
+            self.statusLabel.setText("Ping received!")
+            // Reply back to confirm receipt
+            self.session?.sendMessage(["response": "pong"], replyHandler: nil, errorHandler: { error in
+                print("🔴 [WATCH] Error sending pong: \(error.localizedDescription)")
+            })
+            
+        default:
+            self.statusLabel.setText("Command: \(command)")
         }
     }
     
-    // Update UI with received metrics
     private func updateMetrics(_ metrics: [String: Any]) {
         if let heartRate = metrics["heartRate"] as? Double {
             heartRateLabel.setText(String(format: "HR: %.0f bpm", heartRate))

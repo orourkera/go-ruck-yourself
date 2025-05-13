@@ -902,6 +902,15 @@ emit(ActiveSessionComplete(
       calories: finalCalories,
     ));
     
+    // Send updates to the watch
+    // Ensure pace has a non-null value; default to 0.0 if null
+    await _watchService.updateSessionOnWatch(
+      distance: currentState.distanceKm,
+      duration: Duration(seconds: newElapsed),
+      pace: newPace ?? 0.0, // Pass 0.0 if newPace is null
+      isPaused: currentState.isPaused,
+    );
+
     // Check for distance milestones via service on ticks too
     await _splitTrackingService.checkForMilestone(
       currentDistanceKm: currentState.distanceKm,
