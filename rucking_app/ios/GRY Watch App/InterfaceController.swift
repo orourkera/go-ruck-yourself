@@ -1,9 +1,10 @@
+#if os(watchOS)
 import WatchKit
 import Foundation
 import WatchConnectivity
 import HealthKit
 
-class InterfaceController: WKInterfaceController, WCSessionDelegate {
+class InterfaceController: WKInterfaceController, SessionManagerDelegate {
     
     @IBOutlet weak var heartRateLabel: WKInterfaceLabel!
     @IBOutlet weak var distanceLabel: WKInterfaceLabel!
@@ -12,27 +13,19 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
     @IBOutlet weak var elevationLabel: WKInterfaceLabel!
     @IBOutlet weak var statusLabel: WKInterfaceLabel!
     
-    private var session: WCSession?
     private var workoutManager: WorkoutManager?
     
     override func awake(withContext context: Any?) {
         super.awake(withContext: context)
         
-        // Initialize WatchConnectivity session
-        if WCSession.isSupported() {
-            session = WCSession.default
-            session?.delegate = self
-            if session?.activationState != .activated {
-                print("Activating Watch session...")
-                session?.activate()
-            } else {
-                print("Watch session already activated with state: \(session?.activationState.rawValue ?? -1)")
-            }
-            print("Session pairing status checks are not available in watchOS")
-        } else {
-            print("WatchConnectivity is not supported on this device.")
-        }
+        // Initialize WatchConnectivity session through SessionManager
+        // SessionManager.shared.startSession() // Or ensure SessionManager.shared is initialized
+        // The line below is removed as SessionManager is the delegate
         
+        // Initialize SessionManager if it's not already active
+        _ = SessionManager.shared // This will trigger its init if not already done.
+        SessionManager.shared.delegate = self // Set InterfaceController as the delegate
+
         // Set initial UI state - attempt to set even if outlets are not connected
         if statusLabel == nil {
             print("statusLabel outlet is not connected in storyboard!")
@@ -64,7 +57,6 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
         } else {
             elevationLabel.setText("Elevation: -- m")
         }
-        updateStatusLabel()
         
         // Initialize WorkoutManager for HealthKit
         workoutManager = WorkoutManager()
@@ -73,20 +65,6 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
     
     override func willActivate() {
         super.willActivate()
-        // Check session state when view becomes visible
-        if let session = session {
-            switch session.activationState {
-            case .activated:
-                statusLabel.setText("Connected")
-                print("Updated UI: Session is activated.")
-            case .inactive, .notActivated:
-                statusLabel.setText("Not Connected")
-                print("Updated UI: Session is not activated. Current state: \(session.activationState.rawValue)")
-            @unknown default:
-                statusLabel.setText("Unknown State")
-                print("Updated UI: Session state is unknown.")
-            }
-        }
     }
     
     override func didDeactivate() {
@@ -115,120 +93,7 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
         }
     }
     
-    // MARK: - WCSessionDelegate Methods
-    
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        if let error = error {
-            print("WCSession activation failed with error: \(error.localizedDescription)")
-            return
-        }
-        print("WCSession activated with state: \(activationState.rawValue)")
-    }
-    
-    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
-        print("[WATCH] SessionManager received application context: \(applicationContext)")
-        
-        if let command = applicationContext["command"] as? String {
-            processCommand(command, data: applicationContext)
-        }
-    }
-    
-    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any]) {
-        print("[WATCH] SessionManager received user info: \(userInfo)")
-        
-        if let command = userInfo["command"] as? String {
-            processCommand(command, data: userInfo)
-        }
-    }
-    
-    func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
-        print("🔔 [WATCH] Received message from iOS: \(message)")
-        
-        // Make sure we're on the main thread for UI updates
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            // Update the status label to show activity
-            self.statusLabel.setText("Message received")
-            
-            // Handle incoming messages from iOS app
-            if let command = message["command"] as? String {
-                print("🔔 [WATCH] Received command: \(command)")
-                self.processCommand(command, from: message)
-            } else {
-                self.statusLabel.setText("Received: \(message)")
-            }
-        }
-    }
-    
-    // Implement application context receiver as well
-    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
-        print("🔔 [WATCH] Received application context: \(applicationContext)")
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.statusLabel.setText("Context Received")
-            
-            // Process application context the same way as regular messages
-            if let command = applicationContext["command"] as? String {
-                print("🔔 [WATCH] App context command: \(command)")
-                self.processCommand(command, from: applicationContext)
-            }
-        }
-    }
-    
     // Update UI with received metrics
-    // Common command processing helper
-    private func processCommand(_ command: String, from data: [String: Any]) {
-        switch command {
-        case "workoutStarted":
-            self.statusLabel.setText("Workout Active")
-            // Extract ruck weight if present
-            if let ruckWeight = data["ruckWeight"] as? Double {
-                print("🔔 [WATCH] Ruck weight: \(ruckWeight)")
-            }
-            
-            self.workoutManager?.startWorkout { error in
-                if let error = error {
-                    self.statusLabel.setText("Workout Error: \(error.localizedDescription)")
-                }
-            }
-            
-        case "workoutStopped":
-            self.statusLabel.setText("Workout Ended")
-            self.workoutManager?.endWorkout { error in
-                if let error = error {
-                    self.statusLabel.setText("Workout End Error: \(error.localizedDescription)")
-                }
-            }
-            
-        case "updateMetrics":
-            print("🔔 [WATCH] processCommand: Handling 'updateMetrics'")
-            print("🔔 [WATCH] processCommand: Raw data for 'updateMetrics': \(data)")
-            if let metrics = data["metrics"] as? [String: Any] {
-                print("🔔 [WATCH] processCommand updateMetrics received: \(metrics)")
-                self.updateMetrics(metrics)
-            } else {
-                print("🔴 [WATCH] processCommand: Failed to cast 'metrics' from data: \(data)")
-            }
-            
-        case "setSessionId":
-            if let sessionId = data["sessionId"] as? Int {
-                self.statusLabel.setText("Session: \(sessionId)")
-            }
-            
-        case "ping":
-            // Special ping command to test communication
-            self.statusLabel.setText("Ping received!")
-            // Reply back to confirm receipt
-            self.session?.sendMessage(["response": "pong"], replyHandler: nil, errorHandler: { error in
-                print("🔴 [WATCH] Error sending pong: \(error.localizedDescription)")
-            })
-            
-        default:
-            self.statusLabel.setText("Command: \(command)")
-        }
-    }
-    
     private func updateMetrics(_ metrics: [String: Any]) {
         if let heartRate = metrics["heartRate"] as? Double {
             heartRateLabel.setText(String(format: "HR: %.0f bpm", heartRate))
@@ -249,19 +114,87 @@ class InterfaceController: WKInterfaceController, WCSessionDelegate {
     
     // Send heart rate data to iOS app
     func sendHeartRate(_ heartRate: Double) {
-        guard let session = session else {
-            statusLabel.setText("Not Connected")
-            return
-        }
-        
-        switch session.activationState {
-        case .activated:
-            session.sendMessage(["heartRate": heartRate], replyHandler: nil) { error in
-                self.statusLabel.setText("Send Error: \(error.localizedDescription)")
+        // Use SessionManager.shared to send heart rate data
+        SessionManager.shared.sendHeartRate(heartRate)
+    }
+    
+    // MARK: - Command Processing
+    private func processCommand(_ command: String, from data: [String: Any]) {
+        DispatchQueue.main.async { // Ensure UI updates are on the main thread
+            switch command {
+            case "workoutStarted":
+                self.statusLabel.setText("Workout Active")
+                // Extract ruck weight if present
+                if let ruckWeight = data["ruckWeight"] as? Double {
+                    print("🔔 [WATCH UI] Ruck weight: \(ruckWeight)")
+                }
+                self.workoutManager?.startWorkout { error in
+                    if let error = error {
+                        self.statusLabel.setText("Workout Error: \(error.localizedDescription)")
+                    }
+                }
+                
+            case "workoutStopped":
+                self.statusLabel.setText("Workout Ended")
+                self.workoutManager?.endWorkout { error in
+                    if let error = error {
+                        self.statusLabel.setText("Workout End Error: \(error.localizedDescription)")
+                    }
+                }
+                
+            case "updateMetrics":
+                print("🔔 [WATCH UI] processCommand: Handling 'updateMetrics'")
+                if let metrics = data["metrics"] as? [String: Any] {
+                    print("🔔 [WATCH UI] processCommand updateMetrics received: \(metrics)")
+                    self.updateMetrics(metrics)
+                } else {
+                    print("🔴 [WATCH UI] processCommand: Failed to cast 'metrics' from data: \(data)")
+                }
+                
+            case "setSessionId":
+                if let sessionId = data["sessionId"] as? Int {
+                    self.statusLabel.setText("Session: \(sessionId)")
+                }
+                
+            case "ping":
+                self.statusLabel.setText("Ping received!")
+                // Optionally, reply back via SessionManager if needed for testing
+                // SessionManager.shared.sendMessage(["response": "pong_ui"], replyHandler: nil, errorHandler: { error in
+                //     print("🔴 [WATCH UI] Error sending pong: \(error.localizedDescription)")
+                // })
+                
+            default:
+                self.statusLabel.setText("Cmd: \(command)")
             }
-            print("Sent heart rate to iOS app: \(heartRate) bpm")
-        default:
-            statusLabel.setText("Not Connected")
+        }
+    }
+
+    // MARK: - SessionManagerDelegate Methods
+    
+    func sessionDidActivate() {
+        DispatchQueue.main.async {
+            self.statusLabel.setText("Connected")
+            print("🔔 [WATCH UI] SessionManagerDelegate: Session Activated")
+        }
+    }
+    
+    func sessionDidDeactivate() {
+        DispatchQueue.main.async {
+            self.statusLabel.setText("Disconnected")
+            print("🔔 [WATCH UI] SessionManagerDelegate: Session Deactivated")
+        }
+    }
+    
+    func didReceiveMessage(_ message: [String: Any]) {
+        print("🔔 [WATCH UI] SessionManagerDelegate: Received message: \(message)")
+        if let command = message["command"] as? String {
+            processCommand(command, from: message)
+        } else {
+            // Handle messages without a 'command' key if necessary
+            DispatchQueue.main.async {
+                self.statusLabel.setText("Msg Received")
+            }
         }
     }
 }
+#endif

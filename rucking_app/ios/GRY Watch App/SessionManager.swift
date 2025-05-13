@@ -43,9 +43,18 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             return
         }
         
+        // Log the message being sent for debugging
+        print(" [WATCH] SessionManager attempting to send message: \(message)")
+
         session.sendMessage(message, replyHandler: nil) { error in
             print("Error sending message: \(error.localizedDescription)")
         }
+    }
+    
+    func sendHeartRate(_ heartRate: Double) {
+        let message: [String: Any] = ["heartRate": heartRate, "command": "watchHeartRateUpdate"]
+        sendMessage(message)
+        print(" [WATCH] SessionManager: Sent heart rate to iOS: \(heartRate) bpm")
     }
     
     // MARK: - WCSessionDelegate
@@ -59,6 +68,22 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         if let error = error {
             print("Session activation failed: \(error.localizedDescription)")
         }
+    }
+    
+    func sessionDidBecomeInactive(_ session: WCSession) {
+        // Called when the session has become inactive.
+        // You should stop using the session here and wait for sessionDidDeactivate(_:) to be called.
+        // For example, disable UI related to WatchConnectivity.
+        print(" [WATCH] SessionManager sessionDidBecomeInactive")
+        delegate?.sessionDidDeactivate() // Or a new specific delegate method for inactive
+    }
+    
+    func sessionDidDeactivate(_ session: WCSession) {
+        // Called when the session has been deactivated.
+        // You should re-activate the session here if you want to continue using WatchConnectivity.
+        print(" [WATCH] SessionManager sessionDidDeactivate")
+        // WCSession.default.activate() // Re-activate the session if appropriate for your app.
+        delegate?.sessionDidDeactivate()
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
@@ -87,6 +112,25 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             }
             
             if let metrics = applicationContext["metrics"] as? [String: Any], 
+               let hr = metrics["heartRate"] as? Double {
+                self.heartRate = Int(hr)
+            }
+        }
+    }
+    
+    // Add didReceiveUserInfo to handle user info transfers
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any] = [:]) {
+        print(" [WATCH] SessionManager received user info: \(userInfo)")
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            // Process user info similarly to application context or messages
+            self.delegate?.didReceiveMessage(userInfo) // Forward to SessionManagerDelegate
+            
+            if let command = userInfo["command"] as? String {
+                self.status = "User Info: \(command)"
+            }
+            // Potentially update other @Published properties based on userInfo
+            if let metrics = userInfo["metrics"] as? [String: Any],
                let hr = metrics["heartRate"] as? Double {
                 self.heartRate = Int(hr)
             }

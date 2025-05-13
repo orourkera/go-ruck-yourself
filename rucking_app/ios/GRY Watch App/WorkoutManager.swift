@@ -1,3 +1,4 @@
+#if os(watchOS)
 import Foundation
 import HealthKit
 
@@ -125,3 +126,4 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
         // Handle events if needed
     }
 }
+#endif
