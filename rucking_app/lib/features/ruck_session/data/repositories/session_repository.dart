@@ -19,6 +19,7 @@ class SessionRepository {
         return null;
       }
       final response = await _apiClient.get('/rucks/$sessionId');
+      AppLogger.info('Raw session response: $response');
       if (response == null) {
         AppLogger.error('No response from backend for session $sessionId');
         return null;
@@ -31,7 +32,9 @@ class SessionRepository {
         heartRateSamples = (response['heart_rate_samples'] as List)
             .map((e) => HeartRateSample.fromJson(e as Map<String, dynamic>))
             .toList();
-        AppLogger.info('Received ${heartRateSamples.length} heart rate samples for session $sessionId');
+        AppLogger.info('Parsed ${heartRateSamples.length} heart rate samples');
+      } else {
+        AppLogger.warn('No heart_rate_samples field in session response');
       }
       // Return a session with samples attached (assumes RuckSession has a field for this)
       return session.copyWith(heartRateSamples: heartRateSamples);
