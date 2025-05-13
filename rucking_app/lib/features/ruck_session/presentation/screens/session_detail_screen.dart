@@ -282,7 +282,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 8),
-                        AppLogger.info('DEBUG: Rendering Heart Rate section. Samples: ${widget.session.heartRateSamples?.length ?? 0}'),
                         const SizedBox(height: 16),
                         // Average Heart Rate
                         _buildDetailRow(
