@@ -11,6 +11,7 @@ import 'package:rucking_app/shared/utils/error_mapper.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 /// Screen for registering new users
 class RegisterScreen extends StatefulWidget {
@@ -56,11 +57,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void _register() {
     if (_formKey.currentState!.validate()) {
       if (!_acceptTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please accept the terms and conditions'),
-            backgroundColor: Colors.red,
-          ),
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Please accept the terms and conditions',
+          animationStyle: SnackBarAnimationStyle.slideUpBounce,
         );
         return;
       }
@@ -118,34 +118,87 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           );
         } else if (state is AuthUserAlreadyExists) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Text('Email already in use. '),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text(
-                      'Login',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ],
+          // Using a custom widget with clickable login button
+          final content = Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('EMAIL ALREADY IN USE. ', 
+                style: TextStyle(
+                  fontFamily: 'Bangers',
+                  fontSize: 20.0,
+                  letterSpacing: 1.5,
+                  color: Colors.white,
+                ),
               ),
-              backgroundColor: Colors.red,
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'LOGIN',
+                  style: TextStyle(
+                    fontFamily: 'Bangers',
+                    fontSize: 20.0,
+                    letterSpacing: 1.5,
+                    color: Colors.white,
+                    decoration: TextDecoration.underline,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          );
+          
+          // Show error with the custom widget
+          StyledSnackBar.showError(
+            context: context,
+            message: '', // Empty because we're using a custom widget
+          );
+          
+          // Insert our custom widget into the overlay (similar to how StyledSnackBar does it)
+          final overlayState = Overlay.of(context);
+          final overlayEntry = OverlayEntry(
+            builder: (context) => Positioned(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+              left: 20,
+              right: 20,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(15.0),
+                    border: Border.all(
+                      color: AppColors.errorDark,
+                      width: 2.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.errorDark.withOpacity(0.5),
+                        offset: const Offset(0, 3),
+                        blurRadius: 6.0,
+                        spreadRadius: 1.0,
+                      ),
+                    ],
+                  ),
+                  child: content,
+                ),
+              ),
             ),
           );
+          
+          overlayState.insert(overlayEntry);
+          
+          // Remove after delay
+          Future.delayed(const Duration(seconds: 4), () {
+            overlayEntry.remove();
+          });
         } else if (state is AuthError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_friendlyErrorMessage(state.message)),
-              backgroundColor: Colors.red,
-            ),
+          StyledSnackBar.showError(
+            context: context,
+            message: _friendlyErrorMessage(state.message),
+            animationStyle: SnackBarAnimationStyle.popIn,
           );
         }
       },
