@@ -12,6 +12,8 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -72,6 +74,7 @@ class ActiveSessionPage extends StatelessWidget {
         locationService: locator<LocationService>(),
         healthService: locator<HealthService>(),
         watchService: locator<WatchService>(),
+        splitTrackingService: locator<SplitTrackingService>(),
       ),
       child: _ActiveSessionView(args: args),
     );

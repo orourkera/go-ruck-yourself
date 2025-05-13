@@ -264,6 +264,50 @@ class WatchService {
     }
   }
   
+  /// Send a split notification to the watch when a distance milestone is reached
+  /// This will trigger a haptic feedback and notification on the watch
+  Future<bool> sendSplitNotification({
+    required double splitDistance, // Current milestone (e.g., 1.0 km or 1.0 mi)
+    required Duration splitDuration, // Time taken for this split
+    required double totalDistance, // Total distance so far
+    required Duration totalDuration, // Total duration so far
+    required bool isMetric, // Whether user prefers metric units
+  }) async {
+    try {
+      AppLogger.info('[WATCH] Sending split notification: $splitDistance ${isMetric ? 'km' : 'mi'}, time: ${_formatDuration(splitDuration)}');
+      
+      // Format distances with appropriate units
+      final String formattedSplitDistance = '${splitDistance.toStringAsFixed(1)} ${isMetric ? 'km' : 'mi'}';
+      final String formattedTotalDistance = '${totalDistance.toStringAsFixed(1)} ${isMetric ? 'km' : 'mi'}';
+      
+      await _sendMessageToWatch({
+        'command': 'splitNotification',
+        'splitDistance': formattedSplitDistance,
+        'splitTime': _formatDuration(splitDuration),
+        'totalDistance': formattedTotalDistance,
+        'totalTime': _formatDuration(totalDuration),
+        'isMetric': isMetric,
+      });
+      
+      AppLogger.info('[WATCH] Split notification sent successfully');
+      return true;
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to send split notification: $e');
+      return false;
+    }
+  }
+
+  /// Helper method to format duration as MM:SS or HH:MM:SS
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    
+    if (duration.inHours > 0) {
+      return '${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}';
+    } else {
+      return '${twoDigits(duration.inMinutes)}:${twoDigits(duration.inSeconds.remainder(60))}';
+    }
+  }
+
   /// Update session metrics on the watch
   Future<bool> updateSessionOnWatch({
     required double distance,
