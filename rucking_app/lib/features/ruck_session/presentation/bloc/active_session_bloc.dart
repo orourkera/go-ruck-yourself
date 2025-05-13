@@ -331,15 +331,23 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           AppLogger.info('Ignoring duplicate location point.');
           return;
         }
-        final double distance = _calculateDistance(last.latitude, last.longitude, currentPoint.latitude, currentPoint.longitude);
+        // Calculate segment distance in metres for comparison against metre thresholds.
+        final double distanceMeters = _calculateDistance(
+              last.latitude,
+              last.longitude,
+              currentPoint.latitude,
+              currentPoint.longitude,
+            ) * 1000; // _calculateDistance returns kilometres
 
-        if (currentState.distanceKm * 1000 < 10 && distance > driftIgnoreJumpMeters) {
-          debugPrint("Ignoring GPS update due to drift: distance = " + distance.toString());
+        // Ignore large GPS jumps when total travelled distance is still tiny (<10 m)
+        if (currentState.distanceKm * 1000 < 10 && distanceMeters > driftIgnoreJumpMeters) {
+          debugPrint("Ignoring GPS update due to drift: distance = " + distanceMeters.toString());
           return;
         }
 
-        if (distance < thresholdMeters) {
-          AppLogger.info('Ignoring minimal location update; distance ' + distance.toString() + ' m is below threshold.');
+        // Ignore negligible movements below the noise threshold
+        if (distanceMeters < thresholdMeters) {
+          AppLogger.info('Ignoring minimal location update; distance ' + distanceMeters.toString() + ' m is below threshold.');
           return;
         }
 
