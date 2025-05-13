@@ -294,11 +294,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                             ],
                           ),
                           padding: const EdgeInsets.all(16),
-                          child: HeartRateGraph(
-                            samples: widget.session.heartRateSamples!,
-                            height: 160,
-                            showLabels: true,
-                            showTooltips: true,
+                          child: Column(
+                            children: [
+                              Text('Debug: HR samples count: ${widget.session.heartRateSamples!.length}'),
+                              HeartRateGraph(
+                                samples: widget.session.heartRateSamples!,
+                                height: 160,
+                                showLabels: true,
+                                showTooltips: true,
+                              ),
+                            ],
                           ),
                         ),
                     ],

@@ -96,7 +96,13 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
       if (fullSession != null) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => SessionDetailScreen(session: fullSession),
+            builder: (context) => MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: context.read<AuthBloc>()),
+                BlocProvider.value(value: context.read<SessionHistoryBloc>()),
+              ],
+              child: SessionDetailScreen(session: fullSession),
+            ),
           ),
         );
       } else {
