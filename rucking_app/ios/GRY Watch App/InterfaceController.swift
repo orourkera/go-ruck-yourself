@@ -107,7 +107,11 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
         if let pace = metrics["pace"] as? Double {
             paceLabel.setText(String(format: "Pace: %.2f min/km", pace))
         }
-        if let elevation = metrics["elevation"] as? Double {
+        // Handle both formats: elevation (old) or elevationGain/elevationLoss (new)
+        if let elevationGain = metrics["elevationGain"] as? Double, let elevationLoss = metrics["elevationLoss"] as? Double {
+            elevationLabel.setText(String(format: "Elev: +%.0f/-%.0f m", elevationGain, elevationLoss))
+        } else if let elevation = metrics["elevation"] as? Double {
+            // Fallback for backward compatibility
             elevationLabel.setText(String(format: "Elev: %.0f m", elevation))
         }
     }
