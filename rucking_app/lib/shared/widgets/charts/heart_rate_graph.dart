@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/utils/app_logger.dart'; // Import AppLogger
 
 class HeartRateGraph extends StatelessWidget {
   final List<HeartRateSample> samples;
@@ -20,9 +21,10 @@ class HeartRateGraph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (samples.isEmpty) {
+      AppLogger.info('HeartRateGraph: No samples to display');
       return SizedBox(height: height);
     }
-
+    AppLogger.info('HeartRateGraph: Building graph with ${samples.length} samples');
     return SizedBox(
       height: height,
       child: LineChart(_buildHeartRateChartData()),

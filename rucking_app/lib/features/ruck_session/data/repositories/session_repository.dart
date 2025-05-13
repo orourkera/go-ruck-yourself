@@ -31,6 +31,7 @@ class SessionRepository {
         heartRateSamples = (response['heart_rate_samples'] as List)
             .map((e) => HeartRateSample.fromJson(e as Map<String, dynamic>))
             .toList();
+        AppLogger.info('Received ${heartRateSamples.length} heart rate samples for session $sessionId');
       }
       // Return a session with samples attached (assumes RuckSession has a field for this)
       return session.copyWith(heartRateSamples: heartRateSamples);
