@@ -8,6 +8,8 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/session_hist
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_card.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 class SessionHistoryScreen extends StatefulWidget {
   const SessionHistoryScreen({Key? key}) : super(key: key);
@@ -80,13 +82,38 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
     );
   }
   
-  void _navigateToSessionDetail(RuckSession session) {
-    AppLogger.info('Navigating to session detail for session ${session.id}');    
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => SessionDetailScreen(session: session),
-      ),
+  Future<void> _navigateToSessionDetail(RuckSession session) async {
+    AppLogger.info('Navigating to session detail for session ${session.id}');
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+    try {
+      final repo = context.read<SessionRepository>();
+      final fullSession = await repo.fetchSessionById(session.id!);
+      Navigator.of(context).pop(); // Remove loading dialog
+      if (fullSession != null) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => SessionDetailScreen(session: fullSession),
+          ),
+        );
+      } else {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Failed to load session details',
+          duration: const Duration(seconds: 2),
+        );
+      }
+    } catch (e) {
+      Navigator.of(context).pop();
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error fetching session: $e',
+        duration: const Duration(seconds: 2),
+      );
+    }
   }
   
   Widget _buildEmptyState() {
