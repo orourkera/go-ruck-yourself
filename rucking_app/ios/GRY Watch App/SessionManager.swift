@@ -40,7 +40,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     }
 
     func startSession() {
-        status = "Connected"
+        // Leave status as "--" for cleaner UI
         
         // Set up heart rate handler to send heart rate updates to the phone
         workoutManager.setHeartRateHandler { [weak self] heartRate in

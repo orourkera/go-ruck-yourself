@@ -21,8 +21,8 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 2)
                 
-                // Full-width timer (status text contains the timer now)
-                Text(sessionManager.statusText)
+                // Full-width timer (only show timer when active, otherwise show placeholder)
+                Text(sessionManager.statusText.contains("Connect") ? "--" : sessionManager.statusText)
                     .font(.system(size: 34, weight: .semibold, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
