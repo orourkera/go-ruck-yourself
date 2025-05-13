@@ -18,6 +18,8 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     @Published var elevationLoss: Double = 0.0
     @Published var distanceValue: Double = 0.0
     @Published var paceValue: Double = 0.0
+    @Published var isPaused: Bool = false
+    @Published var isSessionActive: Bool = false
     
     // Split notification properties
     @Published var showingSplitNotification: Bool = false
@@ -113,6 +115,39 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         print(" [WATCH] SessionManager: Sent heart rate to iOS: \(heartRate) bpm")
     }
     
+    // Pause the session from the watch
+    func pauseSession() {
+        guard isSessionActive && !isPaused else { return }
+        
+        print("[WATCH] Pausing session from watch")
+        isPaused = true
+        
+        // Send pause command to the iPhone app
+        let message: [String: Any] = ["command": "pauseSession", "action": "pauseSession"]
+        sendMessage(message)
+    }
+    
+    // Resume the session from the watch
+    func resumeSession() {
+        guard isSessionActive && isPaused else { return }
+        
+        print("[WATCH] Resuming session from watch")
+        isPaused = false
+        
+        // Send resume command to the iPhone app
+        let message: [String: Any] = ["command": "resumeSession", "action": "resumeSession"]
+        sendMessage(message)
+    }
+    
+    // Toggle between pause and resume
+    func togglePauseResume() {
+        if isPaused {
+            resumeSession()
+        } else {
+            pauseSession()
+        }
+    }
+    
     // MARK: - WCSessionDelegate
     
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
@@ -129,20 +164,69 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         delegate?.didReceiveMessage(message)
         
-        // Check if this is a split notification
-        if let command = message["command"] as? String, command == "splitNotification" {
-            processSplitNotification(message)
+        print("[WATCH] Received message: \(message)")
+        
+        // Check message command
+        if let command = message["command"] as? String {
+            switch command {
+            case "splitNotification":
+                processSplitNotification(message)
+                
+            case "startSession":
+                self.isSessionActive = true
+                self.isPaused = false
+                print("[WATCH] Session started from phone")
+                
+            case "pauseSession":
+                self.isPaused = true
+                print("[WATCH] Session paused from phone")
+                
+            case "resumeSession":
+                self.isPaused = false
+                print("[WATCH] Session resumed from phone")
+                
+            case "endSession":
+                self.isSessionActive = false
+                self.isPaused = false
+                print("[WATCH] Session ended from phone")
+                
+            default: break
+            }
         }
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
         delegate?.didReceiveMessage(message)
         
-        // Check if this is a split notification
-        if let command = message["command"] as? String, command == "splitNotification" {
-            processSplitNotification(message)
+        // Check message command
+        if let command = message["command"] as? String {
+            switch command {
+            case "splitNotification":
+                processSplitNotification(message)
+                
+            case "startSession":
+                self.isSessionActive = true
+                self.isPaused = false
+                print("[WATCH] Session started from phone (with reply)")
+                
+            case "pauseSession":
+                self.isPaused = true
+                print("[WATCH] Session paused from phone (with reply)")
+                
+            case "resumeSession":
+                self.isPaused = false
+                print("[WATCH] Session resumed from phone (with reply)")
+                
+            case "endSession":
+                self.isSessionActive = false
+                self.isPaused = false
+                print("[WATCH] Session ended from phone (with reply)")
+                
+            default: break
+            }
         }
         
+        // Send the reply that message was received
         replyHandler(["received": true])
     }
     
@@ -178,6 +262,9 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     // Helper method to consistently update metrics from received data
     private func updateMetricsFromData(_ metrics: [String: Any]) {
+        // Mark session as active when receiving metrics
+        self.isSessionActive = true
+        
         // Update heart rate when present
         if let hr = metrics["heartRate"] as? Double {
             self.heartRate = Int(hr)
@@ -204,6 +291,11 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         // Update pace when present
         if let pace = metrics["pace"] as? Double {
             self.paceValue = pace
+        }
+        
+        // Update paused state when present
+        if let paused = metrics["isPaused"] as? Int {
+            self.isPaused = paused == 1
         }
         
         // Update timer display from duration
