@@ -459,6 +459,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       selected: isSelected,
       onSelected: (selected) async {
         if (selected) {
+          HapticFeedback.mediumImpact();
           setState(() {
             _ruckWeight = weightInKg;
             _displayRuckWeight = isMetric ? weightValue : weightValue;
@@ -641,6 +642,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                       ),
                     ),
                     onPressed: () {
+                      HapticFeedback.mediumImpact();
                       _snapToNearestWeight(); 
                       if (_formKey.currentState!.validate()) {
                         if (!_isCreating) _createSession();
