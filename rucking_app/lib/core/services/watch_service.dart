@@ -42,7 +42,11 @@ class WatchService {
   // Heart rate samples list
   List<HeartRateSample> _currentSessionHeartRateSamples = [];
   
-  WatchService(this._locationService, this._healthService, this._authService);
+  WatchService(this._locationService, this._healthService, this._authService) {
+    AppLogger.info('[WATCH] Initializing WatchService');
+    _initPlatformChannels();
+    AppLogger.info('[WATCH] WatchService initialized');
+  }
   
   void _initPlatformChannels() {
     AppLogger.info('[WATCH] Initializing platform channels');
@@ -264,6 +268,21 @@ class WatchService {
     }
   }
   
+  /// Test connectivity to watch by sending a ping message
+  /// Use this to verify that the watch app can receive messages
+  Future<void> pingWatch() async {
+    AppLogger.info('[WATCH] Pinging watch to test connectivity');
+    try {
+      await _sendMessageToWatch({
+        'command': 'ping',
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      AppLogger.info('[WATCH] Ping sent to watch');
+    } catch (e) {
+      AppLogger.error('[WATCH] Error pinging watch: $e');
+    }
+  }
+  
   /// Send a split notification to the watch when a distance milestone is reached
   /// This will trigger a haptic feedback and notification on the watch
   Future<bool> sendSplitNotification({
@@ -297,17 +316,6 @@ class WatchService {
     }
   }
 
-  /// Helper method to format duration as MM:SS or HH:MM:SS
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    
-    if (duration.inHours > 0) {
-      return '${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}';
-    } else {
-      return '${twoDigits(duration.inMinutes)}:${twoDigits(duration.inSeconds.remainder(60))}';
-    }
-  }
-
   /// Update session metrics on the watch
   Future<bool> updateSessionOnWatch({
     required double distance,
@@ -322,17 +330,32 @@ class WatchService {
     _isPaused = isPaused;
     
     try {
-      final api = FlutterRuckingApi();
-      await api.updateSessionOnWatch(
-        distance,
-        duration.inSeconds.toDouble(),
-        pace,
-        isPaused,
-      );
+      // Send an explicit updateMetrics message via WatchConnectivity
+      await _sendMessageToWatch({
+        'command': 'updateMetrics',
+        'metrics': {
+          'distance': distance,
+          'duration': duration.inSeconds,
+          'pace': pace,
+          'isPaused': isPaused,
+          if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
+        },
+      });
       return true;
     } catch (e) {
-      debugPrint('[ERROR] Failed to update session on Watch: $e');
+      AppLogger.error('[WATCH] Failed to update session on Watch: $e');
       return false;
+    }
+  }
+  
+  /// Helper method to format duration as MM:SS or HH:MM:SS
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    
+    if (duration.inHours > 0) {
+      return '${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))}:${twoDigits(duration.inSeconds.remainder(60))}';
+    } else {
+      return '${twoDigits(duration.inMinutes)}:${twoDigits(duration.inSeconds.remainder(60))}';
     }
   }
   
