@@ -34,7 +34,10 @@ class SessionControls extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: onTogglePause, 
+            onPressed: () {
+            HapticFeedback.mediumImpact();
+            if (onTogglePause != null) onTogglePause!();
+          }, 
           ),
         ),
         const SizedBox(width: 16),
@@ -49,7 +52,10 @@ class SessionControls extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: onEndSession, 
+            onPressed: () {
+            HapticFeedback.mediumImpact();
+            if (onEndSession != null) onEndSession!();
+          }, 
           ),
         ),
       ],
