@@ -21,10 +21,22 @@ class HeartRateGraph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (samples.isEmpty) {
-      AppLogger.info('HeartRateGraph: No samples to display');
+      AppLogger.info('DEBUGGING: HeartRateGraph: No samples to display');
       return SizedBox(height: height);
     }
-    AppLogger.info('HeartRateGraph: Building graph with ${samples.length} samples');
+    
+    // Detailed debug logging
+    AppLogger.info('DEBUGGING: HeartRateGraph: Building graph with ${samples.length} samples');
+    if (samples.isNotEmpty) {
+      final minBpm = samples.map((s) => s.bpm).reduce((a, b) => a < b ? a : b);
+      final maxBpm = samples.map((s) => s.bpm).reduce((a, b) => a > b ? a : b);
+      final avgBpm = (samples.map((s) => s.bpm).reduce((a, b) => a + b) / samples.length).round();
+      
+      AppLogger.info('DEBUGGING: Heart rate range - min: $minBpm, max: $maxBpm, avg: $avgBpm bpm');
+      AppLogger.info('DEBUGGING: First sample time: ${samples.first.timestamp}');
+      AppLogger.info('DEBUGGING: Last sample time: ${samples.last.timestamp}');
+    }
+    
     return SizedBox(
       height: height,
       child: LineChart(_buildHeartRateChartData()),
