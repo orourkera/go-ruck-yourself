@@ -100,18 +100,43 @@ struct ContentView: View {
                     }
                     .padding(.top, 5)
                     
-                    // Heart rate at the bottom
-                    HStack(spacing: 4) {
-                        Image(systemName: "heart.fill")
-                            .foregroundColor(.red)
-                            .font(.title3)
-                        Text(sessionManager.heartRateText)
-                            .font(.system(size: 24, weight: .bold))
+                    // Heart rate and control buttons section
+                    VStack(spacing: 10) {
+                        // Heart rate indicator
+                        HStack(spacing: 4) {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.red)
+                                .font(.title3)
+                            Text(sessionManager.heartRateText)
+                                .font(.system(size: 24, weight: .bold))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.1))
+                        .cornerRadius(8)
+                        
+                        // Play/Pause button (only shown if session is active)
+                        if sessionManager.isSessionActive {
+                            Button(action: {
+                                sessionManager.togglePauseResume()
+                            }) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: sessionManager.isPaused ? "play.fill" : "pause.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(sessionManager.isPaused ? .green : .orange)
+                                    
+                                    Text(sessionManager.isPaused ? "Resume" : "Pause")
+                                        .font(.headline)
+                                        .foregroundColor(sessionManager.isPaused ? .green : .orange)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.black.opacity(0.2))
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 15)
-                    .background(Color.black.opacity(0.1))
-                    .cornerRadius(8)
                     .padding(.top, 5)
                 }
                 .padding(12)
