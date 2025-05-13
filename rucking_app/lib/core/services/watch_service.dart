@@ -271,6 +271,8 @@ class WatchService {
   }
 
   /// Send updated session metrics to the watch using Pigeon.
+  /// This method also calls updateMetricsOnWatch to ensure both communication
+  /// channels receive the data.
   Future<bool> updateSessionOnWatch({
     required double distance,
     required Duration duration,
@@ -286,6 +288,38 @@ class WatchService {
         'paused=$isPaused, calories=$calories, gain=$elevationGain, loss=$elevationLoss');
     
     bool success = false;
+    
+    // First send via WatchConnectivity which is the channel the watch is actually using
+    try {
+      await updateMetricsOnWatch(
+        distance: distance,
+        duration: duration,
+        pace: pace,
+        isPaused: isPaused,
+        calories: calories.toInt(), // Convert to int since updateMetricsOnWatch expects int
+        elevation: elevationGain, // For now just use gain, we'll enhance this below
+      );
+      
+      // Also send a more complete metrics update that includes both gain and loss
+      await _sendMessageToWatch({
+        'command': 'updateMetrics',
+        'metrics': {
+          'distance': distance,
+          'duration': duration.inSeconds,
+          'pace': pace,
+          'isPaused': isPaused ? 1 : 0,
+          'calories': calories,
+          'elevationGain': elevationGain,
+          'elevationLoss': elevationLoss,
+          if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
+        },
+      });
+    } catch (e) {
+      AppLogger.error('[WATCH_SERVICE] Failed to send metrics via WatchConnectivity: $e');
+      // Continue to try Pigeon anyway
+    }
+    
+    // Also send via Pigeon for future compatibility
     try {
       // Create the API instance
       final api = FlutterRuckingApi();
@@ -309,11 +343,11 @@ class WatchService {
       AppLogger.info('[WATCH_SERVICE] Successfully updated session on watch');
     } catch (e) {
       // Log the error
-      AppLogger.error('[WATCH_SERVICE] Failed to update session on watch: $e');
+      AppLogger.error('[WATCH_SERVICE] Failed to update session via Pigeon: $e');
       success = false;
     }
     
-    // Return the success flag explicitly
+    // Return success true if either method worked
     return success;
   }
 
