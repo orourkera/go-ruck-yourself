@@ -448,7 +448,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         height: 36,
         alignment: Alignment.center,
         child: Text(
-          weightValue == 0 ? 'HIKE' : (isMetric ? '${weightValue.toStringAsFixed(1)} kg' : '${weightValue.round()} lbs'),
+          (weightValue == 0 && isSelected) ? 'HIKE' : (isMetric ? (weightValue == 0 ? '0 kg' : '${weightValue.toStringAsFixed(1)} kg') : (weightValue == 0 ? '0 lbs' : '${weightValue.round()} lbs')),
           textAlign: TextAlign.center,
           style: AppTextStyles.statValue.copyWith(
             color: Theme.of(context).brightness == Brightness.dark ? Colors.white : (isSelected ? Colors.white : Colors.black),
