@@ -8,6 +8,8 @@ protocol SessionManagerDelegate: AnyObject {
 }
 
 class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
+    // WorkoutManager for HealthKit access
+    private let workoutManager = WorkoutManager()
     // Published properties for SwiftUI
     @Published var status: String = "--"
     @Published var heartRate: Int = 0
@@ -39,7 +41,36 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
 
     func startSession() {
         status = "Connected"
-        // Add additional session start logic if needed
+        
+        // Set up heart rate handler to send heart rate updates to the phone
+        workoutManager.setHeartRateHandler { [weak self] heartRate in
+            guard let self = self else { return }
+            // Update UI with heart rate
+            DispatchQueue.main.async {
+                self.heartRate = Int(heartRate)
+            }
+            // Send heart rate to iOS app
+            self.sendHeartRate(heartRate)
+        }
+        
+        // Request HealthKit permissions
+        workoutManager.requestAuthorization { success, error in
+            if success {
+                print("[WATCH] HealthKit authorization successful")
+                // Start workout session to get heart rate
+                DispatchQueue.main.async {
+                    self.workoutManager.startWorkout { error in
+                        if let error = error {
+                            print("[WATCH] Failed to start workout: \(error.localizedDescription)")
+                        } else {
+                            print("[WATCH] Workout session started successfully")
+                        }
+                    }
+                }
+            } else if let error = error {
+                print("[WATCH] HealthKit authorization failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     static let shared = SessionManager()
