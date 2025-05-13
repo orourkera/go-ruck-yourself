@@ -636,13 +636,14 @@ class _RouteMapState extends State<_RouteMap> {
       final logBase2 = math.log(2);
       final latZoom = math.log(360 / (maxLat - minLat)) / logBase2;
       final lngZoom = math.log(360 / (maxLng - minLng)) / logBase2;
-      final zoom = math.min(math.min(latZoom, lngZoom), 16.0); // cap at 16.0
+      double zoom = math.min(math.min(latZoom, lngZoom), 16.0); // base zoom capped at 16
+      zoom = math.min(zoom + 0.5, 17.0); // zoom in just slightly but never beyond 17
       
       // Move to this center and zoom
       _controller.move(latlong.LatLng(centerLat, centerLng), zoom);
     } else if (mounted && widget.route.isNotEmpty) {
       // If only one point, center on it with a fixed zoom
-      _controller.move(widget.route.last, 16.0);
+      _controller.move(widget.route.last, 17.0);
     }
   }
   
