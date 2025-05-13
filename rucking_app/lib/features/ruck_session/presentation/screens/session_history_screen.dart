@@ -4,6 +4,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
@@ -100,6 +101,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
               providers: [
                 BlocProvider.value(value: context.read<AuthBloc>()),
                 BlocProvider.value(value: context.read<SessionHistoryBloc>()),
+                BlocProvider.value(value: context.read<SessionBloc>()),
               ],
               child: SessionDetailScreen(session: fullSession),
             ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
-import 'package:rucking_app/shared/utils/app_logger.dart'; // Import AppLogger
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 class HeartRateGraph extends StatelessWidget {
   final List<HeartRateSample> samples;
