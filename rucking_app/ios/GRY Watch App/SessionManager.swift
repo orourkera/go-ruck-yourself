@@ -69,4 +69,27 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         delegate?.didReceiveMessage(message)
         replyHandler(["received": true])
     }
-}
+    
+    // Handle application context
+    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
+        print(" [WATCH] SessionManager received application context: \(applicationContext)")
+        
+        // Always update UI on the main thread (prevents the SwiftUI threading error)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Process application context the same way as messages
+            self.delegate?.didReceiveMessage(applicationContext)
+            
+            // Update UI properties directly as well
+            if let command = applicationContext["command"] as? String {
+                self.status = "Received: \(command)"
+            }
+            
+            if let metrics = applicationContext["metrics"] as? [String: Any], 
+               let hr = metrics["heartRate"] as? Double {
+                self.heartRate = Int(hr)
+            }
+        }
+    }
+}    

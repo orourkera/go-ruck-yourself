@@ -301,8 +301,6 @@
 				98CF8CFF2DCA4B26003BA7BC /* GRY Watch App */,
 			);
 			name = "GRY Watch App";
-			packageProductDependencies = (
-			);
 			productName = "GRY Watch App";
 			productReference = 98CF8CFE2DCA4B26003BA7BC /* GRY Watch App.app */;
 			productType = "com.apple.product-type.application";
@@ -324,8 +322,6 @@
 				98CF8D0D2DCA4B28003BA7BC /* GRY Watch AppTests */,
 			);
 			name = "GRY Watch AppTests";
-			packageProductDependencies = (
-			);
 			productName = "GRY Watch AppTests";
 			productReference = 98CF8D0A2DCA4B28003BA7BC /* GRY Watch AppTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -347,8 +343,6 @@
 				98CF8D172DCA4B28003BA7BC /* GRY Watch AppUITests */,
 			);
 			name = "GRY Watch AppUITests";
-			packageProductDependencies = (
-			);
 			productName = "GRY Watch AppUITests";
 			productReference = 98CF8D142DCA4B28003BA7BC /* GRY Watch AppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";

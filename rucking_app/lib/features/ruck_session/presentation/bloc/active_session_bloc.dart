@@ -17,6 +17,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dar
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 
@@ -142,6 +143,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       );
       emit(initialSessionState);
       AppLogger.info('ActiveSessionRunning state emitted for session $sessionId with plannedDuration: \u001B[33m${initialSessionState.plannedDuration}\u001B[0m seconds');
+
+      // Initialize the watch workout
+      AppLogger.info('Initializing watch workout for session $sessionId');
+      final userPrefs = await GetIt.instance<SharedPreferences>();
+      final bool preferMetric = userPrefs.getBool('use_metric') ?? false;
+      
+      // First start the session with ruck weight
+      await _watchService.startSessionOnWatch(event.ruckWeightKg);
+      
+      // Then send the session ID to the watch
+      await _watchService.sendSessionIdToWatch(sessionId!);
+      
+      AppLogger.info('Watch workout initialized successfully');
 
       // Before starting location tracking, reset the validator state
       _validationService.reset();
