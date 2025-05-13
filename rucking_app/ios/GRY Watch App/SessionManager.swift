@@ -70,22 +70,6 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         }
     }
     
-    func sessionDidBecomeInactive(_ session: WCSession) {
-        // Called when the session has become inactive.
-        // You should stop using the session here and wait for sessionDidDeactivate(_:) to be called.
-        // For example, disable UI related to WatchConnectivity.
-        print(" [WATCH] SessionManager sessionDidBecomeInactive")
-        delegate?.sessionDidDeactivate() // Or a new specific delegate method for inactive
-    }
-    
-    func sessionDidDeactivate(_ session: WCSession) {
-        // Called when the session has been deactivated.
-        // You should re-activate the session here if you want to continue using WatchConnectivity.
-        print(" [WATCH] SessionManager sessionDidDeactivate")
-        // WCSession.default.activate() // Re-activate the session if appropriate for your app.
-        delegate?.sessionDidDeactivate()
-    }
-    
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         delegate?.didReceiveMessage(message)
     }
