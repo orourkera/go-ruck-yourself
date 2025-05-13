@@ -477,25 +477,7 @@ class _SessionRouteMap extends StatelessWidget {
                 ),
               ],
             ),
-            if (points.isNotEmpty)
-              MarkerLayer(
-                markers: [
-                  // Start marker
-                  Marker(
-                    point: points.first,
-                    width: 32,
-                    height: 32,
-                    child: Image.asset('assets/images/map marker.png'),
-                  ),
-                  // End marker
-                  Marker(
-                    point: points.last,
-                    width: 32,
-                    height: 32,
-                    child: Image.asset('assets/images/home pin.png'),
-                  ),
-                ],
-              ),
+
           ],
         ),
       ),
