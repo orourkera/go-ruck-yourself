@@ -95,6 +95,23 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
     
     // Update UI with received metrics
     private func updateMetrics(_ metrics: [String: Any]) {
+        // Update the status label with the duration (timer) value if available
+        if let duration = metrics["duration"] as? Int {
+            let hours = duration / 3600
+            let minutes = (duration % 3600) / 60
+            let seconds = duration % 60
+            
+            // Format as HH:MM:SS if hours > 0, otherwise MM:SS
+            let formattedTime: String
+            if hours > 0 {
+                formattedTime = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+            } else {
+                formattedTime = String(format: "%02d:%02d", minutes, seconds)
+            }
+            
+            statusLabel.setText(formattedTime)
+        }
+        
         if let heartRate = metrics["heartRate"] as? Double {
             heartRateLabel.setText(String(format: "HR: %.0f bpm", heartRate))
         }
