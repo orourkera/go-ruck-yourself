@@ -249,6 +249,7 @@ class WatchService {
     required bool isPaused,
     required int calories,
     required double elevation,
+    double? elevationLoss, // Optional parameter for elevation loss
   }) async {
     try {
       AppLogger.info('[WATCH] Sending updated metrics to watch');
@@ -258,13 +259,16 @@ class WatchService {
           'distance': distance,
           'duration': duration.inSeconds,
           'pace': pace,
-          'isPaused': isPaused,
+          'isPaused': isPaused ? 1 : 0, // Convert bool to int for Swift compatibility
           'calories': calories,
+          // Include both elevation formats for compatibility
           'elevation': elevation,
+          'elevationGain': elevation,
+          'elevationLoss': elevationLoss ?? 0.0, // Use provided loss or default to 0
           if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
         },
       });
-      AppLogger.info('[WATCH] Metrics updated successfully');
+      AppLogger.debug('[WATCH] Metrics updated successfully with calories=$calories, elevation gain=$elevation, loss=${elevationLoss ?? 0.0}');
     } catch (e) {
       AppLogger.error('[WATCH] Failed to send metrics to watch: $e');
     }
@@ -291,29 +295,22 @@ class WatchService {
     
     // First send via WatchConnectivity which is the channel the watch is actually using
     try {
+      // Use the enhanced updateMetricsOnWatch that includes both elevation gain and loss
       await updateMetricsOnWatch(
         distance: distance,
         duration: duration,
         pace: pace,
         isPaused: isPaused,
         calories: calories.toInt(), // Convert to int since updateMetricsOnWatch expects int
-        elevation: elevationGain, // For now just use gain, we'll enhance this below
+        elevation: elevationGain,    // This is for backward compatibility
+        elevationLoss: elevationLoss, // Pass elevation loss directly
       );
       
-      // Also send a more complete metrics update that includes both gain and loss
-      await _sendMessageToWatch({
-        'command': 'updateMetrics',
-        'metrics': {
-          'distance': distance,
-          'duration': duration.inSeconds,
-          'pace': pace,
-          'isPaused': isPaused ? 1 : 0,
-          'calories': calories,
-          'elevationGain': elevationGain,
-          'elevationLoss': elevationLoss,
-          if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
-        },
-      });
+      // Also log detailed debug information to help diagnose any remaining issues
+      AppLogger.debug('[WATCH_SERVICE] Sent metrics update with:');
+      AppLogger.debug('[WATCH_SERVICE] - calories: ${calories.toInt()}');
+      AppLogger.debug('[WATCH_SERVICE] - elevationGain: $elevationGain');
+      AppLogger.debug('[WATCH_SERVICE] - elevationLoss: $elevationLoss');
     } catch (e) {
       AppLogger.error('[WATCH_SERVICE] Failed to send metrics via WatchConnectivity: $e');
       // Continue to try Pigeon anyway
