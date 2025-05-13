@@ -18,6 +18,13 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     @Published var elevationLoss: Double = 0.0
     @Published var distanceValue: Double = 0.0
     @Published var paceValue: Double = 0.0
+    
+    // Split notification properties
+    @Published var showingSplitNotification: Bool = false
+    @Published var splitDistance: String = ""
+    @Published var splitTime: String = ""
+    @Published var totalDistance: String = ""
+    @Published var totalTime: String = ""
 
     var statusText: String {
         // Status now contains the timer
@@ -121,10 +128,21 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         delegate?.didReceiveMessage(message)
+        
+        // Check if this is a split notification
+        if let command = message["command"] as? String, command == "splitNotification" {
+            processSplitNotification(message)
+        }
     }
     
     func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
         delegate?.didReceiveMessage(message)
+        
+        // Check if this is a split notification
+        if let command = message["command"] as? String, command == "splitNotification" {
+            processSplitNotification(message)
+        }
+        
         replyHandler(["received": true])
     }
     
@@ -202,4 +220,34 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             }
         }
     }
-}    
+    
+    // Process a split notification message
+    func processSplitNotification(_ message: [String: Any]) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Extract split notification data
+            if let splitDistance = message["splitDistance"] as? String,
+               let splitTime = message["splitTime"] as? String,
+               let totalDistance = message["totalDistance"] as? String,
+               let totalTime = message["totalTime"] as? String {
+                
+                // Update properties
+                self.splitDistance = splitDistance
+                self.splitTime = splitTime
+                self.totalDistance = totalDistance
+                self.totalTime = totalTime
+                
+                // Show the notification
+                self.showingSplitNotification = true
+                
+                print("[WATCH] Received split notification: \(splitDistance) in \(splitTime)")
+                
+                // Auto-dismiss after 5 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    self.showingSplitNotification = false
+                }
+            }
+        }
+    }
+}
