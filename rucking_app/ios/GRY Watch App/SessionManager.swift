@@ -190,7 +190,24 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 self.isPaused = false
                 print("[WATCH] Session ended from phone")
                 
+            case "updateMetrics":
+                // Extract and process metrics data
+                if let metricsData = message["metrics"] as? [String: Any] {
+                    DispatchQueue.main.async {
+                        self.updateMetricsFromData(metricsData)
+                        print("[WATCH] Updated metrics from message")
+                    }
+                }
+                
             default: break
+            }
+        }
+        
+        // Direct check for metrics in the root object (for backward compatibility)
+        if let metricsData = message["metrics"] as? [String: Any] {
+            DispatchQueue.main.async {
+                self.updateMetricsFromData(metricsData)
+                print("[WATCH] Updated metrics directly from message")
             }
         }
     }
@@ -222,7 +239,24 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 self.isPaused = false
                 print("[WATCH] Session ended from phone (with reply)")
                 
+            case "updateMetrics":
+                // Extract and process metrics data
+                if let metricsData = message["metrics"] as? [String: Any] {
+                    DispatchQueue.main.async {
+                        self.updateMetricsFromData(metricsData)
+                        print("[WATCH] Updated metrics from message (with reply)")
+                    }
+                }
+                
             default: break
+            }
+        }
+        
+        // Direct check for metrics in the root object (for backward compatibility)
+        if let metricsData = message["metrics"] as? [String: Any] {
+            DispatchQueue.main.async {
+                self.updateMetricsFromData(metricsData)
+                print("[WATCH] Updated metrics directly from message (with reply)")
             }
         }
         
