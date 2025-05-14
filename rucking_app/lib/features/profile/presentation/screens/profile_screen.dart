@@ -11,6 +11,8 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -156,39 +158,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 24),
                     
-                    // App settings section
+                    // Settings Section
                     _buildSection(
-                      title: 'App Settings',
+                      title: 'SETTINGS',
                       children: [
+                        // HealthKit Integration
+                        _buildClickableHealthKitItem(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const HealthIntegrationIntroScreen(
+                                  showSkipButton: true,
+                                  navigateToHome: false,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        
+                        const Divider(),
+                        
+                        // Unit Preferences Setting
                         _buildSettingItem(
-                          icon: Icons.language_outlined,
+                          icon: Icons.straighten,
                           label: 'Units',
                           trailing: DropdownButton<String>(
                             value: _selectedUnit,
-                            underline: const SizedBox(),
-                            items: ['Metric', 'Standard']
-                                .map((String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(value),
-                                  );
-                                })
-                                .toList(),
-                            onChanged: (String? newValue) {
-                              if (newValue != null && newValue != _selectedUnit) {
-                                setState(() {
-                                  _selectedUnit = newValue;
-                                });
-                                // Dispatch update event
-                                bool newPreferMetric = newValue == 'Metric';
-                                context.read<AuthBloc>().add(AuthUpdateProfileRequested(
-                                  preferMetric: newPreferMetric,
-                                  username: user.username,
-                                  weightKg: user.weightKg,
-                                  heightCm: user.heightCm,
-                                ));
+                            onChanged: (newValue) {
+                              if (newValue != null) {
+                                setState(() => _selectedUnit = newValue);
+                                // Trigger preference update in Bloc
+                                context.read<AuthBloc>().add(
+                                      UpdateUserPreferMetric(
+                                        user: user,
+                                        preferMetric: newValue == 'Metric',
+                                      ),
+                                    );
                               }
                             },
+                            items: ['Metric', 'Standard']
+                                .map<DropdownMenuItem<String>>((
+                                  String value,
+                                ) =>
+                                    DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value),
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // HealthKit Integration Section with detailed information
+                    _buildSection(
+                      title: 'HEALTHKIT INTEGRATION',
+                      subtitle: 'Health data access and management',
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.withOpacity(0.2)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.medical_services,
+                                    color: Colors.green,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Apple HealthKit',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'This app uses Apple HealthKit to:',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text('• Read heart rate data'),
+                              const Text('• Record workouts and activities'),
+                              const Text('• Track calories burned'),
+                              const Text('• Monitor distance traveled'),
+                              const SizedBox(height: 8),
+                              BlocBuilder<HealthBloc, HealthState>(
+                                builder: (context, state) {
+                                  bool isAuthorized = state is HealthReady;
+                                  return Row(
+                                    children: [
+                                      Text(
+                                        'Status: ',
+                                        style: TextStyle(fontWeight: FontWeight.w500),
+                                      ),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: isAuthorized ? Colors.green : Colors.orange,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          isAuthorized ? 'Connected' : 'Not Connected',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -544,6 +639,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         );
       },
+    );
+  }
+
+  /// Builds a clickable HealthKit item with the HealthKit logo and label
+  Widget _buildClickableHealthKitItem({
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Stack(
+              children: [
+                Icon(
+                  Icons.favorite,
+                  color: Colors.red,
+                  size: 24,
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(1),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                    ),
+                    child: const Icon(
+                      Icons.medical_services,
+                      color: Colors.green,
+                      size: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Row(
+                children: [
+                  Text(
+                    'HealthKit Integration',
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      color: isDark ? Color(0xFF728C69) : AppColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'HealthKit',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: Colors.grey,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
