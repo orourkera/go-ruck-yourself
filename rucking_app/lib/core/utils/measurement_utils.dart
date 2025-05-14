@@ -1,6 +1,7 @@
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:intl/intl.dart';
 
 /// MeasurementUtils centralizes all unit conversions and number
 /// formatting rules so that every widget in the app shows data with
@@ -116,6 +117,34 @@ class MeasurementUtils {
 
   /// Calories formatted as integer string.
   static String formatCalories(int calories) => calories.toString();
+  
+  /// Format a UTC date to the local timezone and locale with specified format.
+  /// Default format is 'MMMM d, yyyy' (e.g. "May 14, 2025")
+  static String formatDate(DateTime utcDateTime, {String format = 'MMMM d, yyyy'}) {
+    // Convert UTC time to local timezone
+    final localDateTime = utcDateTime.toLocal();
+    final dateFormat = DateFormat(format);
+    return dateFormat.format(localDateTime);
+  }
+  
+  /// Format a UTC time to the local timezone and locale with specified format.
+  /// Default format is 'h:mm a' (e.g. "3:30 PM")
+  static String formatTime(DateTime utcDateTime, {String format = 'h:mm a'}) {
+    // Convert UTC time to local timezone
+    final localDateTime = utcDateTime.toLocal();
+    final timeFormat = DateFormat(format);
+    return timeFormat.format(localDateTime);
+  }
+  
+  /// Format a UTC dateTime to a readable representation in local timezone.
+  /// This returns both date and time, separated by a space.
+  /// Useful for showing the full date and time of an event.
+  static String formatDateTime(DateTime utcDateTime, {
+    String dateFormat = 'MMMM d, yyyy',
+    String timeFormat = 'h:mm a',
+  }) {
+    return '${formatDate(utcDateTime, format: dateFormat)} at ${formatTime(utcDateTime, format: timeFormat)}';
+  }
 
   /// Calculates total distance in kilometers from a list of LocationPoints.
   static double totalDistance(List<LocationPoint> points) {
