@@ -50,6 +50,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   
   // Service for tracking distance milestones/splits
   final SplitTrackingService _splitTrackingService;
+  
+  // Flag to track if heart rate monitoring has been started
+  bool _isHeartRateMonitoringStarted = false;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -243,6 +246,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     // Skip if already started to avoid disrupting the connection
     if (_isHeartRateMonitoringStarted) {
       AppLogger.info('Heart rate monitoring already started, skipping initialization');
+      // Even if monitoring is already started, make sure we have active subscriptions
+      _setupHeartRateSubscriptions();
       return;
     }
     
@@ -256,40 +261,84 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     
     // Setup subscriptions for heart rate updates
     _setupHeartRateSubscriptions();
+    
+    // Immediately get the current heart rate if available
+    final currentHr = _heartRateService.latestHeartRate;
+    if (currentHr > 0 && state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      AppLogger.info('Setting initial heart rate value: $currentHr BPM');
+      emit(currentState.copyWith(latestHeartRate: currentHr));
+    }
   }
   
   /// Set up subscriptions to heart rate data streams
   void _setupHeartRateSubscriptions() {
     AppLogger.info('Setting up heart rate stream subscriptions');
     
-    // Listen for individual heart rate updates
+    // First, cancel any existing subscriptions to avoid duplicates
     _heartRateSubscription?.cancel();
+    _heartRateBufferSubscription?.cancel();
+    
+    // Listen for individual heart rate updates
     _heartRateSubscription = _heartRateService.heartRateStream.listen(
       (HeartRateSample sample) {
-        AppLogger.info('Heart rate sample received: ${sample.bpm} BPM at ${sample.timestamp}');
+        AppLogger.info('Heart rate sample received in ActiveSessionBloc: ${sample.bpm} BPM at ${sample.timestamp}');
+        
+        // Only process valid heart rate values
+        if (sample.bpm <= 0) {
+          AppLogger.warning('Ignoring invalid heart rate value: ${sample.bpm}');
+          return;
+        }
+        
         // Update the session state with the latest heart rate
         if (state is ActiveSessionRunning) {
           final currentState = state as ActiveSessionRunning;
-          emit(currentState.copyWith(latestHeartRate: sample.bpm));
+          // Only emit if heart rate has changed to avoid unnecessary renders
+          if (currentState.latestHeartRate != sample.bpm) {
+            AppLogger.info('Updating UI with heart rate: ${sample.bpm} BPM (previous: ${currentState.latestHeartRate})');
+            emit(currentState.copyWith(latestHeartRate: sample.bpm));
+          }
+        } else {
+          AppLogger.warning('Received heart rate update but state is not ActiveSessionRunning: ${state.runtimeType}');
         }
       },
       onError: (error) {
         AppLogger.error('Error in heart rate stream: $error');
+        // Try to recover by reestablishing the subscription
+        Future.delayed(const Duration(seconds: 2), () {
+          AppLogger.info('Attempting to reestablish heart rate subscription after error');
+          _setupHeartRateSubscriptions();
+        });
       },
     );
     
     // Listen for buffered heart rate samples to send to the API
-    _heartRateBufferSubscription?.cancel();
     _heartRateBufferSubscription = _heartRateService.heartRateBufferStream.listen(
       (List<HeartRateSample> samples) {
-        if (state is ActiveSessionRunning && samples.isNotEmpty) {
+        if (samples.isEmpty) return;
+        
+        AppLogger.info('Received heart rate buffer with ${samples.length} samples');
+        
+        if (state is ActiveSessionRunning) {
           _sendHeartRateSamplesToApi(state as ActiveSessionRunning, samples);
+          
+          // Also update the current heart rate from the latest sample
+          final latestSample = samples.last;
+          if (latestSample.bpm > 0) {
+            final currentState = state as ActiveSessionRunning;
+            if (currentState.latestHeartRate != latestSample.bpm) {
+              AppLogger.info('Updating UI with latest buffered heart rate: ${latestSample.bpm} BPM');
+              emit(currentState.copyWith(latestHeartRate: latestSample.bpm));
+            }
+          }
         }
       },
       onError: (error) {
         AppLogger.error('Error in heart rate buffer stream: $error');
       },
     );
+    
+    AppLogger.info('Heart rate stream subscriptions successfully set up');
   }
 
   void _stopHeartRateMonitoring() {
@@ -958,8 +1007,16 @@ emit(ActiveSessionComplete(
   Future<void> close() {
     _locationSubscription?.cancel();
     _heartRateSubscription?.cancel();
+    _heartRateBufferSubscription?.cancel();
     _ticker?.cancel();
     _watchdogTimer?.cancel();
+    
+    // Make sure to stop heart rate monitoring
+    if (_isHeartRateMonitoringStarted) {
+      _heartRateService.stopHeartRateMonitoring();
+      _isHeartRateMonitoringStarted = false;
+    }
+    
     return super.close();
   }
 }

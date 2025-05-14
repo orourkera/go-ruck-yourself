@@ -128,8 +128,18 @@ class HeartRateService {
   void _setupWatchHeartRateSubscription() {
     AppLogger.info('HeartRateService: Setting up watch heart rate subscription');
     
+    // Cancel existing subscription if present to avoid duplicates
+    _watchHeartRateSubscription?.cancel();
+    
     _watchHeartRateSubscription = _watchService.onHeartRateUpdate.listen(
       (heartRate) {
+        AppLogger.info('HeartRateService: Raw heart rate from watch: $heartRate');
+        // Validate heart rate before processing
+        if (heartRate <= 0) {
+          AppLogger.warning('HeartRateService: Invalid heart rate received from watch: $heartRate');
+          return;
+        }
+        
         final sample = HeartRateSample(
           timestamp: DateTime.now(),
           bpm: heartRate.toInt(),
@@ -148,6 +158,8 @@ class HeartRateService {
       },
       cancelOnError: false, // Don't cancel on error to handle reconnects
     );
+    
+    AppLogger.info('HeartRateService: Watch heart rate subscription successfully set up');
   }
   
   /// Set up subscription to HealthKit heart rate updates
@@ -226,24 +238,38 @@ class HeartRateService {
   
   /// Process a heart rate sample from any source
   void _processHeartRateSample(HeartRateSample sample, String source) {
+    // Only process valid heart rate values
+    if (sample.bpm <= 0) {
+      AppLogger.warning('HeartRateService: Ignoring invalid heart rate value: ${sample.bpm} from $source');
+      return;
+    }
+    
     _latestHeartRate = sample.bpm;
     _lastHeartRateTime = DateTime.now(); // Track when we received this sample
     
     AppLogger.info('HeartRateService: Received heart rate update from $source: ${sample.bpm} BPM');
     _hrBuffer.add(sample);
     
-    // Broadcast individual sample
+    // Broadcast individual sample - this is critical for UI updates
     if (!_heartRateController.isClosed) {
       _heartRateController.add(sample);
+      AppLogger.info('HeartRateService: Successfully broadcast heart rate: ${sample.bpm} BPM');
     } else {
       AppLogger.error('HeartRateService: Cannot broadcast heart rate sample - controller is closed!');
       // Try to recover by recreating the controller
       _recreateControllers();
+      // Try to send again after recreation
+      if (!_heartRateController.isClosed) {
+        _heartRateController.add(sample);
+        AppLogger.info('HeartRateService: Broadcast heart rate after controller recreation: ${sample.bpm} BPM');
+      }
     }
     
     // If buffer exceeds threshold, also broadcast buffer update
     if (_hrBuffer.length >= 10) {
-      _bufferController.add(List.unmodifiable(_hrBuffer));
+      if (!_bufferController.isClosed) {
+        _bufferController.add(List.unmodifiable(_hrBuffer));
+      }
     }
   }
   

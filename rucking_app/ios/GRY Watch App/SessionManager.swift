@@ -474,12 +474,9 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             let minutes = (duration % 3600) / 60
             let seconds = duration % 60
             
-            // Format as HH:MM:SS if hours > 0, otherwise MM:SS
-            if hours > 0 {
-                self.status = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
-            } else {
-                self.status = String(format: "%02d:%02d", minutes, seconds)
-            }
+            // Always use HH:MM:SS format for consistency regardless of duration
+            // This prevents the UI from "wrapping" when going over an hour
+            self.status = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         }
     }
     
