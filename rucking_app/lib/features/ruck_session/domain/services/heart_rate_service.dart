@@ -12,8 +12,8 @@ class HeartRateService {
   final HealthService _healthService;
 
   // Stream controllers to expose heart rate data
-  final _heartRateController = StreamController<HeartRateSample>.broadcast();
-  final _bufferController = StreamController<List<HeartRateSample>>.broadcast();
+  StreamController<HeartRateSample> _heartRateController = StreamController<HeartRateSample>.broadcast();
+  StreamController<List<HeartRateSample>> _bufferController = StreamController<List<HeartRateSample>>.broadcast();
 
   // Subscriptions to source streams
   StreamSubscription? _watchHeartRateSubscription;
@@ -27,6 +27,15 @@ class HeartRateService {
   
   // Current heart rate value
   int _latestHeartRate = 0;
+  
+  // Flag to track if we're currently attempting a reconnection
+  bool _isReconnecting = false;
+  
+  // Timer to detect and recover from lost connections
+  Timer? _watchdogTimer;
+  
+  // Track the last time we received a heart rate update
+  DateTime? _lastHeartRateTime;
 
   /// Stream of individual heart rate updates
   Stream<HeartRateSample> get heartRateStream => _heartRateController.stream;
@@ -70,6 +79,24 @@ class HeartRateService {
     
     // Set up check to detect and recover from lost connections
     _startConnectionWatchdog();
+    
+    // Get initial heart rate from HealthKit if available
+    await _fetchInitialHeartRate();
+  }
+  
+  /// Stop heart rate monitoring
+  void stopHeartRateMonitoring() {
+    _watchHeartRateSubscription?.cancel();
+    _healthHeartRateSubscription?.cancel();
+    
+    // Cancel the watchdog timer
+    _watchdogTimer?.cancel();
+    
+    _watchHeartRateSubscription = null;
+    _healthHeartRateSubscription = null;
+    _watchdogTimer = null;
+    
+    AppLogger.info('HeartRateService: Heart rate monitoring stopped');
   }
   
   /// Reset all subscriptions to ensure clean state
@@ -162,16 +189,8 @@ class HeartRateService {
     });
   }
   
-  // Flag to track if we're currently attempting a reconnection
-  bool _isReconnecting = false;
-  
-  // Timer to detect and recover from lost connections
-  Timer? _watchdogTimer;
-  
-  // Track the last time we received a heart rate update
-  DateTime? _lastHeartRateTime;
-
-    // Get initial heart rate from HealthKit if available
+  /// Get initial heart rate from HealthKit if available
+  Future<void> _fetchInitialHeartRate() async {
     try {
       final initialHr = await _healthService.getHeartRate();
       if (initialHr != null && initialHr > 0) {
@@ -188,7 +207,7 @@ class HeartRateService {
       AppLogger.error('HeartRateService: Error fetching initial heart rate: $e');
     }
   }
-
+  
   /// Process a heart rate sample from any source
   void _processHeartRateSample(HeartRateSample sample, String source) {
     _latestHeartRate = sample.bpm;
@@ -228,7 +247,7 @@ class HeartRateService {
       AppLogger.info('HeartRateService: Buffer controller recreated');
     }
   }
-
+  
   /// Flush the heart rate buffer to listeners
   Future<void> flushHeartRateBuffer() async {
     if (_hrBuffer.isEmpty) return;
@@ -240,13 +259,13 @@ class HeartRateService {
       AppLogger.error('HeartRateService: Failed to flush heart rate buffer: $e');
     }
   }
-
+  
   /// Clear the heart rate buffer
   void clearHeartRateBuffer() {
     _hrBuffer.clear();
     _lastHrFlush = DateTime.now();
   }
-
+  
   /// Check if the buffer should be flushed based on time
   bool shouldFlushBuffer() {
     if (_hrBuffer.isEmpty) return false;
@@ -254,7 +273,7 @@ class HeartRateService {
     return _lastHrFlush == null || 
            DateTime.now().difference(_lastHrFlush!) > const Duration(seconds: 5);
   }
-
+  
   /// Update heart rate from an external source (like direct input)
   void updateHeartRate(int heartRate) {
     final sample = HeartRateSample(
@@ -263,25 +282,10 @@ class HeartRateService {
     );
     _processHeartRateSample(sample, 'External');
   }
-
-  /// Stop heart rate monitoring
-  void stopHeartRateMonitoring() {
-    _watchHeartRateSubscription?.cancel();
-    _healthHeartRateSubscription?.cancel();
-    
-    _watchHeartRateSubscription = null;
-    _healthHeartRateSubscription = null;
-    
-    AppLogger.info('HeartRateService: Heart rate monitoring stopped');
-  }
-
+  
   /// Dispose all resources
   void dispose() {
     stopHeartRateMonitoring();
-    
-    // Cancel the watchdog timer
-    _watchdogTimer?.cancel();
-    _watchdogTimer = null;
     
     // Reset reconnection state
     _isReconnecting = false;

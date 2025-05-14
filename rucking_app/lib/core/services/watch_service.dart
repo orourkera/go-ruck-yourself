@@ -452,7 +452,7 @@ class WatchService {
   void handleWatchHeartRateUpdate(double heartRate) {
     _currentHeartRate = heartRate;
     // Always log heart rate updates for debugging
-    AppLogger.info('[WATCH_SERVICE] Broadcasting heart rate update: $heartRate BPM to ${_heartRateController.hasListener ? _heartRateController.length : 0} listeners');
+    AppLogger.info('[WATCH_SERVICE] Broadcasting heart rate update: $heartRate BPM to listeners');
     
     if (_isSessionActive) {
       _healthService.updateHeartRate(heartRate);
