@@ -15,6 +15,7 @@ import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,8 +31,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final LocationService _locationService;
   final HealthService _healthService;
   final WatchService _watchService;
+  final HeartRateService _heartRateService;
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
+  StreamSubscription<List<HeartRateSample>>? _heartRateBufferSubscription;
   Timer? _ticker;
   Timer? _watchdogTimer;
   DateTime _lastTickTime = DateTime.now();
@@ -39,7 +42,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final SessionValidationService _validationService = SessionValidationService();
   LocationPoint? _lastValidLocation;
   int _validLocationCount = 0;
-  int _latestHeartRate = 0;
   // Local dumb timer counters
   int _elapsedCounter = 0; // seconds since session start minus pauses
   int _ticksSinceTruth = 0;
@@ -54,11 +56,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required LocationService locationService,
     required HealthService healthService,
     required WatchService watchService,
+    required HeartRateService heartRateService,
     required SplitTrackingService splitTrackingService,
   }) : _apiClient = apiClient,
        _locationService = locationService,
        _healthService = healthService,
        _watchService = watchService,
+       _heartRateService = heartRateService,
        _splitTrackingService = splitTrackingService,
        super(ActiveSessionInitial()) {
     on<SessionStarted>(_onSessionStarted);
@@ -67,7 +71,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<SessionResumed>(_onSessionResumed);
     on<SessionCompleted>(_onSessionCompleted);
     on<SessionFailed>(_onSessionFailed);
-    on<HeartRateUpdated>(_onHeartRateUpdated);
     on<Tick>(_onTick);
     on<SessionErrorCleared>(_onSessionErrorCleared);
     on<TimerStarted>(_onTimerStarted);
@@ -166,6 +169,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _ticksSinceTruth = 0;
       await _startHeartRateMonitoring();
       AppLogger.info('Location, heart rate started for session $sessionId');
+      // Verify heart rate subscription status
+      if (_heartRateSubscription == null) {
+        AppLogger.warning('Heart rate subscription is null after start attempt for session $sessionId');
+        await _startHeartRateMonitoring();
+      } else {
+        AppLogger.info('Heart rate subscription confirmed active for session $sessionId');
+      }
     } catch (e, stackTrace) {
       final String RuckIdForError = sessionId ?? "unknown";
       AppLogger.error('Failed to start session $RuckIdForError: $e. StackTrace: $stackTrace');
@@ -221,46 +231,39 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _startHeartRateMonitoring() async {
-    AppLogger.info('Starting heart rate monitoring...');
+    AppLogger.info('Starting heart rate monitoring via HeartRateService...');
     
-    // Ensure HealthKit permissions are granted once per app session
-    if (!_healthService.isAuthorized) {
-      final granted = await _healthService.requestAuthorization();
-      if (!granted) {
-        AppLogger.warning('Health authorization denied – heart-rate stream disabled');
-        return; // Do not start subscription without permission
-      }
-    }
+    // Start the heart rate service which handles both Watch and HealthKit
+    await _heartRateService.startHeartRateMonitoring();
     
-    _heartRateSubscription?.cancel(); // Cancel previous subscription if any
-    _heartRateSubscription = _healthService.heartRateStream.listen(
+    // Listen for individual heart rate updates
+    _heartRateSubscription?.cancel();
+    _heartRateSubscription = _heartRateService.heartRateStream.listen(
       (HeartRateSample sample) {
         AppLogger.info('Heart rate sample received: ${sample.bpm} BPM at ${sample.timestamp}');
-        add(HeartRateUpdated(sample));
+        // Update the session state with the latest heart rate
+        if (state is ActiveSessionRunning) {
+          final currentState = state as ActiveSessionRunning;
+          emit(currentState.copyWith(latestHeartRate: sample.bpm));
+        }
       },
       onError: (error) {
         AppLogger.error('Error in heart rate stream: $error');
       },
-      onDone: () {
-        AppLogger.info('Heart rate stream closed.');
+    );
+    
+    // Listen for buffered heart rate samples to send to the API
+    _heartRateBufferSubscription?.cancel();
+    _heartRateBufferSubscription = _heartRateService.heartRateBufferStream.listen(
+      (List<HeartRateSample> samples) {
+        if (state is ActiveSessionRunning && samples.isNotEmpty) {
+          _sendHeartRateSamplesToApi(state as ActiveSessionRunning, samples);
+        }
+      },
+      onError: (error) {
+        AppLogger.error('Error in heart rate buffer stream: $error');
       },
     );
-
-    // Seed with immediate reading in case stream takes a few seconds
-    try {
-      final initialHr = await _healthService.getHeartRate();
-      if (initialHr != null && initialHr > 0) {
-        AppLogger.info('Initial heart rate fetched: $initialHr BPM');
-        add(HeartRateUpdated(HeartRateSample(
-          timestamp: DateTime.now(),
-          bpm: initialHr.round(),
-        )));
-      } else {
-        AppLogger.info('Initial heart rate not available');
-      }
-    } catch (e) {
-      AppLogger.error('Error fetching initial heart rate: $e');
-    }
   }
 
   void _stopHeartRateMonitoring() {
@@ -776,12 +779,12 @@ emit(ActiveSessionComplete(
   ) {
     AppLogger.error('Session failed: ${event.errorMessage}');
     
-    // Cancel location subscription
+    // Clean up
+    _ticker?.cancel();
+    _watchdogTimer?.cancel();
     _locationSubscription?.cancel();
-    _locationSubscription = null;
-    _heartRateSubscription?.cancel();
-    _heartRateSubscription = null;
-    _stopTicker();
+    _heartRateService.stopHeartRateMonitoring();
+    _heartRateService.clearHeartRateBuffer();
     
     // Emit failure state
     emit(ActiveSessionFailure(
@@ -789,43 +792,21 @@ emit(ActiveSessionComplete(
     ));
   }
 
-  List<HeartRateSample> _hrBuffer = [];
-  DateTime? _lastHrFlush;
-
-  Future<void> _onHeartRateUpdated(
-    HeartRateUpdated event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
-    _latestHeartRate = event.sample.bpm;
-    final currentState = state;
-    if (currentState is ActiveSessionRunning) {
-      AppLogger.info('HeartRateUpdated event: ${event.sample.bpm} BPM at ${event.sample.timestamp}');
-      _hrBuffer.add(event.sample);
-      emit(currentState.copyWith(latestHeartRate: _latestHeartRate));
-      if (_hrBuffer.length > 10) {
-        await _flushHeartRateBuffer(currentState);
-      }
-    } else {
-      AppLogger.warning('HeartRateUpdated event received but session is not running. Current state: $currentState');
-    }
-  }
-
-  Future<void> _flushHeartRateBuffer(ActiveSessionRunning currentState) async {
-    if (_hrBuffer.isEmpty || currentState.sessionId.isEmpty) return;
+  Future<void> _sendHeartRateSamplesToApi(ActiveSessionRunning currentState, List<HeartRateSample> samples) async {
+    if (samples.isEmpty || currentState.sessionId.isEmpty) return;
     try {
       await _apiClient.post(
         '/rucks/${currentState.sessionId}/heart_rate',
         {
-          'samples': _hrBuffer.map((s) => {
+          'samples': samples.map((s) => {
             'timestamp': s.timestamp.toIso8601String(),
             'bpm': s.bpm,
           }).toList(),
         },
       );
-      _hrBuffer.clear();
-      _lastHrFlush = DateTime.now();
+      AppLogger.info('Sent ${samples.length} heart rate samples to API');
     } catch (e) {
-      AppLogger.error('Failed to send heart rate samples: $e');
+      AppLogger.error('Failed to send heart rate samples to API: $e');
     }
   }
 
@@ -837,11 +818,9 @@ emit(ActiveSessionComplete(
     if (state is! ActiveSessionRunning) return;
     final currentState = state as ActiveSessionRunning;
 
-    // Flush heart-rate buffer every 5 seconds
-    if (_hrBuffer.isNotEmpty &&
-        (_lastHrFlush == null ||
-            DateTime.now().difference(_lastHrFlush!) > const Duration(seconds: 5))) {
-      await _flushHeartRateBuffer(currentState);
+    // Check if heart rate service buffer needs flushing
+    if (_heartRateService.shouldFlushBuffer()) {
+      await _heartRateService.flushHeartRateBuffer();
     }
 
     _elapsedCounter++;
