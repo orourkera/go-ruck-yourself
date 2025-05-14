@@ -31,6 +31,9 @@ class HeartRateService {
   // Flag to track if we're currently attempting a reconnection
   bool _isReconnecting = false;
   
+  // Flag to track if monitoring has been started
+  bool _isMonitoringStarted = false;
+  
   // Timer to detect and recover from lost connections
   Timer? _watchdogTimer;
   
@@ -57,6 +60,12 @@ class HeartRateService {
 
   /// Start monitoring heart rate from all available sources
   Future<void> startHeartRateMonitoring() async {
+    // If monitoring is already started, don't initialize again to avoid disrupting existing connections
+    if (_isMonitoringStarted) {
+      AppLogger.info('HeartRateService: Heart rate monitoring already active, skipping initialization');
+      return;
+    }
+    
     AppLogger.info('HeartRateService: Starting heart rate monitoring...');
     
     // Ensure HealthKit permissions are granted once per app session
@@ -82,6 +91,10 @@ class HeartRateService {
     
     // Get initial heart rate from HealthKit if available
     await _fetchInitialHeartRate();
+    
+    // Mark monitoring as started
+    _isMonitoringStarted = true;
+    AppLogger.info('HeartRateService: Heart rate monitoring successfully started');
   }
   
   /// Stop heart rate monitoring
@@ -95,6 +108,9 @@ class HeartRateService {
     _watchHeartRateSubscription = null;
     _healthHeartRateSubscription = null;
     _watchdogTimer = null;
+    
+    // Reset monitoring flag
+    _isMonitoringStarted = false;
     
     AppLogger.info('HeartRateService: Heart rate monitoring stopped');
   }

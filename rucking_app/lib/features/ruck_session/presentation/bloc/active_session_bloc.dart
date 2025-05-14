@@ -167,12 +167,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _startLocationTracking(emit);
       _elapsedCounter = 0;
       _ticksSinceTruth = 0;
-      await _startHeartRateMonitoring();
+      if (!_isHeartRateMonitoringStarted) {
+        await _startHeartRateMonitoring();
+        _isHeartRateMonitoringStarted = true;
+      }
       AppLogger.info('Location, heart rate started for session $sessionId');
       // Verify heart rate subscription status
       if (_heartRateSubscription == null) {
-        AppLogger.warning('Heart rate subscription is null after start attempt for session $sessionId');
-        await _startHeartRateMonitoring();
+        AppLogger.warning('Heart rate subscription was null after session start!');
+        if (!_isHeartRateMonitoringStarted) {
+          await _startHeartRateMonitoring();
+        } else {
+          AppLogger.warning('Heart rate monitoring was marked as started but subscription is null - reconnecting');
+          // Just reconnect the subscription without reinitializing the service
+          _setupHeartRateSubscriptions();
+        }
       } else {
         AppLogger.info('Heart rate subscription confirmed active for session $sessionId');
       }
@@ -231,10 +240,27 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _startHeartRateMonitoring() async {
+    // Skip if already started to avoid disrupting the connection
+    if (_isHeartRateMonitoringStarted) {
+      AppLogger.info('Heart rate monitoring already started, skipping initialization');
+      return;
+    }
+    
     AppLogger.info('Starting heart rate monitoring via HeartRateService...');
     
     // Start the heart rate service which handles both Watch and HealthKit
     await _heartRateService.startHeartRateMonitoring();
+    
+    // Mark as started
+    _isHeartRateMonitoringStarted = true;
+    
+    // Setup subscriptions for heart rate updates
+    _setupHeartRateSubscriptions();
+  }
+  
+  /// Set up subscriptions to heart rate data streams
+  void _setupHeartRateSubscriptions() {
+    AppLogger.info('Setting up heart rate stream subscriptions');
     
     // Listen for individual heart rate updates
     _heartRateSubscription?.cancel();
@@ -267,9 +293,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   void _stopHeartRateMonitoring() {
-    AppLogger.info('Stopping heart rate monitoring...');
     _heartRateSubscription?.cancel();
     _heartRateSubscription = null;
+    _heartRateBufferSubscription?.cancel();
+    _heartRateBufferSubscription = null;
+    
+    // Reset the flag to allow restarting heart rate monitoring in a new session
+    _isHeartRateMonitoringStarted = false;
+    
+    AppLogger.info('Heart rate monitoring stopped');
   }
 
   void _startTicker() {
