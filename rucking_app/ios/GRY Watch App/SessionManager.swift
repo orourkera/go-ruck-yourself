@@ -123,8 +123,9 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         isPaused = true
         
         // Send pause command to the iPhone app
-        let message: [String: Any] = ["command": "pauseSession", "action": "pauseSession"]
+        let message: [String: Any] = ["command": "pauseSession"]
         sendMessage(message)
+        print("[WATCH] Pause command sent to iPhone")
     }
     
     // Resume the session from the watch
@@ -135,8 +136,9 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         isPaused = false
         
         // Send resume command to the iPhone app
-        let message: [String: Any] = ["command": "resumeSession", "action": "resumeSession"]
+        let message: [String: Any] = ["command": "resumeSession"]
         sendMessage(message)
+        print("[WATCH] Resume command sent to iPhone")
     }
     
     // Toggle between pause and resume
