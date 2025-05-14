@@ -386,8 +386,8 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
     
     // Flag to track if we've logged error about event sink recently
     private static var lastErrorLogTime: Date?
-    private static var lastHeartRateSent: Double?
-    private static var lastHeartRateSentTime: Date?
+    static var lastHeartRateSent: Double?
+    static var lastHeartRateSentTime: Date?
     
     // Buffer for heart rates received when sink is unavailable
     private static var pendingHeartRates: [Double] = []
