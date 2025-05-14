@@ -31,17 +31,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final isAuthenticated = await _authRepository.isAuthenticated();
       
       if (isAuthenticated) {
-        final user = await _authRepository.getCurrentUser();
-        if (user != null) {
-          emit(Authenticated(user));
-        } else {
+        try {
+          final user = await _authRepository.getCurrentUser();
+          if (user != null) {
+            emit(Authenticated(user));
+          } else {
+            // If we can't get a user despite being "authenticated", force logout
+            await _authRepository.logout();
+            emit(Unauthenticated());
+          }
+        } catch (e) {
+          // If we get an error while trying to get the current user,
+          // force a logout and re-authentication
+          AppLogger.error('[AuthBloc] Error getting current user: $e');
+          await _authRepository.logout();
           emit(Unauthenticated());
         }
       } else {
         emit(Unauthenticated());
       }
     } catch (e) {
-      emit(AuthError('Failed to check authentication status: $e'));
+      AppLogger.error('[AuthBloc] Auth check error: $e');
+      // Force logout if there's any authentication-related error
+      await _authRepository.logout();
+      emit(Unauthenticated());
     }
   }
 
@@ -94,6 +107,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         weightKg: event.weightKg,
         heightCm: event.heightCm,
         dateOfBirth: event.dateOfBirth,
+        gender: event.gender,
       );
       
       emit(Authenticated(user));
@@ -138,6 +152,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           heightCm: event.heightCm,
           preferMetric: event.preferMetric,
           allowRuckSharing: event.allowRuckSharing,
+          gender: event.gender,
         );
         emit(Authenticated(updatedUser)); // Emit new state with updated user
       } catch (e) {

@@ -30,6 +30,9 @@ class User extends Equatable {
   /// Whether the user allows their rucks to be shared in the Ruck Buddies feed
   final bool allowRuckSharing;
   
+  /// User's gender: 'male', 'female', 'other', or null if unspecified
+  final String? gender;
+  
   /// User stats information
   final UserStats? stats;
 
@@ -44,6 +47,7 @@ class User extends Equatable {
     this.createdAt,
     required this.preferMetric,
     this.allowRuckSharing = true,
+    this.gender,
     this.stats,
   });
   
@@ -58,6 +62,7 @@ class User extends Equatable {
     String? createdAt,
     bool? preferMetric,
     bool? allowRuckSharing,
+    String? gender,
     UserStats? stats,
   }) {
     return User(
@@ -70,6 +75,7 @@ class User extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       preferMetric: preferMetric ?? this.preferMetric,
       allowRuckSharing: allowRuckSharing ?? this.allowRuckSharing,
+      gender: gender ?? this.gender,
       stats: stats ?? this.stats,
     );
   }
@@ -109,6 +115,7 @@ class User extends Equatable {
       createdAt: json['created_at'] as String?,
       preferMetric: json['prefer_metric'] as bool? ?? true,
       allowRuckSharing: json['allow_ruck_sharing'] as bool? ?? true,
+      gender: json['gender'] as String?,
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
@@ -133,13 +140,14 @@ class User extends Equatable {
     if (heightCm != null) data['height_cm'] = heightCm;
     if (dateOfBirth != null) data['date_of_birth'] = dateOfBirth;
     if (createdAt != null) data['created_at'] = createdAt;
+    if (gender != null) data['gender'] = gender;
     if (stats != null) data['stats'] = stats!.toJson();
     return data;
   }
   
   @override
   List<Object?> get props => [
-    userId, email, username, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, stats
+    userId, email, username, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, allowRuckSharing, gender, stats
   ];
 }
 

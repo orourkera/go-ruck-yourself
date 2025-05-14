@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'package:dartz/dartz.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart'; 
+import 'package:logger/logger.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/config/app_config.dart';
@@ -19,6 +24,7 @@ abstract class AuthService {
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
+    String? gender,
   });
   
   /// Sign out the current user
@@ -46,6 +52,7 @@ abstract class AuthService {
     double? heightCm,
     bool? preferMetric,
     bool? allowRuckSharing,
+    String? gender,
   });
 
   /// Delete the current user's account
@@ -105,6 +112,7 @@ class AuthServiceImpl implements AuthService {
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
+    String? gender,
   }) async {
     try {
       final response = await _apiClient.post(
@@ -117,6 +125,7 @@ class AuthServiceImpl implements AuthService {
           if (weightKg != null) 'weight_kg': weightKg,
           if (heightCm != null) 'height_cm': heightCm,
           if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
+          if (gender != null) 'gender': gender,
         },
       );
       
@@ -175,11 +184,10 @@ class AuthServiceImpl implements AuthService {
     }
 
     try {
-      // Get profile data from API using userId
-      final profileResponse = await _apiClient.get('/users/profile'); // This uses g.user.id on backend
+      // Fetch the latest user profile
+      final profileResponse = await _apiClient.get('/users/profile');
       
       final userFromProfile = User.fromJson(profileResponse);
-      
       // Update stored user data (might overwrite email if missing from profile)
       await _storageService.setObject(AppConfig.userProfileKey, userFromProfile.toJson());
       userToReturn = userFromProfile;
@@ -274,6 +282,7 @@ class AuthServiceImpl implements AuthService {
     double? heightCm,
     bool? preferMetric,
     bool? allowRuckSharing,
+    String? gender,
   }) async {
     try {
       final data = <String, dynamic>{};
@@ -282,6 +291,7 @@ class AuthServiceImpl implements AuthService {
       if (heightCm != null) data['height_cm'] = heightCm;
       if (preferMetric != null) data['preferMetric'] = preferMetric;
       if (allowRuckSharing != null) data['allow_ruck_sharing'] = allowRuckSharing;
+      if (gender != null) data['gender'] = gender;
       
       // Only send request if there is data to update
       if (data.isEmpty) {

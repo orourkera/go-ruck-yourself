@@ -712,6 +712,30 @@ class _RouteMapState extends State<_RouteMap> {
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a));
     return earthRadius * c;
   }
+  
+  double _toRadians(double degrees) => degrees * math.pi / 180.0;
+  
+  /// Build a gender-specific map marker based on the user's gender
+  Widget _buildGenderSpecificMarker() {
+    // Get user gender from AuthBloc if available
+    String? userGender;
+    try {
+      final authBloc = GetIt.instance<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        userGender = (authBloc.state as Authenticated).user.gender;
+      }
+    } catch (e) {
+      // If auth bloc is not available, continue with default marker
+      debugPrint('Could not get user gender for map marker: $e');
+    }
+    
+    // Determine which marker image to use based on gender
+    final String markerImagePath = (userGender == 'female')
+        ? 'assets/images/map_marker_lady.png' // Female version
+        : 'assets/images/map marker.png'; // Default/male version
+    
+    return Image.asset(markerImagePath);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -784,7 +808,7 @@ class _RouteMapState extends State<_RouteMap> {
                         point: widget.route.isNotEmpty ? widget.route.last : widget.initialCenter!,
                         width: 40,
                         height: 40,
-                        child: Image.asset('assets/images/map marker.png'),
+                        child: _buildGenderSpecificMarker(),
                       ),
                     ],
                   ),

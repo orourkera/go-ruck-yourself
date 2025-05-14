@@ -158,6 +158,7 @@ class MetCalculator {
   /// - [elapsedSeconds]: Total elapsed time in seconds
   /// - [elevationGain]: Total elevation gain in meters
   /// - [elevationLoss]: Total elevation loss in meters
+  /// - [gender]: User's gender ('male', 'female', or null) - affects calorie calculations
   ///
   /// Returns: Calories burned as a double
   static double calculateRuckingCalories({
@@ -167,6 +168,7 @@ class MetCalculator {
     required int elapsedSeconds,
     double elevationGain = 0.0,
     double elevationLoss = 0.0,
+    String? gender,
   }) {
     // Calculate average speed (km/h)
     double durationHours = elapsedSeconds / 3600.0;
@@ -191,11 +193,41 @@ class MetCalculator {
     );
 
     double durationMinutes = elapsedSeconds / 60.0;
-    return calculateCaloriesBurned(
+    
+    // Calculate base calories using MET formula
+    double baseCalories = calculateCaloriesBurned(
       weightKg: userWeightKg + ruckWeightKg,
       durationMinutes: durationMinutes,
       metValue: metValue,
     );
+    
+    // Apply gender-based adjustment for more accurate calculations
+    // Female and male bodies metabolize calories differently due to body composition differences
+    double genderAdjustedCalories = baseCalories;
+    if (gender == 'female') {
+      // Female adjustment: approx. 15-20% lower calorie burn due to
+      // differences in body composition (more fat, less muscle)
+      // and lower basal metabolic rate
+      genderAdjustedCalories = baseCalories * 0.85; // 15% reduction
+      
+      debugPrint('Gender-adjusted calories (female): ${genderAdjustedCalories.toStringAsFixed(2)} ' +
+                'from base: ${baseCalories.toStringAsFixed(2)}');
+    } else if (gender == 'male') {
+      // Male baseline - no adjustment needed as the formulas are typically
+      // based on male physiological data
+      genderAdjustedCalories = baseCalories;
+      
+      debugPrint('Gender-adjusted calories (male): ${genderAdjustedCalories.toStringAsFixed(2)} ' +
+                'from base: ${baseCalories.toStringAsFixed(2)}');
+    } else {
+      // If gender is not specified, use a middle ground (7.5% reduction)
+      genderAdjustedCalories = baseCalories * 0.925;
+      
+      debugPrint('Gender-adjusted calories (unspecified): ${genderAdjustedCalories.toStringAsFixed(2)} ' +
+                'from base: ${baseCalories.toStringAsFixed(2)}');
+    }
+    
+    return genderAdjustedCalories;
   }
 }
 

@@ -37,6 +37,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isConfirmPasswordVisible = false;
   bool _preferMetric = false; // Default to Standard (lbs)
   bool _acceptTerms = false;
+  String? _selectedGender; // For gender selection dropdown
 
   @override
   void dispose() {
@@ -82,6 +83,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           preferMetric: _preferMetric,
           heightCm: null,
           dateOfBirth: null,
+          gender: _selectedGender,
         ),
       );
     }
@@ -379,6 +381,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Gender selection dropdown
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark 
+                            ? Colors.grey[800] 
+                            : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedGender,
+                        decoration: InputDecoration(
+                          labelText: 'Gender',
+                          prefixIcon: const Icon(Icons.person_outline),
+                          border: InputBorder.none,
+                        ),
+                        items: [
+                          DropdownMenuItem(value: 'male', child: Text('Male')),
+                          DropdownMenuItem(value: 'female', child: Text('Female')),
+                          DropdownMenuItem(value: 'other', child: Text('Other')),
+                          DropdownMenuItem(value: null, child: Text('Prefer not to say')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedGender = value;
+                          });
+                        },
+                        hint: Text('Select your gender'),
+                        isExpanded: true,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Explanation text for gender, weight, and height fields
+                    Text(
+                      'Gender and weight information helps calculate calories more accurately and personalize your experience.',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
                     // Terms and Conditions Checkbox

@@ -141,20 +141,46 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Stats',
           ),
           BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/profile.png',
-              width: 48,
-              height: 48,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/profile_active.png',
-              width: 48,
-              height: 48,
-            ),
+            icon: _buildProfileIcon(false),
+            activeIcon: _buildProfileIcon(true),
             label: 'Profile',
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileIcon(bool isActive) {
+    // Get user gender from AuthBloc if available
+    String? userGender;
+    try {
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        userGender = (authBloc.state as Authenticated).user.gender;
+      }
+    } catch (e) {
+      // If auth bloc is not available, continue with default icon
+      debugPrint('Could not get user gender for profile icon: $e');
+    }
+    
+    // Determine which icon to use based on gender and active state
+    String iconPath;
+    if (userGender == 'female') {
+      // Female icon based on active state
+      iconPath = isActive 
+          ? 'assets/images/lady rucker profile active.png'
+          : 'assets/images/lady rucker profile.png';
+    } else {
+      // Default/male icon based on active state
+      iconPath = isActive 
+          ? 'assets/images/profile_active.png'
+          : 'assets/images/profile.png';
+    }
+    
+    return Image.asset(
+      iconPath,
+      width: 48,
+      height: 48,
     );
   }
 }
