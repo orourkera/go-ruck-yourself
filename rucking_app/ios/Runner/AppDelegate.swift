@@ -241,6 +241,16 @@ import WatchConnectivity
     
     // Receive and process messages from the Watch
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
+        processWatchMessage(message: message, replyHandler: nil)
+    }
+    
+    // Receive and process messages from the Watch that require a reply
+    func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
+        processWatchMessage(message: message, replyHandler: replyHandler)
+    }
+    
+    // Common processing function for both message types
+    private func processWatchMessage(message: [String: Any], replyHandler: (([String: Any]) -> Void)?) {
         // Handle message commands
         if let command = message["command"] as? String {
             print("[WATCH] Received command from Watch: \(command)")
@@ -259,9 +269,16 @@ import WatchConnectivity
                 watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "pauseSession"]) { result in
                     if let error = result as? FlutterError {
                         print("[WATCH] Error forwarding pause command to Flutter: \(error.message ?? "unknown error")")
+                        // Send error back if reply handler exists
+                        replyHandler?(["error": error.message ?? "unknown error"])
                     } else {
                         print("[WATCH] Successfully forwarded pause command to Flutter")
-                        self.sendMessageToWatch(["command": "pauseConfirmed"])
+                        // Use reply handler if available, otherwise send a regular message
+                        if let replyHandler = replyHandler {
+                            replyHandler(["status": "success", "command": "pauseConfirmed"])
+                        } else {
+                            self.sendMessageToWatch(["command": "pauseConfirmed"])
+                        }
                     }
                 }
             case "resumeSession":
@@ -269,15 +286,24 @@ import WatchConnectivity
                 watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "resumeSession"]) { result in
                     if let error = result as? FlutterError {
                         print("[WATCH] Error forwarding resume command to Flutter: \(error.message ?? "unknown error")")
+                        // Send error back if reply handler exists
+                        replyHandler?(["error": error.message ?? "unknown error"])
                     } else {
                         print("[WATCH] Successfully forwarded resume command to Flutter")
-                        self.sendMessageToWatch(["command": "resumeConfirmed"])
+                        if let replyHandler = replyHandler {
+                            replyHandler(["status": "success", "command": "resumeConfirmed"])
+                        } else {
+                            self.sendMessageToWatch(["command": "resumeConfirmed"])
+                        }
                     }
                 }
             case "watchHeartRateUpdate":
                 if let heartRate = message["heartRate"] as? Double {
                     print("[WATCH] Heart rate update command received: \(heartRate) BPM")
                     HeartRateStreamHandler.sendHeartRate(heartRate)
+                    
+                    // Acknowledge the heart rate reception if reply handler is available
+                    replyHandler?(["status": "success", "heartRateReceived": heartRate])
                 }
             default:
                 print("[WATCH] Unknown command: \(command)")
