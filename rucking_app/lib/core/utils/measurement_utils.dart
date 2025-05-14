@@ -89,13 +89,13 @@ class MeasurementUtils {
     return '+${gain.round()}${metric ? 'm' : 'ft'}/-${loss.round()}${metric ? 'm' : 'ft'}';
   }
 
-  /// Weight formatted to the nearest whole number + unit label.
+  /// Weight formatted with one decimal place + unit label.
   static String formatWeight(double kg, {required bool metric}) {
     if (metric) {
       return '${kg.toStringAsFixed(1)} kg'; // Show one decimal place for metric
     } else {
       final lbs = kg * AppConfig.kgToLbs;
-      return '${lbs.round()} lbs'; // Round to whole number for standard
+      return '${lbs.toStringAsFixed(1)} lbs'; // Show one decimal place for imperial too
     }
   }
   

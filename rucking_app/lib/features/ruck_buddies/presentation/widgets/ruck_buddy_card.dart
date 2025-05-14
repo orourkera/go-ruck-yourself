@@ -68,7 +68,7 @@ class RuckBuddyCard extends StatelessWidget {
                 Chip(
                   backgroundColor: AppColors.secondary,
                   label: Text(
-                    _formatWeight(ruckBuddy.ruckWeightKg, preferMetric),
+                    MeasurementUtils.formatWeight(ruckBuddy.ruckWeightKg, metric: preferMetric),
                     style: AppTextStyles.labelMedium.copyWith(
                       color: Colors.white,
                     ),
@@ -126,7 +126,7 @@ class RuckBuddyCard extends StatelessWidget {
                         context: context,
                         icon: Icons.terrain, 
                         label: 'Elevation',
-                        value: '+${ruckBuddy.elevationGainM.toStringAsFixed(0)}/${ruckBuddy.elevationLossM.toStringAsFixed(0)}',
+                        value: MeasurementUtils.formatElevationCompact(ruckBuddy.elevationGainM, ruckBuddy.elevationLossM.abs(), metric: preferMetric),
                       ),
                     ],
                   ),
@@ -167,11 +167,6 @@ class RuckBuddyCard extends StatelessWidget {
   String _formatCompletedDate(DateTime? completedAt) {
     if (completedAt == null) return 'Unknown date';
     return DateFormat.yMMMd().format(completedAt);
-  }
-  
-  String _formatWeight(double weightKg, bool preferMetric) {
-    if (weightKg == 0) return 'HIKE';
-    return MeasurementUtils.formatWeight(weightKg, metric: preferMetric);
   }
   
   Widget _buildStatTile({

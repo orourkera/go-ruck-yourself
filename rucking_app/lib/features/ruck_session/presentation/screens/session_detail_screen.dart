@@ -40,10 +40,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final formattedStartTime = timeFormat.format(widget.session.startTime);
     final formattedEndTime = timeFormat.format(widget.session.endTime);
     
-    // Format distance
-    final distanceValue = preferMetric 
-        ? '${widget.session.distance.toStringAsFixed(2)} km'
-        : '${(widget.session.distance * 0.621371).toStringAsFixed(2)} mi';
+    // Format distance using MeasurementUtils
+    final distanceValue = MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric);
     
     // Format pace
     final paceValue = MeasurementUtils.formatPace(
@@ -54,14 +52,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     // Format elevation
     final elevationDisplay = MeasurementUtils.formatElevation(
       widget.session.elevationGain,
-      widget.session.elevationLoss,
+      widget.session.elevationLoss.abs(),
       metric: preferMetric,
     );
     
-    // Format weight
-    final weight = preferMetric
-        ? '${widget.session.ruckWeightKg.toStringAsFixed(1)} kg'
-        : '${(widget.session.ruckWeightKg * 2.20462).toStringAsFixed(1)} lb';
+    // Format weight using MeasurementUtils
+    final weight = MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric);
     
     return BlocListener<SessionBloc, SessionState>(
       listener: (context, state) {
@@ -324,9 +320,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final shareText = '''🏋️ Go Rucky Yourself - Session Completed!
 📅 $formattedDate
 🔄 ${widget.session.formattedDuration}
-📏 ${widget.session.distance.toStringAsFixed(2)} km
+📏 ${MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric)}
 🔥 ${widget.session.caloriesBurned} calories
-⚖️ ${widget.session.ruckWeightKg.toStringAsFixed(1)} kg weight
+⚖️ ${MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric)}
 
 Download Go Rucky Yourself from the App Store!
 ''';
