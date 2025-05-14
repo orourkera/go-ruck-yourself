@@ -30,6 +30,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _weightController;
   late TextEditingController _heightController;
   bool _isLoading = false;
+  String? _selectedGender;
 
   // Constants for conversion
   static const double kgToLbs = 2.20462;
@@ -57,6 +58,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             : widget.user.heightCm! * cmToInches;
      }
     _heightController = TextEditingController(text: displayHeight > 0 ? displayHeight.toStringAsFixed(1) : '');
+    
+    // Initialize gender selection
+    _selectedGender = widget.user.gender;
   }
 
   @override
@@ -97,6 +101,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               weightKg: weightKg,
               heightCm: heightCm,
               preferMetric: widget.preferMetric,
+              gender: _selectedGender,
             ),
           );
 
@@ -202,9 +207,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                    return null;
                 },
               ),
+              const SizedBox(height: 20),
+              // Gender dropdown
+              Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? Colors.grey[800] 
+                      : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedGender,
+                  decoration: InputDecoration(
+                    labelText: 'Gender',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: InputBorder.none,
+                  ),
+                  items: [
+                    DropdownMenuItem(value: 'male', child: Text('Male')),
+                    DropdownMenuItem(value: 'female', child: Text('Female')),
+                    DropdownMenuItem(value: 'other', child: Text('Other')),
+                    DropdownMenuItem(value: null, child: Text('Prefer not to say')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedGender = value;
+                    });
+                  },
+                  hint: Text('Select your gender'),
+                  isExpanded: true,
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
-                'Weight and height information help calculate calories burned during your rucking sessions more accurately.',
+                'Weight, height, and gender information help calculate calories more accurately and personalize your experience.',
                 style: AppTextStyles.bodySmall.copyWith(
                   color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                 ),

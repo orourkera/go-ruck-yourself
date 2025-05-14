@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 
 /// App color palette with rustic theme
 class AppColors {
-  // Primary colors - Olive green
+  // Primary colors - Olive green (default male mode)
   static final Color primary = Color(0xFF728C69); 
   static final Color primaryLight = Color(0xFF94A98C);
   static final Color primaryDark = Color(0xFF546A4A);
+  
+  // Lady mode colors - Sky blue
+  static final Color ladyPrimary = Color(0xFF4A90E2); // Sky blue
+  static final Color ladyPrimaryLight = Color(0xFF72B0FB);
+  static final Color ladyPrimaryDark = Color(0xFF2E71BC);
   
   // Secondary colors - Brownish-orange
   static final Color secondary = Color(0xFFCC6A2A); 

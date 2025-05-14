@@ -42,18 +42,45 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     Timer(const Duration(seconds: 3), () async {
       if (!mounted || _navigated) return;
       _navigated = true;
-      // Check subscription status via RevenueCatService
-      final revenueCatService = GetIt.instance<RevenueCatService>();
-      final isSubscribed = await revenueCatService.checkSubscriptionStatus();
-      if (isSubscribed) {
-        // If subscribed, navigate directly to Home Screen
-        Navigator.pushReplacementNamed(context, '/home');
+
+      // First check authentication status
+      final authBloc = BlocProvider.of<AuthBloc>(context);
+      final authState = authBloc.state;
+      
+      if (authState is Unauthenticated || authState is AuthError) {
+        // If not authenticated, navigate to login screen
+        Navigator.pushReplacementNamed(context, '/login');
+        return;
+      }
+      
+      // Only check subscription if authenticated
+      if (authState is Authenticated) {
+        // Check subscription status via RevenueCatService
+        final revenueCatService = GetIt.instance<RevenueCatService>();
+        final isSubscribed = await revenueCatService.checkSubscriptionStatus();
+        if (isSubscribed) {
+          // If subscribed, navigate directly to Home Screen
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          // If not subscribed, navigate to Paywall Screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const PaywallScreen()),
+          );
+        }
       } else {
-        // If not subscribed, navigate to Paywall Screen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const PaywallScreen()),
-        );
+        // If still loading or in initial state, wait a bit longer
+        Timer(const Duration(seconds: 2), () {
+          if (!mounted) return;
+          final currentState = authBloc.state;
+          
+          if (currentState is Authenticated) {
+            Navigator.pushReplacementNamed(context, '/home');
+          } else {
+            // If still not authenticated, go to login
+            Navigator.pushReplacementNamed(context, '/login');
+          }
+        });
       }
     });
   }
@@ -66,6 +93,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    // Get user gender from AuthBloc if available
+    String? userGender;
+    try {
+      final authBloc = GetIt.instance<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        userGender = (authBloc.state as Authenticated).user.gender;
+      }
+    } catch (e) {
+      // If auth bloc is not available, continue with default image
+      debugPrint('Could not get user gender for splash screen: $e');
+    }
+    
+    // Determine which splash image to use based on gender
+    final String splashImagePath = (userGender == 'female')
+        ? 'assets/images/go_ruck_yourself_lady.png' // Female version
+        : 'assets/images/go ruck yourself.png'; // Default/male version
+        
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: Center(
@@ -74,7 +118,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Main logo image with animation
+              // Main logo image with animation - gender-specific
               ScaleTransition(
                 scale: Tween<double>(begin: 1.0, end: 1.5).animate(
                   CurvedAnimation(
@@ -83,7 +127,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ),
                 ),
                 child: Image.asset(
-                  'assets/images/go ruck yourself.png',
+                  splashImagePath,
                   width: 281.25, // 375 * 0.75
                   height: 281.25, // 375 * 0.75
                   fit: BoxFit.contain,
