@@ -33,12 +33,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final authState = context.read<AuthBloc>().state;
     final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
     
-    // Format date
-    final dateFormat = DateFormat('MMMM d, yyyy');
-    final timeFormat = DateFormat('h:mm a');
-    final formattedDate = dateFormat.format(widget.session.startTime);
-    final formattedStartTime = timeFormat.format(widget.session.startTime);
-    final formattedEndTime = timeFormat.format(widget.session.endTime);
+    // Format date and time using MeasurementUtils to handle timezone conversion
+    final formattedDate = MeasurementUtils.formatDate(widget.session.startTime);
+    final formattedStartTime = MeasurementUtils.formatTime(widget.session.startTime);
+    final formattedEndTime = MeasurementUtils.formatTime(widget.session.endTime);
     
     // Format distance using MeasurementUtils
     final distanceValue = MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric);
@@ -309,12 +307,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   }
   
   void _shareSession(BuildContext context) {
-    // Log session sharing
     AppLogger.info('Sharing session ${widget.session.id}');
     
-    // Create shareable text
-    final dateFormat = DateFormat('MMMM d, yyyy');
-    final formattedDate = dateFormat.format(widget.session.startTime);
+    // Get user preferences for metric/imperial
+    final authState = context.read<AuthBloc>().state;
+    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    
+    // Format date using MeasurementUtils for timezone conversion
+    final formattedDate = MeasurementUtils.formatDate(widget.session.startTime);
     
     // Create message with emoji for style points
     final shareText = '''🏋️ Go Rucky Yourself - Session Completed!

@@ -166,7 +166,7 @@ class RuckBuddyCard extends StatelessWidget {
   
   String _formatCompletedDate(DateTime? completedAt) {
     if (completedAt == null) return 'Unknown date';
-    return DateFormat.yMMMd().format(completedAt);
+    return MeasurementUtils.formatDate(completedAt, format: 'MMM d, yyyy');
   }
   
   Widget _buildStatTile({
