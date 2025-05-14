@@ -51,6 +51,14 @@ import WatchConnectivity
             case "stopWorkout":
                 self.sendMessageToWatch(["command": "workoutStopped"])
                 result(true)
+            case "flutterHeartRateListenerReady":
+                print("[WATCH] Flutter heart rate listener is ready")
+                // If we have buffered heart rates in HeartRateStreamHandler, now is the time to send them
+                if let lastHR = HeartRateStreamHandler.lastHeartRateSent {
+                    print("[WATCH] Re-sending most recent heart rate after Flutter listener ready: \(lastHR) BPM")
+                    HeartRateStreamHandler.sendHeartRate(lastHR)
+                }
+                result(true)
             case "watchHeartRateUpdate":
                 // Handle heart rate update from Flutter
                 if let heartRate = call.arguments as? [String: Any], let heartRateValue = heartRate["heartRate"] as? Double {
