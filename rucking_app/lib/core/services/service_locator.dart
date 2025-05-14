@@ -8,6 +8,7 @@ import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/security/ssl_pinning.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/core/security/token_refresh_interceptor.dart';
 import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl.dart';
@@ -63,6 +64,14 @@ Future<void> setupServiceLocator() async {
     ),
   );
   
+  // Register HeartRateService which centralizes heart rate handling
+  getIt.registerSingleton<HeartRateService>(
+    HeartRateService(
+      watchService: getIt<WatchService>(),
+      healthService: getIt<HealthService>(),
+    ),
+  );
+  
   // Register SplitTrackingService which depends on WatchService
   getIt.registerSingleton<SplitTrackingService>(
     SplitTrackingService(watchService: getIt<WatchService>()),
@@ -88,6 +97,7 @@ Future<void> setupServiceLocator() async {
         locationService: getIt<LocationService>(),
         healthService: getIt<HealthService>(),
         watchService: getIt<WatchService>(),
+        heartRateService: getIt<HeartRateService>(),
         splitTrackingService: getIt<SplitTrackingService>(),
       ));
       

@@ -381,9 +381,36 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
     private static var lastHeartRateSent: Double?
     private static var lastHeartRateSentTime: Date?
     
+    // Buffer for heart rates received when sink is unavailable
+    private static var pendingHeartRates: [Double] = []
+    
+    // Flag to track if we're actively listening
+    private static var isListening: Bool = false
+    
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         print("🟢 [WATCH] HeartRateStreamHandler.onListen called - setting up event sink")
         HeartRateStreamHandler.eventSink = events
+        HeartRateStreamHandler.isListening = true
+        
+        // Send any pending heart rates that were buffered while sink was unavailable
+        if !HeartRateStreamHandler.pendingHeartRates.isEmpty {
+            print("📤 [WATCH] Sending \(HeartRateStreamHandler.pendingHeartRates.count) buffered heart rates")
+            // Make a copy to avoid concurrent modification issues
+            let ratesToSend = HeartRateStreamHandler.pendingHeartRates
+            HeartRateStreamHandler.pendingHeartRates.removeAll()
+            
+            // Send buffered rates with small delays to ensure they're processed
+            for (index, rate) in ratesToSend.enumerated() {
+                let delay = Double(index) * 0.1 // 100ms between each to avoid overwhelming
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    // Only send if we still have an active sink
+                    if HeartRateStreamHandler.isListening, let sink = HeartRateStreamHandler.eventSink {
+                        print("📲 [WATCH] Sending buffered heart rate: \(rate) BPM")
+                        sink(rate)
+                    }
+                }
+            }
+        }
         
         // If we have a recent heart rate, send it immediately to ensure the UI updates
         if let lastHR = HeartRateStreamHandler.lastHeartRateSent,
@@ -392,16 +419,32 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
             
             print("🔄 [WATCH] Re-sending cached heart rate to new stream: \(lastHR) BPM")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                events(lastHR) // Send to the new listener after a short delay
+                if HeartRateStreamHandler.isListening {
+                    events(lastHR) // Send to the new listener after a short delay
+                }
             }
         }
+        
+        // Notify Flutter that we're ready for heart rate updates
+        NotificationCenter.default.post(name: NSNotification.Name("HeartRateChannelReady"), object: nil)
         
         return nil
     }
     
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
         print("🔴 [WATCH] HeartRateStreamHandler.onCancel called - removing event sink")
-        HeartRateStreamHandler.eventSink = nil
+        HeartRateStreamHandler.isListening = false
+        // Don't immediately set eventSink to nil - keep a reference in case we need it
+        // We'll use the isListening flag to determine if we should actually send data
+        
+        // Schedule clearing the eventSink after a delay to allow for Flutter hot reload
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+            // Only clear if we're still not listening after the delay
+            if !HeartRateStreamHandler.isListening {
+                print("🔴 [WATCH] Clearing event sink after delay")
+                HeartRateStreamHandler.eventSink = nil
+            }
+        }
         return nil
     }
     
@@ -416,27 +459,37 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
         print("❤️ [WATCH] Processing heart rate: \(roundedHeartRate) BPM")
         
         if Thread.isMainThread {
-            if let sink = eventSink {
-                print("📲 [WATCH] Sending heart rate to Flutter: \(roundedHeartRate) BPM")
-                // IMPORTANT: Send as Int - the UI may expect integer values
-                sink(roundedHeartRate)
-                print("✅ [WATCH] Heart rate sent to Flutter: \(roundedHeartRate) BPM")
-            } else {
-                logEventSinkError()
-                // Try to recreate event channel - this is a more aggressive fix
-                recreateEventChannelIfNeeded()
-            }
+            sendHeartRateOnMainThread(roundedHeartRate)
         } else {
             DispatchQueue.main.async {
-                if let sink = eventSink {
-                    print("📲 [WATCH] Sending heart rate to Flutter from background thread: \(heartRate) BPM")
-                    sink(heartRate)
-                } else {
-                    logEventSinkError()
-                    // Try to recreate event channel - this is a more aggressive fix
-                    recreateEventChannelIfNeeded()
-                }
+                sendHeartRateOnMainThread(roundedHeartRate)
             }
+        }
+    }
+    
+    private static func sendHeartRateOnMainThread(_ heartRate: Double) {
+        if isListening, let sink = eventSink {
+            print("📲 [WATCH] Sending heart rate to Flutter: \(heartRate) BPM")
+            // IMPORTANT: Send as Int - the UI may expect integer values
+            sink(heartRate)
+            print("✅ [WATCH] Heart rate sent to Flutter: \(heartRate) BPM")
+            
+            // Clear successful send from pending buffer if it was there
+            pendingHeartRates.removeAll { $0 == heartRate }
+        } else {
+            // Buffer the heart rate for later delivery when sink is available again
+            if !pendingHeartRates.contains(heartRate) {
+                pendingHeartRates.append(heartRate)
+                // Cap the buffer size to avoid memory issues
+                if pendingHeartRates.count > 50 {
+                    pendingHeartRates.removeFirst()
+                }
+                print("📥 [WATCH] Buffered heart rate \(heartRate) BPM (buffer size: \(pendingHeartRates.count))")
+            }
+            
+            logEventSinkError()
+            // Try to recreate event channel - this is a more aggressive fix
+            recreateEventChannelIfNeeded()
         }
     }
     
@@ -450,35 +503,75 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
     }
     
     private static func recreateEventChannelIfNeeded() {
-        // Only attempt recreation if sink is nil and we haven't done it recently
-        guard eventSink == nil else { return }
+        // Only attempt recreation if we're not actively listening and we haven't tried recently
+        guard !isListening else { return }
         
-        if let lastRecreateTime = lastErrorLogTime, Date().timeIntervalSince(lastRecreateTime) < 30 {
-            return // Don't try more often than every 30 seconds
+        if let lastRecreateTime = lastErrorLogTime, Date().timeIntervalSince(lastRecreateTime) < 15 {
+            return // Don't try more often than every 15 seconds
         }
         
         // Actually implement the recreation logic
         print("🔄 [WATCH] Attempting to recreate heart rate event channel")
         
-        // Get access to the root view controller
-        guard let rootViewController = UIApplication.shared.windows.first?.rootViewController as? FlutterViewController else {
+        // Get access to the root view controller - try both windows approach for different iOS versions
+        var rootViewController: FlutterViewController? = nil
+        
+        // iOS 13+ approach
+        if #available(iOS 13.0, *) {
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let viewController = window.rootViewController as? FlutterViewController {
+                rootViewController = viewController
+            }
+        }
+        
+        // Fallback for older iOS versions
+        if rootViewController == nil, let window = UIApplication.shared.delegate?.window,
+           let windowObj = window,
+           let viewController = windowObj.rootViewController as? FlutterViewController {
+            rootViewController = viewController
+        }
+        
+        // Try a different approach if still nil
+        if rootViewController == nil,
+           let viewController = UIApplication.shared.windows.first?.rootViewController as? FlutterViewController {
+            rootViewController = viewController
+        }
+        
+        guard let controller = rootViewController else {
             print("❌ [WATCH] Cannot recreate event channel - no FlutterViewController available")
             return
         }
         
+        // Update last attempt time
+        lastErrorLogTime = Date()
+        
         // Create a new event channel
         let channelName = "com.getrucky.gfy/heartRateStream"
-        let eventChannel = FlutterEventChannel(name: channelName, binaryMessenger: rootViewController.binaryMessenger)
-        eventChannel.setStreamHandler(HeartRateStreamHandler())
+        let eventChannel = FlutterEventChannel(name: channelName, binaryMessenger: controller.binaryMessenger)
         
-        print("✅ [WATCH] Event channel recreation attempted")
+        // Important: Create a completely fresh handler instance
+        let handler = HeartRateStreamHandler()
+        eventChannel.setStreamHandler(handler)
         
-        // Try to get the Flutter view controller and recreate the event channel
-        if let controller = UIApplication.shared.delegate?.window??.rootViewController as? FlutterViewController {
-            print("🔄 [WATCH] Attempting to recreate heart rate event channel")
-            let eventChannel = FlutterEventChannel(name: "com.getrucky.gfy/heartRateStream", 
-                                              binaryMessenger: controller.binaryMessenger)
-            eventChannel.setStreamHandler(HeartRateStreamHandler())
+        print("✅ [WATCH] Heart rate event channel recreated")
+        
+        // Try to notify Flutter that a channel was recreated
+        NotificationCenter.default.post(name: NSNotification.Name("HeartRateChannelRecreated"), object: nil)
+        
+        // After recreation, try to resend any buffered heart rates
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            // First check if the recreation actually resulted in an active sink
+            if isListening, let _ = eventSink, !pendingHeartRates.isEmpty {
+                print("🔄 [WATCH] Attempting to send \(pendingHeartRates.count) buffered heart rates after recreation")
+                // Send the most recent heart rate immediately
+                if let lastRate = pendingHeartRates.last {
+                    sendHeartRate(lastRate)
+                }
+            } else if let lastHR = lastHeartRateSent {
+                // Just try to send the last known heart rate
+                sendHeartRate(lastHR)
+            }
         }
     }
 }

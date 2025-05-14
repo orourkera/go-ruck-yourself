@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -40,6 +41,12 @@ class WatchService {
   final _healthDataController = StreamController<Map<String, dynamic>>.broadcast();
   final _heartRateController = StreamController<double>.broadcast();
   StreamSubscription? _nativeHeartRateSubscription;
+  
+  // Flag to track if we've attempted to reconnect the heart rate listener
+  bool _isReconnectingHeartRate = false;
+  int _heartRateReconnectAttempts = 0;
+  Timer? _heartRateWatchdogTimer;
+  DateTime? _lastHeartRateUpdateTime;
 
   // Heart rate samples list
   List<HeartRateSample> _currentSessionHeartRateSamples = [];
@@ -59,16 +66,8 @@ class WatchService {
     _watchSessionChannel.setMethodCallHandler(_handleWatchSessionMethod);
 
     AppLogger.info('[WATCH_SERVICE] Setting up heart rate event channel stream...');
-    _nativeHeartRateSubscription = _heartRateEventChannel
-        .receiveBroadcastStream()
-        .listen((dynamic heartRate) {
-      if (heartRate is double) {
-        AppLogger.info('[WATCH_SERVICE] Received heart rate from native channel: $heartRate BPM');
-        handleWatchHeartRateUpdate(heartRate);
-      }
-    }, onError: (dynamic error) {
-      AppLogger.error('[WATCH_SERVICE] Error in heart rate event channel: $error');
-    });
+    _setupNativeHeartRateListener();
+    _startHeartRateWatchdog();
 
     AppLogger.info('[WATCH_SERVICE] Registering RuckingApi (Pigeon) handler...');
     RuckingApi.setUp(RuckingApiHandler(this));
@@ -498,9 +497,104 @@ class WatchService {
   }
 
   void dispose() {
+    _heartRateWatchdogTimer?.cancel();
     _nativeHeartRateSubscription?.cancel();
     _sessionEventController.close();
     _healthDataController.close();
     _heartRateController.close();
+  }
+
+  // ------------------------------------------------------------
+  // Native heart-rate stream resilience helpers
+  // ------------------------------------------------------------
+
+  /// Start a watchdog timer to ensure heart rate updates are being received
+  void _startHeartRateWatchdog() {
+    _heartRateWatchdogTimer?.cancel();
+    _heartRateWatchdogTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      final lastUpdateTime = _lastHeartRateUpdateTime;
+      if (lastUpdateTime != null) {
+        final timeSinceLastUpdate = DateTime.now().difference(lastUpdateTime);
+        if (timeSinceLastUpdate > const Duration(seconds: 60) && !_isReconnectingHeartRate) {
+          AppLogger.warning('[WATCH_SERVICE] No heart rate updates received for ${timeSinceLastUpdate.inSeconds} seconds - restarting listener');
+          _restartNativeHeartRateListener();
+        }
+      }
+    });
+  }
+
+  void _setupNativeHeartRateListener() {
+    // Cancel any existing subscription first
+    _nativeHeartRateSubscription?.cancel();
+    _nativeHeartRateSubscription = null;
+    
+    AppLogger.info('[WATCH_SERVICE] Setting up native heart rate listener');
+    
+    try {
+      _nativeHeartRateSubscription = _heartRateEventChannel.receiveBroadcastStream().listen(
+        (dynamic heartRate) {
+          if (heartRate is double) {
+            _heartRateReconnectAttempts = 0; // Reset reconnect counter on successful update
+            _lastHeartRateUpdateTime = DateTime.now();
+            _isReconnectingHeartRate = false;
+            AppLogger.info('[WATCH_SERVICE] Received heart rate from native channel: $heartRate BPM');
+            handleWatchHeartRateUpdate(heartRate);
+          }
+        },
+        onError: _onNativeHeartRateError,
+        onDone: _onNativeHeartRateDone,
+        cancelOnError: false, // Don't cancel on error, let our error handler decide
+      );
+      
+      // Notify native code that Flutter is listening
+      _watchSessionChannel.invokeMethod('flutterHeartRateListenerReady');
+      AppLogger.info('[WATCH_SERVICE] Notified native code that Flutter heart rate listener is ready');
+    } catch (e) {
+      AppLogger.error('[WATCH_SERVICE] Failed to set up heart rate listener: $e');
+      _scheduleHeartRateReconnect();
+    }
+  }
+
+  void _onNativeHeartRateError(dynamic error) {
+    AppLogger.error('[WATCH_SERVICE] Heart rate channel error: $error – scheduling restart');
+    _scheduleHeartRateReconnect();
+  }
+
+  void _onNativeHeartRateDone() {
+    AppLogger.warning('[WATCH_SERVICE] Heart rate channel closed – scheduling restart');
+    _scheduleHeartRateReconnect();
+  }
+
+  void _scheduleHeartRateReconnect() {
+    if (_isReconnectingHeartRate) {
+      AppLogger.info('[WATCH_SERVICE] Already attempting to reconnect heart rate channel');
+      return;
+    }
+    
+    _isReconnectingHeartRate = true;
+    _heartRateReconnectAttempts++;
+    
+    // Exponential backoff for reconnection attempts
+    final delaySeconds = math.min(30, math.pow(2, math.min(5, _heartRateReconnectAttempts)).toInt());
+    AppLogger.info('[WATCH_SERVICE] Scheduling heart rate reconnect in $delaySeconds seconds (attempt $_heartRateReconnectAttempts)');
+    
+    // Small delay to avoid tight reconnection loops
+    Future.delayed(Duration(seconds: delaySeconds), () {
+      _restartNativeHeartRateListener();
+    });
+  }
+
+  void _restartNativeHeartRateListener() {
+    AppLogger.info('[WATCH_SERVICE] Restarting native heart rate listener');
+    _nativeHeartRateSubscription?.cancel();
+    _setupNativeHeartRateListener();
+  }
+  
+  /// Public method to force restart the heart rate monitoring from outside this class
+  void restartHeartRateMonitoring() {
+    AppLogger.info('[WATCH_SERVICE] Manually restarting heart rate monitoring');
+    _heartRateReconnectAttempts = 0;
+    _isReconnectingHeartRate = false;
+    _restartNativeHeartRateListener();
   }
 }
