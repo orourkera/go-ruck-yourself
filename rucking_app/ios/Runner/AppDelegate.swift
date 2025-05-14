@@ -132,7 +132,42 @@ import WatchConnectivity
         eventChannel.setStreamHandler(HeartRateStreamHandler())
         
         GeneratedPluginRegistrant.register(with: self)
+        
+        // Re-assert our AppDelegate as the WCSession delegate AFTER all plugins
+        // (including Firebase via GeneratedPluginRegistrant) have initialized.
+        // This prevents Firebase's GUL_Runner.AppDelegate from hijacking WCSession calls.
+        if WCSession.isSupported() {
+            session = WCSession.default // Ensure session is not nil if it wasn't already set up
+            session?.delegate = self
+            // Activate if not already active (might be redundant but safe)
+            if session?.activationState != .activated {
+                session?.activate()
+            }
+            // Start a watchdog timer that re-asserts the delegate every 10 seconds in case another
+            // library tries to hijack it while the app is running.
+            Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                let defaultSession = WCSession.default
+                if !(defaultSession.delegate === self) {
+                    print("[WATCH] Watchdog: delegate hijacked (\(String(describing: defaultSession.delegate))). Re-asserting AppDelegate as delegate.")
+                    defaultSession.delegate = self
+                }
+            }
+        }
+
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+    
+    // Ensure WCSession delegate remains set when app becomes active (protect against delegate hijacking)
+    override func applicationDidBecomeActive(_ application: UIApplication) {
+        super.applicationDidBecomeActive(application)
+        if WCSession.isSupported() {
+            let defaultSession = WCSession.default
+            if !(defaultSession.delegate === self) {
+                print("[WATCH] Detected delegate hijack (\(String(describing: defaultSession.delegate))). Re-asserting AppDelegate as WCSession delegate.")
+                defaultSession.delegate = self
+            }
+        }
     }
     
     /// Send a message to the watch via the session channel
@@ -224,41 +259,52 @@ import WatchConnectivity
     // MARK: - WCSessionDelegate Methods
     
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        if let error = error {
-            print("[WATCH] Watch session activation failed: \(error.localizedDescription)")
-            return
+        DispatchQueue.main.async {
+            print("[WATCH] Watch session activated with state: \(activationState.rawValue)")
+            if let error = error {
+                print("[WATCH] Activation error: \(error.localizedDescription)")
+            }
+            // You might want to inform Flutter or update UI based on activationState
         }
-        print("[WATCH] Watch session activated with state: \(activationState.rawValue)")
     }
-    
+
     func sessionDidBecomeInactive(_ session: WCSession) {
-        print("[WATCH] Watch session became inactive")
+        DispatchQueue.main.async {
+            print("[WATCH] Watch session did become inactive")
+        }
     }
-    
+
     func sessionDidDeactivate(_ session: WCSession) {
-        print("[WATCH] Watch session deactivated")
+        DispatchQueue.main.async {
+            print("[WATCH] Watch session did deactivate. Re-activating...")
+            session.activate() // Re-activate the session
+        }
     }
-    
+
     // Receive and process messages from the Watch
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
-        processWatchMessage(message: message, replyHandler: nil)
+        print("[WATCH] Received message from Watch (raw): \(message)")
+        DispatchQueue.main.async {
+            print("[WATCH] Processing message on main thread: \(message)")
+            self.processWatchMessage(message: message, replyHandler: nil)
+        }
     }
-    
+
     // Receive and process messages from the Watch that require a reply
     func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
-        processWatchMessage(message: message, replyHandler: replyHandler)
+        print("[WATCH] Received message from Watch (raw): \(message)")
+        DispatchQueue.main.async {
+            print("[WATCH] Processing message on main thread: \(message)")
+            self.processWatchMessage(message: message, replyHandler: replyHandler)
+        }
     }
-    
+
     // Common processing function for both message types
     private func processWatchMessage(message: [String: Any], replyHandler: (([String: Any]) -> Void)?) {
         // Handle message commands
         if let command = message["command"] as? String {
-            print("[WATCH] Received command from Watch: \(command)")
-            
-            // Get controller and channel only once
-            let controller = window?.rootViewController as! FlutterViewController
-            let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
-            
+            print("[WATCH] Received command: \(command)")
+
             switch command {
             case "sessionStarted":
                 print("[WATCH] Session started from Watch")
@@ -266,6 +312,8 @@ import WatchConnectivity
                 print("[WATCH] Session ended from Watch")
             case "pauseSession":
                 print("[WATCH] Session pause command received from Watch - forwarding to Flutter")
+                let controller = window?.rootViewController as! FlutterViewController
+                let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
                 watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "pauseSession"]) { result in
                     if let error = result as? FlutterError {
                         print("[WATCH] Error forwarding pause command to Flutter: \(error.message ?? "unknown error")")
@@ -283,6 +331,8 @@ import WatchConnectivity
                 }
             case "resumeSession":
                 print("[WATCH] Session resume command received from Watch - forwarding to Flutter")
+                let controller = window?.rootViewController as! FlutterViewController
+                let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
                 watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "resumeSession"]) { result in
                     if let error = result as? FlutterError {
                         print("[WATCH] Error forwarding resume command to Flutter: \(error.message ?? "unknown error")")
@@ -310,34 +360,125 @@ import WatchConnectivity
             }
         }
     }
-    
+
     // Handle application context updates from Watch
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
-        print("[WATCH] Received application context from Watch: \(applicationContext)")
-        
-        // Process the context similarly to messages
-        if let heartRate = applicationContext["heartRate"] as? Double {
-            print("[WATCH] Received heart rate from context: \(heartRate) BPM")
-            HeartRateStreamHandler.sendHeartRate(heartRate)
+        print("[WATCH] Received application context from Watch (raw): \(applicationContext)")
+        DispatchQueue.main.async {
+            print("[WATCH] Processing application context on main thread: \(applicationContext)")
+            self.processWatchMessage(message: applicationContext, replyHandler: nil) // No reply handler for context updates
         }
     }
 }
 
 // Stream handler for heart rate data to Flutter
 class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
+    // Use static eventSink so it persists across instance lifecycle
     private static var eventSink: FlutterEventSink?
     
+    // Flag to track if we've logged error about event sink recently
+    private static var lastErrorLogTime: Date?
+    private static var lastHeartRateSent: Double?
+    private static var lastHeartRateSentTime: Date?
+    
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        print("🟢 [WATCH] HeartRateStreamHandler.onListen called - setting up event sink")
         HeartRateStreamHandler.eventSink = events
+        
+        // If we have a recent heart rate, send it immediately to ensure the UI updates
+        if let lastHR = HeartRateStreamHandler.lastHeartRateSent,
+           let lastTime = HeartRateStreamHandler.lastHeartRateSentTime,
+           Date().timeIntervalSince(lastTime) < 60 { // Only if within last minute
+            
+            print("🔄 [WATCH] Re-sending cached heart rate to new stream: \(lastHR) BPM")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                events(lastHR) // Send to the new listener after a short delay
+            }
+        }
+        
         return nil
     }
     
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        print("🔴 [WATCH] HeartRateStreamHandler.onCancel called - removing event sink")
         HeartRateStreamHandler.eventSink = nil
         return nil
     }
     
     static func sendHeartRate(_ heartRate: Double) {
-        eventSink?(heartRate)
+        // Store the most recent heart rate regardless of sink availability
+        lastHeartRateSent = heartRate
+        lastHeartRateSentTime = Date()
+        
+        // Force heart rate to be a whole number to match expected format
+        let roundedHeartRate = round(heartRate)
+        
+        print("❤️ [WATCH] Processing heart rate: \(roundedHeartRate) BPM")
+        
+        if Thread.isMainThread {
+            if let sink = eventSink {
+                print("📲 [WATCH] Sending heart rate to Flutter: \(roundedHeartRate) BPM")
+                // IMPORTANT: Send as Int - the UI may expect integer values
+                sink(roundedHeartRate)
+                print("✅ [WATCH] Heart rate sent to Flutter: \(roundedHeartRate) BPM")
+            } else {
+                logEventSinkError()
+                // Try to recreate event channel - this is a more aggressive fix
+                recreateEventChannelIfNeeded()
+            }
+        } else {
+            DispatchQueue.main.async {
+                if let sink = eventSink {
+                    print("📲 [WATCH] Sending heart rate to Flutter from background thread: \(heartRate) BPM")
+                    sink(heartRate)
+                } else {
+                    logEventSinkError()
+                    // Try to recreate event channel - this is a more aggressive fix
+                    recreateEventChannelIfNeeded()
+                }
+            }
+        }
+    }
+    
+    private static func logEventSinkError() {
+        // Only log error every 10 seconds to avoid log spam
+        let now = Date()
+        if lastErrorLogTime == nil || now.timeIntervalSince(lastErrorLogTime!) > 10 {
+            print("❌ [WATCH] ERROR: Cannot send heart rate to Flutter - eventSink is nil. This means Flutter is not receiving heart rate updates!")
+            lastErrorLogTime = now
+        }
+    }
+    
+    private static func recreateEventChannelIfNeeded() {
+        // Only attempt recreation if sink is nil and we haven't done it recently
+        guard eventSink == nil else { return }
+        
+        if let lastRecreateTime = lastErrorLogTime, Date().timeIntervalSince(lastRecreateTime) < 30 {
+            return // Don't try more often than every 30 seconds
+        }
+        
+        // Actually implement the recreation logic
+        print("🔄 [WATCH] Attempting to recreate heart rate event channel")
+        
+        // Get access to the root view controller
+        guard let rootViewController = UIApplication.shared.windows.first?.rootViewController as? FlutterViewController else {
+            print("❌ [WATCH] Cannot recreate event channel - no FlutterViewController available")
+            return
+        }
+        
+        // Create a new event channel
+        let channelName = "com.getrucky.gfy/heartRateStream"
+        let eventChannel = FlutterEventChannel(name: channelName, binaryMessenger: rootViewController.binaryMessenger)
+        eventChannel.setStreamHandler(HeartRateStreamHandler())
+        
+        print("✅ [WATCH] Event channel recreation attempted")
+        
+        // Try to get the Flutter view controller and recreate the event channel
+        if let controller = UIApplication.shared.delegate?.window??.rootViewController as? FlutterViewController {
+            print("🔄 [WATCH] Attempting to recreate heart rate event channel")
+            let eventChannel = FlutterEventChannel(name: "com.getrucky.gfy/heartRateStream", 
+                                              binaryMessenger: controller.binaryMessenger)
+            eventChannel.setStreamHandler(HeartRateStreamHandler())
+        }
     }
 }
