@@ -50,6 +50,14 @@ import WatchConnectivity
             case "stopWorkout":
                 self.sendMessageToWatch(["command": "workoutStopped"])
                 result(true)
+            case "watchHeartRateUpdate":
+                // Handle heart rate update from Flutter
+                if let heartRate = call.arguments as? [String: Any], let heartRateValue = heartRate["heartRate"] as? Double {
+                    print("[WATCH] Manually processing watchHeartRateUpdate with heartRate: \(heartRateValue)")
+                    // Also trigger heart rate stream to ensure Flutter receives this
+                    HeartRateStreamHandler.sendHeartRate(heartRateValue)
+                }
+                result(true)
             case "updateMetrics":
                 if let metrics = call.arguments as? [String: Any] {
                     self.sendMessageToWatch(["command": "updateMetrics", "metrics": metrics])
@@ -186,8 +194,11 @@ import WatchConnectivity
         
         // Handle messages from Watch, such as heart rate data
         if let heartRate = message["heartRate"] as? Double {
-            print("[WATCH] Received heart rate: \(heartRate) BPM")
-            HeartRateStreamHandler.sendHeartRate(heartRate)
+            print("[WATCH] Received heart rate: \(heartRate) BPM - updating event channel")
+            // Send heart rate to Flutter via event channel
+            DispatchQueue.main.async {
+                HeartRateStreamHandler.sendHeartRate(heartRate)
+            }
         }
         
         // Handle other message types as needed
@@ -201,11 +212,19 @@ import WatchConnectivity
             case "sessionEnded":
                 // Handle session ended on Watch
                 break
-            case "sessionPaused":
-                // Handle session paused on Watch
+            case "pauseSession", "sessionPaused":
+                // Handle session paused on Watch - forward to Flutter
+                print("[WATCH] Session paused from Watch - forwarding to Flutter")
+                let controller = window?.rootViewController as! FlutterViewController
+                let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "pauseSession"])
                 break
-            case "sessionResumed":
-                // Handle session resumed on Watch
+            case "resumeSession", "sessionResumed":
+                // Handle session resumed on Watch - forward to Flutter
+                print("[WATCH] Session resumed from Watch - forwarding to Flutter")
+                let controller = window?.rootViewController as! FlutterViewController
+                let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "resumeSession"])
                 break
             default:
                 print("[WATCH] Unknown command: \(command)")
