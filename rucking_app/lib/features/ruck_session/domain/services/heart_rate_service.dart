@@ -59,11 +59,32 @@ class HeartRateService {
       }
     }
     
-    // Cancel previous subscriptions if any
+    // Make sure we're not maintaining stale subscriptions
+    _resetSubscriptions();
+    
+    // Set up watch subscription with auto-reconnect capability
+    _setupWatchHeartRateSubscription();
+    
+    // Subscribe to HealthKit heart rate updates
+    _setupHealthKitHeartRateSubscription();
+    
+    // Set up check to detect and recover from lost connections
+    _startConnectionWatchdog();
+  }
+  
+  /// Reset all subscriptions to ensure clean state
+  void _resetSubscriptions() {
+    AppLogger.info('HeartRateService: Resetting all subscriptions');
     _watchHeartRateSubscription?.cancel();
     _healthHeartRateSubscription?.cancel();
+    _watchHeartRateSubscription = null;
+    _healthHeartRateSubscription = null;
+  }
+  
+  /// Set up subscription to watch heart rate updates with auto-reconnect
+  void _setupWatchHeartRateSubscription() {
+    AppLogger.info('HeartRateService: Setting up watch heart rate subscription');
     
-    // Subscribe to Watch heart rate updates
     _watchHeartRateSubscription = _watchService.onHeartRateUpdate.listen(
       (heartRate) {
         final sample = HeartRateSample(
@@ -74,10 +95,22 @@ class HeartRateService {
       },
       onError: (error) {
         AppLogger.error('HeartRateService: Error in watch heart rate stream: $error');
+        // Auto-reconnect after error
+        _tryReconnectWatchService();
       },
+      onDone: () {
+        AppLogger.warning('HeartRateService: Watch heart rate stream closed');
+        // Auto-reconnect when stream closes unexpectedly
+        _tryReconnectWatchService();
+      },
+      cancelOnError: false, // Don't cancel on error to handle reconnects
     );
+  }
+  
+  /// Set up subscription to HealthKit heart rate updates
+  void _setupHealthKitHeartRateSubscription() {
+    AppLogger.info('HeartRateService: Setting up HealthKit heart rate subscription');
     
-    // Subscribe to HealthKit heart rate updates
     _healthHeartRateSubscription = _healthService.heartRateStream.listen(
       (sample) {
         _processHeartRateSample(sample, 'HealthKit');
@@ -85,7 +118,58 @@ class HeartRateService {
       onError: (error) {
         AppLogger.error('HeartRateService: Error in HealthKit heart rate stream: $error');
       },
+      cancelOnError: false, // Don't cancel on error
     );
+  }
+  
+  /// Attempt to reconnect to watch service
+  void _tryReconnectWatchService() {
+    // Avoid multiple simultaneous reconnection attempts
+    if (_isReconnecting) return;
+    
+    _isReconnecting = true;
+    AppLogger.info('HeartRateService: Attempting to reconnect watch heart rate subscription');
+    
+    Future.delayed(const Duration(seconds: 2), () {
+      if (_watchHeartRateSubscription != null) {
+        _watchHeartRateSubscription!.cancel();
+        _watchHeartRateSubscription = null;
+      }
+      
+      _setupWatchHeartRateSubscription();
+      _isReconnecting = false;
+      AppLogger.info('HeartRateService: Watch heart rate subscription reconnected');
+    });
+  }
+  
+  /// Start a watchdog timer to detect and recover from lost connections
+  void _startConnectionWatchdog() {
+    // Clean up existing timer if any
+    _watchdogTimer?.cancel();
+    
+    // Check every 10 seconds if we're still receiving heart rate updates
+    _watchdogTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      final now = DateTime.now();
+      
+      // If no heart rate updates in 20 seconds and we should be receiving them,
+      // attempt to reconnect
+      if (_lastHeartRateTime != null && 
+          now.difference(_lastHeartRateTime!).inSeconds > 20 &&
+          !_isReconnecting) {
+        AppLogger.warning('HeartRateService: No heart rate updates received in the last 20 seconds');
+        _tryReconnectWatchService();
+      }
+    });
+  }
+  
+  // Flag to track if we're currently attempting a reconnection
+  bool _isReconnecting = false;
+  
+  // Timer to detect and recover from lost connections
+  Timer? _watchdogTimer;
+  
+  // Track the last time we received a heart rate update
+  DateTime? _lastHeartRateTime;
 
     // Get initial heart rate from HealthKit if available
     try {
@@ -108,16 +192,40 @@ class HeartRateService {
   /// Process a heart rate sample from any source
   void _processHeartRateSample(HeartRateSample sample, String source) {
     _latestHeartRate = sample.bpm;
+    _lastHeartRateTime = DateTime.now(); // Track when we received this sample
     
     AppLogger.info('HeartRateService: Received heart rate update from $source: ${sample.bpm} BPM');
     _hrBuffer.add(sample);
     
     // Broadcast individual sample
-    _heartRateController.add(sample);
+    if (!_heartRateController.isClosed) {
+      _heartRateController.add(sample);
+    } else {
+      AppLogger.error('HeartRateService: Cannot broadcast heart rate sample - controller is closed!');
+      // Try to recover by recreating the controller
+      _recreateControllers();
+    }
     
     // If buffer exceeds threshold, also broadcast buffer update
     if (_hrBuffer.length >= 10) {
       _bufferController.add(List.unmodifiable(_hrBuffer));
+    }
+  }
+  
+  /// Recreate the stream controllers if they are closed
+  void _recreateControllers() {
+    AppLogger.info('HeartRateService: Recreating stream controllers');
+    
+    // Only recreate if closed
+    if (_heartRateController.isClosed) {
+      // Save any listeners to reattach them
+      _heartRateController = StreamController<HeartRateSample>.broadcast();
+      AppLogger.info('HeartRateService: Heart rate controller recreated');
+    }
+    
+    if (_bufferController.isClosed) {
+      _bufferController = StreamController<List<HeartRateSample>>.broadcast();
+      AppLogger.info('HeartRateService: Buffer controller recreated');
     }
   }
 
@@ -170,7 +278,27 @@ class HeartRateService {
   /// Dispose all resources
   void dispose() {
     stopHeartRateMonitoring();
-    _heartRateController.close();
-    _bufferController.close();
+    
+    // Cancel the watchdog timer
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    
+    // Reset reconnection state
+    _isReconnecting = false;
+    
+    // Close stream controllers
+    if (!_heartRateController.isClosed) {
+      _heartRateController.close();
+    }
+    
+    if (!_bufferController.isClosed) {
+      _bufferController.close();
+    }
+    
+    // Clear any buffered data
+    _hrBuffer.clear();
+    _lastHeartRateTime = null;
+    
+    AppLogger.info('HeartRateService: Disposed all resources');
   }
 }
