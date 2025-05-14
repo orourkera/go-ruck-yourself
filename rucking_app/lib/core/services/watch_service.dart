@@ -546,9 +546,16 @@ class WatchService {
         cancelOnError: false, // Don't cancel on error, let our error handler decide
       );
       
-      // Notify native code that Flutter is listening
-      _watchSessionChannel.invokeMethod('flutterHeartRateListenerReady');
-      AppLogger.info('[WATCH_SERVICE] Notified native code that Flutter heart rate listener is ready');
+      // Notify native code that Flutter is ready to receive heart rate updates
+      try {
+        _watchSessionChannel.invokeMethod('flutterHeartRateListenerReady')
+          .then((_) => AppLogger.info('[WATCH_SERVICE] Successfully notified native code that heart rate listener is ready'))
+          .catchError((error) {
+            AppLogger.error('[WATCH_SERVICE] Error notifying native code about heart rate listener: $error');
+          });
+      } catch (e) {
+        AppLogger.error('[WATCH_SERVICE] Failed to notify native about heart rate listener: $e');
+      }
     } catch (e) {
       AppLogger.error('[WATCH_SERVICE] Failed to set up heart rate listener: $e');
       _scheduleHeartRateReconnect();
