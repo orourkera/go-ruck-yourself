@@ -172,7 +172,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             case "splitNotification":
                 processSplitNotification(message)
                 
-            case "startSession":
+            case "startSession", "workoutStarted":
                 self.isSessionActive = true
                 self.isPaused = false
                 print("[WATCH] Session started from phone")
@@ -185,7 +185,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 self.isPaused = false
                 print("[WATCH] Session resumed from phone")
                 
-            case "endSession":
+            case "endSession", "workoutStopped":
                 self.isSessionActive = false
                 self.isPaused = false
                 print("[WATCH] Session ended from phone")
