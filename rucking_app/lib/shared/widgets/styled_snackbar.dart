@@ -23,6 +23,18 @@ enum SnackBarAnimationStyle {
   spin,
 }
 
+/// Types of SnackBars for different states
+enum SnackBarType {
+  /// Normal information SnackBar (slate grey)
+  normal,
+  
+  /// Success SnackBar (green)
+  success,
+  
+  /// Error SnackBar (red)
+  error,
+}
+
 /// A utility class that provides badass SnackBars with Bangers font and custom animation
 class StyledSnackBar {
   /// Shows a styled SnackBar with Bangers font and custom animation
@@ -30,22 +42,41 @@ class StyledSnackBar {
   /// [context] - The BuildContext
   /// [message] - The message to display
   /// [duration] - How long to display the message
-  /// [isError] - Whether to show as an error (red) or success (normal)
+  /// [type] - The type of snackbar (normal, success, or error)
   /// [animationStyle] - The animation style to use (default: popIn)
   static void show({
     required BuildContext context,
     required String message,
     Duration? duration,
-    bool isError = false,
+    SnackBarType type = SnackBarType.normal,
     SnackBarAnimationStyle animationStyle = SnackBarAnimationStyle.popIn,
   }) {
     // Dismiss any existing SnackBars
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     
     // Main and border colors based on type
-    final Color mainColor = isError ? AppColors.error : AppColors.slateGrey;
-    final Color borderColor = isError ? AppColors.errorDark : AppColors.greyDark;
-    final Color shadowColor = isError ? AppColors.errorDark.withOpacity(0.5) : AppColors.black.withOpacity(0.3);
+    late Color mainColor;
+    late Color borderColor;
+    late Color shadowColor;
+    
+    switch (type) {
+      case SnackBarType.error:
+        mainColor = AppColors.error;
+        borderColor = AppColors.errorDark;
+        shadowColor = AppColors.errorDark.withOpacity(0.5);
+        break;
+      case SnackBarType.success:
+        mainColor = Colors.green.shade600;
+        borderColor = Colors.green.shade800;
+        shadowColor = Colors.green.shade800.withOpacity(0.5);
+        break;
+      case SnackBarType.normal:
+      default:
+        mainColor = AppColors.slateGrey;
+        borderColor = AppColors.greyDark;
+        shadowColor = AppColors.black.withOpacity(0.3);
+        break;
+    }
     
     // Create the snackbar content with CAPS for badass effect
     final Widget content = Container(
@@ -209,7 +240,7 @@ class StyledSnackBar {
     });
   }
   
-  /// Shows a success-styled SnackBar (slate grey color)
+  /// Shows a success-styled SnackBar (green color)
   static void showSuccess({
     required BuildContext context,
     required String message,
@@ -220,7 +251,7 @@ class StyledSnackBar {
       context: context,
       message: message,
       duration: duration,
-      isError: false,
+      type: SnackBarType.success,
       animationStyle: animationStyle,
     );
   }
@@ -236,7 +267,7 @@ class StyledSnackBar {
       context: context,
       message: message,
       duration: duration ?? const Duration(seconds: 3),
-      isError: true,
+      type: SnackBarType.error,
       animationStyle: animationStyle,
     );
   }

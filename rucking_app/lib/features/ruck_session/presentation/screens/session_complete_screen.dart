@@ -15,6 +15,7 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -313,32 +314,55 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       preferMetric = authState.user.preferMetric;
     }
 
-    return BlocListener<SessionBloc, SessionState>(
-      listener: (context, state) {
-        if (state is SessionOperationInProgress) {
-          // Show loading indicator
-          StyledSnackBar.show(
-            context: context,
-            message: 'Discarding session...',
-            duration: const Duration(seconds: 1),
-          );
-        } else if (state is SessionDeleteSuccess) {
-          // Show success message and navigate back to home
-          StyledSnackBar.showSuccess(
-            context: context,
-            message: 'The session is gone, rucker. Gone forever.',
-            duration: const Duration(seconds: 2),
-          );
-          Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
-        } else if (state is SessionOperationFailure) {
-          // Show error message
-          StyledSnackBar.showError(
-            context: context,
-            message: 'Error: ${state.message}',
-            duration: const Duration(seconds: 3),
-          );
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<SessionBloc, SessionState>(
+          listener: (context, state) {
+            if (state is SessionOperationInProgress) {
+              // Show loading indicator
+              StyledSnackBar.show(
+                context: context,
+                message: 'Discarding session...',
+                duration: const Duration(seconds: 1),
+              );
+            } else if (state is SessionDeleteSuccess) {
+              // Show success message and navigate back to home
+              StyledSnackBar.showSuccess(
+                context: context,
+                message: 'The session is gone, rucker. Gone forever.',
+                duration: const Duration(seconds: 2),
+              );
+              Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+            } else if (state is SessionOperationFailure) {
+              // Show error message
+              StyledSnackBar.showError(
+                context: context,
+                message: 'Error: ${state.message}',
+                duration: const Duration(seconds: 3),
+              );
+            }
+          },
+        ),
+        BlocListener<HealthBloc, HealthState>(
+          listener: (context, state) {
+            if (state is HealthDataWriteStatus) {
+              if (state.success) {
+                StyledSnackBar.showSuccess(
+                  context: context,
+                  message: 'Session data successfully saved to Apple Health',
+                  duration: const Duration(seconds: 2),
+                );
+              } else {
+                StyledSnackBar.showError(
+                  context: context,
+                  message: 'Failed to save session data to Apple Health',
+                  duration: const Duration(seconds: 3),
+                );
+              }
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Session Complete'),
