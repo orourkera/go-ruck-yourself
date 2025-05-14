@@ -33,11 +33,13 @@ class WatchService {
 
   // Method channels
   late MethodChannel _watchSessionChannel;
+  late EventChannel _heartRateEventChannel;
 
   // Stream controllers for watch events
   final _sessionEventController = StreamController<Map<String, dynamic>>.broadcast();
   final _healthDataController = StreamController<Map<String, dynamic>>.broadcast();
   final _heartRateController = StreamController<double>.broadcast();
+  StreamSubscription? _nativeHeartRateSubscription;
 
   // Heart rate samples list
   List<HeartRateSample> _currentSessionHeartRateSamples = [];
@@ -51,9 +53,22 @@ class WatchService {
   void _initPlatformChannels() {
     AppLogger.info('[WATCH_SERVICE] Initializing platform channels...');
     _watchSessionChannel = const MethodChannel('com.getrucky.gfy/watch_session');
+    _heartRateEventChannel = const EventChannel('com.getrucky.gfy/heartRateStream');
 
     AppLogger.info('[WATCH_SERVICE] Setting up method call handlers for MethodChannel...');
     _watchSessionChannel.setMethodCallHandler(_handleWatchSessionMethod);
+
+    AppLogger.info('[WATCH_SERVICE] Setting up heart rate event channel stream...');
+    _nativeHeartRateSubscription = _heartRateEventChannel
+        .receiveBroadcastStream()
+        .listen((dynamic heartRate) {
+      if (heartRate is double) {
+        AppLogger.info('[WATCH_SERVICE] Received heart rate from native channel: $heartRate BPM');
+        handleWatchHeartRateUpdate(heartRate);
+      }
+    }, onError: (dynamic error) {
+      AppLogger.error('[WATCH_SERVICE] Error in heart rate event channel: $error');
+    });
 
     AppLogger.info('[WATCH_SERVICE] Registering RuckingApi (Pigeon) handler...');
     RuckingApi.setUp(RuckingApiHandler(this));
@@ -78,9 +93,13 @@ class WatchService {
         } else if (data['action'] == 'pauseSession') {
           AppLogger.info('[WATCH] Pausing session from watch');
           _isPaused = true;
+          // Call the dedicated pause callback that dispatches to the session controller
+          pauseSessionFromWatchCallback();
         } else if (data['action'] == 'resumeSession') {
           AppLogger.info('[WATCH] Resuming session from watch');
           _isPaused = false;
+          // Call the dedicated resume callback that dispatches to the session controller
+          resumeSessionFromWatchCallback();
         }
 
         return true;
@@ -479,6 +498,7 @@ class WatchService {
   }
 
   void dispose() {
+    _nativeHeartRateSubscription?.cancel();
     _sessionEventController.close();
     _healthDataController.close();
     _heartRateController.close();
