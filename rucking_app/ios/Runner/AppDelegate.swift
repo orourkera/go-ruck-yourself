@@ -45,7 +45,8 @@ import WatchConnectivity
                     result(FlutterError(code: "-1", message: "Invalid arguments", details: nil))
                 }
             case "startWorkout":
-                self.sendMessageToWatch(["command": "workoutStarted"])
+                // Use auto-launch functionality
+                self.launchWatchAppAndStartSession(["command": "workoutStarted"])
                 result(true)
             case "stopWorkout":
                 self.sendMessageToWatch(["command": "workoutStopped"])
@@ -60,7 +61,26 @@ import WatchConnectivity
                 result(true)
             case "updateMetrics":
                 if let metrics = call.arguments as? [String: Any] {
-                    self.sendMessageToWatch(["command": "updateMetrics", "metrics": metrics])
+                    // Create a copy of metrics where we can add additional data
+                    var enhancedMetrics = metrics
+                    
+                    // Make sure session state (paused status) is always included in enhanced metrics
+                    // This ensures the watch always has the latest state from the iPhone
+                    if let isPaused = metrics["isPaused"] as? Bool {
+                        // If isPaused is already in the metrics, make sure it's in integer format as expected by watch
+                        enhancedMetrics["isPaused"] = isPaused ? 1 : 0
+                    }
+                    
+                    self.sendMessageToWatch(["command": "updateMetrics", "metrics": enhancedMetrics])
+                    result(true)
+                } else {
+                    result(FlutterError(code: "-1", message: "Invalid arguments", details: nil))
+                }
+                
+            case "updateSessionState":
+                if let stateData = call.arguments as? [String: Any], let isPaused = stateData["isPaused"] as? Bool {
+                    print("[WATCH] Sending session state update to watch: isPaused = \(isPaused)")
+                    self.sendMessageToWatch(["command": "updateSessionState", "isPaused": isPaused])
                     result(true)
                 } else {
                     result(FlutterError(code: "-1", message: "Invalid arguments", details: nil))
@@ -115,8 +135,8 @@ import WatchConnectivity
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
     
-    // Send message to Watch
-    private func sendMessageToWatch(_ message: [String: Any]) {
+    /// Send a message to the watch via the session channel
+    private func sendMessageToWatch(_ message: [String: Any], launchApp: Bool = false) {
         guard let session = session else {
             print("[WATCH] Watch session is nil.")
             return
@@ -163,9 +183,41 @@ import WatchConnectivity
                 print("[WATCH] Failed to update application context: \(error.localizedDescription)")
             }
             
-            // Try transferUserInfo as another option
-            session.transferUserInfo(message)
-            print("[WATCH] Attempted transferUserInfo as fallback")
+            // Always use transferUserInfo since this works even when watch app is not running
+            var userInfo = message
+            if launchApp {
+                print("[WATCH] Setting launchApp flag to auto-launch Watch app")
+            }
+            session.transferUserInfo(userInfo)
+            print("[WATCH] Attempted transferUserInfo\(launchApp ? " with auto-launch flag" : "")")
+        }
+    }
+    
+    // Launch the watch app and start session
+    private func launchWatchAppAndStartSession(_ message: [String: Any]) {
+        guard let session = session else {
+            print("[WATCH] Watch session is nil.")
+            return
+        }
+        
+        // Set message content
+        var userInfo = message
+        if !userInfo.keys.contains("command") {
+            userInfo["command"] = "workoutStarted"
+        }
+        
+        // Use both methods to ensure message is delivered
+        // 1. Standard message sending if watch is reachable
+        sendMessageToWatch(userInfo, launchApp: true)
+        
+        // 2. Specifically use transferUserInfo which works for app launch
+        print("[WATCH] Attempting to auto-launch Watch app with session")
+        session.transferUserInfo(userInfo)
+        
+        // 3. For devices supporting WKApplication launch
+        if #available(iOS 16.0, *) {
+            print("[WATCH] Using modern WKApplication launch API")
+            session.transferCurrentComplicationUserInfo(userInfo)
         }
     }
     
@@ -185,47 +237,48 @@ import WatchConnectivity
     
     func sessionDidDeactivate(_ session: WCSession) {
         print("[WATCH] Watch session deactivated")
-        // Reactivate session if possible
-        session.activate()
     }
     
+    // Receive and process messages from the Watch
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
-        print("[WATCH] Received message from Watch: \(message)")
-        
-        // Handle messages from Watch, such as heart rate data
-        if let heartRate = message["heartRate"] as? Double {
-            print("[WATCH] Received heart rate: \(heartRate) BPM - updating event channel")
-            // Send heart rate to Flutter via event channel
-            DispatchQueue.main.async {
-                HeartRateStreamHandler.sendHeartRate(heartRate)
-            }
-        }
-        
-        // Handle other message types as needed
+        // Handle message commands
         if let command = message["command"] as? String {
             print("[WATCH] Received command from Watch: \(command)")
             
+            // Get controller and channel only once
+            let controller = window?.rootViewController as! FlutterViewController
+            let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+            
             switch command {
             case "sessionStarted":
-                // Handle session started on Watch
-                break
+                print("[WATCH] Session started from Watch")
             case "sessionEnded":
-                // Handle session ended on Watch
-                break
-            case "pauseSession", "sessionPaused":
-                // Handle session paused on Watch - forward to Flutter
-                print("[WATCH] Session paused from Watch - forwarding to Flutter")
-                let controller = window?.rootViewController as! FlutterViewController
-                let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
-                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "pauseSession"])
-                break
-            case "resumeSession", "sessionResumed":
-                // Handle session resumed on Watch - forward to Flutter
-                print("[WATCH] Session resumed from Watch - forwarding to Flutter")
-                let controller = window?.rootViewController as! FlutterViewController
-                let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
-                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "resumeSession"])
-                break
+                print("[WATCH] Session ended from Watch")
+            case "pauseSession":
+                print("[WATCH] Session pause command received from Watch - forwarding to Flutter")
+                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "pauseSession"]) { result in
+                    if let error = result as? FlutterError {
+                        print("[WATCH] Error forwarding pause command to Flutter: \(error.message ?? "unknown error")")
+                    } else {
+                        print("[WATCH] Successfully forwarded pause command to Flutter")
+                        self.sendMessageToWatch(["command": "pauseConfirmed"])
+                    }
+                }
+            case "resumeSession":
+                print("[WATCH] Session resume command received from Watch - forwarding to Flutter")
+                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "resumeSession"]) { result in
+                    if let error = result as? FlutterError {
+                        print("[WATCH] Error forwarding resume command to Flutter: \(error.message ?? "unknown error")")
+                    } else {
+                        print("[WATCH] Successfully forwarded resume command to Flutter")
+                        self.sendMessageToWatch(["command": "resumeConfirmed"])
+                    }
+                }
+            case "watchHeartRateUpdate":
+                if let heartRate = message["heartRate"] as? Double {
+                    print("[WATCH] Heart rate update command received: \(heartRate) BPM")
+                    HeartRateStreamHandler.sendHeartRate(heartRate)
+                }
             default:
                 print("[WATCH] Unknown command: \(command)")
             }

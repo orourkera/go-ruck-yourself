@@ -88,6 +88,17 @@ class WorkoutManager: NSObject {
         }
     }
     
+    // Convenience helper to end a workout without needing a completion handler at call-site
+    func stopWorkout() {
+        endWorkout { error in
+            if let error = error {
+                print("[WATCH] Failed to end workout: \(error.localizedDescription)")
+            } else {
+                print("[WATCH] Workout ended successfully")
+            }
+        }
+    }
+    
     // Set handler for heart rate updates
     func setHeartRateHandler(_ handler: @escaping (Double) -> Void) {
         self.heartRateHandler = handler
