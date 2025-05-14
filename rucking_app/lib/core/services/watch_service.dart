@@ -451,6 +451,9 @@ class WatchService {
   /// Handle heart rate updates from the watch
   void handleWatchHeartRateUpdate(double heartRate) {
     _currentHeartRate = heartRate;
+    // Always log heart rate updates for debugging
+    AppLogger.info('[WATCH_SERVICE] Broadcasting heart rate update: $heartRate BPM to ${_heartRateController.hasListener ? _heartRateController.length : 0} listeners');
+    
     if (_isSessionActive) {
       _healthService.updateHeartRate(heartRate);
       final sample = HeartRateSample(
@@ -459,7 +462,14 @@ class WatchService {
       );
       _currentSessionHeartRateSamples.add(sample);
     }
-    _heartRateController.add(heartRate);
+    
+    // Ensure we're broadcasting the heart rate update
+    // This is critical for reconnection scenarios
+    if (!_heartRateController.isClosed) {
+      _heartRateController.add(heartRate);
+    } else {
+      AppLogger.error('[WATCH_SERVICE] Cannot broadcast heart rate update - controller is closed!');
+    }
   }
 
   /// Stream to listen for heart rate updates from the Watch
