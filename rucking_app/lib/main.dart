@@ -11,7 +11,8 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:app_tracking_transparency/app_tracking_transparency.dart'; 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
+import 'package:rucking_app/core/services/location_service.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
