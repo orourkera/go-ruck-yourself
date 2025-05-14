@@ -33,6 +33,21 @@ void main() async {
     AppLogger.error('Error requesting tracking authorization: $e');
   }
   
+  // Request location permissions early to prevent crashes when starting workouts
+  try {
+    final locationService = getIt<LocationService>();
+    final hasPermission = await locationService.hasLocationPermission();
+    
+    if (!hasPermission) {
+      AppLogger.info('Requesting location permission at app startup...');
+      await locationService.requestLocationPermission();
+    } else {
+      AppLogger.info('Location permission already granted.');
+    }
+  } catch (e) {
+    AppLogger.error('Error requesting location permission: $e');
+  }
+  
   // Disable RevenueCat debug logs for production
   Purchases.setDebugLogsEnabled(false);
   // Removed Purchases.configure from main.dart. Now handled in RevenueCatService.
