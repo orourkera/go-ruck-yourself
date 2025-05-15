@@ -3,7 +3,6 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
-import 'dart:ui' as ui;
 
 /// Overlay widget that shows current distance, pace, elapsed time, heart rate and calories.
 class SessionStatsOverlay extends StatelessWidget {
@@ -181,23 +180,7 @@ class SessionStatsOverlay extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              // HealthKit label
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.green.withOpacity(0.3)),
-                                ),
-                                child: const Text(
-                                  'HealthKit',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
+                              // No HealthKit label - removed as requested
                             ],
                           ),
                         ],
@@ -350,7 +333,7 @@ class _StatTile extends StatelessWidget {
               ),
             ],
           ),
-        ] else [
+        ] else ...[
           Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(fontSize: 11, color: AppColors.primary)),
         ],
         const SizedBox(height: 2),
