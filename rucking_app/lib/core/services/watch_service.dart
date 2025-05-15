@@ -491,12 +491,30 @@ class WatchService {
 
   void pauseSessionFromWatchCallback() {
     _isPaused = true;
-    AppLogger.info('[WATCH_SERVICE] Session paused via RuckingApiHandler callback.');
+    AppLogger.info('[WATCH_SERVICE] Session paused via watch. Dispatching SessionPaused event to ActiveSessionBloc');
+    
+    // Get the ActiveSessionBloc instance from GetIt and add a SessionPaused event
+    try {
+      final activeSessionBloc = GetIt.instance.get<ActiveSessionBloc>();
+      activeSessionBloc.add(SessionPaused());
+      AppLogger.info('[WATCH_SERVICE] Successfully dispatched SessionPaused event to ActiveSessionBloc');
+    } catch (e) {
+      AppLogger.error('[WATCH_SERVICE] Failed to dispatch SessionPaused event: $e');
+    }
   }
 
   void resumeSessionFromWatchCallback() {
     _isPaused = false;
-    AppLogger.info('[WATCH_SERVICE] Session resumed via RuckingApiHandler callback.');
+    AppLogger.info('[WATCH_SERVICE] Session resumed via watch. Dispatching SessionResumed event to ActiveSessionBloc');
+    
+    // Get the ActiveSessionBloc instance from GetIt and add a SessionResumed event
+    try {
+      final activeSessionBloc = GetIt.instance.get<ActiveSessionBloc>();
+      activeSessionBloc.add(SessionResumed());
+      AppLogger.info('[WATCH_SERVICE] Successfully dispatched SessionResumed event to ActiveSessionBloc');
+    } catch (e) {
+      AppLogger.error('[WATCH_SERVICE] Failed to dispatch SessionResumed event: $e');
+    }
   }
 
   void endSessionFromWatchCallback(int duration, double distance, double calories) {
