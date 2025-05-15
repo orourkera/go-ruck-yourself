@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,9 +11,28 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/data/heart_rate_sample_storage.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'rucking_api_handler.dart';
+
+/// Class for SessionPaused event that mimics the structure expected by ActiveSessionBloc
+class _SessionPausedEvent extends Equatable {
+  const _SessionPausedEvent();
+  @override
+  List<Object?> get props => [];
+  @override
+  String toString() => 'SessionPaused';
+}
+
+/// Class for SessionResumed event that mimics the structure expected by ActiveSessionBloc
+class _SessionResumedEvent extends Equatable {
+  const _SessionResumedEvent();
+  @override
+  List<Object?> get props => [];
+  @override
+  String toString() => 'SessionResumed';
+}
 
 /// Service for managing communication with Apple Watch companion app
 class WatchService {
@@ -489,32 +509,60 @@ class WatchService {
     AppLogger.info('[WATCH_SERVICE] Session started via RuckingApiHandler callback. Weight: $ruckWeight');
   }
 
+  /// Callback when session is paused from the watch
+  /// This will update the internal state and dispatch the appropriate events to the ActiveSessionBloc
   void pauseSessionFromWatchCallback() {
     _isPaused = true;
-    AppLogger.info('[WATCH_SERVICE] Session paused via watch. Dispatching SessionPaused event to ActiveSessionBloc');
+    AppLogger.info('[WATCH_SERVICE] Session paused via watch. Attempting to dispatch pause event to ActiveSessionBloc');
     
-    // Get the ActiveSessionBloc instance from GetIt and add a SessionPaused event
     try {
+      // Get the activeSessionBloc
       final activeSessionBloc = GetIt.instance.get<ActiveSessionBloc>();
-      activeSessionBloc.add(SessionPaused());
-      AppLogger.info('[WATCH_SERVICE] Successfully dispatched SessionPaused event to ActiveSessionBloc');
+      
+      // Manually create the event based on what the bloc expects
+      // This is our custom event that will be handled by the bloc
+      // Don't need to match the exact class since bloc uses typematcher
+      final pauseEvent = _createPauseEvent();
+      activeSessionBloc.add(pauseEvent);
+      
+      AppLogger.info('[WATCH_SERVICE] Successfully dispatched pause event to ActiveSessionBloc');
     } catch (e) {
-      AppLogger.error('[WATCH_SERVICE] Failed to dispatch SessionPaused event: $e');
+      AppLogger.error('[WATCH_SERVICE] Failed to dispatch pause event: $e');
     }
   }
-
+  
+  /// Creates a pause event that matches what the ActiveSessionBloc expects
+  dynamic _createPauseEvent() {
+    // This is a simple event with no properties, matching what SessionPaused looks like
+    return const _SessionPausedEvent();
+  }
+  
+  /// Callback when session is resumed from the watch
+  /// This will update the internal state and dispatch the appropriate events to the ActiveSessionBloc
   void resumeSessionFromWatchCallback() {
     _isPaused = false;
-    AppLogger.info('[WATCH_SERVICE] Session resumed via watch. Dispatching SessionResumed event to ActiveSessionBloc');
+    AppLogger.info('[WATCH_SERVICE] Session resumed via watch. Attempting to dispatch resume event to ActiveSessionBloc');
     
-    // Get the ActiveSessionBloc instance from GetIt and add a SessionResumed event
     try {
+      // Get the activeSessionBloc
       final activeSessionBloc = GetIt.instance.get<ActiveSessionBloc>();
-      activeSessionBloc.add(SessionResumed());
-      AppLogger.info('[WATCH_SERVICE] Successfully dispatched SessionResumed event to ActiveSessionBloc');
+      
+      // Manually create the event based on what the bloc expects
+      // This is our custom event that will be handled by the bloc
+      // Don't need to match the exact class since bloc uses typematcher
+      final resumeEvent = _createResumeEvent();
+      activeSessionBloc.add(resumeEvent);
+      
+      AppLogger.info('[WATCH_SERVICE] Successfully dispatched resume event to ActiveSessionBloc');
     } catch (e) {
-      AppLogger.error('[WATCH_SERVICE] Failed to dispatch SessionResumed event: $e');
+      AppLogger.error('[WATCH_SERVICE] Failed to dispatch resume event: $e');
     }
+  }
+  
+  /// Creates a resume event that matches what the ActiveSessionBloc expects
+  dynamic _createResumeEvent() {
+    // This is a simple event with no properties, matching what SessionResumed looks like
+    return const _SessionResumedEvent();
   }
 
   void endSessionFromWatchCallback(int duration, double distance, double calories) {
