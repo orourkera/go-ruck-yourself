@@ -113,63 +113,6 @@ class SessionStatsOverlay extends StatelessWidget {
                                 textAlign: TextAlign.center,
                               ),
                             ),
-<<<<<<< HEAD
-                        ],
-                      ),
-                    ),
-                    // Right half: Heart rate (centered)
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // Heart rate with HealthKit badge
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Stack(
-                                    children: [
-                                      Icon(
-                                        Icons.favorite,
-                                        color: Colors.red,
-                                        size: 36,
-                                      ),
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(color: Colors.grey.shade300),
-                                          ),
-                                          child: const Icon(
-                                            Icons.medical_services,
-                                            color: Colors.green,
-                                            size: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
-                                    style: AppTextStyles.timerDisplay.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 36,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // No HealthKit label - removed as requested
-                            ],
-=======
->>>>>>> 266de49b (Additional changes for watch integration)
                           ),
                       ],
                     ),
