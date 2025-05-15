@@ -3,6 +3,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'dart:ui' as ui;
 
 /// Overlay widget that shows current distance, pace, elapsed time, heart rate and calories.
 class SessionStatsOverlay extends StatelessWidget {
@@ -44,9 +45,10 @@ class SessionStatsOverlay extends StatelessWidget {
             _StatTile(label: 'TIME', value: _formatMinutesSeconds(Duration(seconds: state.elapsedSeconds))),
             if ((state.latestHeartRate ?? 0) > 0)
               _StatTile(
-                label: 'HR',
+                label: 'HR HealthKit',
                 value: '${state.latestHeartRate} bpm',
                 color: _hrColor(state.latestHeartRate ?? 0),
+                isHealthKit: true,
               ),
             _StatTile(
               label: 'CAL',
@@ -135,21 +137,65 @@ class SessionStatsOverlay extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Row(
+                          Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.favorite,
-                                color: Colors.red,
-                                size: 36,
+                              // Heart rate with HealthKit badge
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Stack(
+                                    children: [
+                                      Icon(
+                                        Icons.favorite,
+                                        color: Colors.red,
+                                        size: 36,
+                                      ),
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: Colors.grey.shade300),
+                                          ),
+                                          child: const Icon(
+                                            Icons.medical_services,
+                                            color: Colors.green,
+                                            size: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
+                                    style: AppTextStyles.timerDisplay.copyWith(
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 36,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
-                                style: AppTextStyles.timerDisplay.copyWith(
-                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 36,
+                              // HealthKit label
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                                ),
+                                child: const Text(
+                                  'HealthKit',
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ],
@@ -241,12 +287,13 @@ class _PlaceholderTile extends StatelessWidget {
 }
 
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value, this.color, this.icon});
+  const _StatTile({required this.label, required this.value, this.color, this.icon, this.isHealthKit = false});
 
   final String label;
   final String value;
   final Color? color;
   final IconData? icon;
+  final bool isHealthKit;
 
   @override
   Widget build(BuildContext context) {
@@ -254,10 +301,58 @@ class _StatTile extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (icon != null) ...[
+          isHealthKit ? 
+          // If it's HealthKit data, show the health icon badge
+          Stack(
+            children: [
+              Icon(icon, color: color ?? AppColors.primary, size: 18),
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(1),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                  ),
+                  child: const Icon(
+                    Icons.medical_services,
+                    color: Colors.green,
+                    size: 8,
+                  ),
+                ),
+              ),
+            ],
+          ) :
           Icon(icon, color: color ?? AppColors.primary, size: 18),
           const SizedBox(height: 2),
         ],
-        Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(fontSize: 11, color: AppColors.primary)),
+        // Add a small medical icon for HealthKit if no primary icon
+        if (icon == null && isHealthKit) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(fontSize: 11, color: AppColors.primary)),
+              const SizedBox(width: 2),
+              Container(
+                padding: const EdgeInsets.all(1),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: const Icon(
+                  Icons.medical_services,
+                  color: Colors.white,
+                  size: 8,
+                ),
+              ),
+            ],
+          ),
+        ] else [
+          Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(fontSize: 11, color: AppColors.primary)),
+        ],
         const SizedBox(height: 2),
         Text(value, style: AppTextStyles.titleLarge.copyWith(fontSize: 22, color: color)), 
       ],
