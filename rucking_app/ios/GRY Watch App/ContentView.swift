@@ -25,10 +25,11 @@ struct ContentView: View {
                     
                     // Full-width timer (only show timer when active, otherwise show placeholder)
                     Text(sessionManager.statusText.contains("Connect") ? "--" : sessionManager.statusText)
-                        .font(.system(size: 34, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 28, weight: .semibold, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 4)
-                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     
                     // 2x2 Grid for metrics - with larger cells
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {

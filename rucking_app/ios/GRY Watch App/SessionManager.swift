@@ -58,26 +58,26 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             DispatchQueue.main.async {
                 self.heartRate = Int(heartRate)
             }
-            // Send heart rate to iOS app
+            // Send heart rate to iOS app silently
             self.sendHeartRate(heartRate)
         }
         
         // Request HealthKit permissions
         workoutManager.requestAuthorization { success, error in
             if success {
-                print("[WATCH] HealthKit authorization successful")
+                // HealthKit authorization successful
                 // Start workout session to get heart rate
                 DispatchQueue.main.async {
                     self.workoutManager.startWorkout { error in
                         if let error = error {
                             print("[WATCH] Failed to start workout: \(error.localizedDescription)")
                         } else {
-                            print("[WATCH] Workout session started successfully")
+                            // Workout session started successfully
                         }
                     }
                 }
             } else if let error = error {
-                print("[WATCH] HealthKit authorization failed: \(error.localizedDescription)")
+                print("[ERROR] HealthKit authorization failed: \(error.localizedDescription)")
             }
         }
     }
@@ -97,15 +97,21 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     func sendMessage(_ message: [String: Any]) {
         guard session.activationState == .activated else {
-            print("Session not activated, message not sent.")
+            // Session not activated, message not sent.
             return
         }
         
-        // Log the message being sent for debugging
-        print(" [WATCH] SessionManager attempting to send message: \(message)")
+        // Ensure message has proper type format for Dart side casting
+        // This ensures the message is always a Dictionary with String keys and valid JSON values
+        if var sanitizedMessage = message as? [String: Any] {
+            // Log the message being sent for debugging
+            // SessionManager sending message
 
-        session.sendMessage(message, replyHandler: nil) { error in
-            print("Error sending message: \(error.localizedDescription)")
+            session.sendMessage(sanitizedMessage, replyHandler: nil) { error in
+                print("Error sending message: \(error.localizedDescription)")
+            }
+        } else {
+            // Error: Could not sanitize message to proper format
         }
     }
     
@@ -113,52 +119,56 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         // Create a dedicated heart rate message with the command
         let message: [String: Any] = ["heartRate": heartRate, "command": "watchHeartRateUpdate"]
         
-        // Log sending attempt
-        print("[WATCH] Sending heart rate to iOS: \(heartRate) BPM")
-        
         // Send with a reply handler to confirm receipt
         if session.activationState == .activated && session.isReachable {
             session.sendMessage(message, replyHandler: { reply in
-                print("[WATCH] Heart rate message confirmed received by iPhone: \(reply)")
+                // Heart rate receipt confirmed - no logging needed
             }) { error in
+                // Only log errors
                 print("[WATCH] Error sending heart rate: \(error.localizedDescription)")
             }
         } else {
             // Fallback to regular send which might be less reliable
             sendMessage(message)
-            print("[WATCH] Heart rate sent via regular channel: \(heartRate) BPM")
         }
     }
     
     // Pause the session from the watch
     func pauseSession() {
         guard isSessionActive else { 
-            print("[WATCH] Cannot pause: session not active")
+            print("[DEBUG] Cannot pause: session not active")
             return 
         }
         
         if isPaused {
-            print("[WATCH] Session already paused, ignoring pause request")
+            print("[DEBUG] Session already paused, ignoring pause request")
             return
         }
         
-        print("[WATCH] Pausing session from watch")
+        print("[DEBUG] Pausing session from watch")
         // Update the state immediately for UI responsiveness
         DispatchQueue.main.async {
             self.isPaused = true
         }
         
         // Send pause command to the iPhone app with a reply handler to confirm
-        let message: [String: Any] = ["command": "pauseSession"]
+        // Make sure we use a Dictionary with String keys to ensure proper mapping to Dart Map<String, dynamic>
+        let message = ["command": "pauseSession"] as [String: Any]
         
+        print("[DEBUG] Sending pause command to iPhone: \(message)")
+        // Note: Direct Pigeon API not available in Watch extension
+        // Using WatchConnectivity API instead
+        
+        // Fallback to WatchConnectivity API if Pigeon not available
         // Use sendMessageWithReply for acknowledgement
         if session.activationState == .activated && session.isReachable {
+            // Using WatchConnectivity for pause command
             session.sendMessage(message, replyHandler: { reply in
-                print("[WATCH] Pause command acknowledged by iPhone: \(reply)")
+                // Pause command acknowledged by iPhone
                 // Verify state was applied correctly
                 DispatchQueue.main.async {
                     if !self.isPaused {
-                        print("[WATCH] Re-applying pause state after confirmation")
+                        // Re-applying pause state after confirmation
                         self.isPaused = true
                     }
                 }
@@ -167,15 +177,16 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             })
         } else {
             // Fallback to regular message if not reachable
+            // Using regular message channel for pause command
             sendMessage(message)
         }
         
-        print("[WATCH] Pause command sent to iPhone")
+        // Pause command sent to iPhone
     }
     
     // Toggle between pause and resume states - used by the UI button
     func togglePauseResume() {
-        print("[WATCH] Toggle pause/resume called. Current state: isPaused=\(isPaused)")
+        // Toggle pause/resume called
         if isPaused {
             resumeSession()
         } else {
@@ -183,20 +194,44 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         }
         
         // Debug confirmation
-        print("[WATCH] togglePauseResume executed, new isPaused state should be: \(!isPaused)")
+        // togglePauseResume executed
     }
     
     // Resume the session from the watch
     func resumeSession() {
-        guard isSessionActive && isPaused else { return }
+        guard isSessionActive && isPaused else { 
+            print("[DEBUG] Cannot resume: session not active or not paused")
+            return 
+        }
         
-        print("[WATCH] Resuming session from watch")
-        isPaused = false
+        print("[DEBUG] Resuming session from watch")
+        // Update UI immediately for responsiveness
+        DispatchQueue.main.async {
+            self.isPaused = false
+        }
+        
+        // Note: Direct Pigeon API not available in Watch extension
+        // Using WatchConnectivity API instead
         
         // Send resume command to the iPhone app
-        let message: [String: Any] = ["command": "resumeSession"]
-        sendMessage(message)
-        print("[WATCH] Resume command sent to iPhone")
+        // Make sure we use a Dictionary with String keys to ensure proper mapping to Dart Map<String, dynamic>
+        let message = ["command": "resumeSession"] as [String: Any]
+        
+        print("[DEBUG] Sending resume command to iPhone: \(message)")
+        
+        // Using WatchConnectivity for resume command
+        if session.activationState == .activated && session.isReachable {
+            // Use sendMessageWithReply for acknowledgement
+            session.sendMessage(message, replyHandler: { reply in
+                print("[DEBUG] Resume command acknowledged by iPhone: \(reply)")
+            }, errorHandler: { error in
+                print("[ERROR] Error sending resume command: \(error.localizedDescription)")
+            })
+        } else {
+            // Fallback to regular message if not reachable
+            sendMessage(message)
+        }
+        print("[DEBUG] Resume command sent to iPhone")
     }
     
     // MARK: - WCSessionDelegate
@@ -217,11 +252,11 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         delegate?.didReceiveMessage(message)
         
-        print("[WATCH] Received message: \(message)")
+        // Heart rate update received silently
         
         // Check message command
         if let command = message["command"] as? String {
-            print("[WATCH] Processing command: \(command)")
+            // Processing command from message
             
             switch command {
             case "splitNotification":
@@ -230,7 +265,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             case "startSession", "workoutStarted":
                 // Start the session if not already active
                 if !isSessionActive {
-                    print("[WATCH] Starting session from phone command")
+                    // Starting session from phone command
                     DispatchQueue.main.async {
                         self.isSessionActive = true
                         self.isPaused = false
@@ -241,7 +276,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             case "stopSession", "workoutStopped":
                 // Stop the session if active
                 if isSessionActive {
-                    print("[WATCH] Stopping session from phone command")
+                    // Stopping session from phone command
                     DispatchQueue.main.async {
                         self.isSessionActive = false
                         self.workoutManager.stopWorkout()
@@ -249,20 +284,20 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 }
                 
             case "pauseSession":
-                print("[WATCH] Pause command from phone")
+                // Pause command from phone
                 DispatchQueue.main.async {
                     self.isPaused = true
                 }
                 
             case "resumeSession":
-                print("[WATCH] Resume command from phone")
+                // Resume command from phone
                 DispatchQueue.main.async {
                     self.isPaused = false
                 }
                 
             case "pauseConfirmed":
                 // iPhone has confirmed our pause request
-                print("[WATCH] iPhone confirmed pause - ensuring watch UI is in paused state")
+                // iPhone confirmed pause - ensuring watch UI is in paused state
                 DispatchQueue.main.async {
                     if !self.isPaused {
                         self.isPaused = true
@@ -271,7 +306,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 
             case "resumeConfirmed":
                 // iPhone has confirmed our resume request
-                print("[WATCH] iPhone confirmed resume - ensuring watch UI is in resumed state")
+                // iPhone confirmed resume - ensuring watch UI is in resumed state
                 DispatchQueue.main.async {
                     if self.isPaused {
                         self.isPaused = false
@@ -281,14 +316,14 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             case "updateSessionState":
                 // Direct state update from iPhone (used to sync states)
                 if let isPaused = message["isPaused"] as? Bool {
-                    print("[WATCH] Updating session state: isPaused = \(isPaused)")
+                    // Updating session state
                     DispatchQueue.main.async {
                         self.isPaused = isPaused
                     }
                 }
                 
             default:
-                print("[WATCH] Unknown command: \(command)")
+                // Unknown command received
                 break
             }
         }
@@ -297,7 +332,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         if let metricsData = message["metrics"] as? [String: Any] {
             DispatchQueue.main.async {
                 self.updateMetricsFromData(metricsData)
-                print("[WATCH] Updated metrics directly from message")
+                // Heart rate metrics updated
             }
         }
     }
@@ -307,7 +342,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         
         // Check message command
         if let command = message["command"] as? String {
-            print("[WATCH] Processing command with reply: \(command)")
+            // Processing command with reply
             
             switch command {
             case "splitNotification":
@@ -316,7 +351,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             case "startSession", "workoutStarted":
                 // Start the session if not already active
                 if !isSessionActive {
-                    print("[WATCH] Starting session from phone command (with reply)")
+                    // Starting session from phone command (with reply)
                     DispatchQueue.main.async {
                         self.isSessionActive = true
                         self.isPaused = false
@@ -327,7 +362,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             case "stopSession", "workoutStopped", "endSession":
                 // Stop the session if active
                 if isSessionActive {
-                    print("[WATCH] Stopping session from phone command (with reply)")
+                    // Stopping session from phone command (with reply)
                     DispatchQueue.main.async {
                         self.isSessionActive = false
                         self.workoutManager.stopWorkout()
@@ -335,20 +370,20 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 }
                 
             case "pauseSession":
-                print("[WATCH] Pause command from phone (with reply)")
+                // Pause command from phone (with reply)
                 DispatchQueue.main.async {
                     self.isPaused = true
                 }
                 
             case "resumeSession":
-                print("[WATCH] Resume command from phone (with reply)")
+                // Resume command from phone (with reply)
                 DispatchQueue.main.async {
                     self.isPaused = false
                 }
                 
             case "pauseConfirmed":
                 // iPhone has confirmed our pause request
-                print("[WATCH] iPhone confirmed pause - ensuring watch UI is in paused state (with reply)")
+                // iPhone confirmed pause - ensuring watch UI is in paused state (with reply)
                 DispatchQueue.main.async {
                     if !self.isPaused {
                         self.isPaused = true
@@ -357,7 +392,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 
             case "resumeConfirmed":
                 // iPhone has confirmed our resume request
-                print("[WATCH] iPhone confirmed resume - ensuring watch UI is in resumed state (with reply)")
+                // iPhone confirmed resume - ensuring watch UI is in resumed state (with reply)
                 DispatchQueue.main.async {
                     if self.isPaused {
                         self.isPaused = false
@@ -367,7 +402,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
             case "updateSessionState":
                 // Direct state update from iPhone (used to sync states)
                 if let isPaused = message["isPaused"] as? Bool {
-                    print("[WATCH] Updating session state: isPaused = \(isPaused) (with reply)")
+                    // Updating session state (with reply)
                     DispatchQueue.main.async {
                         self.isPaused = isPaused
                     }
@@ -378,12 +413,12 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 if let metricsData = message["metrics"] as? [String: Any] {
                     DispatchQueue.main.async {
                         self.updateMetricsFromData(metricsData)
-                        print("[WATCH] Updated metrics from message (with reply)")
+                        // Updated metrics from message (with reply)
                     }
                 }
                 
             default:
-                print("[WATCH] Unknown command: \(command) (with reply)")
+                // Unknown command received (with reply)
                 break
             }
         }
@@ -392,7 +427,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         if let metricsData = message["metrics"] as? [String: Any] {
             DispatchQueue.main.async {
                 self.updateMetricsFromData(metricsData)
-                print("[WATCH] Updated metrics directly from message (with reply)")
+                // Updated metrics directly from message (with reply)
             }
         }
         
@@ -435,7 +470,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         // Mark session as active when receiving metrics
         self.isSessionActive = true
         
-        // Update heart rate when present
+        // Update heart rate when present (silently)
         if let hr = metrics["heartRate"] as? Double {
             self.heartRate = Int(hr)
         }
@@ -500,7 +535,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                 // Show the notification
                 self.showingSplitNotification = true
                 
-                print("[WATCH] Received split notification: \(splitDistance) in \(splitTime)")
+                // Received split notification
                 
                 // Auto-dismiss after 5 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5) {

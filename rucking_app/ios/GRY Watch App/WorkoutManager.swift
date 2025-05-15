@@ -92,9 +92,9 @@ class WorkoutManager: NSObject {
     func stopWorkout() {
         endWorkout { error in
             if let error = error {
-                print("[WATCH] Failed to end workout: \(error.localizedDescription)")
+                print("[ERROR] Failed to end workout: \(error.localizedDescription)")
             } else {
-                print("[WATCH] Workout ended successfully")
+                // Workout ended successfully
             }
         }
     }

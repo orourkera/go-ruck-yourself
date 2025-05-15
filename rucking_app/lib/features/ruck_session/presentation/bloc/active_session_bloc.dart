@@ -428,6 +428,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
+
+      // If the session is currently paused, ignore location updates. This prevents
+      // distance, pace and duration from changing while paused and avoids
+      // sending "isPaused = 0" metric updates back to the watch which would
+      // cause the watch UI to flip back to the running state.
+      if (currentState.isPaused) {
+        return;
+      }
+
       if (_lastValidLocation != null) {
         final last = _lastValidLocation!;
         // DEDUPLICATION: Ignore if lat/lng and timestamp match last valid location
@@ -598,12 +607,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
       
       AppLogger.info('Pausing session ${currentState.sessionId}');
+      AppLogger.debug('[PAUSE] Before processing: isPaused=${currentState.isPaused}, tickerActive=${_ticker != null}');
       
       // Stop the timer when pausing
       _stopTicker();
+      AppLogger.debug('[PAUSE] Ticker stopped. tickerActive=${_ticker != null}');
       
       // Tell watch to pause
-      _watchService.pauseSessionOnWatch();
+      final watchPauseSuccess = await _watchService.pauseSessionOnWatch();
+      AppLogger.debug('[PAUSE] pauseSessionOnWatch returned: $watchPauseSuccess');
       
       // Update backend about pause
       try {
@@ -613,11 +625,27 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Continue with local pause even if backend update fails
       }
       
-      // Emit paused state
-      emit(currentState.copyWith(
+      // Create the paused state object
+      final pausedState = currentState.copyWith(
         isPaused: true,
         currentPauseStartTimeUtc: DateTime.now().toUtc(), // Record when pause started
-      ));
+      );
+      
+      // Emit paused state
+      emit(pausedState);
+      AppLogger.debug('[PAUSE] Emitted paused state.');
+      
+      // Force a direct isPaused=true metrics update to ensure watch stays paused
+      await _watchService.updateSessionOnWatch(
+        distance: pausedState.distanceKm,
+        duration: Duration(seconds: pausedState.elapsedSeconds),
+        pace: pausedState.pace ?? 0.0,
+        isPaused: true,  // CRITICAL: explicitly set pause flag
+        calories: pausedState.calories.toDouble(),
+        elevationGain: pausedState.elevationGain,
+        elevationLoss: pausedState.elevationLoss,
+      );
+      AppLogger.debug('[PAUSE] Sent forced pause metrics to watch.');
     }
   }
 
@@ -627,6 +655,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
+      AppLogger.debug('[RESUME] Before processing: isPaused=${currentState.isPaused}, tickerActive=${_ticker != null}');
+      
       Duration newTotalPausedDuration = currentState.totalPausedDuration;
 
       if (currentState.currentPauseStartTimeUtc != null) {
@@ -639,6 +669,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       // Restart the timer when resuming
       _startTicker();
+      AppLogger.debug('[RESUME] Ticker restarted. tickerActive=${_ticker != null}');
       
       // Tell watch to resume
       _watchService.resumeSessionOnWatch();
@@ -657,6 +688,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         totalPausedDuration: newTotalPausedDuration, // Update total paused duration
         clearCurrentPauseStartTimeUtc: true, // Clear the specific pause start time
       ));
+      AppLogger.debug('[RESUME] Emitted resumed state, restarting ticker');
       
       // Re-sync elapsed counter on resume
       _elapsedCounter = DateTime.now().toUtc().difference(currentState.originalSessionStartTimeUtc).inSeconds - newTotalPausedDuration.inSeconds;
@@ -898,6 +930,15 @@ emit(ActiveSessionComplete(
 
     if (state is! ActiveSessionRunning) return;
     final currentState = state as ActiveSessionRunning;
+    
+    // If the session is currently paused, ignore this tick entirely. This ensures
+    // we do NOT send an update with isPaused = false that could flip the watch
+    // UI back to the running state. Because there might be one final tick that
+    // slipped through the cracks right before _stopTicker() cancelled the
+    // timer, this guard guarantees nothing happens while paused.
+    if (currentState.isPaused) {
+      return;
+    }
 
     // Check if heart rate service buffer needs flushing
     if (_heartRateService.shouldFlushBuffer()) {
