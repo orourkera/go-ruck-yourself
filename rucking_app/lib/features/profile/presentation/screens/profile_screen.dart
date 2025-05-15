@@ -10,7 +10,6 @@ import 'package:rucking_app/features/profile/presentation/screens/terms_of_servi
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 /// Screen for displaying and managing user profile
@@ -274,9 +273,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Icons.article_outlined,
                           label: 'Terms of Use (EULA)',
                           onTap: () async {
-                            const url = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
-                            if (await canLaunch(url)) {
-                              await launch(url);
+                            final url = Uri.parse('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/');
+                            if (await canLaunchUrl(url)) {
+                              await launchUrl(url);
                             }
                           },
                         ),
@@ -319,11 +318,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       onPressed: () async {
-                        final url = Theme.of(context).platform == TargetPlatform.iOS
+                        final url = Uri.parse(Theme.of(context).platform == TargetPlatform.iOS
                             ? 'https://apps.apple.com/account/subscriptions'
-                            : 'https://play.google.com/store/account/subscriptions';
-                        if (await canLaunch(url)) {
-                          await launch(url);
+                            : 'https://play.google.com/store/account/subscriptions');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url);
                         } else {
                           StyledSnackBar.showError(
                             context: context,
