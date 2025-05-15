@@ -4,11 +4,13 @@ class UserInfo extends Equatable {
   final String id;
   final String username;
   final String? photoUrl;
+  final String gender; // Either 'male' or 'female'
   
   const UserInfo({
     required this.id,
     required this.username,
     this.photoUrl,
+    required this.gender,
   });
   
   factory UserInfo.fromJson(Map<String, dynamic> json) {
@@ -16,9 +18,10 @@ class UserInfo extends Equatable {
       id: json['id']?.toString() ?? '',
       username: json['username'] ?? 'Unknown User',
       photoUrl: json['avatar_url'],
+      gender: json['gender'] ?? 'male', // Default to male if gender not specified
     );
   }
   
   @override
-  List<Object?> get props => [id, username, photoUrl];
+  List<Object?> get props => [id, username, photoUrl, gender];
 }

@@ -106,9 +106,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => EditProfileScreen(
-                            user: user, 
-                            // Pass the preference
-                            preferMetric: user.preferMetric, 
+                            user: user,
+                            preferMetric: user.preferMetric,
                           ),
                         ),
                       );
@@ -196,7 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           label: 'Share Rucks with Others',
                           trailing: Switch(
                             value: user.allowRuckSharing,
-                            activeColor: AppColors.primary,
+                            activeColor: user.gender == 'female' ? AppColors.ladyPrimary : AppColors.primary,
                             onChanged: (bool newValue) {
                               // Dispatch update event
                               context.read<AuthBloc>().add(AuthUpdateProfileRequested(
@@ -313,7 +312,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: const Text('Manage Subscription'),
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: user.gender == 'female' ? AppColors.ladyPrimary : AppColors.primary,
                         foregroundColor: Colors.white,
                         textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
@@ -434,8 +433,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Icon(
             icon,
-            color: AppColors.primary,
             size: 24,
+            color: AppColors.primary,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -470,14 +469,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required Widget trailing,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           Icon(
             icon,
-            color: AppColors.primary,
             size: 24,
+            color: AppColors.primary,
           ),
           const SizedBox(width: 16),
           Expanded(

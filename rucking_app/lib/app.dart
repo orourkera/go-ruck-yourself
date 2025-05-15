@@ -50,7 +50,12 @@ class RuckingApp extends StatelessWidget {
           final brightness = MediaQuery.platformBrightnessOf(context);
           final isDarkMode = brightness == Brightness.dark;
           
+          // Use a key based on user gender to force rebuild when gender changes
+          // This ensures the theme updates immediately after registration or profile updates
+          final String genderKey = user?.gender ?? 'default';
+          
           return MaterialApp(
+            key: Key(genderKey), // Force rebuild when gender changes
             title: 'GRY',
             debugShowCheckedModeBanner: false,
             theme: DynamicTheme.getThemeData(user, false),

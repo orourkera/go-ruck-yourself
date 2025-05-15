@@ -30,7 +30,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _weightController;
   late TextEditingController _heightController;
   bool _isLoading = false;
-  String? _selectedGender;
+  late String _selectedGender;
+  
+  // Dynamically get primary color based on selected gender
+  Color get _primaryColor => _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
 
   // Constants for conversion
   static const double kgToLbs = 2.20462;
@@ -59,8 +62,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
      }
     _heightController = TextEditingController(text: displayHeight > 0 ? displayHeight.toStringAsFixed(1) : '');
     
-    // Initialize gender selection
-    _selectedGender = widget.user.gender;
+    // Initialize gender selection - default to male if null
+    _selectedGender = widget.user.gender ?? 'male';
   }
 
   @override
@@ -208,36 +211,97 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 },
               ),
               const SizedBox(height: 20),
-              // Gender dropdown
-              Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.grey[800] 
-                      : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: DropdownButtonFormField<String>(
-                  value: _selectedGender,
-                  decoration: InputDecoration(
-                    labelText: 'Gender',
-                    prefixIcon: const Icon(Icons.person_outline),
-                    border: InputBorder.none,
+              // Gender selection toggle
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_outline, color: AppColors.grey),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Gender',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  items: [
-                    DropdownMenuItem(value: 'male', child: Text('Male')),
-                    DropdownMenuItem(value: 'female', child: Text('Female')),
-                    DropdownMenuItem(value: 'other', child: Text('Other')),
-                    DropdownMenuItem(value: null, child: Text('Prefer not to say')),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedGender = value;
-                    });
-                  },
-                  hint: Text('Select your gender'),
-                  isExpanded: true,
-                ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey[800]
+                          : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedGender = 'male';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedGender == 'male'
+                                    ? _primaryColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'M',
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedGender == 'male'
+                                        ? Colors.white
+                                        : AppColors.grey,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedGender = 'female';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedGender == 'female'
+                                    ? _primaryColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'F',
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedGender == 'female'
+                                        ? Colors.white
+                                        : AppColors.grey,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Text(
