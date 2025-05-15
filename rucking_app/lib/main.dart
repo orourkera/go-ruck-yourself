@@ -7,12 +7,10 @@ import 'package:rucking_app/core/services/tracking_transparency_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
-import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
-import 'package:rucking_app/core/services/location_service.dart'; 
+import 'package:rucking_app/core/services/location_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
