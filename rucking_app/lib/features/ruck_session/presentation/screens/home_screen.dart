@@ -394,24 +394,32 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                 const SizedBox(height: 32),
                 
                 // Quick stats section (USE _monthlySummaryStats)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: AppColors.primaryGradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    // Determine if user is in lady mode
+                    bool isLadyMode = false;
+                    if (state is Authenticated && state.user.gender == 'female') {
+                      isLadyMode = true;
+                    }
+                    
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isLadyMode ? AppColors.ladyPrimaryGradient : AppColors.primaryGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isLadyMode ? AppColors.ladyPrimary.withOpacity(0.3) : AppColors.primary.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
+                      child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -446,7 +454,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                          }
                       ),
                     ],
-                  ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
                 

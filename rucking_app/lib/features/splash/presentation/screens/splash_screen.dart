@@ -106,12 +106,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
     
     // Determine which splash image to use based on gender
-    final String splashImagePath = (userGender == 'female')
+    final bool isLadyMode = (userGender == 'female');
+    final String splashImagePath = isLadyMode
         ? 'assets/images/go_ruck_yourself_lady.png' // Female version
         : 'assets/images/go ruck yourself.png'; // Default/male version
         
+    // Use lady mode colors for female users
+    final Color backgroundColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+        
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: backgroundColor,
       body: Center(
         child: FadeTransition(
           opacity: _fadeInAnimation,

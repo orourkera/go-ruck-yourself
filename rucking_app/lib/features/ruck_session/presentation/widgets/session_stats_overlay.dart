@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -52,7 +54,7 @@ class SessionStatsOverlay extends StatelessWidget {
             _StatTile(
               label: 'CAL',
               value: state.calories.toStringAsFixed(0),
-              color: _calColor(state.calories.toDouble()),
+              color: _calColor(context, state.calories.toDouble()),
             ),
             _StatTile(
               label: 'ELEV',
@@ -79,7 +81,7 @@ class SessionStatsOverlay extends StatelessWidget {
       _StatTile(
         label: 'Calories',
         value: '${state.calories.toStringAsFixed(0)} KCAL',
-        color: _calColor(state.calories.toDouble()),
+        color: _calColor(context, state.calories.toDouble()),
         icon: Icons.local_fire_department,
       ),
       _StatTile(
@@ -222,9 +224,19 @@ class SessionStatsOverlay extends StatelessWidget {
     return AppColors.error;
   }
 
-  Color _calColor(double cal) {
+  Color _calColor(BuildContext context, double cal) {
+    bool isLadyMode = false;
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        isLadyMode = true;
+      }
+    } catch (e) {
+      // If can't access AuthBloc, continue with default colors
+    }
+    
     if (cal < 100) return AppColors.warning; // Yellow when calories are low
-    return AppColors.primary; // Use primary color for better contrast instead of white
+    return isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
   }
 
   // Placeholder widget to show when no session data is yet available

@@ -65,6 +65,12 @@ class AppColors {
     Color(0xFF546A4A), // Dark olive
   ];
   
+  // Lady mode gradient - Sky blue
+  static final List<Color> ladyPrimaryGradient = [
+    Color(0xFF4A90E2), // Sky blue
+    Color(0xFF2E71BC), // Darker sky blue
+  ];
+  
   static final List<Color> secondaryGradient = [
     Color(0xFFCC6A2A), // Brownish-orange
     Color(0xFFE09355), // Light orange

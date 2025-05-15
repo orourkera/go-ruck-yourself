@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/widgets/filter_chip_group.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/widgets/ruck_buddy_card.dart';
@@ -51,11 +52,26 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Check for lady mode in AuthBloc
+    bool isLadyMode = false;
+    try {
+      final authBloc = BlocProvider.of<AuthBloc>(context);
+      if (authBloc.state is Authenticated) {
+        isLadyMode = (authBloc.state as Authenticated).user.gender == 'female';
+      }
+    } catch (e) {
+      // If we can't access the auth bloc, default to standard mode
+      debugPrint('Could not determine gender for theme: $e');
+    }
+    
+    // Use lady mode colors for female users
+    final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ruck Buddies'),
         elevation: 0,
-        backgroundColor: AppColors.primary,
+        backgroundColor: primaryColor,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

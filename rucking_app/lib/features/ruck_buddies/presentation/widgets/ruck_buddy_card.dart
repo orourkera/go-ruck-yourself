@@ -140,26 +140,22 @@ class RuckBuddyCard extends StatelessWidget {
   }
   
   Widget _buildAvatar(UserInfo user) {
+    // Check if we should use photo URL (if available)
     if (user.photoUrl != null && user.photoUrl!.isNotEmpty) {
       return CircleAvatar(
         radius: 20,
         backgroundImage: NetworkImage(user.photoUrl!),
       );
     } else {
-      final String initial = user.username.isNotEmpty 
-        ? user.username[0].toUpperCase() 
-        : 'R';
+      // Use gender-specific rucker image
+      final String imagePath = user.gender == 'female'
+        ? 'assets/images/lady rucker profile.png'
+        : 'assets/images/profile.png';
       
       return CircleAvatar(
         radius: 20,
-        backgroundColor: AppColors.primary,
-        child: Text(
-          initial,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        backgroundColor: Colors.transparent,
+        backgroundImage: AssetImage(imagePath),
       );
     }
   }
