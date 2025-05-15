@@ -52,10 +52,10 @@ import WatchConnectivity
                 self.sendMessageToWatch(["command": "workoutStopped"])
                 result(true)
             case "flutterHeartRateListenerReady":
-                print("[WATCH] Flutter heart rate listener is ready")
+                // Flutter heart rate listener is ready
                 // If we have buffered heart rates in HeartRateStreamHandler, now is the time to send them
                 if let lastHR = HeartRateStreamHandler.lastHeartRateSent {
-                    print("[WATCH] Re-sending most recent heart rate after Flutter listener ready: \(lastHR) BPM")
+                    // Re-sending most recent heart rate
                     HeartRateStreamHandler.sendHeartRate(lastHR)
                 }
                 result(true)
@@ -319,16 +319,16 @@ import WatchConnectivity
             case "sessionEnded":
                 print("[WATCH] Session ended from Watch")
             case "pauseSession":
-                print("[WATCH] Session pause command received from Watch - forwarding to Flutter")
+                print("[DEBUG] Session pause command received from Watch - forwarding to Flutter")
                 let controller = window?.rootViewController as! FlutterViewController
                 let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
-                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "pauseSession"]) { result in
+                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["command": "pauseSession"] as [String: Any]) { result in
                     if let error = result as? FlutterError {
-                        print("[WATCH] Error forwarding pause command to Flutter: \(error.message ?? "unknown error")")
+                        print("[ERROR] Error forwarding pause command to Flutter: \(error.message ?? "unknown error")")
                         // Send error back if reply handler exists
                         replyHandler?(["error": error.message ?? "unknown error"])
                     } else {
-                        print("[WATCH] Successfully forwarded pause command to Flutter")
+                        print("[DEBUG] Successfully forwarded pause command to Flutter")
                         // Use reply handler if available, otherwise send a regular message
                         if let replyHandler = replyHandler {
                             replyHandler(["status": "success", "command": "pauseConfirmed"])
@@ -338,16 +338,17 @@ import WatchConnectivity
                     }
                 }
             case "resumeSession":
-                print("[WATCH] Session resume command received from Watch - forwarding to Flutter")
+                print("[DEBUG] Session resume command received from Watch - forwarding to Flutter")
                 let controller = window?.rootViewController as! FlutterViewController
                 let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
-                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["action": "resumeSession"]) { result in
+                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["command": "resumeSession"] as [String: Any]) { result in
                     if let error = result as? FlutterError {
-                        print("[WATCH] Error forwarding resume command to Flutter: \(error.message ?? "unknown error")")
+                        print("[ERROR] Error forwarding resume command to Flutter: \(error.message ?? "unknown error")")
                         // Send error back if reply handler exists
                         replyHandler?(["error": error.message ?? "unknown error"])
                     } else {
-                        print("[WATCH] Successfully forwarded resume command to Flutter")
+                        print("[DEBUG] Successfully forwarded resume command to Flutter")
+                        // Use reply handler if available, otherwise send a regular message
                         if let replyHandler = replyHandler {
                             replyHandler(["status": "success", "command": "resumeConfirmed"])
                         } else {
@@ -357,7 +358,7 @@ import WatchConnectivity
                 }
             case "watchHeartRateUpdate":
                 if let heartRate = message["heartRate"] as? Double {
-                    print("[WATCH] Heart rate update command received: \(heartRate) BPM")
+                    // Heart rate update received
                     HeartRateStreamHandler.sendHeartRate(heartRate)
                     
                     // Acknowledge the heart rate reception if reply handler is available
@@ -402,7 +403,7 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
         
         // Send any pending heart rates that were buffered while sink was unavailable
         if !HeartRateStreamHandler.pendingHeartRates.isEmpty {
-            print("📤 [WATCH] Sending \(HeartRateStreamHandler.pendingHeartRates.count) buffered heart rates")
+            // Sending buffered heart rates
             // Make a copy to avoid concurrent modification issues
             let ratesToSend = HeartRateStreamHandler.pendingHeartRates
             HeartRateStreamHandler.pendingHeartRates.removeAll()
@@ -413,7 +414,7 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                     // Only send if we still have an active sink
                     if HeartRateStreamHandler.isListening, let sink = HeartRateStreamHandler.eventSink {
-                        print("📲 [WATCH] Sending buffered heart rate: \(rate) BPM")
+                        // Sending buffered heart rate
                         sink(rate)
                     }
                 }
@@ -425,7 +426,7 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
            let lastTime = HeartRateStreamHandler.lastHeartRateSentTime,
            Date().timeIntervalSince(lastTime) < 60 { // Only if within last minute
             
-            print("🔄 [WATCH] Re-sending cached heart rate to new stream: \(lastHR) BPM")
+            // Re-sending cached heart rate
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 if HeartRateStreamHandler.isListening {
                     events(lastHR) // Send to the new listener after a short delay
@@ -464,7 +465,7 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
         // Force heart rate to be a whole number to match expected format
         let roundedHeartRate = round(heartRate)
         
-        print("❤️ [WATCH] Processing heart rate: \(roundedHeartRate) BPM")
+        // Processing heart rate
         
         if Thread.isMainThread {
             sendHeartRateOnMainThread(roundedHeartRate)
@@ -477,10 +478,10 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
     
     private static func sendHeartRateOnMainThread(_ heartRate: Double) {
         if isListening, let sink = eventSink {
-            print("📲 [WATCH] Sending heart rate to Flutter: \(heartRate) BPM")
+            // Sending heart rate to Flutter
             // IMPORTANT: Send as Int - the UI may expect integer values
             sink(heartRate)
-            print("✅ [WATCH] Heart rate sent to Flutter: \(heartRate) BPM")
+            // Heart rate sent to Flutter
             
             // Clear successful send from pending buffer if it was there
             pendingHeartRates.removeAll { $0 == heartRate }
@@ -492,7 +493,7 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
                 if pendingHeartRates.count > 50 {
                     pendingHeartRates.removeFirst()
                 }
-                print("📥 [WATCH] Buffered heart rate \(heartRate) BPM (buffer size: \(pendingHeartRates.count))")
+                // Buffered heart rate
             }
             
             logEventSinkError()
@@ -519,7 +520,7 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
         }
         
         // Actually implement the recreation logic
-        print("🔄 [WATCH] Attempting to recreate heart rate event channel")
+        // Attempting to recreate heart rate event channel
         
         // Get access to the root view controller - try both windows approach for different iOS versions
         var rootViewController: FlutterViewController? = nil
@@ -562,7 +563,7 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
         let handler = HeartRateStreamHandler()
         eventChannel.setStreamHandler(handler)
         
-        print("✅ [WATCH] Heart rate event channel recreated")
+        // Heart rate event channel recreated
         
         // Try to notify Flutter that a channel was recreated
         NotificationCenter.default.post(name: NSNotification.Name("HeartRateChannelRecreated"), object: nil)
@@ -571,7 +572,7 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             // First check if the recreation actually resulted in an active sink
             if isListening, let _ = eventSink, !pendingHeartRates.isEmpty {
-                print("🔄 [WATCH] Attempting to send \(pendingHeartRates.count) buffered heart rates after recreation")
+                // Attempting to send buffered heart rates after recreation
                 // Send the most recent heart rate immediately
                 if let lastRate = pendingHeartRates.last {
                     sendHeartRate(lastRate)
