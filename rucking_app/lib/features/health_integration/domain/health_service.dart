@@ -65,6 +65,8 @@ class HealthService {
     }
     
     try {
+      AppLogger.info('Starting health authorization request...');
+      
       // Updated to use proper health data types from the health package v12.1.0
       final types = [
         HealthDataType.STEPS,
@@ -82,7 +84,12 @@ class HealthService {
         HealthDataAccess.READ,             // Heart Rate (read only)
         if (Platform.isIOS) HealthDataAccess.READ_WRITE, // Workout (includes writing)
       ];
-
+      
+      // Ensure we're showing the system dialog by forcing a clean request
+      // This is important for iOS where sometimes the dialog doesn't appear
+      await Future.delayed(const Duration(milliseconds: 500)); // Small delay to ensure UI is ready
+      
+      AppLogger.info('Calling health package requestAuthorization with ${types.length} types');
       // Request authorization with specific permissions
       final authorized = await _health.requestAuthorization(types, permissions: permissions);
       AppLogger.info('Health authorization request result: $authorized');

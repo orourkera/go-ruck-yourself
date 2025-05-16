@@ -5,15 +5,14 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 class HealthIntegrationIntroScreen extends StatelessWidget {
-  final bool showSkipButton;
   final bool navigateToHome;
   final String? userId;
 
   const HealthIntegrationIntroScreen({
     Key? key, 
-    this.showSkipButton = true,
     this.navigateToHome = true,
     this.userId,
   }) : super(key: key);
@@ -29,18 +28,12 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
           // Mark intro as seen regardless of authorization status
           context.read<HealthBloc>().add(const MarkHealthIntroSeen());
           
-          // Show appropriate message based on authorization
+          // Only show success message when permission is granted (Apple Store compliant)
           if (state.authorized) {
             StyledSnackBar.showSuccess(
               context: context,
               message: 'Apple Health integration enabled!',
               duration: const Duration(seconds: 2),
-            );
-          } else {
-            StyledSnackBar.showError(
-              context: context,
-              message: 'Apple Health access was not granted.',
-              duration: const Duration(seconds: 3),
             );
           }
         } else if (state is HealthIntroShown) {
@@ -226,10 +219,24 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: ElevatedButton(
                       onPressed: () async {
-                        // Directly trigger HealthKit authorization prompt
-                        await context.read<HealthBloc>().healthService.requestAuthorization();
-                        // Notify bloc of authorization result
-                        context.read<HealthBloc>().add(const RequestHealthAuthorization());
+                        AppLogger.info('Requesting HealthKit authorization from intro screen');
+                        try {
+                          // Using the direct health service call to ensure the system dialog shows
+                          final authorized = await context.read<HealthBloc>().healthService.requestAuthorization();
+                          AppLogger.info('HealthKit authorization result: $authorized');
+                          
+                          // Notify bloc of authorization result
+                          context.read<HealthBloc>().add(const RequestHealthAuthorization());
+                        } catch (e) {
+                          AppLogger.error('Error requesting HealthKit authorization: $e');
+                          // Show error to user
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to request HealthKit access: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -245,10 +252,10 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.favorite, color: Colors.white, size: 20),
+                            Icon(Icons.arrow_forward, color: Colors.white, size: 20),
                             SizedBox(width: 8),
                             Text(
-                              'ENABLE HEALTHKIT',
+                              'CONTINUE',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -259,46 +266,7 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (showSkipButton)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: TextButton(
-                        onPressed: () {
-                          // Mark as seen when skipped, but don't request authorization
-                          // Navigation will be handled by the BlocListener
-                          context.read<HealthBloc>().add(const MarkHealthIntroSeen());
-                        },
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 50),
-                        ),
-                        child: const Text(
-                          'Later',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                    ),
-                  
-                  TextButton(
-                    onPressed: () {
-                      // Mark as seen and don't show again
-                      // Navigation will be handled by the BlocListener
-                      context.read<HealthBloc>().add(const SetHasAppleWatch(hasWatch: false));
-                    },
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 40),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    child: const Text(
-                      'I don\'t own one',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
+                  // No skip or 'I don't own one' buttons to comply with App Store guidelines
                   const SizedBox(height: 8),
                       ],
                     ),
