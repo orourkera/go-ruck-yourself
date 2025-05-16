@@ -100,6 +100,31 @@ class MeasurementUtils {
     }
   }
   
+  /// Special weight formatter for ruck buddies weight chips to preserve exact values
+  /// This helps avoid rounding issues when displaying weights that were originally
+  /// entered as whole numbers (like 10 lbs, 20 lbs, etc.)
+  static String formatWeightForChip(double kg, {required bool metric}) {
+    if (metric) {
+      return '${kg.toStringAsFixed(1)} kg';
+    } else {
+      final lbs = kg * AppConfig.kgToLbs;
+      
+      // Check if this was likely a standard weight value in lbs
+      // Identify common whole pound values that might have been converted to kg
+      final roundedLbs = lbs.round();
+      
+      // If the value is very close to a whole number (within 0.1 lbs)
+      // AND it's a likely standard weight (5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 lbs)
+      if ((lbs - roundedLbs).abs() < 0.1 && roundedLbs % 5 == 0 && roundedLbs <= 100) {
+        // Show as a nice whole number since it was likely entered that way
+        return '$roundedLbs lbs';
+      }
+      
+      // Otherwise use the standard one decimal place
+      return '${lbs.toStringAsFixed(1)} lbs';
+    }
+  }
+  
   /// Format a duration into a readable string (e.g., "1h 23m" or "45m")
   static String formatDuration(Duration duration) {
     final hours = duration.inHours;

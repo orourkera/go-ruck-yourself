@@ -68,7 +68,9 @@ class RuckBuddyCard extends StatelessWidget {
                 Chip(
                   backgroundColor: AppColors.secondary,
                   label: Text(
-                    MeasurementUtils.formatWeight(ruckBuddy.ruckWeightKg, metric: preferMetric),
+                    // Use the specialized formatter that preserves original input values
+                    // This prevents rounding issues with standard weights like 10, 20, 60 lbs
+                    MeasurementUtils.formatWeightForChip(ruckBuddy.ruckWeightKg, metric: preferMetric),
                     style: AppTextStyles.labelMedium.copyWith(
                       color: Colors.white,
                     ),
