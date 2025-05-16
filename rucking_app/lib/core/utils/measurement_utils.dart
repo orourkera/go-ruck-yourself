@@ -2,6 +2,7 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 
 /// MeasurementUtils centralizes all unit conversions and number
 /// formatting rules so that every widget in the app shows data with
@@ -104,24 +105,39 @@ class MeasurementUtils {
   /// This helps avoid rounding issues when displaying weights that were originally
   /// entered as whole numbers (like 10 lbs, 20 lbs, etc.)
   static String formatWeightForChip(double kg, {required bool metric}) {
+    if (kDebugMode) {
+      debugPrint('[formatWeightForChip] Received kg: $kg, metric: $metric');
+    }
     if (metric) {
+      // For metric, just display the kg value with one decimal
       return '${kg.toStringAsFixed(1)} kg';
     } else {
-      final lbs = kg * AppConfig.kgToLbs;
-      
-      // Check if this was likely a standard weight value in lbs
-      // Identify common whole pound values that might have been converted to kg
-      final roundedLbs = lbs.round();
-      
-      // If the value is very close to a whole number (within 0.1 lbs)
-      // AND it's a likely standard weight (5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 lbs)
-      if ((lbs - roundedLbs).abs() < 0.1 && roundedLbs % 5 == 0 && roundedLbs <= 100) {
-        // Show as a nice whole number since it was likely entered that way
+      final double calculatedLbs = kg * AppConfig.kgToLbs;
+      if (kDebugMode) {
+        debugPrint('[formatWeightForChip] Calculated lbs: $calculatedLbs (from kg: $kg)');
+      }
+
+      // Common standard ruck weights in pounds
+      const List<int> standardPoundWeights = [
+        5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
+      ];
+
+      // Check if calculatedLbs is extremely close to a standard pound weight
+      for (final int standardLb in standardPoundWeights) {
+        // Use a slightly larger tolerance for floating point comparisons directly in pounds
+        if ((calculatedLbs - standardLb).abs() < 0.02) { 
+          return '$standardLb lbs';
+        }
+      }
+
+      // If not a standard weight, check if calculatedLbs is extremely close to any whole number
+      final int roundedLbs = calculatedLbs.round();
+      if ((calculatedLbs - roundedLbs).abs() < 0.02) { 
         return '$roundedLbs lbs';
       }
       
-      // Otherwise use the standard one decimal place
-      return '${lbs.toStringAsFixed(1)} lbs';
+      // Otherwise, format to one decimal place as a fallback
+      return '${calculatedLbs.toStringAsFixed(1)} lbs';
     }
   }
   
