@@ -51,7 +51,7 @@ class SessionControls extends StatelessWidget {
               ),
             ),
             onPressed: () {
-            HapticFeedback.mediumImpact();
+            HapticFeedback.heavyImpact();
             debugPrint('[PAUSE_DEBUG] SessionControls: Pause/Resume button pressed on PHONE UI. Current isPaused state (on UI): $isPaused');
             if (onTogglePause != null) onTogglePause!();
           }, 
@@ -70,7 +70,7 @@ class SessionControls extends StatelessWidget {
               ),
             ),
             onPressed: () {
-            HapticFeedback.mediumImpact();
+            HapticFeedback.heavyImpact();
             if (onEndSession != null) onEndSession!();
           }, 
           ),
