@@ -7,7 +7,7 @@ protocol SessionManagerDelegate: AnyObject {
     func didReceiveMessage(_ message: [String: Any])
 }
 
-class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
+class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutManagerDelegate {
     // WorkoutManager for HealthKit access
     private let workoutManager = WorkoutManager()
     // Published properties for SwiftUI
@@ -93,6 +93,8 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
         if session.activationState != .activated {
             session.activate()
         }
+        // Ensure we receive callbacks when the workout ends
+        workoutManager.delegate = self
     }
     
     func sendMessage(_ message: [String: Any]) {
@@ -550,6 +552,25 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
                     self.showingSplitNotification = false
                 }
             }
+        }
+    }
+    
+    // MARK: - WorkoutManagerDelegate
+    func workoutDidEnd() {
+        DispatchQueue.main.async {
+            self.isSessionActive = false
+            self.isPaused = false
+            self.status = "--"
+            self.heartRate = 0
+            self.calories = 0
+            self.elevationGain = 0.0
+            self.elevationLoss = 0.0
+            self.distanceValue = 0.0
+            self.paceValue = 0.0
+            self.splitDistance = ""
+            self.splitTime = ""
+            self.totalDistance = ""
+            self.totalTime = ""
         }
     }
 }

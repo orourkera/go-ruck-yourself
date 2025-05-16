@@ -2,11 +2,18 @@
 import Foundation
 import HealthKit
 
+protocol WorkoutManagerDelegate: AnyObject {
+    func workoutDidEnd()
+}
+
 class WorkoutManager: NSObject {
     private let healthStore = HKHealthStore()
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
     private var heartRateHandler: ((Double) -> Void)?
+    
+    // Delegate to notify about significant workout events
+    weak var delegate: WorkoutManagerDelegate?
     
     var isHealthKitAvailable: Bool {
         return HKHealthStore.isHealthDataAvailable()
@@ -109,6 +116,9 @@ class WorkoutManager: NSObject {
 extension WorkoutManager: HKWorkoutSessionDelegate {
     func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
         // Handle state changes if needed
+        if toState == .ended {
+            delegate?.workoutDidEnd()
+        }
     }
     
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
