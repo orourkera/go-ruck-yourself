@@ -457,19 +457,16 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         ),
       ),
       selected: isSelected,
-      onSelected: (selected) async {
-        if (selected) {
-          HapticFeedback.mediumImpact();
-          setState(() {
-            _ruckWeight = weightInKg;
-            _displayRuckWeight = isMetric ? weightValue : weightValue;
-            _selectedRuckWeight = weightInKg;
-          });
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setDouble('lastRuckWeightKg', weightInKg);
-          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelectedWeight());
-        }
-      },
+      onSelected: (selected) {
+      if (selected) {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _selectedRuckWeight = weightInKg;
+          _ruckWeight = weightInKg;
+          _displayRuckWeight = isMetric ? weightValue : weightValue;
+        });
+      }
+    },
       selectedColor: Theme.of(context).primaryColor,
       backgroundColor: isSelected
         ? Theme.of(context).primaryColor
@@ -501,9 +498,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           toolbarButtons: [
             (node) => TextButton(
                   onPressed: () {
-                    node.unfocus();
-                    if (!_isCreating) _createSession();
-                  },
+                  HapticFeedback.heavyImpact();
+                  node.unfocus();
+                  if (!_isCreating) _createSession();
+                },
                   child: const Text('Done'),
                 ),
           ],
