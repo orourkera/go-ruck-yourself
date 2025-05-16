@@ -42,6 +42,9 @@ class RuckingApp extends StatelessWidget {
         BlocProvider<RuckBuddiesBloc>(
           create: (context) => getIt<RuckBuddiesBloc>(),
         ),
+        BlocProvider<HealthBloc>(
+          create: (context) => getIt<HealthBloc>(),
+        ),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, authState) {

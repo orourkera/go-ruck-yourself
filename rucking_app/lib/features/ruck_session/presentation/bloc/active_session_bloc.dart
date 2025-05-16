@@ -15,7 +15,10 @@ import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 
@@ -28,39 +31,56 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final LocationService _locationService;
   final HealthService _healthService;
   final WatchService _watchService;
+  final HeartRateService _heartRateService;
+  final SessionValidationService _validationService;
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
+  StreamSubscription<List<HeartRateSample>>? _heartRateBufferSubscription;
   Timer? _ticker;
   Timer? _watchdogTimer;
   DateTime _lastTickTime = DateTime.now();
-  // Reuse one validation service instance to keep state between points
-  final SessionValidationService _validationService = SessionValidationService();
   LocationPoint? _lastValidLocation;
   int _validLocationCount = 0;
-  int _latestHeartRate = 0;
   // Local dumb timer counters
   int _elapsedCounter = 0; // seconds since session start minus pauses
   int _ticksSinceTruth = 0;
   // Watchdog: track time of last valid location to auto-restart GPS if stalled
   DateTime _lastLocationTimestamp = DateTime.now();
+  
+  // Service for tracking distance milestones/splits
+  final SplitTrackingService _splitTrackingService;
+  
+  // Flag to track if heart rate monitoring has been started
+  bool _isHeartRateMonitoringStarted = false;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
     required LocationService locationService,
     required HealthService healthService,
     required WatchService watchService,
-  }) : _apiClient = apiClient,
-       _locationService = locationService,
-       _healthService = healthService,
-       _watchService = watchService,
-       super(ActiveSessionInitial()) {
+    required HeartRateService heartRateService,
+    required SplitTrackingService splitTrackingService,
+    SessionValidationService? validationService,
+  })  : _apiClient = apiClient,
+        _locationService = locationService,
+        _healthService = healthService,
+        _watchService = watchService,
+        _heartRateService = heartRateService,
+        _splitTrackingService = splitTrackingService,
+        _validationService = validationService ?? SessionValidationService(),
+        super(ActiveSessionInitial()) {
+    // Ensure the current instance is globally available for cross-layer callbacks (e.g. WatchService).
+    if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
+      GetIt.I.unregister<ActiveSessionBloc>();
+    }
+    GetIt.I.registerSingleton<ActiveSessionBloc>(this);
+
     on<SessionStarted>(_onSessionStarted);
     on<LocationUpdated>(_onLocationUpdated);
     on<SessionPaused>(_onSessionPaused);
     on<SessionResumed>(_onSessionResumed);
     on<SessionCompleted>(_onSessionCompleted);
     on<SessionFailed>(_onSessionFailed);
-    on<HeartRateUpdated>(_onHeartRateUpdated);
     on<Tick>(_onTick);
     on<SessionErrorCleared>(_onSessionErrorCleared);
     on<TimerStarted>(_onTimerStarted);
@@ -70,6 +90,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    // Reset split tracking for new session
+    _splitTrackingService.reset();
     AppLogger.info('SessionStarted event received. plannedDuration: \u001B[33m${event.plannedDuration}\u001B[0m seconds');
     AppLogger.info('SessionStarted event received. Weight: ${event.ruckWeightKg}kg, Notes: ${event.notes}');
     emit(ActiveSessionLoading());
@@ -134,6 +156,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       );
       emit(initialSessionState);
       AppLogger.info('ActiveSessionRunning state emitted for session $sessionId with plannedDuration: \u001B[33m${initialSessionState.plannedDuration}\u001B[0m seconds');
+      debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: About to call _watchService.startSessionOnWatch. Current BLoC state: ${state.runtimeType}');
+
+      // Initialize the watch workout
+      AppLogger.info('Initializing watch workout for session $sessionId');
+      final userPrefs = await GetIt.instance<SharedPreferences>();
+      final bool preferMetric = userPrefs.getBool('use_metric') ?? false;
+      
+      // First start the session with ruck weight
+      await _watchService.startSessionOnWatch(event.ruckWeightKg);
+      
+      // Then send the session ID to the watch
+      await _watchService.sendSessionIdToWatch(sessionId!);
+      
+      AppLogger.info('Watch workout initialized successfully');
 
       // Before starting location tracking, reset the validator state
       _validationService.reset();
@@ -142,11 +178,27 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _startLocationTracking(emit);
       _elapsedCounter = 0;
       _ticksSinceTruth = 0;
-      await _startHeartRateMonitoring();
+      if (!_isHeartRateMonitoringStarted) {
+        await _startHeartRateMonitoring();
+        _isHeartRateMonitoringStarted = true;
+      }
       AppLogger.info('Location, heart rate started for session $sessionId');
-    } catch (e, stackTrace) {
+      // Verify heart rate subscription status
+      if (_heartRateSubscription == null) {
+        AppLogger.warning('Heart rate subscription was null after session start!');
+        if (!_isHeartRateMonitoringStarted) {
+          await _startHeartRateMonitoring();
+        } else {
+          AppLogger.warning('Heart rate monitoring was marked as started but subscription is null - reconnecting');
+          // Just reconnect the subscription without reinitializing the service
+          _setupHeartRateSubscriptions();
+        }
+      } else {
+        AppLogger.info('Heart rate subscription confirmed active for session $sessionId');
+      }
+    } catch (e) {
       final String RuckIdForError = sessionId ?? "unknown";
-      AppLogger.error('Failed to start session $RuckIdForError: $e. StackTrace: $stackTrace');
+      AppLogger.error('Failed to start session $RuckIdForError: $e');
       emit(ActiveSessionFailure(
         errorMessage: ErrorHandler.getUserFriendlyMessage(e, 'Session Start'),
       ));
@@ -164,6 +216,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           add(LocationUpdated(locationPoint));
         },
         onError: (error) {
+          debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _startLocationTracking stream onError: $error. Adding SessionFailed.');
           AppLogger.error('Location error during active session: $error');
           // Instead of giving up, attempt a graceful retry after a short delay.
           if (state is ActiveSessionRunning) {
@@ -199,52 +252,121 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _startHeartRateMonitoring() async {
-    AppLogger.info('Starting heart rate monitoring...');
-    
-    // Ensure HealthKit permissions are granted once per app session
-    if (!_healthService.isAuthorized) {
-      final granted = await _healthService.requestAuthorization();
-      if (!granted) {
-        AppLogger.warning('Health authorization denied – heart-rate stream disabled');
-        return; // Do not start subscription without permission
-      }
+    // Skip if already started to avoid disrupting the connection
+    if (_isHeartRateMonitoringStarted) {
+      AppLogger.info('Heart rate monitoring already started, skipping initialization');
+      // Even if monitoring is already started, make sure we have active subscriptions
+      _setupHeartRateSubscriptions();
+      return;
     }
     
-    _heartRateSubscription?.cancel(); // Cancel previous subscription if any
-    _heartRateSubscription = _healthService.heartRateStream.listen(
+    AppLogger.info('Starting heart rate monitoring via HeartRateService...');
+    
+    // Start the heart rate service which handles both Watch and HealthKit
+    await _heartRateService.startHeartRateMonitoring();
+    
+    // Mark as started
+    _isHeartRateMonitoringStarted = true;
+    
+    // Setup subscriptions for heart rate updates
+    _setupHeartRateSubscriptions();
+    
+    // Immediately get the current heart rate if available
+    final currentHr = _heartRateService.latestHeartRate;
+    if (currentHr > 0 && state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      AppLogger.info('Setting initial heart rate value: $currentHr BPM');
+      emit(currentState.copyWith(latestHeartRate: currentHr));
+    }
+  }
+  
+  /// Set up subscriptions to heart rate data streams
+  void _setupHeartRateSubscriptions() {
+    AppLogger.info('Setting up heart rate stream subscriptions');
+    
+    // First, cancel any existing subscriptions to avoid duplicates
+    _heartRateSubscription?.cancel();
+    _heartRateBufferSubscription?.cancel();
+    
+    // Listen for individual heart rate updates
+    _heartRateSubscription = _heartRateService.heartRateStream.listen(
       (HeartRateSample sample) {
-        AppLogger.info('Heart rate sample received: ${sample.bpm} BPM at ${sample.timestamp}');
-        add(HeartRateUpdated(sample));
+        AppLogger.info('Heart rate sample received in ActiveSessionBloc: ${sample.bpm} BPM at ${sample.timestamp}');
+        
+        // Only process valid heart rate values
+        if (sample.bpm <= 0) {
+          AppLogger.warning('Ignoring invalid heart rate value: ${sample.bpm}');
+          return;
+        }
+        
+        // Update the session state with the latest heart rate
+        if (state is ActiveSessionRunning) {
+          final currentState = state as ActiveSessionRunning;
+          // Only emit if heart rate has changed to avoid unnecessary renders
+          if (currentState.latestHeartRate != sample.bpm) {
+            AppLogger.info('Updating UI with heart rate: ${sample.bpm} BPM (previous: ${currentState.latestHeartRate})');
+            emit(currentState.copyWith(latestHeartRate: sample.bpm));
+          }
+        } else {
+          AppLogger.warning('Received heart rate update but state is not ActiveSessionRunning: ${state.runtimeType}');
+        }
       },
       onError: (error) {
         AppLogger.error('Error in heart rate stream: $error');
-      },
-      onDone: () {
-        AppLogger.info('Heart rate stream closed.');
+        // Try to recover by reestablishing the subscription
+        Future.delayed(const Duration(seconds: 2), () {
+          AppLogger.info('Attempting to reestablish heart rate subscription after error');
+          _setupHeartRateSubscriptions();
+        });
       },
     );
+    
+    // Listen for buffered heart rate samples to send to the API
+    _heartRateBufferSubscription = _heartRateService.heartRateBufferStream.listen(
+      (List<HeartRateSample> samples) {
+        if (samples.isEmpty) return;
+        
+        AppLogger.info('[PAUSE_DEBUG] Received heart rate buffer with ${samples.length} samples in _setupHeartRateSubscriptions');
 
-    // Seed with immediate reading in case stream takes a few seconds
-    try {
-      final initialHr = await _healthService.getHeartRate();
-      if (initialHr != null && initialHr > 0) {
-        AppLogger.info('Initial heart rate fetched: $initialHr BPM');
-        add(HeartRateUpdated(HeartRateSample(
-          timestamp: DateTime.now(),
-          bpm: initialHr.round(),
-        )));
-      } else {
-        AppLogger.info('Initial heart rate not available');
-      }
-    } catch (e) {
-      AppLogger.error('Error fetching initial heart rate: $e');
-    }
+        if (state is ActiveSessionRunning) {
+          final currentState = state as ActiveSessionRunning;
+          // Only send if the session is NOT paused
+          if (!currentState.isPaused) {
+            AppLogger.info('[PAUSE_DEBUG] Session is RUNNING. Sending ${samples.length} HR samples via _sendHeartRateSamplesToApi.');
+            _sendHeartRateSamplesToApi(currentState, samples);
+          } else {
+            AppLogger.info('[PAUSE_DEBUG] Session is PAUSED. Suppressing HR sample send for ${samples.length} samples.');
+          }
+
+          // Also update the current heart rate from the latest sample
+          final latestSample = samples.last;
+          if (latestSample.bpm > 0) {
+            final currentState = state as ActiveSessionRunning;
+            if (currentState.latestHeartRate != latestSample.bpm) {
+              AppLogger.info('Updating UI with latest buffered heart rate: ${latestSample.bpm} BPM');
+              emit(currentState.copyWith(latestHeartRate: latestSample.bpm));
+            }
+          }
+        }
+      },
+      onError: (error) {
+        AppLogger.error('Error in heart rate buffer stream: $error');
+      },
+    );
+    
+    AppLogger.info('Heart rate stream subscriptions successfully set up');
   }
 
   void _stopHeartRateMonitoring() {
-    AppLogger.info('Stopping heart rate monitoring...');
     _heartRateSubscription?.cancel();
     _heartRateSubscription = null;
+    _heartRateBufferSubscription?.cancel();
+    _heartRateBufferSubscription = null;
+    
+    // Reset the flag to allow restarting heart rate monitoring in a new session
+    _isHeartRateMonitoringStarted = false;
+    
+    AppLogger.info('Heart rate monitoring stopped');
   }
 
   void _startTicker() {
@@ -338,6 +460,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
+
+      // If the session is currently paused, ignore location updates. This prevents
+      // distance, pace and duration from changing while paused and avoids
+      // sending "isPaused = 0" metric updates back to the watch which would
+      // cause the watch UI to flip back to the running state.
+      if (currentState.isPaused) {
+        return;
+      }
+
       if (_lastValidLocation != null) {
         final last = _lastValidLocation!;
         // DEDUPLICATION: Ignore if lat/lng and timestamp match last valid location
@@ -475,6 +606,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.error('Failed to send location to backend: $e');
       }
       
+      // Check for distance milestones via service
+      await _splitTrackingService.checkForMilestone(
+        currentDistanceKm: currentState.distanceKm,
+        sessionStartTime: currentState.originalSessionStartTimeUtc,
+        elapsedSeconds: currentState.elapsedSeconds,
+        isPaused: currentState.isPaused,
+      );
+      
       // Handle auto-pause / auto-end based on validation flags
       if (validationResult != null) {
         if (validationResult['shouldPause'] == true && !currentState.isPaused) {
@@ -491,35 +630,87 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionPaused event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused event handler entered.');
+
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      if (currentState.sessionId.isEmpty) {
-        AppLogger.error('Invalid session ID for pausing session.');
-        emit(ActiveSessionFailure(errorMessage: 'Session ID is missing. Please try again.'));
+
+      // Prevent re-pausing if already paused
+      if (currentState.isPaused) {
+        AppLogger.info('[PAUSE_DEBUG] _onSessionPaused: Session is already paused. Ignoring event.');
         return;
       }
-      
-      AppLogger.info('Pausing session ${currentState.sessionId}');
-      
-      // Stop the timer when pausing
-      _stopTicker();
-      
-      // Tell watch to pause
-      _watchService.pauseSessionOnWatch();
-      
-      // Update backend about pause
-      try {
-        await _apiClient.post('/rucks/${currentState.sessionId}/pause', {});
-      } catch (e) {
-        AppLogger.error('Failed to pause session in backend: $e');
-        // Continue with local pause even if backend update fails
-      }
-      
-      // Emit paused state
-      emit(currentState.copyWith(
+
+      AppLogger.info('[PAUSE_DEBUG] _onSessionPaused: Processing pause. Current isPaused: ${currentState.isPaused}');
+      _stopTicker(); // Stop the ticker to halt elapsed time updates
+
+      final now = DateTime.now().toUtc();
+      final newPausedState = currentState.copyWith(
         isPaused: true,
-        currentPauseStartTimeUtc: DateTime.now().toUtc(), // Record when pause started
-      ));
+        currentPauseStartTimeUtc: now,
+      );
+      emit(newPausedState);
+      AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: Paused. Emitting ActiveSessionRunning with isPaused: true. Watch update next.');
+      debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused calling _watchService.updateSessionOnWatch. isPaused: true, distance: ${newPausedState.distanceKm}, elapsed: ${newPausedState.elapsedSeconds}');
+      await _watchService.updateSessionOnWatch(
+        distance: newPausedState.distanceKm,
+        duration: Duration(seconds: newPausedState.elapsedSeconds),
+        pace: newPausedState.pace ?? 0.0,
+        isPaused: true,
+        calories: newPausedState.calories.toDouble(),
+        elevationGain: newPausedState.elevationGain,
+        elevationLoss: newPausedState.elevationLoss,
+      );
+      AppLogger.info('Session paused. Watch notified.');
+    } else if (state is ActiveSessionFailure) {
+      final failureState = state as ActiveSessionFailure;
+      if (failureState.sessionDetails != null) {
+        AppLogger.info('[PAUSE_DEBUG] _onSessionPaused: Session is in ActiveSessionFailure state with details, attempting to pause it.');
+        final sessionDetails = failureState.sessionDetails!;
+        
+        if (sessionDetails.isPaused) {
+          AppLogger.info('[PAUSE_DEBUG] _onSessionPaused: SessionFailure details indicate already paused. Emitting and notifying watch.');
+          _stopTicker(); 
+          final now = DateTime.now().toUtc();
+          final consistentPausedState = sessionDetails.copyWith(isPaused: true, currentPauseStartTimeUtc: sessionDetails.currentPauseStartTimeUtc ?? now);
+          emit(consistentPausedState);
+          await _watchService.updateSessionOnWatch(
+            distance: consistentPausedState.distanceKm,
+            duration: Duration(seconds: consistentPausedState.elapsedSeconds),
+            pace: consistentPausedState.pace ?? 0.0,
+            isPaused: true,
+            calories: consistentPausedState.calories.toDouble(),
+            elevationGain: consistentPausedState.elevationGain,
+            elevationLoss: consistentPausedState.elevationLoss,
+          );
+          AppLogger.info('Session paused from failure state (already paused in details). Watch notified.');
+          return;
+        }
+
+        _stopTicker();
+        final now = DateTime.now().toUtc();
+        final newPausedStateFromFailure = sessionDetails.copyWith(
+          isPaused: true,
+          currentPauseStartTimeUtc: now,
+        );
+        emit(newPausedStateFromFailure);
+        AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: Paused from Failure. Emitting ActiveSessionRunning with isPaused: true. Watch update next.');
+        debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused (from failure) calling _watchService.updateSessionOnWatch. isPaused: true, distance: ${newPausedStateFromFailure.distanceKm}, elapsed: ${newPausedStateFromFailure.elapsedSeconds}');
+        await _watchService.updateSessionOnWatch(
+          distance: newPausedStateFromFailure.distanceKm,
+          duration: Duration(seconds: newPausedStateFromFailure.elapsedSeconds),
+          pace: newPausedStateFromFailure.pace ?? 0.0,
+          isPaused: true,
+          calories: newPausedStateFromFailure.calories.toDouble(),
+          elevationGain: newPausedStateFromFailure.elevationGain,
+          elevationLoss: newPausedStateFromFailure.elevationLoss,
+        );
+        AppLogger.info('Session paused from failure state. Watch notified.');
+      } else {
+        AppLogger.warning('[PAUSE_DEBUG] _onSessionPaused: Session is ActiveSessionFailure but has no sessionDetails. Cannot pause.');
+      }
+    } else {
+      AppLogger.warning('[PAUSE_DEBUG] _onSessionPaused: Session is not ActiveSessionRunning or ActiveSessionFailure. Current state: ${state.runtimeType}. Cannot pause.');
     }
   }
 
@@ -527,42 +718,60 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionResumed event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionResumed triggered. Event source: ${event.source}');
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      Duration newTotalPausedDuration = currentState.totalPausedDuration;
 
-      if (currentState.currentPauseStartTimeUtc != null) {
-        final pauseEndedUtc = DateTime.now().toUtc();
-        final currentPauseLength = pauseEndedUtc.difference(currentState.currentPauseStartTimeUtc!);
-        newTotalPausedDuration += currentPauseLength;
-      } // else: was not properly in a timed pause state, resume without adding to pause duration
-      
-      AppLogger.info('Resuming session ${currentState.sessionId}');
-      
-      // Restart the timer when resuming
-      _startTicker();
-      
-      // Tell watch to resume
-      _watchService.resumeSessionOnWatch();
-      
-      // Update backend about resume
-      try {
-        await _apiClient.post('/rucks/${currentState.sessionId}/resume', {});
-      } catch (e) {
-        AppLogger.error('Failed to resume session in backend: $e');
-        // Continue with local resume even if backend update fails
+      // Prevent re-resuming if already resumed
+      if (!currentState.isPaused) {
+        debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionResumed from WATCH, but already running. Ignoring to prevent loop.');
+        // Similar to pause, consider logic if already resumed by watch.
       }
       
-      // Emit resumed state
-      emit(currentState.copyWith(
+      // If not paused and event is not from UI override, consider logging and returning
+      if (!currentState.isPaused && event.source != SessionActionSource.ui) {
+        debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionResumed called but session already running. Current source: ${event.source}. State: $currentState');
+        // emit(currentState); // Optionally re-emit
+        // return; // Let it proceed
+      }
+
+      // Calculate paused duration
+      int justPausedSeconds = 0;
+      if (currentState.currentPauseStartTimeUtc != null) {
+        justPausedSeconds = DateTime.now().toUtc().difference(currentState.currentPauseStartTimeUtc!).inSeconds;
+      }
+      final newTotalPausedDuration = currentState.totalPausedDuration + Duration(seconds: justPausedSeconds);
+
+      // Notify the backend that the session is resumed
+      try {
+        debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: Notifying backend session ${currentState.sessionId} is RESUMED.');
+        await _apiClient.post('/rucks/${currentState.sessionId}/resume', {});
+        debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: Backend notified of RESUME for session ${currentState.sessionId}.');
+      } catch (e) {
+        AppLogger.error('Error notifying backend of session resume: $e');
+        // Decide if this should prevent resume or just be logged
+      }
+
+      // Update the watch about the resume state *before* emitting the new state
+      try {
+        debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: Calling _watchService.resumeSessionOnWatch() for session ${currentState.sessionId}');
+        await _watchService.resumeSessionOnWatch(); // Explicitly tell watch to resume
+      } catch (e) {
+        AppLogger.error('Error telling watch to resume: $e');
+      }
+
+      final newResumedState = currentState.copyWith(
         isPaused: false,
-        totalPausedDuration: newTotalPausedDuration, // Update total paused duration
-        clearCurrentPauseStartTimeUtc: true, // Clear the specific pause start time
-      ));
-      
-      // Re-sync elapsed counter on resume
-      _elapsedCounter = DateTime.now().toUtc().difference(currentState.originalSessionStartTimeUtc).inSeconds - newTotalPausedDuration.inSeconds;
-      _ticksSinceTruth = 0;
+        totalPausedDuration: newTotalPausedDuration,
+        clearCurrentPauseStartTimeUtc: true, // Clears currentPauseStartTimeUtc
+      );
+      debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: Emitting new Resumed state: isPaused: ${newResumedState.isPaused}, totalPausedDuration: ${newResumedState.totalPausedDuration}');
+      emit(newResumedState);
+      // Restart the ticker now that the session is running again
+      _startTicker();
+      debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: Resumed. Ticker restarted.');
+    } else {
+      debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionResumed called but state is not ActiveSessionRunning. State: $state');
     }
   }
 
@@ -756,62 +965,48 @@ emit(ActiveSessionComplete(
     }
   }
 
-  void _onSessionFailed(
+  Future<void> _onSessionFailed(
     SessionFailed event, 
     Emitter<ActiveSessionState> emit
-  ) {
-    AppLogger.error('Session failed: ${event.errorMessage}');
-    
-    // Cancel location subscription
-    _locationSubscription?.cancel();
-    _locationSubscription = null;
-    _heartRateSubscription?.cancel();
-    _heartRateSubscription = null;
-    _stopTicker();
-    
-    // Emit failure state
-    emit(ActiveSessionFailure(
-      errorMessage: event.errorMessage,
-    ));
-  }
-
-  List<HeartRateSample> _hrBuffer = [];
-  DateTime? _lastHrFlush;
-
-  Future<void> _onHeartRateUpdated(
-    HeartRateUpdated event, 
-    Emitter<ActiveSessionState> emit
   ) async {
-    _latestHeartRate = event.sample.bpm;
-    final currentState = state;
-    if (currentState is ActiveSessionRunning) {
-      AppLogger.info('HeartRateUpdated event: ${event.sample.bpm} BPM at ${event.sample.timestamp}');
-      _hrBuffer.add(event.sample);
-      emit(currentState.copyWith(latestHeartRate: _latestHeartRate));
-      if (_hrBuffer.length > 10) {
-        await _flushHeartRateBuffer(currentState);
+    AppLogger.error('SessionFailed event received: ${event.errorMessage}');
+    _stopTicker();
+    _stopHeartRateMonitoring(); // Ensure heart rate monitoring is stopped on failure
+    _locationSubscription?.cancel();
+    _locationSubscription = null; // Clear the subscription
+
+    // Send any remaining heart rate samples to the API
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      if (_heartRateService.heartRateBuffer.isNotEmpty) {
+        await _sendHeartRateSamplesToApi(currentState, _heartRateService.heartRateBuffer);
+        _heartRateService.clearHeartRateBuffer();
       }
+      // Emit failure state with current session details
+      debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionFailed triggered. Emitting ActiveSessionFailure with sessionDetails.');
+      emit(ActiveSessionFailure(errorMessage: event.errorMessage, sessionDetails: currentState));
     } else {
-      AppLogger.warning('HeartRateUpdated event received but session is not running. Current state: $currentState');
+      // Emit failure state without session details if not in ActiveSessionRunning state
+      debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionFailed triggered. Emitting ActiveSessionFailure without sessionDetails.');
+      emit(ActiveSessionFailure(errorMessage: event.errorMessage));
     }
   }
 
-  Future<void> _flushHeartRateBuffer(ActiveSessionRunning currentState) async {
-    if (_hrBuffer.isEmpty || currentState.sessionId.isEmpty) return;
+  Future<void> _sendHeartRateSamplesToApi(ActiveSessionRunning currentState, List<HeartRateSample> samples) async {
+    if (samples.isEmpty || currentState.sessionId.isEmpty) return;
     try {
       await _apiClient.post(
         '/rucks/${currentState.sessionId}/heart_rate',
         {
-          'samples': _hrBuffer.map((s) => {
+          'samples': samples.map((s) => {
             'timestamp': s.timestamp.toIso8601String(),
             'bpm': s.bpm,
           }).toList(),
         },
       );
-      _hrBuffer.clear();
-      _lastHrFlush = DateTime.now();
+      AppLogger.info('Sent ${samples.length} heart rate samples to API');
     } catch (e) {
-      AppLogger.error('Failed to send heart rate samples: $e');
+      AppLogger.error('Failed to send heart rate samples to API: $e');
     }
   }
 
@@ -822,12 +1017,20 @@ emit(ActiveSessionComplete(
 
     if (state is! ActiveSessionRunning) return;
     final currentState = state as ActiveSessionRunning;
+    
+    // If the session is currently paused, ignore this tick entirely. This ensures
+    // we do NOT send an update with isPaused = false that could flip the watch
+    // UI back to the running state. Because there might be one final tick that
+    // slipped through the cracks right before _stopTicker() cancelled the
+    // timer, this guard guarantees nothing happens while paused.
+    if (currentState.isPaused) {
+      return;
+    }
 
-    // Flush heart-rate buffer every 5 seconds
-    if (_hrBuffer.isNotEmpty &&
-        (_lastHrFlush == null ||
-            DateTime.now().difference(_lastHrFlush!) > const Duration(seconds: 5))) {
-      await _flushHeartRateBuffer(currentState);
+    // Check if heart rate service buffer needs flushing ONLY IF NOT PAUSED
+    if (_heartRateService.shouldFlushBuffer()) {
+      AppLogger.info('Session is RUNNING. Flushing HR buffer.');
+      await _heartRateService.flushHeartRateBuffer(); // This will trigger the listener in _setupHeartRateSubscriptions
     }
 
     _elapsedCounter++;
@@ -888,6 +1091,27 @@ emit(ActiveSessionComplete(
       pace: newPace,
       calories: finalCalories,
     ));
+    
+    // Send updates to the watch
+    // Ensure pace has a non-null value; default to 0.0 if null
+    debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onTick calling _watchService.updateSessionOnWatch. isPaused: ${currentState.isPaused}, distance: ${currentState.distanceKm}, elapsed: $newElapsed');
+    await _watchService.updateSessionOnWatch(
+      distance: currentState.distanceKm,
+      duration: Duration(seconds: newElapsed),
+      pace: newPace ?? 0.0, // Pass 0.0 if newPace is null
+      isPaused: currentState.isPaused,
+      calories: finalCalories.toDouble(),
+      elevationGain: currentState.elevationGain,
+      elevationLoss: currentState.elevationLoss,
+    );
+
+    // Check for distance milestones via service on ticks too
+    await _splitTrackingService.checkForMilestone(
+      currentDistanceKm: currentState.distanceKm,
+      sessionStartTime: currentState.originalSessionStartTimeUtc,
+      elapsedSeconds: newElapsed,
+      isPaused: currentState.isPaused,
+    );
   }
 
   Future<void> _onTimerStarted(
@@ -903,17 +1127,50 @@ emit(ActiveSessionComplete(
       AppLogger.info('Timer started at: ${DateTime.now()}');
     }
   }
+  
+
 
   void _onSessionErrorCleared(SessionErrorCleared event, Emitter<ActiveSessionState> emit) {
-    emit(ActiveSessionInitial());
+    AppLogger.info('SessionErrorCleared event received.');
+    if (state is ActiveSessionFailure) {
+      final failureState = state as ActiveSessionFailure;
+      if (failureState.sessionDetails != null) {
+        final recoveredState = failureState.sessionDetails!;
+        AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionErrorCleared. Restoring sessionDetails. isPaused: ${recoveredState.isPaused}');
+        emit(recoveredState);
+        if (!recoveredState.isPaused) {
+          AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: Restored session was not paused. Restarting ticker and location tracking.');
+          _startTicker();
+          _startLocationTracking(emit); // This also handles heart rate if conditions are met within it
+        }
+      } else {
+        AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionErrorCleared. No sessionDetails in FailureState. Emitting ActiveSessionInitial.');
+        emit(ActiveSessionInitial());
+      }
+    } else {
+      AppLogger.warning('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionErrorCleared called but current state is not ActiveSessionFailure. Emitting ActiveSessionInitial.');
+      emit(ActiveSessionInitial());
+    }
   }
 
   @override
   Future<void> close() {
     _locationSubscription?.cancel();
     _heartRateSubscription?.cancel();
+    _heartRateBufferSubscription?.cancel();
     _ticker?.cancel();
     _watchdogTimer?.cancel();
+    
+    // Make sure to stop heart rate monitoring
+    if (_isHeartRateMonitoringStarted) {
+      _heartRateService.stopHeartRateMonitoring();
+      _isHeartRateMonitoringStarted = false;
+    }
+    
+    // Unregister this instance so a new session can register afresh.
+    if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
+      GetIt.I.unregister<ActiveSessionBloc>();
+    }
     return super.close();
   }
 }

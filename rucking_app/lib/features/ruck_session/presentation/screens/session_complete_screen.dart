@@ -14,6 +14,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 
@@ -140,16 +141,64 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   }
   
   /// Saves the session review/notes and navigates home
-  void _saveAndContinue() {
+  Future<void> _saveAndContinue() async {
     if (_isSaving) return; // Prevent multiple submissions
   
     setState(() {
       _isSaving = true;
     });
-
-    // Prepare the data for updating
+    
+    // Send heart rate samples to backend if available
+    if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty) {
+      try {
+        await _apiClient.post(
+          '/rucks/${widget.ruckId}/heart_rate',
+          _heartRateSamples!.map((e) => e.toJson()).toList(),
+        );
+      } catch (e) {
+        // Ignore errors, do not block session completion
+      }
+    }
+    
+    // Prevent saving if session distance is below minimum
+    final distanceMeters = widget.distance * 1000;
+    if (distanceMeters < SessionValidationService.minSessionDistanceMeters) {
+      // Delete the short session
+      try {
+        _apiClient.delete('/rucks/${widget.ruckId}');
+        debugPrint('Deleted short distance session ${widget.ruckId}');
+      } catch (e) {
+        debugPrint('Failed to delete short distance session: $e');
+      }
+      // Inform user and navigate home
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Distance too short. Session not saved.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
+      return;
+    }
+    
+    // Prepare data for the completion
     final Map<String, dynamic> updateData = {
+      'completed_at': widget.completedAt.toIso8601String(),
       'notes': _notesController.text.trim(),
+      // Backend expects these exact keys:
+      'distance_km': widget.distance, // always send for compatibility
+      'final_distance_km': widget.distance, // for final summary
+      'distance_meters': (widget.distance * 1000).round(),
+      'calories_burned': widget.caloriesBurned,
+      'final_calories_burned': widget.caloriesBurned,
+      'elevation_gain_m': widget.elevationGain,
+      'elevation_loss_m': widget.elevationLoss,
+      'final_elevation_gain': widget.elevationGain,
+      'final_elevation_loss': widget.elevationLoss,
+      'final_average_pace': (widget.distance > 0) ? (widget.duration.inSeconds / widget.distance) : null, // seconds per km
       'rating': _rating,
       'perceived_exertion': _perceivedExertion,
       'tags': _selectedTags.isNotEmpty ? _selectedTags : null,

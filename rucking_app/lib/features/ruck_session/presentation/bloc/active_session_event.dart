@@ -1,5 +1,6 @@
 part of 'active_session_bloc.dart';
 
+@immutable
 abstract class ActiveSessionEvent extends Equatable {
   const ActiveSessionEvent();
   
@@ -7,19 +8,29 @@ abstract class ActiveSessionEvent extends Equatable {
   List<Object?> get props => [];
 }
 
+/// Enum to describe the origin of a session action (pause, resume, etc.)
+enum SessionActionSource {
+  ui,        // Action initiated by the user on the phone UI
+  watch,     // Action initiated by the user on the watch UI or by the watch system
+  system,    // Action initiated by the system (e.g., auto-pause, background process)
+  unknown,   // Source is unknown
+}
+
 class SessionStarted extends ActiveSessionEvent {
   final int? plannedDuration; // in seconds
   final double ruckWeightKg;
   final String? notes;
+  final LocationPoint? initialLocation;
   
   const SessionStarted({
     required this.ruckWeightKg,
     this.notes,
     this.plannedDuration,
+    this.initialLocation,
   });
   
   @override
-  List<Object?> get props => [ruckWeightKg, notes, plannedDuration];
+  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation];
 }
 
 class LocationUpdated extends ActiveSessionEvent {
@@ -32,11 +43,19 @@ class LocationUpdated extends ActiveSessionEvent {
 }
 
 class SessionPaused extends ActiveSessionEvent {
-  const SessionPaused();
+  final SessionActionSource source;
+  const SessionPaused({this.source = SessionActionSource.unknown});
+
+  @override
+  List<Object?> get props => [source];
 }
 
 class SessionResumed extends ActiveSessionEvent {
-  const SessionResumed();
+  final SessionActionSource source;
+  const SessionResumed({this.source = SessionActionSource.unknown});
+
+  @override
+  List<Object?> get props => [source];
 }
 
 class SessionCompleted extends ActiveSessionEvent {

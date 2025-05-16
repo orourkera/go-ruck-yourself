@@ -8,6 +8,8 @@ import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/security/ssl_pinning.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/core/security/token_refresh_interceptor.dart';
 import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
@@ -20,6 +22,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/ruck_buddies/di/ruck_buddies_injection_container.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -62,6 +65,19 @@ Future<void> setupServiceLocator() async {
     ),
   );
   
+  // Register HeartRateService which centralizes heart rate handling
+  getIt.registerSingleton<HeartRateService>(
+    HeartRateService(
+      watchService: getIt<WatchService>(),
+      healthService: getIt<HealthService>(),
+    ),
+  );
+  
+  // Register SplitTrackingService which depends on WatchService
+  getIt.registerSingleton<SplitTrackingService>(
+    SplitTrackingService(watchService: getIt<WatchService>()),
+  );
+  
   // Repositories
   getIt.registerSingleton<AuthRepository>(
     AuthRepositoryImpl(getIt<AuthService>())
@@ -82,12 +98,16 @@ Future<void> setupServiceLocator() async {
         locationService: getIt<LocationService>(),
         healthService: getIt<HealthService>(),
         watchService: getIt<WatchService>(),
+        heartRateService: getIt<HeartRateService>(),
+        splitTrackingService: getIt<SplitTrackingService>(),
       ));
       
   // Register session bloc for operations like delete
   getIt.registerFactory<SessionBloc>(() => SessionBloc(
     sessionRepository: getIt<SessionRepository>(),
   ));
+
+  getIt.registerFactory<HealthBloc>(() => HealthBloc(healthService: getIt<HealthService>()));
   
   // Initialize Ruck Buddies feature
   initRuckBuddiesFeature(getIt);
