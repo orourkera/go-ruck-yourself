@@ -751,6 +751,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       );
       debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: Emitting new Resumed state: isPaused: ${newResumedState.isPaused}, totalPausedDuration: ${newResumedState.totalPausedDuration}');
       emit(newResumedState);
+      // Restart the ticker now that the session is running again
+      _startTicker();
+      debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: Resumed. Ticker restarted.');
     } else {
       debugPrint('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionResumed called but state is not ActiveSessionRunning. State: $state');
     }
