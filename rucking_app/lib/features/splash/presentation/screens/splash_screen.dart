@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -22,55 +23,70 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeInAnimation;
   bool _navigated = false;
-  bool _animationStarted = false;
+  static bool _hasAnimatedOnceThisLaunch = false;
 
   @override
   void initState() {
     super.initState();
+    debugPrint('[Splash] initState: New _SplashScreenState created. HasAnimatedOnce: $_hasAnimatedOnceThisLaunch');
     
-    // Initialize animation controller with faster animation for better transition from native splash
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
+    _animationController.addStatusListener((status) {
+      debugPrint('[Splash] Animation status changed: $status');
+      if (status == AnimationStatus.completed) {
+        if (mounted) { 
+          _hasAnimatedOnceThisLaunch = true;
+          debugPrint('[Splash] Animation completed and _hasAnimatedOnceThisLaunch set to true.');
+        }
+      }
+    });
     
-    // Create fade-in animation
     _fadeInAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(_animationController);
     
-    // Animation will be started in the build method with a state check to prevent repeated starts
+    if (!_hasAnimatedOnceThisLaunch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint('[Splash] addPostFrameCallback executed (condition: !_hasAnimatedOnceThisLaunch).');
+        if (mounted && !_animationController.isAnimating && _animationController.status != AnimationStatus.completed) {
+          debugPrint('[Splash] Forwarding animation controller from addPostFrameCallback.');
+          _animationController.forward();
+        } else {
+          debugPrint('[Splash] NOT forwarding animation (check in addPostFrameCallback): mounted=$mounted, isAnimating=${_animationController.isAnimating}, status=${_animationController.status}');
+        }
+      });
+    } else {
+      debugPrint('[Splash] Animation already played this launch, skipping forward in initState.');
+      if (mounted && _animationController.status != AnimationStatus.completed && !_animationController.isAnimating) {
+        _animationController.value = 1.0; 
+      }
+    }
     
-    // Navigate to the appropriate screen after a delay (reduced to improve UX)
     Timer(const Duration(seconds: 2), () async {
       if (!mounted || _navigated) return;
       _navigated = true;
 
-      // First check authentication status
       final authBloc = BlocProvider.of<AuthBloc>(context);
       final authState = authBloc.state;
       
       if (authState is Unauthenticated || authState is AuthError) {
-        // If not authenticated, navigate to login screen
         Navigator.pushReplacementNamed(context, '/login');
         return;
       }
       
-      // Only check subscription if authenticated
       if (authState is Authenticated) {
-        // Check subscription status via RevenueCatService
         final revenueCatService = GetIt.instance<RevenueCatService>();
         final isSubscribed = await revenueCatService.checkSubscriptionStatus();
         if (isSubscribed) {
-          // If subscribed, navigate directly to Home Screen
           Navigator.pushReplacementNamed(context, '/home');
         } else {
-          // If not subscribed, navigate to Paywall Screen
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const PaywallScreen()),
           );
         }
       } else {
-        // If still loading or in initial state, wait a bit longer
         Timer(const Duration(seconds: 2), () {
           if (!mounted) return;
           final currentState = authBloc.state;
@@ -78,7 +94,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           if (currentState is Authenticated) {
             Navigator.pushReplacementNamed(context, '/home');
           } else {
-            // If still not authenticated, go to login
             Navigator.pushReplacementNamed(context, '/login');
           }
         });
@@ -88,35 +103,27 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   
   @override
   void dispose() {
+    debugPrint('[Splash] dispose: _SplashScreenState disposed. HasAnimatedOnce: $_hasAnimatedOnceThisLaunch');
     _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Ensure the animation controller doesn't restart on rebuild
-    if (mounted && !_animationStarted && _animationController.isDismissed) {
-      _animationStarted = true;
-      _animationController.forward();
-    }
+    debugPrint('[Splash] build: _SplashScreenState build method called. Animation controller status: ${_animationController.status}');
     
     return FutureBuilder<bool>(
-      // First check the cached lady mode status for immediate rendering
       future: SplashHelper.isLadyModeActive(),
       builder: (context, snapshot) {
-        // Default to standard mode if we can't determine lady mode status
         bool isLadyMode = snapshot.data ?? false;
         
-        // Try to get the latest user gender from auth state 
         String? userGender;
         try {
           final authState = context.read<AuthBloc>().state;
           if (authState is Authenticated) {
             userGender = authState.user.gender;
-            // Update our lady mode based on actual user gender
             isLadyMode = (userGender == 'female');
             
-            // Update the cache for next app launch
             SplashHelper.cacheLadyModeStatus(isLadyMode);
             
             debugPrint('[Splash] Gender from auth state: $userGender, Lady mode: $isLadyMode');
@@ -125,10 +132,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           debugPrint('[Splash] Using cached lady mode value: $isLadyMode');
         }
         
-        // Determine which splash image to use based on lady mode status
         final String splashImagePath = SplashHelper.getSplashImagePath(isLadyMode);
         
-        // Use lady mode colors for female users
         final Color backgroundColor = SplashHelper.getBackgroundColor(isLadyMode);
         
         return Scaffold(
@@ -139,7 +144,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Main logo image with animation - gender-specific
                   ScaleTransition(
                     scale: Tween<double>(begin: 1.0, end: 1.5).animate(
                       CurvedAnimation(
@@ -149,13 +153,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     ),
                     child: Image.asset(
                       splashImagePath,
-                      width: 281.25, // 375 * 0.75
-                      height: 281.25, // 375 * 0.75
+                      width: 281.25, 
+                      height: 281.25, 
                       fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 70),
-                  // App tagline
                   Text(
                     'Track your ruck, count your calories.',
                     style: AppTextStyles.titleMedium.copyWith(
