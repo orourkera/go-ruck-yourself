@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 import 'package:flutter/foundation.dart';
 
 /// Client for handling API requests to the backend
@@ -30,6 +31,73 @@ class ApiClient {
         }
       ));
     }
+    
+    // Add token refresh interceptor
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (error, handler) async {
+          if (error.response?.statusCode == 401) {
+            try {
+              debugPrint('[API] Token expired. Attempting to refresh...');
+              
+              // Skip the request if it's already a refresh token request
+              if (error.requestOptions.path.contains('/auth/refresh')) {
+                return handler.next(error);
+              }
+              
+              // Get refresh token from storage
+              final refreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
+              if (refreshToken == null) {
+                debugPrint('[API] No refresh token available');
+                return handler.next(error);
+              }
+              
+              // Create a new Dio instance for refresh request to avoid interceptor loop
+              final refreshDio = Dio(_dio.options);
+              final refreshResponse = await refreshDio.post(
+                '/auth/refresh',
+                data: {'refresh_token': refreshToken},
+              );
+              
+              if (refreshResponse.statusCode == 200) {
+                final newToken = refreshResponse.data['token'] as String;
+                final newRefreshToken = refreshResponse.data['refresh_token'] as String;
+                
+                // Save new tokens
+                await _storageService.setSecureString(AppConfig.tokenKey, newToken);
+                await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
+                
+                // Update token in the current Dio instance
+                setAuthToken(newToken);
+                
+                debugPrint('[API] Token refreshed successfully. Retrying original request...');
+                
+                // Retry the original request with the new token
+                final options = Options(
+                  method: error.requestOptions.method,
+                  headers: {...error.requestOptions.headers, 'Authorization': 'Bearer $newToken'},
+                );
+                
+                final retryResponse = await _dio.request<dynamic>(
+                  error.requestOptions.path,
+                  data: error.requestOptions.data,
+                  queryParameters: error.requestOptions.queryParameters,
+                  options: options,
+                );
+                
+                // Return the response from the retry
+                return handler.resolve(retryResponse);
+              }
+            } catch (e) {
+              debugPrint('[API] Token refresh failed: $e');
+            }
+          }
+          
+          // If token refresh failed or error is not 401, continue with the original error
+          return handler.next(error);
+        },
+      ),
+    );
   }
   
   /// Set the storage service after it has been initialized
