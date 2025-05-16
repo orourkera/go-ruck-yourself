@@ -27,6 +27,19 @@ class SessionDetailScreen extends StatefulWidget {
 }
 
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
+  // Helper method to get the appropriate color based on user gender
+  Color _getLadyModeColor(BuildContext context) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        return AppColors.ladyPrimary;
+      }
+    } catch (e) {
+      // If we can't access the AuthBloc, fall back to default color
+    }
+    return AppColors.primary;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get user preferences for metric/imperial
@@ -87,6 +100,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Session Details'),
+          backgroundColor: _getLadyModeColor(context),
           actions: [
             // Delete session button
             IconButton(
@@ -254,7 +268,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       children: [
         Icon(
           icon,
-          color: Theme.of(context).primaryColor,
+          color: _getLadyModeColor(context),
           size: 24,
         ),
         const SizedBox(height: 4),
@@ -285,7 +299,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         children: [
           Icon(
             icon,
-            color: Theme.of(context).primaryColor,
+            color: _getLadyModeColor(context),
             size: 24,
           ),
           const SizedBox(width: 16),

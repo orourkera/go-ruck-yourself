@@ -16,6 +16,8 @@ import 'package:rucking_app/shared/theme/app_theme.dart';
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 
 /// Main application widget
 class RuckingApp extends StatelessWidget {
@@ -76,17 +78,25 @@ class RuckingApp extends StatelessWidget {
                   final args = settings.arguments as Map<String, dynamic>?;
                   if (args != null) {
                     return MaterialPageRoute(
-                      builder: (_) => SessionCompleteScreen(
-                        completedAt: args['completedAt'] as DateTime,
-                        ruckId: args['ruckId'] as String,
-                        duration: args['duration'] as Duration,
-                        distance: args['distance'] as double,
-                        caloriesBurned: args['caloriesBurned'] as int,
-                        elevationGain: args['elevationGain'] as double,
-                        elevationLoss: args['elevationLoss'] as double,
-                        ruckWeight: args['ruckWeight'] as double,
-                        initialNotes: args['initialNotes'] as String?,
-                        heartRateSamples: args['heartRateSamples'] as List<HeartRateSample>?,
+                      builder: (context) => BlocProvider<HealthBloc>(
+                        create: (context) => HealthBloc(
+                          healthService: getIt<HealthService>(),
+                          userId: context.read<AuthBloc>().state is Authenticated
+                            ? (context.read<AuthBloc>().state as Authenticated).user.userId
+                            : null,
+                        ),
+                        child: SessionCompleteScreen(
+                          completedAt: args['completedAt'] as DateTime,
+                          ruckId: args['ruckId'] as String,
+                          duration: args['duration'] as Duration,
+                          distance: args['distance'] as double,
+                          caloriesBurned: args['caloriesBurned'] as int,
+                          elevationGain: args['elevationGain'] as double,
+                          elevationLoss: args['elevationLoss'] as double,
+                          ruckWeight: args['ruckWeight'] as double,
+                          initialNotes: args['initialNotes'] as String?,
+                          heartRateSamples: args['heartRateSamples'] as List<HeartRateSample>?,
+                        ),
                       ),
                     );
                   } else {

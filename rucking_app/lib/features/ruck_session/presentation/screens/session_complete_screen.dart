@@ -220,7 +220,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
 
   Widget _buildStatCard(String label, String value, String unit) {
     return Card(
-      color: AppColors.primary.withOpacity(0.08),
+      color: _getLadyModeColor(context).withOpacity(0.08),
       elevation: 0,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -249,7 +249,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         LineChartBarData(
           spots: spots,
           isCurved: true,
-          color: AppColors.primary,
+          color: _getLadyModeColor(context),
           barWidth: 3,
           dotData: FlDotData(show: false),
         ),
@@ -306,12 +306,27 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   }
 
   @override
+  // Helper method to get the appropriate color based on user gender
+  Color _getLadyModeColor(BuildContext context) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        return AppColors.ladyPrimary;
+      }
+    } catch (e) {
+      // If we can't access the AuthBloc, fall back to default color
+    }
+    return AppColors.primary;
+  }
+
   Widget build(BuildContext context) {
     // Get user measurement preference
     bool preferMetric = true;
+    String? userGender;
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       preferMetric = authState.user.preferMetric;
+      userGender = authState.user.gender;
     }
 
     return MultiBlocListener(
@@ -367,7 +382,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         appBar: AppBar(
           title: const Text('Session Complete'),
           centerTitle: true,
-          backgroundColor: AppColors.primary,
+          backgroundColor: _getLadyModeColor(context),
           foregroundColor: Colors.white,
           automaticallyImplyLeading: false,
         ),
@@ -418,7 +433,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                       title: 'Time',
                       value: _formatDuration(widget.duration),
                       icon: Icons.timer,
-                      color: AppColors.primary,
+                      color: _getLadyModeColor(context),
                       centerContent: true,
                       valueFontSize: 36,
                     ),
@@ -426,7 +441,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                       title: 'Distance',
                       value: MeasurementUtils.formatDistance(widget.distance, metric: preferMetric),
                       icon: Icons.straighten,
-                      color: AppColors.primary,
+                      color: _getLadyModeColor(context),
                       centerContent: true,
                       valueFontSize: 36,
                     ),
@@ -562,8 +577,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                       selected: isSelected,
                       onSelected: (_) => _toggleTag(tag),
                       backgroundColor: Colors.grey[200],
-                      selectedColor: AppColors.primary.withOpacity(0.2),
-                      checkmarkColor: AppColors.primary,
+                      selectedColor: _getLadyModeColor(context).withOpacity(0.2),
+                      checkmarkColor: _getLadyModeColor(context),
                     );
                   }).toList(),
                 ),
@@ -598,7 +613,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     },
                     text: 'Save and Continue',
                     icon: Icons.save,
-                    color: AppColors.primary,
+                    color: _getLadyModeColor(context),
                     isLoading: _isSaving,
                     width: 250,
                   ),
