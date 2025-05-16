@@ -14,6 +14,7 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/active_se
 import 'package:rucking_app/shared/theme/app_theme.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 
 /// Main application widget
 class RuckingApp extends StatelessWidget {
@@ -37,6 +38,9 @@ class RuckingApp extends StatelessWidget {
         ),
         BlocProvider<RuckBuddiesBloc>(
           create: (context) => getIt<RuckBuddiesBloc>(),
+        ),
+        BlocProvider<HealthBloc>(
+          create: (context) => getIt<HealthBloc>(),
         ),
       ],
       child: MaterialApp(

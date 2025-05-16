@@ -22,6 +22,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/ruck_buddies/di/ruck_buddies_injection_container.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -105,6 +106,8 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<SessionBloc>(() => SessionBloc(
     sessionRepository: getIt<SessionRepository>(),
   ));
+
+  getIt.registerFactory<HealthBloc>(() => HealthBloc(healthService: getIt<HealthService>()));
   
   // Initialize Ruck Buddies feature
   initRuckBuddiesFeature(getIt);

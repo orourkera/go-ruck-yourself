@@ -135,6 +135,11 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     // Pause the session from the watch
     func pauseSession() {
+        // Emit a debug tap signal to the phone so we can confirm the watch button was pressed even
+        // if the command ultimately gets ignored due to local guard conditions. This lets us see
+        // evidence of the tap in the iPhone logs without needing the Watch console.
+        sendMessage(["command": "debug_watchPauseTapped"])  // DEBUG ONLY – harmless for production
+        
         guard isSessionActive else { 
             print("[DEBUG] Cannot pause: session not active")
             return 
@@ -199,6 +204,9 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate {
     
     // Resume the session from the watch
     func resumeSession() {
+        // Emit a debug tap signal to the phone so we can confirm the watch button was pressed.
+        sendMessage(["command": "debug_watchResumeTapped"])  // DEBUG ONLY
+        
         guard isSessionActive && isPaused else { 
             print("[DEBUG] Cannot resume: session not active or not paused")
             return 
