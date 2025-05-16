@@ -8,6 +8,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
+import 'package:rucking_app/features/splash/service/splash_helper.dart';
 
 /// Screen for editing user profile information
 class EditProfileScreen extends StatefulWidget {
@@ -96,6 +97,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
            if (heightVal != null) {
               heightCm = widget.preferMetric ? heightVal : heightVal / cmToInches;
            }
+      }
+      
+      // Check if gender has changed and cache it for splash screen
+      final bool isLadyMode = _selectedGender == 'female';
+      if (widget.user.gender != _selectedGender) {
+        // Cache the gender preference for splash screen
+        SplashHelper.cacheLadyModeStatus(isLadyMode).then((_) {
+          debugPrint('[Profile] Lady mode status cached: $isLadyMode');
+        });
       }
       
       context.read<AuthBloc>().add(

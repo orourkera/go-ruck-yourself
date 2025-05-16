@@ -8,6 +8,7 @@ import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/features/splash/service/splash_helper.dart';
 
 /// Splash screen shown on app launch
 class SplashScreen extends StatefulWidget {
@@ -26,20 +27,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     
-    // Initialize animation controller
+    // Initialize animation controller with faster animation for better transition from native splash
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 800),
     );
     
     // Create fade-in animation
-    _fadeInAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
+    _fadeInAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(_animationController);
     
-    // Start the animation
-    _animationController.forward();
+    // Short delay before starting the animation to ensure smooth transition from native splash
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) {
+        _animationController.forward();
+      }
+    });
     
-    // Navigate to the appropriate screen after a delay
-    Timer(const Duration(seconds: 3), () async {
+    // Navigate to the appropriate screen after a delay (reduced to improve UX)
+    Timer(const Duration(seconds: 2), () async {
       if (!mounted || _navigated) return;
       _navigated = true;
 
@@ -93,65 +98,77 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    // Get user gender from AuthBloc if available
-    String? userGender;
-    try {
-      final authBloc = GetIt.instance<AuthBloc>();
-      if (authBloc.state is Authenticated) {
-        userGender = (authBloc.state as Authenticated).user.gender;
-      }
-    } catch (e) {
-      // If auth bloc is not available, continue with default image
-      debugPrint('Could not get user gender for splash screen: $e');
-    }
-    
-    // Determine which splash image to use based on gender
-    final bool isLadyMode = (userGender == 'female');
-    final String splashImagePath = isLadyMode
-        ? 'assets/images/go_ruck_yourself_lady.png' // Female version
-        : 'assets/images/go ruck yourself.png'; // Default/male version
+    return FutureBuilder<bool>(
+      // First check the cached lady mode status for immediate rendering
+      future: SplashHelper.isLadyModeActive(),
+      builder: (context, snapshot) {
+        // Default to standard mode if we can't determine lady mode status
+        bool isLadyMode = snapshot.data ?? false;
         
-    // Use lady mode colors for female users
-    final Color backgroundColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+        // Try to get the latest user gender from auth state 
+        String? userGender;
+        try {
+          final authState = context.read<AuthBloc>().state;
+          if (authState is Authenticated) {
+            userGender = authState.user.gender;
+            // Update our lady mode based on actual user gender
+            isLadyMode = (userGender == 'female');
+            
+            // Update the cache for next app launch
+            SplashHelper.cacheLadyModeStatus(isLadyMode);
+            
+            debugPrint('[Splash] Gender from auth state: $userGender, Lady mode: $isLadyMode');
+          }
+        } catch (e) {
+          debugPrint('[Splash] Using cached lady mode value: $isLadyMode');
+        }
         
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeInAnimation,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Main logo image with animation - gender-specific
-              ScaleTransition(
-                scale: Tween<double>(begin: 1.0, end: 1.5).animate(
-                  CurvedAnimation(
-                    parent: _animationController,
-                    curve: Curves.elasticOut,
+        // Determine which splash image to use based on lady mode status
+        final String splashImagePath = SplashHelper.getSplashImagePath(isLadyMode);
+        
+        // Use lady mode colors for female users
+        final Color backgroundColor = SplashHelper.getBackgroundColor(isLadyMode);
+        
+        return Scaffold(
+          backgroundColor: backgroundColor,
+          body: Center(
+            child: FadeTransition(
+              opacity: _fadeInAnimation,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Main logo image with animation - gender-specific
+                  ScaleTransition(
+                    scale: Tween<double>(begin: 1.0, end: 1.5).animate(
+                      CurvedAnimation(
+                        parent: _animationController,
+                        curve: Curves.elasticOut,
+                      ),
+                    ),
+                    child: Image.asset(
+                      splashImagePath,
+                      width: 281.25, // 375 * 0.75
+                      height: 281.25, // 375 * 0.75
+                      fit: BoxFit.contain,
+                    ),
                   ),
-                ),
-                child: Image.asset(
-                  splashImagePath,
-                  width: 281.25, // 375 * 0.75
-                  height: 281.25, // 375 * 0.75
-                  fit: BoxFit.contain,
-                ),
+                  const SizedBox(height: 70),
+                  // App tagline
+                  Text(
+                    'Track your ruck, count your calories.',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Bangers',
+                      fontSize: AppTextStyles.titleMedium.fontSize != null ? AppTextStyles.titleMedium.fontSize! * 1.25 : 25,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 70),
-              // App tagline
-              Text(
-                'Track your ruck, count your calories.',
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: 'Bangers',
-                  fontSize: AppTextStyles.titleMedium.fontSize != null ? AppTextStyles.titleMedium.fontSize! * 1.25 : 25,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 } 
