@@ -81,22 +81,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               }
             }
 
+            // Determine if we're in lady mode
+            final bool isLadyMode = user.gender == 'female';
+            final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+            
             return Scaffold(
-              backgroundColor: Colors.white,
+              backgroundColor: isLadyMode ? primaryColor.withOpacity(0.05) : Colors.white,
               appBar: AppBar(
-                backgroundColor: Colors.white,
+                backgroundColor: isLadyMode ? primaryColor : Colors.white,
                 elevation: 0,
-                title: const Text(
+                title: Text(
                   'Profile',
                   style: TextStyle(
-                    color: Colors.black,
+                    color: isLadyMode ? Colors.white : Colors.black,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 actions: [
                   IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.black),
+                    icon: Icon(Icons.edit, color: isLadyMode ? Colors.white : Colors.black),
                     onPressed: () {
                       Navigator.push(
                         context,
