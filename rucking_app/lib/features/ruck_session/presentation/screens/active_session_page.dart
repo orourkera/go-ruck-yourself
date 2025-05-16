@@ -20,6 +20,7 @@ import 'package:rucking_app/features/ruck_session/presentation/widgets/session_s
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
 
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:provider/provider.dart';
 
 /// Arguments passed to the ActiveSessionPage
@@ -58,21 +59,44 @@ class ActiveSessionPage extends StatelessWidget {
       existingBloc = null;
     }
 
+    // Get GetIt instance first so it's available regardless of which path we take
+    final locator = GetIt.I;
+    
     if (existingBloc != null) {
       // Bloc already exists – simply build the view.
-      return _ActiveSessionView(args: args);
+      // Also provide HealthBloc for the session complete screen
+      return BlocProvider<HealthBloc>(
+        create: (_) => HealthBloc(
+          healthService: locator<HealthService>(),
+          userId: context.read<AuthBloc>().state is Authenticated
+            ? (context.read<AuthBloc>().state as Authenticated).user.userId
+            : null,
+        ),
+        child: _ActiveSessionView(args: args),
+      );
     }
 
     // No existing bloc – create a fresh one (e.g. when user lands here
     // directly without going through the countdown page).
-    final locator = GetIt.I;
-    return BlocProvider(
-      create: (_) => ActiveSessionBloc(
-        apiClient: locator<ApiClient>(),
-        locationService: locator<LocationService>(),
-        healthService: locator<HealthService>(),
-        watchService: locator<WatchService>(),
-      ),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => ActiveSessionBloc(
+            apiClient: locator<ApiClient>(),
+            locationService: locator<LocationService>(),
+            healthService: locator<HealthService>(),
+            watchService: locator<WatchService>(),
+          ),
+        ),
+        BlocProvider(
+          create: (_) => HealthBloc(
+            healthService: locator<HealthService>(),
+            userId: context.read<AuthBloc>().state is Authenticated
+              ? (context.read<AuthBloc>().state as Authenticated).user.userId
+              : null,
+          ),
+        ),
+      ],
       child: _ActiveSessionView(args: args),
     );
   }
@@ -94,6 +118,19 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   void _checkAnimateOverlay() {
     // No animation needed anymore since we removed the gray overlay
     // This method is kept for compatibility but doesn't do anything
+  }
+  
+  // Helper method to get the appropriate color based on user gender
+  Color _getLadyModeColor(BuildContext context) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        return AppColors.ladyPrimary;
+      }
+    } catch (e) {
+      // If we can't access the AuthBloc, fall back to default color
+    }
+    return AppColors.primary;
   }
 
   @override
@@ -178,7 +215,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                   return Container(
                     width: double.infinity,
                     padding: EdgeInsets.only(top: topPadding, bottom: 18.0),
-                    color: AppColors.primary,
+                    color: _getLadyModeColor(context),
                     child: Center(
                       child: Text(
                         'ACTIVE SESSION',
@@ -712,6 +749,61 @@ class _RouteMapState extends State<_RouteMap> {
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a));
     return earthRadius * c;
   }
+  
+  double _toRadians(double degrees) => degrees * math.pi / 180.0;
+  
+  /// Build a gender-specific map marker based on the user's gender
+  Widget _buildGenderSpecificMarker(BuildContext context) {
+    // Get user gender from AuthBloc using context
+    String? userGender;
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        userGender = authState.user.gender;
+        debugPrint('Map marker detected gender: $userGender');
+      }
+    } catch (e) {
+      // If auth bloc is not available, continue with default marker
+      debugPrint('Could not get user gender for map marker: $e');
+    }
+    
+    // Determine which marker image to use based on gender
+    final String markerImagePath = (userGender == 'female')
+        ? 'assets/images/lady_rucker.png' // Female version
+        : 'assets/images/map_marker.png'; // Default/male version
+    
+    debugPrint('Using map marker image path: $markerImagePath');
+    
+    // Try to load the image asset with error handling
+    try {
+      return Image.asset(
+        markerImagePath,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('Error loading marker image: $error');
+          return Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.blue, // Use blue for lady mode as a fallback
+            ),
+            child: const Icon(Icons.person_pin, color: Colors.white),
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('Exception loading marker image: $e');
+      return Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.green, // Use green for default mode as a fallback
+        ),
+        child: const Icon(Icons.person_pin, color: Colors.white),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -784,7 +876,7 @@ class _RouteMapState extends State<_RouteMap> {
                         point: widget.route.isNotEmpty ? widget.route.last : widget.initialCenter!,
                         width: 40,
                         height: 40,
-                        child: Image.asset('assets/images/map marker.png'),
+                        child: _buildGenderSpecificMarker(context),
                       ),
                     ],
                   ),

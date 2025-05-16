@@ -24,6 +24,7 @@ class AuthRepositoryImpl implements AuthRepository {
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
+    String? gender,
   }) async {
     return await _authService.register(
       username: username, // This is the display name
@@ -33,6 +34,7 @@ class AuthRepositoryImpl implements AuthRepository {
       weightKg: weightKg,
       heightCm: heightCm,
       dateOfBirth: dateOfBirth,
+      gender: gender,
     );
   }
   
@@ -58,6 +60,7 @@ class AuthRepositoryImpl implements AuthRepository {
     double? heightCm,
     bool? preferMetric,
     bool? allowRuckSharing,
+    String? gender,
   }) async {
     return await _authService.updateProfile(
       username: username,
@@ -65,6 +68,7 @@ class AuthRepositoryImpl implements AuthRepository {
       heightCm: heightCm,
       preferMetric: preferMetric,
       allowRuckSharing: allowRuckSharing,
+      gender: gender,
     );
   }
 
