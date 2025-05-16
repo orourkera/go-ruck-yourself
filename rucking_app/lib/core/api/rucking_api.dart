@@ -58,7 +58,7 @@ abstract class RuckingApi {
   Future<bool> startSessionOnWatch(double ruckWeight);
 
   /// Update session metrics on the watch (Flutter -> native)
-  Future<bool> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused);
+  Future<bool> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused, double calories, double elevationGain, double elevationLoss);
 
   /// Pause an active session from the watch
   Future<bool> pauseSessionFromWatch();
@@ -147,8 +147,17 @@ abstract class RuckingApi {
           final bool? arg_isPaused = (args[3] as bool?);
           assert(arg_isPaused != null,
               'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch was null, expected non-null bool.');
+          final double? arg_calories = (args[4] as double?);
+          assert(arg_calories != null,
+              'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch was null, expected non-null double.');
+          final double? arg_elevationGain = (args[5] as double?);
+          assert(arg_elevationGain != null,
+              'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch was null, expected non-null double.');
+          final double? arg_elevationLoss = (args[6] as double?);
+          assert(arg_elevationLoss != null,
+              'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch was null, expected non-null double.');
           try {
-            final bool output = await api.updateSessionOnWatch(arg_distance!, arg_duration!, arg_pace!, arg_isPaused!);
+            final bool output = await api.updateSessionOnWatch(arg_distance!, arg_duration!, arg_pace!, arg_isPaused!, arg_calories!, arg_elevationGain!, arg_elevationLoss!);
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
@@ -270,14 +279,14 @@ class FlutterRuckingApi {
   final String pigeonVar_messageChannelSuffix;
 
   /// Update session metrics on the watch
-  Future<void> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused) async {
+  Future<void> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused, double calories, double elevationGain, double elevationLoss) async {
     final String pigeonVar_channelName = 'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.updateSessionOnWatch$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[distance, duration, pace, isPaused]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[distance, duration, pace, isPaused, calories, elevationGain, elevationLoss]);
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
     if (pigeonVar_replyList == null) {
