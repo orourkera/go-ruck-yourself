@@ -473,9 +473,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       onTogglePause: () {
                                         if (state is! ActiveSessionRunning) return; // Ignore if not running
                                         if (isPaused) {
-                                          context.read<ActiveSessionBloc>().add(const SessionResumed());
+                                          context.read<ActiveSessionBloc>().add(const SessionResumed(source: SessionActionSource.ui));
                                         } else {
-                                          context.read<ActiveSessionBloc>().add(const SessionPaused());
+                                          context.read<ActiveSessionBloc>().add(const SessionPaused(source: SessionActionSource.ui));
                                         }
                                       },
                                       onEndSession: () {

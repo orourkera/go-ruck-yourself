@@ -87,8 +87,8 @@ import WatchConnectivity
                 
             case "updateSessionState":
                 if let stateData = call.arguments as? [String: Any], let isPaused = stateData["isPaused"] as? Bool {
-                    print("[WATCH] Sending session state update to watch: isPaused = \(isPaused)")
-                    self.sendMessageToWatch(["command": "updateSessionState", "isPaused": isPaused])
+                    print("[WATCH] Sending session state update to watch: isPaused = \(isPaused ? 1 : 0) (as Int)")
+                    self.sendMessageToWatch(["command": "updateSessionState", "isPaused": isPaused ? 1 : 0])
                     result(true)
                 } else {
                     result(FlutterError(code: "-1", message: "Invalid arguments", details: nil))
@@ -366,7 +366,11 @@ import WatchConnectivity
                 }
             default:
                 print("[WATCH] Unknown command: \(command)")
+                replyHandler?(["status": "error", "message": "Unknown command \(command)"])
             }
+        } else {
+            print("[WATCH] Received message from Watch without a valid 'command' string (or 'command' was not a string): \(message)")
+            replyHandler?(["status": "error", "message": "Message did not contain a valid command string"])
         }
     }
 

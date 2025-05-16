@@ -155,11 +155,13 @@ class ActiveSessionComplete extends ActiveSessionState {
 
 class ActiveSessionFailure extends ActiveSessionState {
   final String errorMessage;
-  
+  final ActiveSessionRunning? sessionDetails;
+
   const ActiveSessionFailure({
     required this.errorMessage,
+    this.sessionDetails,
   });
-  
+
   @override
-  List<Object?> get props => [errorMessage];
+  List<Object?> get props => [errorMessage, sessionDetails];
 }
