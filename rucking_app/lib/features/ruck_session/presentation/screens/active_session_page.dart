@@ -83,7 +83,6 @@ class ActiveSessionPage extends StatelessWidget {
 
     // No existing bloc – create a fresh one (e.g. when user lands here
     // directly without going through the countdown page).
-
     return MultiBlocProvider(
       providers: [
         BlocProvider(
@@ -92,6 +91,8 @@ class ActiveSessionPage extends StatelessWidget {
             locationService: locator<LocationService>(),
             healthService: locator<HealthService>(),
             watchService: locator<WatchService>(),
+            heartRateService: locator<HeartRateService>(),
+            splitTrackingService: locator<SplitTrackingService>(),
           ),
         ),
         BlocProvider(
@@ -103,16 +104,6 @@ class ActiveSessionPage extends StatelessWidget {
           ),
         ),
       ],
-    final locator = GetIt.I;
-    return BlocProvider(
-      create: (_) => ActiveSessionBloc(
-        apiClient: locator<ApiClient>(),
-        locationService: locator<LocationService>(),
-        healthService: locator<HealthService>(),
-        watchService: locator<WatchService>(),
-        heartRateService: locator<HeartRateService>(),
-        splitTrackingService: locator<SplitTrackingService>(),
-      ),
       child: _ActiveSessionView(args: args),
     );
   }

@@ -173,7 +173,6 @@ class SessionStatsOverlay extends StatelessWidget {
     return AppColors.error;
   }
 
-<<<<<<< HEAD
   Color _calColor(BuildContext context, double cal) {
     bool isLadyMode = false;
     try {
@@ -187,11 +186,6 @@ class SessionStatsOverlay extends StatelessWidget {
     
     if (cal < 100) return AppColors.warning; // Yellow when calories are low
     return isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
-=======
-  Color _calColor(double cal) {
-    if (cal < 100) return AppColors.warning;
-    return AppColors.primary;
->>>>>>> watch-integration
   }
 
   static Widget placeholder() {
