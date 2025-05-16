@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 
 /// A dialog that explains why the app needs health permissions
 /// This is required by Apple App Store guidelines
+/// Updated to comply with Apple's guidance on permission flows
 class HealthPermissionDialog extends StatelessWidget {
-  final VoidCallback onAllow;
-  final VoidCallback onSkip;
+  final VoidCallback onContinue;
 
   const HealthPermissionDialog({
     Key? key,
-    required this.onAllow,
-    required this.onSkip,
+    required this.onContinue,
   }) : super(key: key);
 
   @override
@@ -62,13 +61,13 @@ class HealthPermissionDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: onSkip,
-          child: const Text('Skip'),
-        ),
         ElevatedButton(
-          onPressed: onAllow,
-          child: const Text('Allow'),
+          onPressed: onContinue,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Continue'),
         ),
       ],
     );

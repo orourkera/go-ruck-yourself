@@ -162,7 +162,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       healthService: GetIt.instance<HealthService>(),
                                     ),
                                     child: const HealthIntegrationIntroScreen(
-                                      showSkipButton: true,
                                       navigateToHome: false,
                                     ),
                                   ),
