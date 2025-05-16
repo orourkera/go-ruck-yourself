@@ -329,7 +329,7 @@ class _StatTile extends StatelessWidget {
           const SizedBox(height: 2),
         ],
         // Add a small medical icon for HealthKit if no primary icon
-        if (icon == null && isHealthKit) ...[
+        if (icon == null && isHealthKit)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -349,10 +349,9 @@ class _StatTile extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ] else [
+          )
+        else
           Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(fontSize: 11, color: AppColors.primary)),
-        ],
         const SizedBox(height: 2),
         Text(value, style: AppTextStyles.titleLarge.copyWith(fontSize: 22, color: color)), 
       ],
