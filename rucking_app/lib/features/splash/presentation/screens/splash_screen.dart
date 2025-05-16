@@ -22,6 +22,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeInAnimation;
   bool _navigated = false;
+  bool _animationStarted = false;
 
   @override
   void initState() {
@@ -36,12 +37,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // Create fade-in animation
     _fadeInAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(_animationController);
     
-    // Short delay before starting the animation to ensure smooth transition from native splash
-    Future.delayed(const Duration(milliseconds: 50), () {
-      if (mounted) {
-        _animationController.forward();
-      }
-    });
+    // Animation will be started in the build method with a state check to prevent repeated starts
     
     // Navigate to the appropriate screen after a delay (reduced to improve UX)
     Timer(const Duration(seconds: 2), () async {
@@ -98,6 +94,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    // Ensure the animation controller doesn't restart on rebuild
+    if (mounted && !_animationStarted && _animationController.isDismissed) {
+      _animationStarted = true;
+      _animationController.forward();
+    }
+    
     return FutureBuilder<bool>(
       // First check the cached lady mode status for immediate rendering
       future: SplashHelper.isLadyModeActive(),
