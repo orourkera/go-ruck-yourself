@@ -56,7 +56,7 @@ class SessionStatsOverlay extends StatelessWidget {
             ),
             _StatTile(
               label: 'ELEV',
-              value: '${state.elevationGain.toStringAsFixed(0)}/${state.elevationLoss.toStringAsFixed(0)} m',
+              value: '+${state.elevationGain.toStringAsFixed(0)}/-${state.elevationLoss.toStringAsFixed(0)} m',
             ),
             // Removed duplicate 'remaining' display from row layout
 
@@ -84,7 +84,7 @@ class SessionStatsOverlay extends StatelessWidget {
       ),
       _StatTile(
         label: 'Elevation',
-        value: '+${state.elevationGain.toStringAsFixed(0)}/${state.elevationLoss.toStringAsFixed(0)}',
+        value: '+${state.elevationGain.toStringAsFixed(0)}/-${state.elevationLoss.toStringAsFixed(0)}',
         icon: Icons.terrain,
       ),
     ];
