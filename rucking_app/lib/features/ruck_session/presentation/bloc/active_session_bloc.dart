@@ -311,6 +311,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     
     return 70.0; // Default to ~154 lbs
   }
+  
+  /// Get the user's gender from the auth bloc state
+  String? _getUserGender() {
+    try {
+      // Try to get from auth bloc state, which should have the User
+      final authBloc = GetIt.instance<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        final User user = (authBloc.state as Authenticated).user;
+        return user.gender;
+      }
+    } catch (e) {
+      AppLogger.info('Could not get user gender from profile: $e');
+    }
+    
+    return null; // Default to null (gender not specified)
+  }
 
   Future<void> _onLocationUpdated(
     LocationUpdated event, 
@@ -845,7 +861,7 @@ emit(ActiveSessionComplete(
       }
     }
 
-    // Calories
+    // Calories - include gender for more accurate gender-specific calculations
     final double calculatedCalories = MetCalculator.calculateRuckingCalories(
       userWeightKg: _getUserWeightKg(),
       ruckWeightKg: currentState.ruckWeightKg,
@@ -853,6 +869,7 @@ emit(ActiveSessionComplete(
       elapsedSeconds: newElapsed,
       elevationGain: currentState.elevationGain,
       elevationLoss: currentState.elevationLoss,
+      gender: _getUserGender(), // Include user gender for more accurate calculations
     );
     
     // Never allow calories to decrease during a session

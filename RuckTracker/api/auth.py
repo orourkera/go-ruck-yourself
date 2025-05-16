@@ -54,6 +54,9 @@ class SignUpResource(Resource):
                     'username': username, # Save username (display name) as username
                     'email': email, # User table needs the email column
                     'weight_kg': data.get('weight_kg'),
+                    'height_cm': data.get('height_cm'),
+                    'date_of_birth': data.get('date_of_birth'),
+                    'gender': data.get('gender'),
                     'prefer_metric': data.get('preferMetric') # Read camelCase from request
                 }
                 user_data_clean = {k: v for k, v in user_data.items() if v is not None}
@@ -275,7 +278,7 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing'] 
+            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing', 'gender', 'date_of_birth'] 
             for field in allowed_fields:
                 if field == 'prefer_metric': # Check for snake_case field name
                     # Expect camelCase 'preferMetric' in the incoming JSON data for updates too
@@ -284,6 +287,16 @@ class UserProfileResource(Resource):
                 # Handle camelCase for height_cm
                 elif field == 'height_cm' and 'heightCm' in data:
                     update_data['height_cm'] = data['heightCm']
+                # Handle gender parameter
+                elif field == 'gender':
+                    if 'gender' in data:
+                        update_data['gender'] = data['gender']
+                # Handle date_of_birth parameter (both formats)
+                elif field == 'date_of_birth':
+                    if 'date_of_birth' in data:
+                        update_data['date_of_birth'] = data['date_of_birth']
+                    elif 'dateOfBirth' in data:
+                        update_data['date_of_birth'] = data['dateOfBirth']
                 # Handle allow_ruck_sharing - check for both camelCase and snake_case versions
                 elif field == 'allow_ruck_sharing':
                     if 'allowRuckSharing' in data:  # Check for camelCase version from mobile app

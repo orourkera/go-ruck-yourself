@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
@@ -35,25 +37,44 @@ class FilterChipGroup extends StatelessWidget {
   Widget _buildFilterChip(String value, String label, IconData icon) {
     final bool isSelected = selectedFilter == value;
     
-    return FilterChip(
-      avatar: Icon(
-        icon,
-        color: isSelected ? Colors.white : AppColors.secondary,
-        size: 18,
-      ),
-      label: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.black87,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      selected: isSelected,
-      selectedColor: AppColors.secondary,
-      backgroundColor: Colors.grey[200],
-      onSelected: (_) => onFilterSelected(value),
-      showCheckmark: false,
-      elevation: isSelected ? 2 : 0,
+    // Check for lady mode
+    return Builder(
+      builder: (context) {
+        // Check for lady mode in AuthBloc
+        bool isLadyMode = false;
+        try {
+          final authBloc = BlocProvider.of<AuthBloc>(context);
+          if (authBloc.state is Authenticated) {
+            isLadyMode = (authBloc.state as Authenticated).user.gender == 'female';
+          }
+        } catch (e) {
+          // Default to standard mode if error
+        }
+        
+        // Use lady color for female users
+        final Color accentColor = isLadyMode ? AppColors.ladyPrimary : AppColors.secondary;
+        
+        return FilterChip(
+          avatar: Icon(
+            icon,
+            color: isSelected ? Colors.white : accentColor,
+            size: 18,
+          ),
+          label: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.black87,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          selected: isSelected,
+          selectedColor: accentColor,
+          backgroundColor: Colors.grey[200],
+          onSelected: (_) => onFilterSelected(value),
+          showCheckmark: false,
+          elevation: isSelected ? 2 : 0,
+        );
+      },
     );
   }
 }

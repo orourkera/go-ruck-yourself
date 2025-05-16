@@ -141,20 +141,46 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Stats',
           ),
           BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/profile.png',
-              width: 48,
-              height: 48,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/profile_active.png',
-              width: 48,
-              height: 48,
-            ),
+            icon: _buildProfileIcon(false),
+            activeIcon: _buildProfileIcon(true),
             label: 'Profile',
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileIcon(bool isActive) {
+    // Get user gender from AuthBloc if available
+    String? userGender;
+    try {
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        userGender = (authBloc.state as Authenticated).user.gender;
+      }
+    } catch (e) {
+      // If auth bloc is not available, continue with default icon
+      debugPrint('Could not get user gender for profile icon: $e');
+    }
+    
+    // Determine which icon to use based on gender and active state
+    String iconPath;
+    if (userGender == 'female') {
+      // Female icon based on active state
+      iconPath = isActive 
+          ? 'assets/images/lady rucker profile active.png'
+          : 'assets/images/lady rucker profile.png';
+    } else {
+      // Default/male icon based on active state
+      iconPath = isActive 
+          ? 'assets/images/profile_active.png'
+          : 'assets/images/profile.png';
+    }
+    
+    return Image.asset(
+      iconPath,
+      width: 48,
+      height: 48,
     );
   }
 }
@@ -368,24 +394,32 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                 const SizedBox(height: 32),
                 
                 // Quick stats section (USE _monthlySummaryStats)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: AppColors.primaryGradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    // Determine if user is in lady mode
+                    bool isLadyMode = false;
+                    if (state is Authenticated && state.user.gender == 'female') {
+                      isLadyMode = true;
+                    }
+                    
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isLadyMode ? AppColors.ladyPrimaryGradient : AppColors.primaryGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isLadyMode ? AppColors.ladyPrimary.withOpacity(0.3) : AppColors.primary.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
+                      child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -420,7 +454,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                          }
                       ),
                     ],
-                  ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
                 

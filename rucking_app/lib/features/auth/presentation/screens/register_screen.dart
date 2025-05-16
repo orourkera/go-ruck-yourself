@@ -37,6 +37,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isConfirmPasswordVisible = false;
   bool _preferMetric = false; // Default to Standard (lbs)
   bool _acceptTerms = false;
+  String _selectedGender = 'male'; // Default to male
+  
+  // Dynamically get primary color based on selected gender
+  Color get _primaryColor => _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
 
   @override
   void dispose() {
@@ -82,6 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           preferMetric: _preferMetric,
           heightCm: null,
           dateOfBirth: null,
+          gender: _selectedGender,
         ),
       );
     }
@@ -103,20 +108,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          // Navigate to Apple Health integration screen after successful registration
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => BlocProvider(
-                create: (context) => HealthBloc(
-                  healthService: HealthService(),
-                  userId: state.user.userId, // Pass the user ID from authenticated state
-                ),
-                child: HealthIntegrationIntroScreen(
-                  userId: state.user.userId, // Pass the user ID to the intro screen
+          // Force app-wide theme rebuild with the new user settings
+          // This ensures gender-based theme is applied immediately after registration
+          Future.delayed(Duration.zero, () {
+            // Navigate to Apple Health integration screen after successful registration
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => BlocProvider(
+                  create: (context) => HealthBloc(
+                    healthService: HealthService(),
+                    userId: state.user.userId, // Pass the user ID from authenticated state
+                  ),
+                  child: HealthIntegrationIntroScreen(
+                    userId: state.user.userId, // Pass the user ID to the intro screen
+                  ),
                 ),
               ),
-            ),
-          );
+            );
+          });
         } else if (state is AuthUserAlreadyExists) {
           // Using a custom widget with clickable login button
           final content = Row(
@@ -342,12 +351,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Text(
                           'Standard',
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: !_preferMetric ? AppColors.primary : AppColors.grey,
+                            color: !_preferMetric ? _primaryColor : AppColors.grey,
                           ),
                         ),
                         Switch(
                           value: _preferMetric,
-                          activeColor: AppColors.primary,
+                          activeColor: _primaryColor,
                           onChanged: (value) {
                             setState(() {
                               _preferMetric = value;
@@ -358,7 +367,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Text(
                           'Metric',
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: _preferMetric ? AppColors.primary : AppColors.grey,
+                            color: _preferMetric ? _primaryColor : AppColors.grey,
                           ),
                         ),
                       ],
@@ -381,6 +390,108 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    // Gender selection toggle
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Icon(Icons.person_outline, color: AppColors.grey),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Gender',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.grey[800]
+                                : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedGender = 'male';
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: _selectedGender == 'male'
+                                          ? _primaryColor
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'M',
+                                        style: AppTextStyles.bodyLarge.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: _selectedGender == 'male'
+                                              ? Colors.white
+                                              : AppColors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedGender = 'female';
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: _selectedGender == 'female'
+                                          ? _primaryColor
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'F',
+                                        style: AppTextStyles.bodyLarge.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: _selectedGender == 'female'
+                                              ? Colors.white
+                                              : AppColors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Explanation text for gender, weight, and height fields
+                    Text(
+                      'Gender and weight information helps calculate calories more accurately and personalize your experience.',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
                     // Terms and Conditions Checkbox
                     Row(
                       children: [
@@ -391,7 +502,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               _acceptTerms = value ?? false;
                             });
                           },
-                          activeColor: AppColors.primary,
+                          activeColor: _primaryColor,
                         ),
                         Expanded(
                           child: Text(
@@ -409,6 +520,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           text: 'CREATE ACCOUNT',
                           isLoading: state is AuthLoading,
                           onPressed: _register,
+                          color: _primaryColor,
                         );
                       },
                     ),
@@ -421,7 +533,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         },
                         child: Text(
                           'Already have an account? Sign In',
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primary),
+                          style: AppTextStyles.bodyMedium.copyWith(color: _primaryColor),
                         ),
                       ),
                     ),

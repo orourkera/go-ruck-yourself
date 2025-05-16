@@ -8,6 +8,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
+import 'package:rucking_app/features/splash/service/splash_helper.dart';
 
 /// Screen for editing user profile information
 class EditProfileScreen extends StatefulWidget {
@@ -30,6 +31,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _weightController;
   late TextEditingController _heightController;
   bool _isLoading = false;
+  late String _selectedGender;
+  
+  // Dynamically get primary color based on selected gender
+  Color get _primaryColor => _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
 
   // Constants for conversion
   static const double kgToLbs = 2.20462;
@@ -57,6 +62,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             : widget.user.heightCm! * cmToInches;
      }
     _heightController = TextEditingController(text: displayHeight > 0 ? displayHeight.toStringAsFixed(1) : '');
+    
+    // Initialize gender selection - default to male if null
+    _selectedGender = widget.user.gender ?? 'male';
   }
 
   @override
@@ -91,12 +99,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
            }
       }
       
+      // Check if gender has changed and cache it for splash screen
+      final bool isLadyMode = _selectedGender == 'female';
+      if (widget.user.gender != _selectedGender) {
+        // Cache the gender preference for splash screen
+        SplashHelper.cacheLadyModeStatus(isLadyMode).then((_) {
+          debugPrint('[Profile] Lady mode status cached: $isLadyMode');
+        });
+      }
+      
       context.read<AuthBloc>().add(
             AuthUpdateProfileRequested(
               username: _usernameController.text,
               weightKg: weightKg,
               heightCm: heightCm,
               preferMetric: widget.preferMetric,
+              gender: _selectedGender,
             ),
           );
 
@@ -202,9 +220,102 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                    return null;
                 },
               ),
+              const SizedBox(height: 20),
+              // Gender selection toggle
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_outline, color: AppColors.grey),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Gender',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey[800]
+                          : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedGender = 'male';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedGender == 'male'
+                                    ? _primaryColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'M',
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedGender == 'male'
+                                        ? Colors.white
+                                        : AppColors.grey,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedGender = 'female';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedGender == 'female'
+                                    ? _primaryColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'F',
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedGender == 'female'
+                                        ? Colors.white
+                                        : AppColors.grey,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               Text(
-                'Weight and height information help calculate calories burned during your rucking sessions more accurately.',
+                'Weight, height, and gender information help calculate calories more accurately and personalize your experience.',
                 style: AppTextStyles.bodySmall.copyWith(
                   color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                 ),
