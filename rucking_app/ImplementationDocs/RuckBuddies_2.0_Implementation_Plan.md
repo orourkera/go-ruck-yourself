@@ -53,28 +53,29 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 
 #### 3.2.1. Ruck Buddies Screen (`ruck_buddies_screen.dart`)
 - Update the existing ruck card to:
-  - Display a photo thumbnail if photos are available
-  - Indicate the number of photos, likes, and comments
-  - Add tap action to navigate to the new detail view
+  - ✅ Display a photo thumbnail if photos are available
+  - ✅ Indicate the likes and comments count
+  - ✅ Add tap action to navigate to the new detail view
+  - ✅ Removed photo count icon from bottom right (redundant with thumbnail display)
 
 #### 3.2.2. Ruck Card Widget (`ruck_buddy_card.dart`)
 - Enhance the existing card design:
-  - Add a photo thumbnail overlay or carousel preview
-  - Add social metrics (likes count, comments count)
-  - Continue using the existing man/lady rucker profile images based on user gender
-  - Improve visual hierarchy to highlight user-generated content
+  - ✅ Add a photo thumbnail overlay or carousel preview
+  - ✅ Add social metrics (likes count, comments count)
+  - ✅ Continue using the existing man/lady rucker profile images based on user gender
+  - ✅ Improve visual hierarchy to highlight user-generated content
 
 ### 3.3. Ruck Buddies Detail Screen (`ruck_buddy_detail_screen.dart`)
-- Create a new screen modeled after the session detail screen that includes:
-  - All session stats matching the session detail layout
-  - Photo carousel section if photos are available
-  - New social interaction section:
-    - Like button with animation
-    - Comments section with:
-      - Text input for adding new comments
-      - List of existing comments with user attribution
-      - Timestamp for each comment
-      - Delete option for user's own comments
+- ✅ Create a new screen modeled after the session detail screen that includes:
+  - ✅ All session stats matching the session detail layout
+  - ✅ Photo carousel section if photos are available
+  - ✅ New social interaction section:
+    - ✅ Like button with animation
+    - ✅ Comments section with:
+      - ✅ Text input for adding new comments
+      - ✅ List of existing comments with user attribution
+      - ✅ Timestamp for each comment
+      - ✅ Delete option for user's own comments
 
 ### 3.4. Notification System
 
@@ -342,22 +343,32 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 
 ## 8. Implementation Phases
 
+## 9. Implementation Progress
+
+### Completed Tasks
+- ✅ Connected Ruck Buddies feature to backend API endpoint (`/api/ruck-buddies`)
+- ✅ Updated data models and repository to handle proper filtering (closest, calories, distance, duration, elevation)
+- ✅ Added location support for the "closest" filter option
+- ✅ Improved UI by removing redundant photo count display
+- ✅ Enhanced the ruck buddy card with photo thumbnails and social metrics
+- ✅ Implemented detail view navigation on card tap
+
 ### Phase 1: Photo Management
-- Implement photo upload on session complete screen
-- Add photo display and management to session detail screen
-- Create backend endpoints and storage for photos
+- ⬜ Implement photo upload on session complete screen
+- ⬜ Add photo display and management to session detail screen
+- ⬜ Create backend endpoints and storage for photos
 
 ### Phase 2: Ruck Buddies Detail View
-- Create the detailed view for community rucks
-- Update ruck buddies feed to link to detail view
-- Include photo display in feed and detail views
+- ✅ Create the detailed view for community rucks
+- ✅ Update ruck buddies feed to link to detail view
+- ✅ Include photo display in feed and detail views
 
 ### Phase 3: Social Interactions
-- Implement like functionality
-- Develop comment system
-- Create backend support for social interactions
+- ⬜ Implement like functionality (UI in place, backend integration needed)
+- ⬜ Develop comment system
+- ⬜ Create backend support for social interactions
 
 ### Phase 4: Notifications
-- Implement notification data structure and API
-- Create notification UI (bell icon, notification screen)
-- Integrate notification system with social features
+- ⬜ Implement notification data structure and API
+- ⬜ Create notification UI (bell icon, notification screen)
+- ⬜ Integrate notification system with social features
