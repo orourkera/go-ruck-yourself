@@ -310,8 +310,10 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           padding: const EdgeInsets.all(8.0),
                           child: Row(
                             children: [
-                              Icon(
-                                _isLiked ? Icons.favorite : Icons.favorite_border,
+                              Image.asset(
+                                'assets/images/tactical_ruck_like_icon_transparent.png',
+                                width: 24,
+                                height: 24,
                                 color: _isLiked ? Colors.red : Colors.grey[600],
                               ),
                               const SizedBox(width: 4),

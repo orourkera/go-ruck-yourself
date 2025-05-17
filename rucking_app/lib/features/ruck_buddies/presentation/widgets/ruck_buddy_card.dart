@@ -168,10 +168,11 @@ class RuckBuddyCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
                       child: Row(
                         children: [
-                          Icon(
-                            ruckBuddy.isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border,
+                          Image.asset(
+                            'assets/images/tactical_ruck_like_icon_transparent.png',
+                            width: 20,
+                            height: 20,
                             color: ruckBuddy.isLikedByCurrentUser ? Colors.red : Colors.grey[600],
-                            size: 20,
                           ),
                           const SizedBox(width: 4),
                           Text(

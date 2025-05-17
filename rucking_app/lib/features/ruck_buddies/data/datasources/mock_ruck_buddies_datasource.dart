@@ -42,7 +42,9 @@ class MockRuckBuddiesDataSource implements RuckBuddiesRemoteDataSource {
   Future<List<RuckBuddyModel>> getRuckBuddies({
     required int limit, 
     required int offset, 
-    required String filter
+    required String filter,
+    double? latitude,
+    double? longitude
   }) async {
     // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 800));
