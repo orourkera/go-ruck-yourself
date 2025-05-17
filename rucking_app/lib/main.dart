@@ -16,11 +16,11 @@ import 'package:rucking_app/core/services/location_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize dependency injection
-  await setupServiceLocator();
-  
-  // Load environment variables from .env
+  // Load environment variables from .env first
   await dotenv.load();
+  
+  // Initialize dependency injection after env vars are loaded
+  await setupServiceLocator();
   
   // Request App Tracking Transparency authorization
   // This is required for iOS 14.5+ to comply with Apple's App Store guidelines
