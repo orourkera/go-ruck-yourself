@@ -164,6 +164,8 @@ from .api.stats import ( # Import new stats resources
     YearlyStatsResource
 )
 
+from .api.ruck_photos_resource import RuckPhotosResource # Added import for RuckPhotosResource
+
 # Apply rate limiting to SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
 
@@ -289,19 +291,30 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 
 # Ruck session endpoints (prefixed with /api)
 api.add_resource(RuckSessionListResource, '/api/rucks')
-api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
-api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
-api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
-api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
-api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete')
-api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
-api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<string:ruck_id>/heart_rate')
-# api.add_resource(RuckSessionDetailResource, '/api/ruck-details/<string:session_id>') # Commented out
+api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
+api.add_resource(RuckSessionStartResource, '/api/rucks/start')
+api.add_resource(RuckSessionPauseResource, '/api/rucks/<int:ruck_id>/pause')
+api.add_resource(RuckSessionResumeResource, '/api/rucks/<int:ruck_id>/resume')
+api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete')
+api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')
+api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
-# Statistics endpoints (prefixed with /api)
-api.add_resource(WeeklyStatsResource, '/api/statistics/weekly')
-api.add_resource(MonthlyStatsResource, '/api/statistics/monthly')
-api.add_resource(YearlyStatsResource, '/api/statistics/yearly')
+# Auth Endpoints
+api.add_resource(SignUpResource, '/api/auth/signup')
+api.add_resource(SignInResource, '/api/auth/signin') # Corrected from /api/auth/signin' to /api/auth/signin
+api.add_resource(SignOutResource, '/api/auth/signout')
+api.add_resource(RefreshTokenResource, '/api/auth/refresh')
+api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password') # Ensure this path is intended
+api.add_resource(UserProfileResource, '/api/users/profile')
+
+# Stats Endpoints
+api.add_resource(WeeklyStatsResource, '/api/stats/weekly')
+api.add_resource(MonthlyStatsResource, '/api/stats/monthly')
+api.add_resource(YearlyStatsResource, '/api/stats/yearly')
+
+# Ruck Photos Endpoint
+api.add_resource(RuckPhotosResource, '/api/ruck-photos')
+rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
