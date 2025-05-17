@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 /// A widget for selecting and uploading photos to a ruck session
 class PhotoUploadSection extends StatefulWidget {
@@ -34,8 +36,18 @@ class PhotoUploadSection extends StatefulWidget {
 }
 
 class _PhotoUploadSectionState extends State<PhotoUploadSection> {
+  final ImagePicker _imagePicker = ImagePicker();
   final List<File> _selectedPhotos = [];
   bool _showPhotoPreview = false;
+  
+  // Helper method to show styled snackbar
+  void showStyledSnackBar(BuildContext context, String message, SnackBarType type) {
+    StyledSnackBar.show(
+      context: context,
+      message: message,
+      type: type,
+    );
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -260,50 +272,125 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
   }
   
   Future<void> _selectPhotos() async {
-    // For frontend preview only, we'll mock image selection
-    // This will be replaced with actual image_picker implementation later
-    
-    // Mock function that simulates selecting photos
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // Assuming we got 3 photos back for our UI development
-    // In a real implementation, this would use image_picker
-    setState(() {
-      // For now, just show the photo preview UI - mock data will be passed later
-      _showPhotoPreview = true;
+    if (_selectedPhotos.length >= widget.maxPhotos) {
+      showStyledSnackBar(
+        context,
+        'Maximum ${widget.maxPhotos} photos allowed',
+        SnackBarType.normal,
+      );
+      return;
+    }
+
+    // Show option to choose camera or gallery
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Photo Gallery'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _getImageFrom(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _getImageFrom(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _getImageFrom(ImageSource source) async {
+    try {
+      final remainingSlots = widget.maxPhotos - _selectedPhotos.length;
       
-      // When we integrate image_picker, this is where we'll add the actual files
-      // For now, we'll leave _selectedPhotos empty but still show the UI
-    });
+      if (source == ImageSource.gallery && remainingSlots > 1) {
+        // For gallery, we can select multiple photos at once
+        final List<XFile> pickedFiles = await _imagePicker.pickMultiImage(
+          maxWidth: 1800,
+          maxHeight: 1800,
+          imageQuality: 85,
+        );
+        
+        if (pickedFiles.isNotEmpty) {
+          // Only add up to the max number of photos
+          final filesToAdd = pickedFiles.take(remainingSlots).map((xFile) => File(xFile.path)).toList();
+          
+          setState(() {
+            _selectedPhotos.addAll(filesToAdd);
+            _showPhotoPreview = true;
+          });
+        }
+      } else {
+        // For camera, we get one photo at a time
+        final XFile? pickedFile = await _imagePicker.pickImage(
+          source: source,
+          maxWidth: 1800,
+          maxHeight: 1800,
+          imageQuality: 85,
+        );
+        
+        if (pickedFile != null) {
+          setState(() {
+            _selectedPhotos.add(File(pickedFile.path));
+            _showPhotoPreview = true;
+          });
+        }
+      }
+    } catch (e) {
+      showStyledSnackBar(
+        context,
+        'Error selecting image: ${e.toString()}',
+        SnackBarType.error,
+      );
+    }
   }
   
   void _handleUpload() {
-    // In real implementation, this would call the onPhotosSelected callback
-    // For now, we'll just simulate the upload process
+    if (_selectedPhotos.isEmpty) {
+      showStyledSnackBar(
+        context, 
+        'Please select at least one photo', 
+        SnackBarType.normal,
+      );
+      return;
+    }
     
+    // Call the onPhotosSelected callback to initiate the upload
     if (widget.onPhotosSelected != null) {
       widget.onPhotosSelected!(_selectedPhotos);
     }
     
-    // For UI demo only - we'll simulate success after a delay
-    Future.delayed(const Duration(seconds: 2), () {
-      if (widget.onUploadSuccess != null) {
-        widget.onUploadSuccess!();
-      }
-      
-      // Reset the UI
-      setState(() {
-        _selectedPhotos.clear();
-        _showPhotoPreview = false;
+    // If onUploadSuccess is provided, the parent widget will handle the reset
+    // Otherwise, we'll handle it here after a delay for demo purposes
+    if (widget.onUploadSuccess == null) {
+      // Demo-only simulation of upload success
+      Future.delayed(const Duration(seconds: 2), () {
+        // Reset the UI
+        setState(() {
+          _selectedPhotos.clear();
+          _showPhotoPreview = false;
+        });
+        
+        // Show success message
+        showStyledSnackBar(
+          context,
+          'Photos uploaded successfully!',
+          SnackBarType.success,
+        );
       });
-      
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Photos uploaded successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    });
+    }
   }
 }

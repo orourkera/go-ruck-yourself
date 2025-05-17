@@ -29,7 +29,7 @@ class RuckBuddiesLoaded extends RuckBuddiesState {
   });
 
   @override
-  List<Object?> get props => [ruckBuddies, hasReachedMax, filter, latitude, longitude, isLoadingMore];
+  List<Object> get props => [ruckBuddies, hasReachedMax, filter, latitude ?? 0.0, longitude ?? 0.0, isLoadingMore];
 }
 
 class RuckBuddiesError extends RuckBuddiesState {

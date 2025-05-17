@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -16,6 +18,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart'; 
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
@@ -74,7 +77,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   
   // Form controllers and state
   final TextEditingController _notesController = TextEditingController();
-
+  
+  // Photo upload state
+  final List<File> _selectedPhotos = [];
+  bool _isUploadingPhotos = false;
   
   List<HeartRateSample>? _heartRateSamples;
   int? _avgHeartRate;
@@ -202,26 +208,68 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     print('[SESSION_UPDATE]   tags: ${updateData['tags']}');
 
     // Make a PATCH request to update notes, rating, perceived exertion, and tags after completion
-    _apiClient.patch('/rucks/${widget.ruckId}', updateData)
-      .then((_) {
-        // Navigate home on success
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
-      })
-      .catchError((error) {
-        print('[SESSION_UPDATE] Error: $error');
-        // Show error and reset saving state
-        StyledSnackBar.showError(
-          context: context,
-          message: 'Error saving session details: ${error.toString()}',
-          duration: const Duration(seconds: 3),
-        );
+    try {
+      await _apiClient.patch('/rucks/${widget.ruckId}', updateData);
+      
+      // Handle photo uploads if any are selected
+      if (_selectedPhotos.isNotEmpty) {
         setState(() {
-          _isSaving = false;
+          _isUploadingPhotos = true;
         });
+        
+        try {
+          AppLogger.info('Uploading ${_selectedPhotos.length} photos for session ${widget.ruckId}');
+          
+          // Create session repository for photo uploads
+          final sessionRepo = SessionRepository(apiClient: _apiClient);
+          
+          // Upload photos
+          final uploadedPhotos = await sessionRepo.uploadSessionPhotos(
+            widget.ruckId, 
+            _selectedPhotos,
+          );
+          
+          AppLogger.info('Uploaded ${uploadedPhotos.length} photos successfully');
+          
+          // Update session to indicate it has photos
+          if (uploadedPhotos.isNotEmpty) {
+            await _apiClient.patch(
+              '/rucks/${widget.ruckId}',
+              {'has_photos': true},
+            );
+          }
+        } catch (e) {
+          AppLogger.error('Error uploading photos: $e');
+          // Show message but don't block navigation - user can try again later
+          StyledSnackBar.show(
+            context: context,
+            message: 'Session saved, but there was an issue uploading photos. You can try again from the session details screen.',
+            duration: const Duration(seconds: 3),
+          );
+        } finally {
+          setState(() {
+            _isUploadingPhotos = false;
+          });
+        }
+      }
+      
+      // Navigate home on success
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        (route) => false,
+      );
+    } catch (error) {
+      AppLogger.error('[SESSION_UPDATE] Error: $error');
+      // Show error and reset saving state
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error saving session details: ${error.toString()}',
+        duration: const Duration(seconds: 3),
+      );
+      setState(() {
+        _isSaving = false;
       });
+    }
   }
 
   /// Populate stats from widget parameters
@@ -826,7 +874,19 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                   keyboardType: TextInputType.multiline,
                 ),
                 
-
+                const SizedBox(height: 24),
+                
+                // Photo upload section
+                PhotoUploadSection(
+                  ruckId: widget.ruckId,
+                  onPhotosSelected: (photos) {
+                    setState(() {
+                      _selectedPhotos.clear();
+                      _selectedPhotos.addAll(photos);
+                    });
+                  },
+                  isUploading: _isUploadingPhotos,
+                ),
                 
                 const SizedBox(height: 32),
                 

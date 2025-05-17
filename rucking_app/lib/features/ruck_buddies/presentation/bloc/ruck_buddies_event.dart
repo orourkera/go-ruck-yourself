@@ -21,7 +21,7 @@ class FetchRuckBuddiesEvent extends RuckBuddiesEvent {
   });
 
   @override
-  List<Object?> get props => [limit, filter, latitude, longitude];
+  List<Object> get props => [limit, filter, latitude ?? 0.0, longitude ?? 0.0];
 }
 
 class FetchMoreRuckBuddiesEvent extends RuckBuddiesEvent {

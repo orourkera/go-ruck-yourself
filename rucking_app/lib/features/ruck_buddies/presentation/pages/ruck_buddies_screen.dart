@@ -27,11 +27,15 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     
-    // Initial fetch
-    context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
-    
-    // Preload mock photos for demo
-    _preloadDemoImages();
+    // Schedule BLoC event for the first frame to avoid context access issues
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Initial fetch
+      if (mounted) {
+        context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+        // Preload mock photos for demo
+        _preloadDemoImages();
+      }
+    });
   }
   
   void _preloadDemoImages() {
