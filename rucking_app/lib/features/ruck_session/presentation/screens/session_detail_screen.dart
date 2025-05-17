@@ -11,7 +11,8 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -27,6 +28,164 @@ class SessionDetailScreen extends StatefulWidget {
 }
 
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
+  // Mock data for photo gallery preview - this will come from the backend later
+  final List<String> _mockPhotoUrls = [
+    'https://images.unsplash.com/photo-1541625602330-2277a4c46182?q=80&w=1000',
+    'https://images.unsplash.com/photo-1586105462426-cda89df1e748?q=80&w=1000',
+    'https://images.unsplash.com/photo-1591561582301-665163561f18?q=80&w=1000',
+  ];
+  
+  // Flag to toggle between showing photos and empty state for demo purposes
+  bool _showMockPhotos = true;
+  // Builds the photo section - either showing photos or empty state
+  Widget _buildPhotoSection() {
+    if (_showMockPhotos && _mockPhotoUrls.isNotEmpty) {
+      return Column(
+        children: [
+          // Photo carousel with mock data
+          PhotoCarousel(
+            photoUrls: _mockPhotoUrls,
+            height: 240,
+            showDeleteButtons: true,
+            isEditable: true,
+            onPhotoTap: (index) {
+              // Show fullscreen viewer when a photo is tapped
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => FullscreenPhotoViewer(
+                    photoUrls: _mockPhotoUrls,
+                    initialIndex: index,
+                  ),
+                ),
+              );
+            },
+            onDeleteRequest: (index) {
+              // For the demo, we'll just show a snackbar
+              StyledSnackBar.show(
+                context: context,
+                message: 'Photo deletion will be implemented with backend integration',
+                type: SnackBarType.normal,
+              );
+            },
+          ),
+          // Toggle button for demo purposes (to show empty state)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  _showMockPhotos = false;
+                });
+              },
+              child: Text(
+                'Toggle Empty State (Demo)',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          // Empty state
+          Container(
+            height: 240,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: 48,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No photos added yet',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add photos to share your experience',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Toggle button for demo purposes (to show photos)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  _showMockPhotos = true;
+                });
+              },
+              child: Text(
+                'Toggle Photos (Demo)',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+  }
+
+  // Shows a bottom sheet with options to add photos
+  void _showAddPhotoOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  StyledSnackBar.show(
+                    context: context,
+                    message: 'Camera functionality coming soon',
+                    type: SnackBarType.normal,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  StyledSnackBar.show(
+                    context: context,
+                    message: 'Gallery selection coming soon',
+                    type: SnackBarType.normal,
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // Helper method to get the appropriate color based on user gender
   Color _getLadyModeColor(BuildContext context) {
     try {
@@ -162,6 +321,46 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: _SessionRouteMap(session: widget.session),
+              ),
+
+              // Photo Gallery Section
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.photo_library, color: _getLadyModeColor(context)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Photos',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ],
+                        ),
+                        // Add photo button
+                        TextButton.icon(
+                          onPressed: () {
+                            _showAddPhotoOptions(context);
+                          },
+                          icon: const Icon(Icons.add_photo_alternate),
+                          label: const Text('Add Photos'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: _getLadyModeColor(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // DEMO: Show the photo carousel with sample photos or empty state
+                    // This is just for UI development and will be replaced with real data
+                    _buildPhotoSection(),
+                  ],
+                ),
               ),
 
               // Detail stats

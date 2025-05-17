@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/features/ruck_buddies/data/datasources/mock_ruck_buddies_datasource.dart';
 import 'package:rucking_app/features/ruck_buddies/data/datasources/ruck_buddies_remote_datasource.dart';
 import 'package:rucking_app/features/ruck_buddies/data/repositories/ruck_buddies_repository_impl.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/repositories/ruck_buddies_repository.dart';
@@ -26,9 +27,12 @@ void initRuckBuddiesFeature(GetIt sl) {
 
   // Data sources
   sl.registerLazySingleton<RuckBuddiesRemoteDataSource>(
-    () => RuckBuddiesRemoteDataSourceImpl(
-      apiClient: sl(),
-    ),
+    // TODO: Switch back to real implementation when backend is ready
+    // () => RuckBuddiesRemoteDataSourceImpl(
+    //   apiClient: sl(),
+    // ),
+    // Use mock implementation for development
+    () => MockRuckBuddiesDataSource(),
   );
 
   // No need for NetworkInfo registration anymore
