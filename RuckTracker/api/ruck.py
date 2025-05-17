@@ -461,6 +461,39 @@ from flask_restful import Resource
 from flask_limiter.util import get_remote_address
 
 class HeartRateSampleUploadResource(Resource):
+    def get(self, ruck_id):
+        """Get heart rate samples for a ruck session (GET /api/rucks/<ruck_id>/heart_rate)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+                
+            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            
+            # Check if session exists and belongs to user
+            session_resp = supabase.table('ruck_session') \
+                .select('id,user_id') \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .single() \
+                .execute()
+                
+            if not session_resp.data:
+                return {'message': 'Session not found'}, 404
+            
+            # Get heart rate samples for this session
+            response = supabase.table('heart_rate_sample') \
+                .select('*') \
+                .eq('session_id', ruck_id) \
+                .order('timestamp') \
+                .execute()
+            
+            logger.info(f"Retrieved {len(response.data)} heart rate samples for session {ruck_id}")
+            return response.data, 200
+            
+        except Exception as e:
+            logger.error(f"Error fetching heart rate samples for session {ruck_id}: {e}")
+            return {'message': f"Error fetching heart rate samples: {str(e)}"}, 500
+
     def post(self, ruck_id):
         """Upload heart rate samples to a ruck session (POST /api/rucks/<ruck_id>/heart_rate)"""
         try:
