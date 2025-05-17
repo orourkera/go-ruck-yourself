@@ -203,24 +203,6 @@ class RuckBuddyCard extends StatelessWidget {
                     ],
                   ),
                   const Spacer(),
-                  // Photo count if any
-                  if (ruckBuddy.photos != null && ruckBuddy.photos!.isNotEmpty)
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.photo_library,
-                          color: Colors.grey[600],
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${ruckBuddy.photos!.length}',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                      ],
-                    ),
                 ],
               ),
             ],
@@ -461,7 +443,7 @@ class _RouteMapPreview extends StatelessWidget {
           ),
           children: [
             TileLayer(
-              urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=\${dotenv.env['STADIA_MAPS_API_KEY']}",
+              urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
               userAgentPackageName: 'com.getrucky.gfy',
               retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
             ),
