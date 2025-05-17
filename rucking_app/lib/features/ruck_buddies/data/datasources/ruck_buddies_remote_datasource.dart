@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:rucking_app/core/error/exceptions.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -51,12 +52,15 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
       }
       
       final response = await apiClient.get(
-        '/api/ruck-buddies',
+        '/api/rucks',
         queryParams: queryParams,
       );
 
-      final Map<String, dynamic> jsonResponse = response;
-      final List<dynamic> data = jsonResponse['ruck_sessions'] ?? [];
+      // The API returns the list directly, not wrapped in a 'ruck_sessions' property
+      final List<dynamic> data = response is List ? response : [];
+      
+      // Add debug logging
+      print('RuckBuddies API Response: ${response.toString().substring(0, min(100, response.toString().length))}...');
       
       return data.map((item) => RuckBuddyModel.fromJson(item)).toList();
     } catch (e) {

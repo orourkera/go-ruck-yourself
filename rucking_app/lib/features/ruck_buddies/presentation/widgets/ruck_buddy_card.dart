@@ -168,11 +168,32 @@ class RuckBuddyCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
                       child: Row(
                         children: [
-                          Image.asset(
-                            'assets/images/tactical_ruck_like_icon_transparent.png',
-                            width: 20,
-                            height: 20,
-                            color: ruckBuddy.isLikedByCurrentUser ? Colors.red : Colors.grey[600],
+                          Builder(
+                            builder: (context) {
+                              try {
+                                return Image.asset(
+                                  'assets/images/tactical_ruck_like_icon_transparent.png',
+                                  width: 20,
+                                  height: 20,
+                                  color: ruckBuddy.isLikedByCurrentUser ? Colors.red : Colors.grey[600],
+                                  errorBuilder: (context, error, stackTrace) {
+                                    print('Error loading like icon: $error');
+                                    return Icon(
+                                      Icons.favorite,
+                                      size: 20,
+                                      color: ruckBuddy.isLikedByCurrentUser ? Colors.red : Colors.grey[600],
+                                    );
+                                  },
+                                );
+                              } catch (e) {
+                                print('Exception loading like icon: $e');
+                                return Icon(
+                                  Icons.favorite,
+                                  size: 20,
+                                  color: ruckBuddy.isLikedByCurrentUser ? Colors.red : Colors.grey[600],
+                                );
+                              }
+                            },
                           ),
                           const SizedBox(width: 4),
                           Text(

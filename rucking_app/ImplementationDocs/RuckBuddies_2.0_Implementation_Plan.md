@@ -29,19 +29,20 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 ### 3.1. Photo Management
 
 #### 3.1.1. Session Complete Screen (`session_complete_screen.dart`)
-- Add a photo upload section after the session stats
+- ✅ Added photo upload section after the session stats
 - **Photo upload component**:
-  - Button to trigger device camera or photo library access
-  - Preview of selected photos before submission
-  - Progress indicator for upload process
-  - Limit of 5 photos per session
+  - ✅ Button to trigger device camera or photo library access
+  - ✅ Preview of selected photos before submission
+  - ✅ Progress indicator for upload process
+  - ✅ Limit of 5 photos per session
 
 #### 3.1.2. Session Detail Screen (`session_detail_screen.dart`)
-- Add a new section to display existing photos in a carousel
+- ✅ Added a section to display photos in a carousel (currently using mock data)
 - **Photo management**:
-  - Add ability to upload additional photos
-  - Add ability to delete existing photos with confirmation dialog
-  - Add ability to view photos in full-screen mode
+  - ❌ Add ability to upload additional photos (UI exists but not connected to backend)
+  - ❌ Add ability to delete existing photos with confirmation dialog (UI exists but not connected to backend)
+  - ✅ Added ability to view photos in full-screen mode (using mock data)
+  - ❌ Connect photo management to backend API
 
 #### 3.1.3. Shared Photo Components
 - Create reusable widgets:
