@@ -10,14 +10,18 @@ abstract class RuckBuddiesEvent extends Equatable {
 class FetchRuckBuddiesEvent extends RuckBuddiesEvent {
   final int limit;
   final String filter;
+  final double? latitude;
+  final double? longitude;
 
   const FetchRuckBuddiesEvent({
     this.limit = 20,
     this.filter = 'closest',
+    this.latitude,
+    this.longitude,
   });
 
   @override
-  List<Object> get props => [limit, filter];
+  List<Object?> get props => [limit, filter, latitude, longitude];
 }
 
 class FetchMoreRuckBuddiesEvent extends RuckBuddiesEvent {

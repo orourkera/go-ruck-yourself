@@ -12,5 +12,7 @@ abstract class RuckBuddiesRepository {
     required int limit,
     required int offset,
     required String filter,
+    double? latitude,
+    double? longitude,
   });
 }

@@ -16,6 +16,8 @@ class GetRuckBuddies implements UseCase<List<RuckBuddy>, RuckBuddiesParams> {
       limit: params.limit,
       offset: params.offset,
       filter: params.filter,
+      latitude: params.latitude,
+      longitude: params.longitude,
     );
   }
 }
@@ -24,13 +26,17 @@ class RuckBuddiesParams extends Equatable {
   final int limit;
   final int offset;
   final String filter;
+  final double? latitude;
+  final double? longitude;
 
   const RuckBuddiesParams({
     this.limit = 20,
     this.offset = 0,
-    this.filter = 'recent',
+    this.filter = 'closest',
+    this.latitude,
+    this.longitude,
   });
 
   @override
-  List<Object?> get props => [limit, offset, filter];
+  List<Object?> get props => [limit, offset, filter, latitude, longitude];
 }
