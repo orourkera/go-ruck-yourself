@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -99,12 +100,20 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // Initialize notes controller with initial notes if provided
     _notesController.text = widget.initialNotes ?? '';
     
-    // Populate stats
-    // _populateStats(); // This method was empty anyway
+    // Debug heart rate data
+    debugPrint('[SESSION-COMPLETE] Heart rate samples from widget: ${widget.heartRateSamples?.length ?? 0}');
+    if (widget.heartRateSamples == null) {
+      debugPrint('[SESSION-COMPLETE] No heart rate samples passed to session complete screen');
+    } else if (widget.heartRateSamples!.isEmpty) {
+      debugPrint('[SESSION-COMPLETE] Empty heart rate samples list passed to session complete screen');
+    } else {
+      debugPrint('[SESSION-COMPLETE] First heart rate sample: ${widget.heartRateSamples![0].bpm} BPM at ${widget.heartRateSamples![0].timestamp}');
+    }
     
     // --- Heart Rate: get samples from arguments if present
     if (widget.heartRateSamples != null) {
       setHeartRateSamples(widget.heartRateSamples!);
+      debugPrint('[SESSION-COMPLETE] Heart rate samples set with ${widget.heartRateSamples!.length} samples');
     }
   }
   
@@ -160,29 +169,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       }
     }
     
-    // Prevent saving if session distance is below minimum
-    final distanceMeters = widget.distance * 1000;
-    if (distanceMeters < SessionValidationService.minSessionDistanceMeters) {
-      // Delete the short session
-      try {
-        _apiClient.delete('/rucks/${widget.ruckId}');
-        debugPrint('Deleted short distance session ${widget.ruckId}');
-      } catch (e) {
-        debugPrint('Failed to delete short distance session: $e');
-      }
-      // Inform user and navigate home
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Distance too short. Session not saved.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
-      );
-      return;
-    }
+    // No session validation - allow saving all sessions regardless of distance
     
     // Prepare data for the completion
     final Map<String, dynamic> updateData = {
@@ -240,30 +227,57 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // No need to fetch from API in this case
   }
 
+  // Helper method to get heart rate widgets as a list for spreading into the column
+  List<Widget> _getHeartRateWidgets() {
+    debugPrint('[SESSION-COMPLETE] _getHeartRateWidgets called, samples: ${_heartRateSamples?.length ?? 0}');
+    if (_heartRateSamples == null || _heartRateSamples!.isEmpty) {
+      debugPrint('[SESSION-COMPLETE] No heart rate samples to show');
+      return [];
+    }
+    
+    return [
+      const SizedBox(height: 16),
+      Text('Heart Rate', style: AppTextStyles.titleMedium),
+      const SizedBox(height: 16),
+      // Enhanced heart rate chart with larger height and padding
+      Container(
+        height: 240, // 20% larger than standard 200
+        child: ClipRect(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: _AnimatedHeartRateChart(
+              heartRateSamples: _heartRateSamples!,
+              avgHeartRate: _avgHeartRate,
+              maxHeartRate: _maxHeartRate,
+              minHeartRate: _minHeartRate,
+              getLadyModeColor: _getLadyModeColor,
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      // Heart rate stats below chart
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildHeartRateStat('Average', _avgHeartRate),
+          _buildHeartRateStat('Maximum', _maxHeartRate),
+          _buildHeartRateStat('Minimum', _minHeartRate),
+        ],
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+  
+  // Keep this for backward compatibility
   Widget _buildHeartRateSection() {
+    debugPrint('[SESSION-COMPLETE] _buildHeartRateSection called, samples: ${_heartRateSamples?.length ?? 0}');
     if (_heartRateSamples == null || _heartRateSamples!.isEmpty) {
       return const SizedBox.shrink();
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        Text('Heart Rate', style: AppTextStyles.titleMedium),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildStatCard('Avg', _avgHeartRate?.toString() ?? '--', 'bpm'),
-            _buildStatCard('Max', _maxHeartRate?.toString() ?? '--', 'bpm'),
-            _buildStatCard('Min', _minHeartRate?.toString() ?? '--', 'bpm'),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 120,
-          child: LineChart(_buildHeartRateChart()),
-        ),
-      ],
+      children: _getHeartRateWidgets(),
     );
   }
 
@@ -284,27 +298,135 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     );
   }
 
+  Widget _buildHeartRateStat(String label, int? value) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 14, color: Colors.black54),
+        ),
+        Text(
+          value != null ? '$value bpm' : '--',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
   LineChartData _buildHeartRateChart() {
-    final spots = _heartRateSamples!.asMap().entries.map((entry) {
-      final idx = entry.key;
-      final bpm = entry.value.bpm;
-      return FlSpot(idx.toDouble(), bpm.toDouble());
+    debugPrint('[SESSION-COMPLETE] Building heart rate chart with ${_heartRateSamples?.length ?? 0} samples');
+    
+    if (_heartRateSamples == null || _heartRateSamples!.isEmpty) {
+      debugPrint('[SESSION-COMPLETE] No heart rate samples, returning empty chart');
+      return LineChartData();
+    }
+    
+    final firstTimestamp = _heartRateSamples!.first.timestamp.millisecondsSinceEpoch.toDouble();
+    
+    // Find the sample with maximum heart rate for visual emphasis
+    HeartRateSample maxSample = _heartRateSamples!.reduce((a, b) => a.bpm > b.bpm ? a : b);
+    final maxTimeOffset = (maxSample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
+    
+    final spots = _heartRateSamples!.map((sample) {
+      // Convert timestamp to minutes from session start for x-axis
+      final timeOffset = (sample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
+      return FlSpot(timeOffset, sample.bpm.toDouble());
     }).toList();
+    
+    debugPrint('[SESSION-COMPLETE] Created ${spots.length} chart spots');
+    
     return LineChartData(
-      gridData: FlGridData(show: false),
-      titlesData: FlTitlesData(show: false),
-      borderData: FlBorderData(show: false),
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: true,
+        horizontalInterval: 30,
+        verticalInterval: 5,
+        getDrawingHorizontalLine: (value) {
+          return FlLine(
+            color: Colors.grey[300],
+            strokeWidth: 1,
+          );
+        },
+        getDrawingVerticalLine: (value) {
+          return FlLine(
+            color: Colors.grey[300],
+            strokeWidth: 1,
+          );
+        },
+      ),
+      titlesData: FlTitlesData(
+        show: true,
+        // Remove top titles
+        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        // Remove right titles
+        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 30,
+            getTitlesWidget: (value, meta) {
+              // Round to nearest integer
+              return SideTitleWidget(
+                axisSide: meta.axisSide,
+                child: Text(
+                  '${value.round()}m',
+                  style: TextStyle(fontSize: 10),
+                ),
+              );
+            },
+            interval: 5,
+          ),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            getTitlesWidget: (value, meta) {
+              return SideTitleWidget(
+                axisSide: meta.axisSide,
+                child: Text(
+                  '${value.toInt()}',
+                  style: TextStyle(fontSize: 10),
+                ),
+              );
+            },
+            reservedSize: 30,
+          ),
+        ),
+      ),
+      borderData: FlBorderData(show: true),
+      minX: 0,
+      maxX: spots.isEmpty ? 10 : spots.last.x,
+      minY: (_minHeartRate?.toDouble() ?? 60.0) - 10.0,
+      maxY: (_maxHeartRate?.toDouble() ?? 180.0) + 10.0,
       lineBarsData: [
         LineChartBarData(
           spots: spots,
           isCurved: true,
           color: _getLadyModeColor(context),
           barWidth: 3,
+          isStrokeCapRound: true,
           dotData: FlDotData(show: false),
+          belowBarData: BarAreaData(show: true, color: _getLadyModeColor(context).withOpacity(0.2)),
         ),
       ],
-      minY: _minHeartRate?.toDouble() ?? 0,
-      maxY: _maxHeartRate?.toDouble() ?? 200,
+      // Add a marker for the maximum heart rate
+      extraLinesData: ExtraLinesData(
+        horizontalLines: [
+          HorizontalLine(
+            y: _maxHeartRate?.toDouble() ?? 0.0,
+            color: Colors.red.withOpacity(0.8),
+            strokeWidth: 1,
+            dashArray: [5, 5],
+            label: HorizontalLineLabel(
+              show: true,
+              alignment: Alignment.topRight,
+              padding: const EdgeInsets.only(right: 5, bottom: 5),
+              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
+              labelResolver: (line) => 'Max: ${_maxHeartRate ?? 0} bpm',
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -548,9 +670,51 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                   ],
                 ),
                 
-                // Insert Heart Rate Section after summary stats
+                // Heart Rate Section 
                 if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty)
-                  _buildHeartRateSection(),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.favorite, color: AppColors.error, size: 20),
+                          const SizedBox(width: 8),
+                          Text('Heart Rate', style: AppTextStyles.titleMedium),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildStatCard('Avg', _avgHeartRate?.toString() ?? '--', 'bpm'),
+                          _buildStatCard('Max', _maxHeartRate?.toString() ?? '--', 'bpm'),
+                          _buildStatCard('Min', _minHeartRate?.toString() ?? '--', 'bpm'),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 180,
+                        child: _heartRateSamples!.isNotEmpty
+                          ? LineChart(_buildHeartRateChart())
+                          : Center(child: Text('No heart rate data available', style: TextStyle(color: Colors.grey[600]))),
+                      ),
+                    ],
+                  ),
+                ),
                 
                 const SizedBox(height: 24),
                 
@@ -610,29 +774,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 
                 const SizedBox(height: 24),
                 
-                // Tags
-                Text(
-                  'Add tags',
-                  style: AppTextStyles.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _availableTags.map((tag) {
-                    final isSelected = _selectedTags.contains(tag);
-                    return FilterChip(
-                      label: Text(tag),
-                      selected: isSelected,
-                      onSelected: (_) => _toggleTag(tag),
-                      backgroundColor: Colors.grey[200],
-                      selectedColor: _getLadyModeColor(context).withOpacity(0.2),
-                      checkmarkColor: _getLadyModeColor(context),
-                    );
-                  }).toList(),
-                ),
-                
-                const SizedBox(height: 24),
+                // Tags section removed
+                const SizedBox(height: 12),
                 
                 // Notes
                 Text(
@@ -649,6 +792,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                   maxLines: 4,
                   keyboardType: TextInputType.multiline,
                 ),
+                
+
                 
                 const SizedBox(height: 32),
                 
@@ -691,5 +836,197 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         ),
       ),
     ));
+  }
+}
+
+// Animated heart rate chart that draws from left to right
+class _AnimatedHeartRateChart extends StatefulWidget {
+  final List<HeartRateSample> heartRateSamples;
+  final int? avgHeartRate;
+  final int? maxHeartRate;
+  final int? minHeartRate;
+  final Color Function(BuildContext) getLadyModeColor;
+
+  const _AnimatedHeartRateChart({
+    required this.heartRateSamples,
+    required this.avgHeartRate,
+    required this.maxHeartRate,
+    required this.minHeartRate,
+    required this.getLadyModeColor,
+  });
+
+  @override
+  State<_AnimatedHeartRateChart> createState() => _AnimatedHeartRateChartState();
+}
+
+class _AnimatedHeartRateChartState extends State<_AnimatedHeartRateChart> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Set up animation controller to run for 2 seconds - slower for smoother animation
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    
+    // Create animation that goes from 0.0 to 1.0 with a smoother curve
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutQuad, // Using a smoother curve for animation
+    );
+    
+    // Start the animation when widget is built
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return LineChart(
+          _buildHeartRateChart(_animation.value),
+        );
+      },
+    );
+  }
+
+  LineChartData _buildHeartRateChart(double animationValue) {
+    if (widget.heartRateSamples.isEmpty) {
+      return LineChartData();
+    }
+    
+    // Calculate how many points to show based on animation value
+    int pointsToShow = (widget.heartRateSamples.length * animationValue).round();
+    pointsToShow = pointsToShow.clamp(1, widget.heartRateSamples.length);
+    
+    // Get the subset of samples to show for the current animation frame
+    final visibleSamples = widget.heartRateSamples.sublist(0, pointsToShow);
+    
+    final firstTimestamp = widget.heartRateSamples.first.timestamp.millisecondsSinceEpoch.toDouble();
+    
+    final spots = visibleSamples.map((sample) {
+      // Convert timestamp to minutes from session start for x-axis
+      final timeOffset = (sample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
+      return FlSpot(timeOffset, sample.bpm.toDouble());
+    }).toList();
+    
+    // debugPrint('[SESSION-COMPLETE] Created ${spots.length} spots for the heart rate chart'); // This debug line can be removed if not needed
+    
+    // Add safety checks for min/max values using widget properties
+    final safeMinY = (widget.minHeartRate?.toDouble() ?? 60.0) - 10.0;
+    final safeMaxY = (widget.maxHeartRate?.toDouble() ?? 180.0) + 10.0;
+    final safeMaxX = spots.isNotEmpty ? spots.last.x : 10.0; // Ensure spots is not empty before accessing last.x
+    
+    // debugPrint('[SESSION-COMPLETE] Chart Y range: $safeMinY to $safeMaxY'); // These debug lines can be removed
+    // debugPrint('[SESSION-COMPLETE] Chart X range: 0 to $safeMaxX');
+    
+    final lineColor = widget.getLadyModeColor(context);
+    
+    return LineChartData(
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: true,
+        horizontalInterval: 30,
+        verticalInterval: 5,
+        getDrawingHorizontalLine: (value) {
+          return FlLine(
+            color: Colors.grey.shade300,
+            strokeWidth: 1,
+          );
+        },
+        getDrawingVerticalLine: (value) {
+          return FlLine(
+            color: Colors.grey.shade300,
+            strokeWidth: 1,
+          );
+        },
+      ),
+      titlesData: FlTitlesData(
+        show: true,
+        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 22, // Adjusted for better fit
+            getTitlesWidget: (value, meta) {
+              return SideTitleWidget(
+                axisSide: meta.axisSide,
+                child: Text(
+                  '${value.round()}m',
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                ),
+              );
+            },
+            // Dynamic interval based on data range, clamped for sanity
+            interval: spots.isNotEmpty && spots.last.x > 10 
+                      ? (spots.last.x / 5).roundToDouble().clamp(1.0, 20.0) 
+                      : 5,
+          ),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            getTitlesWidget: (value, meta) {
+              return SideTitleWidget(
+                axisSide: meta.axisSide,
+                child: Text(
+                  '${value.toInt()}',
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                ),
+              );
+            },
+            reservedSize: 30, // Adjusted for better fit
+            interval: 30,
+          ),
+        ),
+      ),
+      borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.shade300)),
+      minX: 0,
+      maxX: safeMaxX,
+      minY: safeMinY,
+      maxY: safeMaxY,
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          curveSmoothness: 0.25, // Adjust curve smoothness to match session detail
+          color: lineColor,
+          barWidth: 3.5, // Slightly thicker to match session detail
+          isStrokeCapRound: true,
+          dotData: FlDotData(show: false),
+          belowBarData: BarAreaData(show: true, color: lineColor.withOpacity(0.2)),
+        ),
+      ],
+      extraLinesData: ExtraLinesData(
+        horizontalLines: [
+          if (widget.maxHeartRate != null) // Ensure maxHeartRate is not null before using it
+            HorizontalLine(
+              y: widget.maxHeartRate!.toDouble(), // Use ! because of the null check
+              color: Colors.red.withOpacity(0.6),
+              strokeWidth: 1,
+              dashArray: [5, 5],
+              label: HorizontalLineLabel(
+                show: true,
+                alignment: Alignment.topRight,
+                padding: const EdgeInsets.only(right: 5, bottom: 5),
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
+                labelResolver: (line) => 'Max: ${widget.maxHeartRate} bpm', // Add bpm unit to match session detail screen
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

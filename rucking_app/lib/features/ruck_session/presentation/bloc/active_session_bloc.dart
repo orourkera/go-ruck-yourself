@@ -153,6 +153,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         originalSessionStartTimeUtc: DateTime.now().toUtc(),
         totalPausedDuration: Duration.zero,
         currentPauseStartTimeUtc: null,
+        heartRateSamples: [], // Initialize heartRateSamples
       );
       emit(initialSessionState);
       AppLogger.info('ActiveSessionRunning state emitted for session $sessionId with plannedDuration: \u001B[33m${initialSessionState.plannedDuration}\u001B[0m seconds');
@@ -302,10 +303,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Update the session state with the latest heart rate
         if (state is ActiveSessionRunning) {
           final currentState = state as ActiveSessionRunning;
-          // Only emit if heart rate has changed to avoid unnecessary renders
-          if (currentState.latestHeartRate != sample.bpm) {
-            AppLogger.info('Updating UI with heart rate: ${sample.bpm} BPM (previous: ${currentState.latestHeartRate})');
-            emit(currentState.copyWith(latestHeartRate: sample.bpm));
+          final newHeartRateSamples = List<HeartRateSample>.from(currentState.heartRateSamples)..add(sample);
+
+          // Only emit if heart rate has changed or samples list grew to avoid unnecessary renders
+          if (currentState.latestHeartRate != sample.bpm || newHeartRateSamples.length > currentState.heartRateSamples.length) {
+            AppLogger.info('Updating UI with heart rate: ${sample.bpm} BPM (previous: ${currentState.latestHeartRate}), total samples: ${newHeartRateSamples.length}');
+            emit(currentState.copyWith(latestHeartRate: sample.bpm, heartRateSamples: newHeartRateSamples));
           }
         } else {
           AppLogger.warning('Received heart rate update but state is not ActiveSessionRunning: ${state.runtimeType}');
@@ -818,7 +821,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Update backend about session completion
         // DEBUG: Log all outgoing values for session completion
         AppLogger.info('[SESSION COMPLETE PAYLOAD]');
-        AppLogger.info('  distance_km: [36m${double.parse(currentState.distanceKm.toStringAsFixed(3))}[0m');
+        AppLogger.info('  distance_km: \u001b[36m${double.parse(currentState.distanceKm.toStringAsFixed(3))}\u001b[0m');
         AppLogger.info('  duration_seconds: ${finalElapsedSeconds}');
         AppLogger.info('  calories_burned: ${currentState.calories.round()}');
         AppLogger.info('  elevation_gain_m: ${currentState.elevationGain.round()}');
@@ -835,9 +838,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // DEBUG: Log all values used to construct the RuckSession emitted in ActiveSessionComplete
         AppLogger.info('[ACTIVE SESSION COMPLETE]');
         AppLogger.info('  id: ${currentState.sessionId}');
-        AppLogger.info('  startTime: [32m${DateTime.now().subtract(actualDuration)}[0m');
-        AppLogger.info('  endTime: [32m${DateTime.now()}[0m');
-        AppLogger.info('  duration: [32m$actualDuration[0m');
+        AppLogger.info('  startTime: \u001b[32m${DateTime.now().subtract(actualDuration)}\u001b[0m');
+        AppLogger.info('  endTime: \u001b[32m${DateTime.now()}\u001b[0m');
+        AppLogger.info('  duration: \u001b[32m$actualDuration\u001b[0m');
         AppLogger.info('  distance: ${currentState.distanceKm}');
         AppLogger.info('  elevationGain: ${currentState.elevationGain}');
         AppLogger.info('  elevationLoss: ${currentState.elevationLoss}');
@@ -852,6 +855,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.info('  weightKg: ${event.weightKg ?? currentState.weightKg}');
         AppLogger.info('  plannedDurationMinutes: ${event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null)}');
         AppLogger.info('  pausedDurationSeconds: ${event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds}');
+        AppLogger.info('  heartRateSamples count: ${currentState.heartRateSamples.length}');
         
         await _apiClient.post(
           '/rucks/${currentState.sessionId}/complete',
@@ -861,9 +865,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'calories_burned': currentState.calories.round(),
             'elevation_gain_m': currentState.elevationGain.round(),
             'elevation_loss_m': currentState.elevationLoss.round(),
-            'average_pace': currentState.distanceKm > 0
-                ? (currentState.elapsedSeconds / currentState.distanceKm)
-                : 0.0,
             'ruck_weight_kg': currentState.ruckWeightKg.roundToDouble(),
             'notes': event.notes,
             'rating': event.rating,
@@ -872,96 +873,59 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'weight_kg': event.weightKg ?? currentState.weightKg,
             'planned_duration_minutes': event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null),
             'paused_duration_seconds': event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds,
+            // Ensure heart rate samples are sent to the API if needed here
+            // 'heart_rate_samples': currentState.heartRateSamples.map((s) => s.toJson()).toList(), 
           },
         );
         
-        // Cancel location subscription
-        await _locationSubscription?.cancel();
-        _locationSubscription = null;
-        await _heartRateSubscription?.cancel();
-        _heartRateSubscription = null;
+        final completedSession = RuckSession(
+          id: currentState.sessionId,
+          // Use the computed start time for consistency
+          startTime: DateTime.now().subtract(actualDuration),
+          endTime: DateTime.now(),
+          duration: actualDuration,
+          distance: currentState.distanceKm,
+          elevationGain: currentState.elevationGain,
+          elevationLoss: currentState.elevationLoss,
+          caloriesBurned: currentState.calories.toInt(),
+          averagePace: currentState.distanceKm > 0 ? (currentState.elapsedSeconds / currentState.distanceKm) : 0.0,
+          ruckWeightKg: currentState.ruckWeightKg,
+          status: RuckStatus.completed,
+          notes: event.notes,
+          rating: event.rating,
+          tags: event.tags ?? currentState.tags,
+          perceivedExertion: event.perceivedExertion ?? currentState.perceivedExertion,
+          weightKg: event.weightKg ?? currentState.weightKg,
+          plannedDurationMinutes: event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null),
+          pausedDurationSeconds: event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds,
+          heartRateSamples: currentState.heartRateSamples, // Pass the collected samples
+          locationPoints: currentState.locationPoints.map((p) => p.toJson()).toList(), // Pass collected location points as route
+        );
+        
+        // Stop location tracking and ticker
+        _locationSubscription?.cancel();
         _stopTicker();
+        _stopHeartRateMonitoring();
         
-        // Save workout to HealthKit
-        try {
-          final startTime = DateTime.now().subtract(actualDuration);
-          final endTime = DateTime.now();
-          await _healthService.saveWorkout(
-            startDate: startTime,
-            endDate: endTime,
-            distanceKm: currentState.distanceKm,
-            caloriesBurned: currentState.calories,
-            ruckWeightKg: currentState.ruckWeightKg,
-            elevationGainMeters: currentState.elevationGain,
-            elevationLossMeters: currentState.elevationLoss,          );
-        } catch (e) {
-          AppLogger.error('Failed to save workout to HealthKit: $e');
-        }
+        AppLogger.info('Session completed successfully. Emitting ActiveSessionComplete with session: ${completedSession.id}');
+        AppLogger.info('Heart rate samples in completed session: ${completedSession.heartRateSamples?.length ?? 0}');
         
-        // Emit completion state
-        AppLogger.info('[COMPLETE] Emitting ActiveSessionComplete with values:');
-AppLogger.info('  id: ${currentState.sessionId}');
-AppLogger.info('  startTime: [32m${DateTime.now().subtract(actualDuration)}[0m');
-AppLogger.info('  endTime: [32m${DateTime.now()}[0m');
-AppLogger.info('  duration: [32m$actualDuration[0m');
-AppLogger.info('  distance: ${currentState.distanceKm}');
-AppLogger.info('  elevationGain: ${currentState.elevationGain}');
-AppLogger.info('  elevationLoss: ${currentState.elevationLoss}');
-AppLogger.info('  caloriesBurned: ${currentState.calories}');
-AppLogger.info('  averagePace: ${currentState.distanceKm > 0 ? (currentState.elapsedSeconds / currentState.distanceKm) : 0.0}');
-AppLogger.info('  ruckWeightKg: ${currentState.ruckWeightKg}');
-
-assert(currentState.sessionId != null, 'sessionId should never be null');
-assert(actualDuration != null, 'actualDuration should never be null');
-assert(currentState.distanceKm != null, 'distanceKm should never be null');
-assert(currentState.elevationGain != null, 'elevationGain should never be null');
-assert(currentState.elevationLoss != null, 'elevationLoss should never be null');
-assert(currentState.calories != null, 'calories should never be null');
-assert(currentState.ruckWeightKg != null, 'ruckWeightKg should never be null');
-
-emit(ActiveSessionComplete(
-  session: RuckSession(
-    id: currentState.sessionId,
-    startTime: DateTime.now().subtract(actualDuration),
-    endTime: DateTime.now(),
-    duration: actualDuration,
-    distance: currentState.distanceKm,
-    elevationGain: currentState.elevationGain,
-    elevationLoss: currentState.elevationLoss,
-    caloriesBurned: currentState.calories.toInt(),
-    averagePace: currentState.distanceKm > 0
-        ? (currentState.elapsedSeconds / currentState.distanceKm)
-        : 0.0,
-    ruckWeightKg: currentState.ruckWeightKg,
-    status: RuckStatus.completed,
-    notes: event.notes,
-    rating: event.rating,
-    tags: event.tags ?? currentState.tags,
-    perceivedExertion: event.perceivedExertion ?? currentState.perceivedExertion,
-    weightKg: event.weightKg ?? currentState.weightKg,
-    plannedDurationMinutes: event.plannedDurationMinutes ?? (currentState.plannedDuration != null ? (currentState.plannedDuration! ~/ 60) : null),
-    pausedDurationSeconds: event.pausedDurationSeconds ?? currentState.totalPausedDuration.inSeconds,
-  ),
-));
-      } catch (e) {
-        AppLogger.error('Failed to complete session: $e');
-        
-        // Try fallback - complete locally even if backend fails
-        await _locationSubscription?.cancel();
-        _locationSubscription = null;
-        await _heartRateSubscription?.cancel();
-        _heartRateSubscription = null;
-        _stopTicker();
-        
-        // Check if the error is a network issue
-        final errorMessage = e is ApiException && e.statusCode == 503
-            ? 'Could not save to server - check your internet connection. Your session data is saved locally.'
-            : ErrorHandler.getUserFriendlyMessage(e, 'Session Completion');
-        
+        emit(ActiveSessionComplete(session: completedSession));
+      } on ApiException catch (e) {
+        AppLogger.error('API Exception during session completion: ${e.message}');
         emit(ActiveSessionFailure(
-          errorMessage: errorMessage,
+          errorMessage: e.message,
+          sessionDetails: state as ActiveSessionRunning, // Pass current state for potential recovery
+        ));
+      } catch (e, stackTrace) {
+        AppLogger.error('Unexpected error during session completion: ${e.toString()}');
+        emit(ActiveSessionFailure(
+          errorMessage: 'Failed to complete session: ${e.toString()}. Please try again.',
+          sessionDetails: state as ActiveSessionRunning, // Pass current state for potential recovery
         ));
       }
+    } else {
+      AppLogger.warning('SessionCompleted event received but state is not ActiveSessionRunning: ${state.runtimeType}');
     }
   }
 
@@ -993,20 +957,27 @@ emit(ActiveSessionComplete(
   }
 
   Future<void> _sendHeartRateSamplesToApi(ActiveSessionRunning currentState, List<HeartRateSample> samples) async {
-    if (samples.isEmpty || currentState.sessionId.isEmpty) return;
+    if (samples.isEmpty) return;
+
+    // Check if there is a session ID
+    if (currentState.sessionId.isEmpty) {
+      AppLogger.warning('No session ID available. Cannot send heart rate samples to API.');
+      return;
+    }
+
+    final List<Map<String, dynamic>> samplesJson = samples.map((s) => s.toJson()).toList();
+    
     try {
+      AppLogger.info('[HR_BATCH] Sending batch of ${samplesJson.length} heart rate samples for session ${currentState.sessionId}.');
       await _apiClient.post(
-        '/rucks/${currentState.sessionId}/heart_rate',
-        {
-          'samples': samples.map((s) => {
-            'timestamp': s.timestamp.toIso8601String(),
-            'bpm': s.bpm,
-          }).toList(),
-        },
+        '/rucks/${currentState.sessionId}/heart_rate_samples',
+        {'samples': samplesJson},
       );
-      AppLogger.info('Sent ${samples.length} heart rate samples to API');
-    } catch (e) {
-      AppLogger.error('Failed to send heart rate samples to API: $e');
+      AppLogger.info('[HR_BATCH] Successfully sent ${samplesJson.length} heart rate samples.');
+    } on ApiException catch (e) {
+      AppLogger.error('[HR_BATCH] API Exception sending heart rate samples: ${e.message}');
+    } catch (e, stackTrace) {
+      AppLogger.error('[HR_BATCH] Unexpected error sending heart rate samples: ${e.toString()}');
     }
   }
 
@@ -1135,10 +1106,9 @@ emit(ActiveSessionComplete(
     if (state is ActiveSessionFailure) {
       final failureState = state as ActiveSessionFailure;
       if (failureState.sessionDetails != null) {
-        final recoveredState = failureState.sessionDetails!;
-        AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionErrorCleared. Restoring sessionDetails. isPaused: ${recoveredState.isPaused}');
-        emit(recoveredState);
-        if (!recoveredState.isPaused) {
+        AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionErrorCleared. Restoring sessionDetails. isPaused: ${failureState.sessionDetails!.isPaused}');
+        emit(failureState.sessionDetails!);
+        if (!failureState.sessionDetails!.isPaused) {
           AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: Restored session was not paused. Restarting ticker and location tracking.');
           _startTicker();
           _startLocationTracking(emit); // This also handles heart rate if conditions are met within it
