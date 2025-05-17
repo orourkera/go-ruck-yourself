@@ -10,13 +10,19 @@ import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 
 class RuckBuddyCard extends StatelessWidget {
   final RuckBuddy ruckBuddy;
+  final Function()? onTap;
+  final Function()? onLikeTap;
 
   const RuckBuddyCard({
     Key? key,
     required this.ruckBuddy,
+    this.onTap,
+    this.onLikeTap,
   }) : super(key: key);
 
   @override
@@ -25,117 +31,200 @@ class RuckBuddyCard extends StatelessWidget {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : false;
+    final hasPhotos = ruckBuddy.photos != null && ruckBuddy.photos!.isNotEmpty;
     
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // User Info Row
-            Row(
-              children: [
-                // Avatar (fallback to circle with first letter if no URL)
-                _buildAvatar(ruckBuddy.user),
-                const SizedBox(width: 12),
-                
-                // User Name & Time Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ruckBuddy.user.username,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // User Info Row
+              Row(
+                children: [
+                  // Avatar (fallback to circle with first letter if no URL)
+                  _buildAvatar(ruckBuddy.user),
+                  const SizedBox(width: 12),
+                  
+                  // User Name & Time Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          ruckBuddy.user.username,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _formatCompletedDate(ruckBuddy.completedAt),
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: Colors.grey[600],
+                        Text(
+                          _formatCompletedDate(ruckBuddy.completedAt),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.grey[600],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Weight chip
-                Chip(
-                  backgroundColor: AppColors.secondary,
-                  label: Text(
-                    // Use the specialized formatter that preserves original input values
-                    // This prevents rounding issues with standard weights like 10, 20, 60 lbs
-                    MeasurementUtils.formatWeightForChip(ruckBuddy.ruckWeightKg, metric: preferMetric),
-                    style: AppTextStyles.labelMedium.copyWith(
-                      color: Colors.white,
+                      ],
                     ),
                   ),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-
-            // Map snippet
-            _RouteMapPreview(ruckBuddy: ruckBuddy),
-
-            const Divider(height: 24),
-            
-            // Stats Grid (2x2)
-            Row(
-              children: [
-                // Left column
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildStatTile(
-                        context: context,
-                        icon: Icons.straighten, 
-                        label: 'Distance',
-                        value: MeasurementUtils.formatDistance(ruckBuddy.distanceKm, metric: preferMetric),
+                  
+                  // Weight chip
+                  Chip(
+                    backgroundColor: AppColors.secondary,
+                    label: Text(
+                      // Use the specialized formatter that preserves original input values
+                      // This prevents rounding issues with standard weights like 10, 20, 60 lbs
+                      MeasurementUtils.formatWeightForChip(ruckBuddy.ruckWeightKg, metric: preferMetric),
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 16),
-                      _buildStatTile(
-                        context: context,
-                        icon: Icons.local_fire_department, 
-                        label: 'Calories',
-                        value: '${ruckBuddy.caloriesBurned} kcal',
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 12),
+
+              // Map snippet with photos overlay if available
+              Stack(
+                children: [
+                  _RouteMapPreview(ruckBuddy: ruckBuddy),
+                  if (hasPhotos)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: _PhotoThumbnailsOverlay(photos: ruckBuddy.photos!),
+                    ),
+                ],
+              ),
+
+              const Divider(height: 24),
+              
+              // Stats Grid (2x2)
+              Row(
+                children: [
+                  // Left column
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildStatTile(
+                          context: context,
+                          icon: Icons.straighten, 
+                          label: 'Distance',
+                          value: MeasurementUtils.formatDistance(ruckBuddy.distanceKm, metric: preferMetric),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildStatTile(
+                          context: context,
+                          icon: Icons.local_fire_department, 
+                          label: 'Calories',
+                          value: '${ruckBuddy.caloriesBurned} kcal',
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 24),
+                  
+                  // Right column
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildStatTile(
+                          context: context,
+                          icon: Icons.timer, 
+                          label: 'Duration',
+                          value: MeasurementUtils.formatDuration(Duration(seconds: ruckBuddy.durationSeconds)),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildStatTile(
+                          context: context,
+                          icon: Icons.terrain, 
+                          label: 'Elevation',
+                          value: MeasurementUtils.formatElevationCompact(ruckBuddy.elevationGainM, ruckBuddy.elevationLossM.abs(), metric: preferMetric),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Social interactions row
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  // Like button with count
+                  InkWell(
+                    onTap: onLikeTap,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                      child: Row(
+                        children: [
+                          Icon(
+                            ruckBuddy.isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border,
+                            color: ruckBuddy.isLikedByCurrentUser ? Colors.red : Colors.grey[600],
+                            size: 20,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${ruckBuddy.likeCount}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Comments count
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${ruckBuddy.commentCount}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.grey[700],
+                        ),
                       ),
                     ],
                   ),
-                ),
-                
-                const SizedBox(width: 24),
-                
-                // Right column
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildStatTile(
-                        context: context,
-                        icon: Icons.timer, 
-                        label: 'Duration',
-                        value: MeasurementUtils.formatDuration(Duration(seconds: ruckBuddy.durationSeconds)),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildStatTile(
-                        context: context,
-                        icon: Icons.terrain, 
-                        label: 'Elevation',
-                        value: MeasurementUtils.formatElevationCompact(ruckBuddy.elevationGainM, ruckBuddy.elevationLossM.abs(), metric: preferMetric),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
+                  const Spacer(),
+                  // Photo count if any
+                  if (ruckBuddy.photos != null && ruckBuddy.photos!.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.photo_library,
+                          color: Colors.grey[600],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${ruckBuddy.photos!.length}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -151,8 +240,8 @@ class RuckBuddyCard extends StatelessWidget {
     } else {
       // Use gender-specific rucker image
       final String imagePath = user.gender == 'female'
-        ? 'assets/images/lady rucker profile.png'
-        : 'assets/images/profile.png';
+          ? 'assets/images/lady rucker profile.png'
+          : 'assets/images/profile.png';
       
       return CircleAvatar(
         radius: 20,
@@ -161,12 +250,12 @@ class RuckBuddyCard extends StatelessWidget {
       );
     }
   }
-  
+
   String _formatCompletedDate(DateTime? completedAt) {
-    if (completedAt == null) return 'Unknown date';
-    return MeasurementUtils.formatDate(completedAt, format: 'MMM d, yyyy');
+    if (completedAt == null) return 'Date unknown';
+    return DateFormat('MMM d, yyyy').format(completedAt);
   }
-  
+
   Widget _buildStatTile({
     required BuildContext context,
     required IconData icon, 
@@ -202,6 +291,95 @@ class RuckBuddyCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PhotoThumbnailsOverlay extends StatelessWidget {
+  final List<RuckPhoto> photos;
+  final int maxDisplay;
+
+  const _PhotoThumbnailsOverlay({
+    required this.photos,
+    this.maxDisplay = 3,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Show up to maxDisplay photos, with a +X indicator if there are more
+    final displayCount = photos.length > maxDisplay ? maxDisplay : photos.length;
+    final hasMore = photos.length > maxDisplay;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          ...List.generate(displayCount, (index) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.black12,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: photos[index].url != null
+                      ? CachedNetworkImage(
+                          imageUrl: photos[index].url!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: SizedBox(
+                              width: 10,
+                              height: 10,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white54,
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.error,
+                            size: 12,
+                            color: Colors.white70,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.image,
+                          size: 12,
+                          color: Colors.white70,
+                        ),
+                ),
+              ),
+            );
+          }),
+          if (hasMore)
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.black38,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Center(
+                child: Text(
+                  '+${photos.length - maxDisplay}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -283,7 +461,7 @@ class _RouteMapPreview extends StatelessWidget {
           ),
           children: [
             TileLayer(
-              urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+              urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=\${dotenv.env['STADIA_MAPS_API_KEY']}",
               userAgentPackageName: 'com.getrucky.gfy',
               retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
             ),
@@ -297,7 +475,6 @@ class _RouteMapPreview extends StatelessWidget {
                   )
                 ],
               ),
-
           ],
         ),
       ),

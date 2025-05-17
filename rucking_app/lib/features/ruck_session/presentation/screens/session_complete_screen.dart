@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -18,6 +19,8 @@ import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sampl
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -713,6 +716,36 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                           : Center(child: Text('No heart rate data available', style: TextStyle(color: Colors.grey[600]))),
                       ),
                     ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Photo Upload Section
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: PhotoUploadSection(
+                    ruckId: widget.ruckId,
+                    onPhotosSelected: (photos) {
+                      // We'll implement this when we add the backend
+                      debugPrint('Selected ${photos.length} photos for upload');
+                    },
+                    onUploadSuccess: () {
+                      // We'll implement this when we add the backend
+                      debugPrint('Photos uploaded successfully');
+                    },
                   ),
                 ),
                 

@@ -4,6 +4,7 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/widgets/filter_chip_group.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/widgets/ruck_buddy_card.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
@@ -28,6 +29,23 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     
     // Initial fetch
     context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+    
+    // Preload mock photos for demo
+    _preloadDemoImages();
+  }
+  
+  void _preloadDemoImages() {
+    // This would be removed when real photo support is implemented
+    // Preload sample images
+    const sampleUrls = [
+      'https://images.unsplash.com/photo-1551632811-561732d1e306',
+      'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05',
+      'https://images.unsplash.com/photo-1441974231531-c6227db76b6e'
+    ];
+    
+    for (final url in sampleUrls) {
+      precacheImage(NetworkImage(url), context);
+    }
   }
   
   @override
@@ -164,7 +182,25 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
         final ruckBuddy = ruckBuddies[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 16.0),
-          child: RuckBuddyCard(ruckBuddy: ruckBuddy),
+          child: RuckBuddyCard(
+            ruckBuddy: ruckBuddy,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => RuckBuddyDetailScreen(ruckBuddy: ruckBuddy),
+                ),
+              );
+            },
+            onLikeTap: () {
+              // This will be connected to the API in the future
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Like feature coming soon!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
         );
       },
     );

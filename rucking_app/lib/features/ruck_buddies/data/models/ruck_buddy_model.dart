@@ -1,5 +1,6 @@
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 
 class RuckBuddyModel extends RuckBuddy {
   const RuckBuddyModel({
@@ -17,6 +18,10 @@ class RuckBuddyModel extends RuckBuddy {
     int? avgHeartRate,
     required UserInfo user,
     List<dynamic>? locationPoints,
+    List<RuckPhoto>? photos,
+    int likeCount = 0,
+    int commentCount = 0,
+    bool isLikedByCurrentUser = false,
   }) : super(
     id: id,
     userId: userId,
@@ -32,6 +37,10 @@ class RuckBuddyModel extends RuckBuddy {
     avgHeartRate: avgHeartRate,
     user: user,
     locationPoints: locationPoints,
+    photos: photos,
+    likeCount: likeCount,
+    commentCount: commentCount,
+    isLikedByCurrentUser: isLikedByCurrentUser,
   );
 
   factory RuckBuddyModel.fromJson(Map<String, dynamic> json) {
@@ -61,6 +70,14 @@ class RuckBuddyModel extends RuckBuddy {
       locationPoints = json['route'] as List<dynamic>;
     }
 
+    // Parse photos if available
+    List<RuckPhoto>? photos;
+    if (json['photos'] != null) {
+      photos = (json['photos'] as List)
+          .map((photoJson) => RuckPhoto.fromJson(photoJson))
+          .toList();
+    }
+
     return RuckBuddyModel(
       id: json['id'].toString(),
       userId: json['user_id'].toString(),
@@ -80,6 +97,10 @@ class RuckBuddyModel extends RuckBuddy {
         'avatar_url': userData['avatar_url'],
       }),
       locationPoints: locationPoints,
+      photos: photos,
+      likeCount: json['like_count'] ?? 0,
+      commentCount: json['comment_count'] ?? 0,
+      isLikedByCurrentUser: json['is_liked_by_current_user'] ?? false,
     );
   }
 }
