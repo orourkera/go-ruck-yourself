@@ -34,6 +34,7 @@ class ActiveSessionRunning extends ActiveSessionState {
   final DateTime originalSessionStartTimeUtc; // Tracks when the session originally started
   final Duration totalPausedDuration;      // Accumulates total time paused
   final DateTime? currentPauseStartTimeUtc; // Tracks when the current pause began
+  final List<HeartRateSample> heartRateSamples;
 
   static const _unset = Object();
 
@@ -58,6 +59,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     required this.pace,
     required this.originalSessionStartTimeUtc,
     required this.totalPausedDuration,
+    required this.heartRateSamples,
     this.currentPauseStartTimeUtc,
     this.notes,
     this.latestHeartRate,
@@ -88,6 +90,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     originalSessionStartTimeUtc,
     totalPausedDuration,
     currentPauseStartTimeUtc,
+    heartRateSamples,
   ];
   
   ActiveSessionRunning copyWith({
@@ -108,6 +111,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool? isPaused,
     Object? pace = _unset,
     int? latestHeartRate,
+    List<HeartRateSample>? heartRateSamples,
     String? validationMessage,
     bool clearValidationMessage = false,
     DateTime? originalSessionStartTimeUtc,
@@ -133,6 +137,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       isPaused: isPaused ?? this.isPaused,
       pace: identical(pace, _unset) ? this.pace : pace as double?,
       latestHeartRate: latestHeartRate ?? this.latestHeartRate,
+      heartRateSamples: heartRateSamples ?? this.heartRateSamples,
       validationMessage: clearValidationMessage ? null : validationMessage ?? this.validationMessage,
       plannedDuration: plannedDuration ?? this.plannedDuration,
       originalSessionStartTimeUtc: originalSessionStartTimeUtc ?? this.originalSessionStartTimeUtc,
