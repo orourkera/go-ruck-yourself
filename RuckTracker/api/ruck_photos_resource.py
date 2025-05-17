@@ -79,3 +79,275 @@ class RuckPhotosResource(Resource):
         except Exception as e:
             logger.error(f"RuckPhotosResource: Error fetching ruck photos from database: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while fetching photos.", status_code=500)
+            
+    def post(self):
+        """
+        Upload photos for a specific ruck session.
+        Expects 'ruck_id' as a form field and 'photos' as a list of files.
+        The user must be authenticated, and the ruck session must belong to the user.
+        """
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            logger.warning("RuckPhotosResource: Missing or invalid Authorization header.")
+            return build_api_response(success=False, error="Unauthorized", status_code=401)
+        
+        token = auth_header.split("Bearer ")[1]
+
+        # Initialize Supabase client with the user's token to respect RLS
+        try:
+            supabase = get_supabase_client(user_jwt=token)
+            user_response = supabase.auth.get_user(token)
+            if not user_response.user:
+                logger.warning("RuckPhotosResource: Invalid token or user not found.")
+                return build_api_response(success=False, error="Invalid token or user not found.", status_code=401)
+            
+            user_id = user_response.user.id
+            logger.debug(f"RuckPhotosResource: Authenticated user {user_id}")
+        except Exception as e:
+            logger.error(f"RuckPhotosResource: Error during Supabase client initialization or user auth: {e}")
+            return build_api_response(success=False, error="Authentication error.", status_code=500)
+
+        # Check if form data is present
+        if 'ruck_id' not in request.form:
+            logger.info("RuckPhotosResource: Missing ruck_id form field.")
+            return build_api_response(success=False, error="Missing ruck_id form field", status_code=400)
+        
+        # Check if files are present
+        if 'photos' not in request.files:
+            logger.info("RuckPhotosResource: No photos were uploaded.")
+            return build_api_response(success=False, error="No photos were uploaded", status_code=400)
+        
+        try:
+            ruck_id = int(request.form['ruck_id'])
+        except ValueError:
+            logger.info(f"RuckPhotosResource: Invalid ruck_id format: {request.form['ruck_id']}")
+            return build_api_response(success=False, error="Invalid ruck_id format, must be an integer.", status_code=400)
+        
+        # Verify the ruck exists and belongs to the user
+        try:
+            ruck_query = supabase.table('ruck_session') \
+                                 .select('id, user_id') \
+                                 .eq('id', ruck_id) \
+                                 .execute()
+            
+            if not ruck_query.data:
+                return build_api_response(success=False, error=f"Ruck session with ID {ruck_id} not found.", status_code=404)
+            
+            # Due to RLS, if the ruck doesn't belong to the user, it won't be found
+            # But for extra validation:
+            if ruck_query.data[0]['user_id'] != user_id:
+                return build_api_response(success=False, error="You don't have permission to upload photos to this ruck session.", status_code=403)
+            
+        except Exception as e:
+            logger.error(f"RuckPhotosResource: Error verifying ruck session: {e}")
+            return build_api_response(success=False, error="Error verifying ruck session", status_code=500)
+        
+        uploaded_photos = []
+        photo_files = request.files.getlist('photos')
+        
+        # Limit the number of photos that can be uploaded at once (e.g., 5)
+        MAX_PHOTOS = 5
+        if len(photo_files) > MAX_PHOTOS:
+            return build_api_response(
+                success=False, 
+                error=f"Maximum {MAX_PHOTOS} photos can be uploaded at once.", 
+                status_code=400
+            )
+        
+        for photo_file in photo_files:
+            if photo_file.filename == '':
+                continue
+                
+            # Validate file type
+            if not photo_file.content_type.startswith('image/'):
+                continue
+                
+            # Generate a unique filename
+            import uuid
+            from pathlib import Path
+            original_filename = photo_file.filename
+            extension = Path(original_filename).suffix
+            unique_filename = f"{uuid.uuid4()}{extension}"
+            
+            # Store photo metadata in the ruck_photos table
+            try:
+                # Upload the file to storage
+                storage_path = f"ruck_photos/{user_id}/{ruck_id}/{unique_filename}"
+                
+                # Create a temporary file
+                import tempfile
+                temp_file = tempfile.NamedTemporaryFile(delete=False)
+                photo_file.save(temp_file.name)
+                
+                # Upload to Supabase storage
+                storage_response = supabase.storage.from_('ruck-photos').upload(
+                    storage_path,
+                    temp_file.name,
+                    file_options={
+                        "content-type": photo_file.content_type,
+                        "cache-control": "3600"
+                    }
+                )
+                
+                # Get the public URL
+                public_url = supabase.storage.from_('ruck-photos').get_public_url(storage_path)
+                
+                # Create thumbnail (this would be done on the server-side in a real implementation)
+                # For this MVP, we'll just use the original URL as the thumbnail
+                thumbnail_url = public_url
+                
+                # Insert into ruck_photos table
+                photo_data = {
+                    'ruck_id': ruck_id,
+                    'user_id': user_id,
+                    'filename': unique_filename,
+                    'original_filename': original_filename,
+                    'content_type': photo_file.content_type,
+                    'size': photo_file.content_length if hasattr(photo_file, 'content_length') else 0,
+                    'url': public_url,
+                    'thumbnail_url': thumbnail_url
+                }
+                
+                insert_response = supabase.table('ruck_photos').insert(photo_data).execute()
+                
+                if hasattr(insert_response, 'error') and insert_response.error:
+                    logger.error(f"RuckPhotosResource: Error inserting photo metadata: {insert_response.error}")
+                    continue
+                
+                # Add to uploaded photos list
+                uploaded_photos.append(insert_response.data[0])
+                
+                # Clean up temp file
+                import os
+                os.unlink(temp_file.name)
+                
+            except Exception as e:
+                logger.error(f"RuckPhotosResource: Error uploading photo: {e}", exc_info=True)
+                continue
+        
+        if not uploaded_photos:
+            return build_api_response(
+                success=False, 
+                error="Failed to upload any photos. Please try again.", 
+                status_code=500
+            )
+            
+        # Update the ruck_session has_photos flag if needed
+        try:
+            supabase.table('ruck_session').update({'has_photos': True}).eq('id', ruck_id).execute()
+        except Exception as e:
+            logger.warning(f"RuckPhotosResource: Error updating has_photos flag: {e}")
+            # We don't fail the request for this
+            
+        return build_api_response(
+            data={
+                'count': len(uploaded_photos),
+                'photos': uploaded_photos
+            },
+            status_code=201
+        )
+        
+    def delete(self):
+        """
+        Delete a specific photo from a ruck session.
+        Expects 'photo_id' as a query parameter.
+        The user must be authenticated, and the photo must belong to the user.
+        """
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            logger.warning("RuckPhotosResource: Missing or invalid Authorization header.")
+            return build_api_response(success=False, error="Unauthorized", status_code=401)
+        
+        token = auth_header.split("Bearer ")[1]
+
+        # Initialize Supabase client with the user's token to respect RLS
+        try:
+            supabase = get_supabase_client(user_jwt=token)
+            user_response = supabase.auth.get_user(token)
+            if not user_response.user:
+                logger.warning("RuckPhotosResource: Invalid token or user not found.")
+                return build_api_response(success=False, error="Invalid token or user not found.", status_code=401)
+            
+            user_id = user_response.user.id
+            logger.debug(f"RuckPhotosResource: Authenticated user {user_id}")
+        except Exception as e:
+            logger.error(f"RuckPhotosResource: Error during Supabase client initialization or user auth: {e}")
+            return build_api_response(success=False, error="Authentication error.", status_code=500)
+
+        photo_id = request.args.get('photo_id')
+        if not photo_id:
+            logger.info("RuckPhotosResource: Missing photo_id query parameter.")
+            return build_api_response(success=False, error="Missing photo_id query parameter", status_code=400)
+        
+        # First, get the photo information to verify ownership and get details needed for cleanup
+        try:
+            photo_query = supabase.table('ruck_photos') \
+                                  .select('id, ruck_id, user_id, filename') \
+                                  .eq('id', photo_id) \
+                                  .execute()
+            
+            if not photo_query.data:
+                logger.info(f"RuckPhotosResource: Photo with ID {photo_id} not found.")
+                return build_api_response(success=False, error=f"Photo with ID {photo_id} not found.", status_code=404)
+            
+            # Due to RLS, if the photo doesn't belong to the user, it won't be found
+            # But for extra validation:
+            photo_data = photo_query.data[0]
+            if photo_data['user_id'] != user_id:
+                logger.warning(f"RuckPhotosResource: User {user_id} attempted to delete photo {photo_id} belonging to user {photo_data['user_id']}")
+                return build_api_response(
+                    success=False, 
+                    error="You don't have permission to delete this photo.", 
+                    status_code=403
+                )
+            
+            ruck_id = photo_data['ruck_id']
+            filename = photo_data['filename']
+            
+        except Exception as e:
+            logger.error(f"RuckPhotosResource: Error getting photo information: {e}")
+            return build_api_response(success=False, error="Error getting photo information", status_code=500)
+        
+        # Delete the photo file from storage
+        try:
+            storage_path = f"ruck_photos/{user_id}/{ruck_id}/{filename}"
+            supabase.storage.from_('ruck-photos').remove([storage_path])
+        except Exception as e:
+            logger.error(f"RuckPhotosResource: Error deleting photo file from storage: {e}")
+            # Continue even if storage deletion fails, as the metadata is more important
+        
+        # Delete the photo metadata from the database
+        try:
+            delete_response = supabase.table('ruck_photos').delete().eq('id', photo_id).execute()
+            
+            if hasattr(delete_response, 'error') and delete_response.error:
+                logger.error(f"RuckPhotosResource: Error deleting photo metadata: {delete_response.error}")
+                return build_api_response(
+                    success=False, 
+                    error="Failed to delete photo metadata.", 
+                    status_code=500
+                )
+                
+            # Check if this was the last photo for this ruck
+            remaining_photos = supabase.table('ruck_photos').select('id').eq('ruck_id', ruck_id).execute()
+            
+            if not remaining_photos.data:
+                # Update the ruck's has_photos flag to false
+                supabase.table('ruck_session').update({'has_photos': False}).eq('id', ruck_id).execute()
+            
+            return build_api_response(
+                success=True,
+                data={
+                    "message": "Photo deleted successfully",
+                    "photo_id": photo_id
+                },
+                status_code=200
+            )
+            
+        except Exception as e:
+            logger.error(f"RuckPhotosResource: Error deleting photo metadata: {e}")
+            return build_api_response(
+                success=False, 
+                error="Failed to delete photo. Please try again.", 
+                status_code=500
+            )
