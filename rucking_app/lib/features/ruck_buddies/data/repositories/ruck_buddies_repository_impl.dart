@@ -17,12 +17,16 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
     required int limit,
     required int offset,
     required String filter,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       final ruckBuddies = await remoteDataSource.getRuckBuddies(
         limit: limit,
         offset: offset,
         filter: filter,
+        latitude: latitude,
+        longitude: longitude,
       );
 
       return Right(ruckBuddies);

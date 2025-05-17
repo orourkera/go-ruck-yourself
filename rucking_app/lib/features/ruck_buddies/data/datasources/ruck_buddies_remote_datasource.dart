@@ -7,13 +7,20 @@ import 'package:rucking_app/features/ruck_buddies/data/models/ruck_buddy_model.d
 abstract class RuckBuddiesRemoteDataSource {
   /// Gets a list of public ruck sessions from other users
   /// 
-  /// Filter types: 'recent', 'popular', 'distance', 'duration'
+  /// Filter options: 
+  /// - 'closest' - Closest rucks (requires lat/lon)
+  /// - 'calories' - Most calories burned
+  /// - 'distance' - Furthest distance
+  /// - 'duration' - Longest duration
+  /// - 'elevation' - Most elevation gain
   ///
   /// Throws a [ServerException] if there is an error
   Future<List<RuckBuddyModel>> getRuckBuddies({
     required int limit, 
     required int offset, 
-    required String filter
+    required String filter,
+    double? latitude,
+    double? longitude
   });
 }
 
@@ -26,16 +33,26 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
   Future<List<RuckBuddyModel>> getRuckBuddies({
     required int limit, 
     required int offset, 
-    required String filter
+    required String filter,
+    double? latitude,
+    double? longitude
   }) async {
     try {
+      final queryParams = {
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+        'filter': filter,
+      };
+      
+      // Add location data if available and we're using proximity filter
+      if (filter == 'closest' && latitude != null && longitude != null) {
+        queryParams['latitude'] = latitude.toString();
+        queryParams['longitude'] = longitude.toString();
+      }
+      
       final response = await apiClient.get(
-        '/ruck-buddies',
-        queryParams: {
-          'limit': limit.toString(),
-          'offset': offset.toString(),
-          'filter': filter,
-        },
+        '/api/ruck-buddies',
+        queryParams: queryParams,
       );
 
       final Map<String, dynamic> jsonResponse = response;
