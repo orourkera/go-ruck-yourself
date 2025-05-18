@@ -170,7 +170,7 @@ class SocialRepository {
       }
 
       debugPrint('🔍 Making API request to check if user liked ruck');
-      final endpoint = '${ApiEndpoints.baseApi}/api/ruck-likes/check?ruck_id=$ruckId';
+      final endpoint = '${ApiEndpoints.baseApi}/ruck-likes/check?ruck_id=$ruckId';
       debugPrint('🔍 Endpoint: $endpoint');
       
       final response = await _httpClient.get(
