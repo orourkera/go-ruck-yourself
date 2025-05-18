@@ -135,10 +135,15 @@ class ApiClient {
   }
   
   /// Makes a GET request to the API
-  Future<dynamic> get(String endpoint) async {
+  Future<dynamic> get(String endpoint, {Map<String, dynamic>? queryParams}) async {
     try {
-      // For authenticated endpoints, verify we have a token first
-      if (endpoint.contains('/rucks') || endpoint.contains('/users')) {
+      // Determine if this request should include an auth token.
+      // By default, ALL API routes require authentication unless they are
+      // explicitly public (e.g. /auth/*, /public/*, /users/register).
+      final bool isPublicEndpoint =
+          endpoint.startsWith('/auth/') || endpoint == '/users/register';
+
+      if (!isPublicEndpoint) {
         final hasToken = await _ensureAuthToken();
         if (!hasToken) {
           throw UnauthorizedException('Not authenticated - please log in first');
@@ -155,6 +160,7 @@ class ApiClient {
       // Make API call
       final response = await _dio.get(
         endpoint,
+        queryParameters: queryParams,
         options: options,
       );
       
@@ -165,7 +171,7 @@ class ApiClient {
   }
   
   /// Makes a POST request to the specified endpoint with the given body
-  Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
+  Future<dynamic> post(String endpoint, dynamic body) async {
     try {
       // Require token for /rucks/* and /users/* endpoints, EXCEPT for /users/register
       bool requiresAuth = (endpoint.startsWith('/rucks') || endpoint.startsWith('/users/')) && 

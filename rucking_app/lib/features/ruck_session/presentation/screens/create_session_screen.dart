@@ -14,6 +14,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/error_messages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -131,19 +132,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     if (_formKey.currentState!.validate()) {
       final authState = context.read<AuthBloc>().state;
       if (authState is! Authenticated) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('You must be logged in to create a session'),
-            backgroundColor: AppColors.error,
-            action: SnackBarAction(
-              label: 'Log In',
-              onPressed: () {
-                // Navigate to login screen
-                Navigator.of(context).pushNamed('/login');
-              },
-            ),
-          ),
+        StyledSnackBar.showError(
+          context: context,
+          message: 'You must be logged in to create a session',
+          duration: const Duration(seconds: 3),
         );
+        // Navigate to login screen after a brief delay
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          Navigator.of(context).pushNamed('/login');
+        });
         return;
       }
       
@@ -243,13 +240,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       } catch (e) {
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().contains(sessionUserWeightRequired)
-                ? sessionUserWeightRequired
-                : 'Failed to create/start session: $e'),
-              backgroundColor: AppColors.error,
-            ),
+          StyledSnackBar.showError(
+            context: context,
+            message: e.toString().contains(sessionUserWeightRequired)
+              ? sessionUserWeightRequired
+              : 'Failed to create/start session: $e',
+            duration: const Duration(seconds: 3),
           );
           // Only set creating to false on error, success leads to navigation
           setState(() {
@@ -452,7 +448,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         height: 36,
         alignment: Alignment.center,
         child: Text(
-          isMetric ? '${weightValue.toStringAsFixed(1)} kg' : '${weightValue.round()} lbs',
+          (weightValue == 0 && isSelected) ? 'HIKE' : (isMetric ? (weightValue == 0 ? '0 kg' : '${weightValue.toStringAsFixed(1)} kg') : (weightValue == 0 ? '0 lbs' : '${weightValue.round()} lbs')),
           textAlign: TextAlign.center,
           style: AppTextStyles.statValue.copyWith(
             color: Theme.of(context).brightness == Brightness.dark ? Colors.white : (isSelected ? Colors.white : Colors.black),
@@ -461,18 +457,16 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         ),
       ),
       selected: isSelected,
-      onSelected: (selected) async {
-        if (selected) {
-          setState(() {
-            _ruckWeight = weightInKg;
-            _displayRuckWeight = isMetric ? weightValue : weightValue;
-            _selectedRuckWeight = weightInKg;
-          });
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setDouble('lastRuckWeightKg', weightInKg);
-          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelectedWeight());
-        }
-      },
+      onSelected: (selected) {
+      if (selected) {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _selectedRuckWeight = weightInKg;
+          _ruckWeight = weightInKg;
+          _displayRuckWeight = isMetric ? weightValue : weightValue;
+        });
+      }
+    },
       selectedColor: Theme.of(context).primaryColor,
       backgroundColor: isSelected
         ? Theme.of(context).primaryColor
@@ -504,9 +498,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           toolbarButtons: [
             (node) => TextButton(
                   onPressed: () {
-                    node.unfocus();
-                    if (!_isCreating) _createSession();
-                  },
+                  HapticFeedback.heavyImpact();
+                  node.unfocus();
+                  if (!_isCreating) _createSession();
+                },
                   child: const Text('Done'),
                 ),
           ],
@@ -617,6 +612,16 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     }
                     return null;
                   },
+                  onChanged: (value) {
+                    setState(() {
+                      if (value.isEmpty) {
+                        _plannedDuration = null;
+                      } else {
+                        final parsed = int.tryParse(value);
+                        _plannedDuration = (parsed != null && parsed > 0) ? parsed : null;
+                      }
+                    });
+                  },
                   onFieldSubmitted: (_) {
                     FocusScope.of(context).unfocus();
                     if (!_isCreating) _createSession();
@@ -645,6 +650,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                       ),
                     ),
                     onPressed: () {
+                      HapticFeedback.mediumImpact();
                       _snapToNearestWeight(); 
                       if (_formKey.currentState!.validate()) {
                         if (!_isCreating) _createSession();

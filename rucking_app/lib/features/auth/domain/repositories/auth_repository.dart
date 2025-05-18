@@ -17,6 +17,7 @@ abstract class AuthRepository {
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
+    String? gender,
   });
   
   /// Log out the current user
@@ -37,6 +38,8 @@ abstract class AuthRepository {
     double? weightKg,
     double? heightCm,
     bool? preferMetric,
+    bool? allowRuckSharing,
+    String? gender,
   });
 
   /// Delete the current user's account

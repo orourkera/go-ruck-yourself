@@ -9,8 +9,12 @@ import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// A dedicated countdown page that shows a countdown before starting a ruck session
 /// This avoids showing any map or loading screens before the session is ready
@@ -58,6 +62,9 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       locationService: locator<LocationService>(),
       healthService: locator<HealthService>(),
       watchService: locator<WatchService>(),
+      heartRateService: locator<HeartRateService>(),
+      splitTrackingService: locator<SplitTrackingService>(),
+      sessionRepository: locator<SessionRepository>(),
     );
     
     // Start countdown after a brief delay to ensure screen is visible
@@ -197,12 +204,25 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     // Don't dispose the session bloc - it's being passed to the next screen
     super.dispose();
   }
+  
+  // Helper method to get the appropriate background color based on user gender
+  Color _getLadyModeColor(BuildContext context) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        return AppColors.ladyPrimary;
+      }
+    } catch (e) {
+      // If we can't access the AuthBloc, fall back to default color
+    }
+    return AppColors.primary;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        color: AppColors.primary,
+        color: _getLadyModeColor(context),
         child: Center(
           child: AnimatedBuilder(
             animation: _controller,

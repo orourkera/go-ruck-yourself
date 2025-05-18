@@ -34,6 +34,20 @@ class ActiveSessionRunning extends ActiveSessionState {
   final DateTime originalSessionStartTimeUtc; // Tracks when the session originally started
   final Duration totalPausedDuration;      // Accumulates total time paused
   final DateTime? currentPauseStartTimeUtc; // Tracks when the current pause began
+  final List<HeartRateSample> heartRateSamples;
+  final bool isGpsReady; // Flag to indicate if GPS has acquired the first point
+  final List<RuckPhoto> photos;
+  final bool isPhotosLoading;
+  final String? photosError;
+  
+  // Photo upload fields
+  final bool isUploading;
+  final String? uploadError;
+  final bool uploadSuccess;
+  
+  // Photo deletion fields
+  final bool isDeleting;
+  final String? deleteError;
 
   static const _unset = Object();
 
@@ -58,10 +72,22 @@ class ActiveSessionRunning extends ActiveSessionState {
     required this.pace,
     required this.originalSessionStartTimeUtc,
     required this.totalPausedDuration,
+    required this.heartRateSamples,
+    this.photos = const [],
+    this.isPhotosLoading = false,
+    this.photosError,
+    // Photo upload fields
+    this.isUploading = false,
+    this.uploadError,
+    this.uploadSuccess = false,
+    // Photo deletion fields
+    this.isDeleting = false,
+    this.deleteError,
     this.currentPauseStartTimeUtc,
     this.notes,
     this.latestHeartRate,
     this.validationMessage,
+    this.isGpsReady = false, // Default to false
   });
   
   @override
@@ -88,6 +114,18 @@ class ActiveSessionRunning extends ActiveSessionState {
     originalSessionStartTimeUtc,
     totalPausedDuration,
     currentPauseStartTimeUtc,
+    heartRateSamples,
+    isGpsReady, // Add to props
+    photos,
+    isPhotosLoading,
+    photosError,
+    // Photo upload fields
+    isUploading,
+    uploadError,
+    uploadSuccess,
+    // Photo deletion fields
+    isDeleting,
+    deleteError,
   ];
   
   ActiveSessionRunning copyWith({
@@ -108,12 +146,27 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool? isPaused,
     Object? pace = _unset,
     int? latestHeartRate,
+    List<HeartRateSample>? heartRateSamples,
+    List<RuckPhoto>? photos,
+    bool? isPhotosLoading,
+    String? photosError,
+    bool clearPhotosError = false,
+    // Photo upload fields
+    bool? isUploading,
+    String? uploadError,
+    bool clearUploadError = false,
+    bool? uploadSuccess,
+    // Photo deletion fields
+    bool? isDeleting,
+    String? deleteError,
+    bool clearDeleteError = false,
     String? validationMessage,
     bool clearValidationMessage = false,
     DateTime? originalSessionStartTimeUtc,
     Duration? totalPausedDuration,
     DateTime? currentPauseStartTimeUtc,
     bool clearCurrentPauseStartTimeUtc = false,
+    bool? isGpsReady, // Add to copyWith parameters
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -133,11 +186,23 @@ class ActiveSessionRunning extends ActiveSessionState {
       isPaused: isPaused ?? this.isPaused,
       pace: identical(pace, _unset) ? this.pace : pace as double?,
       latestHeartRate: latestHeartRate ?? this.latestHeartRate,
+      heartRateSamples: heartRateSamples ?? this.heartRateSamples,
+      photos: photos ?? this.photos,
+      isPhotosLoading: isPhotosLoading ?? this.isPhotosLoading,
+      photosError: clearPhotosError ? null : photosError ?? this.photosError,
+      // Photo upload fields
+      isUploading: isUploading ?? this.isUploading,
+      uploadError: clearUploadError ? null : uploadError ?? this.uploadError,
+      uploadSuccess: uploadSuccess ?? this.uploadSuccess,
+      // Photo deletion fields
+      isDeleting: isDeleting ?? this.isDeleting,
+      deleteError: clearDeleteError ? null : deleteError ?? this.deleteError,
       validationMessage: clearValidationMessage ? null : validationMessage ?? this.validationMessage,
       plannedDuration: plannedDuration ?? this.plannedDuration,
       originalSessionStartTimeUtc: originalSessionStartTimeUtc ?? this.originalSessionStartTimeUtc,
       totalPausedDuration: totalPausedDuration ?? this.totalPausedDuration,
       currentPauseStartTimeUtc: clearCurrentPauseStartTimeUtc ? null : currentPauseStartTimeUtc ?? this.currentPauseStartTimeUtc,
+      isGpsReady: isGpsReady ?? this.isGpsReady, // Use in copyWith
     );
   }
 }
@@ -155,11 +220,13 @@ class ActiveSessionComplete extends ActiveSessionState {
 
 class ActiveSessionFailure extends ActiveSessionState {
   final String errorMessage;
-  
+  final ActiveSessionRunning? sessionDetails;
+
   const ActiveSessionFailure({
     required this.errorMessage,
+    this.sessionDetails,
   });
-  
+
   @override
-  List<Object?> get props => [errorMessage];
+  List<Object?> get props => [errorMessage, sessionDetails];
 }

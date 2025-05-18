@@ -89,6 +89,7 @@ limiter.init_app(app)
 
 # Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
 from RuckTracker.api.ruck import HeartRateSampleUploadResource
+
 limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
 
 # Define custom rate limits for specific endpoints
@@ -127,10 +128,14 @@ if os.environ.get("FLASK_ENV") == "development":
         "http://127.0.0.1:8080"
     ])
 
-CORS(app, origins=allowed_origins, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
 # Initialize API
 api = Api(app)
+
+# Import and register ruck_buddies blueprint (single place)
+from RuckTracker.api.ruck_buddies import ruck_buddies_bp
+app.register_blueprint(ruck_buddies_bp)
 
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (
@@ -158,6 +163,10 @@ from .api.stats import ( # Import new stats resources
     MonthlyStatsResource,
     YearlyStatsResource
 )
+
+from .api.ruck_photos_resource import RuckPhotosResource # Added import for RuckPhotosResource
+from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesResource
+from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
 
 # Apply rate limiting to SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
@@ -284,19 +293,30 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 
 # Ruck session endpoints (prefixed with /api)
 api.add_resource(RuckSessionListResource, '/api/rucks')
-api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
-api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
-api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
-api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
-api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete')
-api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
-api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<string:ruck_id>/heart_rate')
-# api.add_resource(RuckSessionDetailResource, '/api/ruck-details/<string:session_id>') # Commented out
+api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
+api.add_resource(RuckSessionStartResource, '/api/rucks/start')
+api.add_resource(RuckSessionPauseResource, '/api/rucks/<int:ruck_id>/pause')
+api.add_resource(RuckSessionResumeResource, '/api/rucks/<int:ruck_id>/resume')
+api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete')
+api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')
+api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
-# Statistics endpoints (prefixed with /api)
-api.add_resource(WeeklyStatsResource, '/api/statistics/weekly')
-api.add_resource(MonthlyStatsResource, '/api/statistics/monthly')
-api.add_resource(YearlyStatsResource, '/api/statistics/yearly')
+# Stats Endpoints
+api.add_resource(WeeklyStatsResource, '/api/stats/weekly')
+api.add_resource(MonthlyStatsResource, '/api/stats/monthly')
+api.add_resource(YearlyStatsResource, '/api/stats/yearly')
+
+# Ruck Photos Endpoint
+api.add_resource(RuckPhotosResource, '/api/ruck-photos')
+rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
+
+# Ruck Likes Endpoints
+api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
+rate_limit_resource(RuckLikesResource, "60 per minute") # Apply rate limiting
+
+# Ruck Comments Endpoint
+api.add_resource(RuckCommentsResource, '/api/ruck-comments')
+rate_limit_resource(RuckCommentsResource, "60 per minute") # Apply rate limiting
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')

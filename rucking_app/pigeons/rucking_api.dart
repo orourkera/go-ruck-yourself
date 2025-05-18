@@ -23,7 +23,7 @@ abstract class RuckingApi {
 
   /// Update session metrics on the watch (Flutter -> native)
   @async
-  bool updateSessionOnWatch(double distance, double duration, double pace, bool isPaused);
+  bool updateSessionOnWatch(double distance, double duration, double pace, bool isPaused, double calories, double elevationGain, double elevationLoss);
 
   /// Pause an active session from the watch
   @async
@@ -46,7 +46,7 @@ abstract class RuckingApi {
 @HostApi()
 abstract class FlutterRuckingApi {
   /// Update session metrics on the watch
-  void updateSessionOnWatch(double distance, double duration, double pace, bool isPaused);
+  void updateSessionOnWatch(double distance, double duration, double pace, bool isPaused, double calories, double elevationGain, double elevationLoss);
 
   /// Start a session on the watch
   void startSessionOnWatch(double ruckWeight);

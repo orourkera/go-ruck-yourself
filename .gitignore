@@ -1,2 +1,41 @@
 # Ignore environment and secret files
 RuckTracker/.env
+
+# Flutter/Dart
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+.idea/
+*.iml
+*.lastUpdate
+
+# iOS/macOS
+*.hmap
+*.ipa
+*.dSYM/
+*.xcscheme
+xcuserdata/
+DerivedData/
+.DS_Store
+Carthage/
+Pods/
+
+# Specific to this project's previous conflicts if they persist
+rucking_app/ios/build/
+rucking_app/ios_backup/build/
+
+# Android
+.gradle
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Web (if applicable)
+.dart_tool/build/
+
+# VS Code
+.vscode/

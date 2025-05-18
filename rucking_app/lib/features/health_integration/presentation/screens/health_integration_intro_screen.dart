@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
@@ -27,13 +28,12 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
           // Mark intro as seen regardless of authorization status
           context.read<HealthBloc>().add(const MarkHealthIntroSeen());
           
-          // Only show a success message when permission is granted
+          // Only show success message when permission is granted (Apple Store compliant)
           if (state.authorized) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Apple Health integration enabled!'),
-                backgroundColor: Colors.green,
-              ),
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: 'Apple Health integration enabled!',
+              duration: const Duration(seconds: 2),
             );
           }
         } else if (state is HealthIntroShown) {

@@ -1,22 +1,27 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/api/rucking_api.dart';
+import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
-import 'package:rucking_app/features/ruck_session/data/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/data/heart_rate_sample_storage.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
-import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'rucking_api_handler.dart';
 
 /// Service for managing communication with Apple Watch companion app
 class WatchService {
   final LocationService _locationService;
   final HealthService _healthService;
   final AuthService _authService;
-  
+
   // Session state
   bool _isSessionActive = false;
   bool _isPaused = false;
@@ -25,56 +30,95 @@ class WatchService {
   double _currentPace = 0.0;
   double? _currentHeartRate;
   double _ruckWeight = 0.0;
-  
+  int _currentCalories = 0;
+  double _currentElevationGain = 0.0;
+  double _currentElevationLoss = 0.0;
+
   // Method channels
   late MethodChannel _watchSessionChannel;
-  late MethodChannel _watchHealthChannel;
-  late MethodChannel _userPrefsChannel;
-  
+  late EventChannel _heartRateEventChannel;
+
   // Stream controllers for watch events
   final _sessionEventController = StreamController<Map<String, dynamic>>.broadcast();
   final _healthDataController = StreamController<Map<String, dynamic>>.broadcast();
+  final _heartRateController = StreamController<double>.broadcast();
+  StreamSubscription? _nativeHeartRateSubscription;
   
-  // Public streams
-  Stream<Map<String, dynamic>> get sessionEvents => _sessionEventController.stream;
-  Stream<Map<String, dynamic>> get healthData => _healthDataController.stream;
-  
+  // Flag to track if we've attempted to reconnect the heart rate listener
+  bool _isReconnectingHeartRate = false;
+  int _heartRateReconnectAttempts = 0;
+  Timer? _heartRateWatchdogTimer;
+  DateTime? _lastHeartRateUpdateTime;
+
+  // Heart rate samples list
+  List<HeartRateSample> _currentSessionHeartRateSamples = [];
+
   WatchService(this._locationService, this._healthService, this._authService) {
+    // Watch service initialization
     _initPlatformChannels();
+    // Watch service initialized
   }
-  
+
   void _initPlatformChannels() {
-    // Set up method channels
+    // Initialize platform channels
     _watchSessionChannel = const MethodChannel('com.getrucky.gfy/watch_session');
-    _watchHealthChannel = const MethodChannel('com.getrucky.gfy/watch_health');
-    _userPrefsChannel = const MethodChannel('com.getrucky.gfy/user_preferences');
-    
-    // Set up method call handlers
+    _heartRateEventChannel = const EventChannel('com.getrucky.gfy/heartRateStream');
+
+    // Setup method call handlers
     _watchSessionChannel.setMethodCallHandler(_handleWatchSessionMethod);
-    _watchHealthChannel.setMethodCallHandler(_handleWatchHealthMethod);
-    
-    // Register the RuckingApi handler
+
+    // Setup heart rate event channel
+    _setupNativeHeartRateListener();
+    _startHeartRateWatchdog();
+
+    // Register Pigeon handler
     RuckingApi.setUp(RuckingApiHandler(this));
+    // Platform channels setup complete
   }
-  
+
   /// Handle method calls from the watch session channel
   Future<dynamic> _handleWatchSessionMethod(MethodCall call) async {
+    // Silent method call processing
+    debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod received call: ${call.method} with arguments: ${call.arguments}');
     switch (call.method) {
       case 'onWatchSessionUpdated':
-        final data = call.arguments as Map<String, dynamic>;
+        // Safely handle the arguments map with proper type casting
+        if (call.arguments is! Map) {
+          AppLogger.error('[WATCH] Invalid arguments type: ${call.arguments.runtimeType}');
+          return;
+        }
+        
+        // Convert from Map<Object?, Object?> to Map<String, dynamic>
+        final rawMap = call.arguments as Map<Object?, Object?>;
+        final data = <String, dynamic>{};
+        rawMap.forEach((key, value) {
+          if (key is String) {
+            data[key] = value;
+          }
+        });
+        
+        AppLogger.info('[WATCH] Session updated with data: $data');
         _sessionEventController.add(data);
         
-        // Check if a session was started from the watch
-        if (data['action'] == 'startSession') {
+        // Get the command type from the message
+        final command = data['command'] as String?;
+        
+        if (command == 'startSession') {
+          debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod -> startSession command received from watch');
           await _handleSessionStartedFromWatch(data);
-        } else if (data['action'] == 'endSession') {
+        } else if (command == 'pauseSession') {
+          debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod -> pauseSession command received from watch');
+          await pauseSessionFromWatchCallback();
+        } else if (command == 'resumeSession') {
+          debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod -> resumeSession command received from watch');
+          await resumeSessionFromWatchCallback();
+        } else if (command == 'endSession') {
+          debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod -> endSession command received from watch');
           await _handleSessionEndedFromWatch(data);
-        } else if (data['action'] == 'pauseSession') {
-          _isPaused = true;
-        } else if (data['action'] == 'resumeSession') {
-          _isPaused = false;
+        } else if (command == 'pingResponse') {
+          AppLogger.info('[WATCH] Ping response received from watch: ${data['message']}');
         }
-        
+
         return true;
       default:
         throw PlatformException(
@@ -83,371 +127,538 @@ class WatchService {
         );
     }
   }
-  
-  /// Handle method calls from the watch health channel
-  Future<dynamic> _handleWatchHealthMethod(MethodCall call) async {
-    switch (call.method) {
-      case 'onHealthDataUpdated':
-        final data = call.arguments as Map<String, dynamic>;
-        _healthDataController.add(data);
-        
-        // Update heart rate if needed
-        if (data['type'] == 'heartRate') {
-          _currentHeartRate = data['value'];
-          
-          // If session is active, send to health service
-          if (_isSessionActive) {
-            _healthService.updateHeartRate(_currentHeartRate!);
-          }
-        }
-        
-        return true;
-      default:
-        throw PlatformException(
-          code: 'UNIMPLEMENTED',
-          message: 'Method ${call.method} not implemented',
-        );
-    }
-  }
-  
+
   /// Handle a session started from the watch
   Future<void> _handleSessionStartedFromWatch(Map<String, dynamic> data) async {
-    // Extract ruckWeight or use a default
     final double ruckWeight = (data['ruckWeight'] as num?)?.toDouble() ?? 10.0;
-    
+    // Handle session start from watch
+
     try {
       // Get current user
       final authState = await _authService.getCurrentUser();
       if (authState == null) {
-        debugPrint('[ERROR] No authenticated user found - cannot create session from Watch');
+        AppLogger.error('[WATCH] No authenticated user found - cannot create session from Watch');
         return;
       }
-      
+      // User authenticated
+
       // Create ruck session
       final response = await GetIt.instance<ApiClient>().post('/rucks', {
         'ruckWeight': ruckWeight,
       });
-      
+
+      AppLogger.debug('[WATCH] API response for session creation: $response');
+
       if (response == null || !response.containsKey('id')) {
+        AppLogger.error('[WATCH] Failed to create session - invalid API response');
         return;
       }
-      
-      // Extract session ID and start the session
+      // Session created successfully
+
       final String sessionId = response['id'].toString();
-      
-      // Send session ID to watch so it can include it in API calls
+      // Session ID extracted
+
+      // Send session ID to watch
       await sendSessionIdToWatch(sessionId);
-      
+
       // Start session on backend
       await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {});
-      
-      // Send event to BLoC to update UI
-      /* // Temporarily commented out - removing watch functionality
-      GetIt.instance<ActiveSessionBloc>().add(SessionStarted(
-        ruckId: sessionId,
-        ruckWeight: ruckWeight,
-        userWeight: await _getUserWeight() ?? 70.0, // Get from service or use default
-      ));
-      */
-      
+
+      // Notify watch of workout start
+      await _sendMessageToWatch({
+        'command': 'workoutStarted',
+        'sessionId': sessionId,
+        'ruckWeight': ruckWeight,
+      });
+
+      // Update app state
+      _isSessionActive = true;
+      _ruckWeight = ruckWeight;
+      _currentSessionHeartRateSamples = [];
+      // Session started successfully
     } catch (e) {
-      debugPrint('[ERROR] Failed to process session start from Watch: $e');
+      AppLogger.error('[ERROR] Failed to process session start from Watch: $e');
     }
   }
-  
+
   /// Handle a session ended from the watch
   Future<void> _handleSessionEndedFromWatch(Map<String, dynamic> data) async {
     try {
-      final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionRunning) {
-        bloc.add(const SessionCompleted());
-      }
+      // Handle session end from watch
+      // Save heart rate samples to storage
+      await HeartRateSampleStorage.saveSamples(_currentSessionHeartRateSamples);
+      // Heart rate samples sent successfully
     } catch (e) {
-      debugPrint('[ERROR] Failed to handle session end from Watch: $e');
+      AppLogger.error('[WATCH] Failed to handle session end from Watch: $e');
     }
   }
-  
-  /// Handle a session pause from the watch
-  Future<void> _handlePauseSessionFromWatch(Map<String, dynamic> data) async {
-    try {
-      final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionRunning && !(bloc.state as ActiveSessionRunning).isPaused) {
-        bloc.add(const SessionPaused());
-      }
-    } catch (e) {
-      debugPrint('[ERROR] Failed to pause session from Watch: $e');
-    }
-  }
-  
-  /// Handle a session resume from the watch
-  Future<void> _handleResumeSessionFromWatch(Map<String, dynamic> data) async {
-    try {
-      final bloc = GetIt.instance<ActiveSessionBloc>();
-      if (bloc.state is ActiveSessionRunning && (bloc.state as ActiveSessionRunning).isPaused) {
-        bloc.add(const SessionResumed());
-      }
-    } catch (e) {
-      debugPrint('[ERROR] Failed to resume session from Watch: $e');
-    }
-  }
-  
+
   /// Start a new rucking session on the watch
   Future<void> startSessionOnWatch(double ruckWeight) async {
+    debugPrint('[PAUSE_DEBUG] WatchService: startSessionOnWatch called with ruckWeight: $ruckWeight. Setting _isSessionActive = true.');
+    _isSessionActive = true;
+    _isPaused = false;
+    _ruckWeight = ruckWeight;
+    _currentSessionHeartRateSamples = []; // Clear samples for the new session
+
     try {
       await _sendMessageToWatch({
-        'command': 'startSession',
+        'command': 'workoutStarted',
         'ruckWeight': ruckWeight,
       });
     } catch (e) {
-      debugPrint('[ERROR] Failed to start session on Watch: $e');
+      AppLogger.error('[ERROR] Failed to start session on Watch: $e');
     }
   }
-  
-  /// Update session metrics on the watch
+
+  /// Send the session ID to the watch
+  Future<void> sendSessionIdToWatch(String sessionId) async {
+    try {
+      // Send session ID to watch
+      await _sendMessageToWatch({
+        'command': 'setSessionId',
+        'sessionId': sessionId,
+      });
+      // Session ID sent
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to send session ID to Watch: $e');
+    }
+  }
+
+  /// Send a message to the watch via the session channel
+  Future<void> _sendMessageToWatch(Map<String, dynamic> message) async {
+    try {
+      AppLogger.debug('[WATCH] Sending message to watch: ${message['command']}');
+      await _watchSessionChannel.invokeMethod('sendMessage', message);
+      AppLogger.debug('[WATCH] Message sent successfully');
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to send message to Watch: $e');
+      AppLogger.error('[WATCH] Message details: $message');
+    }
+  }
+
+  /// Test connectivity to watch by sending a ping message
+  Future<void> pingWatch() async {
+    // Ping watch for connectivity test
+    try {
+      await _sendMessageToWatch({
+        'command': 'ping',
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      // Ping sent
+    } catch (e) {
+      AppLogger.error('[WATCH] Error pinging watch: $e');
+    }
+  }
+
+  /// Send a split notification to the watch
+  Future<bool> sendSplitNotification({
+    required double splitDistance,
+    required Duration splitDuration,
+    required double totalDistance,
+    required Duration totalDuration,
+    required bool isMetric,
+  }) async {
+    try {
+      AppLogger.info(
+          '[WATCH] Sending split notification: $splitDistance ${isMetric ? 'km' : 'mi'}, time: ${_formatDuration(splitDuration)}');
+
+      final String formattedSplitDistance = '${splitDistance.toStringAsFixed(1)} ${isMetric ? 'km' : 'mi'}';
+      final String formattedTotalDistance = '${totalDistance.toStringAsFixed(1)} ${isMetric ? 'km' : 'mi'}';
+
+      await _sendMessageToWatch({
+        'command': 'splitNotification',
+        'splitDistance': formattedSplitDistance,
+        'splitTime': _formatDuration(splitDuration),
+        'totalDistance': formattedTotalDistance,
+        'totalTime': _formatDuration(totalDuration),
+        'isMetric': isMetric,
+      });
+
+      // Split notification sent
+      return true;
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to send split notification: $e');
+      return false;
+    }
+  }
+
+  /// Send updated metrics to the watch
+  Future<void> updateMetricsOnWatch({
+    required double distance,
+    required Duration duration,
+    required double pace,
+    required bool isPaused,
+    required int calories,
+    required double elevation,
+    double? elevationLoss, // Optional parameter for elevation loss
+  }) async {
+    try {
+      AppLogger.info('[WATCH] Sending updated metrics to watch');
+      await _sendMessageToWatch({
+        'command': 'updateMetrics',
+        'metrics': {
+          'distance': distance,
+          'duration': duration.inSeconds,
+          'pace': pace,
+          'isPaused': isPaused ? 1 : 0, // Convert bool to int for Swift compatibility
+          'calories': calories,
+          // Include both elevation formats for compatibility
+          'elevation': elevation,
+          'elevationGain': elevation,
+          'elevationLoss': elevationLoss ?? 0.0, // Use provided loss or default to 0
+          if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
+        },
+      });
+      AppLogger.debug('[WATCH] Metrics updated successfully with calories=$calories, elevation gain=$elevation, loss=${elevationLoss ?? 0.0}');
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to send metrics to watch: $e');
+    }
+  }
+
+  /// Send updated session metrics to the watch.
+  /// Primary method uses WatchConnectivity which is the reliable channel.
   Future<bool> updateSessionOnWatch({
     required double distance,
     required Duration duration,
     required double pace,
     required bool isPaused,
+    required double calories,
+    required double elevationGain,
+    required double elevationLoss,
   }) async {
-    // Update local state
-    _currentDistance = distance;
-    _currentDuration = duration;
-    _currentPace = pace;
-    _isPaused = isPaused;
+    // Attempt to update session on watch
     
+    bool success = false;
+    
+    // Send via WatchConnectivity which is the channel that's working reliably
     try {
-      final api = FlutterRuckingApi();
-      await api.updateSessionOnWatch(
-        distance,
-        duration.inSeconds.toDouble(),
-        pace,
-        isPaused,
+      debugPrint('[PAUSE_DEBUG] WatchService: updateSessionOnWatch called. isPaused: $isPaused, distance: $distance, duration: $duration, pace: $pace');
+      _currentDistance = distance;
+      _currentDuration = duration;
+      // Use the enhanced updateMetricsOnWatch that includes both elevation gain and loss
+      await updateMetricsOnWatch(
+        distance: distance,
+        duration: duration,
+        pace: pace,
+        isPaused: isPaused,
+        calories: calories.toInt(), // Convert to int since updateMetricsOnWatch expects int
+        elevation: elevationGain,    // This is for backward compatibility
+        elevationLoss: elevationLoss, // Pass elevation loss directly
       );
-      return true;
+      
+      // Successfully sent metrics via WatchConnectivity
+      success = true;
+      
     } catch (e) {
-      debugPrint('[ERROR] Failed to update session on Watch: $e');
-      return false;
+      AppLogger.error('[WATCH_SERVICE] Failed to send metrics via WatchConnectivity: $e');
+      success = false;
+    }
+    
+    return success;
+  }
+
+  /// Format duration for display
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    if (hours > 0) {
+      return '${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}';
+    } else {
+      return '${twoDigits(minutes)}:${twoDigits(seconds)}';
     }
   }
-  
+
+  /// Format number to two digits
+  String twoDigits(int n) => n.toString().padLeft(2, '0');
+
   /// Pause the session on the watch
   Future<bool> pauseSessionOnWatch() async {
-    _isPaused = true;
-    
-    try {
-      final api = FlutterRuckingApi();
-      await api.pauseSessionOnWatch();
-      return true;
-    } catch (e) {
-      debugPrint('[ERROR] Failed to pause session on Watch: $e');
-      return false;
-    }
-  }
-  
-  /// Resume the session on the watch
-  Future<bool> resumeSessionOnWatch() async {
-    _isPaused = false;
-    
-    try {
-      final api = FlutterRuckingApi();
-      await api.resumeSessionOnWatch();
-      return true;
-    } catch (e) {
-      debugPrint('[ERROR] Failed to resume session on Watch: $e');
-      return false;
-    }
-  }
-  
-  /// End the session on the watch
-  Future<bool> endSessionOnWatch() async {
-    _isSessionActive = false;
-    
-    try {
-      final api = FlutterRuckingApi();
-      await api.endSessionOnWatch();
-      return true;
-    } catch (e) {
-      debugPrint('[ERROR] Failed to end session on Watch: $e');
-      return false;
-    }
-  }
-  
-  /// Handle heart rate updates from the watch
-  void handleWatchHeartRateUpdate(double heartRate) {
-    _currentHeartRate = heartRate;
-    // Notify health service if needed
-    if (_isSessionActive) {
-      _healthService.updateHeartRate(heartRate);
-    }
-  }
-  
-  /// Sync user preferences to the watch
-  Future<bool> syncUserPreferencesToWatch({
-    required String userId,
-    required bool useMetricUnits,
-  }) async {
-    try {
-      // Define the method channel for user preferences
-      const methodChannel = MethodChannel('com.getrucky.gfy/user_preferences');
-      
-      // Call the native method to sync preferences
-      final result = await methodChannel.invokeMethod<bool>(
-        'syncUserPreferences',
-        {
-          'userId': userId,
-          'useMetricUnits': useMetricUnits,
-        },
-      );
-      
-      debugPrint('[INFO] Sync user preferences to watch result: $result');
-      return result ?? false;
-    } catch (e) {
-      debugPrint('[ERROR] Failed to sync user preferences to watch: $e');
-      return false;
-    }
-  }
-  
-  /// Send the backend session ID to the watch so that it can include it
-  /// in subsequent API calls originating from the watch.
-  Future<void> sendSessionIdToWatch(String sessionId) async {
-    await _sendMessageToWatch({
-      'command': 'setSessionId',
-      'sessionId': sessionId,
-    });
-  }
-  
-  /// Low-level helper to deliver a JSON-like map to the watch via the
-  /// session MethodChannel. All higher-level watch messages should flow
-  /// through this utility so that we have a single point for error handling.
-  Future<void> _sendMessageToWatch(Map<String, dynamic> message) async {
-    try {
-      await _watchSessionChannel.invokeMethod('message', message);
-    } on PlatformException catch (e) {
-      debugPrint('[ERROR] Failed to send message to Watch: $e – $message');
-    }
-  }
-  
-  /// Get current state values
-  bool get isSessionActive => _isSessionActive;
-  bool get isPaused => _isPaused;
-  double get currentDistance => _currentDistance;
-  Duration get currentDuration => _currentDuration;
-  double get currentPace => _currentPace;
-  double? get currentHeartRate => _currentHeartRate;
-  double get ruckWeight => _ruckWeight;
-  
-  void dispose() {
-    _sessionEventController.close();
-    _healthDataController.close();
-  }
-}
-
-/// Implementation of the RuckingApi for handling watch messages
-class RuckingApiHandler extends RuckingApi {
-  final WatchService _watchService;
-  
-  RuckingApiHandler(this._watchService);
-  
-  @override
-  Future<bool> startSessionFromWatch(double ruckWeight) async {
-    debugPrint('[INFO] Starting session from watch with weight: $ruckWeight');
-    try {
-      // Create new ruck session via backend API
-      final apiClient = GetIt.instance<ApiClient>();
-      final authService = GetIt.instance<AuthService>();
-      final user = await authService.getCurrentUser();
-      if (user == null) {
-        debugPrint('[ERROR] No authenticated user found. Cannot create session.');
+    // If a session is active, pause it
+    debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionOnWatch called. Current _isSessionActive: $_isSessionActive, _isPaused: $_isPaused');
+    if (_isSessionActive && !_isPaused) {
+      _isPaused = true;
+      AppLogger.info('[WATCH] Sending pause command to watch');
+      try {
+        await _watchSessionChannel.invokeMethod('pauseSession');
+        debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionOnWatch -> invokeMethod(\'pauseSession\') successful.');
+        return true;
+      } catch (e) {
+        AppLogger.error('[WATCH] Error sending pause command to watch: $e');
+        debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionOnWatch -> invokeMethod(\'pauseSession\') FAILED: $e');
+        _isPaused = false; // Revert optimistic update
         return false;
       }
-
-      // Use user's default body weight if available
-      final double? userWeightKg = user.weightKg;
-
-      // Minimal payload for session creation
-      final payload = {
-        'ruck_weight_kg': ruckWeight,
-        'user_weight_kg': userWeightKg,
-        'status': 'in_progress',
-        'user_id': user.userId, // Ensure user ID is included
-        'started_from': 'apple_watch',
-        'start_time': DateTime.now().toUtc().toIso8601String(),
-      };
-      
-      final response = await apiClient.post('/rucks', payload);
-      debugPrint('[INFO] Session created from watch: $response');
-
-      // Update app state
-      _watchService._isSessionActive = true;
-      _watchService._isPaused = false;
-      _watchService._ruckWeight = ruckWeight;
-
-      // Auto-navigate to active session screen if context is available
-      // (Assume navigatorKey is set in your app for global navigation)
-      final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
-      navigatorKey.currentState?.pushNamedAndRemoveUntil(
-        '/activeSession',
-        (route) => false,
-        arguments: response, // Pass the session data if needed
-      );
-
-      return true;
-    } catch (e) {
-      debugPrint('[ERROR] Failed to create session from watch: $e');
-      return false;
+    } else {
+      debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionOnWatch -> NO-OP. Session not active or already paused. _isSessionActive: $_isSessionActive, _isPaused: $_isPaused');
+      // Return true if already paused, false if not active, to indicate desired state might be met or not applicable
+      return _isPaused; 
     }
   }
-  
-  @override
-  Future<bool> pauseSessionFromWatch() async {
-    // Implement pausing an active session
-    debugPrint('[INFO] Pausing session from watch');
-    
-    // You'll need to implement this logic to interact with your existing app
-    return true;
-  }
-  
-  @override
-  Future<bool> resumeSessionFromWatch() async {
-    // Implement resuming a paused session
-    debugPrint('[INFO] Resuming session from watch');
-    
-    // You'll need to implement this logic to interact with your existing app
-    return true;
-  }
-  
-  @override
-  Future<bool> endSessionFromWatch(int duration, double distance, double calories) async {
-    // Implement ending a session
-    debugPrint('[INFO] Ending session from watch. Duration: $duration, Distance: $distance, Calories: $calories');
-    
-    // You'll need to implement this logic to interact with your existing app
-    return true;
-  }
-  
-  @override
-  Future<bool> updateHeartRateFromWatch(double heartRate) async {
-    // Handle heart rate updates from watch
-    _watchService.handleWatchHeartRateUpdate(heartRate);
-    return true;
+
+  /// Resume the session on the watch
+  Future<bool> resumeSessionOnWatch() async {
+    // If a session is active and paused, resume it
+    debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionOnWatch called. Current _isSessionActive: $_isSessionActive, _isPaused: $_isPaused');
+    if (_isSessionActive && _isPaused) {
+      _isPaused = false;
+      AppLogger.info('[WATCH] Sending resume command to watch');
+      try {
+        await _watchSessionChannel.invokeMethod('resumeSession');
+        debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionOnWatch -> invokeMethod(\'resumeSession\') successful.');
+        return true;
+      } catch (e) {
+        AppLogger.error('[WATCH] Error sending resume command to watch: $e');
+        debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionOnWatch -> invokeMethod(\'resumeSession\') FAILED: $e');
+        _isPaused = true; // Revert optimistic update
+        return false;
+      }
+    } else {
+      debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionOnWatch -> NO-OP. Session not active or already running. _isSessionActive: $_isSessionActive, _isPaused: $_isPaused');
+      // Return true if already resumed (not paused), false if not active
+      return !_isPaused && _isSessionActive;
+    }
   }
 
-  @override
-  Future<bool> startSessionOnWatch(double ruckWeight) async {
-    // This method is for Flutter->Watch communication
-    // It's implemented in RuckingApi but we don't need logic here
-    // since our WatchService handles this using FlutterRuckingApi directly
-    debugPrint('[INFO] startSessionOnWatch called on Flutter side, ignoring.');
-    return true;
+  /// End the session on the watch
+  Future<bool> endSessionOnWatch() async {
+    // Update local state
+    _isSessionActive = false;
+    // End session on watch
+    
+    // First save heart rate samples (outside the try-catch for the API call)
+    try {
+      await HeartRateSampleStorage.saveSamples(_currentSessionHeartRateSamples);
+    } catch (e) {
+      // Sending heart rate samples to API
+      // Continue anyway, try to end the session on watch
+    }
+    
+    bool success = false;
+    try {
+      // Create the API instance
+      final api = FlutterRuckingApi();
+      
+      // Make the API call separately
+      await api.endSessionOnWatch();
+      
+      // Set success flag if no exceptions
+      success = true;
+      // Session ended on watch
+    } catch (e) {
+      // Log the error
+      AppLogger.error('[WATCH_SERVICE] Failed to end session on watch: $e');
+      success = false;
+    }
+    
+    // Return the success flag explicitly
+    return success;
   }
 
-  @override
-  Future<bool> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused) async {
-    // This method is for Flutter->Watch communication
-    // It's implemented in RuckingApi but we don't need logic here
-    // since our WatchService handles this using FlutterRuckingApi directly
-    debugPrint('[INFO] updateSessionOnWatch called on Flutter side, ignoring.');
-    return true;
+  /// Handle heart rate updates from the watch
+  void handleWatchHeartRateUpdate(double heartRate) {
+    // Update our local heart rate value
+    _currentHeartRate = heartRate;
+    // Add to heart rate stream for UI components
+    _heartRateController.add(heartRate);
+    
+    // Add to session heart rate samples
+    if (_isSessionActive) {
+      final sample = HeartRateSample(
+        bpm: heartRate.toInt(),
+        timestamp: DateTime.now().toUtc(),
+      );
+      _currentSessionHeartRateSamples.add(sample);
+      
+      // Store heart rate samples for processing
+      try {
+        // Just add to our local list for now - we'll save the entire list later
+        // HeartRateSampleStorage has static methods only, not instance methods
+        // We'll call HeartRateSampleStorage.saveSamples() when the session ends
+      } catch (e) {
+        // Only log errors for heart rate storage
+        AppLogger.error('[WATCH_SERVICE] Failed to store heart rate sample: $e');
+      }
+    }
+  }
+
+  /// Stream to listen for heart rate updates from the Watch
+  Stream<double> get onHeartRateUpdate => _heartRateController.stream;
+
+  /// Get current heart rate
+  double? getCurrentHeartRate() => _currentHeartRate;
+
+  /// Get current session heart rate samples
+  List<HeartRateSample> getCurrentSessionHeartRateSamples() => _currentSessionHeartRateSamples;
+
+  // Callbacks for RuckingApiHandler
+  void sessionStartedFromWatchCallback(double ruckWeight, dynamic response) {
+    _isSessionActive = true;
+    _isPaused = false;
+    _ruckWeight = ruckWeight;
+    // Session started via watch
+  }
+
+  /// Callback when session is paused from the watch
+  /// This will update the internal state and dispatch the appropriate events to the ActiveSessionBloc
+  Future<void> pauseSessionFromWatchCallback() async {
+    debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionFromWatchCallback triggered.');
+    // Regardless of current _isPaused value, forward the pause request – let the
+    // ActiveSessionBloc decide if it is a duplicate. This prevents dropped
+    // commands when our local flag drifts out-of-sync with the Bloc.
+    if (!_isSessionActive) {
+      debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionFromWatchCallback -> NO-OP. Session not active.');
+      return;
+    }
+
+    // Dispatch pause event to ActiveSessionBloc if available
+    if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
+      debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionFromWatchCallback -> Dispatching SessionPaused(source: SessionActionSource.watch) to ActiveSessionBloc.');
+      GetIt.I<ActiveSessionBloc>().add(const SessionPaused(source: SessionActionSource.watch));
+    } else {
+      debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionFromWatchCallback -> ActiveSessionBloc not registered in GetIt.');
+      AppLogger.warning('[WATCH_SERVICE] ActiveSessionBloc not ready in GetIt for pauseSessionFromWatchCallback');
+    }
+
+    // Update local flag after dispatching
+    _isPaused = true;
+  }
+
+  /// Callback when session is resumed from the watch
+  /// This will update the internal state and dispatch the appropriate events to the ActiveSessionBloc
+  Future<void> resumeSessionFromWatchCallback() async {
+    debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionFromWatchCallback triggered.');
+    if (!_isSessionActive) {
+      debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionFromWatchCallback -> NO-OP. Session not active.');
+      return;
+    }
+
+    // Dispatch resume event regardless of local _isPaused – Bloc will ignore if necessary
+    if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
+      debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionFromWatchCallback -> Dispatching SessionResumed(source: SessionActionSource.watch) to ActiveSessionBloc.');
+      GetIt.I<ActiveSessionBloc>().add(const SessionResumed(source: SessionActionSource.watch));
+    } else {
+      debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionFromWatchCallback -> ActiveSessionBloc not registered in GetIt.');
+      AppLogger.warning('[WATCH_SERVICE] ActiveSessionBloc not ready in GetIt for resumeSessionFromWatchCallback');
+    }
+
+    _isPaused = false;
+  }
+
+  void endSessionFromWatchCallback(int duration, double distance, double calories) {
+    _isSessionActive = false;
+    _isPaused = false;
+    AppLogger.info(
+        '[WATCH_SERVICE] Session ended via RuckingApiHandler callback. Duration: $duration, Distance: $distance, Calories: $calories');
+  }
+
+  void dispose() {
+    _heartRateWatchdogTimer?.cancel();
+    _nativeHeartRateSubscription?.cancel();
+    _sessionEventController.close();
+    _healthDataController.close();
+    _heartRateController.close();
+  }
+
+  // ------------------------------------------------------------
+  // Native heart-rate stream resilience helpers
+  // ------------------------------------------------------------
+
+  /// Start a watchdog timer to ensure heart rate updates are being received
+  void _startHeartRateWatchdog() {
+    _heartRateWatchdogTimer?.cancel();
+    _heartRateWatchdogTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      final lastUpdateTime = _lastHeartRateUpdateTime;
+      if (lastUpdateTime != null) {
+        final timeSinceLastUpdate = DateTime.now().difference(lastUpdateTime);
+        if (timeSinceLastUpdate > const Duration(seconds: 60) && !_isReconnectingHeartRate) {
+          AppLogger.warning('[WATCH_SERVICE] No heart rate updates received for ${timeSinceLastUpdate.inSeconds} seconds - restarting listener');
+          _restartNativeHeartRateListener();
+        }
+      }
+    });
+  }
+
+  void _setupNativeHeartRateListener() {
+    // Cancel any existing subscription first
+    _nativeHeartRateSubscription?.cancel();
+    _nativeHeartRateSubscription = null;
+    
+    // Setup heart rate listener
+    
+    try {
+      _nativeHeartRateSubscription = _heartRateEventChannel.receiveBroadcastStream().listen(
+        (dynamic heartRate) {
+          if (heartRate is double) {
+            _heartRateReconnectAttempts = 0; // Reset reconnect counter on successful update
+            _lastHeartRateUpdateTime = DateTime.now();
+            _isReconnectingHeartRate = false;
+            // Silently handle heart rate update
+            handleWatchHeartRateUpdate(heartRate);
+          }
+        },
+        onError: _onNativeHeartRateError,
+        onDone: _onNativeHeartRateDone,
+        cancelOnError: false, // Don't cancel on error, let our error handler decide
+      );
+      
+      // Notify native code that Flutter is ready to receive heart rate updates
+      try {
+        _watchSessionChannel.invokeMethod('flutterHeartRateListenerReady')
+          .then((_) {})
+          .catchError((error) {
+            AppLogger.error('[WATCH_SERVICE] Error notifying native code about heart rate listener: $error');
+          });
+      } catch (e) {
+        AppLogger.error('[WATCH_SERVICE] Failed to notify native about heart rate listener: $e');
+      }
+    } catch (e) {
+      AppLogger.error('[WATCH_SERVICE] Failed to set up heart rate listener: $e');
+      _scheduleHeartRateReconnect();
+    }
+  }
+
+  void _onNativeHeartRateError(dynamic error) {
+    AppLogger.error('[WATCH_SERVICE] Heart rate channel error: $error – scheduling restart');
+    _scheduleHeartRateReconnect();
+  }
+
+  void _onNativeHeartRateDone() {
+    AppLogger.warning('[WATCH_SERVICE] Heart rate channel closed – scheduling restart');
+    _scheduleHeartRateReconnect();
+  }
+
+  void _scheduleHeartRateReconnect() {
+    if (_isReconnectingHeartRate) {
+      // Already reconnecting heart rate channel
+      return;
+    }
+    
+    _isReconnectingHeartRate = true;
+    _heartRateReconnectAttempts++;
+    
+    // Exponential backoff for reconnection attempts
+    final delaySeconds = math.min(30, math.pow(2, math.min(5, _heartRateReconnectAttempts)).toInt());
+    // Schedule heart rate reconnect
+    
+    // Small delay to avoid tight reconnection loops
+    Future.delayed(Duration(seconds: delaySeconds), () {
+      _restartNativeHeartRateListener();
+    });
+  }
+
+  void _restartNativeHeartRateListener() {
+    // Restart heart rate listener
+    _nativeHeartRateSubscription?.cancel();
+    _setupNativeHeartRateListener();
+  }
+  
+  /// Public method to force restart the heart rate monitoring from outside this class
+  void restartHeartRateMonitoring() {
+    // Manual restart of heart rate monitoring
+    _heartRateReconnectAttempts = 0;
+    _isReconnectingHeartRate = false;
+    _restartNativeHeartRateListener();
   }
 }

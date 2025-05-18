@@ -9,6 +9,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/utils/error_mapper.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 /// Login screen for user authentication
 class LoginScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
@@ -30,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
     super.dispose();
   }
@@ -56,12 +59,10 @@ class _LoginScreenState extends State<LoginScreen> {
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         } else if (state is AuthError) {
-          // Show error message if login fails
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(mapFriendlyErrorMessage(state.message)),
-              backgroundColor: AppColors.error,
-            ),
+          // Show error message if login fails using the styled snackbar
+          StyledSnackBar.showError(
+            context: context,
+            message: mapFriendlyErrorMessage(state.message),
           );
         }
       },
@@ -120,6 +121,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     keyboardType: TextInputType.emailAddress,
                     prefixIcon: Icons.email_outlined,
                     textInputAction: TextInputAction.next,
+                    focusNode: _emailFocusNode,
+                    onTap: () {
+                      FocusScope.of(context).requestFocus(_emailFocusNode);
+                    },
                     onFieldSubmitted: (_) {
                       FocusScope.of(context).requestFocus(_passwordFocusNode);
                     },

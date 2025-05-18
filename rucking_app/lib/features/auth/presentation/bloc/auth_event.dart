@@ -34,6 +34,7 @@ class AuthRegisterRequested extends AuthEvent {
   final double? heightCm;
   final String? dateOfBirth;
   final bool preferMetric;
+  final String? gender;
 
   const AuthRegisterRequested({
     required this.username,
@@ -43,10 +44,11 @@ class AuthRegisterRequested extends AuthEvent {
     this.heightCm,
     this.dateOfBirth,
     required this.preferMetric,
+    this.gender,
   });
 
   @override
-  List<Object?> get props => [username, email, password, weightKg, heightCm, dateOfBirth, preferMetric];
+  List<Object?> get props => [username, email, password, weightKg, heightCm, dateOfBirth, preferMetric, gender];
 }
 
 /// Event to request user logout
@@ -58,16 +60,20 @@ class AuthUpdateProfileRequested extends AuthEvent {
   final double? weightKg;
   final double? heightCm;
   final bool? preferMetric;
+  final bool? allowRuckSharing;
+  final String? gender;
 
   const AuthUpdateProfileRequested({
     this.username,
     this.weightKg,
     this.heightCm,
     this.preferMetric,
+    this.allowRuckSharing,
+    this.gender,
   });
 
   @override
-  List<Object?> get props => [username, weightKg, heightCm, preferMetric];
+  List<Object?> get props => [username, weightKg, heightCm, preferMetric, allowRuckSharing, gender];
 }
 
 /// Event triggered when the user requests to delete their account

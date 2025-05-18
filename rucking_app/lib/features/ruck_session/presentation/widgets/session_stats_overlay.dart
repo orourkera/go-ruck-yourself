@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
-import 'dart:ui' as ui;
 
 /// Overlay widget that shows current distance, pace, elapsed time, heart rate and calories.
 class SessionStatsOverlay extends StatelessWidget {
@@ -42,30 +43,21 @@ class SessionStatsOverlay extends StatelessWidget {
               label: 'PACE',
               value: state.pace != null ? MeasurementUtils.formatPaceSeconds(state.pace!, metric: preferMetric) : '--',
             ),
-            _StatTile(label: 'TIME', value: _formatMinutesSeconds(Duration(seconds: state.elapsedSeconds))),
-            if ((state.latestHeartRate ?? 0) > 0)
-              _StatTile(
-                label: 'HR HealthKit',
-                value: '${state.latestHeartRate} bpm',
-                color: _hrColor(state.latestHeartRate ?? 0),
-                isHealthKit: true,
-              ),
+            _ElapsedTimeDisplay(isCardLayout: false),
+            _HeartRateTile(preferMetric: preferMetric, isCardLayout: false),
             _StatTile(
               label: 'CAL',
               value: state.calories.toStringAsFixed(0),
-              color: _calColor(state.calories.toDouble()),
+              color: _calColor(context, state.calories.toDouble()),
             ),
             _StatTile(
               label: 'ELEV',
-              value: '${state.elevationGain.toStringAsFixed(0)}/${state.elevationLoss.toStringAsFixed(0)} m',
+              value: '+${state.elevationGain.toStringAsFixed(0)}/-${state.elevationLoss.toStringAsFixed(0)} m',
             ),
-            // Removed duplicate 'remaining' display from row layout
-
           ],
         ),
       );
     }
-    // Card layout: 2x2 grid
     final List<_StatTile> statTiles = [
       _StatTile(
         label: 'Distance',
@@ -80,12 +72,12 @@ class SessionStatsOverlay extends StatelessWidget {
       _StatTile(
         label: 'Calories',
         value: '${state.calories.toStringAsFixed(0)} KCAL',
-        color: _calColor(state.calories.toDouble()),
+        color: _calColor(context, state.calories.toDouble()),
         icon: Icons.local_fire_department,
       ),
       _StatTile(
         label: 'Elevation',
-        value: '+${state.elevationGain.toStringAsFixed(0)}/${state.elevationLoss.toStringAsFixed(0)}',
+        value: '+${state.elevationGain.toStringAsFixed(0)}/-${state.elevationLoss.toStringAsFixed(0)}',
         icon: Icons.terrain,
       ),
     ];
@@ -93,122 +85,64 @@ class SessionStatsOverlay extends StatelessWidget {
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        const SizedBox(height: 8.0), // Reduce vertical space at top
+        const SizedBox(height: 8.0),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center, // Added for vertical alignment
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Time (big)
             Expanded(
-                flex: 2,
-                child: Row(
-                  children: [
-                    // Left half: Timer (centered)
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Removed SizedBox to align with heart rate display
-                          Text(
-                            _formatHoursMinutesSeconds(Duration(seconds: state.elapsedSeconds)),
-                            style: AppTextStyles.timerDisplay.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                              fontSize: 36, // Changed to 36 to match HR value
-                            ),
-                          ),
-                          if (state.plannedDuration != null && state.plannedDuration! > state.elapsedSeconds)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2.0), // Reduce padding
-                              child: Center(
-                                child: Text(
-                                  '${_formatMinutesSeconds(Duration(seconds: state.plannedDuration! - state.elapsedSeconds))} remaining',
-                                  style: AppTextStyles.bodyMedium.copyWith(color: Colors.black54, fontSize: 15),
-                                  textAlign: TextAlign.center,
-                                ),
+              flex: 2,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _ElapsedTimeDisplay(isCardLayout: true, textStyle: AppTextStyles.timerDisplay.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          fontSize: 36,
+                        )),
+                        if (state.plannedDuration != null && state.plannedDuration! > state.elapsedSeconds)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: Center(
+                              child: Text(
+                                '${_formatMinutesSeconds(Duration(seconds: state.plannedDuration! - state.elapsedSeconds))} remaining',
+                                style: AppTextStyles.bodyMedium.copyWith(color: Colors.black54, fontSize: 15),
+                                textAlign: TextAlign.center,
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    // Right half: Heart rate (centered)
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // Heart rate with HealthKit badge
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Stack(
-                                    children: [
-                                      Icon(
-                                        Icons.favorite,
-                                        color: Colors.red,
-                                        size: 36,
-                                      ),
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(color: Colors.grey.shade300),
-                                          ),
-                                          child: const Icon(
-                                            Icons.medical_services,
-                                            color: Colors.green,
-                                            size: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    (state.latestHeartRate ?? 0) > 0 ? '${state.latestHeartRate}' : '--',
-                                    style: AppTextStyles.timerDisplay.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 36,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // HealthKit label
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.green.withOpacity(0.3)),
-                                ),
-                                child: const Text(
-                                  'HealthKit',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ),
-                        ],
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.favorite,
+                              color: Colors.red,
+                              size: 36,
+                            ),
+                            const SizedBox(width: 8),
+                            _HeartRateTile(preferMetric: preferMetric, isCardLayout: true),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
           ],
         ),
-        const SizedBox(height: 0.0), 
+        const SizedBox(height: 0.0),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
@@ -216,14 +150,14 @@ class SessionStatsOverlay extends StatelessWidget {
           childAspectRatio: 1.2,
           mainAxisSpacing: 4,
           crossAxisSpacing: 8,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 5), // Reduce bottom padding
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 5),
           children: statTiles
               .map((tile) => Card(
                     elevation: 1,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     color: Colors.white,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2), // Reduce vertical padding
+                      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
                       child: tile,
                     ),
                   ))
@@ -239,12 +173,21 @@ class SessionStatsOverlay extends StatelessWidget {
     return AppColors.error;
   }
 
-  Color _calColor(double cal) {
+  Color _calColor(BuildContext context, double cal) {
+    bool isLadyMode = false;
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        isLadyMode = true;
+      }
+    } catch (e) {
+      // If can't access AuthBloc, continue with default colors
+    }
+    
     if (cal < 100) return AppColors.warning; // Yellow when calories are low
-    return AppColors.primary; // Use primary color for better contrast instead of white
+    return isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
   }
 
-  // Placeholder widget to show when no session data is yet available
   static Widget placeholder() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -263,7 +206,6 @@ class SessionStatsOverlay extends StatelessWidget {
   }
 }
 
-// Simple placeholder tile used by the placeholder overlay
 class _PlaceholderTile extends StatelessWidget {
   const _PlaceholderTile({required this.label});
 
@@ -329,7 +271,7 @@ class _StatTile extends StatelessWidget {
           const SizedBox(height: 2),
         ],
         // Add a small medical icon for HealthKit if no primary icon
-        if (icon == null && isHealthKit)
+        if (icon == null && isHealthKit) ...[
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -349,12 +291,113 @@ class _StatTile extends StatelessWidget {
                 ),
               ),
             ],
-          )
-        else
+          ),
+        ] else ...[
           Text(label.toUpperCase(), style: AppTextStyles.labelSmall.copyWith(fontSize: 11, color: AppColors.primary)),
+        ],
         const SizedBox(height: 2),
-        Text(value, style: AppTextStyles.titleLarge.copyWith(fontSize: 22, color: color)), 
+        Text(value, style: AppTextStyles.titleLarge.copyWith(fontSize: 22, color: color)),
       ],
+    );
+  }
+}
+
+class _HeartRateTile extends StatelessWidget {
+  final bool preferMetric;
+  final bool isCardLayout;
+
+  const _HeartRateTile({Key? key, required this.preferMetric, this.isCardLayout = false}) : super(key: key);
+
+  Color _determineHrColor(int bpm) {
+    if (bpm < 100) return AppColors.success;
+    if (bpm < 140) return AppColors.warning;
+    return AppColors.error;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<ActiveSessionBloc, ActiveSessionState, int?>(
+      selector: (state) {
+        if (state is ActiveSessionRunning) {
+          return state.latestHeartRate;
+        }
+        return null;
+      },
+      builder: (context, latestHeartRate) {
+        final int currentBpm = latestHeartRate ?? 0;
+        if (!isCardLayout) {
+          if (currentBpm > 0) {
+            return _StatTile(
+              label: 'HR',
+              value: '$currentBpm bpm',
+              color: _determineHrColor(currentBpm),
+            );
+          }
+          return const SizedBox.shrink();
+        }
+        return Text(
+          currentBpm > 0 ? '$currentBpm' : '--',
+          style: AppTextStyles.timerDisplay.copyWith(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 36,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ElapsedTimeDisplay extends StatelessWidget {
+  final bool isCardLayout;
+  final TextStyle? textStyle;
+
+  const _ElapsedTimeDisplay({Key? key, required this.isCardLayout, this.textStyle}) : super(key: key);
+
+  String _formatDuration(Duration duration, bool forCard) {
+    if (forCard) {
+      String twoDigits(int n) => n.toString().padLeft(2, '0');
+      String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+      String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+      if (duration.inHours > 0) {
+        return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
+      }
+      return "$twoDigitMinutes:$twoDigitSeconds";
+    } else {
+      String twoDigits(int n) => n.toString().padLeft(2, "0");
+      String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+      String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+      if (duration.inHours > 0) {
+        return "${duration.inHours}:$twoDigitMinutes:$twoDigitSeconds";
+      } else {
+        return "${duration.inMinutes}:$twoDigitSeconds";
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<ActiveSessionBloc, ActiveSessionState, int>(
+      selector: (state) {
+        if (state is ActiveSessionRunning) {
+          return state.elapsedSeconds;
+        }
+        return 0;
+      },
+      builder: (context, elapsedSeconds) {
+        final formattedTime = _formatDuration(Duration(seconds: elapsedSeconds), isCardLayout);
+        if (!isCardLayout) {
+          return _StatTile(label: 'TIME', value: formattedTime);
+        }
+        return Text(
+          formattedTime,
+          style: textStyle ?? AppTextStyles.timerDisplay.copyWith(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 36,
+          ),
+        );
+      },
     );
   }
 }

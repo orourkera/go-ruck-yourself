@@ -1,24 +1,32 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/core/models/location_point.dart';
 
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
 
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:provider/provider.dart';
 
 /// Arguments passed to the ActiveSessionPage
@@ -57,21 +65,47 @@ class ActiveSessionPage extends StatelessWidget {
       existingBloc = null;
     }
 
+    // Get GetIt instance first so it's available regardless of which path we take
+    final locator = GetIt.I;
+    
     if (existingBloc != null) {
       // Bloc already exists – simply build the view.
-      return _ActiveSessionView(args: args);
+      // Also provide HealthBloc for the session complete screen
+      return BlocProvider<HealthBloc>(
+        create: (_) => HealthBloc(
+          healthService: locator<HealthService>(),
+          userId: context.read<AuthBloc>().state is Authenticated
+            ? (context.read<AuthBloc>().state as Authenticated).user.userId
+            : null,
+        ),
+        child: _ActiveSessionView(args: args),
+      );
     }
 
     // No existing bloc – create a fresh one (e.g. when user lands here
     // directly without going through the countdown page).
-    final locator = GetIt.I;
-    return BlocProvider(
-      create: (_) => ActiveSessionBloc(
-        apiClient: locator<ApiClient>(),
-        locationService: locator<LocationService>(),
-        healthService: locator<HealthService>(),
-        watchService: locator<WatchService>(),
-      ),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => ActiveSessionBloc(
+            apiClient: locator<ApiClient>(),
+            locationService: locator<LocationService>(),
+            healthService: locator<HealthService>(),
+            watchService: locator<WatchService>(),
+            heartRateService: locator<HeartRateService>(),
+            splitTrackingService: locator<SplitTrackingService>(),
+            sessionRepository: locator<SessionRepository>(),
+          ),
+        ),
+        BlocProvider(
+          create: (_) => HealthBloc(
+            healthService: locator<HealthService>(),
+            userId: context.read<AuthBloc>().state is Authenticated
+              ? (context.read<AuthBloc>().state as Authenticated).user.userId
+              : null,
+          ),
+        ),
+      ],
       child: _ActiveSessionView(args: args),
     );
   }
@@ -93,6 +127,19 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   void _checkAnimateOverlay() {
     // No animation needed anymore since we removed the gray overlay
     // This method is kept for compatibility but doesn't do anything
+  }
+  
+  // Helper method to get the appropriate color based on user gender
+  Color _getLadyModeColor(BuildContext context) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        return AppColors.ladyPrimary;
+      }
+    } catch (e) {
+      // If we can't access the AuthBloc, fall back to default color
+    }
+    return AppColors.primary;
   }
 
   @override
@@ -177,7 +224,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                   return Container(
                     width: double.infinity,
                     padding: EdgeInsets.only(top: topPadding, bottom: 18.0),
-                    color: AppColors.primary,
+                    color: _getLadyModeColor(context),
                     child: Center(
                       child: Text(
                         'ACTIVE SESSION',
@@ -196,14 +243,35 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                 child: SafeArea(
                   top: false,
                   child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
+                    buildWhen: (previous, current) {
+                      // Always rebuild if the type of state changes (e.g., Loading -> Running)
+                      if (previous.runtimeType != current.runtimeType) {
+                        return true;
+                      }
+                      // If both are ActiveSessionRunning, check for specific significant changes
+                      if (previous is ActiveSessionRunning && current is ActiveSessionRunning) {
+                        return previous.isPaused != current.isPaused ||
+                            !listEquals(previous.locationPoints, current.locationPoints) || // More robust list comparison
+                            previous.distanceKm != current.distanceKm ||
+                            previous.pace != current.pace ||
+                            previous.calories != current.calories ||
+                            previous.elevationGain != current.elevationGain ||
+                            previous.elevationLoss != current.elevationLoss ||
+                            previous.sessionId != current.sessionId; // Important for initial load
+                      }
+                      // For other state types or transitions, allow rebuild
+                      return true;
+                    },
                     listenWhen: (prev, curr) => 
                       (prev is ActiveSessionFailure != curr is ActiveSessionFailure) || 
                       (curr is ActiveSessionComplete) ||
                       (curr is ActiveSessionRunning && !sessionRunning),
-                    listener: (ctx, state) {
+                    listener: (context, state) {
                       if (state is ActiveSessionFailure) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(content: Text(state.errorMessage)),
+                        StyledSnackBar.showError(
+                          context: context,
+                          message: state.errorMessage,
+                          duration: const Duration(seconds: 3),
                         );
                       } else if (state is ActiveSessionComplete) {
                         final endTime = state.session.endTime ?? DateTime.now();
@@ -242,7 +310,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           debugPrint('[SessionCompleteScreen] ruckWeightKg was null, using 0.0');
                         }
 
-                        Navigator.of(ctx).pushReplacementNamed(
+                        Navigator.of(context).pushReplacementNamed(
                           '/session_complete',
                           arguments: {
                             'completedAt': endTime,
@@ -263,10 +331,69 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         });
                         // Session just started running - DON'T animate overlay away yet
                         // The countdown completion will trigger this later
-                      }  
+                      } else if (state is ActiveSessionRunning 
+                                && uiInitialized 
+                                && context.read<ActiveSessionBloc>().state is ActiveSessionInitial) {
+                        // This case is to handle if the session somehow reverts to Initial AFTER UI is initialized
+                        // and a session was running. This might indicate a need to restart the session logic.
+                        // This specific log and condition might need review based on actual app flow.
+                        AppLogger.warning('Session was running, UI initialized, but BLoC reset to Initial. Re-triggering SessionStarted.');
+                        context.read<ActiveSessionBloc>().add(SessionStarted(
+                                ruckWeightKg: widget.args.ruckWeight,
+                                notes: widget.args.notes,
+                                plannedDuration: widget.args.plannedDuration,
+                                initialLocation: widget.args.initialCenter == null 
+                                    ? null 
+                                    : LocationPoint(
+                                        latitude: widget.args.initialCenter!.latitude,
+                                        longitude: widget.args.initialCenter!.longitude,
+                                        timestamp: DateTime.now().toUtc(),
+                                        elevation: 0.0, // Added default
+                                        accuracy: 0.0, // Added default
+                                      )
+                            ));
+                      }
                     },
-                    buildWhen: (prev, curr) => prev != curr,
-                    builder: (ctx, state) {
+                    builder: (context, state) {
+                      AppLogger.debug('[ActiveSessionPage] BlocConsumer builder rebuilding with state: ${state.runtimeType}');
+                      // Add a check for uiInitialized before starting the session
+                      // This ensures that the session doesn't start before the UI is ready.
+                      if (!uiInitialized && state is ActiveSessionInitial) {
+                        // Delay starting the session until after the first frame
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) { // Ensure widget is still mounted
+                             AppLogger.info('UI Initialized, starting session with args: ${widget.args.ruckWeight}kg, ${widget.args.plannedDuration}s');
+                             context.read<ActiveSessionBloc>().add(SessionStarted(
+                                  ruckWeightKg: widget.args.ruckWeight,
+                                  notes: widget.args.notes,
+                                  plannedDuration: widget.args.plannedDuration,
+                                  initialLocation: widget.args.initialCenter == null 
+                                    ? null 
+                                    : LocationPoint(
+                                        latitude: widget.args.initialCenter!.latitude,
+                                        longitude: widget.args.initialCenter!.longitude,
+                                        timestamp: DateTime.now().toUtc(),
+                                        elevation: 0.0, // Added default
+                                        accuracy: 0.0, // Added default
+                                      )
+                              ));
+                             setState(() {
+                               uiInitialized = true; // Mark UI as initialized
+                             });
+                          }
+                        });
+                      } else if (state is ActiveSessionRunning && !sessionRunning) {
+                        // This case might be redundant if listenWhen handles it, but ensures sessionRunning is set.
+                        // Consider if sessionRunning flag logic can be simplified.
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if(mounted) {
+                             setState(() {
+                              sessionRunning = true;
+                            });
+                          }
+                        });
+                      }
+
                       if (state is ActiveSessionInitial || state is ActiveSessionLoading) {
                         return _buildSessionContent(state);
                       }
@@ -385,9 +512,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       onTogglePause: () {
                                         if (state is! ActiveSessionRunning) return; // Ignore if not running
                                         if (isPaused) {
-                                          context.read<ActiveSessionBloc>().add(const SessionResumed());
+                                          context.read<ActiveSessionBloc>().add(const SessionResumed(source: SessionActionSource.ui));
                                         } else {
-                                          context.read<ActiveSessionBloc>().add(const SessionPaused());
+                                          context.read<ActiveSessionBloc>().add(const SessionPaused(source: SessionActionSource.ui));
                                         }
                                       },
                                       onEndSession: () {
@@ -709,6 +836,61 @@ class _RouteMapState extends State<_RouteMap> {
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a));
     return earthRadius * c;
   }
+  
+  double _toRadians(double degrees) => degrees * math.pi / 180.0;
+  
+  /// Build a gender-specific map marker based on the user's gender
+  Widget _buildGenderSpecificMarker(BuildContext context) {
+    // Get user gender from AuthBloc using context
+    String? userGender;
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        userGender = authState.user.gender;
+        debugPrint('Map marker detected gender: $userGender');
+      }
+    } catch (e) {
+      // If auth bloc is not available, continue with default marker
+      debugPrint('Could not get user gender for map marker: $e');
+    }
+    
+    // Determine which marker image to use based on gender
+    final String markerImagePath = (userGender == 'female')
+        ? 'assets/images/lady_rucker.png' // Female version
+        : 'assets/images/map_marker.png'; // Default/male version
+    
+    debugPrint('Using map marker image path: $markerImagePath');
+    
+    // Try to load the image asset with error handling
+    try {
+      return Image.asset(
+        markerImagePath,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('Error loading marker image: $error');
+          return Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.blue, // Use blue for lady mode as a fallback
+            ),
+            child: const Icon(Icons.person_pin, color: Colors.white),
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('Exception loading marker image: $e');
+      return Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.green, // Use green for default mode as a fallback
+        ),
+        child: const Icon(Icons.person_pin, color: Colors.white),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -781,7 +963,7 @@ class _RouteMapState extends State<_RouteMap> {
                         point: widget.route.isNotEmpty ? widget.route.last : widget.initialCenter!,
                         width: 40,
                         height: 40,
-                        child: Image.asset('assets/images/map marker.png'),
+                        child: _buildGenderSpecificMarker(context),
                       ),
                     ],
                   ),
@@ -813,7 +995,9 @@ class _WeightChip extends StatelessWidget {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : true;
-    final String weightDisplay = preferMetric ? '${weightKg.toStringAsFixed(1)} kg' : '${(weightKg * 2.20462).toStringAsFixed(1)} lb';
+    final String weightDisplay = weightKg == 0
+        ? 'HIKE'
+        : (preferMetric ? '${weightKg.toStringAsFixed(1)} kg' : '${(weightKg * 2.20462).toStringAsFixed(1)} lb');
     return Chip(
       backgroundColor: AppColors.secondary,
       label: Text(

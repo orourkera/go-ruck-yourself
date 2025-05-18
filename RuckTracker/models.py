@@ -13,11 +13,25 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256))
     weight_kg = db.Column(db.Float, nullable=True)  # User's weight in kg
     prefer_metric = db.Column(db.Boolean, nullable=False, default=True) # User's preference for metric units
+    gender = db.Column(db.String(10), nullable=True)  # User's gender (male/female)
+    height_cm = db.Column(db.Float, nullable=True)  # User's height in cm
+    allow_ruck_sharing = db.Column(db.Boolean, nullable=False, default=True)  # User's preference for sharing ruck data
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationship with RuckSession
     sessions = db.relationship('RuckSession', backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    
+    # Non-persistent token attribute for JWT storage
+    _token = None
+    
+    @property
+    def token(self):
+        return self._token
+        
+    @token.setter
+    def token(self, value):
+        self._token = value
     
     def to_dict(self):
         """Convert user data to dictionary for API responses"""
@@ -26,6 +40,9 @@ class User(UserMixin, db.Model):
             'username': self.username,
             'email': self.email,
             'weight_kg': self.weight_kg,
+            'height_cm': self.height_cm,
+            'gender': self.gender,
+            'allow_ruck_sharing': self.allow_ruck_sharing,
             'prefer_metric': self.prefer_metric, # Added prefer_metric
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None

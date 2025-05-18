@@ -1,6 +1,8 @@
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 
 /// MeasurementUtils centralizes all unit conversions and number
 /// formatting rules so that every widget in the app shows data with
@@ -89,18 +91,101 @@ class MeasurementUtils {
     return '+${gain.round()}${metric ? 'm' : 'ft'}/-${loss.round()}${metric ? 'm' : 'ft'}';
   }
 
-  /// Weight formatted to the nearest whole number + unit label.
+  /// Weight formatted with one decimal place + unit label.
   static String formatWeight(double kg, {required bool metric}) {
     if (metric) {
       return '${kg.toStringAsFixed(1)} kg'; // Show one decimal place for metric
     } else {
       final lbs = kg * AppConfig.kgToLbs;
-      return '${lbs.round()} lbs'; // Round to whole number for standard
+      return '${lbs.toStringAsFixed(1)} lbs'; // Show one decimal place for imperial too
+    }
+  }
+  
+  /// Special weight formatter for ruck buddies weight chips to preserve exact values
+  /// This helps avoid rounding issues when displaying weights that were originally
+  /// entered as whole numbers (like 10 lbs, 20 lbs, etc.)
+  static String formatWeightForChip(double kg, {required bool metric}) {
+    if (kDebugMode) {
+      debugPrint('[formatWeightForChip] Received kg: $kg, metric: $metric');
+    }
+    if (metric) {
+      // For metric, just display the kg value with one decimal
+      return '${kg.toStringAsFixed(1)} kg';
+    } else {
+      final double calculatedLbs = kg * AppConfig.kgToLbs;
+      if (kDebugMode) {
+        debugPrint('[formatWeightForChip] Calculated lbs: $calculatedLbs (from kg: $kg)');
+      }
+
+      // Common standard ruck weights in pounds
+      const List<int> standardPoundWeights = [
+        5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
+      ];
+
+      // Check if calculatedLbs is extremely close to a standard pound weight
+      for (final int standardLb in standardPoundWeights) {
+        // Use a slightly larger tolerance for floating point comparisons directly in pounds
+        if ((calculatedLbs - standardLb).abs() < 0.02) { 
+          return '$standardLb lbs';
+        }
+      }
+
+      // If not a standard weight, check if calculatedLbs is extremely close to any whole number
+      final int roundedLbs = calculatedLbs.round();
+      if ((calculatedLbs - roundedLbs).abs() < 0.02) { 
+        return '$roundedLbs lbs';
+      }
+      
+      // Otherwise, format to one decimal place as a fallback
+      return '${calculatedLbs.toStringAsFixed(1)} lbs';
+    }
+  }
+  
+  /// Format a duration into a readable string (e.g., "1h 23m" or "45m")
+  static String formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else if (minutes > 0) {
+      return '${minutes}m ${seconds}s';
+    } else {
+      return '${seconds}s';
     }
   }
 
   /// Calories formatted as integer string.
   static String formatCalories(int calories) => calories.toString();
+  
+  /// Format a UTC date to the local timezone and locale with specified format.
+  /// Default format is 'MMMM d, yyyy' (e.g. "May 14, 2025")
+  static String formatDate(DateTime utcDateTime, {String format = 'MMMM d, yyyy'}) {
+    // Convert UTC time to local timezone
+    final localDateTime = utcDateTime.toLocal();
+    final dateFormat = DateFormat(format);
+    return dateFormat.format(localDateTime);
+  }
+  
+  /// Format a UTC time to the local timezone and locale with specified format.
+  /// Default format is 'h:mm a' (e.g. "3:30 PM")
+  static String formatTime(DateTime utcDateTime, {String format = 'h:mm a'}) {
+    // Convert UTC time to local timezone
+    final localDateTime = utcDateTime.toLocal();
+    final timeFormat = DateFormat(format);
+    return timeFormat.format(localDateTime);
+  }
+  
+  /// Format a UTC dateTime to a readable representation in local timezone.
+  /// This returns both date and time, separated by a space.
+  /// Useful for showing the full date and time of an event.
+  static String formatDateTime(DateTime utcDateTime, {
+    String dateFormat = 'MMMM d, yyyy',
+    String timeFormat = 'h:mm a',
+  }) {
+    return '${formatDate(utcDateTime, format: dateFormat)} at ${formatTime(utcDateTime, format: timeFormat)}';
+  }
 
   /// Calculates total distance in kilometers from a list of LocationPoints.
   static double totalDistance(List<LocationPoint> points) {
