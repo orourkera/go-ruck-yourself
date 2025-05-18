@@ -1,5 +1,8 @@
 part of 'active_session_bloc.dart';
 
+import 'dart:io';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+
 @immutable
 abstract class ActiveSessionEvent extends Equatable {
   const ActiveSessionEvent();
@@ -124,4 +127,39 @@ class TimerStarted extends ActiveSessionEvent {
 
   @override
   List<Object?> get props => [];
+}
+
+class FetchSessionPhotosRequested extends ActiveSessionEvent {
+  final String sessionId;
+
+  const FetchSessionPhotosRequested(this.sessionId);
+
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class UploadSessionPhotosRequested extends ActiveSessionEvent {
+  final String sessionId;
+  final List<File> photos;
+
+  const UploadSessionPhotosRequested({
+    required this.sessionId,
+    required this.photos,
+  });
+
+  @override
+  List<Object?> get props => [sessionId, photos];
+}
+
+class DeleteSessionPhotoRequested extends ActiveSessionEvent {
+  final String sessionId;
+  final RuckPhoto photo;
+
+  const DeleteSessionPhotoRequested({
+    required this.sessionId,
+    required this.photo,
+  });
+
+  @override
+  List<Object?> get props => [sessionId, photo];
 }

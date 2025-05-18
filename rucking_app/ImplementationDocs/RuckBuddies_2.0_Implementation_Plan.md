@@ -12,8 +12,8 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 - **Photo display**: Show photos in an attractive carousel in both personal and community views
 
 ### 2.2. Ruck Buddies Detail View
-- Create a dedicated view for each community ruck that matches the layout of the session detail screen
-- Add social interaction capabilities specific to the community context
+- ✅ Create a dedicated view for each community ruck that matches the layout of the session detail screen
+- ✅ Add social interaction capabilities specific to the community context
 
 ### 2.3. Social Interactions
 - **Likes**: Allow users to "like" other users' rucks
@@ -37,18 +37,22 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
   - ✅ Limit of 5 photos per session
 
 #### 3.1.2. Session Detail Screen (`session_detail_screen.dart`)
-- ✅ Added a section to display photos in a carousel (currently using mock data)
+- ✅ Added a section to display photos in a carousel
 - **Photo management**:
-  - ❌ Add ability to upload additional photos (UI exists but not connected to backend)
-  - ❌ Add ability to delete existing photos with confirmation dialog (UI exists but not connected to backend)
-  - ✅ Added ability to view photos in full-screen mode (using mock data)
-  - ❌ Connect photo management to backend API
+  - ✅ Add ability to upload additional photos (Connected to backend API)
+  - ✅ Add ability to delete existing photos with confirmation dialog (Connected to backend API)
+  - ✅ Added ability to view photos in full-screen mode
+  - ✅ Connect photo retrieval to backend API (Deployed to Staging)
+  - ✅ Implement backend API endpoints for upload and delete photos (Deployed to Staging)
 
 #### 3.1.3. Shared Photo Components
-- Create reusable widgets:
-  - `PhotoCarousel`: Horizontally scrollable container for displaying photos
-  - `PhotoUploadButton`: Consistent UI for triggering photo selection
-  - `PhotoViewer`: Full-screen photo viewer with pinch-to-zoom and swipe navigation
+- ✅ Created reusable widgets:
+  - ✅ `PhotoCarousel`: Horizontally scrollable container for displaying photos
+  - ✅ `PhotoUploadButton`: Consistent UI for triggering photo selection
+  - ✅ `PhotoViewer`: Full-screen photo viewer with pinch-to-zoom and swipe navigation
+- ✅ Storage configuration:
+  - ✅ Created `ruck-photos` storage bucket in Supabase
+  - ✅ Configured RLS policy for photo access
 
 ### 3.2. Ruck Buddies Feed Enhancements
 
@@ -72,11 +76,28 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
   - ✅ Photo carousel section if photos are available
   - ✅ New social interaction section:
     - ✅ Like button with animation
+      - ✅ Custom tactical ruck icon for like button
+      - ✅ Animation on like/unlike action
     - ✅ Comments section with:
       - ✅ Text input for adding new comments
       - ✅ List of existing comments with user attribution
       - ✅ Timestamp for each comment
       - ✅ Delete option for user's own comments
+
+### 3.4. Social Interaction Backend
+- ✅ Created data models for social interactions:
+  - ✅ `RuckLike` model for storing like data
+  - ✅ `RuckComment` model for storing comment data
+- ✅ Implemented repository for social interactions:
+  - ✅ Methods for getting, adding, updating, and deleting both likes and comments
+- ✅ Implemented BLoC for managing social interactions state:
+  - ✅ Events, states, and business logic for likes and comments
+- ✅ Created UI components:
+  - ✅ `RuckLikeButton` with custom tactical ruck icons
+  - ✅ `CommentsSection` with comment creation, editing, and deletion
+- ✅ Implemented backend API endpoints:
+  - ✅ `/api/ruck-likes` for like operations
+  - ✅ `/api/ruck-comments` for comment operations
 
 ### 3.4. Notification System
 
@@ -194,14 +215,16 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 ### 4.2. API Endpoints
 
 #### 4.2.1. Photo Management Endpoints
-- **Upload Photos**: `POST /api/rucks/:id/photos`
-  - Request: `multipart/form-data` with photo files
+- **Upload Photos**: ✅ `POST /api/ruck-photos` (Deployed to Staging)
+  - Request: `multipart/form-data` with photo files and `ruck_id` as form field
   - Response: Array of photo metadata
   
-- **Get Photos**: `GET /api/rucks/:id/photos`
+- **Get Photos**: ✅ `GET /api/ruck-photos` (Deployed to Staging)
+  - Request: `ruck_id` as query parameter
   - Response: Array of photo metadata with URLs
   
-- **Delete Photo**: `DELETE /api/rucks/:id/photos/:photo_id`
+- **Delete Photo**: ✅ `DELETE /api/ruck-photos` (Deployed to Staging)
+  - Request: `photo_id` as query parameter
   - Response: Success message
 
 #### 4.2.2. Social Interaction Endpoints

@@ -15,12 +15,14 @@ import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
 part 'active_session_event.dart';
 part 'active_session_state.dart';
@@ -33,6 +35,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final WatchService _watchService;
   final HeartRateService _heartRateService;
   final SessionValidationService _validationService;
+  final SessionRepository _sessionRepository;
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
   StreamSubscription<List<HeartRateSample>>? _heartRateBufferSubscription;
@@ -60,6 +63,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required WatchService watchService,
     required HeartRateService heartRateService,
     required SplitTrackingService splitTrackingService,
+    required SessionRepository sessionRepository,
     SessionValidationService? validationService,
   })  : _apiClient = apiClient,
         _locationService = locationService,
@@ -67,6 +71,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _watchService = watchService,
         _heartRateService = heartRateService,
         _splitTrackingService = splitTrackingService,
+        _sessionRepository = sessionRepository,
         _validationService = validationService ?? SessionValidationService(),
         super(ActiveSessionInitial()) {
     // Ensure the current instance is globally available for cross-layer callbacks (e.g. WatchService).
@@ -84,6 +89,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<Tick>(_onTick);
     on<SessionErrorCleared>(_onSessionErrorCleared);
     on<TimerStarted>(_onTimerStarted);
+    on<FetchSessionPhotosRequested>(_onFetchSessionPhotosRequested);
+    on<UploadSessionPhotosRequested>(_onUploadSessionPhotosRequested);
+    on<DeleteSessionPhotoRequested>(_onDeleteSessionPhotoRequested);
   }
 
   Future<void> _onSessionStarted(
@@ -1140,6 +1148,118 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     } else {
       AppLogger.warning('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionErrorCleared called but current state is not ActiveSessionFailure. Emitting ActiveSessionInitial.');
       emit(ActiveSessionInitial());
+    }
+  }
+
+  Future<void> _onFetchSessionPhotosRequested(
+    FetchSessionPhotosRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      emit(currentState.copyWith(isPhotosLoading: true, photosError: null, clearPhotosError: true));
+      try {
+        final photos = await _sessionRepository.getSessionPhotos(event.sessionId);
+ 
+        emit(currentState.copyWith(
+          photos: photos,
+          isPhotosLoading: false,
+        ));
+      } catch (e) {
+        AppLogger.error('Failed to fetch session photos: $e');
+        emit(currentState.copyWith(
+          isPhotosLoading: false,
+          photosError: 'Failed to load photos. Please try again.',
+        ));
+      }
+    }
+  }
+
+  Future<void> _onUploadSessionPhotosRequested(
+    UploadSessionPhotosRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      emit(currentState.copyWith(isUploading: true, uploadError: null, clearUploadError: true));
+      
+      try {
+        AppLogger.info('Uploading ${event.photos.length} photos for session ${event.sessionId}');
+        
+        // Use the repository to upload photos
+        final uploadedPhotos = await _sessionRepository.uploadSessionPhotos(
+          event.sessionId,
+          event.photos,
+        );
+        
+        // Get existing photos plus new ones
+        final updatedPhotos = List<RuckPhoto>.from(currentState.photos ?? []);
+        updatedPhotos.addAll(uploadedPhotos);
+        
+        AppLogger.info('Successfully uploaded ${uploadedPhotos.length} photos');
+        
+        emit(currentState.copyWith(
+          photos: updatedPhotos,
+          isUploading: false,
+          uploadSuccess: true,
+        ));
+      } catch (e) {
+        AppLogger.error('Failed to upload photos: $e');
+        emit(currentState.copyWith(
+          isUploading: false,
+          uploadError: 'Failed to upload photos. Please try again.',
+        ));
+      }
+    }
+  }
+
+  Future<void> _onDeleteSessionPhotoRequested(
+    DeleteSessionPhotoRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      
+      // Create a copy of photos to work with
+      final List<RuckPhoto> currentPhotos = List<RuckPhoto>.from(currentState.photos ?? []);
+      
+      try {
+        AppLogger.info('Deleting photo ${event.photo.id} from session ${event.sessionId}');
+        
+        // Optimistically remove the photo from the list immediately for responsive UI
+        final List<RuckPhoto> updatedPhotos = currentPhotos.where((p) => p.id != event.photo.id).toList();
+        
+        emit(currentState.copyWith(
+          photos: updatedPhotos,
+          isDeleting: true,
+        ));
+        
+        // Use the repository to delete the photo
+        final success = await _sessionRepository.deletePhoto(event.photo);
+        
+        if (success) {
+          AppLogger.info('Successfully deleted photo ${event.photo.id}');
+          emit(currentState.copyWith(
+            isDeleting: false,
+          ));
+        } else {
+          // If deletion failed, restore the photo to the list
+          AppLogger.error('Failed to delete photo ${event.photo.id}');
+          emit(currentState.copyWith(
+            photos: currentPhotos, // Restore original photos
+            isDeleting: false,
+            deleteError: 'Failed to delete photo. Please try again.',
+          ));
+        }
+      } catch (e) {
+        AppLogger.error('Exception when deleting photo: $e');
+        // If an exception occurred, restore the photo to the list
+        emit(currentState.copyWith(
+          photos: currentPhotos, // Restore original photos
+          isDeleting: false,
+          deleteError: 'Failed to delete photo. Please try again.',
+        ));
+      }
     }
   }
 

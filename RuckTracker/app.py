@@ -165,6 +165,8 @@ from .api.stats import ( # Import new stats resources
 )
 
 from .api.ruck_photos_resource import RuckPhotosResource # Added import for RuckPhotosResource
+from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesResource
+from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
 
 # Apply rate limiting to SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
@@ -315,6 +317,14 @@ api.add_resource(YearlyStatsResource, '/api/stats/yearly')
 # Ruck Photos Endpoint
 api.add_resource(RuckPhotosResource, '/api/ruck-photos')
 rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
+
+# Ruck Likes Endpoints
+api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
+rate_limit_resource(RuckLikesResource, "60 per minute") # Apply rate limiting
+
+# Ruck Comments Endpoint
+api.add_resource(RuckCommentsResource, '/api/ruck-comments')
+rate_limit_resource(RuckCommentsResource, "60 per minute") # Apply rate limiting
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')

@@ -172,7 +172,7 @@ class RuckPhotosResource(Resource):
             # Store photo metadata in the ruck_photos table
             try:
                 # Upload the file to storage
-                storage_path = f"ruck_photos/{user_id}/{ruck_id}/{unique_filename}"
+                storage_path = f"{user_id}/{ruck_id}/{unique_filename}"
                 
                 # Create a temporary file
                 import tempfile
@@ -310,7 +310,7 @@ class RuckPhotosResource(Resource):
         
         # Delete the photo file from storage
         try:
-            storage_path = f"ruck_photos/{user_id}/{ruck_id}/{filename}"
+            storage_path = f"{user_id}/{ruck_id}/{filename}"
             supabase.storage.from_('ruck-photos').remove([storage_path])
         except Exception as e:
             logger.error(f"RuckPhotosResource: Error deleting photo file from storage: {e}")
