@@ -45,7 +45,7 @@ class SessionStatsOverlay extends StatelessWidget {
             _StatTile(label: 'TIME', value: _formatMinutesSeconds(Duration(seconds: state.elapsedSeconds))),
             if ((state.latestHeartRate ?? 0) > 0)
               _StatTile(
-                label: 'HR HealthKit',
+                label: 'HR',
                 value: '${state.latestHeartRate} bpm',
                 color: _hrColor(state.latestHeartRate ?? 0),
                 isHealthKit: true,
@@ -180,23 +180,6 @@ class SessionStatsOverlay extends StatelessWidget {
                                     ),
                                   ),
                                 ],
-                              ),
-                              // HealthKit label
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.green.withOpacity(0.3)),
-                                ),
-                                child: const Text(
-                                  'HealthKit',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
                               ),
                             ],
                           ),
