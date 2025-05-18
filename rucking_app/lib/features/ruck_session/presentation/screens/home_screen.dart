@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_history_screen.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
@@ -66,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     const _HomeTab(),
     const SessionHistoryScreen(),
+    const RuckBuddiesScreen(),
     const StatisticsScreen(),
     const ProfileScreen(),
   ];
@@ -113,6 +116,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           BottomNavigationBarItem(
             icon: Image.asset(
+              'assets/images/ruckbuddies.png',
+              width: 48,
+              height: 48,
+            ),
+            activeIcon: Image.asset(
+              'assets/images/ruckbuddies_active.png',
+              width: 48,
+              height: 48,
+            ),
+            label: 'Buddies',
+          ),
+          BottomNavigationBarItem(
+            icon: Image.asset(
               'assets/images/stats.png',
               width: 48,
               height: 48,
@@ -125,20 +141,46 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Stats',
           ),
           BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/profile.png',
-              width: 48,
-              height: 48,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/profile_active.png',
-              width: 48,
-              height: 48,
-            ),
+            icon: _buildProfileIcon(false),
+            activeIcon: _buildProfileIcon(true),
             label: 'Profile',
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileIcon(bool isActive) {
+    // Get user gender from AuthBloc if available
+    String? userGender;
+    try {
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        userGender = (authBloc.state as Authenticated).user.gender;
+      }
+    } catch (e) {
+      // If auth bloc is not available, continue with default icon
+      debugPrint('Could not get user gender for profile icon: $e');
+    }
+    
+    // Determine which icon to use based on gender and active state
+    String iconPath;
+    if (userGender == 'female') {
+      // Female icon based on active state
+      iconPath = isActive 
+          ? 'assets/images/lady rucker profile active.png'
+          : 'assets/images/lady rucker profile.png';
+    } else {
+      // Default/male icon based on active state
+      iconPath = isActive 
+          ? 'assets/images/profile_active.png'
+          : 'assets/images/profile.png';
+    }
+    
+    return Image.asset(
+      iconPath,
+      width: 48,
+      height: 48,
     );
   }
 }
@@ -352,24 +394,32 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                 const SizedBox(height: 32),
                 
                 // Quick stats section (USE _monthlySummaryStats)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: AppColors.primaryGradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    // Determine if user is in lady mode
+                    bool isLadyMode = false;
+                    if (state is Authenticated && state.user.gender == 'female') {
+                      isLadyMode = true;
+                    }
+                    
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isLadyMode ? AppColors.ladyPrimaryGradient : AppColors.primaryGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isLadyMode ? AppColors.ladyPrimary.withOpacity(0.3) : AppColors.primary.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
+                      child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -404,7 +454,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                          }
                       ),
                     ],
-                  ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
                 
@@ -418,14 +470,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                       style: AppTextStyles.labelLarge.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                      )
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     onPressed: () {
@@ -436,9 +480,17 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                         ),
                       );
                     },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      minimumSize: const Size.fromHeight(56),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 
                 // Recent sessions section
                 Text(
@@ -597,11 +649,17 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           onTap: () {
                             try {
                               final sessionModel = RuckSession.fromJson(session);
-                              Navigator.of(context).push(
+                              // Navigate to detail screen and handle the result
+                              Navigator.of(context).push<bool>(
                                 MaterialPageRoute(
                                   builder: (context) => SessionDetailScreen(session: sessionModel),
                                 ),
-                              );
+                              ).then((refreshNeeded) {
+                                // If returned with true (session deleted), refresh the data
+                                if (refreshNeeded == true) {
+                                  _fetchData();
+                                }
+                              });
                             } catch (e) {
                               
                             }
@@ -647,25 +705,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                               ),
                                             ],
                                           ),
-                                          if (routePoints.isNotEmpty)
-                                            MarkerLayer(
-                                              markers: [
-                                                // Start marker (green)
-                                                Marker(
-                                                  point: routePoints.first,
-                                                  width: 20,
-                                                  height: 20,
-                                                  child: const Icon(Icons.trip_origin, color: Colors.green, size: 20),
-                                                ),
-                                                // End marker (red)
-                                                Marker(
-                                                  point: routePoints.last,
-                                                  width: 20,
-                                                  height: 20,
-                                                  child: const Icon(Icons.location_pin, color: Colors.red, size: 20),
-                                                ),
-                                              ],
-                                            ),
+                                          
                                         ],
                                       ),
                                     ),

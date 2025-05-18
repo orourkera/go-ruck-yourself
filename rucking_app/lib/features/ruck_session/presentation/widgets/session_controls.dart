@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
@@ -18,6 +21,19 @@ class SessionControls extends StatelessWidget {
     required this.isPaused,
   });
 
+  // Helper method to get the appropriate color based on user gender
+  Color _getLadyModeColor(BuildContext context) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        return AppColors.ladyPrimary;
+      }
+    } catch (e) {
+      // If we can't access the AuthBloc, fall back to default color
+    }
+    return AppColors.primary;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -28,13 +44,17 @@ class SessionControls extends StatelessWidget {
             icon: Icon(isPaused ? Icons.play_arrow : Icons.pause, color: AppColors.white, size: 20),
             label: Text(isPaused ? 'RESUME' : 'PAUSE', style: AppTextStyles.labelLarge.copyWith(color: Colors.white)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary, 
+              backgroundColor: _getLadyModeColor(context), 
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: onTogglePause, 
+            onPressed: () {
+            HapticFeedback.heavyImpact();
+            debugPrint('[PAUSE_DEBUG] SessionControls: Pause/Resume button pressed on PHONE UI. Current isPaused state (on UI): $isPaused');
+            if (onTogglePause != null) onTogglePause!();
+          }, 
           ),
         ),
         const SizedBox(width: 16),
@@ -49,7 +69,10 @@ class SessionControls extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: onEndSession, 
+            onPressed: () {
+            HapticFeedback.heavyImpact();
+            if (onEndSession != null) onEndSession!();
+          }, 
           ),
         ),
       ],

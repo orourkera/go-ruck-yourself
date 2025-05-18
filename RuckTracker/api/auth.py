@@ -1,13 +1,29 @@
-from flask import request, g
+from flask import request, g, jsonify
 from flask_restful import Resource
 import uuid
 from datetime import datetime, timedelta
 import sys
 import logging
+from functools import wraps
 
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
+
+# Auth decorators
+def auth_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not hasattr(g, 'user') or g.user is None:
+            return jsonify({'message': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+def get_user_id():
+    """Helper function to get the current user's ID"""
+    if hasattr(g, 'user') and g.user and hasattr(g.user, 'id'):
+        return g.user.id
+    return None
 
 class SignUpResource(Resource):
     def post(self):
@@ -38,6 +54,9 @@ class SignUpResource(Resource):
                     'username': username, # Save username (display name) as username
                     'email': email, # User table needs the email column
                     'weight_kg': data.get('weight_kg'),
+                    'height_cm': data.get('height_cm'),
+                    'date_of_birth': data.get('date_of_birth'),
+                    'gender': data.get('gender'),
                     'prefer_metric': data.get('preferMetric') # Read camelCase from request
                 }
                 user_data_clean = {k: v for k, v in user_data.items() if v is not None}
@@ -259,12 +278,31 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['username', 'weight_kg', 'prefer_metric'] 
+            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing', 'gender', 'date_of_birth'] 
             for field in allowed_fields:
                 if field == 'prefer_metric': # Check for snake_case field name
                     # Expect camelCase 'preferMetric' in the incoming JSON data for updates too
                     if 'preferMetric' in data:
                          update_data['prefer_metric'] = data['preferMetric'] # Use snake_case for DB update dict key
+                # Handle camelCase for height_cm
+                elif field == 'height_cm' and 'heightCm' in data:
+                    update_data['height_cm'] = data['heightCm']
+                # Handle gender parameter
+                elif field == 'gender':
+                    if 'gender' in data:
+                        update_data['gender'] = data['gender']
+                # Handle date_of_birth parameter (both formats)
+                elif field == 'date_of_birth':
+                    if 'date_of_birth' in data:
+                        update_data['date_of_birth'] = data['date_of_birth']
+                    elif 'dateOfBirth' in data:
+                        update_data['date_of_birth'] = data['dateOfBirth']
+                # Handle allow_ruck_sharing - check for both camelCase and snake_case versions
+                elif field == 'allow_ruck_sharing':
+                    if 'allowRuckSharing' in data:  # Check for camelCase version from mobile app
+                        update_data['allow_ruck_sharing'] = data['allowRuckSharing']
+                    elif 'allow_ruck_sharing' in data:  # Also check for snake_case
+                        update_data['allow_ruck_sharing'] = data['allow_ruck_sharing']
                 elif field in data:
                     update_data[field] = data[field]
                  

@@ -11,8 +11,8 @@ class AppConfig {
   // Weight Conversion and Options
   static const double kgToLbs = 2.20462;
   static const double defaultRuckWeight = 10.0; // Default weight in KG
-  static const List<double> metricWeightOptions = [2.6, 4.5, 9.0, 11.3, 13.6, 20.4]; 
-  static const List<double> standardWeightOptions = [10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 60.0]; // LBS
+  static const List<double> metricWeightOptions = [0.0, 2.6, 4.5, 9.0, 11.3, 13.6, 20.4, 22.7, 27.2]; 
+  static const List<double> standardWeightOptions = [0.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 60.0]; // LBS
   
   // Storage keys
   static const String tokenKey = 'auth_token';
