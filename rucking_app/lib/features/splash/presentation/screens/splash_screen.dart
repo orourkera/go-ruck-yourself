@@ -124,7 +124,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (authStateToNavigate is Authenticated) {
       debugPrint('[Splash] AuthState is Authenticated. Checking subscription.');
       final revenueCatService = GetIt.instance<RevenueCatService>();
-      final bool isSubscribed = await revenueCatService.isSubscribed();
+      final bool isSubscribed = await revenueCatService.checkSubscriptionStatus(); 
       if (!mounted) return; // Check mounted after await
 
       if (isSubscribed) {
