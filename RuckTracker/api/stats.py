@@ -141,7 +141,7 @@ class WeeklyStatsResource(Resource):
             return {'message': f'Error calculating weekly stats: {str(e)}'}, 500
 
 class MonthlyStatsResource(Resource):
-     def get(self):
+    def get(self):
         """Get aggregated stats for the current month."""
         if not hasattr(g, 'user') or g.user is None:
             return {'message': 'User not authenticated'}, 401

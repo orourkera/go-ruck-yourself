@@ -35,6 +35,7 @@ class ActiveSessionRunning extends ActiveSessionState {
   final Duration totalPausedDuration;      // Accumulates total time paused
   final DateTime? currentPauseStartTimeUtc; // Tracks when the current pause began
   final List<HeartRateSample> heartRateSamples;
+  final bool isGpsReady; // Flag to indicate if GPS has acquired the first point
 
   static const _unset = Object();
 
@@ -64,6 +65,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     this.notes,
     this.latestHeartRate,
     this.validationMessage,
+    this.isGpsReady = false, // Default to false
   });
   
   @override
@@ -91,6 +93,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     totalPausedDuration,
     currentPauseStartTimeUtc,
     heartRateSamples,
+    isGpsReady, // Add to props
   ];
   
   ActiveSessionRunning copyWith({
@@ -118,6 +121,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     Duration? totalPausedDuration,
     DateTime? currentPauseStartTimeUtc,
     bool clearCurrentPauseStartTimeUtc = false,
+    bool? isGpsReady, // Add to copyWith parameters
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -143,6 +147,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       originalSessionStartTimeUtc: originalSessionStartTimeUtc ?? this.originalSessionStartTimeUtc,
       totalPausedDuration: totalPausedDuration ?? this.totalPausedDuration,
       currentPauseStartTimeUtc: clearCurrentPauseStartTimeUtc ? null : currentPauseStartTimeUtc ?? this.currentPauseStartTimeUtc,
+      isGpsReady: isGpsReady ?? this.isGpsReady, // Use in copyWith
     );
   }
 }

@@ -36,14 +36,49 @@ class RuckSessionListResource(Resource):
                     .eq('session_id', session['id']) \
                     .order('timestamp') \
                     .execute()
+                
                 logger.info(f"Location response data for session {session['id']}: {locations_resp.data}")
+                
                 if locations_resp.data:
+                    # Process and verify location data is valid
+                    valid_location_points = []
+                    for loc in locations_resp.data:
+                        # Ensure the location data contains latitude and longitude
+                        if 'latitude' in loc and 'longitude' in loc:
+                            try:
+                                # Convert numeric values if needed
+                                lat = float(loc['latitude']) if loc['latitude'] is not None else None
+                                lng = float(loc['longitude']) if loc['longitude'] is not None else None
+                                
+                                if lat is not None and lng is not None:
+                                    valid_location_points.append({'lat': lat, 'lng': lng})
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Invalid location data for session {session['id']}: {e}")
+                    
+                    logger.info(f"Processed {len(valid_location_points)} valid location points for session {session['id']}")
+                    
                     # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
-                    session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
-                    session['location_points'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+                    session['route'] = valid_location_points
+                    session['location_points'] = valid_location_points
                 else:
                     session['route'] = []
                     session['location_points'] = []
+            
+            # Log the sessions data before returning to client
+            logger.info(f"Session data being returned to client (sample of up to 3 sessions):")
+            for i, session_data in enumerate(sessions[:3]): # Log first 3 sessions as sample
+                log_output = {
+                    'id': session_data.get('id'),
+                    'start_time': session_data.get('start_time'),
+                    'created_at': session_data.get('created_at'),
+                    'completed_at': session_data.get('completed_at'),
+                    'end_time': session_data.get('end_time'),
+                    'status': session_data.get('status')
+                }
+                logger.info(f"Session sample {i+1}: {log_output}")
+            if len(sessions) > 3:
+                logger.info(f"...(and {len(sessions) - 3} more sessions)")
+
             return {'sessions': sessions}, 200
         except Exception as e:
             logger.error(f"Error fetching ruck sessions: {e}")
@@ -361,10 +396,11 @@ class RuckSessionCompleteResource(Resource):
             distance_km = None
             if 'distance_km' in data and data['distance_km']:
                 distance_km = data['distance_km']
-            # Only calculate if both duration and distance are valid
-            final_average_pace = None
+            
+            server_calculated_pace = None
             if distance_km and distance_km > 0 and duration_seconds > 0:
-                final_average_pace = duration_seconds / distance_km  # seconds per km
+                server_calculated_pace = duration_seconds / distance_km  # seconds per km
+
             # Update session status to completed with end data
             update_data = {
                 'status': 'completed',
@@ -385,13 +421,18 @@ class RuckSessionCompleteResource(Resource):
                 update_data['elevation_loss_m'] = data['elevation_loss_m']
             # Always set completed_at to now (UTC) when completing session
             update_data['completed_at'] = datetime.now(tz.tzutc()).isoformat()
+
+            # Store server-calculated pace first
+            if server_calculated_pace is not None:
+                update_data['average_pace'] = server_calculated_pace
+
             if 'start_time' in data:
                 update_data['start_time'] = data['start_time']
-            if 'end_time' in data:
+            if 'end_time' in data: # Keep this for now, though completed_at should be primary
                 update_data['end_time'] = data['end_time']
-            if 'final_average_pace' in data:
+            if 'final_average_pace' in data: # Client-sent pace (legacy key), overrides server calc
                 update_data['average_pace'] = data['final_average_pace']
-            if 'average_pace' in data:
+            if 'average_pace' in data:     # Client-sent pace (current key), overrides server calc / legacy key
                 update_data['average_pace'] = data['average_pace']
             if 'rating' in data:
                 update_data['rating'] = data['rating']
