@@ -19,6 +19,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 // Social features imports
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/widgets/like_button.dart';
 import 'package:rucking_app/features/social/presentation/widgets/comments_section.dart';
 
@@ -41,12 +42,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     super.initState();
     if (widget.session.id != null) {
       // Load photos
-      context.read<ActiveSessionBloc>().add(FetchSessionPhotosRequested(sessionId: widget.session.id!));
+      context.read<ActiveSessionBloc>().add(FetchSessionPhotosRequested(widget.session.id!));
       
       // Load social data (likes and comments)
       final socialBloc = getIt<SocialBloc>();
-      socialBloc.add(LoadRuckLikes(ruckId: widget.session.id!));
-      socialBloc.add(LoadComments(ruckId: widget.session.id!));
+      socialBloc.add(LoadRuckLikes(int.parse(widget.session.id!)));
+      socialBloc.add(LoadRuckComments(int.parse(widget.session.id!)));
     }
   }
 
@@ -83,7 +84,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               onPhotoTap: (index) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => FullscreenPhotoViewer(
+                    builder: (context) => PhotoViewer(
                       photoUrls: photoUrls,
                       initialIndex: index,
                     ),
@@ -404,7 +405,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                       BlocProvider.value(
                         value: getIt<SocialBloc>(),
                         child: CommentsSection(
-                          ruckId: widget.session.id!,
+                          ruckId: int.parse(widget.session.id!),
                         ),
                       ),
                     ],

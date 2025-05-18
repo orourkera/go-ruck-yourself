@@ -108,7 +108,7 @@ class _PhotoViewerState extends State<PhotoViewer> {
                 maxScale: 3.0,
                 onInteractionStart: (details) {
                   if (details is ScaleStartDetails) {
-                    _initialScale = details.scale;
+                    _initialScale = 1.0;
                   }
                 },
                 child: Hero(

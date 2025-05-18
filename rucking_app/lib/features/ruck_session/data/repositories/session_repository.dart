@@ -2,6 +2,9 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/core/network/api_endpoints.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:path/path.dart' as path;
@@ -63,14 +66,17 @@ class SessionRepository {
       // Prepare multipart request to our new API endpoint
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${_apiClient.baseUrl}/ruck-photos'),
+        Uri.parse(ApiEndpoints.ruckPhotos),
       );
       
       // Add the authorization header
-      final authToken = await _apiClient.getAuthToken();
-      request.headers.addAll({
-        'Authorization': 'Bearer $authToken',
-      });
+      final authService = GetIt.I<AuthService>();
+      final authToken = await authService.getToken();
+      if (authToken != null && authToken.isNotEmpty) {
+        request.headers.addAll({
+          'Authorization': 'Bearer $authToken',
+        });
+      }
       
       // Add ruck_id as a form field
       request.fields['ruck_id'] = ruckId;

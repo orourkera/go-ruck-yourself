@@ -21,6 +21,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
 
@@ -93,6 +94,7 @@ class ActiveSessionPage extends StatelessWidget {
             watchService: locator<WatchService>(),
             heartRateService: locator<HeartRateService>(),
             splitTrackingService: locator<SplitTrackingService>(),
+            sessionRepository: locator<SessionRepository>(),
           ),
         ),
         BlocProvider(
