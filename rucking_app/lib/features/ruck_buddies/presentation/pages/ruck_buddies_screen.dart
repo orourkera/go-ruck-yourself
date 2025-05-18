@@ -123,7 +123,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                       ? state.filter 
                       : 'closest';
                   
-                  final statsUrl = '${AppConfig.apiBaseUrl}/stats/monthly';  // Removed duplicate '/api/'
+                  final statsUrl = '${AppConfig.apiBaseUrl}/statistics/monthly';  // Changed to /statistics/monthly
                   
                   return FilterChipGroup(
                     selectedFilter: currentFilter,
