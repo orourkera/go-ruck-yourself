@@ -102,7 +102,12 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        color: AppColors.surfaceLight,
+        color: AppColors.surfaceLight, // Explicitly set for light theme
+      ),
+      snackBarTheme: SnackBarThemeData(
+        contentTextStyle: _getTextTheme(AppColors.textDark).bodySmall,
+        backgroundColor: AppColors.grey700, // Darker background for light theme snackbar
+        actionTextColor: AppColors.primaryLight, // Example, adjust as needed
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.primary, // Brownish-orange
@@ -163,6 +168,11 @@ class AppTheme {
         fillColor: MaterialStateProperty.all<Color>(AppColors.secondary),
       ),
       textTheme: _getTextTheme(Color(0xFF728C69)), // Olive green for body text in dark mode
+      snackBarTheme: SnackBarThemeData(
+        contentTextStyle: _getTextTheme(AppColors.textLight).bodySmall,
+        backgroundColor: AppColors.grey300, // Lighter background for dark theme snackbar
+        actionTextColor: AppColors.primaryDark, // Example, adjust as needed
+      ),
     );
   }
 
@@ -197,14 +207,14 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.secondaryDark,
+          backgroundColor: AppColors.secondaryDark, // Dark olive green
           foregroundColor: AppColors.textLight,
           elevation: 4,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: AppTextStyles.labelLarge.copyWith( // Changed from button
+          textStyle: AppTextStyles.labelLarge.copyWith(
             fontFamily: 'Bangers',
             fontSize: 18,
             letterSpacing: 1.2,
@@ -213,7 +223,7 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.secondaryLight, // Lighter green for contrast
+          foregroundColor: AppColors.secondaryLight, // Light olive green
           textStyle: AppTextStyles.labelLarge, // Changed from button
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           shape: RoundedRectangleBorder(
@@ -223,8 +233,9 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppColors.secondaryLight, width: 2),
-          foregroundColor: AppColors.secondaryLight,
+          side: BorderSide(color: AppColors.secondaryLight, width: 2), // Light olive green
+          foregroundColor: AppColors.secondaryLight, // Light olive green
+          backgroundColor: AppColors.surfaceDark,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -264,6 +275,11 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
         ),
         color: AppColors.surfaceDark,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        contentTextStyle: _getTextTheme(AppColors.textLight).bodySmall,
+        backgroundColor: AppColors.grey300, // Lighter background for dark theme snackbar
+        actionTextColor: AppColors.primaryDark, 
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.primaryDark,
