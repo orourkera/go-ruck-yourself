@@ -36,11 +36,30 @@ class RuckSessionListResource(Resource):
                     .eq('session_id', session['id']) \
                     .order('timestamp') \
                     .execute()
+                
                 logger.info(f"Location response data for session {session['id']}: {locations_resp.data}")
+                
                 if locations_resp.data:
+                    # Process and verify location data is valid
+                    valid_location_points = []
+                    for loc in locations_resp.data:
+                        # Ensure the location data contains latitude and longitude
+                        if 'latitude' in loc and 'longitude' in loc:
+                            try:
+                                # Convert numeric values if needed
+                                lat = float(loc['latitude']) if loc['latitude'] is not None else None
+                                lng = float(loc['longitude']) if loc['longitude'] is not None else None
+                                
+                                if lat is not None and lng is not None:
+                                    valid_location_points.append({'lat': lat, 'lng': lng})
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Invalid location data for session {session['id']}: {e}")
+                    
+                    logger.info(f"Processed {len(valid_location_points)} valid location points for session {session['id']}")
+                    
                     # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
-                    session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
-                    session['location_points'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+                    session['route'] = valid_location_points
+                    session['location_points'] = valid_location_points
                 else:
                     session['route'] = []
                     session['location_points'] = []
