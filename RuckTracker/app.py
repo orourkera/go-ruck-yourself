@@ -302,12 +302,12 @@ api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location
 api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
 # Auth Endpoints
-api.add_resource(SignUpResource, '/api/auth/signup')
-api.add_resource(SignInResource, '/api/auth/signin') # Corrected from /api/auth/signin' to /api/auth/signin
-api.add_resource(SignOutResource, '/api/auth/signout')
-api.add_resource(RefreshTokenResource, '/api/auth/refresh')
-api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password') # Ensure this path is intended
-api.add_resource(UserProfileResource, '/api/users/profile')
+# api.add_resource(SignUpResource, '/api/auth/signup')  # Removed duplicate registration
+# api.add_resource(SignInResource, '/api/auth/signin')  # Removed duplicate registration
+# api.add_resource(SignOutResource, '/api/auth/signout')  # Removed duplicate registration
+# api.add_resource(RefreshTokenResource, '/api/auth/refresh')  # Removed duplicate registration
+# api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')  # Removed duplicate registration
+# api.add_resource(UserProfileResource, '/api/users/profile')  # Removed duplicate registration
 
 # Stats Endpoints
 api.add_resource(WeeklyStatsResource, '/api/stats/weekly')
