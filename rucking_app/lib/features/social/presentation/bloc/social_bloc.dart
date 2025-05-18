@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
