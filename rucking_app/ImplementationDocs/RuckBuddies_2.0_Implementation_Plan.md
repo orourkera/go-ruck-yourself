@@ -98,6 +98,10 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 - ✅ Implemented backend API endpoints:
   - ✅ `/api/ruck-likes` for like operations
   - ✅ `/api/ruck-comments` for comment operations
+- ✅ Created database tables and security:
+  - ✅ `ruck_likes` table with indexes and unique constraints
+  - ✅ `ruck_comments` table with automatic timestamp updates
+  - ✅ Row-level security policies for proper access control
 
 ### 3.4. Notification System
 
@@ -133,18 +137,24 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 ### 3.6. State Management
 
 #### 3.6.1. Photo Management
-- Enhance `SessionBloc` to handle photo operations:
-  - Add events: `UploadPhotosRequested`, `DeletePhotoRequested`
-  - Add states: `PhotosUploading`, `PhotosUploadSuccess`, `PhotosUploadFailure`
-  - Track photo upload progress
+- ✅ Enhanced `ActiveSessionBloc` to handle photo operations:
+  - ✅ Added events: `FetchSessionPhotosRequested`, `UploadSessionPhotosRequested`, `DeleteSessionPhotoRequested`
+  - ✅ Added state management for tracking: loading, uploading, deletion, errors, and success
+  - ✅ Implemented optimistic updates for better UX
 
 #### 3.6.2. Social Interactions
-- Create `SocialBloc` to manage likes and comments:
-  - Add events: `LikeToggled`, `CommentAdded`, `CommentDeleted`
-  - Add states to track interaction status
-  - Handle optimistic updates for better UX
+- ✅ Created `SocialBloc` to manage likes and comments:
+  - ✅ Added events: `LoadRuckLikes`, `ToggleLike`, `LoadComments`, `AddComment`, `UpdateComment`, `DeleteComment`
+  - ✅ Added states to track interaction status, loading states, and error handling
+  - ✅ Implemented optimistic updates for responsive UX
 
-#### 3.6.3. Notifications
+#### 3.6.3. UI Integration
+- Next step: Integrate social components into the Ruck Buddies detail screen
+  - Connect `PhotoCarousel`, `RuckLikeButton`, and `CommentsSection` components
+  - Wire up the BLoCs to the UI components
+  - Test the end-to-end flow for all features
+
+#### 3.6.4. Notifications (Future Work)
 - Create `NotificationBloc` to manage notification state:
   - Add events: `NotificationsRequested`, `NotificationRead`, `AllNotificationsRead`
   - Add states: `NotificationsLoading`, `NotificationsLoaded`, `NotificationsError`
