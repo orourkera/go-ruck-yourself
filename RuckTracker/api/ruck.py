@@ -396,10 +396,11 @@ class RuckSessionCompleteResource(Resource):
             distance_km = None
             if 'distance_km' in data and data['distance_km']:
                 distance_km = data['distance_km']
-            # Only calculate if both duration and distance are valid
-            final_average_pace = None
+            
+            server_calculated_pace = None
             if distance_km and distance_km > 0 and duration_seconds > 0:
-                final_average_pace = duration_seconds / distance_km  # seconds per km
+                server_calculated_pace = duration_seconds / distance_km  # seconds per km
+
             # Update session status to completed with end data
             update_data = {
                 'status': 'completed',
@@ -420,13 +421,18 @@ class RuckSessionCompleteResource(Resource):
                 update_data['elevation_loss_m'] = data['elevation_loss_m']
             # Always set completed_at to now (UTC) when completing session
             update_data['completed_at'] = datetime.now(tz.tzutc()).isoformat()
+
+            # Store server-calculated pace first
+            if server_calculated_pace is not None:
+                update_data['average_pace'] = server_calculated_pace
+
             if 'start_time' in data:
                 update_data['start_time'] = data['start_time']
             if 'end_time' in data: # Keep this for now, though completed_at should be primary
                 update_data['end_time'] = data['end_time']
-            if 'final_average_pace' in data:
+            if 'final_average_pace' in data: # Client-sent pace (legacy key), overrides server calc
                 update_data['average_pace'] = data['final_average_pace']
-            if 'average_pace' in data:
+            if 'average_pace' in data:     # Client-sent pace (current key), overrides server calc / legacy key
                 update_data['average_pace'] = data['average_pace']
             if 'rating' in data:
                 update_data['rating'] = data['rating']
