@@ -63,6 +63,22 @@ class RuckSessionListResource(Resource):
                 else:
                     session['route'] = []
                     session['location_points'] = []
+            
+            # Log the sessions data before returning to client
+            logger.info(f"Session data being returned to client (sample of up to 3 sessions):")
+            for i, session_data in enumerate(sessions[:3]): # Log first 3 sessions as sample
+                log_output = {
+                    'id': session_data.get('id'),
+                    'start_time': session_data.get('start_time'),
+                    'created_at': session_data.get('created_at'),
+                    'completed_at': session_data.get('completed_at'),
+                    'end_time': session_data.get('end_time'),
+                    'status': session_data.get('status')
+                }
+                logger.info(f"Session sample {i+1}: {log_output}")
+            if len(sessions) > 3:
+                logger.info(f"...(and {len(sessions) - 3} more sessions)")
+
             return {'sessions': sessions}, 200
         except Exception as e:
             logger.error(f"Error fetching ruck sessions: {e}")
@@ -406,7 +422,7 @@ class RuckSessionCompleteResource(Resource):
             update_data['completed_at'] = datetime.now(tz.tzutc()).isoformat()
             if 'start_time' in data:
                 update_data['start_time'] = data['start_time']
-            if 'end_time' in data:
+            if 'end_time' in data: # Keep this for now, though completed_at should be primary
                 update_data['end_time'] = data['end_time']
             if 'final_average_pace' in data:
                 update_data['average_pace'] = data['final_average_pace']
