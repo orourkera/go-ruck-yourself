@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
@@ -47,6 +48,7 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       }
     }
     
+    debugPrint('[BLOC] Fetching ruck buddies with filter: ${event.filter}, location: ($lat, $lon)');
     final result = await getRuckBuddies(
       RuckBuddiesParams(
         limit: event.limit,
@@ -58,14 +60,27 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
     );
     
     result.fold(
-      (failure) => emit(RuckBuddiesError(message: failure.message)),
-      (ruckBuddies) => emit(
-        RuckBuddiesLoaded(
-          ruckBuddies: ruckBuddies,
-          hasReachedMax: ruckBuddies.length < event.limit,
-          filter: event.filter,
-        ),
-      ),
+      (failure) {
+        debugPrint('[BLOC] Error fetching ruck buddies: ${failure.message}');
+        emit(RuckBuddiesError(message: failure.message));
+      },
+      (ruckBuddies) {
+        debugPrint('[BLOC] Loaded ${ruckBuddies.length} ruck buddies');
+        if (ruckBuddies.isEmpty) {
+          debugPrint('[BLOC] No ruck buddies found in API response');
+        } else {
+          debugPrint('[BLOC] First buddy: ${ruckBuddies.first.id}, user: ${ruckBuddies.first.user.username}');
+        }
+        emit(
+          RuckBuddiesLoaded(
+            ruckBuddies: ruckBuddies,
+            hasReachedMax: ruckBuddies.length < event.limit,
+            filter: event.filter,
+            latitude: lat,
+            longitude: lon,
+          ),
+        );
+      },
     );
   }
 

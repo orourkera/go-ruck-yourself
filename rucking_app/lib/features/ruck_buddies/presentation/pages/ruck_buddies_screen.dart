@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -119,6 +120,8 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                   final String currentFilter = state is RuckBuddiesLoaded 
                       ? state.filter 
                       : 'closest';
+                  
+                  final statsUrl = '${AppConfig.apiBaseUrl}/stats/monthly';  // Removed duplicate '/api/'
                   
                   return FilterChipGroup(
                     selectedFilter: currentFilter,

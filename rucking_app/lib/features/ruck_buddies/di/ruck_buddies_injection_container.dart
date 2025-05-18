@@ -27,12 +27,9 @@ void initRuckBuddiesFeature(GetIt sl) {
 
   // Data sources
   sl.registerLazySingleton<RuckBuddiesRemoteDataSource>(
-    // TODO: Switch back to real implementation when backend is ready
-    // () => RuckBuddiesRemoteDataSourceImpl(
-    //   apiClient: sl(),
-    // ),
-    // Use mock implementation for development
-    () => MockRuckBuddiesDataSource(),
+    () => RuckBuddiesRemoteDataSourceImpl(
+      apiClient: sl(),
+    ),
   );
 
   // No need for NetworkInfo registration anymore
