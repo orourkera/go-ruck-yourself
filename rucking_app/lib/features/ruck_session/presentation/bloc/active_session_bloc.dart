@@ -131,6 +131,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         originalSessionStartTimeUtc: DateTime.now().toUtc(),
         totalPausedDuration: Duration.zero,
         currentPauseStartTimeUtc: null,
+        isGpsReady: false,
       );
       emit(initialSessionState);
       AppLogger.info('ActiveSessionRunning state emitted for session $sessionId with plannedDuration: \u001B[33m${initialSessionState.plannedDuration}\u001B[0m seconds');
@@ -438,13 +439,32 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         newCalories += segmentCalories.round();
       }
     
+      Map<String, dynamic> updates = {};
+      updates['locationPoints'] = updatedPoints;
+      updates['distanceKm'] = newDistance;
+      updates['calories'] = newCalories;
+      updates['elevationGain'] = newElevationGain.toDouble();
+      updates['elevationLoss'] = newElevationLoss.toDouble();
+      updates['validationMessage'] = validationResult['reason'];
+      updates['clearValidationMessage'] = validationResult['shouldClearMessage'];
+
+      // Set isGpsReady to true if it's not already true
+      // Determine if isGpsReady needs to be updated
+      bool newIsGpsReady = currentState.isGpsReady;
+      if (!currentState.isGpsReady) {
+        newIsGpsReady = true; // Set to true as we have a valid point
+        AppLogger.info('GPS is now ready. First valid location point received and processed.');
+      }
+      
       emit(currentState.copyWith(
-        locationPoints: updatedPoints,
-        distanceKm: newDistance,
-        // pace: newPace, // pace now managed by _onTick every 15 seconds
-        calories: newCalories,
-        elevationGain: newElevationGain.toDouble(),
-        elevationLoss: newElevationLoss.toDouble(),
+        locationPoints: updates['locationPoints'],
+        distanceKm: updates['distanceKm'],
+        calories: updates['calories'],
+        elevationGain: updates['elevationGain'],
+        elevationLoss: updates['elevationLoss'],
+        validationMessage: updates['validationMessage'],
+        clearValidationMessage: updates['clearValidationMessage'],
+        isGpsReady: newIsGpsReady, // Pass the determined value
       ));
 
       try {
