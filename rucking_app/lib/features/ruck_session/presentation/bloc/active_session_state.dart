@@ -1,5 +1,7 @@
 part of 'active_session_bloc.dart';
 
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+
 abstract class ActiveSessionState extends Equatable {
   const ActiveSessionState();
   

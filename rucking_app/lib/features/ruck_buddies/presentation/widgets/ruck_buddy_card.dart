@@ -153,7 +153,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                       ],
                     ),
                   ),
-                      ),
                       
                       // Weight chip
                       Chip(
@@ -307,11 +306,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                   const Spacer(),
                 ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
-    );
+      );
   }
   
   Widget _buildAvatar(UserInfo user) {
