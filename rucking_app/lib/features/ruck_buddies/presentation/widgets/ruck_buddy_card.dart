@@ -388,16 +388,31 @@ class _RouteMapPreview extends StatelessWidget {
   List<LatLng> _getRoutePoints() {
     final pts = <LatLng>[];
     final lp = ruckBuddy.locationPoints;
-    if (lp == null) return pts;
+    if (lp == null || lp.isEmpty) {
+      // No location data available
+      return pts;
+    }
+    
+    // Process locationPoints according to DATA_MODEL_REFERENCE.md
+    // Format used is {"lat": 40.41, "lng": -3.68, "timestamp": "..." }
     for (final p in lp) {
       double? lat;
       double? lng;
 
       if (p is Map) {
-        // attempt to handle multiple possible key names and value types
-        lat = _parseCoord(p['lat']) ?? _parseCoord(p['latitude']);
-        lng = _parseCoord(p['lng']) ?? _parseCoord(p['lon']) ?? _parseCoord(p['longitude']);
+        // Primary format from backend is 'latitude'/'longitude'
+        lat = _parseCoord(p['latitude']);
+        lng = _parseCoord(p['longitude']);
+        
+        // Fallbacks for other possible formats
+        if (lat == null) {
+          lat = _parseCoord(p['lat']);
+        }
+        if (lng == null) {
+          lng = _parseCoord(p['lng']) ?? _parseCoord(p['lon']);
+        }
       } else if (p is List && p.length >= 2) {
+        // Handle array format [lat, lng]
         lat = _parseCoord(p[0]);
         lng = _parseCoord(p[1]);
       }
@@ -437,6 +452,26 @@ class _RouteMapPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
+    
+    // If we have no route data at all, show a placeholder
+    if (routePoints.isEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 175,
+          width: double.infinity,
+          color: Colors.grey[200],
+          child: Center(
+            child: Icon(
+              Icons.map_outlined,
+              size: 48,
+              color: Colors.grey[400],
+            ),
+          ),
+        ),
+      );
+    }
+    
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: SizedBox(
