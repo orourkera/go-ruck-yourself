@@ -38,6 +38,16 @@ class CheckUserLikeStatus extends SocialEvent {
   List<Object?> get props => [ruckId];
 }
 
+/// Additional event for checking ruck like status with a different name for UI components
+class CheckRuckLikeStatus extends SocialEvent {
+  final int ruckId;
+
+  const CheckRuckLikeStatus(this.ruckId);
+
+  @override
+  List<Object?> get props => [ruckId];
+}
+
 /// Event to load comments for a specific ruck session
 class LoadRuckComments extends SocialEvent {
   final int ruckId;

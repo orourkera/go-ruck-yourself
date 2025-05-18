@@ -15,6 +15,7 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     on<LoadRuckLikes>(_onLoadRuckLikes);
     on<ToggleRuckLike>(_onToggleRuckLike);
     on<CheckUserLikeStatus>(_onCheckUserLikeStatus);
+    on<CheckRuckLikeStatus>(_onCheckRuckLikeStatus); // Add handler for CheckRuckLikeStatus
     on<LoadRuckComments>(_onLoadRuckComments);
     on<AddRuckComment>(_onAddRuckComment);
     on<UpdateRuckComment>(_onUpdateRuckComment);
@@ -52,50 +53,69 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     ToggleRuckLike event,
     Emitter<SocialState> emit,
   ) async {
+    debugPrint('🔄 SocialBloc._onToggleRuckLike called with ruckId: ${event.ruckId}');
+    
     // Check current state to see if user has already liked this ruck
     bool isCurrentlyLiked = false;
+    debugPrint('🔄 Checking if user has already liked this ruck');
+    
     if (state is LikesLoaded) {
       isCurrentlyLiked = (state as LikesLoaded).userHasLiked;
+      debugPrint('🔄 From loaded state, user has liked: $isCurrentlyLiked');
     } else {
+      debugPrint('🔄 State is not LikesLoaded, checking with repository');
       try {
         isCurrentlyLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
+        debugPrint('🔄 Repository check complete, user has liked: $isCurrentlyLiked');
       } catch (e) {
+        debugPrint('❌ Error checking like status: $e');
         emit(LikeActionError('Error checking like status: $e'));
         return;
       }
     }
     
+    debugPrint('🔄 Emitting LikeActionInProgress state');
     emit(LikeActionInProgress());
     
     try {
       bool success;
       if (isCurrentlyLiked) {
-        // User already liked it, so remove like
+        debugPrint('🔄 User already liked this ruck, removing like');
         success = await _socialRepository.removeRuckLike(event.ruckId);
+        debugPrint('🔄 Remove like result: $success');
+        
         if (success) {
+          debugPrint('✅ Successfully removed like');
           emit(LikeActionCompleted(
             isLiked: false,
             ruckId: event.ruckId,
           ));
         } else {
+          debugPrint('❌ Failed to unlike ruck session');
           emit(const LikeActionError('Failed to unlike ruck session'));
         }
       } else {
-        // User hasn't liked it yet, so add like
+        debugPrint('🔄 User hasn\'t liked this ruck yet, adding like');
         final like = await _socialRepository.addRuckLike(event.ruckId);
+        debugPrint('✅ Successfully added like: ${like.id}');
+        
         emit(LikeActionCompleted(
           isLiked: true,
           ruckId: event.ruckId,
         ));
       }
       
-      // Refresh likes
+      debugPrint('🔄 Triggering refresh of likes');
       add(LoadRuckLikes(event.ruckId));
+      
     } on UnauthorizedException catch (e) {
+      debugPrint('❌ Authentication error: ${e.message}');
       emit(LikeActionError('Authentication error: ${e.message}'));
     } on ServerException catch (e) {
+      debugPrint('❌ Server error: ${e.message}');
       emit(LikeActionError('Server error: ${e.message}'));
     } catch (e) {
+      debugPrint('❌ Unknown error during like action: $e');
       emit(LikeActionError('Unknown error: $e'));
     }
   }
@@ -123,6 +143,33 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       emit(LikesError('Server error: ${e.message}'));
     } catch (e) {
       emit(LikesError('Unknown error: $e'));
+    }
+  }
+
+  /// Handler for checking ruck like status (specifically for UI components)
+  Future<void> _onCheckRuckLikeStatus(
+    CheckRuckLikeStatus event,
+    Emitter<SocialState> emit,
+  ) async {
+    debugPrint('🔍 Checking like status for ruck ID: ${event.ruckId}');
+    try {
+      final hasLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
+      debugPrint('✅ Like status check complete: $hasLiked');
+      
+      // Emit simple state just with like status
+      emit(LikeStatusChecked(
+        isLiked: hasLiked,
+        ruckId: event.ruckId,
+      ));
+    } on UnauthorizedException catch (e) {
+      debugPrint('❌ Authentication error checking like status: ${e.message}');
+      // Don't emit error state for this quietly running check
+    } on ServerException catch (e) {
+      debugPrint('❌ Server error checking like status: ${e.message}');
+      // Don't emit error state for this quietly running check
+    } catch (e) {
+      debugPrint('❌ Unknown error checking like status: $e');
+      // Don't emit error state for this quietly running check
     }
   }
 
