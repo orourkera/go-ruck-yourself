@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/social/domain/models/ruck_comment.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// A widget for displaying and interacting with comments on a ruck session
 class CommentsSection extends StatefulWidget {
@@ -42,8 +43,19 @@ class _CommentsSectionState extends State<CommentsSection> {
   bool _isAddingComment = false;
   String? _editingCommentId;
   
-  // Current user info
-  final _currentUserId = Supabase.instance.client.auth.currentUser?.id;
+  // Get the current user ID from the AuthBloc
+  String? _getCurrentUserId(BuildContext context) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        return authState.user.userId;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting current user ID: $e');
+      return null;
+    }
+  }
 
   @override
   void initState() {
@@ -334,7 +346,7 @@ class _CommentsSectionState extends State<CommentsSection> {
   }
 
   Widget _buildCommentItem(RuckComment comment) {
-    final isCurrentUserComment = comment.userId == _currentUserId;
+    final isCurrentUserComment = comment.userId == _getCurrentUserId(context);
     final formattedDate = DateFormat('MMM d, yyyy • h:mm a').format(comment.createdAt);
     
     return Container(

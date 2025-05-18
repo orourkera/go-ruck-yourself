@@ -8,6 +8,8 @@ import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/widgets/filter_chip_group.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/widgets/ruck_buddy_card.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/empty_state.dart';
@@ -199,13 +201,31 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
               );
             },
             onLikeTap: () {
-              // This will be connected to the API in the future
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Like feature coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              // Use the actual like functionality
+              try {
+                debugPrint('🔍 Attempting to like ruck buddy with id: ${ruckBuddy.id}');
+                
+                // Parse ruckId to int since SocialBloc expects an integer
+                final ruckId = int.parse(ruckBuddy.id);
+                debugPrint('🔍 Parsed ruckId as int: $ruckId');
+                
+                // Check if SocialBloc is available
+                final socialBloc = context.read<SocialBloc>();
+                debugPrint('🔍 SocialBloc instance found: ${socialBloc != null}');
+                
+                // Use the SocialBloc to toggle like
+                debugPrint('🔍 Dispatching ToggleRuckLike event to SocialBloc');
+                socialBloc.add(ToggleRuckLike(ruckId));
+                debugPrint('🔍 ToggleRuckLike event dispatched successfully');
+              } catch (e) {
+                debugPrint('❌ Error toggling like: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error liking ruck: $e'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
             },
           ),
         );
