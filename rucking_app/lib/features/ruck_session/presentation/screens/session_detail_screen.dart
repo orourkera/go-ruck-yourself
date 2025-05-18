@@ -11,9 +11,16 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
-import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+
+// Social features imports
+import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
+import 'package:rucking_app/features/social/presentation/widgets/like_button.dart';
+import 'package:rucking_app/features/social/presentation/widgets/comments_section.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -33,7 +40,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   void initState() {
     super.initState();
     if (widget.session.id != null) {
+      // Load photos
       context.read<ActiveSessionBloc>().add(FetchSessionPhotosRequested(sessionId: widget.session.id!));
+      
+      // Load social data (likes and comments)
+      final socialBloc = getIt<SocialBloc>();
+      socialBloc.add(LoadRuckLikes(ruckId: widget.session.id!));
+      socialBloc.add(LoadComments(ruckId: widget.session.id!));
     }
   }
 
@@ -229,38 +242,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '$formattedStartTime - $formattedEndTime',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildHeaderStat(
-                          context, 
-                          Icons.straighten, 
-                          'Distance', 
-                          distanceValue,
-                        ),
-                        _buildHeaderStat(
-                          context, 
-                          Icons.timer, 
-                          'Duration', 
-                          widget.session.formattedDuration,
-                        ),
-                        _buildHeaderStat(
-                          context, 
-                          Icons.speed, 
-                          'Pace', 
-                          paceValue,
-                        ),
-                      ],
+                      "${formattedStartTime} - ${formattedEndTime}",
+                      style: Theme.of(context).textTheme.bodyLarge,
                     ),
                   ],
                 ),
               ),
 
-              // Route map preview
+              // Map Section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: _SessionRouteMap(session: widget.session),
@@ -393,6 +382,34 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   ],
                 ),
               ),
+              
+              // Comments Section
+              if (widget.session.id != null)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.comment, color: _getLadyModeColor(context)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Comments',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      BlocProvider.value(
+                        value: getIt<SocialBloc>(),
+                        child: CommentsSection(
+                          ruckId: widget.session.id!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),

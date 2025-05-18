@@ -1,8 +1,5 @@
 part of 'active_session_bloc.dart';
 
-import 'dart:io';
-import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
-
 @immutable
 abstract class ActiveSessionEvent extends Equatable {
   const ActiveSessionEvent();
