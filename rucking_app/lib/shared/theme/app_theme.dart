@@ -106,7 +106,7 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         contentTextStyle: _getTextTheme(AppColors.textDark).bodySmall,
-        backgroundColor: AppColors.grey700, // Darker background for light theme snackbar
+        backgroundColor: AppColors.greyDark, // Darker background for light theme snackbar
         actionTextColor: AppColors.primaryLight, // Example, adjust as needed
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -170,7 +170,7 @@ class AppTheme {
       textTheme: _getTextTheme(Color(0xFF728C69)), // Olive green for body text in dark mode
       snackBarTheme: SnackBarThemeData(
         contentTextStyle: _getTextTheme(AppColors.textLight).bodySmall,
-        backgroundColor: AppColors.grey300, // Lighter background for dark theme snackbar
+        backgroundColor: AppColors.greyLight, // Lighter background for dark theme snackbar
         actionTextColor: AppColors.primaryDark, // Example, adjust as needed
       ),
     );
@@ -278,7 +278,7 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         contentTextStyle: _getTextTheme(AppColors.textLight).bodySmall,
-        backgroundColor: AppColors.grey300, // Lighter background for dark theme snackbar
+        backgroundColor: AppColors.greyLight, // Lighter background for dark theme snackbar
         actionTextColor: AppColors.primaryDark, 
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(

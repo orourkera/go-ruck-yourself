@@ -22,8 +22,13 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeInAnimation;
-  bool _navigated = false; // To prevent multiple navigations
   static bool _hasAnimatedOnceThisLaunch = false;
+
+  // New state variables for timed splash screen
+  bool _minimumDisplayTimeElapsed = false;
+  bool _authCheckCompleted = false;
+  AuthState? _definitiveAuthState; 
+  bool _navigationAttempted = false; 
 
   @override
   void initState() {
@@ -68,41 +73,76 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       if (mounted) {
         final authState = BlocProvider.of<AuthBloc>(context).state;
         debugPrint('[Splash] initState - postFrameCallback - initial AuthState check: ${authState.runtimeType}');
-        _handleAuthNavigation(context, authState);
+        _processAuthState(authState); // New call
+      }
+    });
+
+    // Start 3-second timer for minimum display duration
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        debugPrint('[Splash] Minimum 3-second display time elapsed.');
+        setState(() {
+          _minimumDisplayTimeElapsed = true;
+        });
+        _attemptNavigation(); // Attempt navigation when timer elapses
       }
     });
   }
 
-  Future<void> _handleAuthNavigation(BuildContext context, AuthState authState) async {
-    // If already navigated or not mounted, do nothing.
-    // The check for authState being AuthInitial or AuthLoading is implicitly handled by not setting _navigated = true
-    // and allowing the BlocListener to pick up subsequent state changes.
-    if (!mounted || _navigated && (authState is Authenticated || authState is Unauthenticated || authState is AuthError)) return;
+  void _processAuthState(AuthState authState) {
+    if (authState is Authenticated || authState is Unauthenticated || authState is AuthError) {
+      if (!_authCheckCompleted) { // Process only the first definitive auth state
+        debugPrint('[Splash] Definitive AuthState received: ${authState.runtimeType}');
+        setState(() {
+          _authCheckCompleted = true;
+          _definitiveAuthState = authState;
+        });
+        _attemptNavigation(); // Attempt navigation when auth state is definitive
+      } else {
+        debugPrint('[Splash] Auth check already completed with ${_definitiveAuthState?.runtimeType}, new state ${authState.runtimeType} ignored for navigation processing.');
+      }
+    } else {
+      // For states like AuthInitial or AuthLoading, do nothing here.
+      debugPrint('[Splash] Non-definitive AuthState: ${authState.runtimeType}. Waiting.');
+    }
+  }
 
-    if (authState is Authenticated) {
-      _navigated = true; // Set flag before async gap to prevent re-entry for this specific state change event
+  Future<void> _attemptNavigation() async {
+    if (!mounted || _navigationAttempted || !_minimumDisplayTimeElapsed || !_authCheckCompleted || _definitiveAuthState == null) {
+      debugPrint('[Splash] Navigation attempt condition not met: mounted=$mounted, attempted=$_navigationAttempted, timerElapsed=$_minimumDisplayTimeElapsed, authDone=$_authCheckCompleted, authStateIsNull=${_definitiveAuthState == null}');
+      if(_definitiveAuthState != null) {
+          debugPrint('[Splash] Definitive auth state for non-navigation: ${_definitiveAuthState.runtimeType}');
+      }
+      return;
+    }
+
+    _navigationAttempted = true; // Set flag immediately to prevent re-entry
+    debugPrint('[Splash] Attempting navigation with AuthState: ${_definitiveAuthState!.runtimeType}');
+
+    final authStateToNavigate = _definitiveAuthState!; 
+
+    if (authStateToNavigate is Authenticated) {
       debugPrint('[Splash] AuthState is Authenticated. Checking subscription.');
       final revenueCatService = GetIt.instance<RevenueCatService>();
-      final isSubscribed = await revenueCatService.checkSubscriptionStatus();
-      if (!mounted) return; // Check mounted again after await
+      final bool isSubscribed = await revenueCatService.isSubscribed();
+      if (!mounted) return; // Check mounted after await
+
       if (isSubscribed) {
-        debugPrint('[Splash] User is subscribed. Navigating to /home.');
+        debugPrint('[Splash] User is subscribed. Navigating to HomeScreen.');
         Navigator.pushReplacementNamed(context, '/home');
       } else {
-        debugPrint('[Splash] User is NOT subscribed. Navigating to PaywallScreen.');
+        debugPrint('[Splash] User is not subscribed. Navigating to PaywallScreen.');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const PaywallScreen()),
         );
       }
-    } else if (authState is Unauthenticated || authState is AuthError) {
-      _navigated = true; // Set flag
-      debugPrint('[Splash] AuthState is ${authState.runtimeType}. Navigating to /login.');
+    } else if (authStateToNavigate is Unauthenticated || authStateToNavigate is AuthError) {
+      debugPrint('[Splash] AuthState is ${authStateToNavigate.runtimeType}. Navigating to /login.');
       Navigator.pushReplacementNamed(context, '/login');
     } else {
-      // For states like AuthInitial or AuthLoading, do nothing here.
-      // _navigated remains false, allowing BlocListener to catch the next definitive state.
-      debugPrint('[Splash] AuthState is ${authState.runtimeType}. Waiting for Authenticated or Unauthenticated.');
+      // Should not happen due to the checks above, but good for completeness
+      debugPrint('[Splash] Critical: _attemptNavigation called with unexpected authState: ${authStateToNavigate.runtimeType}');
     }
   }
   
@@ -120,9 +160,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         debugPrint('[Splash] BlocListener received AuthState: ${state.runtimeType}');
-        _handleAuthNavigation(context, state);
+        _processAuthState(state); // New call
       },
-      // listenWhen could be used to optimize if needed, e.g., listenWhen: (prev, curr) => !_navigated,
+      // listenWhen could be used to optimize if needed, e.g., listenWhen: (prev, curr) => !_navigationAttempted,
       child: FutureBuilder<bool>(
         future: SplashHelper.isLadyModeActive(),
         builder: (context, snapshot) {
