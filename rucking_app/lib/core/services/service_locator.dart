@@ -100,6 +100,7 @@ Future<void> setupServiceLocator() async {
         watchService: getIt<WatchService>(),
         heartRateService: getIt<HeartRateService>(),
         splitTrackingService: getIt<SplitTrackingService>(),
+        sessionRepository: getIt<SessionRepository>(),
       ));
       
   // Register session bloc for operations like delete

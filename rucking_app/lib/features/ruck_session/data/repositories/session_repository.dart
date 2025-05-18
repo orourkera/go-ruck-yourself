@@ -6,6 +6,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:path/path.dart' as path;
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,7 +50,8 @@ class SessionRepository {
   
   /// Upload photos for a ruck session
   /// 
-  /// Takes a list of photo files and uploads them to storage
+  /// Takes a list of photo files and uploads them to the backend API,
+  /// which handles both storage and metadata creation
   Future<List<RuckPhoto>> uploadSessionPhotos(String ruckId, List<File> photos) async {
     try {
       AppLogger.info('Uploading ${photos.length} photos for session: $ruckId');
@@ -58,67 +60,66 @@ class SessionRepository {
         return [];
       }
       
-      if (_supabaseUrl.isEmpty || _supabaseAnonKey.isEmpty) {
-        AppLogger.error('Supabase URL or Anon Key not configured');
-        throw Exception('Supabase storage not properly configured');
-      }
+      // Prepare multipart request to our new API endpoint
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${_apiClient.baseUrl}/ruck-photos'),
+      );
       
-      final List<RuckPhoto> uploadedPhotos = [];
+      // Add the authorization header
+      final authToken = await _apiClient.getAuthToken();
+      request.headers.addAll({
+        'Authorization': 'Bearer $authToken',
+      });
       
-      // Get the current user ID
-      final userId = await getCurrentUserId();
-      if (userId == null || userId.isEmpty) {
-        AppLogger.error('Unable to get current user ID for photo upload');
-        throw Exception('User not authenticated');
-      }
+      // Add ruck_id as a form field
+      request.fields['ruck_id'] = ruckId;
       
-      // Create the necessary directories if they don't exist
-      final userFolder = userId;
-      final ruckFolder = ruckId;
-      final uuid = const Uuid();
-      
+      // Add each photo as a file
       for (final photoFile in photos) {
-        final photoId = uuid.v4();
         final originalFilename = path.basename(photoFile.path);
-        final ext = path.extension(originalFilename).isNotEmpty 
-            ? path.extension(originalFilename) 
-            : '.jpg';
+        final contentType = _getContentType(photoFile.path);
         
-        final filename = '$photoId$ext';
-        final storagePath = '$userFolder/$ruckFolder/$filename';
-        
-        // Upload the file to Supabase Storage
-        final uploadResult = await _uploadToSupabase(
-          photoFile, 
-          storagePath,
+        // Add the file to the request
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'photos', // The field name expected by the backend
+            photoFile.path,
+            filename: originalFilename,
+            contentType: MediaType.parse(contentType),
+          ),
         );
-        
-        if (uploadResult != null) {
-          // Construct URLs from storage path
-          final url = '$_supabaseUrl/storage/v1/object/public/$_photoBucketName/$storagePath';
-          final thumbnailUrl = '$url?width=200&height=200&resize=contain';
-          
-          // Create metadata entry in database
-          final photoMetadata = await _createPhotoMetadata(
-            photoId: photoId,
-            ruckId: ruckId,
-            userId: userId,
-            filename: filename,
-            originalFilename: originalFilename,
-            contentType: uploadResult['contentType'],
-            size: uploadResult['size'],
-            url: url,
-            thumbnailUrl: thumbnailUrl,
-          );
-          
-          if (photoMetadata != null) {
-            uploadedPhotos.add(photoMetadata);
-          }
-        }
       }
       
-      AppLogger.info('Successfully uploaded ${uploadedPhotos.length} photos');
-      return uploadedPhotos;
+      // Send the request and get the response
+      AppLogger.info('Sending multipart request to upload photos');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      // Parse the response
+      if (response.statusCode == 201) {
+        final responseData = json.decode(response.body);
+        
+        if (responseData is Map && 
+            responseData.containsKey('data') && 
+            responseData['data'] is Map && 
+            responseData['data'].containsKey('photos')) {
+          
+          final photosList = responseData['data']['photos'] as List;
+          final List<RuckPhoto> uploadedPhotos = photosList
+              .map((photo) => RuckPhoto.fromJson(photo))
+              .toList();
+          
+          AppLogger.info('Successfully uploaded ${uploadedPhotos.length} photos');
+          return uploadedPhotos;
+        } else {
+          AppLogger.warning('Unexpected response format from photo upload: $responseData');
+          return [];
+        }
+      } else {
+        AppLogger.error('Error uploading photos. Status: ${response.statusCode}, Body: ${response.body}');
+        throw Exception('Failed to upload photos: ${response.statusCode}');
+      }
     } catch (e) {
       AppLogger.error('Error uploading photos: $e');
       rethrow;
@@ -255,38 +256,24 @@ class SessionRepository {
   }
   
   /// Delete a photo
+  /// 
+  /// Takes a RuckPhoto object and deletes it using the backend API
+  /// The backend will handle both the database record deletion and storage cleanup
   Future<bool> deletePhoto(RuckPhoto photo) async {
     try {
       AppLogger.info('Deleting photo: ${photo.id}');
       
-      // Delete from database first
-      await _apiClient.delete('/ruck-photos/${photo.id}');
+      // Use the correct query parameter format for our new endpoint
+      final response = await _apiClient.delete('/ruck-photos?photo_id=${photo.id}');
       
-      // Then delete from storage if database deletion was successful
-      // Extract the storage path from the URL
-      final Uri uri = Uri.parse(photo.url ?? '');
-      final pathSegments = uri.pathSegments;
-      if (pathSegments.length >= 4) {
-        // Storage path should be after /storage/v1/object/public/ruck-photos/
-        final storagePath = pathSegments.sublist(4).join('/');
-        
-        // Delete from Supabase storage
-        final storageUrl = '$_supabaseUrl/storage/v1/object/$_photoBucketName/$storagePath';
-        final response = await http.delete(
-          Uri.parse(storageUrl),
-          headers: {
-            'apikey': _supabaseAnonKey,
-            'Authorization': 'Bearer $_supabaseAnonKey',
-          },
-        );
-        
-        if (response.statusCode != 200) {
-          AppLogger.warning('Error deleting file from storage: ${response.body}');
-          // We continue even if storage deletion fails, as the metadata is already deleted
-        }
+      // Check if deletion was successful
+      if (response is Map && response.containsKey('success') && response['success'] == true) {
+        AppLogger.info('Successfully deleted photo with ID: ${photo.id}');
+        return true;
+      } else {
+        AppLogger.warning('Unexpected response when deleting photo: $response');
+        return false;
       }
-      
-      return true;
     } catch (e) {
       AppLogger.error('Error deleting photo: $e');
       return false;
