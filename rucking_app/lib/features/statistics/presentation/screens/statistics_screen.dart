@@ -50,7 +50,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   Future<void> _fetchStatistics() async {
     try {
       // Fetch weekly stats
-      final weeklyResponse = await _apiClient.get('/statistics/weekly');
+      final weeklyResponse = await _apiClient.get('/stats/weekly');
       
       // Process weekly stats
       Map<String, dynamic> weeklyStats = {};
@@ -69,7 +69,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       });
       
       // Fetch monthly stats
-      final monthlyResponse = await _apiClient.get('/statistics/monthly');
+      final monthlyResponse = await _apiClient.get('/stats/monthly');
       
       // Process monthly stats
       Map<String, dynamic> monthlyStats = {};
@@ -89,7 +89,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       });
       
       // Fetch yearly stats
-      final yearlyResponse = await _apiClient.get('/statistics/yearly');
+      final yearlyResponse = await _apiClient.get('/stats/yearly');
       
       // Process yearly stats
       Map<String, dynamic> yearlyStats = {};

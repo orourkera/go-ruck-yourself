@@ -41,7 +41,7 @@ class SocialRepository {
       }
 
       final response = await _httpClient.get(
-        Uri.parse('${ApiEndpoints.baseApi}/api/ruck-likes?ruck_id=$ruckId'),
+        Uri.parse('${ApiEndpoints.baseApi}/ruck-likes?ruck_id=$ruckId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -83,7 +83,7 @@ class SocialRepository {
       }
 
       debugPrint('🔍 Making API request to add like');
-      final endpoint = '${ApiEndpoints.baseApi}/api/ruck-likes';
+      final endpoint = '${ApiEndpoints.baseApi}/ruck-likes';
       final payload = {'ruck_id': ruckId};
       debugPrint('🔍 Endpoint: $endpoint');
       debugPrint('🔍 Request payload: $payload');
@@ -134,7 +134,7 @@ class SocialRepository {
       }
 
       final response = await _httpClient.delete(
-        Uri.parse('${ApiEndpoints.baseApi}/api/ruck-likes?ruck_id=$ruckId'),
+        Uri.parse('${ApiEndpoints.baseApi}/ruck-likes?ruck_id=$ruckId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -221,7 +221,7 @@ class SocialRepository {
       }
 
       final response = await _httpClient.get(
-        Uri.parse('${ApiEndpoints.baseApi}/api/ruck-comments?ruck_id=$ruckId'),
+        Uri.parse('${ApiEndpoints.baseApi}/ruck-comments?ruck_id=$ruckId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -258,7 +258,7 @@ class SocialRepository {
       }
 
       final response = await _httpClient.post(
-        Uri.parse('${ApiEndpoints.baseApi}/api/ruck-comments'),
+        Uri.parse('${ApiEndpoints.baseApi}/ruck-comments'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -297,7 +297,7 @@ class SocialRepository {
       }
 
       final response = await _httpClient.put(
-        Uri.parse('${ApiEndpoints.baseApi}/api/ruck-comments'),
+        Uri.parse('${ApiEndpoints.baseApi}/ruck-comments'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -336,7 +336,7 @@ class SocialRepository {
       }
 
       final response = await _httpClient.delete(
-        Uri.parse('${ApiEndpoints.baseApi}/api/ruck-comments?comment_id=$commentId'),
+        Uri.parse('${ApiEndpoints.baseApi}/ruck-comments?comment_id=$commentId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
