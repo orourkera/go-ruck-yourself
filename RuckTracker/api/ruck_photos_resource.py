@@ -1,7 +1,10 @@
 # /Users/rory/RuckingApp/RuckTracker/api/ruck_photos_resource.py
-from flask import request, jsonify, g
+from flask import request, g
 from flask_restful import Resource
 import logging
+import tempfile
+from pathlib import Path
+import uuid
 
 # Assuming get_supabase_client is the way to get a Supabase client instance
 # It's crucial that this client is initialized in the context of the authenticated user for RLS to work.
@@ -16,7 +19,7 @@ def build_api_response(data=None, success=True, error=None, status_code=200):
         response_body["data"] = data
     if error is not None:
         response_body["error"] = error
-    return jsonify(response_body), status_code
+    return response_body, status_code
 
 class RuckPhotosResource(Resource):
     def get(self):
@@ -156,74 +159,84 @@ class RuckPhotosResource(Resource):
         
         for photo_file in photo_files:
             if photo_file.filename == '':
+                logger.debug("RuckPhotosResource: Skipping photo with empty filename.")
                 continue
                 
-            # Validate file type
             if not photo_file.content_type.startswith('image/'):
+                logger.warning(f"RuckPhotosResource: Skipping non-image file {photo_file.filename} with type {photo_file.content_type}")
                 continue
-                
-            # Generate a unique filename
-            import uuid
-            from pathlib import Path
-            original_filename = photo_file.filename
-            extension = Path(original_filename).suffix
-            unique_filename = f"{uuid.uuid4()}{extension}"
             
-            # Store photo metadata in the ruck_photos table
+            temp_file_path = None  # Initialize path for finally block
             try:
-                # Upload the file to storage
+                # Generate a unique filename
+                original_filename = photo_file.filename
+                extension = Path(original_filename).suffix
+                unique_filename = f"{uuid.uuid4()}{extension}"
                 storage_path = f"{user_id}/{ruck_id}/{unique_filename}"
+
+                logger.debug(f"RuckPhotosResource: Processing photo {original_filename} to be saved as {unique_filename}")
+
+                # Create and use a temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temp_file:
+                    photo_file.save(temp_file) # Save incoming stream to temp_file object
+                    temp_file_path = temp_file.name # Get the path for upload and cleanup
                 
-                # Create a temporary file
-                import tempfile
-                temp_file = tempfile.NamedTemporaryFile(delete=False)
-                photo_file.save(temp_file.name)
+                logger.debug(f"RuckPhotosResource: Saved to temporary file {temp_file_path}. Uploading to Supabase Storage at {storage_path}...")
                 
                 # Upload to Supabase storage
-                storage_response = supabase.storage.from_('ruck-photos').upload(
-                    storage_path,
-                    temp_file.name,
-                    file_options={
-                        "content-type": photo_file.content_type,
-                        "cache-control": "3600"
-                    }
-                )
+                with open(temp_file_path, 'rb') as f_for_upload:
+                    storage_response = supabase.storage.from_('ruck-photos').upload(
+                        path=storage_path,
+                        file=f_for_upload, # Pass file object
+                        file_options={"content-type": photo_file.content_type, "cache-control": "3600"}
+                    )
+
+                logger.debug(f"RuckPhotosResource: Successfully uploaded {unique_filename} to Supabase Storage.")
                 
                 # Get the public URL
-                public_url = supabase.storage.from_('ruck-photos').get_public_url(storage_path)
+                public_url_data = supabase.storage.from_('ruck-photos').get_public_url(storage_path)
+                public_url = public_url_data # get_public_url usually returns the string directly
+
+                thumbnail_url = public_url # For MVP, thumbnail is same as original
                 
-                # Create thumbnail (this would be done on the server-side in a real implementation)
-                # For this MVP, we'll just use the original URL as the thumbnail
-                thumbnail_url = public_url
-                
-                # Insert into ruck_photos table
-                photo_data = {
+                # Prepare metadata for database insert
+                photo_metadata = {
                     'ruck_id': ruck_id,
                     'user_id': user_id,
                     'filename': unique_filename,
                     'original_filename': original_filename,
                     'content_type': photo_file.content_type,
-                    'size': photo_file.content_length if hasattr(photo_file, 'content_length') else 0,
+                    'size': Path(temp_file_path).stat().st_size, # Get size from temp file
                     'url': public_url,
                     'thumbnail_url': thumbnail_url
                 }
                 
-                insert_response = supabase.table('ruck_photos').insert(photo_data).execute()
+                logger.debug(f"RuckPhotosResource: Inserting metadata for {unique_filename} into database: {photo_metadata}")
+                
+                insert_response = supabase.table('ruck_photos').insert(photo_metadata).execute()
                 
                 if hasattr(insert_response, 'error') and insert_response.error:
-                    logger.error(f"RuckPhotosResource: Error inserting photo metadata: {insert_response.error}")
-                    continue
+                    logger.error(f"RuckPhotosResource: Supabase DB insert error for {unique_filename}: {insert_response.error}")
+                    continue 
                 
-                # Add to uploaded photos list
+                if not insert_response.data:
+                    logger.error(f"RuckPhotosResource: Supabase DB insert for {unique_filename} returned no data but no explicit error.")
+                    continue
+
+                logger.info(f"RuckPhotosResource: Successfully processed and stored photo {unique_filename} with ID {insert_response.data[0].get('id')}")
                 uploaded_photos.append(insert_response.data[0])
                 
-                # Clean up temp file
-                import os
-                os.unlink(temp_file.name)
-                
             except Exception as e:
-                logger.error(f"RuckPhotosResource: Error uploading photo: {e}", exc_info=True)
+                logger.error(f"RuckPhotosResource: Unhandled exception while processing photo {photo_file.filename if photo_file else 'unknown'}: {e}", exc_info=True)
                 continue
+            finally:
+                if temp_file_path and Path(temp_file_path).exists():
+                    try:
+                        import os
+                        os.unlink(temp_file_path)
+                        logger.debug(f"RuckPhotosResource: Successfully deleted temporary file {temp_file_path}")
+                    except Exception as e_unlink:
+                        logger.error(f"RuckPhotosResource: Error deleting temporary file {temp_file_path}: {e_unlink}")
         
         if not uploaded_photos:
             return build_api_response(
