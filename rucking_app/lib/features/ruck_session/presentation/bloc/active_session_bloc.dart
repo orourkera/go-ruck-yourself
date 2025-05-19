@@ -1226,8 +1226,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
       
-      // Create a copy of photos to work with
+      // Check if the photo exists in the current state
       final List<RuckPhoto> currentPhotos = List<RuckPhoto>.from(currentState.photos ?? []);
+      final bool photoExists = currentPhotos.any((p) => p.id == event.photo.id);
+      
+      // If the photo is not in our state, it's likely already been deleted
+      if (!photoExists) {
+        AppLogger.info('Photo ${event.photo.id} not found in state, likely already deleted');
+        return; // Exit early without emitting a new state
+      }
       
       try {
         AppLogger.info('Deleting photo ${event.photo.id} from session ${event.sessionId}');
@@ -1247,6 +1254,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           AppLogger.info('Successfully deleted photo ${event.photo.id}');
           emit(currentState.copyWith(
             isDeleting: false,
+            // Keep the updatedPhotos that were set in the optimistic update
           ));
         } else {
           // If deletion failed, restore the photo to the list
@@ -1258,13 +1266,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           ));
         }
       } catch (e) {
-        AppLogger.error('Exception when deleting photo: $e');
-        // If an exception occurred, restore the photo to the list
-        emit(currentState.copyWith(
-          photos: currentPhotos, // Restore original photos
-          isDeleting: false,
-          deleteError: 'Failed to delete photo. Please try again.',
-        ));
+        // Special handling for 404 errors - the photo was already deleted
+        if (e.toString().contains('404') || e.toString().contains('not found')) {
+          AppLogger.info('Photo ${event.photo.id} already deleted (404)');
+          // Keep the optimistic update (photo removed from list)
+          emit(currentState.copyWith(
+            isDeleting: false,
+          ));
+        } else {
+          // For other errors, restore the photo to the list
+          AppLogger.error('Exception when deleting photo: $e');
+          emit(currentState.copyWith(
+            photos: currentPhotos, // Restore original photos
+            isDeleting: false,
+            deleteError: 'Failed to delete photo. Please try again.',
+          ));
+        }
       }
     }
   }

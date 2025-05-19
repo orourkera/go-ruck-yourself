@@ -91,7 +91,37 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             );
           }
 
-          final photoUrls = state.photos.map((p) => p.url).where((url) => url != null).cast<String>().toList();
+          // Debug photo URLs
+        AppLogger.info('DEBUG: Photos in state: ${state.photos.length}');
+        state.photos.forEach((photo) {
+          AppLogger.info('DEBUG: Photo ${photo.id} URL: ${photo.url}');
+        });
+        
+        // Process URLs to ensure proper formatting and accessibility
+        final photoUrls = state.photos.map((p) {
+          String? url = p.url;
+          if (url != null && url.isNotEmpty) {
+            // Remove trailing question mark if present
+            if (url.endsWith('?')) {
+              url = url.substring(0, url.length - 1);
+              AppLogger.info('DEBUG: Fixed URL by removing trailing ?: $url');
+            }
+            
+            // Make sure the URL is publicly accessible by ensuring it has the right access flag
+            if (!url.contains('public=true') && !url.contains('download=true') && url.contains('supabase')) {
+              // Add download=true parameter to force public access
+              url = url.contains('?') 
+                ? '$url&download=true' 
+                : '$url?download=true';
+              AppLogger.info('DEBUG: Added download flag to URL: $url');
+            }
+            
+            return url;
+          }
+          return null;
+        }).where((url) => url != null && url.isNotEmpty).cast<String>().toList();
+        
+        AppLogger.info('DEBUG: Valid photo URLs: ${photoUrls.length}');
 
           // Only show photo carousel if we actually have photos
           if (photoUrls.isNotEmpty) {
