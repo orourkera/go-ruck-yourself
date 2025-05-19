@@ -195,8 +195,8 @@ class RuckLikesResource(Resource):
             
         # Add the like
         try:
-            # Get the user's profile info for display name
-            profile_query = supabase.table('profiles') \
+            # Get the user's profile info from user table (not profiles)
+            profile_query = supabase.table('user') \
                                    .select('display_name, avatar_url') \
                                    .eq('id', user_id) \
                                    .execute()
