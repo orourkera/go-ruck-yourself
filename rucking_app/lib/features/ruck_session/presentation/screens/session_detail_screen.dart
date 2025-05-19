@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -677,30 +678,34 @@ Download Go Rucky Yourself from the App Store!
         
         AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for ${photos.length} photos');
         
-        // Store these variables to use after async operations
+        // Store these variables for use after async operations
         final String sessionId = widget.session.id!;
         
-        // Schedule this for the next frame to avoid context issues
-        Future.microtask(() {
-          // Ensure we're still mounted before using the context
-          if (!mounted) {
-            AppLogger.warning('[PHOTO_UPLOAD] Widget no longer mounted, aborting upload');
-            return;
-          }
+        // Don't use the context here - get the bloc directly from GetIt
+        // This avoids any issues with context being disposed
+        try {
+          // Get the bloc directly from the service locator
+          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
           
           // Upload the photos
-          try {
-            context.read<ActiveSessionBloc>().add(
-              UploadSessionPhotosRequested(
-                sessionId: sessionId,
-                photos: photos,
-              ),
-            );
-            AppLogger.info('[PHOTO_UPLOAD] Added event to bloc successfully');
-          } catch (e) {
-            AppLogger.error('[PHOTO_UPLOAD] Error adding event to bloc: $e');
-          }
-        });
+          activeSessionBloc.add(
+            UploadSessionPhotosRequested(
+              sessionId: sessionId,
+              photos: photos,
+            ),
+          );
+          
+          // Add a delayed refresh to fetch the updated photos after upload completes
+          Future.delayed(const Duration(seconds: 1), () {
+            // Explicitly refresh photos
+            activeSessionBloc.add(FetchSessionPhotosRequested(sessionId));
+            AppLogger.info('[PHOTO_UPLOAD] Requested photo refresh');
+          });
+          
+          AppLogger.info('[PHOTO_UPLOAD] Successfully added upload event to bloc using GetIt');
+        } catch (e) {
+          AppLogger.error('[PHOTO_UPLOAD] Error uploading photos: $e');
+        }
       } else {
         AppLogger.info('[PHOTO_UPLOAD] No photos selected or session ID is null: sessionId=${widget.session.id}');
       }
@@ -751,31 +756,35 @@ Download Go Rucky Yourself from the App Store!
         
         AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for camera photo');
         
-        // Store these variables to use after async operations
+        // Store these variables for use after async operations
         final String sessionId = widget.session.id!;
         final File capturedPhoto = photo;
         
-        // Schedule this for the next frame to avoid context issues
-        Future.microtask(() {
-          // Ensure we're still mounted before using the context
-          if (!mounted) {
-            AppLogger.warning('[PHOTO_UPLOAD] Widget no longer mounted, aborting upload');
-            return;
-          }
+        // Don't use the context here - get the bloc directly from GetIt
+        // This avoids any issues with context being disposed
+        try {
+          // Get the bloc directly from the service locator
+          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
           
           // Upload the photo
-          try {
-            context.read<ActiveSessionBloc>().add(
-              UploadSessionPhotosRequested(
-                sessionId: sessionId,
-                photos: [capturedPhoto],
-              ),
-            );
-            AppLogger.info('[PHOTO_UPLOAD] Added camera photo event to bloc successfully');
-          } catch (e) {
-            AppLogger.error('[PHOTO_UPLOAD] Error adding camera photo event to bloc: $e');
-          }
-        });
+          activeSessionBloc.add(
+            UploadSessionPhotosRequested(
+              sessionId: sessionId,
+              photos: [capturedPhoto],
+            ),
+          );
+          
+          // Add a delayed refresh to fetch the updated photos after upload completes
+          Future.delayed(const Duration(seconds: 1), () {
+            // Explicitly refresh photos
+            activeSessionBloc.add(FetchSessionPhotosRequested(sessionId));
+            AppLogger.info('[PHOTO_UPLOAD] Requested photo refresh after camera upload');
+          });
+          
+          AppLogger.info('[PHOTO_UPLOAD] Successfully added camera photo upload event using GetIt');
+        } catch (e) {
+          AppLogger.error('[PHOTO_UPLOAD] Error uploading camera photo: $e');
+        }
       } else {
         AppLogger.info('[PHOTO_UPLOAD] No photo taken or session ID is null: sessionId=${widget.session.id}');
       }
