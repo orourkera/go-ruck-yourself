@@ -49,24 +49,27 @@ class LikeActionInProgress extends SocialState {}
 class LikeActionCompleted extends SocialState {
   final bool isLiked;
   final int ruckId;
+  final int likeCount;
 
   const LikeActionCompleted({
     required this.isLiked,
     required this.ruckId,
+    required this.likeCount,
   });
 
   @override
-  List<Object?> get props => [isLiked, ruckId];
+  List<Object?> get props => [isLiked, ruckId, likeCount];
 }
 
 /// State for when a like action fails
 class LikeActionError extends SocialState {
   final String message;
+  final int ruckId;
 
-  const LikeActionError(this.message);
+  const LikeActionError(this.message, this.ruckId);
 
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, ruckId];
 }
 
 /// State for when a like status check is completed

@@ -69,8 +69,8 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         isCurrentlyLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
         debugPrint('🔄 Repository check complete, user has liked: $isCurrentlyLiked');
       } catch (e) {
-        debugPrint('❌ Error checking like status: $e');
-        emit(LikeActionError('Error checking like status: $e'));
+        debugPrint('🐞 Error checking like status: $e');
+        emit(LikeActionError('Error checking like status: $e', event.ruckId));
         return;
       }
     }
@@ -87,22 +87,33 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         
         if (success) {
           debugPrint('✅ Successfully removed like');
+          
+          // Get the updated like count
+          final likes = await _socialRepository.getRuckLikes(event.ruckId);
+          final likeCount = likes.length;
+          
           emit(LikeActionCompleted(
             isLiked: false,
             ruckId: event.ruckId,
+            likeCount: likeCount,
           ));
         } else {
           debugPrint('❌ Failed to unlike ruck session');
-          emit(const LikeActionError('Failed to unlike ruck session'));
+          emit(LikeActionError('Failed to unlike ruck session', event.ruckId));
         }
       } else {
         debugPrint('🔄 User hasn\'t liked this ruck yet, adding like');
         final like = await _socialRepository.addRuckLike(event.ruckId);
         debugPrint('✅ Successfully added like: ${like.id}');
         
+        // Get the updated like count
+        final likes = await _socialRepository.getRuckLikes(event.ruckId);
+        final likeCount = likes.length;
+        
         emit(LikeActionCompleted(
           isLiked: true,
           ruckId: event.ruckId,
+          likeCount: likeCount,
         ));
       }
       
@@ -111,13 +122,13 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       
     } on UnauthorizedException catch (e) {
       debugPrint('❌ Authentication error: ${e.message}');
-      emit(LikeActionError('Authentication error: ${e.message}'));
+      emit(LikeActionError('Authentication error: ${e.message}', event.ruckId));
     } on ServerException catch (e) {
       debugPrint('❌ Server error: ${e.message}');
-      emit(LikeActionError('Server error: ${e.message}'));
+      emit(LikeActionError('Server error: ${e.message}', event.ruckId));
     } catch (e) {
       debugPrint('❌ Unknown error during like action: $e');
-      emit(LikeActionError('Unknown error: $e'));
+      emit(LikeActionError('Unknown error: $e', event.ruckId));
     }
   }
 

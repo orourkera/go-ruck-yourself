@@ -65,24 +65,26 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     // Trigger strong haptic feedback when like button is tapped
     HapticFeedback.heavyImpact();
     
+    // Optimistic update for immediate feedback FIRST
     setState(() {
-      _isProcessingLike = true;
-    });
-    
-    // Optimistic update for immediate feedback
-    setState(() {
+      // Update the UI state immediately for responsiveness
       if (_isLiked) {
         _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
       } else {
         _likeCount += 1;
       }
       _isLiked = !_isLiked;
+      
+      // Only set processing to true AFTER the icon has changed
+      // This ensures the user sees the heart change before any loading indicator
+      _isProcessingLike = true;
     });
     
     // Dispatch event to update backend
     final ruckId = int.tryParse(widget.ruckBuddy.id);
-    if (ruckId != null && widget.onLikeTap != null) {
-      widget.onLikeTap!();
+    if (ruckId != null) {
+      // Directly update backend through SocialBloc - this ensures per-ruck state
+      context.read<SocialBloc>().add(ToggleRuckLike(ruckId));
     }
   }
 
@@ -104,29 +106,37 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     return BlocListener<SocialBloc, SocialState>(
       listenWhen: (previous, current) {
         // Listen for like action completions and status checks
+        // Only respond to states related to THIS specific ruck
+        final thisRuckId = int.tryParse(widget.ruckBuddy.id);
+        if (thisRuckId == null) return false;
+        
         if (current is LikeActionCompleted) {
-          return int.tryParse(widget.ruckBuddy.id) == current.ruckId;
+          return thisRuckId == current.ruckId;
         }
         if (current is LikeStatusChecked) {
-          return int.tryParse(widget.ruckBuddy.id) == current.ruckId;
+          return thisRuckId == current.ruckId;
+        }
+        if (current is LikesLoaded) {
+          return thisRuckId == current.ruckId;
         }
         return false;
       },
       listener: (context, state) {
-        debugPrint('🐞 [_RuckBuddyCardState.build] SocialBloc state changed: $state');
-        if (state is LikeActionCompleted) {
+        final thisRuckId = int.tryParse(widget.ruckBuddy.id);
+        if (thisRuckId == null) return;
+        
+        debugPrint('🐞 [_RuckBuddyCardState.build] RuckID ${thisRuckId} received SocialBloc state: $state');
+        
+        if (state is LikeActionCompleted && state.ruckId == thisRuckId) {
           debugPrint('🐞 [_RuckBuddyCardState.build] Like action completed for Ruck ID: ${state.ruckId}, liked: ${state.isLiked}');
-          // Update UI based on the result
+          // Update UI based on the result for THIS specific ruck
           setState(() {
             _isLiked = state.isLiked;
-            if (state.ruckId == int.tryParse(widget.ruckBuddy.id)) {
-              _likeCount = _likeCount + (state.isLiked ? 1 : -1);
-              if (_likeCount < 0) _likeCount = 0; // Safety check
-            }
+            _likeCount = state.likeCount; // Use the count from the state
             _isProcessingLike = false;
           });
-        } else if (state is LikeActionError) {
-          debugPrint('🐞 [_RuckBuddyCardState.build] Like action error: ${state.message}');
+        } else if (state is LikeActionError && state.ruckId == thisRuckId) {
+          debugPrint('🐞 [_RuckBuddyCardState.build] Like action error for Ruck ID ${state.ruckId}: ${state.message}');
           // Show error and revert UI
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -144,20 +154,13 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
             }
             _isProcessingLike = false;
           });
-        } else if (state is LikesLoaded) {
-          debugPrint('🐞 [_RuckBuddyCardState.build] Likes loaded, user has liked: ${state.userHasLiked} for ruckId: ${state.ruckId}');
-          final parsedRuckId = int.tryParse(widget.ruckBuddy.id);
-          if (parsedRuckId != null && state.ruckId == parsedRuckId) {
-            setState(() {
-              _isLiked = state.userHasLiked;
-              _likeCount = state.likes.length;
-              _isProcessingLike = false;
-            });
-          }
-        } else if (state is LikeActionInProgress) {
-          debugPrint('🐞 [_RuckBuddyCardState.build] Like action in progress');
-        } else {
-          debugPrint('🐞 [_RuckBuddyCardState.build] Other SocialBloc state: $state');
+        } else if (state is LikesLoaded && state.ruckId == thisRuckId) {
+          debugPrint('🐞 [_RuckBuddyCardState.build] Likes loaded for Ruck ID ${state.ruckId}, user has liked: ${state.userHasLiked}');
+          setState(() {
+            _isLiked = state.userHasLiked;
+            _likeCount = state.likes.length;
+            _isProcessingLike = false;
+          });
         }
       },
       child: Card(
@@ -305,16 +308,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
                           child: Row(
                             children: [
-                              _isProcessingLike
-                                ? SizedBox(
-                                    width: 40,
-                                    height: 40,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(10.0),
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                  )
-                                : Image.asset(
+                              // Always show the like icon (never a loading indicator)
+                              // This gives immediate visual feedback
+                              Image.asset(
                                     _isLiked 
                                       ? 'assets/images/tactical_ruck_like_icon_active.png' 
                                       : 'assets/images/tactical_ruck_like_icon_transparent.png',
@@ -356,7 +352,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           child: Row(children: [
                             Icon(
                               Icons.comment,
-                              size: 45, // Adjusted to requested size
+                              size: 40, // Adjusted to 40px as requested
                               color: AppColors.secondary, // Brownish-orange color
                             ),
                             const SizedBox(width: 4),
