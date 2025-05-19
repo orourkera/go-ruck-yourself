@@ -110,8 +110,9 @@ def rate_limit_resource(resource, limit):
     resource.dispatch_request = wrapped_dispatch_request
     return resource
 
-# Apply rate limiting to Flask-RESTful endpoints
-decorators = [limiter.limit("5 per minute")]
+# Apply rate limiting to Flask-RESTful endpoints - using higher defaults
+# Individual resources can have their own specific limits applied via rate_limit_resource
+decorators = []  # No global rate limit - we'll set specific limits per endpoint
 
 # Enable CORS with specific allowed origins
 allowed_origins = [
@@ -304,8 +305,11 @@ api.add_resource(RuckPhotosResource, '/api/ruck-photos')
 rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Ruck Likes Endpoints
-api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
-rate_limit_resource(RuckLikesResource, "200 per hour") # Allow more likes per user
+api.add_resource(
+  rate_limit_resource(RuckLikesResource, "100 per hour"),
+  '/api/ruck-likes',
+  '/api/ruck-likes/check'
+)
 
 # Ruck Comments Endpoint
 api.add_resource(RuckCommentsResource, '/api/ruck-comments')
