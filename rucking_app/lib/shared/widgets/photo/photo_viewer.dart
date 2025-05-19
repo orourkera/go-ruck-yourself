@@ -31,7 +31,6 @@ class PhotoViewer extends StatefulWidget {
 class _PhotoViewerState extends State<PhotoViewer> {
   late PageController _pageController;
   late int _currentIndex;
-  double _initialScale = 1.0;
   
   @override
   void initState() {
@@ -98,7 +97,6 @@ class _PhotoViewerState extends State<PhotoViewer> {
           onPageChanged: (index) {
             setState(() {
               _currentIndex = index;
-              _initialScale = 1.0; // Reset scale when changing photos
             });
           },
           itemBuilder: (context, index) {
@@ -107,9 +105,6 @@ class _PhotoViewerState extends State<PhotoViewer> {
                 minScale: 0.5,
                 maxScale: 3.0,
                 onInteractionStart: (details) {
-                  if (details is ScaleStartDetails) {
-                    _initialScale = 1.0;
-                  }
                 },
                 child: Hero(
                   tag: 'photo_${widget.photoUrls[index]}',
