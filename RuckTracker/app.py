@@ -184,6 +184,7 @@ def load_user():
     # Extract auth token from headers
     auth_header = request.headers.get('Authorization')
     g.user = None
+    g.access_token = None
     
     # Check if this is a development environment
     is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
@@ -203,21 +204,9 @@ def load_user():
                 
                 if user_response.user:
                     g.user = user_response.user
-                    # Store token in g.user for use in Supabase client initialization
-                    try:
-                        setattr(g.user, 'token', token)
-                    except Exception as e:
-                        logger.warning(f"Could not set token on user object: {e}")
-                        # If user is immutable, wrap in SimpleNamespace
-                        from types import SimpleNamespace
-                        user_dict = {}
-                        # Manually copy essential attributes if they exist
-                        for attr in ['id', 'email', 'phone', 'role']:
-                            if hasattr(g.user, attr):
-                                user_dict[attr] = getattr(g.user, attr)
-                        g.user = SimpleNamespace(**user_dict, token=token)
-                    logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
-                    logger.info("Token storage code is active")
+                    g.access_token = token
+                    logger.info(f"Token storage code is active")
+                    logger.debug(f"User {user_response.user.id} loaded successfully.")
                     return
                 else:
                     logger.warning("No user data returned from Supabase")
@@ -229,9 +218,11 @@ def load_user():
                         g.user = SimpleNamespace(
                             id="dev-user-id",
                             email="dev@example.com", 
-                            user_metadata={"name": "Development User"},
-                            token=token
+                            user_metadata={"name": "Development User"}
                         )
+                        g.access_token = token
+                    logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
+                    return
             except Exception as token_error:
                 logger.error(f"Token validation error: {str(token_error)}")
                 
@@ -242,9 +233,11 @@ def load_user():
                     g.user = SimpleNamespace(
                         id="dev-user-id",
                         email="dev@example.com", 
-                        user_metadata={"name": "Development User"},
-                        token=token
+                        user_metadata={"name": "Development User"}
                     )
+                    g.access_token = token
+                logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
+                return
                 
         except Exception as e:
             logger.error(f"Error authenticating user: {str(e)}", exc_info=True)
@@ -257,9 +250,9 @@ def load_user():
                 g.user = SimpleNamespace(
                     id="dev-user-id",
                     email="dev@example.com", 
-                    user_metadata={"name": "Development User"},
-                    token=token
+                    user_metadata={"name": "Development User"}
                 )
+                g.access_token = None
     else:
         logger.debug("No authorization header found")
         
@@ -270,9 +263,9 @@ def load_user():
             g.user = SimpleNamespace(
                 id="dev-user-id",
                 email="dev@example.com", 
-                user_metadata={"name": "Development User"},
-                token=None
+                user_metadata={"name": "Development User"}
             )
+            g.access_token = None
 
 # Force HTTPS redirect in production
 @app.before_request
