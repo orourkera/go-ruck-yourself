@@ -155,21 +155,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
             // Photo
             ClipRRect(
               borderRadius: BorderRadius.circular(15.0),
-              child: CachedNetworkImage(
-                imageUrl: widget.photoUrls[index],
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: Colors.grey.shade200,
-                  child: const Center(
-                    child: Icon(Icons.error_outline, color: Colors.red),
-                  ),
-                ),
-              ),
+              child: _buildImageWithFallback(context, index),
             ),
             
             // Delete button (if allowed)
@@ -220,5 +206,41 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         ),
       ),
     );
+  }
+  
+  // Helper method to build image with fallback options and better error handling
+  Widget _buildImageWithFallback(BuildContext context, int index) {
+    final String imageUrl = widget.photoUrls[index];
+    print('Loading image from URL: $imageUrl'); // Direct print for immediate feedback
+    
+    // Simple, reliable approach: just use a direct network image with error handling
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (context, error, stackTrace) {
+        print('Error loading image: $imageUrl, error: $error');
+        return Container(
+          color: Colors.grey.shade200,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.broken_image, color: Colors.red, size: 32),
+                const SizedBox(height: 8),
+                Text(
+                  'Image not available',
+                  style: TextStyle(color: Colors.red.shade800),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    
+    // NOTE: We removed the CachedNetworkImage code that was causing issues
   }
 }

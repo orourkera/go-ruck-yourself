@@ -63,84 +63,118 @@ class SessionRepository {
         return [];
       }
       
-      // Instead of constructing our own HTTP request, prepare to upload photos directly through
-      // the core ApiClient which handles base URLs and authentication
-      List<File> photoFiles = photos;
-      List<Map<String, dynamic>> photoMetadata = [];
-
+      // Get the auth token - we'll need this for each request
+      final authService = GetIt.I<AuthService>();
+      final authToken = await authService.getToken();
+      
       // For photo upload, we need to use a direct URL approach - we'll use the API host from .env file
-      // This assumes the API host is defined in the .env file
       final apiHost = dotenv.env['API_HOST'] ?? 'https://getrucky.com';
       final url = '$apiHost${ApiEndpoints.ruckPhotos}';
       AppLogger.info('Uploading photos to URL: $url');
-
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse(url),
-      );
       
-      // Add the authorization header
-      final authService = GetIt.I<AuthService>();
-      final authToken = await authService.getToken();
-      if (authToken != null && authToken.isNotEmpty) {
-        request.headers.addAll({
-          'Authorization': 'Bearer $authToken',
-        });
-      }
+      // To prevent connection resets, upload photos one at a time with retry logic
+      final List<RuckPhoto> allUploadedPhotos = [];
       
-      // Add ruck_id as a form field
-      request.fields['ruck_id'] = ruckId;
-      
-      // Add each photo as a file
-      for (final photoFile in photos) {
-        final originalFilename = path.basename(photoFile.path);
-        final contentType = _getContentType(photoFile.path);
+      // Upload each photo individually to avoid timeout issues
+      for (int i = 0; i < photos.length; i++) {
+        AppLogger.info('Uploading photo ${i+1} of ${photos.length}');
+        final photo = photos[i];
         
-        // Add the file to the request
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'photos', // The field name expected by the backend
-            photoFile.path,
-            filename: originalFilename,
-            contentType: MediaType.parse(contentType),
-          ),
-        );
-      }
-      
-      // Send the request and get the response
-      AppLogger.info('Sending multipart request to upload photos');
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-      
-      // Parse the response
-      if (response.statusCode == 201) {
-        final responseData = json.decode(response.body);
+        // Create a new request for each photo to prevent connection timeouts
+        bool photoUploaded = false;
+        int retryCount = 0;
+        Exception? lastError;
         
-        if (responseData is Map && 
-            responseData.containsKey('data') && 
-            responseData['data'] is Map && 
-            responseData['data'].containsKey('photos')) {
-          
-          final photosList = responseData['data']['photos'] as List;
-          final List<RuckPhoto> uploadedPhotos = photosList
-              .map((photo) => RuckPhoto.fromJson(photo))
-              .toList();
-          
-          AppLogger.info('Successfully uploaded ${uploadedPhotos.length} photos');
-          return uploadedPhotos;
-        } else {
-          AppLogger.warning('Unexpected response format from photo upload: $responseData');
-          return [];
+        // Try uploading this photo up to 3 times
+        while (!photoUploaded && retryCount < 3) {
+          try {
+            final singlePhotoRequest = http.MultipartRequest(
+              'POST',
+              Uri.parse(url),
+            );
+            
+            // Add timeout settings to the request
+            singlePhotoRequest.persistentConnection = false;
+            
+            // Add the authorization header
+            if (authToken != null && authToken.isNotEmpty) {
+              singlePhotoRequest.headers.addAll({
+                'Authorization': 'Bearer $authToken',
+              });
+            }
+            
+            // Add ruck_id as a form field
+            singlePhotoRequest.fields['ruck_id'] = ruckId;
+            
+            // Add this single photo to the request
+            final originalFilename = path.basename(photo.path);
+            final contentType = _getContentType(photo.path);
+            
+            singlePhotoRequest.files.add(
+              await http.MultipartFile.fromPath(
+                'photos', // The field name expected by the backend
+                photo.path,
+                filename: originalFilename,
+                contentType: MediaType.parse(contentType),
+              ),
+            );
+            
+            // Send the request with timeout protection
+            AppLogger.info('Sending request for photo ${i+1} (attempt ${retryCount+1})');
+            final client = http.Client();
+            try {
+              final streamedResponse = await client.send(singlePhotoRequest)
+                  .timeout(const Duration(seconds: 30));
+              final response = await http.Response.fromStream(streamedResponse);
+              
+              // Handle the response
+              if (response.statusCode == 201) {
+                photoUploaded = true;
+                final responseData = json.decode(response.body);
+                
+                if (responseData is Map && 
+                    responseData.containsKey('data') && 
+                    responseData['data'] is Map && 
+                    responseData['data'].containsKey('photos')) {
+                  
+                  final photosList = responseData['data']['photos'] as List;
+                  final List<RuckPhoto> uploadedPhotos = photosList
+                      .map((photo) => RuckPhoto.fromJson(photo))
+                      .toList();
+                  
+                  if (uploadedPhotos.isNotEmpty) {
+                    allUploadedPhotos.addAll(uploadedPhotos);
+                    AppLogger.info('Successfully uploaded photo ${i+1}');
+                  }
+                }
+              } else {
+                throw Exception('Photo upload failed with status: ${response.statusCode}, Body: ${response.body}');
+              }
+            } finally {
+              client.close();
+            }
+          } catch (e) {
+            lastError = e is Exception ? e : Exception(e.toString());
+            retryCount++;
+            AppLogger.error('Error uploading photo ${i+1} (attempt $retryCount): $e');
+            await Future.delayed(Duration(seconds: 2 * retryCount)); // Backoff strategy
+          }
         }
-      } else {
-        AppLogger.error('Error uploading photos. Status: ${response.statusCode}, Body: ${response.body}');
-        throw Exception('Failed to upload photos: ${response.statusCode}');
+        
+        // If we still couldn't upload this photo after retries, log it but continue with others
+        if (!photoUploaded) {
+          AppLogger.error('Failed to upload photo ${i+1} after 3 attempts: $lastError');
+        }
       }
-    } catch (e) {
-      AppLogger.error('Error uploading photos: $e');
-      rethrow;
+      
+      AppLogger.info('Successfully uploaded ${allUploadedPhotos.length} photos');
+      return allUploadedPhotos;
     }
+  } catch (e) {
+    AppLogger.error('Error uploading photos: $e');
+    rethrow;
   }
+}
   
   /// Upload a file to Supabase storage
   Future<Map<String, dynamic>?> _uploadToSupabase(File file, String storagePath) async {
@@ -238,13 +272,16 @@ class SessionRepository {
       final response = await _apiClient.get('/ruck-photos?ruck_id=$ruckId');
       
       if (response is List) {
+        AppLogger.info('Received ${response.length} photos for session $ruckId (List format)');  
         return response.map((photo) => RuckPhoto.fromJson(photo)).toList();
       } else if (response is Map && response.containsKey('data')) {
         final List<dynamic> data = response['data'];
+        AppLogger.info('Received ${data.length} photos for session $ruckId (Map format)');
         return data.map((photo) => RuckPhoto.fromJson(photo)).toList();
+      } else {
+        AppLogger.warning('Unexpected response format when fetching photos: $response');
+        return [];
       }
-      
-      return [];
     } catch (e) {
       AppLogger.error('Error fetching photos: $e');
       return [];
@@ -275,6 +312,8 @@ class SessionRepository {
   /// 
   /// Takes a RuckPhoto object and deletes it using the backend API
   /// The backend will handle both the database record deletion and storage cleanup
+  /// Returns true if deletion was successful, false if it failed for a reason other than 404
+  /// Throws an exception with 'not found' message if the photo was already deleted (404)
   Future<bool> deletePhoto(RuckPhoto photo) async {
     try {
       AppLogger.info('Deleting photo: ${photo.id}');
@@ -291,6 +330,15 @@ class SessionRepository {
         return false;
       }
     } catch (e) {
+      // Check if this is a 404 error (photo already deleted)
+      if (e.toString().contains('404') || 
+          e.toString().contains('not found') || 
+          (e.toString().contains('StatusCode') && e.toString().contains('404'))) {
+        AppLogger.info('Photo already deleted (404): ${photo.id}');
+        // Rethrow a specific error for the bloc to handle
+        throw Exception('not found'); 
+      }
+      
       AppLogger.error('Error deleting photo: $e');
       return false;
     }
