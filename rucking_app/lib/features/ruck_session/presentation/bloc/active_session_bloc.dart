@@ -1198,11 +1198,86 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           event.photos,
         );
         
+        // IMPORTANT: Check if we got valid data back
+        if (uploadedPhotos.isEmpty) {
+          AppLogger.error('No photos returned from upload API - trying to fetch all photos instead');
+          // If the upload succeeded but didn't return photo data, try to fetch all photos
+          await Future.delayed(const Duration(seconds: 1)); // Wait a moment for the backend to process
+          
+          // Reload all photos to ensure we have the latest
+          emit(currentState.copyWith(
+            isUploading: false,
+            isPhotosLoading: true,
+          ));
+          
+          // Refetch all photos for this session
+          final allPhotos = await _sessionRepository.getSessionPhotos(event.sessionId);
+          AppLogger.info('Fetched ${allPhotos.length} photos after upload');
+          
+          // Create a new list with clean URLs to prevent caching issues
+          final cleanedPhotos = allPhotos.map((photo) {
+            if (photo.url != null && photo.url!.contains('?')) {
+              // Need to create a new copy with the cleaned URL
+              final cleanUrl = photo.url!.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}';
+              AppLogger.info('Cleaned photo URL: $cleanUrl');
+              
+              // Create a new RuckPhoto with the cleaned URL
+              return RuckPhoto(
+                id: photo.id,
+                ruckId: photo.ruckId,
+                userId: photo.userId,
+                filename: photo.filename, 
+                originalFilename: photo.originalFilename,
+                contentType: photo.contentType,
+                size: photo.size,
+                createdAt: photo.createdAt,
+                url: cleanUrl,
+                thumbnailUrl: photo.thumbnailUrl != null 
+                  ? photo.thumbnailUrl!.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}'
+                  : null,
+              );
+            }
+            return photo;
+          }).toList();
+          
+          emit(currentState.copyWith(
+            photos: cleanedPhotos,  // Use our cleaned photos list
+            isPhotosLoading: false,
+            uploadSuccess: true,
+          ));
+          return;
+        }
+        
+        // Clean all photo URLs to avoid caching issues
+        final cleanedUploadedPhotos = uploadedPhotos.map((photo) {
+          if (photo.url != null && photo.url!.contains('?')) {
+            final cleanUrl = photo.url!.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}';
+            AppLogger.info('Cleaned photo URL: $cleanUrl');
+            
+            return RuckPhoto(
+              id: photo.id,
+              ruckId: photo.ruckId,
+              userId: photo.userId,
+              filename: photo.filename, 
+              originalFilename: photo.originalFilename,
+              contentType: photo.contentType,
+              size: photo.size,
+              createdAt: photo.createdAt,
+              url: cleanUrl,
+              thumbnailUrl: photo.thumbnailUrl != null 
+                ? photo.thumbnailUrl!.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}'
+                : null,
+            );
+          }
+          return photo;
+        }).toList();
+        
         // Get existing photos plus new ones
         final updatedPhotos = List<RuckPhoto>.from(currentState.photos ?? []);
-        updatedPhotos.addAll(uploadedPhotos);
+        updatedPhotos.addAll(cleanedUploadedPhotos);  // Use the cleaned photos
         
-        AppLogger.info('Successfully uploaded ${uploadedPhotos.length} photos');
+        AppLogger.info('Successfully uploaded ${cleanedUploadedPhotos.length} photos');
+        AppLogger.info('Photo URLs: ${cleanedUploadedPhotos.map((p) => p.url).join(', ')}');
         
         emit(currentState.copyWith(
           photos: updatedPhotos,

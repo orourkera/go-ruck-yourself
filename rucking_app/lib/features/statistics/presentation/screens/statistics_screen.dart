@@ -5,7 +5,6 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:flutter/widgets.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 /// Screen for displaying statistics and analytics

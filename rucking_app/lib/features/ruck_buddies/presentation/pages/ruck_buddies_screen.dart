@@ -28,15 +28,17 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('🐞 [_RuckBuddiesScreenState.initState] Initializing RuckBuddiesScreen.');
     _scrollController.addListener(_onScroll);
     
     // Schedule BLoC event for the first frame to avoid context access issues
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Initial fetch
       if (mounted) {
+        debugPrint('🐞 [_RuckBuddiesScreenState.initState] Dispatching FetchRuckBuddiesEvent.');
         context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
         // Preload mock photos for demo
-        _preloadDemoImages();
+        // _preloadDemoImages(); // Commenting out demo images for now to simplify debugging
       }
     });
   }
@@ -63,7 +65,18 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
   
   void _onScroll() {
     if (_isBottom) {
-      context.read<RuckBuddiesBloc>().add(const FetchMoreRuckBuddiesEvent());
+      final state = context.read<RuckBuddiesBloc>().state;
+      debugPrint('🐞 [_RuckBuddiesScreenState._onScroll] Scroll isBottom. Current state: ${state.runtimeType}');
+      if (state is RuckBuddiesLoaded) {
+        if (!state.isLoadingMore && !state.hasReachedMax) {
+          debugPrint('🐞 [_RuckBuddiesScreenState._onScroll] Dispatching FetchMoreRuckBuddiesEvent.');
+          context.read<RuckBuddiesBloc>().add(const FetchMoreRuckBuddiesEvent());
+        } else {
+          debugPrint('🐞 [_RuckBuddiesScreenState._onScroll] Not fetching more. isLoadingMore: ${state.isLoadingMore}, hasReachedMax: ${state.hasReachedMax}');
+        }
+      } else {
+        debugPrint('🐞 [_RuckBuddiesScreenState._onScroll] Not fetching more. State is not RuckBuddiesLoaded.');
+      }
     }
   }
   
@@ -77,19 +90,25 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🐞 RuckBuddiesScreen.build called');
+    debugPrint('🐞 [_RuckBuddiesScreenState.build] Called.');
     
     // Check for lady mode in AuthBloc
     bool isLadyMode = false;
+    String authStateInfo = 'Unknown';
     try {
       final authBloc = BlocProvider.of<AuthBloc>(context);
       if (authBloc.state is Authenticated) {
         isLadyMode = (authBloc.state as Authenticated).user.gender == 'female';
+        authStateInfo = 'Authenticated, User gender: ${(authBloc.state as Authenticated).user.gender}';
+      } else {
+        authStateInfo = 'Not Authenticated or AuthBloc state is ${authBloc.state.runtimeType}';
       }
     } catch (e) {
       // If we can't access the auth bloc, default to standard mode
-      debugPrint('Could not determine gender for theme: $e');
+      authStateInfo = 'Error accessing AuthBloc: $e';
+      debugPrint('🐞 [_RuckBuddiesScreenState.build] Could not determine gender for theme: $e');
     }
+    debugPrint('🐞 [_RuckBuddiesScreenState.build] AuthState: $authStateInfo, isLadyMode: $isLadyMode');
     
     // Use lady mode colors for female users
     final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
@@ -103,6 +122,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
+              debugPrint('🐞 [_RuckBuddiesScreenState.build] Refresh button pressed, dispatching RefreshRuckBuddiesEvent.');
               context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
             },
           ),
@@ -110,60 +130,51 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
+          debugPrint('🐞 [_RuckBuddiesScreenState.build] RefreshIndicator onRefresh triggered, dispatching RefreshRuckBuddiesEvent.');
           context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
         },
         child: BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
           builder: (context, state) {
-            debugPrint('🐞 RuckBuddiesScreen BlocBuilder - Current state: ${state.runtimeType}');
-            if (state is RuckBuddiesLoading) {
-              debugPrint('🐞 RuckBuddiesScreen BlocBuilder - State: RuckBuddiesLoading (initial load)');
+            debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder received state: ${state.runtimeType}');
+            if (state is RuckBuddiesLoading) { // Initial loading or refresh with no data yet
+              debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: State is RuckBuddiesLoading (initial). Showing main loading indicator.');
               return const Center(child: CircularProgressIndicator());
             } else if (state is RuckBuddiesError) {
-              debugPrint('🐞 RuckBuddiesScreen BlocBuilder - State: RuckBuddiesError, Message: ${state.message}');
-              return ErrorDisplay(
-                message: state.message,
-                onRetry: () {
-                  context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
-                },
-              );
+              debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: Showing error display: ${state.message}');
+              return ErrorDisplay(message: state.message, onRetry: () {
+                debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder ErrorDisplay: Retry pressed, dispatching FetchRuckBuddiesEvent.');
+                context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+              });
             } else if (state is RuckBuddiesLoaded) {
               final ruckBuddies = state.ruckBuddies;
-              final isLoadingMore = state.isLoadingMore;
-              
-              debugPrint('🐞 RuckBuddiesScreen BlocBuilder - State: RuckBuddiesLoaded or LoadingMore, Count: ${ruckBuddies.length}, IsLoadingMore: $isLoadingMore');
+              final isLoadingMore = state.isLoadingMore; // Use the flag from RuckBuddiesLoaded state
+              debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: State is RuckBuddiesLoaded. Buddies count: ${ruckBuddies.length}, isLoadingMore: $isLoadingMore');
 
-              if (ruckBuddies.isEmpty) {
-                debugPrint('🐞 RuckBuddiesScreen BlocBuilder - RuckBuddies list is empty, showing EmptyState.');
-                return const EmptyState(
-                  title: 'No Ruck Buddies',
-                  message: 'No ruck buddies found yet. Be the first to share!',
-                  icon: Icons.people_outline,
-                );
+              if (ruckBuddies.isEmpty && !isLoadingMore) { // Only show empty state if not loading and actually empty
+                debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: RuckBuddies list is empty, showing EmptyState.');
+                return const EmptyState(title: 'No Buddies Yet', message: 'No ruck buddies found. Start rucking to see them here!');
               }
               return _buildRuckBuddiesList(ruckBuddies, isLoadingMore);
-            } else {
-              // Default to empty state if initial or unknown state
-              debugPrint('🐞 RuckBuddiesScreen BlocBuilder - State: Initial or Unknown, showing EmptyState.');
-              return const EmptyState(
-                title: 'No Ruck Buddies',
-                message: 'No ruck buddies found yet. Be the first to share!',
-                icon: Icons.people_outline,
-              );
             }
+            debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: Unhandled state: ${state.runtimeType}. Returning empty container.');
+            return Container(); // Should ideally not happen
           },
         ),
       ),
     );
   }
-  
+
   Widget _buildRuckBuddiesList(List<RuckBuddy> ruckBuddies, bool isLoadingMore) {
+    debugPrint('🐞 [_RuckBuddiesScreenState._buildRuckBuddiesList] Called with ${ruckBuddies.length} buddies. isLoadingMore: $isLoadingMore');
     return ListView.builder(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16.0),
-      itemCount: ruckBuddies.length + (isLoadingMore ? 1 : 0),
+      itemCount: isLoadingMore ? ruckBuddies.length + 1 : ruckBuddies.length,
       itemBuilder: (context, index) {
-        if (index >= ruckBuddies.length) {
+        // debugPrint('🐞 [_RuckBuddiesScreenState._buildRuckBuddiesList itemBuilder] Index: $index, Total items including loader: ${isLoadingMore ? ruckBuddies.length + 1 : ruckBuddies.length}');
+        if (isLoadingMore && index == ruckBuddies.length) {
+          debugPrint('🐞 [_RuckBuddiesScreenState._buildRuckBuddiesList itemBuilder] Showing loading more indicator at index $index.');
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(16.0),
@@ -175,7 +186,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
         // Wrap each card in an error boundary to prevent entire list from failing if one card fails
         try {
           final ruckBuddy = ruckBuddies[index];
-          debugPrint('🐞 Building card for buddy ${index+1}/${ruckBuddies.length} with ID: ${ruckBuddy.id}');
+          debugPrint('🐞 [_RuckBuddiesScreenState._buildRuckBuddiesList itemBuilder] Building card for buddy ${index+1}/${ruckBuddies.length} with ID: ${ruckBuddy.id}');
           
           return Padding(
             padding: const EdgeInsets.only(bottom: 16.0),

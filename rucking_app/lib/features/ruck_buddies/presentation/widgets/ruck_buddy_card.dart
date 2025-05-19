@@ -82,6 +82,13 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🐞 [_RuckBuddyCardState.build] Called for RuckBuddy ID: ${widget.ruckBuddy.id}');
+
+    if (widget.ruckBuddy.user == null) {
+      debugPrint('🐞 [_RuckBuddyCardState.build] CRITICAL: widget.ruckBuddy.user is NULL for ID: ${widget.ruckBuddy.id}');
+      return const SizedBox.shrink();
+    }
+
     final authBloc = Provider.of<AuthBloc>(context, listen: false);
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
@@ -128,39 +135,39 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
               children: [
                 const Text('--- RUCK BUDDY CARD DEBUG ---', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), // DEBUG TEXT
                 // User Info Row
-                Row(
-                  children: [
-                    // Avatar (fallback to circle with first letter if no URL)
-                    _buildAvatar(widget.ruckBuddy.user),
-                    const SizedBox(width: 12),
-                    
-                    // User Name & Time Info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                        Text(
-                          widget.ruckBuddy.user.username,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
+                Builder(builder: (context) {
+                  debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building User Info Row.');
+                  return Row(
+                    children: [
+                      // Avatar (fallback to circle with first letter if no URL)
+                      _buildAvatar(widget.ruckBuddy.user),
+                      const SizedBox(width: 12),
+                      
+                      // User Name & Time Info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.ruckBuddy.user.username,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              _formatCompletedDate(widget.ruckBuddy.completedAt),
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          _formatCompletedDate(widget.ruckBuddy.completedAt),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
                       
                       // Weight chip
                       Chip(
                         backgroundColor: AppColors.secondary,
                         label: Text(
-                          // Use the specialized formatter that preserves original input values
-                          // This prevents rounding issues with standard weights like 10, 20, 60 lbs
                           MeasurementUtils.formatWeightForChip(widget.ruckBuddy.ruckWeightKg, metric: preferMetric),
                           style: AppTextStyles.labelMedium.copyWith(
                             color: Colors.white,
@@ -169,12 +176,15 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                         padding: EdgeInsets.zero,
                       ),
                     ],
-                  ),
-                  
-                  const SizedBox(height: 12),
+                  );
+                }), // End of User Info Row Builder
+                
+                const SizedBox(height: 12),
 
-                  // Map snippet with photos overlay if available
-                  Stack(
+                // Map snippet with photos overlay if available
+                Builder(builder: (context) {
+                  debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building Map/Photo Stack.');
+                  return Stack(
                     children: [
                       _RouteMapPreview(ruckBuddy: widget.ruckBuddy),
                       if (hasPhotos)
@@ -184,12 +194,15 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           child: _PhotoThumbnailsOverlay(photos: widget.ruckBuddy.photos!),
                         ),
                     ],
-                  ),
+                  );
+                }), // End of Map/Photo Stack Builder
 
-                  const Divider(height: 24),
-                  
-                  // Stats Grid (2x2)
-                  Row(
+                const Divider(height: 24),
+                
+                // Stats Grid (2x2)
+                Builder(builder: (context) {
+                  debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building Stats Grid.');
+                  return Row(
                     children: [
                       // Left column
                       Expanded(
@@ -235,11 +248,15 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                         ),
                       ),
                     ],
-                  ),
-                  
-                  // Social interactions row
-                  const SizedBox(height: 16),
-                  Row(
+                  );
+                }), // End of Stats Grid Builder
+
+                const SizedBox(height: 16),
+
+                // Social interactions row
+                Builder(builder: (context) {
+                  debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building Action Buttons.');
+                  return Row(
                     children: [
                       // Like button with count
                       InkWell(
@@ -303,14 +320,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                       ),
                       const Spacer(),
                     ],
-                  ),
-                  const Spacer(),
-                ],
-              ),
+                  );
+                }), // End of Action Buttons Builder
+              ],
             ),
           ),
         ),
-      );
+      ),
+    );
   }
   
   Widget _buildAvatar(UserInfo user) {

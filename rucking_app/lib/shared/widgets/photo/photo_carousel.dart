@@ -211,16 +211,28 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   // Helper method to build image with fallback options and better error handling
   Widget _buildImageWithFallback(BuildContext context, int index) {
     final String imageUrl = widget.photoUrls[index];
-    print('Loading image from URL: $imageUrl'); // Direct print for immediate feedback
+    // Add a timestamp to force refresh and clean URL if needed
+    final String cleanUrl = imageUrl.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}';
     
-    // Simple, reliable approach: just use a direct network image with error handling
+    // Force more aggressive output for debugging
+    print('LOADING IMAGE FROM URL: $cleanUrl');
+    
     return Image.network(
-      imageUrl,
+      cleanUrl,
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
+      // Disable caching to ensure we always get fresh images
+      cacheWidth: null,
+      cacheHeight: null,
+      // Add headers to prevent caching
+      headers: const {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
       errorBuilder: (context, error, stackTrace) {
-        print('Error loading image: $imageUrl, error: $error');
+        print('ERROR LOADING IMAGE: $cleanUrl, error: $error');
         return Container(
           color: Colors.grey.shade200,
           child: Center(
@@ -240,7 +252,5 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         );
       },
     );
-    
-    // NOTE: We removed the CachedNetworkImage code that was causing issues
   }
 }

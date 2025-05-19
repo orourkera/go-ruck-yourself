@@ -56,6 +56,9 @@ class SessionRepository {
   /// Takes a list of photo files and uploads them to the backend API,
   /// which handles both storage and metadata creation
   Future<List<RuckPhoto>> uploadSessionPhotos(String ruckId, List<File> photos) async {
+    // Create a list to hold all successfully uploaded photos
+    final List<RuckPhoto> allUploadedPhotos = [];
+    
     try {
       AppLogger.info('Uploading ${photos.length} photos for session: $ruckId');
       
@@ -71,9 +74,6 @@ class SessionRepository {
       final apiHost = dotenv.env['API_HOST'] ?? 'https://getrucky.com';
       final url = '$apiHost${ApiEndpoints.ruckPhotos}';
       AppLogger.info('Uploading photos to URL: $url');
-      
-      // To prevent connection resets, upload photos one at a time with retry logic
-      final List<RuckPhoto> allUploadedPhotos = [];
       
       // Upload each photo individually to avoid timeout issues
       for (int i = 0; i < photos.length; i++) {
@@ -169,12 +169,12 @@ class SessionRepository {
       
       AppLogger.info('Successfully uploaded ${allUploadedPhotos.length} photos');
       return allUploadedPhotos;
+      
+    } catch (e) {
+      AppLogger.error('Error uploading photos: $e');
+      rethrow;
     }
-  } catch (e) {
-    AppLogger.error('Error uploading photos: $e');
-    rethrow;
   }
-}
   
   /// Upload a file to Supabase storage
   Future<Map<String, dynamic>?> _uploadToSupabase(File file, String storagePath) async {
@@ -197,17 +197,14 @@ class SessionRepository {
       );
       
       if (response.statusCode == 200) {
-        return {
-          'path': storagePath,
-          'contentType': contentType,
-          'size': fileBytes.length,
-        };
+        final responseData = json.decode(response.body);
+        return responseData;
       } else {
-        AppLogger.error('Error uploading file to Supabase: ${response.body}');
+        AppLogger.error('Error uploading to Supabase: ${response.statusCode}, ${response.body}');
         return null;
       }
     } catch (e) {
-      AppLogger.error('Exception uploading to Supabase: $e');
+      AppLogger.error('Error uploading to Supabase: $e');
       return null;
     }
   }
@@ -226,7 +223,7 @@ class SessionRepository {
   }) async {
     try {
       final data = {
-        'id': photoId,
+        'photo_id': photoId,
         'ruck_id': ruckId,
         'user_id': userId,
         'filename': filename,
