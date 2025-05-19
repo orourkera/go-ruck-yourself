@@ -15,7 +15,7 @@ class RuckSessionListResource(Resource):
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             limit = request.args.get('limit', type=int)
         # If limit is None, do not apply limit
             response_query = supabase.table('ruck_session') \
@@ -92,7 +92,7 @@ class RuckSessionListResource(Resource):
             data = request.get_json()
             if not data:
                 return {'message': 'Missing required data for session creation'}, 400
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
 
             # Deduplication: Check for any active (in_progress) session for the current user
             active_sessions = supabase.table('ruck_session') \
@@ -129,7 +129,7 @@ class RuckSessionResource(Resource):
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('ruck_session') \
                 .select('*') \
                 .eq('id', ruck_id) \
@@ -171,7 +171,7 @@ class RuckSessionResource(Resource):
             if not update_data:
                 return {'message': 'No valid fields to update'}, 400
 
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             update_resp = supabase.table('ruck_session') \
                 .update(update_data) \
                 .eq('id', ruck_id) \
@@ -191,7 +191,7 @@ class RuckSessionResource(Resource):
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # First, delete all associated location_point records
             loc_del_resp = supabase.table('location_point') \
                 .delete() \
@@ -224,7 +224,7 @@ class RuckSessionResource(Resource):
             if not update_data:
                 return {'message': 'No valid fields to update'}, 400
 
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             update_resp = supabase.table('ruck_session') \
                 .update(update_data) \
                 .eq('id', ruck_id) \
@@ -242,7 +242,7 @@ class RuckSessionResource(Resource):
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('ruck_session') \
                 .select('*') \
                 .eq('id', ruck_id) \
@@ -274,7 +274,7 @@ class RuckSessionStartResource(Resource):
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Check if session already exists
             check = supabase.table('ruck_session') \
                 .select('id,status') \
@@ -305,7 +305,7 @@ class RuckSessionPauseResource(Resource):
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Check if session exists and is in_progress
             check = supabase.table('ruck_session') \
                 .select('id,status') \
@@ -335,7 +335,7 @@ class RuckSessionResumeResource(Resource):
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Check if session exists and is paused
             check = supabase.table('ruck_session') \
                 .select('id,status') \
@@ -368,7 +368,7 @@ class RuckSessionCompleteResource(Resource):
             data = request.get_json()
             if not data:
                 return {'message': 'No data provided'}, 400
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Check if session exists
             session_check = supabase.table('ruck_session') \
                 .select('id,status,started_at') \
@@ -466,7 +466,7 @@ class RuckSessionLocationResource(Resource):
             data = request.get_json()
             if not data or 'latitude' not in data or 'longitude' not in data:
                 return {'message': 'Missing location data'}, 400
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Check if session exists and is in_progress
             check = supabase.table('ruck_session') \
                 .select('id,status') \
@@ -508,7 +508,7 @@ class HeartRateSampleUploadResource(Resource):
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
                 
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Check if session exists and belongs to user
             session_resp = supabase.table('ruck_session') \
@@ -543,7 +543,7 @@ class HeartRateSampleUploadResource(Resource):
             data = request.get_json()
             if not data or 'samples' not in data or not isinstance(data['samples'], list):
                 return {'message': 'Missing or invalid samples'}, 400
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Check if session exists and belongs to user
             session_resp = supabase.table('ruck_session') \
                 .select('id,user_id') \
