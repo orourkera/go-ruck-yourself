@@ -677,13 +677,30 @@ Download Go Rucky Yourself from the App Store!
         
         AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for ${photos.length} photos');
         
-        // Upload the photos
-        context.read<ActiveSessionBloc>().add(
-          UploadSessionPhotosRequested(
-            sessionId: widget.session.id!,
-            photos: photos,
-          ),
-        );
+        // Store these variables to use after async operations
+        final String sessionId = widget.session.id!;
+        
+        // Schedule this for the next frame to avoid context issues
+        Future.microtask(() {
+          // Ensure we're still mounted before using the context
+          if (!mounted) {
+            AppLogger.warning('[PHOTO_UPLOAD] Widget no longer mounted, aborting upload');
+            return;
+          }
+          
+          // Upload the photos
+          try {
+            context.read<ActiveSessionBloc>().add(
+              UploadSessionPhotosRequested(
+                sessionId: sessionId,
+                photos: photos,
+              ),
+            );
+            AppLogger.info('[PHOTO_UPLOAD] Added event to bloc successfully');
+          } catch (e) {
+            AppLogger.error('[PHOTO_UPLOAD] Error adding event to bloc: $e');
+          }
+        });
       } else {
         AppLogger.info('[PHOTO_UPLOAD] No photos selected or session ID is null: sessionId=${widget.session.id}');
       }
@@ -734,13 +751,31 @@ Download Go Rucky Yourself from the App Store!
         
         AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for camera photo');
         
-        // Upload the photo
-        context.read<ActiveSessionBloc>().add(
-          UploadSessionPhotosRequested(
-            sessionId: widget.session.id!,
-            photos: [photo],
-          ),
-        );
+        // Store these variables to use after async operations
+        final String sessionId = widget.session.id!;
+        final File capturedPhoto = photo;
+        
+        // Schedule this for the next frame to avoid context issues
+        Future.microtask(() {
+          // Ensure we're still mounted before using the context
+          if (!mounted) {
+            AppLogger.warning('[PHOTO_UPLOAD] Widget no longer mounted, aborting upload');
+            return;
+          }
+          
+          // Upload the photo
+          try {
+            context.read<ActiveSessionBloc>().add(
+              UploadSessionPhotosRequested(
+                sessionId: sessionId,
+                photos: [capturedPhoto],
+              ),
+            );
+            AppLogger.info('[PHOTO_UPLOAD] Added camera photo event to bloc successfully');
+          } catch (e) {
+            AppLogger.error('[PHOTO_UPLOAD] Error adding camera photo event to bloc: $e');
+          }
+        });
       } else {
         AppLogger.info('[PHOTO_UPLOAD] No photo taken or session ID is null: sessionId=${widget.session.id}');
       }
