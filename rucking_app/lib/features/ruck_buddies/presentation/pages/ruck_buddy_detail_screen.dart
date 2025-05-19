@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Import for HapticFeedback
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
+import 'package:rucking_app/features/social/presentation/widgets/comments_section.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
@@ -34,6 +40,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   bool _isLiked = false;
   List<RuckPhoto> _photos = [];
   int _likeCount = 0;
+  bool _isProcessingLike = false;
 
   @override
   void initState() {
@@ -41,6 +48,17 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser;
     _likeCount = widget.ruckBuddy.likeCount;
     _photos = widget.ruckBuddy.photos ?? [];
+    
+    // Check current like status through SocialBloc
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final ruckId = int.tryParse(widget.ruckBuddy.id);
+        if (ruckId != null) {
+          // Quietly check if user has liked this ruck
+          context.read<SocialBloc>().add(CheckRuckLikeStatus(ruckId));
+        }
+      }
+    });
     
     // If focusComment is true, request focus on the comment field after build
     if (widget.focusComment) {
@@ -57,12 +75,33 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     super.dispose();
   }
 
-  void _toggleLike() {
-    // In the future, this would call an API to record the like
+  void _handleLikeTap() {
+    if (_isProcessingLike) return; // Prevent multiple rapid clicks
+    
+    // Trigger strong haptic feedback when like button is tapped
+    HapticFeedback.heavyImpact();
+    
+    // Optimistic update for immediate feedback FIRST
     setState(() {
+      // Update the UI state immediately for responsiveness
+      if (_isLiked) {
+        _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
+      } else {
+        _likeCount += 1;
+      }
       _isLiked = !_isLiked;
-      _likeCount = _isLiked ? _likeCount + 1 : _likeCount - 1;
+      
+      // Only set processing to true AFTER the icon has changed
+      // This ensures the user sees the heart change before any loading indicator
+      _isProcessingLike = true;
     });
+    
+    // Dispatch event to update backend
+    final ruckId = int.tryParse(widget.ruckBuddy.id);
+    if (ruckId != null) {
+      // Directly update backend through SocialBloc - this ensures per-ruck state
+      context.read<SocialBloc>().add(ToggleRuckLike(ruckId));
+    }
   }
 
   void _submitComment() {
@@ -104,8 +143,62 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : false;
-
-    return Scaffold(
+    
+    return BlocListener<SocialBloc, SocialState>(
+      listenWhen: (previous, current) {
+        // Only respond to states related to THIS specific ruck
+        final thisRuckId = int.tryParse(widget.ruckBuddy.id);
+        if (thisRuckId == null) return false;
+        
+        if (current is LikeActionCompleted) {
+          return thisRuckId == current.ruckId;
+        }
+        if (current is LikeStatusChecked) {
+          return thisRuckId == current.ruckId;
+        }
+        if (current is LikesLoaded) {
+          return thisRuckId == current.ruckId;
+        }
+        return false;
+      },
+      listener: (context, state) {
+        final thisRuckId = int.tryParse(widget.ruckBuddy.id);
+        if (thisRuckId == null) return;
+        
+        if (state is LikeActionCompleted && state.ruckId == thisRuckId) {
+          // Update UI based on the result for THIS specific ruck
+          setState(() {
+            _isLiked = state.isLiked;
+            _likeCount = state.likeCount; // Use the count from the state
+            _isProcessingLike = false;
+          });
+        } else if (state is LikeActionError && state.ruckId == thisRuckId) {
+          // Show error and revert UI
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to like ruck. Server error related to database table.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          setState(() {
+            _isLiked = !_isLiked; // Revert the optimistic update
+            if (_isLiked) {
+              _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
+            } else {
+              _likeCount += 1;
+            }
+            _isProcessingLike = false;
+          });
+        } else if (state is LikesLoaded && state.ruckId == thisRuckId) {
+          setState(() {
+            _isLiked = state.userHasLiked;
+            _likeCount = state.likes.length;
+            _isProcessingLike = false;
+          });
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Ruck Details'),
         actions: [
@@ -313,41 +406,55 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                   // Like and comment counts
                   Row(
                     children: [
-                      // Like button
+                      // Like button with same styling as card
                       InkWell(
-                        onTap: _toggleLike,
+                        onTap: _handleLikeTap,
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
-                          padding: const EdgeInsets.all(8.0),
+                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
                           child: Row(
                             children: [
+                              // Use same image assets with same size as card
                               Image.asset(
-                                'assets/images/tactical_ruck_like_icon_transparent.png',
-                                width: 24,
-                                height: 24,
-                                color: _isLiked ? Colors.red : Colors.grey[600],
+                                _isLiked 
+                                  ? 'assets/images/tactical_ruck_like_icon_active.png' 
+                                  : 'assets/images/tactical_ruck_like_icon_transparent.png',
+                                width: 40,
+                                height: 40,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 '$_likeCount',
-                                style: AppTextStyles.bodyMedium,
+                                style: TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: 24,
+                                  color: Colors.grey[800],
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // Comments count
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.ruckBuddy.commentCount}',
-                            style: AppTextStyles.bodyMedium,
+                      // Comments count with same styling as card
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.comment,
+                              size: 40, // Same size as in card
+                              color: AppColors.secondary, // Same color as in card
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${widget.ruckBuddy.commentCount}',
+                              style: TextStyle(
+                                fontFamily: 'Bangers',
+                                fontSize: 24,
+                                color: Colors.grey[800],
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -385,16 +492,13 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                   
                   const SizedBox(height: 16),
                   
-                  // Comments list (placeholder for now)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        'Comments coming soon!',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                      ),
+                  // Comments section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: CommentsSection(
+                      ruckId: int.parse(widget.ruckBuddy.id), // Convert string ID to int
+                      maxDisplayed: 5, // Show 5 most recent comments
+                      showViewAllButton: true,
                     ),
                   ),
                 ],
