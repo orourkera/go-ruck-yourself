@@ -80,8 +80,13 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
+          debugPrint('🐞 Bottom navigation tapped: $index');
           setState(() {
             _selectedIndex = index;
+          });
+          // Add a post-render check to verify the screen changed
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            debugPrint('🐞 Selected index after render: $_selectedIndex');
           });
         },
         type: BottomNavigationBarType.fixed,

@@ -49,6 +49,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       socialBloc.add(LoadRuckLikes(int.parse(widget.session.id!)));
       socialBloc.add(LoadRuckComments(int.parse(widget.session.id!)));
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) { 
+      if (mounted && widget.session.id != null) {
+        AppLogger.info('--- SessionDetailScreen initState: Dispatching LoadSessionForViewing for session ${widget.session.id} ---');
+        context.read<ActiveSessionBloc>().add(LoadSessionForViewing(
+          sessionId: widget.session.id!,
+          session: widget.session,
+        ));
+      }
+    }); 
   }
 
   // Builds the photo section - either showing photos or empty state
@@ -56,10 +65,19 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     return BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
       builder: (context, state) {
         if (state is ActiveSessionRunning) {
+          // Only show loading indicator during initial photo load if we know photos exist
           if (state.isPhotosLoading) {
-            return const Center(child: CircularProgressIndicator());
+            // Check if we have photos in the state that are loading (like during refresh)
+            // If we do have existing photos we know about, show the spinner, otherwise don't
+            if (state.photos.isNotEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            } else {
+              // No need to show anything if we're loading but don't know of any photos yet
+              return const SizedBox.shrink();
+            }
           }
 
+          // Only show error if we have a specific error related to photos
           if (state.photosError != null && state.photosError!.isNotEmpty) {
             return Center(
               child: Padding(
@@ -75,6 +93,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
           final photoUrls = state.photos.map((p) => p.url).where((url) => url != null).cast<String>().toList();
 
+          // Only show photo carousel if we actually have photos
           if (photoUrls.isNotEmpty) {
             return PhotoCarousel(
               photoUrls: photoUrls,
@@ -92,53 +111,29 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 );
               },
               onDeleteRequest: (index) {
-                // TODO: Implement photo deletion logic
-                // This would involve getting the RuckPhoto object from state.photos[index]
-                // and dispatching an event like DeleteSessionPhotoRequested(photo: state.photos[index])
-                StyledSnackBar.show(
-                  context: context,
-                  message: 'Photo deletion feature coming soon.',
-                  type: SnackBarType.normal,
-                );
+                // Get the photo object from the state's photos list
+                if (index < state.photos.length) {
+                  final photo = state.photos[index];
+                  if (photo.id != null) {
+                    // Dispatch delete event
+                    context.read<ActiveSessionBloc>().add(
+                      DeleteSessionPhotoRequested(
+                        sessionId: widget.session.id!,
+                        photo: photo,
+                      ),
+                    );
+                  }
+                }
               },
             );
           } else {
-            // Empty state (no photos and no error)
-            return Container(
-              height: 240,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.photo_library_outlined,
-                      size: 48,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No photos yet.',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                    // Optionally, add a button to add photos if relevant here
-                    // TextButton(
-                    //   onPressed: () => _showAddPhotoOptions(context),
-                    //   child: const Text('Add Photos'),
-                    // ),
-                  ],
-                ),
-              ),
-            );
+            // No photos, return empty widget instead of a placeholder
+            return const SizedBox.shrink();
           }
         }
-        // Initial state or other states (e.g. ActiveSessionInitial, ActiveSessionFailure)
-        // You might want to show a loading indicator or a placeholder here too
-        return const SizedBox(height: 240, child: Center(child: CircularProgressIndicator())); 
+        
+        // Initial state or other states - don't show a placeholder
+        return const SizedBox.shrink();
       },
     );
   }
@@ -560,6 +555,11 @@ Download Go Rucky Yourself from the App Store!
   }
 
   void _showAddPhotoOptions(BuildContext context) {
+    AppLogger.info('=== _showAddPhotoOptions called for session ${widget.session.id} ===');
+    // Show a snackbar to confirm the method is being called
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Opening photo options...')),
+    );
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -578,11 +578,7 @@ Download Go Rucky Yourself from the App Store!
                 title: const Text('Take Photo'),
                 onTap: () {
                   Navigator.pop(context);
-                  StyledSnackBar.show(
-                    context: context,
-                    message: 'Camera functionality coming soon',
-                    type: SnackBarType.normal,
-                  );
+                  _takePhotoWithCamera(context);
                 },
               ),
               ListTile(
@@ -590,11 +586,7 @@ Download Go Rucky Yourself from the App Store!
                 title: const Text('Choose from Gallery'),
                 onTap: () {
                   Navigator.pop(context);
-                  StyledSnackBar.show(
-                    context: context,
-                    message: 'Gallery selection coming soon',
-                    type: SnackBarType.normal,
-                  );
+                  _pickPhotoFromGallery(context);
                 },
               ),
               const SizedBox(height: 8),
@@ -603,6 +595,62 @@ Download Go Rucky Yourself from the App Store!
         );
       },
     );
+  }
+
+  // Take a photo with the camera
+  void _takePhotoWithCamera(BuildContext context) {
+    if (widget.session.id == null) {
+      AppLogger.error('Session ID is null, cannot take photo.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Session ID is missing.')),
+      );
+      return;
+    }
+    
+    final currentState = BlocProvider.of<ActiveSessionBloc>(context).state;
+    AppLogger.info('--- PHOTO DEBUG: _takePhotoWithCamera called ---');
+    AppLogger.info('--- PHOTO DEBUG: Session ID: ${widget.session.id} ---');
+    AppLogger.info('--- PHOTO DEBUG: BLoC state type: ${currentState.runtimeType} ---');
+    if (currentState is ActiveSessionRunning) {
+      AppLogger.info('--- PHOTO DEBUG: State is ActiveSessionRunning, sessionId: ${currentState.sessionId} ---');
+    } else {
+      AppLogger.info('--- PHOTO DEBUG: State is NOT ActiveSessionRunning ---');
+    }
+    
+    // Show a snackbar to confirm the event is being dispatched
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Opening camera...')),
+    );
+    
+    BlocProvider.of<ActiveSessionBloc>(context).add(TakePhotoRequested(sessionId: widget.session.id!));
+  }
+
+  // Pick a photo from the gallery
+  void _pickPhotoFromGallery(BuildContext context) {
+    if (widget.session.id == null) {
+      AppLogger.error('Session ID is null, cannot pick photo.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Session ID is missing.')),
+      );
+      return;
+    }
+    
+    final currentState = BlocProvider.of<ActiveSessionBloc>(context).state;
+    AppLogger.info('--- PHOTO DEBUG: _pickPhotoFromGallery called ---');
+    AppLogger.info('--- PHOTO DEBUG: Session ID: ${widget.session.id} ---');
+    AppLogger.info('--- PHOTO DEBUG: BLoC state type: ${currentState.runtimeType} ---');
+    if (currentState is ActiveSessionRunning) {
+      AppLogger.info('--- PHOTO DEBUG: State is ActiveSessionRunning, sessionId: ${currentState.sessionId} ---');
+    } else {
+      AppLogger.info('--- PHOTO DEBUG: State is NOT ActiveSessionRunning ---');
+    }
+    
+    // Show a snackbar to confirm the event is being dispatched
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Opening gallery...')),
+    );
+    
+    BlocProvider.of<ActiveSessionBloc>(context).add(PickPhotoRequested(sessionId: widget.session.id!));
   }
 }
 
