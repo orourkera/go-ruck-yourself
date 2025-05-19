@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// A widget for selecting and uploading photos to a ruck session
 class PhotoUploadSection extends StatefulWidget {
@@ -55,10 +56,10 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Share Your Experience', style: AppTextStyles.titleMedium),
+        Text('Ruck Shots', style: AppTextStyles.titleMedium),
         const SizedBox(height: 8),
         Text(
-          'Add photos from your ruck to share with the community',
+          'Capture the action with photos from your ruck',
           style: AppTextStyles.bodyMedium,
         ),
         const SizedBox(height: 16),
@@ -142,58 +143,7 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
           },
         ),
         
-        const SizedBox(height: 16),
-        
-        // Upload Button
-        if (_selectedPhotos.isNotEmpty)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: widget.isUploading ? null : _handleUpload,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: widget.isUploading
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text('Uploading...'),
-                    ],
-                  )
-                : Text('Upload ${_selectedPhotos.length} Photos'),
-            ),
-          ),
-        
-        // Cancel Button  
-        if (_selectedPhotos.isNotEmpty)
-          TextButton(
-            onPressed: widget.isUploading ? null : () {
-              setState(() {
-                _selectedPhotos.clear();
-                _showPhotoPreview = false;
-              });
-            },
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: widget.isUploading ? Colors.grey : Colors.black54,
-              ),
-            ),
-          ),
+        // No Upload/Cancel buttons here - photos will be uploaded when user hits Save and Continue
       ],
     );
   }
@@ -315,38 +265,70 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
   Future<void> _getImageFrom(ImageSource source) async {
     try {
       final remainingSlots = widget.maxPhotos - _selectedPhotos.length;
+      AppLogger.info('[PHOTO_UPLOAD] Selecting photos from ${source.toString()}, remaining slots: $remainingSlots');
       
       if (source == ImageSource.gallery && remainingSlots > 1) {
         // For gallery, we can select multiple photos at once
+        // Don't specify imageQuality for PNG images since it's not supported on iOS
+        // and generates warnings/errors
         final List<XFile> pickedFiles = await _imagePicker.pickMultiImage(
-          maxWidth: 1800,
-          maxHeight: 1800,
-          imageQuality: 85,
+          imageQuality: 80,  // Only applies to JPG images
         );
+        
+        AppLogger.info('[PHOTO_UPLOAD] Picked ${pickedFiles.length} photos from gallery');
         
         if (pickedFiles.isNotEmpty) {
           // Only add up to the max number of photos
-          final filesToAdd = pickedFiles.take(remainingSlots).map((xFile) => File(xFile.path)).toList();
+          final toAdd = pickedFiles.take(remainingSlots).toList();
+          final filesToAdd = <File>[];
+          
+          // Log each photo's details
+          for (var xFile in toAdd) {
+            final file = File(xFile.path);
+            filesToAdd.add(file);
+            
+            final fileExists = await file.exists();
+            final fileSize = fileExists ? await file.length() : 0;
+            AppLogger.info('[PHOTO_UPLOAD] Gallery photo: path=${xFile.path}, exists=$fileExists, size=$fileSize bytes, name=${xFile.name}');
+          }
           
           setState(() {
             _selectedPhotos.addAll(filesToAdd);
             _showPhotoPreview = true;
           });
+          
+          // Notify callback of photos selected
+          if (widget.onPhotosSelected != null) {
+            AppLogger.info('[PHOTO_UPLOAD] Notifying listener of ${filesToAdd.length} photos selected');
+            widget.onPhotosSelected?.call(_selectedPhotos);
+          }
         }
       } else {
         // For camera, we get one photo at a time
+        AppLogger.info('[PHOTO_UPLOAD] Opening camera picker');
         final XFile? pickedFile = await _imagePicker.pickImage(
           source: source,
-          maxWidth: 1800,
-          maxHeight: 1800,
-          imageQuality: 85,
+          imageQuality: 80,  // Only applies to JPG images
         );
         
+        AppLogger.info('[PHOTO_UPLOAD] Camera photo selected: ${pickedFile != null}');
+        
         if (pickedFile != null) {
+          final file = File(pickedFile.path);
+          final fileExists = await file.exists();
+          final fileSize = fileExists ? await file.length() : 0;
+          AppLogger.info('[PHOTO_UPLOAD] Camera photo: path=${pickedFile.path}, exists=$fileExists, size=$fileSize bytes, name=${pickedFile.name}');
+          
           setState(() {
-            _selectedPhotos.add(File(pickedFile.path));
+            _selectedPhotos.add(file);
             _showPhotoPreview = true;
           });
+          
+          // Notify callback of photos selected
+          if (widget.onPhotosSelected != null) {
+            AppLogger.info('[PHOTO_UPLOAD] Notifying listener of camera photo selected');
+            widget.onPhotosSelected?.call(_selectedPhotos);
+          }
         }
       }
     } catch (e) {

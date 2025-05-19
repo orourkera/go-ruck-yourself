@@ -60,10 +60,24 @@ class SessionRepository {
     final List<RuckPhoto> allUploadedPhotos = [];
     
     try {
-      AppLogger.info('Uploading ${photos.length} photos for session: $ruckId');
+      AppLogger.info('[PHOTO_UPLOAD] Starting upload of ${photos.length} photos for session: $ruckId');
       
       if (photos.isEmpty) {
+        AppLogger.info('[PHOTO_UPLOAD] No photos to upload, returning empty list');
         return [];
+      }
+      
+      // Check if any photos don't exist or are empty
+      for (int i = 0; i < photos.length; i++) {
+        final file = photos[i];
+        final exists = await file.exists();
+        final size = exists ? await file.length() : 0;
+        
+        AppLogger.info('[PHOTO_UPLOAD] Photo ${i+1} check: exists=$exists, size=$size bytes');
+        
+        if (!exists || size == 0) {
+          AppLogger.error('[PHOTO_UPLOAD] Photo ${i+1} is invalid: exists=$exists, size=$size bytes');
+        }
       }
       
       // Get the auth token - we'll need this for each request
@@ -105,6 +119,7 @@ class SessionRepository {
             
             // Add ruck_id as a form field
             singlePhotoRequest.fields['ruck_id'] = ruckId;
+            AppLogger.info('Added ruck_id=$ruckId to photo upload request');
             
             // Add this single photo to the request
             final originalFilename = path.basename(photo.path);

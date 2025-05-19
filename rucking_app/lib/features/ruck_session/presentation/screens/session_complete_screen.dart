@@ -769,7 +769,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 
                 const SizedBox(height: 24),
                 
-                // Photo Upload Section
+                // Ruck Shots Photo Section
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
                   padding: const EdgeInsets.all(16.0),
@@ -787,13 +787,12 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                   child: PhotoUploadSection(
                     ruckId: widget.ruckId,
                     onPhotosSelected: (photos) {
-                      // We'll implement this when we add the backend
-                      debugPrint('Selected ${photos.length} photos for upload');
+                      setState(() {
+                        _selectedPhotos.clear();
+                        _selectedPhotos.addAll(photos);
+                      });
                     },
-                    onUploadSuccess: () {
-                      // We'll implement this when we add the backend
-                      debugPrint('Photos uploaded successfully');
-                    },
+                    isUploading: _isUploadingPhotos,
                   ),
                 ),
                 
@@ -876,17 +875,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 
                 const SizedBox(height: 24),
                 
-                // Photo upload section
-                PhotoUploadSection(
-                  ruckId: widget.ruckId,
-                  onPhotosSelected: (photos) {
-                    setState(() {
-                      _selectedPhotos.clear();
-                      _selectedPhotos.addAll(photos);
-                    });
-                  },
-                  isUploading: _isUploadingPhotos,
-                ),
+                // Photo upload section moved above
                 
                 const SizedBox(height: 32),
                 

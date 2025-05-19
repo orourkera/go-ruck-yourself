@@ -17,6 +17,7 @@ import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
 
 // Social features imports
 import 'package:rucking_app/core/services/service_locator.dart';
@@ -261,13 +262,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                                     Icon(Icons.photo_library, color: _getLadyModeColor(context)),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'Photos',
-                                      style: Theme.of(context).textTheme.titleLarge,
+                                      'Ruck Shots',
+                                      style: Theme.of(context).textTheme.titleMedium,
                                     ),
                                   ],
                                 ),
-                                // Add photo button
-                                TextButton.icon(
+                                // Add photo button removed since we're using PhotoUploadSection
+                                if (photoUrls.isNotEmpty) TextButton.icon(
                                   onPressed: () {
                                     _showAddPhotoOptions(context);
                                   },
@@ -286,7 +287,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                                 padding: EdgeInsets.symmetric(vertical: 40),
                                 child: Center(child: CircularProgressIndicator()),
                               )
-                            // Show photos when available and not in loading/uploading state
+                            // Show photos carousel when available and not in loading/uploading state
                             else if (photoUrls.isNotEmpty)
                               PhotoCarousel(
                                 photoUrls: photoUrls,
@@ -299,6 +300,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                                       builder: (context) => PhotoViewer(
                                         photoUrls: photoUrls,
                                         initialIndex: index,
+                                        title: 'Your Ruck Shots',
                                       ),
                                     ),
                                   );
@@ -313,42 +315,23 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                                         photo: photoToDelete,
                                       ),
                                     );
-                                  } else {
-                                    StyledSnackBar.show(
-                                      context: context,
-                                      message: 'Cannot delete this photo. Please try again.',
-                                      type: SnackBarType.error,
-                                    );
                                   }
                                 },
                               )
-                            // Show placeholder if no photos but we're displaying the section
+                            // Show PhotoUploadSection for empty state
                             else
-                              Container(
-                                height: 180,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.photo_library_outlined, 
-                                        size: 48, 
-                                        color: Colors.grey[400],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'No photos yet. Tap "Add Photos" to get started.',
-                                        style: TextStyle(color: Colors.grey[600]),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              PhotoUploadSection(
+                                ruckId: widget.session.id!,
+                                onPhotosSelected: (photos) {
+                                  // Upload photos using the ActiveSessionBloc
+                                  context.read<ActiveSessionBloc>().add(
+                                    UploadSessionPhotosRequested(
+                                      sessionId: widget.session.id!,
+                                      photos: photos,
+                                    ),
+                                  );
+                                },
+                                isUploading: state.isUploading,
                               ),
                           ],
                         ),
@@ -659,23 +642,40 @@ Download Go Rucky Yourself from the App Store!
     final ImagePicker imagePicker = ImagePicker();
     
     try {
+      AppLogger.info('[PHOTO_UPLOAD] Attempting to pick multiple images from gallery');
+      
       // Select multiple photos
       final List<XFile> pickedFiles = await imagePicker.pickMultiImage(
-        maxWidth: 1800,
-        maxHeight: 1800,
-        imageQuality: 85,
+        // Don't set imageQuality for PNG files as it's not supported
+        // and causes issues on iOS
+        imageQuality: 80,
       );
       
+      AppLogger.info('[PHOTO_UPLOAD] Picked ${pickedFiles.length} images from gallery');
+      
       if (pickedFiles.isNotEmpty && widget.session.id != null) {
-        // Convert XFiles to File objects
-        final List<File> photos = pickedFiles.map((xFile) => File(xFile.path)).toList();
+        // Convert XFiles to File objects and log their info
+        final List<File> photos = [];
         
-        // Show a loading indicator
-        StyledSnackBar.show(
-          context: context,
-          message: 'Uploading ${photos.length} ${photos.length == 1 ? 'photo' : 'photos'}...',
-          duration: const Duration(seconds: 2),
-        );
+        for (var xFile in pickedFiles) {
+          final file = File(xFile.path);
+          photos.add(file);
+          
+          // Log each photo's details
+          AppLogger.info('[PHOTO_UPLOAD] Photo details: path=${xFile.path}, size=${await file.length()} bytes, name=${xFile.name}');
+        }
+        
+        // Check if context is still mounted before showing snackbar
+        if (context.mounted) {
+          // Show a loading indicator
+          StyledSnackBar.show(
+            context: context,
+            message: 'Uploading ${photos.length} ${photos.length == 1 ? 'photo' : 'photos'}...',
+            duration: const Duration(seconds: 2),
+          );
+        }
+        
+        AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for ${photos.length} photos');
         
         // Upload the photos
         context.read<ActiveSessionBloc>().add(
@@ -684,8 +684,13 @@ Download Go Rucky Yourself from the App Store!
             photos: photos,
           ),
         );
+      } else {
+        AppLogger.info('[PHOTO_UPLOAD] No photos selected or session ID is null: sessionId=${widget.session.id}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error('[PHOTO_UPLOAD] Error selecting images: $e');
+      AppLogger.error('[PHOTO_UPLOAD] Stack trace: $stackTrace');
+      
       if (!context.mounted) return;
       StyledSnackBar.showError(
         context: context,
@@ -699,24 +704,35 @@ Download Go Rucky Yourself from the App Store!
     final ImagePicker imagePicker = ImagePicker();
     
     try {
-      // Take a single photo
+      AppLogger.info('[PHOTO_UPLOAD] Attempting to take photo from camera');
+      
       final XFile? pickedFile = await imagePicker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 1800,
-        maxHeight: 1800,
-        imageQuality: 85,
+        // Don't set imageQuality for PNG files as it's not supported
+        // and causes issues on iOS
+        imageQuality: 80,
       );
+      
+      AppLogger.info('[PHOTO_UPLOAD] Photo captured: ${pickedFile != null}');
       
       if (pickedFile != null && widget.session.id != null) {
         // Convert XFile to File
         final File photo = File(pickedFile.path);
         
-        // Show a loading indicator
-        StyledSnackBar.show(
-          context: context,
-          message: 'Uploading photo...',
-          duration: const Duration(seconds: 2),
-        );
+        // Log photo details
+        AppLogger.info('[PHOTO_UPLOAD] Camera photo details: path=${pickedFile.path}, size=${await photo.length()} bytes, name=${pickedFile.name}');
+        
+        // Check if context is still mounted before showing snackbar
+        if (context.mounted) {
+          // Show a loading indicator
+          StyledSnackBar.show(
+            context: context,
+            message: 'Uploading photo...',
+            duration: const Duration(seconds: 2),
+          );
+        }
+        
+        AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for camera photo');
         
         // Upload the photo
         context.read<ActiveSessionBloc>().add(
@@ -725,8 +741,13 @@ Download Go Rucky Yourself from the App Store!
             photos: [photo],
           ),
         );
+      } else {
+        AppLogger.info('[PHOTO_UPLOAD] No photo taken or session ID is null: sessionId=${widget.session.id}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error('[PHOTO_UPLOAD] Error taking photo: $e');
+      AppLogger.error('[PHOTO_UPLOAD] Stack trace: $stackTrace');
+      
       if (!context.mounted) return;
       StyledSnackBar.showError(
         context: context,

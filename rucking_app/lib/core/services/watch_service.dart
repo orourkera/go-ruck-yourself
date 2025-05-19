@@ -162,7 +162,7 @@ class WatchService {
       await sendSessionIdToWatch(sessionId);
 
       // Start session on backend
-      await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {});
+      await GetIt.instance<ApiClient>().post('/rucks/start', {'ruck_id': sessionId});
 
       // Notify watch of workout start
       await _sendMessageToWatch({

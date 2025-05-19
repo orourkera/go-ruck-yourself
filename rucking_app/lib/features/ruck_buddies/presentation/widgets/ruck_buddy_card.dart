@@ -635,10 +635,12 @@ class _RouteMapPreview extends StatelessWidget {
     
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: SizedBox(
-        height: 175,
-        width: double.infinity,
-        child: FlutterMap(
+      child: Stack(
+        children: [
+          SizedBox(
+            height: 175,
+            width: double.infinity,
+            child: FlutterMap(
           options: MapOptions(
             initialCenter: _getRouteCenter(routePoints),
             initialZoom: _getFitZoom(routePoints),
@@ -662,6 +664,18 @@ class _RouteMapPreview extends StatelessWidget {
               ),
           ],
         ),
+          ),
+          // Show photo thumbnails overlay if available
+          if (ruckBuddy.photos != null && ruckBuddy.photos!.isNotEmpty)
+            Positioned(
+              bottom: 8,
+              left: 8,
+              child: _PhotoThumbnailsOverlay(
+                photos: ruckBuddy.photos!,
+                maxDisplay: 3,
+              ),
+            ),
+        ],
       ),
     );
   }

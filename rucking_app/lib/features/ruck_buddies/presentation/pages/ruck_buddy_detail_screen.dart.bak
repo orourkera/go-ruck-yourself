@@ -9,7 +9,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:rucking_app/core/utils/measurement_utils.dart';
-import 'package:rucking_app/core/utils/location_utils.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
@@ -20,7 +19,6 @@ import 'package:rucking_app/features/social/presentation/bloc/social_event.dart'
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
-import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 
 class RuckBuddyDetailScreen extends StatefulWidget {
   final RuckBuddy ruckBuddy;
@@ -273,38 +271,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                 locationPoints: widget.ruckBuddy.locationPoints,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-              child: FutureBuilder<String>(
-                future: LocationUtils.getLocationName(widget.ruckBuddy.locationPoints),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Text(
-                      'Could not determine location',
-                      style: AppTextStyles.bodySmall.copyWith(color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    );
-                  }
-                  if (snapshot.hasData && snapshot.data!.isNotEmpty && snapshot.data! != 'Unknown location') {
-                    return Text(
-                      snapshot.data!,
-                      style: TextStyle(
-                        fontFamily: 'Bangers',
-                        fontSize: 26,
-                        color: AppColors.primary,
-                        letterSpacing: 1.2,
-                      ),
-                      textAlign: TextAlign.center,
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ),
-            
+
             // Ruck details
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -422,16 +389,6 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       showDeleteButtons: false,
                       onPhotoTap: (index) {
                         // View photo full screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PhotoViewer(
-                              photoUrls: (widget.ruckBuddy.photos ?? []).map((photo) => photo.url ?? '').toList(),
-                              initialIndex: index,
-                              title: '${widget.ruckBuddy.user.username}\'s Ruck',
-                            ),
-                          ),
-                        );
                       },
                     ),
                   ],
@@ -498,8 +455,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                 color: Colors.grey[800],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -550,9 +507,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
           ],
         ),
       ),
-    ), // close Scaffold
-  );   // close BlocListener
-}
+    );
+  }
 
   Widget _buildStatItem({
     required IconData icon,

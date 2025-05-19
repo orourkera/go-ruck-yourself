@@ -395,7 +395,11 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 ### Phase 2: Ruck Buddies Detail View
 - ✅ Create the detailed view for community rucks
 - ✅ Update ruck buddies feed to link to detail view
-- ✅ Include photo display in feed and detail views
+- ⬜ **Photo Integration for Ruck Buddies Screens**:
+  - ⬜ Modify `ruck_buddy_card.dart` to display the first photo as a thumbnail
+  - ⬜ Update `ruck_buddies_screen.dart` to fetch and pass photo data to cards
+  - ⬜ Add `PhotoCarousel` widget to `ruck_buddy_detail_screen.dart`
+  - ⬜ Connect photos section with backend API to load actual photos
 
 ### Phase 3: Social Interactions
 - ⬜ Implement like functionality (UI in place, backend integration needed)
