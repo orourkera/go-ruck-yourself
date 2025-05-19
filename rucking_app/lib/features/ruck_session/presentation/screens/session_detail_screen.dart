@@ -107,15 +107,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               AppLogger.info('DEBUG: Fixed URL by removing trailing ?: $url');
             }
             
-            // Make sure the URL is publicly accessible by ensuring it has the right access flag
-            if (!url.contains('public=true') && !url.contains('download=true') && url.contains('supabase')) {
-              // Add download=true parameter to force public access
-              url = url.contains('?') 
-                ? '$url&download=true' 
-                : '$url?download=true';
-              AppLogger.info('DEBUG: Added download flag to URL: $url');
-            }
-            
             return url;
           }
           return null;

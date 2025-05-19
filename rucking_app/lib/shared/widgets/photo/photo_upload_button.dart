@@ -118,7 +118,7 @@ class PhotoUploadButton extends StatelessWidget {
     }
     
     return InkWell(
-      onTap: isLoading ? null : _handlePhotoSelection,
+      onTap: isLoading ? null : () => _handlePhotoSelection(context),
       child: Container(
         width: width ?? buttonWidth,
         height: height ?? buttonHeight,
@@ -229,6 +229,7 @@ class PhotoUploadButton extends StatelessWidget {
         }
       }
     } catch (e) {
+      if (!context.mounted) return;
       StyledSnackBar.show(
         context: context,
         message: 'Error selecting image: ${e.toString()}',
