@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-// import 'package:cached_network_image/cached_network_image.dart'; // Removed
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// A reusable carousel widget for displaying photos
 class PhotoCarousel extends StatefulWidget {
@@ -59,6 +60,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   
   @override
   Widget build(BuildContext context) {
+    // Show loading state
     if (widget.isLoading) {
       return SizedBox(
         height: widget.height,
@@ -68,6 +70,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       );
     }
     
+    // Show empty state when there are no photos
     if (widget.photoUrls.isEmpty) {
       return SizedBox(
         height: widget.height,
@@ -80,20 +83,29 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       );
     }
     
+    // Debug log all URLs to help diagnose issues
+    AppLogger.info('PhotoCarousel rendering ${widget.photoUrls.length} photos');
+    for (int i = 0; i < widget.photoUrls.length; i++) {
+      AppLogger.info('Photo URL[$i]: ${widget.photoUrls[i]}');
+    }
+    
     return Column(
       children: [
-        SizedBox(
-          height: widget.height,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: widget.photoUrls.length,
-            onPageChanged: (index) {
+        // Using CarouselSlider instead of PageView for more reliable image carousel
+        CarouselSlider.builder(
+          itemCount: widget.photoUrls.length,
+          itemBuilder: (context, index, realIndex) {
+            return _buildPhotoItem(context, index);
+          },
+          options: CarouselOptions(
+            height: widget.height,
+            viewportFraction: 0.85,
+            enlargeCenterPage: true,
+            enableInfiniteScroll: widget.photoUrls.length > 1,
+            onPageChanged: (index, reason) {
               setState(() {
                 _currentPage = index;
               });
-            },
-            itemBuilder: (context, index) {
-              return _buildPhotoItem(context, index);
             },
           ),
         ),
@@ -211,46 +223,76 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   // Helper method to build image with fallback options and better error handling
   Widget _buildImageWithFallback(BuildContext context, int index) {
     final String imageUrl = widget.photoUrls[index];
+    // Validate URL first
+    if (imageUrl.isEmpty || !Uri.parse(imageUrl).isAbsolute) {
+      AppLogger.error('Invalid image URL: $imageUrl');
+      return _buildErrorContainer(context, 'Invalid image URL');
+    }
+    
     // Add a timestamp to force refresh and clean URL if needed
     final String cleanUrl = imageUrl.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}';
     
-    // Force more aggressive output for debugging
-    print('LOADING IMAGE FROM URL: $cleanUrl');
+    // Log URL for debugging
+    AppLogger.info('Loading image from URL: $cleanUrl');
     
-    return Image.network(
-      cleanUrl,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      // Disable caching to ensure we always get fresh images
-      cacheWidth: null,
-      cacheHeight: null,
-      // Add headers to prevent caching
-      headers: const {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      },
-      errorBuilder: (context, error, stackTrace) {
-        print('ERROR LOADING IMAGE: $cleanUrl, error: $error');
-        return Container(
-          color: Colors.grey.shade200,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.broken_image, color: Colors.red, size: 32),
-                const SizedBox(height: 8),
-                Text(
-                  'Image not available',
-                  style: TextStyle(color: Colors.red.shade800),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15.0),
+        color: Colors.grey.shade200, // Placeholder color when image is loading
+      ),
+      child: Image.network(
+        cleanUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        // Use a loading placeholder
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child; // Image has loaded successfully
+          }
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded / (loadingProgress.expectedTotalBytes ?? 1)
+                : null,
             ),
-          ),
-        );
-      },
+          );
+        },
+        // Add headers to force reload and bypass cache
+        headers: const {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+        errorBuilder: (context, error, stackTrace) {
+          AppLogger.error('Error loading image: $cleanUrl, error: $error');
+          return _buildErrorContainer(context, 'Image failed to load');
+        },
+      ),
+    );
+  }
+  
+  // Helper method to build error display container
+  Widget _buildErrorContainer(BuildContext context, String errorMessage) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15.0),
+        color: Colors.grey.shade200,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.broken_image, color: Colors.red, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              style: TextStyle(color: Colors.red.shade800),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -16,7 +16,8 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     on<LoadRuckLikes>(_onLoadRuckLikes);
     on<ToggleRuckLike>(_onToggleRuckLike);
     on<CheckUserLikeStatus>(_onCheckUserLikeStatus);
-    on<CheckRuckLikeStatus>(_onCheckRuckLikeStatus); // Add handler for CheckRuckLikeStatus
+    on<CheckRuckLikeStatus>(_onCheckRuckLikeStatus);
+    on<BatchCheckUserLikeStatus>(_onBatchCheckUserLikeStatus);
     on<LoadRuckComments>(_onLoadRuckComments);
     on<AddRuckComment>(_onAddRuckComment);
     on<UpdateRuckComment>(_onUpdateRuckComment);
@@ -310,6 +311,34 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       emit(SocialInitial());
     } else if (state is CommentsError || state is CommentActionError) {
       emit(SocialInitial());
+    }
+  }
+  
+  /// Handler for batch checking user like status for multiple rucks
+  /// This is more efficient than individual API calls
+  Future<void> _onBatchCheckUserLikeStatus(
+    BatchCheckUserLikeStatus event,
+    Emitter<SocialState> emit,
+  ) async {
+    if (event.ruckIds.isEmpty) return;
+    
+    debugPrint('🔄 SocialBloc.batchCheckUserLikeStatus called for ${event.ruckIds.length} rucks');
+    
+    try {
+      // Use the repository's batch method to efficiently check multiple rucks
+      final likeStatusMap = await _socialRepository.batchCheckUserLikes(event.ruckIds);
+      
+      debugPrint('✅ Batch like status check completed for ${likeStatusMap.length} rucks');
+      emit(BatchLikeStatusChecked(likeStatusMap));
+    } on UnauthorizedException catch (e) {
+      debugPrint('❌ Authentication error checking batch like status: ${e.message}');
+      // Don't emit error state as this is a background operation
+    } on ServerException catch (e) {
+      debugPrint('❌ Server error checking batch like status: ${e.message}');
+      // Don't emit error state as this is a background operation
+    } catch (e) {
+      debugPrint('❌ Unknown error checking batch like status: $e');
+      // Don't emit error state as this is a background operation
     }
   }
 }

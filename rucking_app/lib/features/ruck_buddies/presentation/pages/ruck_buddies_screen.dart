@@ -37,10 +37,26 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       if (mounted) {
         debugPrint('🐞 [_RuckBuddiesScreenState.initState] Dispatching FetchRuckBuddiesEvent.');
         context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
-        // Preload mock photos for demo
-        // _preloadDemoImages(); // Commenting out demo images for now to simplify debugging
       }
     });
+  }
+  
+  // Batch check likes for all displayed ruck buddies to avoid rate limiting
+  void _batchCheckLikes(List<RuckBuddy> ruckBuddies) {
+    if (ruckBuddies.isEmpty) return;
+    
+    // Extract all ruck IDs
+    final List<int> ruckIds = [];
+    for (final buddy in ruckBuddies) {
+      final id = int.tryParse(buddy.id);
+      if (id != null) ruckIds.add(id);
+    }
+    
+    if (ruckIds.isNotEmpty) {
+      debugPrint('🐞 [_RuckBuddiesScreenState._batchCheckLikes] Batch checking ${ruckIds.length} rucks');
+      // Use our new batch checking method
+      context.read<SocialBloc>().add(BatchCheckUserLikeStatus(ruckIds));
+    }
   }
   
   void _preloadDemoImages() {

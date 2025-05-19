@@ -51,15 +51,24 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _loadPhotos();
     if (widget.session.id != null) {
-      // Load photos
-      AppLogger.info('[SESSION_DETAIL] Initial photo fetch for session ${widget.session.id}');
-      context.read<ActiveSessionBloc>().add(FetchSessionPhotosRequested(widget.session.id!));
-      
       // Load social data (likes and comments)
       final socialBloc = getIt<SocialBloc>();
       socialBloc.add(LoadRuckLikes(int.parse(widget.session.id!)));
       socialBloc.add(LoadRuckComments(int.parse(widget.session.id!)));
+    }
+  }
+  
+  /// Fetch photos for the current session
+  void _loadPhotos() {
+    if (widget.session.id != null) {
+      AppLogger.info('[SESSION_DETAIL] Loading photos for session ${widget.session.id} on init');
+      // Use GetIt to get bloc instance rather than context for reliability
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
+    } else {
+      AppLogger.error('[SESSION_DETAIL] Cannot load photos - session ID is null');
     }
   }
   
@@ -271,11 +280,32 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 builder: (context, state) {
                   if (state is ActiveSessionRunning) {
                     // Only show if there are photos or if they're still loading
+                    // Enhancing photo URL extraction with more detailed logging
                     final photoUrls = state.photos
-                        .map((p) => p.url)
-                        .where((url) => url != null && url.isNotEmpty)
+                        .map((p) {
+                          AppLogger.info('Processing photo: id=${p.id}, url=${p.url}');
+                          return p.url;
+                        })
+                        .where((url) {
+                          final isValid = url != null && url.isNotEmpty;
+                          if (!isValid) {
+                            AppLogger.error('Found invalid URL: $url');
+                          }
+                          return isValid;
+                        })
                         .cast<String>()
                         .toList();
+                    
+                    // Add cache-busting to each URL
+                    final processedUrls = photoUrls.map((url) {
+                      // Add timestamp to force cache refresh
+                      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+                      final processedUrl = url.contains('?') 
+                          ? '$url&t=$cacheBuster' 
+                          : '$url?t=$cacheBuster';
+                      AppLogger.info('Processed URL: $processedUrl');
+                      return processedUrl;
+                    }).toList();
                     
                     // DETAILED PHOTO DEBUG LOGGING
                     print('===== PHOTO DEBUG INFO =====');
@@ -337,7 +367,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                             // Show photos carousel when available and not in loading/uploading state
                             else if (photoUrls.isNotEmpty)
                               PhotoCarousel(
-                                photoUrls: photoUrls,
+                                photoUrls: processedUrls, // Use the processed URLs with cache busting
                                 height: 240,
                                 showDeleteButtons: true,
                                 isEditable: true,
@@ -345,7 +375,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (context) => PhotoViewer(
-                                        photoUrls: photoUrls,
+                                        photoUrls: processedUrls, // Use processed URLs here too
                                         initialIndex: index,
                                         title: 'Your Ruck Shots',
                                       ),

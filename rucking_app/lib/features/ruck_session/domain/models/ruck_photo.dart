@@ -28,18 +28,37 @@ class RuckPhoto extends Equatable {
 
   /// Create a RuckPhoto from JSON
   factory RuckPhoto.fromJson(Map<String, dynamic> json) {
-    return RuckPhoto(
-      id: json['id'].toString(),
-      ruckId: json['ruck_id'].toString(),
-      userId: json['user_id'].toString(),
-      filename: json['filename'],
-      originalFilename: json['original_filename'],
-      contentType: json['content_type'],
-      size: json['size'],
-      createdAt: DateTime.parse(json['created_at']),
-      url: json['url'],
-      thumbnailUrl: json['thumbnail_url'],
-    );
+    // Add debug logging for every photo parsing
+    print('Parsing RuckPhoto from JSON: $json');
+    
+    try {
+      return RuckPhoto(
+        id: json['id']?.toString() ?? '',
+        ruckId: json['ruck_id']?.toString() ?? '',
+        userId: json['user_id']?.toString() ?? '',
+        filename: json['filename'] ?? '',
+        originalFilename: json['original_filename'],
+        contentType: json['content_type'],
+        size: json['size'] is int ? json['size'] : json['size'] is String ? int.tryParse(json['size']) : null,
+        createdAt: json['created_at'] != null 
+            ? DateTime.parse(json['created_at']) 
+            : DateTime.now(),
+        url: json['url'],
+        thumbnailUrl: json['thumbnail_url'] ?? json['url'], // Fallback to main URL if thumbnail is missing
+      );
+    } catch (e) {
+      print('Error parsing RuckPhoto: $e');
+      print('JSON that caused the error: $json');
+      
+      // Return a fallback/default model instead of crashing
+      return RuckPhoto(
+        id: json['id']?.toString() ?? 'error-${DateTime.now().millisecondsSinceEpoch}',
+        ruckId: json['ruck_id']?.toString() ?? '',
+        userId: json['user_id']?.toString() ?? '',
+        filename: json['filename'] ?? 'error.jpg',
+        createdAt: DateTime.now(),
+      );
+    }
   }
 
   /// Convert to JSON
