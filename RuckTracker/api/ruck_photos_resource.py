@@ -196,7 +196,10 @@ class RuckPhotosResource(Resource):
                 # Get the public URL
                 public_url_data = supabase.storage.from_('ruck-photos').get_public_url(storage_path)
                 public_url = public_url_data # get_public_url usually returns the string directly
-
+                
+                if isinstance(public_url, str) and public_url.endswith('?'):
+                    public_url = public_url[:-1] # Remove trailing '?'
+                
                 thumbnail_url = public_url # For MVP, thumbnail is same as original
                 
                 # Prepare metadata for database insert
