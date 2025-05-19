@@ -295,9 +295,9 @@ api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location
 api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
 # Stats Endpoints
-api.add_resource(WeeklyStatsResource, '/api/stats/weekly')
-api.add_resource(MonthlyStatsResource, '/api/stats/monthly')
-api.add_resource(YearlyStatsResource, '/api/stats/yearly')
+api.add_resource(WeeklyStatsResource, '/api/stats/weekly', '/api/statistics/weekly')
+api.add_resource(MonthlyStatsResource, '/api/stats/monthly', '/api/statistics/monthly')
+api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/yearly')
 
 # Ruck Photos Endpoint
 api.add_resource(RuckPhotosResource, '/api/ruck-photos')
