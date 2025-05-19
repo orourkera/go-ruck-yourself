@@ -71,7 +71,6 @@ class StyledSnackBar {
         shadowColor = Colors.green.shade800.withOpacity(0.5);
         break;
       case SnackBarType.normal:
-      default:
         mainColor = AppColors.slateGrey;
         borderColor = AppColors.greyDark;
         shadowColor = AppColors.black.withOpacity(0.3);
@@ -180,7 +179,6 @@ class StyledSnackBar {
         break;
         
       case SnackBarAnimationStyle.popIn:
-      default:
         opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
           CurvedAnimation(parent: controller, curve: const Interval(0.0, 0.5, curve: Curves.easeOut)),
         );

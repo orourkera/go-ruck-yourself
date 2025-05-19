@@ -23,7 +23,6 @@ class DynamicTheme {
   static ThemeData _applyLadyModeColors(ThemeData baseTheme) {
     final Color primaryColor = AppColors.ladyPrimary;
     final Color primaryLightColor = AppColors.ladyPrimaryLight;
-    final Color primaryDarkColor = AppColors.ladyPrimaryDark;
     
     // Create a new colorScheme based on the existing one
     final ColorScheme newColorScheme = baseTheme.colorScheme.copyWith(

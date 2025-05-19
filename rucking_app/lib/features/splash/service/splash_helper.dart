@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 
 /// Helper class for splash screen functionality

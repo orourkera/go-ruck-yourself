@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -49,115 +51,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       socialBloc.add(LoadRuckLikes(int.parse(widget.session.id!)));
       socialBloc.add(LoadRuckComments(int.parse(widget.session.id!)));
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) { 
-      if (mounted && widget.session.id != null) {
-        AppLogger.info('--- SessionDetailScreen initState: Dispatching LoadSessionForViewing for session ${widget.session.id} ---');
-        context.read<ActiveSessionBloc>().add(LoadSessionForViewing(
-          sessionId: widget.session.id!,
-          session: widget.session,
-        ));
-      }
-    }); 
   }
 
   // Builds the photo section - either showing photos or empty state
-  Widget _buildPhotoSection() {
-    return BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
-      builder: (context, state) {
-        if (state is ActiveSessionRunning) {
-          // Only show loading indicator during initial photo load if we know photos exist
-          if (state.isPhotosLoading) {
-            // Check if we have photos in the state that are loading (like during refresh)
-            // If we do have existing photos we know about, show the spinner, otherwise don't
-            if (state.photos.isNotEmpty) {
-              return const Center(child: CircularProgressIndicator());
-            } else {
-              // No need to show anything if we're loading but don't know of any photos yet
-              return const SizedBox.shrink();
-            }
-          }
-
-          // Only show error if we have a specific error related to photos
-          if (state.photosError != null && state.photosError!.isNotEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  state.photosError!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-
-          // Debug photo URLs
-        AppLogger.info('DEBUG: Photos in state: ${state.photos.length}');
-        state.photos.forEach((photo) {
-          AppLogger.info('DEBUG: Photo ${photo.id} URL: ${photo.url}');
-        });
-        
-        // Process URLs to ensure proper formatting and accessibility
-        final photoUrls = state.photos.map((p) {
-          String? url = p.url;
-          if (url != null && url.isNotEmpty) {
-            // Remove trailing question mark if present
-            if (url.endsWith('?')) {
-              url = url.substring(0, url.length - 1);
-              AppLogger.info('DEBUG: Fixed URL by removing trailing ?: $url');
-            }
-            
-            return url;
-          }
-          return null;
-        }).where((url) => url != null && url.isNotEmpty).cast<String>().toList();
-        
-        AppLogger.info('DEBUG: Valid photo URLs: ${photoUrls.length}');
-
-          // Only show photo carousel if we actually have photos
-          if (photoUrls.isNotEmpty) {
-            return PhotoCarousel(
-              photoUrls: photoUrls,
-              height: 240,
-              showDeleteButtons: true, // This might need to be conditional based on ownership in future
-              isEditable: true, // This might need to be conditional based on ownership in future
-              onPhotoTap: (index) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => PhotoViewer(
-                      photoUrls: photoUrls,
-                      initialIndex: index,
-                    ),
-                  ),
-                );
-              },
-              onDeleteRequest: (index) {
-                // Get the photo object from the state's photos list
-                if (index < state.photos.length) {
-                  final photo = state.photos[index];
-                  if (photo.id != null) {
-                    // Dispatch delete event
-                    context.read<ActiveSessionBloc>().add(
-                      DeleteSessionPhotoRequested(
-                        sessionId: widget.session.id!,
-                        photo: photo,
-                      ),
-                    );
-                  }
-                }
-              },
-            );
-          } else {
-            // No photos, return empty widget instead of a placeholder
-            return const SizedBox.shrink();
-          }
-        }
-        
-        // Initial state or other states - don't show a placeholder
-        return const SizedBox.shrink();
-      },
-    );
-  }
+  // _buildPhotoSection method removed - functionality moved to photo section in main build method
 
   // Helper method to get the appropriate color based on user gender
   Color _getLadyModeColor(BuildContext context) {
@@ -233,6 +130,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         appBar: AppBar(
           title: const Text('Session Details'),
           backgroundColor: _getLadyModeColor(context),
+          elevation: 0,
           actions: [
             // Delete session button
             IconButton(
@@ -246,21 +144,69 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header section with date and overview
+              // Header section with date and rating stars
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Theme.of(context).primaryColor.withOpacity(0.1),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      formattedDate,
-                      style: Theme.of(context).textTheme.titleLarge,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              formattedDate,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "${formattedStartTime} - ${formattedEndTime}",
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ],
+                        ),
+                        // Rating stars - show all 5 with empty ones if needed
+                        Row(
+                          children: List.generate(
+                            5, // Always generate 5 stars
+                            (index) => Icon(
+                              index < (widget.session.rating ?? 0) 
+                                  ? Icons.star 
+                                  : Icons.star_border,
+                              color: Colors.amber,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "${formattedStartTime} - ${formattedEndTime}",
-                      style: Theme.of(context).textTheme.bodyLarge,
+                    const SizedBox(height: 16),
+                    // Stats row with Distance, Pace, Duration
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildHeaderStat(
+                          context,
+                          Icons.straighten,
+                          'Distance',
+                          distanceValue,
+                        ),
+                        _buildHeaderStat(
+                          context,
+                          Icons.speed,
+                          'Pace',
+                          paceValue,
+                        ),
+                        _buildHeaderStat(
+                          context,
+                          Icons.timer,
+                          'Duration',
+                          MeasurementUtils.formatDuration(widget.session.duration),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -272,26 +218,150 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 child: _SessionRouteMap(session: widget.session),
               ),
 
-              // Photo Gallery Section
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
+              // Photo Gallery Section - only shown when there are photos
+              BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                builder: (context, state) {
+                  if (state is ActiveSessionRunning) {
+                    // Only show if there are photos or if they're still loading
+                    final photoUrls = state.photos
+                        .map((p) => p.url)
+                        .where((url) => url != null && url.isNotEmpty)
+                        .cast<String>()
+                        .toList();
+                    
+                    // DETAILED PHOTO DEBUG LOGGING
+                    print('===== PHOTO DEBUG INFO =====');
+                    print('* Photo loading state:');
+                    print('  - isPhotosLoading: ${state.isPhotosLoading}');
+                    print('  - isUploading: ${state.isUploading}');
+                    print('  - photosError: ${state.photosError}');
+                    print('  - uploadSuccess: ${state.uploadSuccess}');
+                    print('  - Photo count in state: ${state.photos.length}');
+                    print('  - PhotoURLs count: ${photoUrls.length}');
+                    print('\n* Photo details:');
+                    for (var i = 0; i < state.photos.length; i++) {
+                      final photo = state.photos[i];
+                      print('  [$i] ID: ${photo.id}, URL: ${photo.url}');
+                    }
+                    print('==========================');
+                    
+                    final bool shouldShowPhotoSection = photoUrls.isNotEmpty || state.isPhotosLoading || state.isUploading;
+                    
+                    if (shouldShowPhotoSection) {
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.photo_library, color: _getLadyModeColor(context)),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Photos',
-                              style: Theme.of(context).textTheme.titleLarge,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.photo_library, color: _getLadyModeColor(context)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Photos',
+                                      style: Theme.of(context).textTheme.titleLarge,
+                                    ),
+                                  ],
+                                ),
+                                // Add photo button
+                                TextButton.icon(
+                                  onPressed: () {
+                                    _showAddPhotoOptions(context);
+                                  },
+                                  icon: const Icon(Icons.add_photo_alternate),
+                                  label: const Text('Add Photos'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: _getLadyModeColor(context),
+                                  ),
+                                ),
+                              ],
                             ),
+                            const SizedBox(height: 16),
+                            // Show loading state during uploads and loading
+                            if (state.isPhotosLoading || state.isUploading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 40),
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            // Show photos when available and not in loading/uploading state
+                            else if (photoUrls.isNotEmpty)
+                              PhotoCarousel(
+                                photoUrls: photoUrls,
+                                height: 240,
+                                showDeleteButtons: true,
+                                isEditable: true,
+                                onPhotoTap: (index) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => PhotoViewer(
+                                        photoUrls: photoUrls,
+                                        initialIndex: index,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                onDeleteRequest: (index) {
+                                  if (state.photos.length > index) {
+                                    // Properly delete the photo using the full photo object
+                                    final photoToDelete = state.photos[index];
+                                    context.read<ActiveSessionBloc>().add(
+                                      DeleteSessionPhotoRequested(
+                                        sessionId: widget.session.id!,
+                                        photo: photoToDelete,
+                                      ),
+                                    );
+                                  } else {
+                                    StyledSnackBar.show(
+                                      context: context,
+                                      message: 'Cannot delete this photo. Please try again.',
+                                      type: SnackBarType.error,
+                                    );
+                                  }
+                                },
+                              )
+                            // Show placeholder if no photos but we're displaying the section
+                            else
+                              Container(
+                                height: 180,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.photo_library_outlined, 
+                                        size: 48, 
+                                        color: Colors.grey[400],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'No photos yet. Tap "Add Photos" to get started.',
+                                        style: TextStyle(color: Colors.grey[600]),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
-                        // Add photo button
+                      );
+                    }
+                  }
+                  
+                  // Add a floating action button for adding photos when there are none
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
                         TextButton.icon(
                           onPressed: () {
                             _showAddPhotoOptions(context);
@@ -304,12 +374,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    // DEMO: Show the photo carousel with sample photos or empty state
-                    // This is just for UI development and will be replaced with real data
-                    _buildPhotoSection(),
-                  ],
-                ),
+                  );
+                },
               ),
 
               // Detail stats
@@ -357,25 +423,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                         '--',
                         Icons.landscape,
                       ),   
-                    if (widget.session.rating != null) ...[
-                      const SizedBox(height: 24),
-                      Text(
-                        'Rating',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: List.generate(5, (index) {
-                          return Icon(
-                            index < (widget.session.rating ?? 0) 
-                                ? Icons.star 
-                                : Icons.star_border,
-                            color: Theme.of(context).primaryColor,
-                            size: 28,
-                          );
-                        }),
-                      ),
-                    ],
+                    // Rating stars moved to the header
                     if (widget.session.notes?.isNotEmpty == true) ...[
                       const SizedBox(height: 24),
                       Text(
@@ -576,102 +624,116 @@ Download Go Rucky Yourself from the App Store!
   }
 
   void _showAddPhotoOptions(BuildContext context) {
-    AppLogger.info('=== _showAddPhotoOptions called for session ${widget.session.id} ===');
-    // Show a snackbar to confirm the method is being called
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening photo options...')),
-    );
+    // Show option to choose camera or gallery
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(16),
-          topRight: Radius.circular(16),
-        ),
-      ),
-      builder: (context) {
+      builder: (BuildContext context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Take Photo'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _takePhotoWithCamera(context);
-                },
-              ),
+            children: <Widget>[
               ListTile(
                 leading: const Icon(Icons.photo_library),
-                title: const Text('Choose from Gallery'),
-                onTap: () {
+                title: const Text('Photo Gallery'),
+                onTap: () async {
                   Navigator.pop(context);
-                  _pickPhotoFromGallery(context);
+                  await _getImageFromGallery(context);
                 },
               ),
-              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _getImageFromCamera(context);
+                },
+              ),
             ],
           ),
         );
       },
     );
   }
-
-  // Take a photo with the camera
-  void _takePhotoWithCamera(BuildContext context) {
-    if (widget.session.id == null) {
-      AppLogger.error('Session ID is null, cannot take photo.');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Session ID is missing.')),
+  
+  Future<void> _getImageFromGallery(BuildContext context) async {
+    final ImagePicker imagePicker = ImagePicker();
+    
+    try {
+      // Select multiple photos
+      final List<XFile> pickedFiles = await imagePicker.pickMultiImage(
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 85,
       );
-      return;
+      
+      if (pickedFiles.isNotEmpty && widget.session.id != null) {
+        // Convert XFiles to File objects
+        final List<File> photos = pickedFiles.map((xFile) => File(xFile.path)).toList();
+        
+        // Show a loading indicator
+        StyledSnackBar.show(
+          context: context,
+          message: 'Uploading ${photos.length} ${photos.length == 1 ? 'photo' : 'photos'}...',
+          duration: const Duration(seconds: 2),
+        );
+        
+        // Upload the photos
+        context.read<ActiveSessionBloc>().add(
+          UploadSessionPhotosRequested(
+            sessionId: widget.session.id!,
+            photos: photos,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error selecting images: $e',
+        duration: const Duration(seconds: 3),
+      );
     }
-    
-    final currentState = BlocProvider.of<ActiveSessionBloc>(context).state;
-    AppLogger.info('--- PHOTO DEBUG: _takePhotoWithCamera called ---');
-    AppLogger.info('--- PHOTO DEBUG: Session ID: ${widget.session.id} ---');
-    AppLogger.info('--- PHOTO DEBUG: BLoC state type: ${currentState.runtimeType} ---');
-    if (currentState is ActiveSessionRunning) {
-      AppLogger.info('--- PHOTO DEBUG: State is ActiveSessionRunning, sessionId: ${currentState.sessionId} ---');
-    } else {
-      AppLogger.info('--- PHOTO DEBUG: State is NOT ActiveSessionRunning ---');
-    }
-    
-    // Show a snackbar to confirm the event is being dispatched
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening camera...')),
-    );
-    
-    BlocProvider.of<ActiveSessionBloc>(context).add(TakePhotoRequested(sessionId: widget.session.id!));
   }
-
-  // Pick a photo from the gallery
-  void _pickPhotoFromGallery(BuildContext context) {
-    if (widget.session.id == null) {
-      AppLogger.error('Session ID is null, cannot pick photo.');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Session ID is missing.')),
+  
+  Future<void> _getImageFromCamera(BuildContext context) async {
+    final ImagePicker imagePicker = ImagePicker();
+    
+    try {
+      // Take a single photo
+      final XFile? pickedFile = await imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 85,
       );
-      return;
+      
+      if (pickedFile != null && widget.session.id != null) {
+        // Convert XFile to File
+        final File photo = File(pickedFile.path);
+        
+        // Show a loading indicator
+        StyledSnackBar.show(
+          context: context,
+          message: 'Uploading photo...',
+          duration: const Duration(seconds: 2),
+        );
+        
+        // Upload the photo
+        context.read<ActiveSessionBloc>().add(
+          UploadSessionPhotosRequested(
+            sessionId: widget.session.id!,
+            photos: [photo],
+          ),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error taking photo: $e',
+        duration: const Duration(seconds: 3),
+      );
     }
-    
-    final currentState = BlocProvider.of<ActiveSessionBloc>(context).state;
-    AppLogger.info('--- PHOTO DEBUG: _pickPhotoFromGallery called ---');
-    AppLogger.info('--- PHOTO DEBUG: Session ID: ${widget.session.id} ---');
-    AppLogger.info('--- PHOTO DEBUG: BLoC state type: ${currentState.runtimeType} ---');
-    if (currentState is ActiveSessionRunning) {
-      AppLogger.info('--- PHOTO DEBUG: State is ActiveSessionRunning, sessionId: ${currentState.sessionId} ---');
-    } else {
-      AppLogger.info('--- PHOTO DEBUG: State is NOT ActiveSessionRunning ---');
-    }
-    
-    // Show a snackbar to confirm the event is being dispatched
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening gallery...')),
-    );
-    
-    BlocProvider.of<ActiveSessionBloc>(context).add(PickPhotoRequested(sessionId: widget.session.id!));
   }
 }
 

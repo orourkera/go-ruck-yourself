@@ -7,7 +7,6 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/social/domain/models/ruck_like.dart';
 import 'package:rucking_app/features/social/domain/models/ruck_comment.dart';
 import 'package:rucking_app/core/error/exceptions.dart';
-import 'package:rucking_app/core/network/api_endpoints.dart';
 
 /// Repository for handling social interactions (likes, comments)
 class SocialRepository {
