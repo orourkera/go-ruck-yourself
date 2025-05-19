@@ -16,10 +16,12 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 class RuckBuddyDetailScreen extends StatefulWidget {
   final RuckBuddy ruckBuddy;
+  final bool focusComment;
 
   const RuckBuddyDetailScreen({
     Key? key,
     required this.ruckBuddy,
+    this.focusComment = false, // Added parameter to trigger comment field focus
   }) : super(key: key);
 
   @override
@@ -28,6 +30,7 @@ class RuckBuddyDetailScreen extends StatefulWidget {
 
 class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode(); // Added focus node for comment field
   bool _isLiked = false;
   List<RuckPhoto> _photos = [];
   int _likeCount = 0;
@@ -38,11 +41,19 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser;
     _likeCount = widget.ruckBuddy.likeCount;
     _photos = widget.ruckBuddy.photos ?? [];
+    
+    // If focusComment is true, request focus on the comment field after build
+    if (widget.focusComment) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _commentFocusNode.requestFocus();
+      });
+    }
   }
 
   @override
   void dispose() {
     _commentController.dispose();
+    _commentFocusNode.dispose(); // Clean up focus node
     super.dispose();
   }
 
@@ -351,18 +362,17 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       Expanded(
                         child: TextField(
                           controller: _commentController,
-                          decoration: InputDecoration(
+                          focusNode: _commentFocusNode,
+                          decoration: const InputDecoration(
                             hintText: 'Add a comment...',
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
+                              borderRadius: BorderRadius.all(Radius.circular(20.0)),
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                            isDense: true,
                           ),
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _submitComment(),
                         ),
                       ),
                       const SizedBox(width: 8),

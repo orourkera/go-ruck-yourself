@@ -87,7 +87,6 @@ class SocialRepository {
       final payload = {'ruck_id': ruckId};
       debugPrint('🔍 Endpoint: $endpoint');
       debugPrint('🔍 Request payload: $payload');
-      
       final response = await _httpClient.post(
         Uri.parse(endpoint),
         headers: {
@@ -99,10 +98,9 @@ class SocialRepository {
       
       debugPrint('🔍 API response status code: ${response.statusCode}');
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> data = json.decode(response.body);
         debugPrint('🔍 API response data: $data');
-        
         if (data['success'] == true && data['data'] != null) {
           final ruckLike = RuckLike.fromJson(data['data']);
           debugPrint('✅ Successfully added like with id: ${ruckLike.id}');
@@ -133,15 +131,19 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
+      // For DELETE requests, use query parameters instead of request body
+      final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId';
+      debugPrint('🔍 Endpoint: $endpoint');
       final response = await _httpClient.delete(
-        Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes/$ruckId'),
+        Uri.parse(endpoint),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
+        // No body needed, ruck_id is in query parameter
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> data = json.decode(response.body);
         return data['success'] == true;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
