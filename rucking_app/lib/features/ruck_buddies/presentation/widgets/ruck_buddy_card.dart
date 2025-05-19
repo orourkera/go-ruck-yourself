@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Import for HapticFeedback
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart'; // Import for RuckBuddyDetailScreen
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
@@ -50,7 +52,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         final ruckId = int.tryParse(widget.ruckBuddy.id);
         if (ruckId != null) {
           // Quietly check if user has liked this ruck
-          context.read<SocialBloc>().add(CheckRuckLikeStatus(ruckId));
+          context.read<SocialBloc>().add(ToggleRuckLike(ruckId));
+          debugPrint('🐞 [_RuckBuddyCardState.initState] Dispatched ToggleRuckLike for Ruck ID: $ruckId');
         }
       }
     });
@@ -58,6 +61,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   
   void _handleLikeTap() {
     if (_isProcessingLike) return; // Prevent multiple rapid clicks
+    
+    // Trigger strong haptic feedback when like button is tapped
+    HapticFeedback.heavyImpact();
     
     setState(() {
       _isProcessingLike = true;
@@ -167,7 +173,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('--- RUCK BUDDY CARD DEBUG ---', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), // DEBUG TEXT
                 // User Info Row
                 Builder(builder: (context) {
                   debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building User Info Row.');
@@ -310,48 +315,63 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                                     ),
                                   )
                                 : Image.asset(
-                                    'assets/images/tactical_ruck_like_icon_transparent.png',
+                                    _isLiked 
+                                      ? 'assets/images/tactical_ruck_like_icon_active.png' 
+                                      : 'assets/images/tactical_ruck_like_icon_transparent.png',
                                     width: 40,
                                     height: 40,
-                                    color: _isLiked ? Colors.red : null,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      print('Error loading like icon asset: $error. Using fallback icon.');
-                                      return Icon(
-                                        Icons.favorite,
-                                        size: 40,
-                                        color: _isLiked ? Colors.red : Colors.grey,
-                                      );
-                                    },
                                   ),
                               const SizedBox(width: 4),
                               Text(
                                 '$_likeCount',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: Colors.grey[700],
+                                style: TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: 24,
+                                  color: Colors.grey[800],
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
+                      
                       const SizedBox(width: 16),
-                      // Comments count
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            color: Colors.grey[600],
-                            size: 20,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.ruckBuddy.commentCount}',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: Colors.grey[700],
+                      
+                      // Comments count with tap action
+                      InkWell(
+                        onTap: () {
+                          // Navigate to detail screen and focus comment field
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => RuckBuddyDetailScreen(
+                                ruckBuddy: widget.ruckBuddy,
+                                focusComment: true, // Signal to focus comment field
+                              ),
                             ),
-                          ),
-                        ],
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                          child: Row(children: [
+                            Icon(
+                              Icons.comment,
+                              size: 45, // Adjusted to requested size
+                              color: AppColors.secondary, // Brownish-orange color
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${widget.ruckBuddy.commentCount}',
+                              style: TextStyle(
+                                fontFamily: 'Bangers',
+                                fontSize: 24,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ]),
+                        ),
                       ),
+                      
                       const Spacer(),
                     ],
                   );
@@ -365,21 +385,21 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   }
   
   Widget _buildAvatar(UserInfo user) {
-    // Check if we should use photo URL (if available)
     if (user.photoUrl != null && user.photoUrl!.isNotEmpty) {
+      // Always use custom photo if present
       return CircleAvatar(
-        radius: 20,
-        backgroundImage: NetworkImage(user.photoUrl!),
+        radius: 24,
+        backgroundColor: Colors.grey[200],
+        backgroundImage: CachedNetworkImageProvider(user.photoUrl!),
       );
     } else {
-      // Use gender-specific rucker image
+      // Use gender-specific default avatar
       final String imagePath = user.gender == 'female'
           ? 'assets/images/lady rucker profile.png'
           : 'assets/images/profile.png';
-      
       return CircleAvatar(
-        radius: 20,
-        backgroundColor: Colors.transparent,
+        radius: 24,
+        backgroundColor: Colors.grey[200],
         backgroundImage: AssetImage(imagePath),
       );
     }
