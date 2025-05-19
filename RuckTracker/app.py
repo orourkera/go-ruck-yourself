@@ -301,12 +301,13 @@ api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')
 api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
-# Stats Endpoints
-api.add_resource(WeeklyStatsResource, '/api/stats/weekly')
-api.add_resource(MonthlyStatsResource, '/api/stats/monthly')
-api.add_resource(YearlyStatsResource, '/api/stats/yearly')
+# Statistics endpoints (prefixed with /api)
+api.add_resource(WeeklyStatsResource, '/api/statistics/weekly')
+api.add_resource(MonthlyStatsResource, '/api/statistics/monthly')
+api.add_resource(YearlyStatsResource, '/api/statistics/yearly')
 
-# Ruck Photos Endpoint
+# Ruck Photos, Likes, Comments (ensure these are correctly defined as well)
+# Example: api.add_resource(RuckPhotosResource, '/api/ruck-photos')
 api.add_resource(RuckPhotosResource, '/api/ruck-photos')
 rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
