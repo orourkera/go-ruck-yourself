@@ -195,24 +195,16 @@ class RuckLikesResource(Resource):
             
         # Add the like
         try:
-            # Get the user's profile info from user table (not profiles)
-            profile_query = supabase.table('user') \
-                                   .select('display_name, avatar_url') \
-                                   .eq('id', user_id) \
-                                   .execute()
+            # Simplified approach: don't query user table for profile info
+            # Just use the user ID which is all we really need
             
-            if profile_query.data:
-                user_display_name = profile_query.data[0].get('display_name', user_display_name)
-                user_avatar_url = profile_query.data[0].get('avatar_url')
-            else:
-                user_avatar_url = None
-            
-            # Insert the like
+            # Insert the like with minimal required data
             like_data = {
                 'ruck_id': ruck_id,
                 'user_id': user_id,
-                'user_display_name': user_display_name,
-                'user_avatar_url': user_avatar_url
+                # Use fallback values for display info
+                'user_display_name': 'Rucker', # Generic fallback name
+                'user_avatar_url': None        # No avatar fallback
             }
             
             insert_response = supabase.table('ruck_likes').insert(like_data).execute()
