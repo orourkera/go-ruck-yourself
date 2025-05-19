@@ -147,7 +147,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       // Explicitly start the session on the backend
       AppLogger.info('Attempting to start session with ruck ID: $sessionId');
-      await _apiClient.post('/rucks/start', {'ruck_id': sessionId});
+      await _apiClient.post('/rucks/$sessionId/start', {});
       AppLogger.info('Backend notified of session start for ruck ID: $sessionId');
 
       final initialSessionState = ActiveSessionRunning(

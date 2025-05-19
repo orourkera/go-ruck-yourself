@@ -306,7 +306,7 @@ rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Ruck Likes Endpoints
 api.add_resource(
-  rate_limit_resource(RuckLikesResource, "100 per hour"),
+  rate_limit_resource(RuckLikesResource, "500 per minute"),  # Dramatically increased from 100/hour to 500/minute
   '/api/ruck-likes',
   '/api/ruck-likes/check'
 )

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -41,11 +42,18 @@ class SessionDetailScreen extends StatefulWidget {
 }
 
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
+  // Track if we need to periodically check for photos
+  Timer? _photoRefreshTimer;
+  bool _uploadInProgress = false;
+  int _refreshAttempts = 0;
+  final int _maxRefreshAttempts = 5;
+
   @override
   void initState() {
     super.initState();
     if (widget.session.id != null) {
       // Load photos
+      AppLogger.info('[SESSION_DETAIL] Initial photo fetch for session ${widget.session.id}');
       context.read<ActiveSessionBloc>().add(FetchSessionPhotosRequested(widget.session.id!));
       
       // Load social data (likes and comments)
@@ -53,6 +61,44 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       socialBloc.add(LoadRuckLikes(int.parse(widget.session.id!)));
       socialBloc.add(LoadRuckComments(int.parse(widget.session.id!)));
     }
+  }
+  
+  @override
+  void dispose() {
+    _photoRefreshTimer?.cancel();
+    super.dispose();
+  }
+  
+  // Starts polling for photos after upload
+  void _startPhotoRefreshPolling() {
+    _refreshAttempts = 0;
+    _uploadInProgress = true;
+    
+    AppLogger.info('[SESSION_DETAIL] Starting photo refresh polling');
+    
+    // Cancel existing timer if running
+    _photoRefreshTimer?.cancel();
+    
+    // Start a new timer to check every 2 seconds
+    _photoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      _refreshAttempts++;
+      
+      AppLogger.info('[SESSION_DETAIL] Refresh attempt $_refreshAttempts of $_maxRefreshAttempts');
+      
+      if (_refreshAttempts > _maxRefreshAttempts) {
+        AppLogger.info('[SESSION_DETAIL] Max refresh attempts reached, stopping polling');
+        timer.cancel();
+        _uploadInProgress = false;
+        return;
+      }
+      
+      // Request a fresh photo fetch
+      if (mounted && widget.session.id != null) {
+        // Get direct access to the bloc
+        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+        activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
+      }
+    });
   }
 
   // Builds the photo section - either showing photos or empty state
@@ -695,12 +741,11 @@ Download Go Rucky Yourself from the App Store!
             ),
           );
           
-          // Add a delayed refresh to fetch the updated photos after upload completes
-          Future.delayed(const Duration(seconds: 1), () {
-            // Explicitly refresh photos
-            activeSessionBloc.add(FetchSessionPhotosRequested(sessionId));
-            AppLogger.info('[PHOTO_UPLOAD] Requested photo refresh');
-          });
+          // Start polling for photo updates
+          if (mounted) {
+            AppLogger.info('[PHOTO_UPLOAD] Starting polling for photo updates');
+            _startPhotoRefreshPolling();
+          }
           
           AppLogger.info('[PHOTO_UPLOAD] Successfully added upload event to bloc using GetIt');
         } catch (e) {
@@ -774,12 +819,11 @@ Download Go Rucky Yourself from the App Store!
             ),
           );
           
-          // Add a delayed refresh to fetch the updated photos after upload completes
-          Future.delayed(const Duration(seconds: 1), () {
-            // Explicitly refresh photos
-            activeSessionBloc.add(FetchSessionPhotosRequested(sessionId));
-            AppLogger.info('[PHOTO_UPLOAD] Requested photo refresh after camera upload');
-          });
+          // Start polling for photo updates
+          if (mounted) {
+            AppLogger.info('[PHOTO_UPLOAD] Starting polling for photo updates after camera upload');
+            _startPhotoRefreshPolling();
+          }
           
           AppLogger.info('[PHOTO_UPLOAD] Successfully added camera photo upload event using GetIt');
         } catch (e) {
