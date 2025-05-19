@@ -90,14 +90,20 @@ def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at
                 if start_date <= session_time_dt <= end_date:
                     day_index = session_time_dt.weekday()
                     daily_data[day_index]['sessions_count'] += 1
-                    daily_data[day_index]['distance_km'] += s.get('distance_km', 0) or 0
-            except ValueError:
-                logger.warning(f"Could not parse date for daily breakdown: {session_time_str}")
-                
-    return [
-        {'day_name': day_names[i], **data} 
-        for i, data in daily_data.items()
-    ]
+                    daily_data[day_index]['distance_km'] += float(s.get('distance_km', 0) or 0)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error parsing timestamp for daily breakdown: {e}")
+    
+    # Convert to array format for frontend
+    result = []
+    for i in range(7):
+        result.append({
+            'day': day_names[i],
+            'sessions_count': daily_data[i]['sessions_count'],
+            'distance_km': daily_data[i]['distance_km']
+        })
+    
+    return result
 
 class WeeklyStatsResource(Resource):
     def get(self):
@@ -113,7 +119,7 @@ class WeeklyStatsResource(Resource):
             end_iso = end_dt.isoformat()
 
             # Use the authenticated user's JWT for RLS
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('ruck_session') \
                 .select('distance_km, duration_seconds, calories_burned, completed_at') \
                 .eq('user_id', g.user.id) \
@@ -154,7 +160,7 @@ class MonthlyStatsResource(Resource):
             end_iso = end_dt.isoformat()
 
             # Use the authenticated user's JWT for RLS
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('ruck_session') \
                 .select('distance_km, duration_seconds, calories_burned, completed_at') \
                 .eq('user_id', g.user.id) \
@@ -193,7 +199,7 @@ class YearlyStatsResource(Resource):
             end_iso = end_dt.isoformat()
             
             # Use the authenticated user's JWT for RLS
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('ruck_session') \
                 .select('distance_km, duration_seconds, calories_burned, completed_at') \
                 .eq('user_id', g.user.id) \
