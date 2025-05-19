@@ -126,6 +126,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('--- RUCK BUDDY CARD DEBUG ---', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), // DEBUG TEXT
                 // User Info Row
                 Row(
                   children: [

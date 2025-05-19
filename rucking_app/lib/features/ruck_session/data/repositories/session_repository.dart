@@ -63,10 +63,20 @@ class SessionRepository {
         return [];
       }
       
-      // Prepare multipart request to our new API endpoint
+      // Instead of constructing our own HTTP request, prepare to upload photos directly through
+      // the core ApiClient which handles base URLs and authentication
+      List<File> photoFiles = photos;
+      List<Map<String, dynamic>> photoMetadata = [];
+
+      // For photo upload, we need to use a direct URL approach - we'll use the API host from .env file
+      // This assumes the API host is defined in the .env file
+      final apiHost = dotenv.env['API_HOST'] ?? 'https://getrucky.com';
+      final url = '$apiHost${ApiEndpoints.ruckPhotos}';
+      AppLogger.info('Uploading photos to URL: $url');
+
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse(ApiEndpoints.ruckPhotos),
+        Uri.parse(url),
       );
       
       // Add the authorization header

@@ -61,5 +61,11 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Go Rucky Yourself needs access to your camera to capture photos of your ruck sessions to share with the community.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Go Rucky Yourself needs access to your photo library to select photos of your ruck sessions to share with the community.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Go Rucky Yourself needs permission to save photos to your photo library.</string>
 </dict>
 </plist>

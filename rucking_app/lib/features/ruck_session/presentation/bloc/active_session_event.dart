@@ -160,3 +160,34 @@ class DeleteSessionPhotoRequested extends ActiveSessionEvent {
   @override
   List<Object?> get props => [sessionId, photo];
 }
+
+class TakePhotoRequested extends ActiveSessionEvent {
+  final String sessionId;
+
+  const TakePhotoRequested({required this.sessionId});
+
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class PickPhotoRequested extends ActiveSessionEvent {
+  final String sessionId;
+
+  const PickPhotoRequested({required this.sessionId});
+
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class LoadSessionForViewing extends ActiveSessionEvent {
+  final String sessionId;
+  final RuckSession session;
+
+  const LoadSessionForViewing({
+    required this.sessionId,
+    required this.session,
+  });
+
+  @override
+  List<Object?> get props => [sessionId, session];
+}

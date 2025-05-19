@@ -77,6 +77,8 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🐞 RuckBuddiesScreen.build called');
+    
     // Check for lady mode in AuthBloc
     bool isLadyMode = false;
     try {
@@ -109,64 +111,46 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       body: RefreshIndicator(
         onRefresh: () async {
           context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
-          // Wait for refresh to complete
-          await Future.delayed(const Duration(seconds: 1));
         },
-        child: Column(
-          children: [
-            // Filter chips
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
-                builder: (context, state) {
-                  final String currentFilter = state is RuckBuddiesLoaded 
-                      ? state.filter 
-                      : 'closest';
-                  
-                  final statsUrl = '${AppConfig.apiBaseUrl}/stats/monthly';
-                  
-                  return FilterChipGroup(
-                    selectedFilter: currentFilter,
-                    onFilterSelected: (filter) {
-                      context.read<RuckBuddiesBloc>().add(
-                        FilterRuckBuddiesEvent(filter: filter),
-                      );
-                    },
-                  );
+        child: BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
+          builder: (context, state) {
+            debugPrint('🐞 RuckBuddiesScreen BlocBuilder - Current state: ${state.runtimeType}');
+            if (state is RuckBuddiesLoading) {
+              debugPrint('🐞 RuckBuddiesScreen BlocBuilder - State: RuckBuddiesLoading (initial load)');
+              return const Center(child: CircularProgressIndicator());
+            } else if (state is RuckBuddiesError) {
+              debugPrint('🐞 RuckBuddiesScreen BlocBuilder - State: RuckBuddiesError, Message: ${state.message}');
+              return ErrorDisplay(
+                message: state.message,
+                onRetry: () {
+                  context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
                 },
-              ),
-            ),
-            
-            // Main content
-            Expanded(
-              child: BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
-                builder: (context, state) {
-                  if (state is RuckBuddiesInitial || state is RuckBuddiesLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (state is RuckBuddiesLoaded) {
-                    if (state.ruckBuddies.isEmpty) {
-                      return const EmptyState(
-                        title: 'No Ruck Buddies Found',
-                        message: 'Enable sharing on your profile and mark your sessions as public to join the community!',
-                        icon: Icons.people_outline,
-                      );
-                    }
-                    
-                    return _buildRuckBuddiesList(state.ruckBuddies, state.isLoadingMore);
-                  } else if (state is RuckBuddiesError) {
-                    return ErrorDisplay(
-                      message: state.message,
-                      onRetry: () {
-                        context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
-                      },
-                    );
-                  }
-                  
-                  return const SizedBox();
-                },
-              ),
-            ),
-          ],
+              );
+            } else if (state is RuckBuddiesLoaded) {
+              final ruckBuddies = state.ruckBuddies;
+              final isLoadingMore = state.isLoadingMore;
+              
+              debugPrint('🐞 RuckBuddiesScreen BlocBuilder - State: RuckBuddiesLoaded or LoadingMore, Count: ${ruckBuddies.length}, IsLoadingMore: $isLoadingMore');
+
+              if (ruckBuddies.isEmpty) {
+                debugPrint('🐞 RuckBuddiesScreen BlocBuilder - RuckBuddies list is empty, showing EmptyState.');
+                return const EmptyState(
+                  title: 'No Ruck Buddies',
+                  message: 'No ruck buddies found yet. Be the first to share!',
+                  icon: Icons.people_outline,
+                );
+              }
+              return _buildRuckBuddiesList(ruckBuddies, isLoadingMore);
+            } else {
+              // Default to empty state if initial or unknown state
+              debugPrint('🐞 RuckBuddiesScreen BlocBuilder - State: Initial or Unknown, showing EmptyState.');
+              return const EmptyState(
+                title: 'No Ruck Buddies',
+                message: 'No ruck buddies found yet. Be the first to share!',
+                icon: Icons.people_outline,
+              );
+            }
+          },
         ),
       ),
     );
@@ -188,47 +172,90 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
           );
         }
         
-        final ruckBuddy = ruckBuddies[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: RuckBuddyCard(
-            ruckBuddy: ruckBuddy,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => RuckBuddyDetailScreen(ruckBuddy: ruckBuddy),
-                ),
-              );
-            },
-            onLikeTap: () {
-              // Use the actual like functionality
+        // Wrap each card in an error boundary to prevent entire list from failing if one card fails
+        try {
+          final ruckBuddy = ruckBuddies[index];
+          debugPrint('🐞 Building card for buddy ${index+1}/${ruckBuddies.length} with ID: ${ruckBuddy.id}');
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Builder(builder: (context) {
               try {
-                debugPrint('🔍 Attempting to like ruck buddy with id: ${ruckBuddy.id}');
-                
-                // Parse ruckId to int since SocialBloc expects an integer
-                final ruckId = int.parse(ruckBuddy.id);
-                debugPrint('🔍 Parsed ruckId as int: $ruckId');
-                
-                // Check if SocialBloc is available
-                final socialBloc = context.read<SocialBloc>();
-                debugPrint('🔍 SocialBloc instance found: ${socialBloc != null}');
-                
-                // Use the SocialBloc to toggle like
-                debugPrint('🔍 Dispatching ToggleRuckLike event to SocialBloc');
-                socialBloc.add(ToggleRuckLike(ruckId));
-                debugPrint('🔍 ToggleRuckLike event dispatched successfully');
-              } catch (e) {
-                debugPrint('❌ Error toggling like: $e');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error liking ruck: $e'),
-                    duration: const Duration(seconds: 2),
+                return RuckBuddyCard(
+                  ruckBuddy: ruckBuddy,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => RuckBuddyDetailScreen(ruckBuddy: ruckBuddy),
+                      ),
+                    );
+                  },
+                  onLikeTap: () {
+                    // Use the actual like functionality
+                    try {
+                      debugPrint('🔍 Attempting to like ruck buddy with id: ${ruckBuddy.id}');
+                      
+                      // Parse ruckId to int since SocialBloc expects an integer
+                      final ruckId = int.parse(ruckBuddy.id);
+                      debugPrint('🔍 Parsed ruckId as int: $ruckId');
+                      
+                      // Check if SocialBloc is available
+                      final socialBloc = context.read<SocialBloc>();
+                      debugPrint('🔍 SocialBloc instance found: ${socialBloc != null}');
+                      
+                      // Use the SocialBloc to toggle like
+                      debugPrint('🔍 Dispatching ToggleRuckLike event to SocialBloc');
+                      socialBloc.add(ToggleRuckLike(ruckId));
+                      debugPrint('🔍 ToggleRuckLike event dispatched successfully');
+                    } catch (e) {
+                      debugPrint('❌ Error toggling like: $e');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error liking ruck: $e'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                );
+              } catch (e, stackTrace) {
+                debugPrint('❌ Error rendering RuckBuddyCard: $e');
+                debugPrint('❌ Stack trace: $stackTrace');
+                return Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ruck Session #${ruckBuddy.id}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Error rendering this ruck session'),
+                        Text('Distance: ${ruckBuddy.distanceKm}km'),
+                        Text('Duration: ${ruckBuddy.durationSeconds}s'),
+                      ],
+                    ),
                   ),
                 );
               }
-            },
-          ),
-        );
+            }),
+          );
+        } catch (e) {
+          debugPrint('❌ Critical error rendering ruck buddy at index $index: $e');
+          return const Padding(
+            padding: EdgeInsets.only(bottom: 16.0),
+            child: Card(
+              child: ListTile(
+                title: Text('Error loading this ruck session'),
+                subtitle: Text('There was a problem displaying this data'),
+              ),
+            ),
+          );
+        }
       },
     );
   }

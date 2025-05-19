@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/models/api_exception.dart';
 import 'package:rucking_app/core/models/location_point.dart';
@@ -93,6 +95,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<FetchSessionPhotosRequested>(_onFetchSessionPhotosRequested);
     on<UploadSessionPhotosRequested>(_onUploadSessionPhotosRequested);
     on<DeleteSessionPhotoRequested>(_onDeleteSessionPhotoRequested);
+    on<TakePhotoRequested>(_onTakePhotoRequested);
+    on<PickPhotoRequested>(_onPickPhotoRequested);
+    on<LoadSessionForViewing>(_onLoadSessionForViewing);
   }
 
   Future<void> _onSessionStarted(
@@ -697,11 +702,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     } else if (state is ActiveSessionFailure) {
       final failureState = state as ActiveSessionFailure;
       if (failureState.sessionDetails != null) {
-        AppLogger.info('[PAUSE_DEBUG] _onSessionPaused: Session is in ActiveSessionFailure state with details, attempting to pause it.');
+        AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused: Session is in ActiveSessionFailure state with details, attempting to pause it.');
         final sessionDetails = failureState.sessionDetails!;
         
         if (sessionDetails.isPaused) {
-          AppLogger.info('[PAUSE_DEBUG] _onSessionPaused: SessionFailure details indicate already paused. Emitting and notifying watch.');
+          AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused: SessionFailure details indicate already paused. Emitting and notifying watch.');
           _stopTicker(); 
           final now = DateTime.now().toUtc();
           final consistentPausedState = sessionDetails.copyWith(isPaused: true, currentPauseStartTimeUtc: sessionDetails.currentPauseStartTimeUtc ?? now);
@@ -739,10 +744,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         );
         AppLogger.info('Session paused from failure state. Watch notified.');
       } else {
-        AppLogger.warning('[PAUSE_DEBUG] _onSessionPaused: Session is ActiveSessionFailure but has no sessionDetails. Cannot pause.');
+        AppLogger.warning('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused: Session is ActiveSessionFailure but has no sessionDetails. Cannot pause.');
       }
     } else {
-      AppLogger.warning('[PAUSE_DEBUG] _onSessionPaused: Session is not ActiveSessionRunning or ActiveSessionFailure. Current state: ${state.runtimeType}. Cannot pause.');
+      AppLogger.warning('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused: Session is not ActiveSessionRunning or ActiveSessionFailure. Current state: ${state.runtimeType}. Cannot pause.');
     }
   }
 
@@ -850,7 +855,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Update backend about session completion
         // DEBUG: Log all outgoing values for session completion
         AppLogger.info('[SESSION COMPLETE PAYLOAD]');
-        AppLogger.info('  distance_km: \u001b[36m${double.parse(currentState.distanceKm.toStringAsFixed(3))}\u001b[0m');
+        AppLogger.info('  distance_km: \u001b[36m${double.parse(currentState.distanceKm.toStringAsFixed(3))}\u001B[0m');
         AppLogger.info('  duration_seconds: ${finalElapsedSeconds}');
         AppLogger.info('  calories_burned: ${currentState.calories.round()}');
         AppLogger.info('  elevation_gain_m: ${currentState.elevationGain.round()}');
@@ -1262,6 +1267,179 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         ));
       }
     }
+  }
+
+  Future<void> _onTakePhotoRequested(
+    TakePhotoRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('--- _onTakePhotoRequested: Event received for session ${event.sessionId} ---');
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      AppLogger.info('--- _onTakePhotoRequested: Current state is ActiveSessionRunning ---');
+      
+      try {
+        AppLogger.info('Taking photo for session ${event.sessionId}');
+        
+        // Skip manual permission checks and let image_picker handle camera permissions
+        AppLogger.info('--- _onTakePhotoRequested: Attempting to take photo with camera... ---');
+        final imagePicker = ImagePicker();
+        final XFile? pickedFile = await imagePicker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1800,
+          maxHeight: 1800,
+          imageQuality: 85,
+        );
+        AppLogger.info('--- _onTakePhotoRequested: Image picker result: ${pickedFile?.path ?? "No file picked"} ---');
+        
+        if (pickedFile != null) {
+          // Upload the photo by dispatching an UploadSessionPhotosRequested event
+          add(UploadSessionPhotosRequested(
+            sessionId: event.sessionId,
+            photos: [File(pickedFile.path)],
+          ));
+        }
+      } catch (e) {
+        AppLogger.error('Error taking photo: $e');
+        emit(currentState.copyWith(
+          uploadError: 'Error taking photo: $e',
+        ));
+      }
+    } else {
+      AppLogger.warning('--- _onTakePhotoRequested: Event received but state is ${state.runtimeType}, not ActiveSessionRunning. Skipping. ---');
+    }
+  }
+
+  Future<void> _onPickPhotoRequested(
+    PickPhotoRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('--- _onPickPhotoRequested: Event received for session ${event.sessionId} ---');
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      AppLogger.info('--- _onPickPhotoRequested: Current state is ActiveSessionRunning ---');
+      
+      try {
+        AppLogger.info('Picking photos for session ${event.sessionId}');
+        
+        // Skip manual permission checks and let image_picker handle permissions
+        AppLogger.info('--- _onPickPhotoRequested: Attempting to pick images from gallery... ---');
+        final imagePicker = ImagePicker();
+        final List<XFile> pickedFiles = await imagePicker.pickMultiImage(
+          maxWidth: 1800,
+          maxHeight: 1800,
+          imageQuality: 85,
+        );
+        
+        AppLogger.info('--- _onPickPhotoRequested: Image picker result: ${pickedFiles.length} files picked ---');
+        
+        if (pickedFiles.isNotEmpty) {
+          // Convert XFiles to Files and upload them
+          final List<File> files = pickedFiles.map((xFile) => File(xFile.path)).toList();
+          
+          // Upload the photos by dispatching an UploadSessionPhotosRequested event
+          add(UploadSessionPhotosRequested(
+            sessionId: event.sessionId,
+            photos: files,
+          ));
+        }
+      } catch (e) {
+        AppLogger.error('Error picking photos: $e');
+        emit(currentState.copyWith(
+          uploadError: 'Error picking photos: $e',
+        ));
+      }
+    } else {
+      AppLogger.warning('--- _onPickPhotoRequested: Event received but state is ${state.runtimeType}, not ActiveSessionRunning. Skipping. ---');
+    }
+  }
+
+  Future<void> _onLoadSessionForViewing(
+    LoadSessionForViewing event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('--- _onLoadSessionForViewing: Event received for session ${event.sessionId} ---');
+    
+    try {
+      // Use the session object directly from the event
+      final session = event.session;
+      AppLogger.info('--- _onLoadSessionForViewing: Processing session ${event.sessionId} ---');
+
+      // Create an empty list for location points
+      List<LocationPoint> locationPoints = [];
+      
+      // Safely convert location points if they exist
+      if (session.locationPoints != null) {
+        try {
+          for (var point in session.locationPoints!) {
+            try {
+              locationPoints.add(LocationPoint.fromJson(point));
+            } catch (e) {
+              // Log error but continue processing other points
+              AppLogger.warning('Could not convert location point: $e');
+            }
+          }
+        } catch (e) {
+          AppLogger.warning('Error processing location points: $e');
+          // Continue with empty location points rather than failing
+        }
+      }
+      
+      // Empty list for heart rate samples with null safety
+      List<HeartRateSample> heartRateSamples = [];
+      if (session.heartRateSamples != null) {
+        heartRateSamples = session.heartRateSamples!;
+      }
+
+      // Handle numeric values safely with null-coalescing
+      final int elapsedSeconds = session.duration != null ? session.duration.inSeconds : 0;
+      final double distance = session.distance ?? 0.0;
+      final double elevationGain = session.elevationGain ?? 0.0;
+      final double elevationLoss = session.elevationLoss ?? 0.0;
+      final int calories = session.caloriesBurned ?? 0;
+      
+      // Set a valid session ID (never null)
+      final String sessionId = session.id ?? event.sessionId;
+      
+      // Use a safe default for start time
+      final DateTime startTime = session.startTime;
+      
+      // Create the ActiveSessionRunning state with all required parameters
+      // and safe defaults for optional ones
+      emit(ActiveSessionRunning(
+        sessionId: sessionId,
+        locationPoints: locationPoints,
+        elapsedSeconds: elapsedSeconds,
+        distanceKm: distance,
+        ruckWeightKg: session.ruckWeightKg,
+        calories: calories,
+        elevationGain: elevationGain,
+        elevationLoss: elevationLoss,
+        pace: session.averagePace,
+        heartRateSamples: heartRateSamples,
+        isPaused: false,
+        originalSessionStartTimeUtc: startTime,
+        totalPausedDuration: Duration(seconds: session.pausedDurationSeconds ?? 0),
+        notes: session.notes,
+        tags: session.tags,
+        perceivedExertion: session.perceivedExertion,
+        weightKg: session.weightKg,
+        isGpsReady: true, // Viewing existing sessions, so GPS is ready
+        photos: [], // Photos will be loaded separately via FetchSessionPhotosRequested
+      ));
+      
+      AppLogger.info('--- _onLoadSessionForViewing: Successfully emitted ActiveSessionRunning for session $sessionId ---');
+    } catch (e, stackTrace) {
+      AppLogger.error('--- _onLoadSessionForViewing: Error loading session ${event.sessionId}: $e ---');
+      AppLogger.error('Stack trace: $stackTrace');
+      
+      // Fall back to a safe failure state that won't crash the app
+      emit(ActiveSessionFailure(
+        errorMessage: 'Error loading session for viewing: ${e.toString()}',
+        // Don't pass any session details to avoid propagating potentially corrupted data
+        sessionDetails: null,
+      ));
+    }  
   }
 
   @override
