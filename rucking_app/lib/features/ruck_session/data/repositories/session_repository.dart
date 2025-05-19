@@ -279,24 +279,86 @@ class SessionRepository {
   /// Get photos for a ruck session
   Future<List<RuckPhoto>> getSessionPhotos(String ruckId) async {
     try {
+      AppLogger.info('===== FETCH PHOTOS DETAIL =====');
       AppLogger.info('Fetching photos for session: $ruckId');
       
-      final response = await _apiClient.get('/ruck-photos?ruck_id=$ruckId');
-      
-      if (response is List) {
-        AppLogger.info('Received ${response.length} photos for session $ruckId (List format)');  
-        return response.map((photo) => RuckPhoto.fromJson(photo)).toList();
-      } else if (response is Map && response.containsKey('data')) {
-        final List<dynamic> data = response['data'];
-        AppLogger.info('Received ${data.length} photos for session $ruckId (Map format)');
-        return data.map((photo) => RuckPhoto.fromJson(photo)).toList();
-      } else {
-        AppLogger.warning('Unexpected response format when fetching photos: $response');
-        return [];
+      // Create direct http request to get raw response for debugging
+      try {
+        final apiHost = dotenv.env['API_HOST'] ?? 'https://getrucky.com';
+        final apiUrl = '$apiHost/api/ruck-photos?ruck_id=$ruckId';
+        AppLogger.info('Full API URL: $apiUrl');
+        
+        final authService = GetIt.I<AuthService>();
+        final authToken = await authService.getToken();
+        
+        final response = await http.get(
+          Uri.parse(apiUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            if (authToken != null) 'Authorization': 'Bearer $authToken',
+          },
+        );
+        
+        AppLogger.info('RAW DEBUG HTTP STATUS: ${response.statusCode}');
+        AppLogger.info('RAW DEBUG HTTP BODY: ${response.body}');
+      } catch (e) {
+        AppLogger.error('Error with raw debug HTTP request: $e');
       }
-    } catch (e) {
-      AppLogger.error('Error fetching photos: $e');
+      
+      // Now do the real API call
+      final response = await _apiClient.get('/ruck-photos?ruck_id=$ruckId');
+      AppLogger.info('PHOTO API RESPONSE TYPE: ${response.runtimeType}');
+      
+      // Based on the server implementation, we know the structure should be:
+      // { "success": true, "data": [...] }
+      if (response is Map) {
+        final Map<String, dynamic> responseMap = response as Map<String, dynamic>;
+        AppLogger.info('Response is a Map with keys: ${responseMap.keys.join(', ')}');
+        
+        if (responseMap.containsKey('success') && responseMap.containsKey('data')) {
+          final data = responseMap['data'];
+          if (data is List) {
+            AppLogger.info('Found data list with ${data.length} items');
+            final photos = data.map((photo) => RuckPhoto.fromJson(photo)).toList();
+            
+            // Log each photo for debugging
+            for (var i = 0; i < photos.length; i++) {
+              final photo = photos[i];
+              AppLogger.info('Photo[$i]: id=${photo.id}, url=${photo.url}, thumbnailUrl=${photo.thumbnailUrl}');
+            }
+            
+            return photos;
+          } else {
+            AppLogger.info('Data is not a List but a ${data.runtimeType}');
+            return [];
+          }
+        }
+      } else if (response is List) {
+        // Legacy format - directly as a list
+        AppLogger.info('Response is a direct List with ${response.length} items');
+        return response.map((photo) => RuckPhoto.fromJson(photo)).toList();
+      }
+      
+      // Return an empty list as fallback to avoid null return
+      AppLogger.warning('Could not parse photos response, returning empty list');
       return [];
+    } catch (e, stackTrace) {
+      AppLogger.error('Error fetching photos: $e');
+      AppLogger.error('Stack trace: $stackTrace');
+      return [];
+    } finally {
+      AppLogger.info('===== END FETCH PHOTOS DETAIL =====');
+    }
+  }
+  
+  // Helper method to log photo details
+  void _logPhotoDetails(List<RuckPhoto> photos) {
+    AppLogger.info('PHOTO DETAILS:');
+    for (int i = 0; i < photos.length; i++) {
+      final photo = photos[i];
+      AppLogger.info('  [$i] ID: ${photo.id}, URL: ${photo.url}');
+      AppLogger.info('      Created: ${photo.createdAt}, Size: ${photo.size}, Type: ${photo.contentType}');
     }
   }
   

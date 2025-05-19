@@ -161,6 +161,16 @@ class SocialRepository {
   /// Check if the current user has liked a specific ruck session
   Future<bool> hasUserLikedRuck(int ruckId) async {
     debugPrint('🔍 SocialRepository.hasUserLikedRuck called for ruckId: $ruckId');
+    final result = await batchCheckUserLikes([ruckId]);
+    return result[ruckId] ?? false;
+  }
+  
+  /// Batch check if the current user has liked multiple ruck sessions
+  /// Returns a map of ruckId -> hasLiked
+  Future<Map<int, bool>> batchCheckUserLikes(List<int> ruckIds) async {
+    if (ruckIds.isEmpty) return {};
+    
+    debugPrint('🔍 SocialRepository.batchCheckUserLikes called for ${ruckIds.length} rucks');
     try {
       debugPrint('🔍 Getting auth token...');
       final token = await _authToken;
@@ -171,46 +181,76 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      debugPrint('🔍 Making API request to check if user liked ruck');
-      final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes/check?ruck_id=$ruckId';
+      // Convert ruckIds to comma-separated string
+      final ruckIdsParam = ruckIds.join(',');
+      debugPrint('🔍 Making batch API request to check if user liked rucks');
+      final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes/batch-check?ruck_ids=$ruckIdsParam';
       debugPrint('🔍 Endpoint: $endpoint');
       
-      final response = await _httpClient.get(
-        Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-      
-      debugPrint('🔍 API response status code: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        debugPrint('🔍 API response data: $data');
-        
-        // The API returns {"success": true, "data": {"has_liked": true/false}}
-        // Need to check data['data']['has_liked'] rather than just data['data']
-        final result = data['success'] == true && 
-                      (data['data'] != null && data['data']['has_liked'] == true);
-                      
-        debugPrint('🔍 User has liked this ruck: $result');
-        return result;
-      } else if (response.statusCode == 404) {
-        // If the like doesn't exist, return false
-        debugPrint('🔍 Like not found (404), returning false');
-        return false;
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
-        debugPrint('⚠ Unauthorized request: ${response.statusCode}');
-        throw UnauthorizedException(message: 'Unauthorized request');
-      } else {
-        debugPrint('⚠ Server error: ${response.statusCode} - ${response.body}');
-        throw ServerException(
-            message: 'Failed to check like status: ${response.statusCode} - ${response.body}');
+      // Use regular endpoint for single ruck check as fallback if batch endpoint doesn't exist
+      if (ruckIds.length == 1) {
+        return _fallbackSingleRuckCheck(ruckIds.first, token);
       }
+      
+      // Start with individual checks for now, until backend supports batch endpoint
+      // We'll do this sequentially to avoid rate limiting
+      Map<int, bool> results = {};
+      for (final ruckId in ruckIds) {
+        try {
+          // Add a small delay between requests to avoid rate limiting
+          if (results.isNotEmpty) {
+            await Future.delayed(const Duration(milliseconds: 100));
+          }
+          final hasLiked = await _fallbackSingleRuckCheck(ruckId, token);
+          results[ruckId] = hasLiked[ruckId] ?? false;
+        } catch (e) {
+          // If we hit rate limit, just return what we have so far
+          if (e is ServerException && e.message.contains('429')) {
+            debugPrint('⚠ Rate limit hit, returning partial results');
+            return results;
+          }
+          results[ruckId] = false;
+        }
+      }
+      
+      return results;
     } catch (e) {
+      debugPrint('🐞 Error in batch checking like status: $e');
       if (e is UnauthorizedException) rethrow;
-      throw ServerException(message: 'Failed to check like status: $e');
+      throw ServerException(message: 'Failed to batch check like status: $e');
+    }
+  }
+  
+  /// Fallback method for checking a single ruck like status
+  /// Returns a map with a single entry for consistency with batch method
+  Future<Map<int, bool>> _fallbackSingleRuckCheck(int ruckId, String token) async {
+    final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes/check?ruck_id=$ruckId';
+    final response = await _httpClient.get(
+      Uri.parse(endpoint),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    
+    debugPrint('🔍 API response status code: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      if (data['success'] == true && data['data'] != null) {
+        final hasLiked = data['data']['has_liked'] ?? false;
+        debugPrint('🔍 User has liked ruck $ruckId: $hasLiked');
+        return {ruckId: hasLiked};
+      } else {
+        return {ruckId: false};
+      }
+    } else if (response.statusCode == 401 || response.statusCode == 403) {
+      throw UnauthorizedException(message: 'Unauthorized request');
+    } else if (response.statusCode == 429) {
+      throw ServerException(message: '${response.statusCode} - ${response.body}');
+    } else {
+      throw ServerException(
+          message: 'Failed to check like status: ${response.statusCode} - ${response.body}');
     }
   }
 

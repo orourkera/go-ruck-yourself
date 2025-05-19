@@ -102,3 +102,14 @@ class DeleteRuckComment extends SocialEvent {
 
 /// Event to clear any error state
 class ClearSocialError extends SocialEvent {}
+
+/// Event to batch check if the current user has liked multiple rucks
+/// This is more efficient than multiple individual API calls
+class BatchCheckUserLikeStatus extends SocialEvent {
+  final List<int> ruckIds;
+
+  const BatchCheckUserLikeStatus(this.ruckIds);
+
+  @override
+  List<Object?> get props => [ruckIds];
+}

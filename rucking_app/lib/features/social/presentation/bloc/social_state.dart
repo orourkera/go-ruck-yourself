@@ -139,3 +139,15 @@ class CommentActionError extends SocialState {
   @override
   List<Object?> get props => [message];
 }
+
+/// State for when a batch like status check is completed
+/// This stores the like status for multiple ruck IDs
+class BatchLikeStatusChecked extends SocialState {
+  /// Map of ruckId -> isLiked status
+  final Map<int, bool> likeStatusMap;
+
+  const BatchLikeStatusChecked(this.likeStatusMap);
+
+  @override
+  List<Object?> get props => [likeStatusMap];
+}

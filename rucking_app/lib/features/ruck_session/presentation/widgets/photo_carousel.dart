@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-/// A carousel widget for displaying ruck session photos
-class PhotoCarousel extends StatefulWidget {
+/// A carousel widget to display ruck session photos
+class PhotoCarousel extends StatelessWidget {
   /// List of photo URLs to display
   final List<String> photoUrls;
   
@@ -130,21 +134,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
             // Photo
             ClipRRect(
               borderRadius: BorderRadius.circular(15.0),
-              child: CachedNetworkImage(
-                imageUrl: widget.photoUrls[index],
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: Colors.grey.shade200,
-                  child: const Center(
-                    child: Icon(Icons.error_outline, color: Colors.red),
-                  ),
-                ),
-              ),
+              child: _buildImageWithErrorHandling(index),
             ),
             
             // Delete button (if allowed)
