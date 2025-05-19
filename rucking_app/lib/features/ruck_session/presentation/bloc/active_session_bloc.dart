@@ -490,9 +490,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
               currentPoint.longitude,
             ) * 1000; // _calculateDistance returns kilometres
 
-        // Ignore large GPS jumps when total travelled distance is still tiny (<10 m)
-        if (currentState.distanceKm * 1000 < 10 && distanceMeters > driftIgnoreJumpMeters) {
-          debugPrint("Ignoring GPS update due to drift: distance = " + distanceMeters.toString());
+        // Only perform drift check if GPS is already ready - otherwise allow initial points
+        // to accumulate distance even with larger jumps which are expected when GPS first locks on
+        if (currentState.isGpsReady && currentState.distanceKm * 1000 < 10 && distanceMeters > driftIgnoreJumpMeters) {
+          AppLogger.info('Ignoring GPS update due to drift: distance = ${distanceMeters.toStringAsFixed(2)}m');
           return;
         }
 
@@ -596,7 +597,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       updates['elevationGain'] = newElevationGain.toDouble();
       updates['elevationLoss'] = newElevationLoss.toDouble();
       updates['validationMessage'] = validationResult['reason'];
-      updates['clearValidationMessage'] = validationResult['shouldClearMessage'];
+      // Add null safety for shouldClearMessage to prevent type error
+      updates['clearValidationMessage'] = validationResult['shouldClearMessage'] ?? false;
 
       // Set isGpsReady to true if it's not already true
       // Determine if isGpsReady needs to be updated
@@ -985,19 +987,25 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       return;
     }
 
-    final List<Map<String, dynamic>> samplesJson = samples.map((s) => s.toJson()).toList();
-    
     try {
-      AppLogger.info('[HR_BATCH] Sending batch of ${samplesJson.length} heart rate samples for session ${currentState.sessionId}.');
-      await _apiClient.post(
-        '/rucks/${currentState.sessionId}/heart_rate_samples',
-        {'samples': samplesJson},
-      );
-      AppLogger.info('[HR_BATCH] Successfully sent ${samplesJson.length} heart rate samples.');
-    } on ApiException catch (e) {
+      // Construct the samples in the format expected by addHeartRateSamples
+      final samplesForUpload = samples.map((s) => {
+        'timestamp': s.timestamp.toIso8601String(),
+        'bpm': s.bpm,
+      }).toList();
+
+      AppLogger.info('[HR_BATCH] Sending batch of ${samplesForUpload.length} heart rate samples for session ${currentState.sessionId}.');
+      // Use the corrected dedicated method from release/v1.3.3
+      await _apiClient.addHeartRateSamples(currentState.sessionId, samplesForUpload);
+      AppLogger.info('[HR_BATCH] Successfully sent ${samplesForUpload.length} heart rate samples.');
+      
+      _heartRateService.clearHeartRateBuffer(); // Ensure buffer is cleared after successful send
+      _heartRateService._lastHrFlush = DateTime.now(); // Update flush time
+    } on ApiException catch (e) { // Keep the specific ApiException handling from main
       AppLogger.error('[HR_BATCH] API Exception sending heart rate samples: ${e.message}');
-    } catch (e, stackTrace) {
-      AppLogger.error('[HR_BATCH] Unexpected error sending heart rate samples: ${e.toString()}');
+      // Optionally, rethrow or handle specific API errors if needed
+    } catch (e, stackTrace) { // Keep the generic catch and stackTrace from main
+      AppLogger.error('[HR_BATCH] Unexpected error sending heart rate samples: ${e.toString()}', error: e, stackTrace: stackTrace);
     }
   }
 
