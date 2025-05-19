@@ -107,17 +107,51 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         return false;
       },
       listener: (context, state) {
+        debugPrint('🐞 [_RuckBuddyCardState.build] SocialBloc state changed: $state');
         if (state is LikeActionCompleted) {
-          // Update the UI when like action completes
+          debugPrint('🐞 [_RuckBuddyCardState.build] Like action completed for Ruck ID: ${state.ruckId}, liked: ${state.isLiked}');
+          // Update UI based on the result
           setState(() {
             _isLiked = state.isLiked;
+            if (state.ruckId == int.tryParse(widget.ruckBuddy.id)) {
+              _likeCount = _likeCount + (state.isLiked ? 1 : -1);
+              if (_likeCount < 0) _likeCount = 0; // Safety check
+            }
             _isProcessingLike = false;
           });
-        } else if (state is LikeStatusChecked) {
-          // Update when we get initial status
+        } else if (state is LikeActionError) {
+          debugPrint('🐞 [_RuckBuddyCardState.build] Like action error: ${state.message}');
+          // Show error and revert UI
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to like ruck. Server error related to database table.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
           setState(() {
-            _isLiked = state.isLiked;
+            _isLiked = !_isLiked; // Revert the optimistic update
+            if (_isLiked) {
+              _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
+            } else {
+              _likeCount += 1;
+            }
+            _isProcessingLike = false;
           });
+        } else if (state is LikesLoaded) {
+          debugPrint('🐞 [_RuckBuddyCardState.build] Likes loaded, user has liked: ${state.userHasLiked} for ruckId: ${state.ruckId}');
+          final parsedRuckId = int.tryParse(widget.ruckBuddy.id);
+          if (parsedRuckId != null && state.ruckId == parsedRuckId) {
+            setState(() {
+              _isLiked = state.userHasLiked;
+              _likeCount = state.likes.length;
+              _isProcessingLike = false;
+            });
+          }
+        } else if (state is LikeActionInProgress) {
+          debugPrint('🐞 [_RuckBuddyCardState.build] Like action in progress');
+        } else {
+          debugPrint('🐞 [_RuckBuddyCardState.build] Other SocialBloc state: $state');
         }
       },
       child: Card(
