@@ -60,7 +60,7 @@ def get_ruck_buddies():
             'id, user_id, ruck_weight_kg, duration_seconds, distance_km, calories_burned,'
             ' elevation_gain_m, elevation_loss_m, started_at, completed_at, created_at,'
             ' avg_heart_rate, '
-            ' user:user_id(id,username,allow_ruck_sharing),'
+            ' user:user_id(id,username,allow_ruck_sharing,gender),'
             ' location_points:location_point!location_point_session_id_fkey(id,latitude,longitude,altitude,timestamp)'
         ) \
         .eq('is_public', True) \
