@@ -100,9 +100,7 @@ class RuckCommentsResource(Resource):
             
             user_id = user_response.user.id
             user_email = user_response.user.email
-            user_display_name = user_email.split('@')[0] if user_email else 'Anonymous'
-            
-            logger.debug(f"RuckCommentsResource: Authenticated user {user_id}")
+            logger.debug(f"RuckCommentsResource: Authenticated user {user_id} ({user_email})")
         except Exception as e:
             logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {e}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
@@ -112,73 +110,77 @@ class RuckCommentsResource(Resource):
         if not request_data:
             logger.info("RuckCommentsResource: Missing request body.")
             return build_api_response(success=False, error="Missing request body", status_code=400)
-        
+
+        # Validate required fields
         ruck_id = request_data.get('ruck_id')
         content = request_data.get('content')
-        
+
         if ruck_id is None:
-            logger.info("RuckCommentsResource: Missing ruck_id in request body.")
-            return build_api_response(success=False, error="Missing ruck_id in request body", status_code=400)
-            
-        if not content or not content.strip():
-            logger.info("RuckCommentsResource: Missing or empty content in request body.")
+            logger.info("RuckCommentsResource: Missing ruck_id field.")
+            return build_api_response(success=False, error="Missing ruck_id field", status_code=400)
+        
+        if content is None:
+            logger.info("RuckCommentsResource: Missing content field.")
+            return build_api_response(success=False, error="Missing content field", status_code=400)
+        
+        # Validate content length
+        if len(content.strip()) == 0:
+            logger.info("RuckCommentsResource: Empty content.")
             return build_api_response(success=False, error="Comment content cannot be empty", status_code=400)
         
+        if len(content) > 500:
+            logger.info("RuckCommentsResource: Content too long.")
+            return build_api_response(success=False, error="Comment content exceeds maximum length (500 characters)", status_code=400)
+            
+        # Get user display info from the profile table
         try:
-            ruck_id = int(ruck_id)
-        except (ValueError, TypeError):
-            logger.info(f"RuckCommentsResource: Invalid ruck_id format: {ruck_id}")
-            return build_api_response(success=False, error="Invalid ruck_id format, must be an integer.", status_code=400)
+            profile_response = supabase.table('profiles') \
+                                      .select('username, avatar_url') \
+                                      .eq('id', user_id) \
+                                      .execute()
             
-        # Check if the ruck exists
-        try:
-            ruck_query = supabase.table('ruck_session') \
-                                 .select('id') \
-                                 .eq('id', ruck_id) \
-                                 .execute()
-            
-            if not ruck_query.data:
-                logger.info(f"RuckCommentsResource: Ruck session with ID {ruck_id} not found.")
-                return build_api_response(success=False, error=f"Ruck session with ID {ruck_id} not found.", status_code=404)
-        except Exception as e:
-            logger.error(f"RuckCommentsResource: Error verifying ruck session: {e}")
-            return build_api_response(success=False, error="Error verifying ruck session", status_code=500)
-            
-        # Add the comment
-        try:
-            # Get the user's profile info for display name
-            profile_query = supabase.table('profiles') \
-                                   .select('display_name, avatar_url') \
-                                   .eq('id', user_id) \
-                                   .execute()
-            
-            if profile_query.data:
-                user_display_name = profile_query.data[0].get('display_name', user_display_name)
-                user_avatar_url = profile_query.data[0].get('avatar_url')
-            else:
+            if hasattr(profile_response, 'error') and profile_response.error:
+                logger.error(f"RuckCommentsResource: Error fetching user profile: {profile_response.error}")
+                user_display_name = user_email.split('@')[0]  # Fallback
                 user_avatar_url = None
-            
-            # Insert the comment
-            comment_data = {
+            elif profile_response.data:
+                user_profile = profile_response.data[0]
+                user_display_name = user_profile.get('username') or user_email.split('@')[0]
+                user_avatar_url = user_profile.get('avatar_url')
+            else:
+                user_display_name = user_email.split('@')[0]  # Fallback
+                user_avatar_url = None
+                
+        except Exception as e:
+            logger.warning(f"RuckCommentsResource: Error fetching user profile, using fallback: {e}")
+            user_display_name = user_email.split('@')[0]  # Fallback
+            user_avatar_url = None
+        
+        # Create the comment
+        try:
+            insert_data = {
                 'ruck_id': ruck_id,
                 'user_id': user_id,
                 'user_display_name': user_display_name,
                 'user_avatar_url': user_avatar_url,
-                'content': content.strip()
+                'content': content
             }
             
-            insert_response = supabase.table('ruck_comments').insert(comment_data).execute()
+            insert_result = supabase.table('ruck_comments') \
+                                   .insert(insert_data) \
+                                   .execute()
             
-            if hasattr(insert_response, 'error') and insert_response.error:
-                logger.error(f"RuckCommentsResource: Error adding comment: {insert_response.error}")
-                return build_api_response(success=False, error="Failed to add comment", status_code=500)
+            if hasattr(insert_result, 'error') and insert_result.error:
+                logger.error(f"RuckCommentsResource: Supabase insert error: {insert_result.error}")
+                return build_api_response(success=False, error="Failed to create comment in database.", status_code=500)
+
+            created_comment = insert_result.data[0] if insert_result.data else None
             
-            # Return the created comment
-            return build_api_response(data=insert_response.data[0], status_code=201)
+            return build_api_response(data=created_comment, status_code=201)
             
         except Exception as e:
-            logger.error(f"RuckCommentsResource: Error adding comment: {e}", exc_info=True)
-            return build_api_response(success=False, error="An error occurred while adding comment.", status_code=500)
+            logger.error(f"RuckCommentsResource: Error creating comment: {e}", exc_info=True)
+            return build_api_response(success=False, error="An error occurred while creating the comment.", status_code=500)
     
     def put(self):
         """
@@ -213,22 +215,32 @@ class RuckCommentsResource(Resource):
         if not request_data:
             logger.info("RuckCommentsResource: Missing request body.")
             return build_api_response(success=False, error="Missing request body", status_code=400)
-        
+
+        # Validate required fields
         comment_id = request_data.get('comment_id')
         content = request_data.get('content')
-        
+
         if not comment_id:
-            logger.info("RuckCommentsResource: Missing comment_id in request body.")
-            return build_api_response(success=False, error="Missing comment_id in request body", status_code=400)
-            
-        if not content or not content.strip():
-            logger.info("RuckCommentsResource: Missing or empty content in request body.")
+            logger.info("RuckCommentsResource: Missing comment_id field.")
+            return build_api_response(success=False, error="Missing comment_id field", status_code=400)
+        
+        if content is None:
+            logger.info("RuckCommentsResource: Missing content field.")
+            return build_api_response(success=False, error="Missing content field", status_code=400)
+        
+        # Validate content length
+        if len(content.strip()) == 0:
+            logger.info("RuckCommentsResource: Empty content.")
             return build_api_response(success=False, error="Comment content cannot be empty", status_code=400)
-            
+        
+        if len(content) > 500:
+            logger.info("RuckCommentsResource: Content too long.")
+            return build_api_response(success=False, error="Comment content exceeds maximum length (500 characters)", status_code=400)
+        
         # Check if the comment exists and belongs to the user
         try:
             comment_query = supabase.table('ruck_comments') \
-                                   .select('id, user_id, ruck_id') \
+                                   .select('id, user_id') \
                                    .eq('id', comment_id) \
                                    .execute()
             
@@ -243,18 +255,18 @@ class RuckCommentsResource(Resource):
                 logger.warning(f"RuckCommentsResource: User {user_id} attempted to update comment {comment_id} belonging to user {comment_data['user_id']}")
                 return build_api_response(
                     success=False, 
-                    error="You don't have permission to edit this comment.",
+                    error="You don't have permission to update this comment.",
                     status_code=403
                 )
         except Exception as e:
             logger.error(f"RuckCommentsResource: Error verifying comment: {e}")
             return build_api_response(success=False, error="Error verifying comment", status_code=500)
-            
+        
         # Update the comment
         try:
-            # Note: updated_at will be set automatically by the database trigger
             update_data = {
-                'content': content.strip(),
+                'content': content,
+                'updated_at': 'now()'  # Supabase will interpret this as the current timestamp
             }
             
             update_response = supabase.table('ruck_comments') \
@@ -263,15 +275,16 @@ class RuckCommentsResource(Resource):
                                     .execute()
             
             if hasattr(update_response, 'error') and update_response.error:
-                logger.error(f"RuckCommentsResource: Error updating comment: {update_response.error}")
-                return build_api_response(success=False, error="Failed to update comment", status_code=500)
+                logger.error(f"RuckCommentsResource: Supabase update error: {update_response.error}")
+                return build_api_response(success=False, error="Failed to update comment in database.", status_code=500)
+
+            updated_comment = update_response.data[0] if update_response.data else None
             
-            # Return the updated comment
-            return build_api_response(data=update_response.data[0], status_code=200)
+            return build_api_response(data=updated_comment, status_code=200)
             
         except Exception as e:
             logger.error(f"RuckCommentsResource: Error updating comment: {e}", exc_info=True)
-            return build_api_response(success=False, error="An error occurred while updating comment.", status_code=500)
+            return build_api_response(success=False, error="An error occurred while updating the comment.", status_code=500)
     
     def delete(self):
         """
