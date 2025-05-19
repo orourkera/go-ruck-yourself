@@ -340,9 +340,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
               currentPoint.longitude,
             ) * 1000; // _calculateDistance returns kilometres
 
-        // Ignore large GPS jumps when total travelled distance is still tiny (<10 m)
-        if (currentState.distanceKm * 1000 < 10 && distanceMeters > driftIgnoreJumpMeters) {
-          debugPrint("Ignoring GPS update due to drift: distance = " + distanceMeters.toString());
+        // Only perform drift check if GPS is already ready - otherwise allow initial points
+        // to accumulate distance even with larger jumps which are expected when GPS first locks on
+        if (currentState.isGpsReady && currentState.distanceKm * 1000 < 10 && distanceMeters > driftIgnoreJumpMeters) {
+          AppLogger.info('Ignoring GPS update due to drift: distance = ${distanceMeters.toStringAsFixed(2)}m');
           return;
         }
 
@@ -446,7 +447,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       updates['elevationGain'] = newElevationGain.toDouble();
       updates['elevationLoss'] = newElevationLoss.toDouble();
       updates['validationMessage'] = validationResult['reason'];
-      updates['clearValidationMessage'] = validationResult['shouldClearMessage'];
+      // Add null safety for shouldClearMessage to prevent type error
+      updates['clearValidationMessage'] = validationResult['shouldClearMessage'] ?? false;
 
       // Set isGpsReady to true if it's not already true
       // Determine if isGpsReady needs to be updated
@@ -803,15 +805,15 @@ emit(ActiveSessionComplete(
   Future<void> _flushHeartRateBuffer(ActiveSessionRunning currentState) async {
     if (_hrBuffer.isEmpty || currentState.sessionId.isEmpty) return;
     try {
-      await _apiClient.post(
-        '/rucks/${currentState.sessionId}/heart_rate',
-        {
-          'samples': _hrBuffer.map((s) => {
-            'timestamp': s.timestamp.toIso8601String(),
-            'bpm': s.bpm,
-          }).toList(),
-        },
-      );
+      // Use the dedicated ApiClient method for heart rate samples
+      // which already handles the special /api prefix requirement
+      final samples = _hrBuffer.map((s) => {
+        'timestamp': s.timestamp.toIso8601String(),
+        'bpm': s.bpm,
+      }).toList();
+      
+      await _apiClient.addHeartRateSamples(currentState.sessionId, samples);
+      
       _hrBuffer.clear();
       _lastHrFlush = DateTime.now();
     } catch (e) {
