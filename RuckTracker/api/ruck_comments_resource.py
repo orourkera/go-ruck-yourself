@@ -15,7 +15,7 @@ def build_api_response(data=None, success=True, error=None, status_code=200):
         response_body["data"] = data
     if error is not None:
         response_body["error"] = error
-    return jsonify(response_body), status_code
+    return response_body, status_code
 
 class RuckCommentsResource(Resource):
     def get(self):
