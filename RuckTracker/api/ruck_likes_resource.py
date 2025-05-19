@@ -15,8 +15,8 @@ def build_api_response(data=None, success=True, error=None, status_code=200):
         response_body["data"] = data
     if error is not None:
         response_body["error"] = error
-    # Return just the response body and status code for Flask-RESTful
-    # (not jsonify which returns a Response object)
+    # For Flask-RESTful compatibility, just return the dict and status code
+    # This lets Flask-RESTful handle the JSON conversion
     return response_body, status_code
 
 class RuckLikesResource(Resource):
