@@ -274,6 +274,8 @@ class ApiClient {
 
   /// Makes a POST request to add heart rate samples to a ruck session
   Future<dynamic> addHeartRateSamples(String ruckId, List<Map<String, dynamic>> heartRateSamples) async {
+    // Match the pattern of addLocationPoint, which is working
+    // The base URL already handles the /api prefix correctly
     return await post('/rucks/$ruckId/heart_rate', {'samples': heartRateSamples});
   }
   
