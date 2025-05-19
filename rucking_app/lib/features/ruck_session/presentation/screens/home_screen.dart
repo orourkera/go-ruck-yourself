@@ -190,7 +190,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           .toList();
 
       // Fetch monthly stats
-      final statsResponse = await _apiClient.get('/statistics/monthly');
+      final statsResponse = await _apiClient.get('/stats/monthly');
       
       Map<String, dynamic> processedStats = {};
       if (statsResponse is Map && statsResponse.containsKey('data') && statsResponse['data'] is Map) {
