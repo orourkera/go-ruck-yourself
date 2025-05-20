@@ -44,6 +44,20 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   int _likeCount = 0;
   bool _isProcessingLike = false;
 
+  // Helper method to process photo URLs with cache busting
+  List<String> _getProcessedPhotoUrls() {
+    final photoUrls = (_photos)
+        .map((p) => p.url)
+        .where((url) => url != null && url!.isNotEmpty)
+        .cast<String>()
+        .toList();
+        
+    return photoUrls.map((url) {
+      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+      return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -408,6 +422,43 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
             
             const Divider(),
             
+            // Debug information about photos and test display
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Photo Debug', style: AppTextStyles.titleMedium),
+                  Text('Found ${_photos.length} photos'),
+                  for (var photo in _photos)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Photo: id=${photo.id}, url=${photo.url}'),
+                        if (photo.url != null && photo.url!.isNotEmpty)
+                          Container(
+                            height: 100,
+                            width: double.infinity,
+                            margin: const EdgeInsets.symmetric(vertical: 8),
+                            child: CachedNetworkImage(
+                              imageUrl: photo.url!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                              errorWidget: (context, url, error) => Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.error, color: Colors.red),
+                                  Text('Error: $error', style: TextStyle(color: Colors.red, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+
             // Photos section
             if (_photos.isNotEmpty) ...[
               Padding(
@@ -418,10 +469,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                     Text('Photos', style: AppTextStyles.titleMedium),
                     const SizedBox(height: 8),
                     PhotoCarousel(
-                      photoUrls: (widget.ruckBuddy.photos ?? [])
-                        .where((photo) => photo.url != null && photo.url!.isNotEmpty)
-                        .map((photo) => photo.url!)
-                        .toList(),
+                      photoUrls: _getProcessedPhotoUrls(),
                       showDeleteButtons: false,
                       onPhotoTap: (index) {
                         // View photo full screen
@@ -429,10 +477,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => PhotoViewer(
-                              photoUrls: (widget.ruckBuddy.photos ?? [])
-                                .where((photo) => photo.url != null && photo.url!.isNotEmpty)
-                                .map((photo) => photo.url!)
-                                .toList(),
+                              photoUrls: _getProcessedPhotoUrls(),
                               initialIndex: index,
                               title: '${widget.ruckBuddy.user.username}\'s Ruck',
                             ),

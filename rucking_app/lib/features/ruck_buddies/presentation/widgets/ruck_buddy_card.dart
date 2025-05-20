@@ -101,6 +101,15 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : false;
+    // Debug photo data
+    debugPrint('🔍 RuckBuddyCard: Ruck ID ${widget.ruckBuddy.id} has photos? ${widget.ruckBuddy.photos != null}');
+    if (widget.ruckBuddy.photos != null) {
+      debugPrint('🔍 RuckBuddyCard: Photos count: ${widget.ruckBuddy.photos!.length}');
+      widget.ruckBuddy.photos!.forEach((photo) {
+        debugPrint('🔍 Ruck ${widget.ruckBuddy.id} Photo: id=${photo.id}, url=${photo.url ?? "null"}');
+      });
+    }
+    
     final hasPhotos = widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty;
     
     return BlocListener<SocialBloc, SocialState>(
@@ -456,6 +465,20 @@ class _PhotoThumbnailsOverlay extends StatelessWidget {
     required this.photos,
     this.maxDisplay = 3,
   });
+  
+  // Process photo URLs with cache busting parameters
+  List<String> _getProcessedUrls() {
+    final photoUrls = photos
+        .map((p) => p.url)
+        .where((url) => url != null && url!.isNotEmpty)
+        .cast<String>()
+        .toList();
+        
+    return photoUrls.map((url) {
+      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+      return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -465,9 +488,13 @@ class _PhotoThumbnailsOverlay extends StatelessWidget {
       debugPrint('🔍 Photo: id=${photo.id}, url=${photo.url}, thumbnailUrl=${photo.thumbnailUrl}');
     });
     
+    // Process URLs with cache busting
+    final processedUrls = _getProcessedUrls();
+    debugPrint('🔍 Processed ${processedUrls.length} photo URLs with cache busting');
+    
     // Show up to maxDisplay photos, with a +X indicator if there are more
-    final displayCount = photos.length > maxDisplay ? maxDisplay : photos.length;
-    final hasMore = photos.length > maxDisplay;
+    final displayCount = processedUrls.length > maxDisplay ? maxDisplay : processedUrls.length;
+    final hasMore = processedUrls.length > maxDisplay;
     
     return Container(
       decoration: BoxDecoration(
@@ -489,9 +516,9 @@ class _PhotoThumbnailsOverlay extends StatelessWidget {
                     color: Colors.black12,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: photos[index].url != null
+                  child: index < processedUrls.length
                       ? CachedNetworkImage(
-                          imageUrl: photos[index].url!,
+                          imageUrl: processedUrls[index],
                           fit: BoxFit.cover,
                           placeholder: (context, url) => const Center(
                             child: SizedBox(
