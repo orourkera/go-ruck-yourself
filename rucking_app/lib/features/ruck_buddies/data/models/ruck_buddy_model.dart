@@ -112,11 +112,57 @@ class RuckBuddyModel extends RuckBuddy {
         print('Photo data: ${json['photos']}');
         
         if (json['photos'] is List) {
-          photos = (json['photos'] as List)
-              .where((item) => item != null)
-              .map((photoJson) => RuckPhoto.fromJson(photoJson))
-              .toList();
-          print('Parsed ${photos.length} photos from list');
+          List<dynamic> photoList = json['photos'] as List;
+          print('Photo list contains ${photoList.length} items of type: ${photoList.isNotEmpty ? photoList.first.runtimeType : "N/A"}');
+          
+          // Check if it's a list of JSON objects
+          if (photoList.isNotEmpty && photoList.first is Map) {
+            photos = photoList
+                .where((item) => item != null)
+                .map((photoJson) => RuckPhoto.fromJson(photoJson))
+                .toList();
+            print('Parsed ${photos.length} photos from list of Maps');
+          } 
+          // Check if it's a list of strings (URLs)
+          else if (photoList.isNotEmpty && photoList.first is String) {
+            photos = photoList
+                .where((item) => item != null && item.toString().trim().isNotEmpty)
+                .map((url) => RuckPhoto(
+                      id: 'generated-${DateTime.now().millisecondsSinceEpoch}-${photoList.indexOf(url)}',
+                      ruckId: json['id']?.toString() ?? '',
+                      userId: json['user_id']?.toString() ?? '',
+                      filename: url.toString().split('/').last,
+                      url: url.toString().trim(),
+                      thumbnailUrl: url.toString().trim(),
+                      createdAt: DateTime.now(),
+                    ))
+                .toList();
+            print('Created ${photos.length} photos from list of URLs');
+          } else {
+            print('Unknown photo list item type, attempting general conversion');
+            photos = [];
+            for (var photoItem in photoList) {
+              try {
+                if (photoItem is Map) {
+                  // Convert dynamic Map to Map<String, dynamic> before passing to fromJson
+                  photos!.add(RuckPhoto.fromJson(Map<String, dynamic>.from(photoItem)));
+                } else if (photoItem is String && photoItem.trim().isNotEmpty) {
+                  photos!.add(RuckPhoto(
+                    id: 'generated-${DateTime.now().millisecondsSinceEpoch}-${photoList.indexOf(photoItem)}',
+                    ruckId: json['id']?.toString() ?? '',
+                    userId: json['user_id']?.toString() ?? '',
+                    filename: photoItem.split('/').last,
+                    url: photoItem.trim(),
+                    thumbnailUrl: photoItem.trim(),
+                    createdAt: DateTime.now(),
+                  ));
+                }
+              } catch (itemErr) {
+                print('Error parsing individual photo item: $itemErr');
+              }
+            }
+            print('Processed ${photos.length} photos from mixed list');
+          }
         } else if (json['photos'] is String) {
           // Sometimes the backend might return JSON serialized string
           try {
@@ -150,8 +196,9 @@ class RuckBuddyModel extends RuckBuddy {
           photos = [RuckPhoto.fromJson(json['photos'])];
           print('Parsed a single photo from Map');
         }
-      } catch (e) {
+      } catch (e, stackTrace) {
         print('Error parsing photos: $e');
+        print('Stack trace: $stackTrace');
         photos = null;
       }
     }

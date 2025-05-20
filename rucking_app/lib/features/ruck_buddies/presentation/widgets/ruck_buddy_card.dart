@@ -52,8 +52,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         final ruckId = int.tryParse(widget.ruckBuddy.id);
         if (ruckId != null) {
           // Quietly check if user has liked this ruck
-          context.read<SocialBloc>().add(ToggleRuckLike(ruckId));
-          debugPrint('🐞 [_RuckBuddyCardState.initState] Dispatched ToggleRuckLike for Ruck ID: $ruckId');
+          context.read<SocialBloc>().add(CheckUserLikeStatus(ruckId));
+          debugPrint('🐞 [_RuckBuddyCardState.initState] Dispatched CheckUserLikeStatus for Ruck ID: $ruckId');
         }
       }
     });
@@ -128,6 +128,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         if (current is LikesLoaded) {
           return thisRuckId == current.ruckId;
         }
+        // Also listen for batch status updates that include this ruck
+        if (current is BatchLikeStatusChecked) {
+          return current.likeStatusMap.containsKey(thisRuckId);
+        }
         return false;
       },
       listener: (context, state) {
@@ -168,6 +172,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           setState(() {
             _isLiked = state.userHasLiked;
             _likeCount = state.likes.length;
+            _isProcessingLike = false;
+          });
+        } else if (state is BatchLikeStatusChecked && state.likeStatusMap.containsKey(thisRuckId)) {
+          final isLiked = state.likeStatusMap[thisRuckId] ?? false;
+          debugPrint('🐞 [_RuckBuddyCardState.build] Batch status checked for Ruck ID ${thisRuckId}, liked: $isLiked');
+          setState(() {
+            _isLiked = isLiked;
+            // Note: We keep the current _likeCount as the batch check doesn't update count
             _isProcessingLike = false;
           });
         }
@@ -468,6 +480,7 @@ class _PhotoThumbnailsOverlay extends StatelessWidget {
   
   // Process photo URLs with cache busting parameters
   List<String> _getProcessedUrls() {
+    // Fall back to regular approach
     final photoUrls = photos
         .map((p) => p.url)
         .where((url) => url != null && url!.isNotEmpty)

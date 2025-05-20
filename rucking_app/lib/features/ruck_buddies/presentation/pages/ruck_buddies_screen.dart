@@ -54,8 +54,14 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     
     if (ruckIds.isNotEmpty) {
       debugPrint('🐞 [_RuckBuddiesScreenState._batchCheckLikes] Batch checking ${ruckIds.length} rucks');
-      // Use our new batch checking method
-      context.read<SocialBloc>().add(BatchCheckUserLikeStatus(ruckIds));
+      try {
+        // Use the batch checking method instead of individual checks
+        // This reduces API calls and avoids rate limiting
+        context.read<SocialBloc>().add(BatchCheckUserLikeStatus(ruckIds));
+      } catch (e) {
+        debugPrint('❌ Error batch checking likes: $e');
+        // We don't need to show an error to the user for this background operation
+      }
     }
   }
   
@@ -170,6 +176,11 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                 debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: RuckBuddies list is empty, showing EmptyState.');
                 return const EmptyState(title: 'No Buddies Yet', message: 'No ruck buddies found. Start rucking to see them here!');
               }
+              
+              // When buddies are loaded, batch check all their like statuses
+              // This is more efficient than individual API calls from each card
+              _batchCheckLikes(ruckBuddies);
+              
               return _buildRuckBuddiesList(ruckBuddies, isLoadingMore);
             }
             debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: Unhandled state: ${state.runtimeType}. Returning empty container.');
