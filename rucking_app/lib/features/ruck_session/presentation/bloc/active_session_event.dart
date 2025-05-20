@@ -127,12 +127,12 @@ class TimerStarted extends ActiveSessionEvent {
 }
 
 class FetchSessionPhotosRequested extends ActiveSessionEvent {
-  final String sessionId;
+  final String ruckId;
 
-  const FetchSessionPhotosRequested(this.sessionId);
+  const FetchSessionPhotosRequested(this.ruckId);
 
   @override
-  List<Object?> get props => [sessionId];
+  List<Object?> get props => [ruckId];
 }
 
 class UploadSessionPhotosRequested extends ActiveSessionEvent {
@@ -148,17 +148,40 @@ class UploadSessionPhotosRequested extends ActiveSessionEvent {
   List<Object?> get props => [sessionId, photos];
 }
 
+class ClearSessionPhotos extends ActiveSessionEvent {
+  final String ruckId;
+
+  const ClearSessionPhotos({required this.ruckId});
+
+  @override
+  List<Object?> get props => [ruckId];
+}
+
 class DeleteSessionPhotoRequested extends ActiveSessionEvent {
   final String sessionId;
-  final RuckPhoto photo;
+  final dynamic photo; 
 
-  const DeleteSessionPhotoRequested({
+  DeleteSessionPhotoRequested({
     required this.sessionId,
     required this.photo,
   });
 
   @override
   List<Object?> get props => [sessionId, photo];
+}
+
+// Event to update photos in state without going through the normal clear/fetch cycle
+class UpdateStateWithSessionPhotos extends ActiveSessionEvent {
+  final String sessionId;
+  final List<dynamic> photos;
+
+  UpdateStateWithSessionPhotos({
+    required this.sessionId,
+    required this.photos,
+  });
+
+  @override
+  List<Object?> get props => [sessionId, photos];
 }
 
 class TakePhotoRequested extends ActiveSessionEvent {

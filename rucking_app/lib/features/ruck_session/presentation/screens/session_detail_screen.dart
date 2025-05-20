@@ -41,8 +41,12 @@ class SessionDetailScreen extends StatefulWidget {
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
 }
 
-class _SessionDetailScreenState extends State<SessionDetailScreen> {
-  // Track if we need to periodically check for photos
+class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerProviderStateMixin {
+  late TabController _tabController;
+  late ScrollController _scrollController;
+  bool _isScrolledToTop = true;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _photosLoadAttemptedForThisSession = false; // Flag to prevent multiple fetches
   Timer? _photoRefreshTimer;
   bool _uploadInProgress = false;
   int _refreshAttempts = 0;
@@ -51,24 +55,85 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPhotos();
+    AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState called.');
+
+    // Only dispatch LoadSessionForViewing - skip all social data for now
     if (widget.session.id != null) {
-      // Load social data (likes and comments)
+      AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState: Dispatching LoadSessionForViewing for session ${widget.session.id}');
+      GetIt.instance<ActiveSessionBloc>().add(LoadSessionForViewing(sessionId: widget.session.id!, session: widget.session));
+    } else {
+      AppLogger.error('[CASCADE_TRACE] SessionDetailScreen initState: widget.session.id is null');
+    }
+    
+    // Bare minimum initialization
+    _tabController = TabController(length: 1, vsync: this);
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen didChangeDependencies called.');
+  }
+
+  // Load social data (likes and comments) for the session
+  void _loadSocialData(String ruckId) {
+    AppLogger.debug('[CASCADE_TRACE] Loading social data for session $ruckId');
+    try {
       final socialBloc = getIt<SocialBloc>();
-      socialBloc.add(LoadRuckLikes(int.parse(widget.session.id!)));
-      socialBloc.add(LoadRuckComments(int.parse(widget.session.id!)));
+      socialBloc.add(LoadRuckLikes(int.parse(ruckId)));
+      socialBloc.add(LoadRuckComments(int.parse(ruckId)));
+    } catch (e) {
+      AppLogger.error('[CASCADE_TRACE] Error loading social data: $e');
+    }
+  }
+
+  List<Widget> _buildSessionDetailTabs(RuckSession session) {
+    final tabs = <Widget>[
+      const Tab(text: 'Overview'),
+    ];
+    // Only add the 'Live Map' tab if the session status indicates it might have a map.
+    // For instance, if it's in progress or completed and had tracking.
+    // Based on the RuckStatus enum, we use inProgress for active sessions
+    if (session.status == RuckStatus.inProgress) {
+      tabs.add(const Tab(text: 'Live Map'));
+    }
+    return tabs;
+  }
+
+  void _forceLoadPhotos() {
+    if (widget.session.id != null) {
+      AppLogger.info('[PHOTO_DEBUG] 🔄 Force loading photos for session ${widget.session.id}');
+      if (!GetIt.I.isRegistered<ActiveSessionBloc>()) {
+        AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
+        return;
+      }
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      // Clear the current photos from the BLoC state before fetching new ones
+      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Attempting to add ClearSessionPhotos for session ${widget.session.id}');
+      activeSessionBloc.add(ClearSessionPhotos(ruckId: widget.session.id!));
+      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Successfully added ClearSessionPhotos for session ${widget.session.id}');
+      // Then fetch new photos
+      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Attempting to add FetchSessionPhotosRequested for session ${widget.session.id}');
+      activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
+      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Successfully added FetchSessionPhotosRequested for session ${widget.session.id}');
+    } else {
+      AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
     }
   }
   
-  /// Fetch photos for the current session
+  /// Standard photo loading - doesn't clear existing photos first
   void _loadPhotos() {
     if (widget.session.id != null) {
-      AppLogger.info('[SESSION_DETAIL] Loading photos for session ${widget.session.id} on init');
-      // Use GetIt to get bloc instance rather than context for reliability
+      AppLogger.info('[PHOTO_DEBUG] 📸 Loading photos for session ${widget.session.id}');
+      if (!GetIt.I.isRegistered<ActiveSessionBloc>()) {
+        AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
+        return;
+      }
       final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
       activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
     } else {
-      AppLogger.error('[SESSION_DETAIL] Cannot load photos - session ID is null');
+      AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
     }
   }
   
@@ -128,59 +193,37 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Get user preferences for metric/imperial
-    final authState = context.read<AuthBloc>().state;
-    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    
-    // Format date and time using MeasurementUtils to handle timezone conversion
-    final formattedDate = MeasurementUtils.formatDate(widget.session.startTime);
-    final formattedStartTime = MeasurementUtils.formatTime(widget.session.startTime);
-    final formattedEndTime = MeasurementUtils.formatTime(widget.session.endTime);
-    
-    // Format distance using MeasurementUtils
-    final distanceValue = MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric);
-    
-    // Format pace
-    final paceValue = MeasurementUtils.formatPace(
-      widget.session.averagePace,
-      metric: preferMetric,
-    );
-    
-    // Format elevation
-    final elevationDisplay = MeasurementUtils.formatElevation(
-      widget.session.elevationGain,
-      widget.session.elevationLoss.abs(),
-      metric: preferMetric,
-    );
-    
-    // Format weight using MeasurementUtils
-    final weight = MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric);
-    
-    return BlocListener<SessionBloc, SessionState>(
+    final theme = Theme.of(context);
+    final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+
+    return BlocListener<ActiveSessionBloc, ActiveSessionState>(
+      bloc: activeSessionBloc, // Provide the bloc instance
       listener: (context, state) {
-        if (state is SessionOperationInProgress) {
-          // Show loading indicator with styled snackbar
-          StyledSnackBar.show(
-            context: context,
-            message: 'Deleting session...',
-            duration: const Duration(seconds: 1),
-          );
-        } else if (state is SessionDeleteSuccess) {
-          // Show success message and navigate back with refresh result
-          StyledSnackBar.showSuccess(
-            context: context,
-            message: 'The session is gone, rucker. Gone forever.',
-            duration: const Duration(seconds: 2),
-          );
-          // Pop with result to trigger refresh on the home screen
-          Navigator.of(context).pop(true); // true indicates refresh needed
-        } else if (state is SessionOperationFailure) {
-          // Show error message
-          StyledSnackBar.showError(
-            context: context,
-            message: 'Error: ${state.message}',
-            duration: const Duration(seconds: 3),
-          );
+        AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Received state: $state');
+        final currentRuckId = widget.session.id;
+        if (currentRuckId == null) return;
+
+        bool sessionReadyForPhotoLoad = false;
+        if (state is ActiveSessionRunning && state.sessionId == currentRuckId) {
+          AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionRunning for current session.');
+          sessionReadyForPhotoLoad = true;
+        } else if (state is ActiveSessionInitial && state.viewedSession?.id == currentRuckId) {
+          AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionInitial with viewedSession loaded.');
+          sessionReadyForPhotoLoad = true;
+        }
+
+        if (sessionReadyForPhotoLoad) {
+          // Check if photos have already been fetched for this session ID in this screen instance to avoid loops.
+          // This simple flag might need to be more robust depending on navigation patterns.
+          if (!_photosLoadAttemptedForThisSession) {
+            AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Session is ready, calling _forceLoadPhotos for $currentRuckId.');
+            _forceLoadPhotos();
+            if (mounted) {
+              setState(() {
+                _photosLoadAttemptedForThisSession = true;
+              });
+            }
+          }
         }
       },
       child: Scaffold(
@@ -215,12 +258,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              formattedDate,
+                              MeasurementUtils.formatDate(widget.session.startTime),
                               style: Theme.of(context).textTheme.titleLarge,
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              "${formattedStartTime} - ${formattedEndTime}",
+                              "${MeasurementUtils.formatTime(widget.session.startTime)} - ${MeasurementUtils.formatTime(widget.session.endTime)}",
                               style: Theme.of(context).textTheme.bodyLarge,
                             ),
                           ],
@@ -249,13 +292,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                           context,
                           Icons.straighten,
                           'Distance',
-                          distanceValue,
+                          MeasurementUtils.formatDistance(widget.session.distance, metric: true),
                         ),
                         _buildHeaderStat(
                           context,
                           Icons.speed,
                           'Pace',
-                          paceValue,
+                          MeasurementUtils.formatPace(
+                            widget.session.averagePace,
+                            metric: true,
+                          ),
                         ),
                         _buildHeaderStat(
                           context,
@@ -278,160 +324,91 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               // Photo Gallery Section - only shown when there are photos
               BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
                 builder: (context, state) {
+                  List<String> photoUrls = [];
+                  bool isPhotosLoading = false;
+                  bool isUploading = false;
+                  List<dynamic> photos = [];
                   if (state is ActiveSessionRunning) {
-                    // Only show if there are photos or if they're still loading
-                    // Enhancing photo URL extraction with more detailed logging
-                    final photoUrls = state.photos
-                        .map((p) {
-                          AppLogger.info('Processing photo: id=${p.id}, url=${p.url}');
-                          return p.url;
-                        })
-                        .where((url) {
-                          final isValid = url != null && url.isNotEmpty;
-                          if (!isValid) {
-                            AppLogger.error('Found invalid URL: $url');
-                          }
-                          return isValid;
-                        })
+                    photos = state.photos;
+                    isPhotosLoading = state.isPhotosLoading;
+                    isUploading = state.isUploading;
+                    photoUrls = state.photos
+                        .map((p) => p.url)
+                        .where((url) => url != null && url.isNotEmpty)
                         .cast<String>()
                         .toList();
-                    
-                    // Add cache-busting to each URL
-                    final processedUrls = photoUrls.map((url) {
-                      // Add timestamp to force cache refresh
-                      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
-                      final processedUrl = url.contains('?') 
-                          ? '$url&t=$cacheBuster' 
-                          : '$url?t=$cacheBuster';
-                      AppLogger.info('Processed URL: $processedUrl');
-                      return processedUrl;
-                    }).toList();
-                    
-                    // DETAILED PHOTO DEBUG LOGGING
-                    print('===== PHOTO DEBUG INFO =====');
-                    print('* Photo loading state:');
-                    print('  - isPhotosLoading: ${state.isPhotosLoading}');
-                    print('  - isUploading: ${state.isUploading}');
-                    print('  - photosError: ${state.photosError}');
-                    print('  - uploadSuccess: ${state.uploadSuccess}');
-                    print('  - Photo count in state: ${state.photos.length}');
-                    print('  - PhotoURLs count: ${photoUrls.length}');
-                    print('\n* Photo details:');
-                    for (var i = 0; i < state.photos.length; i++) {
-                      final photo = state.photos[i];
-                      print('  [$i] ID: ${photo.id}, URL: ${photo.url}');
-                    }
-                    print('==========================');
-                    
-                    final bool shouldShowPhotoSection = photoUrls.isNotEmpty || state.isPhotosLoading || state.isUploading;
-                    
-                    if (shouldShowPhotoSection) {
-                      return Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.photo_library, color: _getLadyModeColor(context)),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Ruck Shots',
-                                      style: Theme.of(context).textTheme.titleMedium,
-                                    ),
-                                  ],
-                                ),
-                                // Add photo button removed since we're using PhotoUploadSection
-                                if (photoUrls.isNotEmpty) TextButton.icon(
-                                  onPressed: () {
-                                    _showAddPhotoOptions(context);
-                                  },
-                                  icon: const Icon(Icons.add_photo_alternate),
-                                  label: const Text('Add Photos'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: _getLadyModeColor(context),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            // Show loading state during uploads and loading
-                            if (state.isPhotosLoading || state.isUploading)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 40),
-                                child: Center(child: CircularProgressIndicator()),
-                              )
-                            // Show photos carousel when available and not in loading/uploading state
-                            else if (photoUrls.isNotEmpty)
-                              PhotoCarousel(
-                                photoUrls: processedUrls, // Use the processed URLs with cache busting
-                                height: 240,
-                                showDeleteButtons: true,
-                                isEditable: true,
-                                onPhotoTap: (index) {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) => PhotoViewer(
-                                        photoUrls: processedUrls, // Use processed URLs here too
-                                        initialIndex: index,
-                                        title: 'Your Ruck Shots',
-                                      ),
-                                    ),
-                                  );
-                                },
-                                onDeleteRequest: (index) {
-                                  if (state.photos.length > index) {
-                                    // Properly delete the photo using the full photo object
-                                    final photoToDelete = state.photos[index];
-                                    context.read<ActiveSessionBloc>().add(
-                                      DeleteSessionPhotoRequested(
-                                        sessionId: widget.session.id!,
-                                        photo: photoToDelete,
-                                      ),
-                                    );
-                                  }
-                                },
-                              )
-                            // Show PhotoUploadSection for empty state
-                            else
-                              PhotoUploadSection(
-                                ruckId: widget.session.id!,
-                                onPhotosSelected: (photos) {
-                                  // Upload photos using the ActiveSessionBloc
-                                  context.read<ActiveSessionBloc>().add(
-                                    UploadSessionPhotosRequested(
-                                      sessionId: widget.session.id!,
-                                      photos: photos,
-                                    ),
-                                  );
-                                },
-                                isUploading: state.isUploading,
-                              ),
-                          ],
-                        ),
-                      );
-                    }
                   }
-                  
-                  // Add a floating action button for adding photos when there are none
+                  final processedUrls = photoUrls.map((url) {
+                    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+                    return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';
+                  }).toList();
                   return Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        TextButton.icon(
-                          onPressed: () {
-                            _showAddPhotoOptions(context);
-                          },
-                          icon: const Icon(Icons.add_photo_alternate),
-                          label: const Text('Add Photos'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: _getLadyModeColor(context),
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            Icon(Icons.photo_library, color: _getLadyModeColor(context)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Ruck Shots',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 16),
+                        if (isPhotosLoading || isUploading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (processedUrls.isNotEmpty)
+                          PhotoCarousel(
+                            photoUrls: processedUrls,
+                            height: 240,
+                            showDeleteButtons: true,
+                            isEditable: true,
+                            onPhotoTap: (index) {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => PhotoViewer(
+                                    photoUrls: processedUrls,
+                                    initialIndex: index,
+                                    title: 'Your Ruck Shots',
+                                  ),
+                                ),
+                              );
+                            },
+                            onDeleteRequest: (index) {
+                              if (photos.length > index) {
+                                final photoToDelete = photos[index];
+                                context.read<ActiveSessionBloc>().add(
+                                  DeleteSessionPhotoRequested(
+                                    sessionId: widget.session.id!,
+                                    photo: photoToDelete,
+                                  ),
+                                );
+                              }
+                            },
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: PhotoUploadSection(
+                              ruckId: widget.session.id!,
+                              onPhotosSelected: (photos) {
+                                context.read<ActiveSessionBloc>().add(
+                                  UploadSessionPhotosRequested(
+                                    sessionId: widget.session.id!,
+                                    photos: photos,
+                                  ),
+                                );
+                              },
+                              isUploading: isUploading,
+                            ),
+                          ),
                       ],
                     ),
                   );
@@ -458,7 +435,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                     _buildDetailRow(
                       context,
                       'Ruck Weight',
-                      weight,
+                      MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: true),
                       Icons.fitness_center,
                     ),
                     // Elevation Gain/Loss rows
@@ -466,14 +443,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                       _buildDetailRow(
                         context,
                         'Elevation Gain',
-                        MeasurementUtils.formatSingleElevation(widget.session.elevationGain, metric: preferMetric),
+                        MeasurementUtils.formatSingleElevation(widget.session.elevationGain, metric: true),
                         Icons.trending_up,
                       ),
                     if (widget.session.elevationLoss > 0)
                       _buildDetailRow(
                         context,
                         'Elevation Loss',
-                        MeasurementUtils.formatSingleElevation(-widget.session.elevationLoss, metric: preferMetric),
+                        MeasurementUtils.formatSingleElevation(-widget.session.elevationLoss, metric: true),
                         Icons.trending_down,
                       ),
                     if (widget.session.elevationGain == 0.0 && widget.session.elevationLoss == 0.0)

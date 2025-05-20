@@ -55,13 +55,8 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
-        Text('Ruck Shots', style: AppTextStyles.titleMedium),
-        const SizedBox(height: 8),
-        Text(
-          'Capture the action with photos from your ruck',
-          style: AppTextStyles.bodyMedium,
-        ),
+        // Removed duplicate header and subtitle. Only show the photo picker and add button below.
+
         const SizedBox(height: 16),
         
         // Photo Upload Button

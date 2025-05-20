@@ -7,7 +7,33 @@ abstract class ActiveSessionState extends Equatable {
   List<Object?> get props => [];
 }
 
-class ActiveSessionInitial extends ActiveSessionState {}
+class ActiveSessionInitial extends ActiveSessionState {
+  final RuckSession? viewedSession; // The session being viewed, if any
+  final List<RuckPhoto> photos;
+  final PhotoLoadingStatus photosStatus;
+
+  const ActiveSessionInitial({
+    this.viewedSession,
+    this.photos = const [],
+    this.photosStatus = PhotoLoadingStatus.initial,
+  });
+
+  @override
+  List<Object?> get props => [viewedSession, photos, photosStatus];
+
+  ActiveSessionInitial copyWith({
+    RuckSession? viewedSession,
+    bool clearViewedSession = false, // Allows explicitly setting viewedSession to null
+    List<RuckPhoto>? photos,
+    PhotoLoadingStatus? photosStatus,
+  }) {
+    return ActiveSessionInitial(
+      viewedSession: clearViewedSession ? null : (viewedSession ?? this.viewedSession),
+      photos: photos ?? this.photos,
+      photosStatus: photosStatus ?? this.photosStatus,
+    );
+  }
+}
 
 class ActiveSessionLoading extends ActiveSessionState {}
 

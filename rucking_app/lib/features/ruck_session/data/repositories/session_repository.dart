@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/api_client.dart'; 
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/network/api_endpoints.dart';
@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rucking_app/core/models/api_exception.dart'; // Corrected import for ApiException
 
 /// Repository class for session-related operations
 class SessionRepository {
@@ -19,12 +20,12 @@ class SessionRepository {
   final String _supabaseUrl;
   final String _supabaseAnonKey;
   final String _photoBucketName = 'ruck-photos';
-  
+
   SessionRepository({required ApiClient apiClient})
       : _apiClient = apiClient,
         _supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '',
         _supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-  
+
   /// Delete a ruck session by its ID
   /// 
   /// Returns true if the deletion was successful, false otherwise
@@ -278,77 +279,64 @@ class SessionRepository {
   
   /// Get photos for a ruck session
   Future<List<RuckPhoto>> getSessionPhotos(String ruckId) async {
+    AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Attempting to fetch photos for ruckId: $ruckId');
+    AppLogger.info('===== BEGIN FETCH PHOTOS DETAIL (ruckId: $ruckId) =====');
     try {
-      AppLogger.info('===== FETCH PHOTOS DETAIL =====');
-      AppLogger.info('Fetching photos for session: $ruckId');
+      final endpointPath = '/ruck-photos'; 
+      final queryParams = {'ruck_id': ruckId};
+      AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Calling _apiClient.get with endpoint: $endpointPath and params: $queryParams');
       
-      // Create direct http request to get raw response for debugging
+      dynamic response; // Declare response here to ensure it's in scope for the catch block
       try {
-        final apiHost = dotenv.env['API_HOST'] ?? 'https://getrucky.com';
-        final apiUrl = '$apiHost/api/ruck-photos?ruck_id=$ruckId';
-        AppLogger.info('Full API URL: $apiUrl');
-        
-        final authService = GetIt.I<AuthService>();
-        final authToken = await authService.getToken();
-        
-        final response = await http.get(
-          Uri.parse(apiUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            if (authToken != null) 'Authorization': 'Bearer $authToken',
-          },
-        );
-        
-        AppLogger.info('RAW DEBUG HTTP STATUS: ${response.statusCode}');
-        AppLogger.info('RAW DEBUG HTTP BODY: ${response.body}');
-      } catch (e) {
-        AppLogger.error('Error with raw debug HTTP request: $e');
+        response = await _apiClient.get(endpointPath, queryParams: queryParams); // Corrected: queryParams
+        AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Received response from _apiClient.get: $response');
+      } catch (e, stackTrace) {
+        AppLogger.error('[CASCADE_TRACE] SessionRepository getSessionPhotos: Error calling _apiClient.get: $e. StackTrace: $stackTrace');
+        rethrow; 
       }
-      
-      // Now do the real API call
-      final response = await _apiClient.get('/ruck-photos?ruck_id=$ruckId');
-      AppLogger.info('PHOTO API RESPONSE TYPE: ${response.runtimeType}');
-      
-      // Based on the server implementation, we know the structure should be:
-      // { "success": true, "data": [...] }
-      if (response is Map) {
-        final Map<String, dynamic> responseMap = response as Map<String, dynamic>;
-        AppLogger.info('Response is a Map with keys: ${responseMap.keys.join(', ')}');
-        
-        if (responseMap.containsKey('success') && responseMap.containsKey('data')) {
-          final data = responseMap['data'];
-          if (data is List) {
-            AppLogger.info('Found data list with ${data.length} items');
-            final photos = data.map((photo) => RuckPhoto.fromJson(photo)).toList();
-            
-            // Log each photo for debugging
-            for (var i = 0; i < photos.length; i++) {
-              final photo = photos[i];
-              AppLogger.info('Photo[$i]: id=${photo.id}, url=${photo.url}, thumbnailUrl=${photo.thumbnailUrl}');
-            }
-            
-            return photos;
-          } else {
-            AppLogger.info('Data is not a List but a ${data.runtimeType}');
-            return [];
-          }
-        }
+
+      // Handle potential Map response structure (as seen in other parts of the app)
+      // Based on existing code, it seems like the response can sometimes be a Map with 'data' or directly a List.
+      if (response == null) {
+        AppLogger.warning('[CASCADE_TRACE] SessionRepository getSessionPhotos: API response is null. Returning empty list.');
+        return [];
+      }
+
+      List<dynamic> photoDataList;
+      if (response is Map && response.containsKey('data') && response['data'] is List) {
+        AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Response is a Map, extracting data list.');
+        photoDataList = response['data'] as List<dynamic>;
       } else if (response is List) {
-        // Legacy format - directly as a list
-        AppLogger.info('Response is a direct List with ${response.length} items');
-        return response.map((photo) => RuckPhoto.fromJson(photo)).toList();
+        AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Response is a direct List.');
+        photoDataList = response;
+      } else {
+        AppLogger.warning('[CASCADE_TRACE] SessionRepository getSessionPhotos: Unexpected response format: ${response.runtimeType}. Returning empty list.');
+        return [];
       }
+
+      AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Parsing ${photoDataList.length} photo data items.');
+      final photos = photoDataList.map((photoJson) { 
+        try {
+          return RuckPhoto.fromJson(photoJson as Map<String, dynamic>);
+        } catch (e) {
+          AppLogger.error('[CASCADE_TRACE] SessionRepository getSessionPhotos: Error parsing photo JSON: $photoJson. Error: $e');
+          return null; 
+        }
+      }).whereType<RuckPhoto>().toList(); 
       
-      // Return an empty list as fallback to avoid null return
-      AppLogger.warning('Could not parse photos response, returning empty list');
-      return [];
+      AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Successfully parsed ${photos.length} photos.');
+      _logPhotoDetails(photos); 
+      return photos;
+    } on ApiException catch (e, stackTrace) {
+      AppLogger.error('[CASCADE_TRACE] SessionRepository getSessionPhotos: ApiException: ${e.message}. Exception: $e. StackTrace: $stackTrace');
+      rethrow; // Rethrow to be handled by the BLoC
     } catch (e, stackTrace) {
-      AppLogger.error('Error fetching photos: $e');
-      AppLogger.error('Stack trace: $stackTrace');
-      return [];
+      AppLogger.error('[CASCADE_TRACE] SessionRepository getSessionPhotos: Exception: $e. StackTrace: $stackTrace');
+      // Consider rethrowing or returning an empty list based on error handling strategy
+      // For now, rethrowing to ensure the BLoC is aware of the failure.
+      rethrow;
     } finally {
-      AppLogger.info('===== END FETCH PHOTOS DETAIL =====');
+      AppLogger.info('===== END FETCH PHOTOS DETAIL (ruckId: $ruckId) =====');
     }
   }
   
