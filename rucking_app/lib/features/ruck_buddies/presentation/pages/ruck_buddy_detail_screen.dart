@@ -542,6 +542,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       ruckId: int.parse(widget.ruckBuddy.id), // Convert string ID to int
                       maxDisplayed: 5, // Show 5 most recent comments
                       showViewAllButton: true,
+                      hideInput: true, // Hide the built-in comment input since we have our own
                     ),
                   ),
                 ],
