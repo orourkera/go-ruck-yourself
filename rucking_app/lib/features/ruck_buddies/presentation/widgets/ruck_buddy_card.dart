@@ -379,16 +379,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                     children: [
                       _RouteMapPreview(
                         locationPoints: widget.ruckBuddy.locationPoints,
-                        photos: widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty
-                      ? widget.ruckBuddy.photos!
-                      : _photos, // Use our state's photos that are fetched via ActiveSessionBloc
+                        photos: _photos, // Always use the state's photos
                       ),
-                      if (hasPhotos)
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: _PhotoThumbnailsOverlay(photos: _photos),
-                        ),
                     ],
                   );
                 }), // End of Map/Photo Stack Builder
