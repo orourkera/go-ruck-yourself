@@ -256,3 +256,33 @@ class ActiveSessionFailure extends ActiveSessionState {
   @override
   List<Object?> get props => [errorMessage, sessionDetails];
 }
+
+// States for targeted photo loading for a specific session ID
+class SessionPhotosLoadingForId extends ActiveSessionState {
+  final String sessionId;
+
+  const SessionPhotosLoadingForId({required this.sessionId});
+
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class SessionPhotosLoadedForId extends ActiveSessionState {
+  final String sessionId;
+  final List<RuckPhoto> photos;
+
+  const SessionPhotosLoadedForId({required this.sessionId, required this.photos});
+
+  @override
+  List<Object?> get props => [sessionId, photos];
+}
+
+class SessionPhotosErrorForId extends ActiveSessionState {
+  final String sessionId;
+  final String errorMessage;
+
+  const SessionPhotosErrorForId({required this.sessionId, required this.errorMessage});
+
+  @override
+  List<Object?> get props => [sessionId, errorMessage];
+}

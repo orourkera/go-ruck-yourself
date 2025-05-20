@@ -18,6 +18,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart'; // Also provides RuckStatus enum
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'dart:developer' as developer;
 
 class RuckBuddyCard extends StatefulWidget {
   final RuckBuddy ruckBuddy;
@@ -37,23 +41,88 @@ class RuckBuddyCard extends StatefulWidget {
 
 class _RuckBuddyCardState extends State<RuckBuddyCard> {
   // Track local state for immediate feedback
+  int? _likeCount;
   bool _isLiked = false;
-  int _likeCount = 0;
   bool _isProcessingLike = false;
+  String? _userId;
+  // Initialize photos as empty list instead of null to avoid null safety issues
+  List<RuckPhoto> _photos = [];
+  // We calculate and store pace locally since RuckBuddy doesn't have averagePace
+  double _calculatedPace = 0.0;
 
   @override
   void initState() {
     super.initState();
     _likeCount = widget.ruckBuddy.likeCount;
+    // Always initialize _photos as a non-null list
+    _photos = widget.ruckBuddy.photos != null ? List<RuckPhoto>.from(widget.ruckBuddy.photos!) : [];
     
     // Check if this ruck is already liked
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        final ruckId = int.tryParse(widget.ruckBuddy.id);
+        // Extract the ID first, converting from String to int safely
+        final ruckIdStr = widget.ruckBuddy.id;
+        final ruckId = int.tryParse(ruckIdStr);
+
         if (ruckId != null) {
           // Quietly check if user has liked this ruck
           context.read<SocialBloc>().add(CheckUserLikeStatus(ruckId));
-          debugPrint('🐞 [_RuckBuddyCardState.initState] Dispatched CheckUserLikeStatus for Ruck ID: $ruckId');
+          developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching CheckUserLikeStatus', name: 'RuckBuddyCard');
+          
+          // Fetch photos for this ruck
+          // If the photos are empty, try to fetch them via ActiveSessionBloc
+          if (_photos.isEmpty) { 
+            developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Photos list is empty', name: 'RuckBuddyCard');
+            final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+            
+            // First, convert the RuckBuddy to a RuckSession to properly prime the bloc
+            // This mimics what LoadSessionForViewing does in the detail screen
+            final startedAt = widget.ruckBuddy.startedAt ?? DateTime.now();
+            final completedAt = widget.ruckBuddy.completedAt ?? DateTime.now().add(const Duration(minutes: 30));
+            final sessionDuration = completedAt.difference(startedAt);
+            
+            // Calculate pace manually since RuckBuddy doesn't have averagePace
+            // Handle null safety for all fields
+            final double distanceKm = widget.ruckBuddy.distanceKm ?? 0.0;
+            final int durationSeconds = widget.ruckBuddy.durationSeconds ?? 0;
+            
+            final double calculatedPace = 
+                (distanceKm > 0 && durationSeconds > 0)
+                ? (durationSeconds / 60) / distanceKm 
+                : 0.0;
+            
+            // Store the calculated pace locally for UI display too
+            _calculatedPace = calculatedPace;
+            
+            final ruckSession = RuckSession(
+              id: ruckIdStr,
+              startTime: startedAt,
+              endTime: completedAt,
+              duration: sessionDuration,
+              distance: widget.ruckBuddy.distanceKm,
+              elevationGain: widget.ruckBuddy.elevationGainM,
+              elevationLoss: widget.ruckBuddy.elevationLossM,
+              caloriesBurned: widget.ruckBuddy.caloriesBurned,
+              averagePace: calculatedPace,
+              ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
+              // Must provide RuckStatus
+              status: RuckStatus.completed,
+              // Convert location points if available
+              locationPoints: widget.ruckBuddy.locationPoints?.cast<Map<String, dynamic>>(),
+            );
+            
+            // Load session into bloc first - this sets up the proper state
+            developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching LoadSessionForViewing', name: 'RuckBuddyCard');
+            activeSessionBloc.add(LoadSessionForViewing(sessionId: ruckIdStr, session: ruckSession));
+            
+            // Then request photos for that session
+            // The bloc will now be in the proper state to handle this request
+            developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching FetchSessionPhotosRequested', name: 'RuckBuddyCard');
+            activeSessionBloc.add(FetchSessionPhotosRequested(ruckIdStr));
+          } else {
+            // Photos are already available in the RuckBuddy model
+            developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Photos already present: ${_photos.length}', name: 'RuckBuddyCard');
+          }
         }
       }
     });
@@ -69,9 +138,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     setState(() {
       // Update the UI state immediately for responsiveness
       if (_isLiked) {
-        _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
+        _likeCount = (_likeCount ?? 0) > 0 ? (_likeCount ?? 0) - 1 : 0;
       } else {
-        _likeCount += 1;
+        _likeCount = (_likeCount ?? 0) + 1;
       }
       _isLiked = !_isLiked;
       
@@ -81,7 +150,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     });
     
     // Dispatch event to update backend
-    final ruckId = int.tryParse(widget.ruckBuddy.id);
+    final ruckIdStr = widget.ruckBuddy.id;
+    final ruckId = int.tryParse(ruckIdStr);
     if (ruckId != null) {
       // Directly update backend through SocialBloc - this ensures per-ruck state
       context.read<SocialBloc>().add(ToggleRuckLike(ruckId));
@@ -90,10 +160,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🐞 [_RuckBuddyCardState.build] Called for RuckBuddy ID: ${widget.ruckBuddy.id}');
-
+    developer.log('RuckBuddyCard build: Ruck ID ${widget.ruckBuddy.id} - Current _photos count: ${_photos.length}', name: 'RuckBuddyCard');
+    
     if (widget.ruckBuddy.user == null) {
-      debugPrint('🐞 [_RuckBuddyCardState.build] CRITICAL: widget.ruckBuddy.user is NULL for ID: ${widget.ruckBuddy.id}');
+      developer.log('RuckBuddyCard build: Ruck ID ${widget.ruckBuddy.id} - User is null, showing placeholder.', name: 'RuckBuddyCard');
       return const SizedBox.shrink();
     }
 
@@ -101,24 +171,84 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : false;
-    // Debug photo data
-    debugPrint('🔍 RuckBuddyCard: Ruck ID ${widget.ruckBuddy.id} has photos? ${widget.ruckBuddy.photos != null}');
-    if (widget.ruckBuddy.photos != null) {
-      debugPrint('🔍 RuckBuddyCard: Photos count: ${widget.ruckBuddy.photos!.length}');
-      widget.ruckBuddy.photos!.forEach((photo) {
-        debugPrint('🔍 Ruck ${widget.ruckBuddy.id} Photo: id=${photo.id}, url=${photo.url ?? "null"}');
-      });
-    }
     
-    final hasPhotos = widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty;
+    // Check if we have photos either locally or from the original buddy data
+    final hasPhotos = _photos.isNotEmpty;
     
-    return BlocListener<SocialBloc, SocialState>(
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ActiveSessionBloc, ActiveSessionState>(
+          bloc: GetIt.instance<ActiveSessionBloc>(),
+          listener: (context, state) {
+            developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} received state: $state', name: 'RuckBuddyCard');
+            
+            // After our changes, the bloc should emit these states:
+            // 1. ActiveSessionRunning when LoadSessionForViewing completes
+            // 2. The same ActiveSessionRunning with updated photos when FetchSessionPhotosRequested completes
+            
+            // Handle ActiveSessionRunning state with a matching sessionId
+            if (state is ActiveSessionRunning && state.sessionId == widget.ruckBuddy.id) {
+              developer.log('RuckBuddyCard: Received ActiveSessionRunning for session ${state.sessionId} with ${state.photos.length} photos', name: 'RuckBuddyCard');
+              
+              if (mounted && state.photos.isNotEmpty) {
+                developer.log('RuckBuddyCard: Updating photos for card ${widget.ruckBuddy.id} with ${state.photos.length} photos', name: 'RuckBuddyCard');
+                setState(() {
+                  _photos = state.photos;
+                });
+              }
+            }
+            // Also still handle the ActiveSessionInitial state for backward compatibility
+            else if (state is ActiveSessionInitial && state.viewedSession != null && state.photos.isNotEmpty) {
+              final sessionId = state.viewedSession?.id;
+              developer.log('RuckBuddyCard: Received ActiveSessionInitial with ${state.photos.length} photos for session $sessionId', name: 'RuckBuddyCard');
+              
+              if (mounted && sessionId == widget.ruckBuddy.id) {
+                developer.log('RuckBuddyCard: Updating photos for card with ${state.photos.length} photos', name: 'RuckBuddyCard');
+                setState(() {
+                  _photos = state.photos;
+                });
+              }
+            }
+            
+            // Keep these commented until we can successfully update the ActiveSessionBloc
+            // Uncomment once the Bloc emits these states
+            /*
+            if (state is SessionPhotosLoadingForId && state.sessionId == widget.ruckBuddy.id) {
+              developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - SessionPhotosLoadingForId', name: 'RuckBuddyCard');
+            } else if (state is SessionPhotosLoadedForId && state.sessionId == widget.ruckBuddy.id) {
+              developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - SessionPhotosLoadedForId with ${state.photos.length} photos', name: 'RuckBuddyCard');
+              if (mounted) {
+                setState(() {
+                  _photos = state.photos;
+                });
+              }
+            } else if (state is SessionPhotosErrorForId && state.sessionId == widget.ruckBuddy.id) {
+              developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - SessionPhotosErrorForId: ${state.errorMessage}', name: 'RuckBuddyCard');
+            }
+            */
+            // Keep handling for main state updates if needed for other scenarios, though less critical for RuckBuddyCard now
+            // else if (state is ActiveSessionPhotosLoaded && state.sessionId == widget.ruckBuddy.id) {
+            //   developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - ActiveSessionPhotosLoaded with ${state.photos.length} photos (fallback)', name: 'RuckBuddyCard');
+            //   if (mounted) {
+            //     setState(() {
+            //       _photos = state.photos;
+            //     });
+            //   }
+            // } else if (state is ActiveSessionLoading && state.sessionId == widget.ruckBuddy.id) {
+            //   developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - ActiveSessionLoading (fallback)', name: 'RuckBuddyCard');
+            // } else if (state is ActiveSessionError && state.message.contains(widget.ruckBuddy.id.toString())) { 
+            //   developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - ActiveSessionError: ${state.message} (fallback)', name: 'RuckBuddyCard');
+            // }
+          },
+        ),
+        BlocListener<SocialBloc, SocialState>(
       listenWhen: (previous, current) {
         // Listen for like action completions and status checks
         // Only respond to states related to THIS specific ruck
-        final thisRuckId = int.tryParse(widget.ruckBuddy.id);
+        final thisRuckIdStr = widget.ruckBuddy.id;
+        final thisRuckId = int.tryParse(thisRuckIdStr);
         if (thisRuckId == null) return false;
-        
+
         if (current is LikeActionCompleted) {
           return thisRuckId == current.ruckId;
         }
@@ -135,22 +265,19 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         return false;
       },
       listener: (context, state) {
-        final thisRuckId = int.tryParse(widget.ruckBuddy.id);
+        final thisRuckIdStr = widget.ruckBuddy.id;
+        final thisRuckId = int.tryParse(thisRuckIdStr);
         if (thisRuckId == null) return;
         
-        debugPrint('🐞 [_RuckBuddyCardState.build] RuckID ${thisRuckId} received SocialBloc state: $state');
-        
         if (state is LikeActionCompleted && state.ruckId == thisRuckId) {
-          debugPrint('🐞 [_RuckBuddyCardState.build] Like action completed for Ruck ID: ${state.ruckId}, liked: ${state.isLiked}');
-          // Update UI based on the result for THIS specific ruck
+          developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID ${state.ruckId} - LikeActionCompleted', name: 'RuckBuddyCard');
           setState(() {
             _isLiked = state.isLiked;
             _likeCount = state.likeCount; // Use the count from the state
             _isProcessingLike = false;
           });
         } else if (state is LikeActionError && state.ruckId == thisRuckId) {
-          debugPrint('🐞 [_RuckBuddyCardState.build] Like action error for Ruck ID ${state.ruckId}: ${state.message}');
-          // Show error and revert UI
+          developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID ${state.ruckId} - LikeActionError: ${state.message}', name: 'RuckBuddyCard');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to like ruck. Server error related to database table.'),
@@ -161,14 +288,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           setState(() {
             _isLiked = !_isLiked; // Revert the optimistic update
             if (_isLiked) {
-              _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
+              _likeCount = (_likeCount ?? 0) > 0 ? (_likeCount ?? 0) - 1 : 0;
             } else {
-              _likeCount += 1;
+              _likeCount = (_likeCount ?? 0) + 1;
             }
             _isProcessingLike = false;
           });
         } else if (state is LikesLoaded && state.ruckId == thisRuckId) {
-          debugPrint('🐞 [_RuckBuddyCardState.build] Likes loaded for Ruck ID ${state.ruckId}, user has liked: ${state.userHasLiked}');
+          developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID ${state.ruckId} - LikesLoaded', name: 'RuckBuddyCard');
           setState(() {
             _isLiked = state.userHasLiked;
             _likeCount = state.likes.length;
@@ -176,7 +303,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           });
         } else if (state is BatchLikeStatusChecked && state.likeStatusMap.containsKey(thisRuckId)) {
           final isLiked = state.likeStatusMap[thisRuckId] ?? false;
-          debugPrint('🐞 [_RuckBuddyCardState.build] Batch status checked for Ruck ID ${thisRuckId}, liked: $isLiked');
+          developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID ${thisRuckId} - BatchLikeStatusChecked', name: 'RuckBuddyCard');
           setState(() {
             _isLiked = isLiked;
             // Note: We keep the current _likeCount as the batch check doesn't update count
@@ -184,6 +311,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           });
         }
       },
+        ), // Close SocialBloc listener
+      ], // Close listeners array
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -199,7 +328,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
               children: [
                 // User Info Row
                 Builder(builder: (context) {
-                  debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building User Info Row.');
                   return Row(
                     children: [
                       // Avatar (fallback to circle with first letter if no URL)
@@ -217,12 +345,13 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
-                              _formatCompletedDate(widget.ruckBuddy.completedAt),
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: Colors.grey[600],
+                            if (widget.ruckBuddy.completedAt != null) // Added null check here
+                              Text(
+                                _formatCompletedDate(widget.ruckBuddy.completedAt!), // Safely use '!' because of the null check above
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: Colors.grey[600],
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -246,18 +375,19 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
                 // Map snippet with photos overlay if available
                 Builder(builder: (context) {
-                  debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building Map/Photo Stack.');
                   return Stack(
                     children: [
                       _RouteMapPreview(
                         locationPoints: widget.ruckBuddy.locationPoints,
-                        photos: widget.ruckBuddy.photos,
+                        photos: widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty
+                      ? widget.ruckBuddy.photos!
+                      : _photos, // Use our state's photos that are fetched via ActiveSessionBloc
                       ),
                       if (hasPhotos)
                         Positioned(
                           top: 8,
                           left: 8,
-                          child: _PhotoThumbnailsOverlay(photos: widget.ruckBuddy.photos!),
+                          child: _PhotoThumbnailsOverlay(photos: _photos),
                         ),
                     ],
                   );
@@ -267,7 +397,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                 
                 // Stats Grid (2x2)
                 Builder(builder: (context) {
-                  debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building Stats Grid.');
                   return Row(
                     children: [
                       // Left column
@@ -278,14 +407,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                               context: context,
                               icon: Icons.straighten, 
                               label: 'Distance',
-                              value: MeasurementUtils.formatDistance(widget.ruckBuddy.distanceKm, metric: preferMetric),
+                              value: MeasurementUtils.formatDistance(widget.ruckBuddy.distanceKm ?? 0.0, metric: preferMetric),
                             ),
                             const SizedBox(height: 16),
                             _buildStatTile(
                               context: context,
                               icon: Icons.local_fire_department, 
                               label: 'Calories',
-                              value: '${widget.ruckBuddy.caloriesBurned} kcal',
+                              value: '${widget.ruckBuddy.caloriesBurned ?? 0} kcal',
                             ),
                           ],
                         ),
@@ -301,7 +430,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                               context: context,
                               icon: Icons.timer, 
                               label: 'Duration',
-                              value: MeasurementUtils.formatDuration(Duration(seconds: widget.ruckBuddy.durationSeconds)),
+                              value: MeasurementUtils.formatDuration(Duration(seconds: widget.ruckBuddy.durationSeconds ?? 0)),
                             ),
                             const SizedBox(height: 16),
                             _buildStatTile(
@@ -321,7 +450,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
                 // Social interactions row
                 Builder(builder: (context) {
-                  debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building Action Buttons.');
                   return Row(
                     children: [
                       // Like button with count
@@ -343,7 +471,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                                   ),
                               const SizedBox(width: 4),
                               Text(
-                                '$_likeCount',
+                                '${_likeCount ?? 0}',
                                 style: TextStyle(
                                   fontFamily: 'Bangers',
                                   fontSize: 24,
@@ -495,15 +623,8 @@ class _PhotoThumbnailsOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Debug photo information
-    debugPrint('🔍 PhotoThumbnailsOverlay: Found ${photos.length} photos');
-    photos.forEach((photo) {
-      debugPrint('🔍 Photo: id=${photo.id}, url=${photo.url}, thumbnailUrl=${photo.thumbnailUrl}');
-    });
-    
     // Process URLs with cache busting
     final processedUrls = _getProcessedUrls();
-    debugPrint('🔍 Processed ${processedUrls.length} photo URLs with cache busting');
     
     // Show up to maxDisplay photos, with a +X indicator if there are more
     final displayCount = processedUrls.length > maxDisplay ? maxDisplay : processedUrls.length;
