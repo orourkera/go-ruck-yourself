@@ -81,6 +81,18 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
       // Debug logging to see raw response
       debugPrint('[API] Raw ruck buddies response type: ${response.runtimeType}');
       debugPrint('[API] Response keys: ${response is Map ? (response as Map).keys.toString() : 'Not a map'}');
+      
+      // More detailed logging of first several entries
+      if (response is Map && response.containsKey('ruck_sessions') && response['ruck_sessions'] is List) {
+        List<dynamic> sessions = response['ruck_sessions'];
+        for (int i = 0; i < (sessions.length > 3 ? 3 : sessions.length); i++) {
+          var session = sessions[i];
+          debugPrint('=== RUCK SESSION ${session['id']} DEBUG ===');
+          debugPrint('Has photos key? ${session.containsKey('photos')}');
+          debugPrint('Photos value type: ${session['photos']?.runtimeType}');
+          debugPrint('Photos value: ${session['photos']}');
+        }
+      }
 
       // Process the API response
       Map<String, dynamic> responseData;
