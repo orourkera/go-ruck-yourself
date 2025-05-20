@@ -1,17 +1,33 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
+
+// Social features imports
+import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
+import 'package:rucking_app/features/social/presentation/widgets/like_button.dart';
+import 'package:rucking_app/features/social/presentation/widgets/comments_section.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -26,7 +42,143 @@ class SessionDetailScreen extends StatefulWidget {
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
 }
 
-class _SessionDetailScreenState extends State<SessionDetailScreen> {
+class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerProviderStateMixin {
+  late TabController _tabController;
+  late ScrollController _scrollController;
+  bool _isScrolledToTop = true;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _photosLoadAttemptedForThisSession = false; // Flag to prevent multiple fetches
+  Timer? _photoRefreshTimer;
+  bool _uploadInProgress = false;
+  int _refreshAttempts = 0;
+  final int _maxRefreshAttempts = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState called.');
+
+    // Only dispatch LoadSessionForViewing - skip all social data for now
+    if (widget.session.id != null) {
+      AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState: Dispatching LoadSessionForViewing for session ${widget.session.id}');
+      GetIt.instance<ActiveSessionBloc>().add(LoadSessionForViewing(sessionId: widget.session.id!, session: widget.session));
+    } else {
+      AppLogger.error('[CASCADE_TRACE] SessionDetailScreen initState: widget.session.id is null');
+    }
+    
+    // Bare minimum initialization
+    _tabController = TabController(length: 1, vsync: this);
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen didChangeDependencies called.');
+  }
+
+  // Load social data (likes and comments) for the session
+  void _loadSocialData(String ruckId) {
+    AppLogger.debug('[CASCADE_TRACE] Loading social data for session $ruckId');
+    try {
+      final socialBloc = getIt<SocialBloc>();
+      socialBloc.add(LoadRuckLikes(int.parse(ruckId)));
+      socialBloc.add(LoadRuckComments(int.parse(ruckId)));
+    } catch (e) {
+      AppLogger.error('[CASCADE_TRACE] Error loading social data: $e');
+    }
+  }
+
+  List<Widget> _buildSessionDetailTabs(RuckSession session) {
+    final tabs = <Widget>[
+      const Tab(text: 'Overview'),
+    ];
+    // Only add the 'Live Map' tab if the session status indicates it might have a map.
+    // For instance, if it's in progress or completed and had tracking.
+    // Based on the RuckStatus enum, we use inProgress for active sessions
+    if (session.status == RuckStatus.inProgress) {
+      tabs.add(const Tab(text: 'Live Map'));
+    }
+    return tabs;
+  }
+
+  void _forceLoadPhotos() {
+    if (widget.session.id != null) {
+      AppLogger.info('[PHOTO_DEBUG] 🔄 Force loading photos for session ${widget.session.id}');
+      if (!GetIt.I.isRegistered<ActiveSessionBloc>()) {
+        AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
+        return;
+      }
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      // Clear the current photos from the BLoC state before fetching new ones
+      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Attempting to add ClearSessionPhotos for session ${widget.session.id}');
+      activeSessionBloc.add(ClearSessionPhotos(ruckId: widget.session.id!));
+      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Successfully added ClearSessionPhotos for session ${widget.session.id}');
+      // Then fetch new photos
+      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Attempting to add FetchSessionPhotosRequested for session ${widget.session.id}');
+      activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
+      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Successfully added FetchSessionPhotosRequested for session ${widget.session.id}');
+    } else {
+      AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
+    }
+  }
+  
+  /// Standard photo loading - doesn't clear existing photos first
+  void _loadPhotos() {
+    if (widget.session.id != null) {
+      AppLogger.info('[PHOTO_DEBUG] 📸 Loading photos for session ${widget.session.id}');
+      if (!GetIt.I.isRegistered<ActiveSessionBloc>()) {
+        AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
+        return;
+      }
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
+    } else {
+      AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
+    }
+  }
+  
+  @override
+  void dispose() {
+    _photoRefreshTimer?.cancel();
+    super.dispose();
+  }
+  
+  // Starts polling for photos after upload
+  void _startPhotoRefreshPolling() {
+    _refreshAttempts = 0;
+    _uploadInProgress = true;
+    
+    AppLogger.info('[SESSION_DETAIL] Starting photo refresh polling');
+    
+    // Cancel existing timer if running
+    _photoRefreshTimer?.cancel();
+    
+    // Start a new timer to check every 2 seconds
+    _photoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      _refreshAttempts++;
+      
+      AppLogger.info('[SESSION_DETAIL] Refresh attempt $_refreshAttempts of $_maxRefreshAttempts');
+      
+      if (_refreshAttempts > _maxRefreshAttempts) {
+        AppLogger.info('[SESSION_DETAIL] Max refresh attempts reached, stopping polling');
+        timer.cancel();
+        _uploadInProgress = false;
+        return;
+      }
+      
+      // Request a fresh photo fetch
+      if (mounted && widget.session.id != null) {
+        // Get direct access to the bloc
+        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+        activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
+      }
+    });
+  }
+
+  // Builds the photo section - either showing photos or empty state
+  // _buildPhotoSection method removed - functionality moved to photo section in main build method
+
   // Helper method to get the appropriate color based on user gender
   Color _getLadyModeColor(BuildContext context) {
     try {
@@ -42,65 +194,76 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+    
     // Get user preferences for metric/imperial
     final authState = context.read<AuthBloc>().state;
     final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    
-    // Format date and time using MeasurementUtils to handle timezone conversion
-    final formattedDate = MeasurementUtils.formatDate(widget.session.startTime);
-    final formattedStartTime = MeasurementUtils.formatTime(widget.session.startTime);
-    final formattedEndTime = MeasurementUtils.formatTime(widget.session.endTime);
-    
-    // Format distance using MeasurementUtils
-    final distanceValue = MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric);
-    
-    // Format pace
-    final paceValue = MeasurementUtils.formatPace(
-      widget.session.averagePace,
-      metric: preferMetric,
-    );
-    
-    // Format elevation
-    final elevationDisplay = MeasurementUtils.formatElevation(
-      widget.session.elevationGain,
-      widget.session.elevationLoss.abs(),
-      metric: preferMetric,
-    );
-    
-    // Format weight using MeasurementUtils
-    final weight = MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric);
-    
-    return BlocListener<SessionBloc, SessionState>(
-      listener: (context, state) {
-        if (state is SessionOperationInProgress) {
-          // Show loading indicator with styled snackbar
-          StyledSnackBar.show(
-            context: context,
-            message: 'Deleting session...',
-            duration: const Duration(seconds: 1),
-          );
-        } else if (state is SessionDeleteSuccess) {
-          // Show success message and navigate back with refresh result
-          StyledSnackBar.showSuccess(
-            context: context,
-            message: 'The session is gone, rucker. Gone forever.',
-            duration: const Duration(seconds: 2),
-          );
-          // Pop with result to trigger refresh on the home screen
-          Navigator.of(context).pop(true); // true indicates refresh needed
-        } else if (state is SessionOperationFailure) {
-          // Show error message
-          StyledSnackBar.showError(
-            context: context,
-            message: 'Error: ${state.message}',
-            duration: const Duration(seconds: 3),
-          );
-        }
-      },
+
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ActiveSessionBloc, ActiveSessionState>(
+          bloc: activeSessionBloc, // Provide the bloc instance
+          listener: (context, state) {
+            AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Received state: $state');
+            final currentRuckId = widget.session.id;
+            if (currentRuckId == null) return;
+
+            bool sessionReadyForPhotoLoad = false;
+            if (state is ActiveSessionRunning && state.sessionId == currentRuckId) {
+              AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionRunning for current session.');
+              sessionReadyForPhotoLoad = true;
+            } else if (state is ActiveSessionInitial && state.viewedSession?.id == currentRuckId) {
+              AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionInitial with viewedSession loaded.');
+              sessionReadyForPhotoLoad = true;
+            }
+
+            if (sessionReadyForPhotoLoad) {
+              // Check if photos have already been fetched for this session ID in this screen instance to avoid loops.
+              // This simple flag might need to be more robust depending on navigation patterns.
+              if (!_photosLoadAttemptedForThisSession) {
+                AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Session is ready, calling _forceLoadPhotos for $currentRuckId.');
+                _forceLoadPhotos();
+                if (mounted) {
+                  setState(() {
+                    _photosLoadAttemptedForThisSession = true;
+                  });
+                }
+              }
+            }
+          },
+        ),
+        BlocListener<SessionBloc, SessionState>(
+          listener: (context, state) {
+            AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen SessionBloc listener: $state');
+            
+            if (state is SessionDeleteSuccess) {
+              // Show confirmation message using StyledSnackBar
+              StyledSnackBar.showSuccess(
+                context: context,
+                message: error_msgs.sessionDeleteSuccess,
+                animationStyle: SnackBarAnimationStyle.slideUpBounce,
+              );
+              
+              // Navigate back to home screen
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            } else if (state is SessionOperationFailure) {
+              // Show error message using StyledSnackBar
+              StyledSnackBar.showError(
+                context: context,
+                message: state.message,
+                animationStyle: SnackBarAnimationStyle.slideFromTop,
+              );
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Session Details'),
           backgroundColor: _getLadyModeColor(context),
+          elevation: 0,
           actions: [
             // Delete session button
             IconButton(
@@ -114,43 +277,70 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header section with date and overview
+              // Header section with date and rating stars
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Theme.of(context).primaryColor.withOpacity(0.1),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      formattedDate,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$formattedStartTime - $formattedEndTime',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              MeasurementUtils.formatDate(widget.session.startTime),
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "${MeasurementUtils.formatTime(widget.session.startTime)} - ${MeasurementUtils.formatTime(widget.session.endTime)}",
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ],
+                        ),
+                        // Rating stars - show all 5 with empty ones if needed
+                        Row(
+                          children: List.generate(
+                            5, // Always generate 5 stars
+                            (index) => Icon(
+                              index < (widget.session.rating ?? 0) 
+                                  ? Icons.star 
+                                  : Icons.star_border,
+                              color: Colors.amber,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Stats row with Distance, Pace, Duration
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
                         _buildHeaderStat(
-                          context, 
-                          Icons.straighten, 
-                          'Distance', 
-                          distanceValue,
+                          context,
+                          Icons.straighten,
+                          'Distance',
+                          MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric),
                         ),
                         _buildHeaderStat(
-                          context, 
-                          Icons.timer, 
-                          'Duration', 
-                          widget.session.formattedDuration,
+                          context,
+                          Icons.speed,
+                          'Pace',
+                          MeasurementUtils.formatPace(
+                            widget.session.averagePace,
+                            metric: preferMetric,
+                          ),
                         ),
                         _buildHeaderStat(
-                          context, 
-                          Icons.speed, 
-                          'Pace', 
-                          paceValue,
+                          context,
+                          Icons.timer,
+                          'Duration',
+                          MeasurementUtils.formatDuration(widget.session.duration),
                         ),
                       ],
                     ),
@@ -158,10 +348,104 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 ),
               ),
 
-              // Route map preview
+              // Map Section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: _SessionRouteMap(session: widget.session),
+              ),
+
+              // Photo Gallery Section - only shown when there are photos
+              BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                builder: (context, state) {
+                  List<String> photoUrls = [];
+                  bool isPhotosLoading = false;
+                  bool isUploading = false;
+                  List<dynamic> photos = [];
+                  if (state is ActiveSessionRunning) {
+                    photos = state.photos;
+                    isPhotosLoading = state.isPhotosLoading;
+                    isUploading = state.isUploading;
+                    photoUrls = state.photos
+                        .map((p) => p.url)
+                        .where((url) => url != null && url.isNotEmpty)
+                        .cast<String>()
+                        .toList();
+                  }
+                  final processedUrls = photoUrls.map((url) {
+                    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+                    return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';
+                  }).toList();
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            Icon(Icons.photo_library, color: _getLadyModeColor(context)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Ruck Shots',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        if (isPhotosLoading || isUploading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (processedUrls.isNotEmpty)
+                          PhotoCarousel(
+                            photoUrls: processedUrls,
+                            height: 240,
+                            showDeleteButtons: true,
+                            isEditable: true,
+                            onPhotoTap: (index) {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => PhotoViewer(
+                                    photoUrls: processedUrls,
+                                    initialIndex: index,
+                                    title: 'Your Ruck Shots',
+                                  ),
+                                ),
+                              );
+                            },
+                            onDeleteRequest: (index) {
+                              if (photos.length > index) {
+                                final photoToDelete = photos[index];
+                                context.read<ActiveSessionBloc>().add(
+                                  DeleteSessionPhotoRequested(
+                                    sessionId: widget.session.id!,
+                                    photo: photoToDelete,
+                                  ),
+                                );
+                              }
+                            },
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: PhotoUploadSection(
+                              ruckId: widget.session.id!,
+                              onPhotosSelected: (photos) {
+                                context.read<ActiveSessionBloc>().add(
+                                  UploadSessionPhotosRequested(
+                                    sessionId: widget.session.id!,
+                                    photos: photos,
+                                  ),
+                                );
+                              },
+                              isUploading: isUploading,
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
 
               // Detail stats
@@ -184,7 +468,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                     _buildDetailRow(
                       context,
                       'Ruck Weight',
-                      weight,
+                      MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric),
                       Icons.fitness_center,
                     ),
                     // Elevation Gain/Loss rows
@@ -209,25 +493,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                         '--',
                         Icons.landscape,
                       ),   
-                    if (widget.session.rating != null) ...[
-                      const SizedBox(height: 24),
-                      Text(
-                        'Rating',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: List.generate(5, (index) {
-                          return Icon(
-                            index < (widget.session.rating ?? 0) 
-                                ? Icons.star 
-                                : Icons.star_border,
-                            color: Theme.of(context).primaryColor,
-                            size: 28,
-                          );
-                        }),
-                      ),
-                    ],
+                    // Rating stars moved to the header
                     if (widget.session.notes?.isNotEmpty == true) ...[
                       const SizedBox(height: 24),
                       Text(
@@ -251,6 +517,34 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   ],
                 ),
               ),
+              
+              // Comments Section
+              if (widget.session.id != null)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.comment, color: _getLadyModeColor(context)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Comments',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      BlocProvider.value(
+                        value: getIt<SocialBloc>(),
+                        child: CommentsSection(
+                          ruckId: int.parse(widget.session.id!),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -398,6 +692,198 @@ Download Go Rucky Yourself from the App Store!
     // Dispatch the delete event to the SessionBloc
     context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.session.id!));
   }
+
+  void _showAddPhotoOptions(BuildContext context) {
+    // Show option to choose camera or gallery
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Photo Gallery'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _getImageFromGallery(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _getImageFromCamera(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  Future<void> _getImageFromGallery(BuildContext context) async {
+    final ImagePicker imagePicker = ImagePicker();
+    
+    try {
+      AppLogger.info('[PHOTO_UPLOAD] Attempting to pick multiple images from gallery');
+      
+      // Select multiple photos
+      final List<XFile> pickedFiles = await imagePicker.pickMultiImage(
+        // Don't set imageQuality for PNG files as it's not supported
+        // and causes issues on iOS
+        imageQuality: 80,
+      );
+      
+      AppLogger.info('[PHOTO_UPLOAD] Picked ${pickedFiles.length} images from gallery');
+      
+      if (pickedFiles.isNotEmpty && widget.session.id != null) {
+        // Convert XFiles to File objects and log their info
+        final List<File> photos = [];
+        
+        for (var xFile in pickedFiles) {
+          final file = File(xFile.path);
+          photos.add(file);
+          
+          // Log each photo's details
+          AppLogger.info('[PHOTO_UPLOAD] Photo details: path=${xFile.path}, size=${await file.length()} bytes, name=${xFile.name}');
+        }
+        
+        // Check if context is still mounted before showing snackbar
+        if (context.mounted) {
+          // Show a loading indicator
+          StyledSnackBar.show(
+            context: context,
+            message: 'Uploading ${photos.length} ${photos.length == 1 ? 'photo' : 'photos'}...',
+            duration: const Duration(seconds: 2),
+          );
+        }
+        
+        AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for ${photos.length} photos');
+        
+        // Store these variables for use after async operations
+        final String sessionId = widget.session.id!;
+        
+        // Don't use the context here - get the bloc directly from GetIt
+        // This avoids any issues with context being disposed
+        try {
+          // Get the bloc directly from the service locator
+          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+          
+          // Upload the photos
+          activeSessionBloc.add(
+            UploadSessionPhotosRequested(
+              sessionId: sessionId,
+              photos: photos,
+            ),
+          );
+          
+          // Start polling for photo updates
+          if (mounted) {
+            AppLogger.info('[PHOTO_UPLOAD] Starting polling for photo updates');
+            _startPhotoRefreshPolling();
+          }
+          
+          AppLogger.info('[PHOTO_UPLOAD] Successfully added upload event to bloc using GetIt');
+        } catch (e) {
+          AppLogger.error('[PHOTO_UPLOAD] Error uploading photos: $e');
+        }
+      } else {
+        AppLogger.info('[PHOTO_UPLOAD] No photos selected or session ID is null: sessionId=${widget.session.id}');
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('[PHOTO_UPLOAD] Error selecting images: $e');
+      AppLogger.error('[PHOTO_UPLOAD] Stack trace: $stackTrace');
+      
+      if (!context.mounted) return;
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error selecting images: $e',
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+  
+  Future<void> _getImageFromCamera(BuildContext context) async {
+    final ImagePicker imagePicker = ImagePicker();
+    
+    try {
+      AppLogger.info('[PHOTO_UPLOAD] Attempting to take photo from camera');
+      
+      final XFile? pickedFile = await imagePicker.pickImage(
+        source: ImageSource.camera,
+        // Don't set imageQuality for PNG files as it's not supported
+        // and causes issues on iOS
+        imageQuality: 80,
+      );
+      
+      AppLogger.info('[PHOTO_UPLOAD] Photo captured: ${pickedFile != null}');
+      
+      if (pickedFile != null && widget.session.id != null) {
+        // Convert XFile to File
+        final File photo = File(pickedFile.path);
+        
+        // Log photo details
+        AppLogger.info('[PHOTO_UPLOAD] Camera photo details: path=${pickedFile.path}, size=${await photo.length()} bytes, name=${pickedFile.name}');
+        
+        // Check if context is still mounted before showing snackbar
+        if (context.mounted) {
+          // Show a loading indicator
+          StyledSnackBar.show(
+            context: context,
+            message: 'Uploading photo...',
+            duration: const Duration(seconds: 2),
+          );
+        }
+        
+        AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for camera photo');
+        
+        // Store these variables for use after async operations
+        final String sessionId = widget.session.id!;
+        final File capturedPhoto = photo;
+        
+        // Don't use the context here - get the bloc directly from GetIt
+        // This avoids any issues with context being disposed
+        try {
+          // Get the bloc directly from the service locator
+          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+          
+          // Upload the photo
+          activeSessionBloc.add(
+            UploadSessionPhotosRequested(
+              sessionId: sessionId,
+              photos: [capturedPhoto],
+            ),
+          );
+          
+          // Start polling for photo updates
+          if (mounted) {
+            AppLogger.info('[PHOTO_UPLOAD] Starting polling for photo updates after camera upload');
+            _startPhotoRefreshPolling();
+          }
+          
+          AppLogger.info('[PHOTO_UPLOAD] Successfully added camera photo upload event using GetIt');
+        } catch (e) {
+          AppLogger.error('[PHOTO_UPLOAD] Error uploading camera photo: $e');
+        }
+      } else {
+        AppLogger.info('[PHOTO_UPLOAD] No photo taken or session ID is null: sessionId=${widget.session.id}');
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('[PHOTO_UPLOAD] Error taking photo: $e');
+      AppLogger.error('[PHOTO_UPLOAD] Stack trace: $stackTrace');
+      
+      if (!context.mounted) return;
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error taking photo: $e',
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
 }
 
 // Route map preview widget for session details
@@ -486,8 +972,8 @@ class _SessionRouteMap extends StatelessWidget {
                   strokeWidth: 4,
                 ),
               ],
-            ),
 
+            ),
           ],
         ),
       ),

@@ -213,7 +213,7 @@ class UserProfileResource(Resource):
                 
             logger.debug(f"Fetching profile for user ID: {g.user.id}")
             # Use the authenticated user's JWT for RLS
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('user') \
                 .select('*') \
                 .eq('id', str(g.user.id)) \
@@ -237,7 +237,7 @@ class UserProfileResource(Resource):
                     # Fallback: fetch from auth.users (Supabase internal table)
                     try:
                         # Use the same Supabase client instance
-                        auth_user_resp = supabase.auth.get_user(jwt=getattr(g.user, 'token', None))
+                        auth_user_resp = supabase.auth.get_user(jwt=getattr(g, 'access_token', None))
                         if auth_user_resp.user and auth_user_resp.user.email:
                              profile_data['email'] = auth_user_resp.user.email
                         else:
@@ -311,7 +311,7 @@ class UserProfileResource(Resource):
 
             logger.debug(f"Authenticated user id: {g.user.id}")
             logger.debug(f"Attempting update on 'user' table where id = {g.user.id} with: {update_data}")
-            supabase = get_supabase_client(user_jwt=getattr(g.user, 'token', None))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Only allow updating the row where id = g.user.id
             response = supabase.table('user') \
                 .update(update_data) \

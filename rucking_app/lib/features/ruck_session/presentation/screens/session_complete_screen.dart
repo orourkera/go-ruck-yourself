@@ -1,7 +1,11 @@
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/error_messages.dart' as error_msgs;
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -15,9 +19,12 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart'; 
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -71,7 +78,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   
   // Form controllers and state
   final TextEditingController _notesController = TextEditingController();
-
+  
+  // Photo upload state
+  final List<File> _selectedPhotos = [];
+  bool _isUploadingPhotos = false;
   
   List<HeartRateSample>? _heartRateSamples;
   int? _avgHeartRate;
@@ -157,68 +167,136 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       _isSaving = true;
     });
     
-    // Send heart rate samples to backend if available
-    if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty) {
-      try {
-        await _apiClient.post(
-          '/rucks/${widget.ruckId}/heart_rate',
-          _heartRateSamples!.map((e) => e.toJson()).toList(),
-        );
-      } catch (e) {
-        // Ignore errors, do not block session completion
+    bool photoUploadFailed = false;
+    bool sessionSaved = false;
+    
+    try {
+      AppLogger.info('[SESSION_UPDATE] Updating session with completion details...');
+      
+      // Create API client
+      final _apiClient = GetIt.I<ApiClient>();
+      
+      // Prepare rating and exertion data
+      final Map<String, dynamic> completionData = {
+        'rating': _rating,
+        'perceived_exertion': _perceivedExertion,
+        'completed': true,
+        'tags': _selectedTags,
+        'notes': _notesController.text.trim(),
+        // Backend expects these exact keys:
+        'distance_km': widget.distance, // always send for compatibility
+        'final_distance_km': widget.distance, // for final summary
+        'distance_meters': (widget.distance * 1000).round(),
+        'calories_burned': widget.caloriesBurned,
+        'final_calories_burned': widget.caloriesBurned,
+        'elevation_gain_m': widget.elevationGain,
+        'elevation_loss_m': widget.elevationLoss,
+        'final_elevation_gain': widget.elevationGain,
+        'final_elevation_loss': widget.elevationLoss,
+        'final_avg_hr': _avgHeartRate,
+        'final_max_hr': _maxHeartRate,
+      };
+      
+      AppLogger.info('[SESSION_UPDATE] Completion data: $completionData');
+      
+      // Send completion data to the API
+      await _apiClient.patch(
+        '/rucks/${widget.ruckId}',
+        completionData,
+      );
+      
+      sessionSaved = true;
+      AppLogger.info('[SESSION_UPDATE] Session completion data saved successfully');
+      
+      // Upload photos if any were selected
+      if (_selectedPhotos.isNotEmpty) {
+        setState(() {
+          _isUploadingPhotos = true;
+        });
+        
+        try {
+          AppLogger.info('Uploading ${_selectedPhotos.length} photos for session ${widget.ruckId}');
+          
+          // Verify the selected photos exist and are valid
+          for (int i = 0; i < _selectedPhotos.length; i++) {
+            final file = _selectedPhotos[i];
+            final exists = await file.exists();
+            final size = exists ? await file.length() : 0;
+            AppLogger.debug('[CASCADE_TRACE] Photo ${i+1}: path=${file.path}, exists=$exists, size=$size bytes');
+          }
+          
+          // Create session repository for photo uploads
+          final sessionRepo = SessionRepository(apiClient: _apiClient);
+          
+          // Log the upload attempt
+          AppLogger.debug('[CASCADE_TRACE] SessionCompleteScreen: Uploading ${_selectedPhotos.length} photos for ruckId ${widget.ruckId}');
+          
+          // Upload photos - ensure we're using the same parameters and logic that works in session_detail_screen
+          final uploadedPhotos = await sessionRepo.uploadSessionPhotos(
+            widget.ruckId, 
+            _selectedPhotos,
+          );
+          
+          // Log success
+          AppLogger.debug('[CASCADE_TRACE] SessionCompleteScreen: Successfully uploaded ${uploadedPhotos.length} photos');
+          uploadedPhotos.forEach((photo) {
+            AppLogger.debug('[CASCADE_TRACE] Uploaded photo: ${photo.id}, URL: ${photo.url}');
+          });
+          
+          AppLogger.info('Uploaded ${uploadedPhotos.length} photos successfully');
+          
+          // Update session to indicate it has photos
+          if (uploadedPhotos.isNotEmpty) {
+            await _apiClient.patch(
+              '/rucks/${widget.ruckId}',
+              {'has_photos': true},
+            );
+          }
+        } catch (e) {
+          photoUploadFailed = true;
+          AppLogger.error('Error uploading photos: $e');
+        } finally {
+          setState(() {
+            _isUploadingPhotos = false;
+          });
+        }
       }
-    }
-    
-    // No session validation - allow saving all sessions regardless of distance
-    
-    // Prepare data for the completion
-    final Map<String, dynamic> updateData = {
-      'completed_at': widget.completedAt.toIso8601String(),
-      'notes': _notesController.text.trim(),
-      // Backend expects these exact keys:
-      'distance_km': widget.distance, // always send for compatibility
-      'final_distance_km': widget.distance, // for final summary
-      'distance_meters': (widget.distance * 1000).round(),
-      'calories_burned': widget.caloriesBurned,
-      'final_calories_burned': widget.caloriesBurned,
-      'elevation_gain_m': widget.elevationGain,
-      'elevation_loss_m': widget.elevationLoss,
-      'final_elevation_gain': widget.elevationGain,
-      'final_elevation_loss': widget.elevationLoss,
-      'final_average_pace': (widget.distance > 0) ? (widget.duration.inSeconds / widget.distance) : null, // seconds per km
-      'rating': _rating,
-      'perceived_exertion': _perceivedExertion,
-      'tags': _selectedTags.isNotEmpty ? _selectedTags : null,
-    };
-
-    // Log the values being sent
-    print('[SESSION_UPDATE] Sending values:');
-    print('[SESSION_UPDATE]   notes: ${updateData['notes']}');
-    print('[SESSION_UPDATE]   rating: ${updateData['rating']}');
-    print('[SESSION_UPDATE]   perceived_exertion: ${updateData['perceived_exertion']}');
-    print('[SESSION_UPDATE]   tags: ${updateData['tags']}');
-
-    // Make a PATCH request to update notes, rating, perceived exertion, and tags after completion
-    _apiClient.patch('/rucks/${widget.ruckId}', updateData)
-      .then((_) {
-        // Navigate home on success
+      
+      // Navigate home on success, with appropriate messaging based on upload status
+      if (photoUploadFailed) {
+        // Navigate home but include an error message about the photo upload
+        AppLogger.debug('[CASCADE_TRACE] Navigation with photo upload error flag');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const HomeScreen(),
+            settings: const RouteSettings(
+              arguments: {
+                'showPhotoUploadError': true,
+              },
+            ),
+          ),
+        );
+      } else {
+        // Just navigate home with success (no error message)
+        AppLogger.debug('[CASCADE_TRACE] Navigation with success (no errors)');
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const HomeScreen()),
           (route) => false,
         );
-      })
-      .catchError((error) {
-        print('[SESSION_UPDATE] Error: $error');
-        // Show error and reset saving state
-        StyledSnackBar.showError(
-          context: context,
-          message: 'Error saving session details: ${error.toString()}',
-          duration: const Duration(seconds: 3),
-        );
-        setState(() {
-          _isSaving = false;
-        });
+      }
+    } catch (error) {
+      AppLogger.error('[SESSION_UPDATE] Error: $error');
+      // Show error and reset saving state
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error saving session details: ${error.toString()}',
+        duration: const Duration(seconds: 3),
+      );
+      setState(() {
+        _isSaving = false;
       });
+    }
   }
 
   /// Populate stats from widget parameters
@@ -718,6 +796,35 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 
                 const SizedBox(height: 24),
                 
+                // Ruck Shots Photo Section
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: PhotoUploadSection(
+                    ruckId: widget.ruckId,
+                    onPhotosSelected: (photos) {
+                      setState(() {
+                        _selectedPhotos.clear();
+                        _selectedPhotos.addAll(photos);
+                      });
+                    },
+                    isUploading: _isUploadingPhotos,
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
                 // Rating
                 Text(
                   'How would you rate this session?',
@@ -793,7 +900,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                   keyboardType: TextInputType.multiline,
                 ),
                 
-
+                const SizedBox(height: 24),
+                
+                // Photo upload section moved above
                 
                 const SizedBox(height: 32),
                 

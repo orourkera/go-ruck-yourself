@@ -1,14 +1,11 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
-import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
-import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/splash/service/splash_helper.dart';
 
 /// Splash screen shown on app launch
@@ -124,7 +121,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (authStateToNavigate is Authenticated) {
       debugPrint('[Splash] AuthState is Authenticated. Checking subscription.');
       final revenueCatService = GetIt.instance<RevenueCatService>();
-      final bool isSubscribed = await revenueCatService.isSubscribed();
+      final bool isSubscribed = await revenueCatService.checkSubscriptionStatus(); 
       if (!mounted) return; // Check mounted after await
 
       if (isSubscribed) {

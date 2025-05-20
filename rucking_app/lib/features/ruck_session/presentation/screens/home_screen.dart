@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
@@ -80,8 +81,13 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
+          debugPrint('🐞 Bottom navigation tapped: $index');
           setState(() {
             _selectedIndex = index;
+          });
+          // Add a post-render check to verify the screen changed
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            debugPrint('🐞 Selected index after render: $_selectedIndex');
           });
         },
         type: BottomNavigationBarType.fixed,
@@ -204,6 +210,36 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     super.initState();
     _apiClient = GetIt.instance<ApiClient>();
     _fetchData();
+    
+    // Check for photo upload error on initialization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForPhotoUploadError();
+    });
+  }
+  
+  /// Checks route arguments for photo upload error flags and shows appropriate message
+  void _checkForPhotoUploadError() {
+    if (!mounted) return;
+    
+    try {
+      final route = ModalRoute.of(context);
+      if (route != null && route.settings.arguments != null) {
+        final args = route.settings.arguments;
+        
+        // Check if we have photo upload error arguments
+        if (args is Map && args.containsKey('showPhotoUploadError') && args['showPhotoUploadError'] == true) {
+          // Use StyledSnackBar with our custom error message
+          StyledSnackBar.showError(
+            context: context, 
+            message: error_msgs.sessionPhotoUploadError,
+            duration: const Duration(seconds: 4),
+            animationStyle: SnackBarAnimationStyle.slideUpBounce,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking for photo upload error: $e');
+    }
   }
   
   /// Fetches both recent sessions and monthly stats

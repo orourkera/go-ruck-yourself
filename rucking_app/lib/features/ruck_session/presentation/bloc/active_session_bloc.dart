@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 import 'dart:async';
+import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/models/api_exception.dart';
 import 'package:rucking_app/core/models/location_point.dart';
@@ -15,15 +18,20 @@ import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
 part 'active_session_event.dart';
 part 'active_session_state.dart';
+
+// Define the enum for photo loading status
+enum PhotoLoadingStatus { initial, loading, success, failure }
 
 class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   int _paceTickCounter = 0;
@@ -33,6 +41,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final WatchService _watchService;
   final HeartRateService _heartRateService;
   final SessionValidationService _validationService;
+  final SessionRepository _sessionRepository;
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
   StreamSubscription<List<HeartRateSample>>? _heartRateBufferSubscription;
@@ -60,6 +69,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required WatchService watchService,
     required HeartRateService heartRateService,
     required SplitTrackingService splitTrackingService,
+    required SessionRepository sessionRepository,
     SessionValidationService? validationService,
   })  : _apiClient = apiClient,
         _locationService = locationService,
@@ -67,6 +77,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _watchService = watchService,
         _heartRateService = heartRateService,
         _splitTrackingService = splitTrackingService,
+        _sessionRepository = sessionRepository,
         _validationService = validationService ?? SessionValidationService(),
         super(ActiveSessionInitial()) {
     // Ensure the current instance is globally available for cross-layer callbacks (e.g. WatchService).
@@ -84,6 +95,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<Tick>(_onTick);
     on<SessionErrorCleared>(_onSessionErrorCleared);
     on<TimerStarted>(_onTimerStarted);
+    on<FetchSessionPhotosRequested>(_onFetchSessionPhotosRequested);
+    on<UploadSessionPhotosRequested>(_onUploadSessionPhotosRequested);
+    on<DeleteSessionPhotoRequested>(_onDeleteSessionPhotoRequested);
+    on<ClearSessionPhotos>(_onClearSessionPhotos);
+    on<TakePhotoRequested>(_onTakePhotoRequested);
+    on<PickPhotoRequested>(_onPickPhotoRequested);
+    on<LoadSessionForViewing>(_onLoadSessionForViewing);
+    on<UpdateStateWithSessionPhotos>(_onUpdateStateWithSessionPhotos);
   }
 
   Future<void> _onSessionStarted(
@@ -690,11 +709,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     } else if (state is ActiveSessionFailure) {
       final failureState = state as ActiveSessionFailure;
       if (failureState.sessionDetails != null) {
-        AppLogger.info('[PAUSE_DEBUG] _onSessionPaused: Session is in ActiveSessionFailure state with details, attempting to pause it.');
+        AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused: Session is in ActiveSessionFailure state with details, attempting to pause it.');
         final sessionDetails = failureState.sessionDetails!;
         
         if (sessionDetails.isPaused) {
-          AppLogger.info('[PAUSE_DEBUG] _onSessionPaused: SessionFailure details indicate already paused. Emitting and notifying watch.');
+          AppLogger.info('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused: SessionFailure details indicate already paused. Emitting and notifying watch.');
           _stopTicker(); 
           final now = DateTime.now().toUtc();
           final consistentPausedState = sessionDetails.copyWith(isPaused: true, currentPauseStartTimeUtc: sessionDetails.currentPauseStartTimeUtc ?? now);
@@ -732,10 +751,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         );
         AppLogger.info('Session paused from failure state. Watch notified.');
       } else {
-        AppLogger.warning('[PAUSE_DEBUG] _onSessionPaused: Session is ActiveSessionFailure but has no sessionDetails. Cannot pause.');
+        AppLogger.warning('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused: Session is ActiveSessionFailure but has no sessionDetails. Cannot pause.');
       }
     } else {
-      AppLogger.warning('[PAUSE_DEBUG] _onSessionPaused: Session is not ActiveSessionRunning or ActiveSessionFailure. Current state: ${state.runtimeType}. Cannot pause.');
+      AppLogger.warning('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionPaused: Session is not ActiveSessionRunning or ActiveSessionFailure. Current state: ${state.runtimeType}. Cannot pause.');
     }
   }
 
@@ -843,7 +862,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Update backend about session completion
         // DEBUG: Log all outgoing values for session completion
         AppLogger.info('[SESSION COMPLETE PAYLOAD]');
-        AppLogger.info('  distance_km: \u001b[36m${double.parse(currentState.distanceKm.toStringAsFixed(3))}\u001b[0m');
+        AppLogger.info('  distance_km: \u001b[36m${double.parse(currentState.distanceKm.toStringAsFixed(3))}\u001B[0m');
         AppLogger.info('  duration_seconds: ${finalElapsedSeconds}');
         AppLogger.info('  calories_burned: ${currentState.calories.round()}');
         AppLogger.info('  elevation_gain_m: ${currentState.elevationGain.round()}');
@@ -940,9 +959,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           sessionDetails: state as ActiveSessionRunning, // Pass current state for potential recovery
         ));
       } catch (e, stackTrace) {
-        AppLogger.error('Unexpected error during session completion: ${e.toString()}');
+        AppLogger.error('Unexpected error during session completion: $e. StackTrace: $stackTrace');
         emit(ActiveSessionFailure(
-          errorMessage: 'Failed to complete session: ${e.toString()}. Please try again.',
+          errorMessage: 'Failed to complete session: $e. StackTrace: $stackTrace',
           sessionDetails: state as ActiveSessionRunning, // Pass current state for potential recovery
         ));
       }
@@ -988,24 +1007,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
 
     try {
-      // Construct the samples in the format expected by addHeartRateSamples
-      final samplesForUpload = samples.map((s) => {
-        'timestamp': s.timestamp.toIso8601String(),
-        'bpm': s.bpm,
-      }).toList();
-
-      AppLogger.info('[HR_BATCH] Sending batch of ${samplesForUpload.length} heart rate samples for session ${currentState.sessionId}.');
-      // Use the corrected dedicated method from release/v1.3.3
-      await _apiClient.addHeartRateSamples(currentState.sessionId, samplesForUpload);
-      AppLogger.info('[HR_BATCH] Successfully sent ${samplesForUpload.length} heart rate samples.');
-      
-      _heartRateService.clearHeartRateBuffer(); // Ensure buffer is cleared after successful send
-      _heartRateService._lastHrFlush = DateTime.now(); // Update flush time
-    } on ApiException catch (e) { // Keep the specific ApiException handling from main
+      AppLogger.info('[HR_BATCH] Sending batch of ${samplesJson.length} heart rate samples for session ${currentState.sessionId}.');
+      await _apiClient.post(
+        '/rucks/${currentState.sessionId}/heartrate',
+        {'samples': samplesJson},
+      );
+      AppLogger.info('[HR_BATCH] Successfully sent ${samplesJson.length} heart rate samples.');
+    } on ApiException catch (e) {
       AppLogger.error('[HR_BATCH] API Exception sending heart rate samples: ${e.message}');
-      // Optionally, rethrow or handle specific API errors if needed
-    } catch (e, stackTrace) { // Keep the generic catch and stackTrace from main
-      AppLogger.error('[HR_BATCH] Unexpected error sending heart rate samples: ${e.toString()}', error: e, stackTrace: stackTrace);
+    } catch (e, stackTrace) {
+      AppLogger.error('[HR_BATCH] Unexpected error sending heart rate samples: $e. StackTrace: $stackTrace');
     }
   }
 
@@ -1149,6 +1160,481 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.warning('[PAUSE_DEBUG] ActiveSessionBloc: _onSessionErrorCleared called but current state is not ActiveSessionFailure. Emitting ActiveSessionInitial.');
       emit(ActiveSessionInitial());
     }
+  }
+
+  // Direct handler for updating photos in state without going through fetch process
+  Future<void> _onUpdateStateWithSessionPhotos(
+    UpdateStateWithSessionPhotos event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onUpdateStateWithSessionPhotos: Received event for sessionId: ${event.sessionId} with ${event.photos.length} photos');
+    
+    final currentState = state;
+    if (currentState is ActiveSessionRunning) {
+      // We're in an active running session
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onUpdateStateWithSessionPhotos: Updating photos for ActiveSessionRunning, sessionId: ${currentState.sessionId}');
+      // Convert to expected type by casting each photo as RuckPhoto
+      final List<RuckPhoto> typedPhotos = event.photos.map((photo) => photo as RuckPhoto).toList();
+      emit(currentState.copyWith(
+        photos: typedPhotos, 
+        isPhotosLoading: false, 
+        photosError: null, 
+        clearPhotosError: true
+      ));
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onUpdateStateWithSessionPhotos: Emitted ActiveSessionRunning with ${event.photos.length} photos.');
+    } else if (currentState is ActiveSessionInitial && currentState.viewedSession != null) {
+      // We're viewing a session
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onUpdateStateWithSessionPhotos: Updating photos for ActiveSessionInitial, viewedSessionId: ${currentState.viewedSession!.id}');
+      // Convert to expected type by casting each photo as RuckPhoto
+      final List<RuckPhoto> typedPhotos = event.photos.map((photo) => photo as RuckPhoto).toList();
+      emit(currentState.copyWith(
+        photos: typedPhotos, 
+        photosStatus: PhotoLoadingStatus.success
+      ));
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onUpdateStateWithSessionPhotos: Emitted ActiveSessionInitial with ${event.photos.length} photos, photosStatus: success.');
+    } else {
+      AppLogger.warning('[CASCADE_TRACE] ActiveSessionBloc _onUpdateStateWithSessionPhotos: Cannot update photos - inappropriate state: $currentState');
+    }
+  }
+  
+  Future<void> _onClearSessionPhotos(
+    ClearSessionPhotos event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onClearSessionPhotos: Received event for ruckId: ${event.ruckId}');
+    final currentState = state;
+    if (currentState is ActiveSessionRunning) {
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onClearSessionPhotos: Clearing photos for ActiveSessionRunning, sessionId: ${currentState.sessionId}');
+      // Use isPhotosLoading for ActiveSessionRunning, setting to true as a fetch usually follows clear.
+      emit(currentState.copyWith(photos: [], isPhotosLoading: true, clearPhotosError: true)); 
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onClearSessionPhotos: Emitted ActiveSessionRunning with photos cleared, isPhotosLoading: true.');
+    } else if (currentState is ActiveSessionInitial && currentState.viewedSession != null) {
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onClearSessionPhotos: Clearing photos for ActiveSessionInitial, viewedSessionId: ${currentState.viewedSession!.id}');
+      // ActiveSessionInitial correctly uses photosStatus.
+      emit(currentState.copyWith(
+        photos: [], 
+        photosStatus: PhotoLoadingStatus.initial
+      ));
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onClearSessionPhotos: Emitted ActiveSessionInitial with photos cleared, photosStatus: initial.');
+    } else {
+      AppLogger.warning('[CASCADE_TRACE] ActiveSessionBloc _onClearSessionPhotos: State is not ActiveSessionRunning or ActiveSessionInitial with viewedSession, cannot clear photos. Current state: $currentState');
+    }
+  }
+
+  Future<void> _onFetchSessionPhotosRequested(
+    FetchSessionPhotosRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Received event for ruckId ${event.ruckId}');
+    final initialBlocState = state; // Capture state at the beginning of the handler
+
+    try {
+      // Emit Loading state BEFORE the async call
+      if (initialBlocState is ActiveSessionRunning) {
+        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionRunning with isPhotosLoading: true for sessionId: ${initialBlocState.sessionId}');
+        emit(initialBlocState.copyWith(isPhotosLoading: true, clearPhotosError: true));
+      } else if (initialBlocState is ActiveSessionInitial && initialBlocState.viewedSession != null) {
+        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionInitial with photosStatus: loading for viewedSessionId: ${initialBlocState.viewedSession!.id}');
+        emit(initialBlocState.copyWith(photosStatus: PhotoLoadingStatus.loading));
+      } else {
+        AppLogger.warning('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Initial state is not suitable for fetching photos. State: $initialBlocState');
+        return; // Cannot proceed if state is not valid
+      }
+
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Calling _sessionRepository.getSessionPhotos for ruckId: ${event.ruckId}');
+      final photos = await _sessionRepository.getSessionPhotos(event.ruckId);
+      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Received ${photos.length} photos from repository for ruckId ${event.ruckId}.');
+
+      // Emit Success state, re-checking current BLoC state as it might have changed by other events during await.
+      final currentStateAfterAwait = state;
+      if (currentStateAfterAwait is ActiveSessionRunning) {
+        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionRunning with ${photos.length} photos, isPhotosLoading: false.');
+        emit(currentStateAfterAwait.copyWith(photos: photos, isPhotosLoading: false, clearPhotosError: true));
+      } else if (currentStateAfterAwait is ActiveSessionInitial && currentStateAfterAwait.viewedSession != null) {
+        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionInitial with ${photos.length} photos, photosStatus: success.');
+        emit(currentStateAfterAwait.copyWith(photos: photos, photosStatus: PhotoLoadingStatus.success));
+      }
+
+    } catch (e, stackTrace) {
+      AppLogger.error('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Error fetching photos for ruckId ${event.ruckId}. Exception: $e. StackTrace: $stackTrace');
+      // Emit Error state, re-checking current BLoC state.
+      final currentStateAfterError = state;
+      if (currentStateAfterError is ActiveSessionRunning) {
+        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionRunning with error, isPhotosLoading: false.');
+        emit(currentStateAfterError.copyWith(isPhotosLoading: false, photosError: e.toString()));
+      } else if (currentStateAfterError is ActiveSessionInitial && currentStateAfterError.viewedSession != null) {
+        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionInitial with photosStatus: failure.');
+        emit(currentStateAfterError.copyWith(photosStatus: PhotoLoadingStatus.failure));
+      }
+    }
+  }
+
+  Future<void> _onUploadSessionPhotosRequested(
+    UploadSessionPhotosRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      emit(currentState.copyWith(isUploading: true, uploadError: null, clearUploadError: true));
+      
+      try {
+        AppLogger.info('Uploading ${event.photos.length} photos for session ${event.sessionId}');
+        
+        // Use the repository to upload photos
+        final uploadedPhotos = await _sessionRepository.uploadSessionPhotos(
+          event.sessionId,
+          event.photos,
+        );
+        
+        // IMPORTANT: Check if we got valid data back
+        if (uploadedPhotos.isEmpty) {
+          AppLogger.error('No photos returned from upload API - trying to fetch all photos instead');
+          // If the upload succeeded but didn't return photo data, try to fetch all photos
+          await Future.delayed(const Duration(seconds: 1)); // Wait a moment for the backend to process
+          
+          // Reload all photos to ensure we have the latest
+          emit(currentState.copyWith(
+            isUploading: false,
+            isPhotosLoading: true,
+          ));
+          
+          // Refetch all photos for this session
+          final allPhotos = await _sessionRepository.getSessionPhotos(event.sessionId);
+          AppLogger.info('Fetched ${allPhotos.length} photos after upload');
+          
+          // Create a new list with clean URLs to prevent caching issues
+          final cleanedPhotos = allPhotos.map((photo) {
+            if (photo.url != null && photo.url!.contains('?')) {
+              // Need to create a new copy with the cleaned URL
+              final cleanUrl = photo.url!.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}';
+              AppLogger.info('Cleaned photo URL: $cleanUrl');
+              
+              // Create a new RuckPhoto with the cleaned URL
+              return RuckPhoto(
+                id: photo.id,
+                ruckId: photo.ruckId,
+                userId: photo.userId,
+                filename: photo.filename, 
+                originalFilename: photo.originalFilename,
+                contentType: photo.contentType,
+                size: photo.size,
+                createdAt: photo.createdAt,
+                url: cleanUrl,
+                thumbnailUrl: photo.thumbnailUrl != null 
+                  ? photo.thumbnailUrl!.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}'
+                  : null,
+              );
+            }
+            return photo;
+          }).toList();
+          
+          emit(currentState.copyWith(
+            photos: cleanedPhotos,  // Use our cleaned photos list
+            isPhotosLoading: false,
+            uploadSuccess: true,
+          ));
+          return;
+        }
+        
+        // Clean all photo URLs to avoid caching issues
+        final cleanedUploadedPhotos = uploadedPhotos.map((photo) {
+          if (photo.url != null && photo.url!.contains('?')) {
+            final cleanUrl = photo.url!.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}';
+            AppLogger.info('Cleaned photo URL: $cleanUrl');
+            
+            return RuckPhoto(
+              id: photo.id,
+              ruckId: photo.ruckId,
+              userId: photo.userId,
+              filename: photo.filename, 
+              originalFilename: photo.originalFilename,
+              contentType: photo.contentType,
+              size: photo.size,
+              createdAt: photo.createdAt,
+              url: cleanUrl,
+              thumbnailUrl: photo.thumbnailUrl != null 
+                ? photo.thumbnailUrl!.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}'
+                : null,
+            );
+          }
+          return photo;
+        }).toList();
+        
+        // Get existing photos plus new ones
+        final updatedPhotos = List<RuckPhoto>.from(currentState.photos ?? []);
+        updatedPhotos.addAll(cleanedUploadedPhotos);  // Use the cleaned photos
+        
+        AppLogger.info('Successfully uploaded ${cleanedUploadedPhotos.length} photos');
+        AppLogger.info('Photo URLs: ${cleanedUploadedPhotos.map((p) => p.url).join(', ')}');
+        
+        emit(currentState.copyWith(
+          photos: updatedPhotos,
+          isUploading: false,
+          uploadSuccess: true,
+        ));
+      } catch (e, stackTrace) {
+        AppLogger.error('Failed to upload photos: $e. StackTrace: $stackTrace');
+        emit(currentState.copyWith(
+          isUploading: false,
+          uploadError: 'Failed to upload photos: $e. StackTrace: $stackTrace',
+        ));
+      }
+    }
+  }
+
+  Future<void> _onDeleteSessionPhotoRequested(
+    DeleteSessionPhotoRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      
+      // Check if the photo exists in the current state
+      final List<RuckPhoto> currentPhotos = List<RuckPhoto>.from(currentState.photos ?? []);
+      final bool photoExists = currentPhotos.any((p) => p.id == event.photo.id);
+      
+      // If the photo is not in our state, it's likely already been deleted
+      if (!photoExists) {
+        AppLogger.info('Photo ${event.photo.id} not found in state, likely already deleted');
+        return; // Exit early without emitting a new state
+      }
+      
+      try {
+        AppLogger.info('Deleting photo ${event.photo.id} from session ${event.sessionId}');
+        
+        // Optimistically remove the photo from the list immediately for responsive UI
+        final List<RuckPhoto> updatedPhotos = currentPhotos.where((p) => p.id != event.photo.id).toList();
+        
+        emit(currentState.copyWith(
+          photos: updatedPhotos,
+          isDeleting: true,
+        ));
+        
+        // Use the repository to delete the photo
+        final success = await _sessionRepository.deletePhoto(event.photo);
+        
+        if (success) {
+          AppLogger.info('Successfully deleted photo ${event.photo.id}');
+          emit(currentState.copyWith(
+            isDeleting: false,
+            // Keep the updatedPhotos that were set in the optimistic update
+          ));
+        } else {
+          // If deletion failed, restore the photo to the list
+          AppLogger.error('Failed to delete photo ${event.photo.id}');
+          emit(currentState.copyWith(
+            photos: currentPhotos, // Restore original photos
+            isDeleting: false,
+            deleteError: 'Failed to delete photo. Please try again.',
+          ));
+        }
+      } catch (e, stackTrace) {
+        // Special handling for 404 errors - the photo was already deleted
+        if (e.toString().contains('404') || e.toString().contains('not found')) {
+          AppLogger.info('Photo ${event.photo.id} already deleted (404)');
+          // Keep the optimistic update (photo removed from list)
+          emit(currentState.copyWith(
+            isDeleting: false,
+          ));
+        } else {
+          // For other errors, restore the photo to the list
+          AppLogger.error('Exception when deleting photo: $e. StackTrace: $stackTrace');
+          emit(currentState.copyWith(
+            photos: currentPhotos, // Restore original photos
+            isDeleting: false,
+            deleteError: 'Failed to delete photo. Please try again.',
+          ));
+        }
+      }
+    }
+  }
+
+  Future<void> _onTakePhotoRequested(
+    TakePhotoRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('--- _onTakePhotoRequested: Event received for session ${event.sessionId} ---');
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      AppLogger.info('--- _onTakePhotoRequested: Current state is ActiveSessionRunning ---');
+      
+      try {
+        AppLogger.info('Taking photo for session ${event.sessionId}');
+        
+        // Skip manual permission checks and let image_picker handle camera permissions
+        AppLogger.info('--- _onTakePhotoRequested: Attempting to take photo with camera... ---');
+        final imagePicker = ImagePicker();
+        final XFile? pickedFile = await imagePicker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1800,
+          maxHeight: 1800,
+          imageQuality: 85,
+        );
+        AppLogger.info('--- _onTakePhotoRequested: Image picker result: ${pickedFile?.path ?? "No file picked"} ---');
+        
+        if (pickedFile != null) {
+          // Upload the photo by dispatching an UploadSessionPhotosRequested event
+          add(UploadSessionPhotosRequested(
+            sessionId: event.sessionId,
+            photos: [File(pickedFile.path)],
+          ));
+        }
+      } catch (e, stackTrace) {
+        AppLogger.error('Error taking photo: $e. StackTrace: $stackTrace');
+        emit(currentState.copyWith(
+          uploadError: 'Error taking photo: $e. StackTrace: $stackTrace',
+        ));
+      }
+    } else {
+      AppLogger.warning('--- _onTakePhotoRequested: Event received but state is ${state.runtimeType}, not ActiveSessionRunning. Skipping. ---');
+    }
+  }
+
+  Future<void> _onPickPhotoRequested(
+    PickPhotoRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('--- _onPickPhotoRequested: Event received for session ${event.sessionId} ---');
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      AppLogger.info('--- _onPickPhotoRequested: Current state is ActiveSessionRunning ---');
+      
+      try {
+        AppLogger.info('Picking photos for session ${event.sessionId}');
+        
+        // Skip manual permission checks and let image_picker handle permissions
+        AppLogger.info('--- _onPickPhotoRequested: Attempting to pick images from gallery... ---');
+        final imagePicker = ImagePicker();
+        final List<XFile> pickedFiles = await imagePicker.pickMultiImage(
+          maxWidth: 1800,
+          maxHeight: 1800,
+          imageQuality: 85,
+        );
+        
+        AppLogger.info('--- _onPickPhotoRequested: Image picker result: ${pickedFiles.length} files picked ---');
+        
+        if (pickedFiles.isNotEmpty) {
+          // Convert XFiles to Files and upload them
+          final List<File> files = pickedFiles.map((xFile) => File(xFile.path)).toList();
+          
+          // Upload the photos by dispatching an UploadSessionPhotosRequested event
+          add(UploadSessionPhotosRequested(
+            sessionId: event.sessionId,
+            photos: files,
+          ));
+        }
+      } catch (e, stackTrace) {
+        AppLogger.error('Error picking photos: $e. StackTrace: $stackTrace');
+        emit(currentState.copyWith(
+          uploadError: 'Error picking photos: $e. StackTrace: $stackTrace',
+        ));
+      }
+    } else {
+      AppLogger.warning('--- _onPickPhotoRequested: Event received but state is ${state.runtimeType}, not ActiveSessionRunning. Skipping. ---');
+    }
+  }
+
+  Future<void> _onLoadSessionForViewing(
+    LoadSessionForViewing event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('--- _onLoadSessionForViewing: Event received for session ${event.sessionId} ---');
+    
+    try {
+      // Use the session object directly from the event
+      final session = event.session;
+      AppLogger.info('--- _onLoadSessionForViewing: Processing session ${event.sessionId} ---');
+
+      // Create an empty list for location points
+      List<LocationPoint> locationPoints = [];
+      
+      // Safely convert location points if they exist
+      if (session.locationPoints != null) {
+        try {
+          for (var point in session.locationPoints!) {
+            try {
+              locationPoints.add(LocationPoint.fromJson(point));
+            } catch (e) {
+              // Log error but continue processing other points
+              AppLogger.warning('Could not convert location point: $e');
+            }
+          }
+        } catch (e) {
+          AppLogger.warning('Error processing location points: $e');
+          // Continue with empty location points rather than failing
+        }
+      }
+      
+      // Empty list for heart rate samples with null safety
+      List<HeartRateSample> heartRateSamples = [];
+      if (session.heartRateSamples != null) {
+        heartRateSamples = session.heartRateSamples!;
+      }
+
+      // Handle numeric values safely with null-coalescing
+      final int elapsedSeconds = session.duration != null ? session.duration.inSeconds : 0;
+      final double distance = session.distance ?? 0.0;
+      final double elevationGain = session.elevationGain ?? 0.0;
+      final double elevationLoss = session.elevationLoss ?? 0.0;
+      final int calories = session.caloriesBurned ?? 0;
+      
+      // Set a valid session ID (never null)
+      final String sessionId = session.id ?? event.sessionId;
+      
+      // Use a safe default for start time
+      final DateTime startTime = session.startTime;
+      
+      // Create the ActiveSessionRunning state with all required parameters
+      // and safe defaults for optional ones
+      emit(ActiveSessionRunning(
+        sessionId: sessionId,
+        locationPoints: locationPoints,
+        elapsedSeconds: elapsedSeconds,
+        distanceKm: distance,
+        ruckWeightKg: session.ruckWeightKg,
+        calories: calories,
+        elevationGain: elevationGain,
+        elevationLoss: elevationLoss,
+        pace: session.averagePace,
+        heartRateSamples: heartRateSamples,
+        isPaused: false,
+        originalSessionStartTimeUtc: startTime,
+        totalPausedDuration: Duration(seconds: session.pausedDurationSeconds ?? 0),
+        notes: session.notes,
+        tags: session.tags,
+        perceivedExertion: session.perceivedExertion,
+        weightKg: session.weightKg,
+        isGpsReady: true, // Viewing existing sessions, so GPS is ready
+        photos: [], // Photos will be loaded separately via FetchSessionPhotosRequested
+      ));
+      
+      AppLogger.info('--- _onLoadSessionForViewing: Successfully emitted ActiveSessionRunning for session $sessionId ---');
+    
+    // Automatically trigger photo loading for the viewed session
+    AppLogger.debug('[CASCADE_TRACE] _onLoadSessionForViewing: Auto-triggering photo fetch for session $sessionId');
+    _sessionRepository.getSessionPhotos(sessionId).then((photos) {
+      // Re-check current state to make sure we're still viewing this session
+      final currentState = state;
+      if (currentState is ActiveSessionRunning && currentState.sessionId == sessionId) {
+        AppLogger.debug('[CASCADE_TRACE] Auto photo fetch: Got ${photos.length} photos for session $sessionId, updating state');
+        // The photos returned from repository are already RuckPhoto objects
+        add(UpdateStateWithSessionPhotos(sessionId: sessionId, photos: photos));
+      } else {
+        AppLogger.warning('[CASCADE_TRACE] Auto photo fetch: State changed while fetching photos - not updating.');
+      }
+    }).catchError((error) {
+      AppLogger.error('[CASCADE_TRACE] Auto photo fetch: Error fetching photos: $error');
+    });
+    } catch (e, stackTrace) {
+      AppLogger.error('--- _onLoadSessionForViewing: Error loading session ${event.sessionId}: $e. StackTrace: $stackTrace');
+      
+      // Fall back to a safe failure state that won't crash the app
+      emit(ActiveSessionFailure(
+        errorMessage: 'Error loading session for viewing: $e. StackTrace: $stackTrace',
+        // Don't pass any session details to avoid propagating potentially corrupted data
+        sessionDetails: null,
+      ));
+    }  
   }
 
   @override
