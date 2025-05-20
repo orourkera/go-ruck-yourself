@@ -12,6 +12,7 @@ import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
@@ -20,14 +21,14 @@ import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
-import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
-
-// Social features imports
-import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/widgets/like_button.dart';
 import 'package:rucking_app/features/social/presentation/widgets/comments_section.dart';
+import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
+import 'package:rucking_app/core/services/service_locator.dart'; // For 'getIt' variable
+import 'package:get_it/get_it.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -190,6 +191,27 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       // If we can't access the AuthBloc, fall back to default color
     }
     return AppColors.primary;
+  }
+
+  // Heart rate calculation helper methods (from feature/heart-rate-viz)
+  int _calculateAvgHeartRate(List<HeartRateSample> samples) {
+    if (samples.isEmpty) return 0;
+    final sum = samples.fold(0, (sum, sample) => sum + sample.bpm);
+    return (sum / samples.length).round();
+  }
+
+  int _calculateMaxHeartRate(List<HeartRateSample> samples) {
+    if (samples.isEmpty) return 0;
+    return samples.map((e) => e.bpm).reduce((max, bpm) => bpm > max ? bpm : max);
+  }
+
+  // Potentially add _calculateMinHeartRate if needed, or rely on session.minHeartRate
+  int? _getMinHeartRate(RuckSession session) {
+    if (session.minHeartRate != null && session.minHeartRate! > 0) return session.minHeartRate;
+    if (session.heartRateSamples != null && session.heartRateSamples!.isNotEmpty) {
+      return session.heartRateSamples!.map((e) => e.bpm).reduce((min, bpm) => bpm < min ? bpm : min);
+    }
+    return null;
   }
 
   @override
@@ -514,10 +536,55 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                         ),
                       ),
                     ],
+                    // Heart Rate Card
+                    if (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty ||
+                        widget.session.avgHeartRate != null ||
+                        widget.session.maxHeartRate != null ||
+                        widget.session.minHeartRate != null) ...[
+                      _buildStatCard(
+                        context,
+                        'Heart Rate',
+                        [
+                          if (widget.session.avgHeartRate != null && widget.session.avgHeartRate! > 0 || (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty)) 
+                            _buildStatItem(
+                              context,
+                              'Average HR',
+                              '${widget.session.avgHeartRate ?? _calculateAvgHeartRate(widget.session.heartRateSamples ?? [])} bpm',
+                              Icons.favorite,
+                              iconColor: AppColors.error // Or a more neutral/positive color like Colors.pinkAccent
+                            ),
+                          if (widget.session.maxHeartRate != null && widget.session.maxHeartRate! > 0 || (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty))
+                            _buildStatItem(
+                              context,
+                              'Max HR',
+                              '${widget.session.maxHeartRate ?? _calculateMaxHeartRate(widget.session.heartRateSamples ?? [])} bpm',
+                              Icons.whatshot, // Alternative: Icons.arrow_upward or FontAwesomeIcons.heartPulse
+                              iconColor: AppColors.error // Or a specific color for max HR
+                            ),
+                          if (_getMinHeartRate(widget.session) != null)
+                            _buildStatItem(
+                              context,
+                              'Min HR',
+                              '${_getMinHeartRate(widget.session)} bpm',
+                              Icons.arrow_downward, // Alternative: FontAwesomeIcons.heartbeat with a different style
+                              iconColor: Colors.blueAccent // Or a specific color for min HR
+                            ),
+                          if (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16.0),
+                              child: HeartRateGraph(
+                                samples: widget.session.heartRateSamples!,
+                                height: 150,
+                                showLabels: true,
+                                showTooltips: true,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
-              
               // Comments Section
               if (widget.session.id != null)
                 Padding(
@@ -647,7 +714,7 @@ Download Go Rucky Yourself from the App Store!
   void _showDeleteConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Delete Session?'),
           content: const Text(
@@ -664,7 +731,7 @@ Download Go Rucky Yourself from the App Store!
                 Navigator.of(dialogContext).pop();
                 
                 // Execute the delete operation
-                _deleteSession(context);
+                _deleteSession();
               },
               style: TextButton.styleFrom(
                 foregroundColor: Colors.red,
@@ -678,7 +745,7 @@ Download Go Rucky Yourself from the App Store!
   }
 
   /// Handles the actual deletion of the session
-  void _deleteSession(BuildContext context) {
+  void _deleteSession() {
     // Verify session has an ID
     if (widget.session.id == null) {
       StyledSnackBar.showError(
@@ -689,7 +756,8 @@ Download Go Rucky Yourself from the App Store!
       return;
     }
 
-    // Dispatch the delete event to the SessionBloc
+    // Directly dispatch the delete event to the injected SessionBloc
+    AppLogger.info('DEBUGGING: Deleting session ${widget.session.id}');
     context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.session.id!));
   }
 

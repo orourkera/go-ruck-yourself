@@ -13,6 +13,7 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -944,7 +945,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           ),
         ),
       ),
-    ));
+    );
   }
 }
 

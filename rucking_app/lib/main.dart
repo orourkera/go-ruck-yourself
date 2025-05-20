@@ -14,7 +14,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load environment variables from .env first
+  // Attach Bloc observer for detailed logging of state changes & errors
+  Bloc.observer = AppBlocObserver();
+  
+  // Load environment variables from .env
   await dotenv.load();
   
   // Initialize dependency injection after env vars are loaded
