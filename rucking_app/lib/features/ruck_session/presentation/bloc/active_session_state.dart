@@ -11,26 +11,35 @@ class ActiveSessionInitial extends ActiveSessionState {
   final RuckSession? viewedSession; // The session being viewed, if any
   final List<RuckPhoto> photos;
   final PhotoLoadingStatus photosStatus;
+  final bool isPhotosLoading;
+  final String? photoLoadingError;
 
   const ActiveSessionInitial({
     this.viewedSession,
     this.photos = const [],
     this.photosStatus = PhotoLoadingStatus.initial,
+    this.isPhotosLoading = false,
+    this.photoLoadingError,
   });
 
   @override
-  List<Object?> get props => [viewedSession, photos, photosStatus];
+  List<Object?> get props => [viewedSession, photos, photosStatus, isPhotosLoading, photoLoadingError];
 
   ActiveSessionInitial copyWith({
     RuckSession? viewedSession,
     bool clearViewedSession = false, // Allows explicitly setting viewedSession to null
     List<RuckPhoto>? photos,
     PhotoLoadingStatus? photosStatus,
+    bool? isPhotosLoading,
+    String? photoLoadingError,
+    bool clearPhotoLoadingError = false,
   }) {
     return ActiveSessionInitial(
       viewedSession: clearViewedSession ? null : (viewedSession ?? this.viewedSession),
       photos: photos ?? this.photos,
       photosStatus: photosStatus ?? this.photosStatus,
+      isPhotosLoading: isPhotosLoading ?? this.isPhotosLoading,
+      photoLoadingError: clearPhotoLoadingError ? null : (photoLoadingError ?? this.photoLoadingError),
     );
   }
 }
