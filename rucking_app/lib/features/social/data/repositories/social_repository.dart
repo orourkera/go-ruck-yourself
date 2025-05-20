@@ -255,7 +255,7 @@ class SocialRepository {
   }
 
   /// Get comments for a specific ruck session
-  Future<List<RuckComment>> getRuckComments(int ruckId) async {
+  Future<List<RuckComment>> getRuckComments(String ruckId) async {
     try {
       final token = await _authToken;
       if (token == null) {
@@ -292,7 +292,7 @@ class SocialRepository {
   }
 
   /// Add a comment to a ruck session
-  Future<RuckComment> addRuckComment(int ruckId, String content) async {
+  Future<RuckComment> addRuckComment(String ruckId, String content) async {
     try {
       final token = await _authToken;
       if (token == null) {

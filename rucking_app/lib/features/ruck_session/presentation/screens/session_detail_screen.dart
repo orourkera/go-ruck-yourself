@@ -82,8 +82,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     AppLogger.debug('[CASCADE_TRACE] Loading social data for session $ruckId');
     try {
       final socialBloc = getIt<SocialBloc>();
-      socialBloc.add(LoadRuckLikes(int.parse(ruckId)));
-      socialBloc.add(LoadRuckComments(int.parse(ruckId)));
+      socialBloc.add(LoadRuckLikes(int.parse(ruckId))); 
+      socialBloc.add(LoadRuckComments(ruckId)); 
     } catch (e) {
       AppLogger.error('[CASCADE_TRACE] Error loading social data: $e');
     }
@@ -539,7 +539,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       BlocProvider.value(
                         value: getIt<SocialBloc>(),
                         child: CommentsSection(
-                          ruckId: int.parse(widget.session.id!),
+                          ruckId: widget.session.id!,
                         ),
                       ),
                     ],
