@@ -1,36 +1,38 @@
-import 'dart:math' as math;
+// Standard library imports
 import 'dart:io';
+import 'dart:math' as math;
+
+// Flutter and third-party imports
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:get_it/get_it.dart';
+
+// Project-specific imports
+import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/core/error_messages.dart' as error_msgs;
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
-import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
-import 'package:get_it/get_it.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/core/utils/measurement_utils.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
-import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart'; 
-import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
-import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
-import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
-import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
 class SessionCompleteScreen extends StatefulWidget {
-  /// Timestamp when the user ended the session
   final DateTime completedAt;
   final String ruckId;
   final Duration duration;
@@ -43,8 +45,8 @@ class SessionCompleteScreen extends StatefulWidget {
   final List<HeartRateSample>? heartRateSamples;
 
   const SessionCompleteScreen({
+    super.key,
     required this.completedAt,
-    Key? key,
     required this.ruckId,
     required this.duration,
     required this.distance,
@@ -54,139 +56,86 @@ class SessionCompleteScreen extends StatefulWidget {
     required this.ruckWeight,
     this.initialNotes,
     this.heartRateSamples,
-  }) : super(key: key);
+  });
 
   @override
   State<SessionCompleteScreen> createState() => _SessionCompleteScreenState();
 }
 
 class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
+  // Dependencies
   late final ApiClient _apiClient;
-  
+  final _notesController = TextEditingController();
+  final _sessionRepo = SessionRepository(apiClient: GetIt.I<ApiClient>());
+
+  // Form state
   int _rating = 3;
   int _perceivedExertion = 5;
-  String _notes = '';
-  List<String> _selectedTags = [];
-  
-  final List<String> _availableTags = [
-    'morning', 'afternoon', 'evening',
-    'urban', 'trail', 'hills', 'flat',
-    'easy', 'moderate', 'hard',
-    'recovery', 'training'
-  ];
-  
+  List<String> _selectedPhotos = [];
   bool _isSaving = false;
-  
-  // Form controllers and state
-  final TextEditingController _notesController = TextEditingController();
-  
-  // Photo upload state
-  final List<File> _selectedPhotos = [];
   bool _isUploadingPhotos = false;
-  
+
+  // Heart rate data
   List<HeartRateSample>? _heartRateSamples;
   int? _avgHeartRate;
   int? _maxHeartRate;
   int? _minHeartRate;
 
-  void setHeartRateSamples(List<HeartRateSample> samples) {
-    if (!mounted) return;
-    setState(() {
-      _heartRateSamples = samples;
-      if (samples.isNotEmpty) {
-        _avgHeartRate = (samples.map((e) => e.bpm).reduce((a, b) => a + b) / samples.length).round();
-        _maxHeartRate = samples.map((e) => e.bpm).reduce((a, b) => a > b ? a : b);
-        _minHeartRate = samples.map((e) => e.bpm).reduce((a, b) => a < b ? a : b);
-      }
-    });
-  }
-
   @override
   void initState() {
     super.initState();
-    
-    // Initialize API client
-    _apiClient = GetIt.instance<ApiClient>();
-    
-    // Initialize notes controller with initial notes if provided
+    _apiClient = GetIt.I<ApiClient>();
     _notesController.text = widget.initialNotes ?? '';
     
-    // Debug heart rate data
-    debugPrint('[SESSION-COMPLETE] Heart rate samples from widget: ${widget.heartRateSamples?.length ?? 0}');
-    if (widget.heartRateSamples == null) {
-      debugPrint('[SESSION-COMPLETE] No heart rate samples passed to session complete screen');
-    } else if (widget.heartRateSamples!.isEmpty) {
-      debugPrint('[SESSION-COMPLETE] Empty heart rate samples list passed to session complete screen');
-    } else {
-      debugPrint('[SESSION-COMPLETE] First heart rate sample: ${widget.heartRateSamples![0].bpm} BPM at ${widget.heartRateSamples![0].timestamp}');
-    }
-    
-    // --- Heart Rate: get samples from arguments if present
-    if (widget.heartRateSamples != null) {
-      setHeartRateSamples(widget.heartRateSamples!);
-      debugPrint('[SESSION-COMPLETE] Heart rate samples set with ${widget.heartRateSamples!.length} samples');
+    if (widget.heartRateSamples != null && widget.heartRateSamples!.isNotEmpty) {
+      _setHeartRateSamples(widget.heartRateSamples!);
     }
   }
-  
-  /// Format duration as HH:MM:SS
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  // Heart rate handling
+  void _setHeartRateSamples(List<HeartRateSample> samples) {
+    setState(() {
+      _heartRateSamples = samples;
+      _avgHeartRate = (samples.map((e) => e.bpm).reduce((a, b) => a + b) / samples.length).round();
+      _maxHeartRate = samples.map((e) => e.bpm).reduce(math.max);
+      _minHeartRate = samples.map((e) => e.bpm).reduce(math.min);
+    });
+  }
+
+  // Formatting utilities
   String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = twoDigits(duration.inHours);
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return "$hours:$minutes:$seconds";
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
   }
-  
-  /// Format pace based on user preference (metric/imperial)
+
   String _formatPace(bool preferMetric) {
-    // Ensure distance is positive to avoid division by zero or negative pace
     if (widget.distance <= 0 || widget.duration.inSeconds <= 0) return '--:--';
-    
-    // Calculate pace in seconds per kilometer (assuming widget.distance is in km)
     final paceSecondsPerKm = widget.duration.inSeconds / widget.distance;
-    
-    // Use formatPaceSeconds which correctly handles metric/imperial conversion
     return MeasurementUtils.formatPaceSeconds(paceSecondsPerKm, metric: preferMetric);
   }
-  
-  /// Toggle a tag's selection status
-  void _toggleTag(String tag) {
-    setState(() {
-      if (_selectedTags.contains(tag)) {
-        _selectedTags.remove(tag);
-      } else {
-        _selectedTags.add(tag);
-      }
-    });
-  }
-  
-  /// Saves the session review/notes and navigates home
+
+  // Session management
   Future<void> _saveAndContinue() async {
-    if (_isSaving) return; // Prevent multiple submissions
-  
-    setState(() {
-      _isSaving = true;
-    });
+    if (_isSaving) return;
     
-    bool photoUploadFailed = false;
-    bool sessionSaved = false;
+    setState(() => _isSaving = true);
     
     try {
-      AppLogger.info('[SESSION_UPDATE] Updating session with completion details...');
-      
-      // Create API client
-      final _apiClient = GetIt.I<ApiClient>();
-      
-      // Prepare rating and exertion data
-      final Map<String, dynamic> completionData = {
+      final completionData = {
         'rating': _rating,
         'perceived_exertion': _perceivedExertion,
         'completed': true,
-        'tags': _selectedTags,
         'notes': _notesController.text.trim(),
-        // Backend expects these exact keys:
-        'distance_km': widget.distance, // always send for compatibility
-        'final_distance_km': widget.distance, // for final summary
+        'distance_km': widget.distance,
+        'final_distance_km': widget.distance,
         'distance_meters': (widget.distance * 1000).round(),
         'calories_burned': widget.caloriesBurned,
         'final_calories_burned': widget.caloriesBurned,
@@ -197,56 +146,17 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'final_avg_hr': _avgHeartRate,
         'final_max_hr': _maxHeartRate,
       };
+
+      await _apiClient.patch('/rucks/${widget.ruckId}', completionData);
       
-      AppLogger.info('[SESSION_UPDATE] Completion data: $completionData');
-      
-      // Send completion data to the API
-      await _apiClient.patch(
-        '/rucks/${widget.ruckId}',
-        completionData,
-      );
-      
-      sessionSaved = true;
-      AppLogger.info('[SESSION_UPDATE] Session completion data saved successfully');
-      
-      // Upload photos if any were selected
       if (_selectedPhotos.isNotEmpty) {
-        setState(() {
-          _isUploadingPhotos = true;
-        });
-        
+        setState(() => _isUploadingPhotos = true);
         try {
-          AppLogger.info('Uploading ${_selectedPhotos.length} photos for session ${widget.ruckId}');
-          
-          // Verify the selected photos exist and are valid
-          for (int i = 0; i < _selectedPhotos.length; i++) {
-            final file = _selectedPhotos[i];
-            final exists = await file.exists();
-            final size = exists ? await file.length() : 0;
-            AppLogger.debug('[CASCADE_TRACE] Photo ${i+1}: path=${file.path}, exists=$exists, size=$size bytes');
-          }
-          
-          // Create session repository for photo uploads
-          final sessionRepo = SessionRepository(apiClient: _apiClient);
-          
-          // Log the upload attempt
-          AppLogger.debug('[CASCADE_TRACE] SessionCompleteScreen: Uploading ${_selectedPhotos.length} photos for ruckId ${widget.ruckId}');
-          
-          // Upload photos - ensure we're using the same parameters and logic that works in session_detail_screen
-          final uploadedPhotos = await sessionRepo.uploadSessionPhotos(
-            widget.ruckId, 
-            _selectedPhotos,
+          final uploadedPhotos = await _sessionRepo.uploadSessionPhotos(
+            widget.ruckId,
+            _selectedPhotos.map((path) => File(path)).toList(),
           );
           
-          // Log success
-          AppLogger.debug('[CASCADE_TRACE] SessionCompleteScreen: Successfully uploaded ${uploadedPhotos.length} photos');
-          uploadedPhotos.forEach((photo) {
-            AppLogger.debug('[CASCADE_TRACE] Uploaded photo: ${photo.id}, URL: ${photo.url}');
-          });
-          
-          AppLogger.info('Uploaded ${uploadedPhotos.length} photos successfully');
-          
-          // Update session to indicate it has photos
           if (uploadedPhotos.isNotEmpty) {
             await _apiClient.patch(
               '/rucks/${widget.ruckId}',
@@ -254,77 +164,177 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             );
           }
         } catch (e) {
-          photoUploadFailed = true;
-          AppLogger.error('Error uploading photos: $e');
+          AppLogger.error('Photo upload failed: $e');
+          Navigator.pushReplacementNamed(context, '/home', arguments: {'showPhotoUploadError': true});
+          return;
         } finally {
-          setState(() {
-            _isUploadingPhotos = false;
-          });
+          setState(() => _isUploadingPhotos = false);
         }
       }
       
-      // Navigate home on success, with appropriate messaging based on upload status
-      if (photoUploadFailed) {
-        // Navigate home but include an error message about the photo upload
-        AppLogger.debug('[CASCADE_TRACE] Navigation with photo upload error flag');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const HomeScreen(),
-            settings: const RouteSettings(
-              arguments: {
-                'showPhotoUploadError': true,
-              },
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+    } catch (e) {
+      StyledSnackBar.showError(context: context, message: 'Error saving session: $e');
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  void _discardSession(BuildContext context) {
+    if (widget.ruckId.isEmpty) {
+      StyledSnackBar.showError(context: context, message: 'Session ID missing');
+      return;
+    }
+    context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.ruckId));
+  }
+
+  // UI helpers
+  Color _getLadyModeColor(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    return authState is Authenticated && authState.user.gender == 'female'
+        ? AppColors.ladyPrimary
+        : AppColors.primary;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<SessionBloc, SessionState>(
+          listener: (context, state) {
+            if (state is SessionOperationInProgress) {
+              StyledSnackBar.show(context: context, message: 'Discarding session...');
+            } else if (state is SessionDeleteSuccess) {
+              StyledSnackBar.showSuccess(context: context, message: 'Session discarded');
+              Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+            } else if (state is SessionOperationFailure) {
+              StyledSnackBar.showError(context: context, message: 'Error: ${state.message}');
+            }
+          },
+        ),
+        BlocListener<HealthBloc, HealthState>(
+          listener: (context, state) {
+            if (state is HealthDataWriteStatus) {
+              final message = state.success
+                  ? 'Saved to Apple Health'
+                  : 'Failed to save to Apple Health';
+              state.success
+                  ? StyledSnackBar.showSuccess(context: context, message: message)
+                  : StyledSnackBar.showError(context: context, message: message);
+            }
+          },
+        ),
+      ],
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Session Complete'),
+          centerTitle: true,
+          backgroundColor: _getLadyModeColor(context),
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 24),
+                _buildStatsGrid(preferMetric),
+                if (_heartRateSamples?.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 24),
+                  _buildHeartRateSection(),
+                ],
+                const SizedBox(height: 24),
+                _buildPhotoUploadSection(),
+                const SizedBox(height: 24),
+                _buildRatingSection(),
+                const SizedBox(height: 24),
+                _buildExertionSection(),
+                const SizedBox(height: 24),
+                _buildNotesSection(),
+                const SizedBox(height: 32),
+                _buildActionButtons(),
+              ],
             ),
           ),
-        );
-      } else {
-        // Just navigate home with success (no error message)
-        AppLogger.debug('[CASCADE_TRACE] Navigation with success (no errors)');
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
-      }
-    } catch (error) {
-      AppLogger.error('[SESSION_UPDATE] Error: $error');
-      // Show error and reset saving state
-      StyledSnackBar.showError(
-        context: context,
-        message: 'Error saving session details: ${error.toString()}',
-        duration: const Duration(seconds: 3),
-      );
-      setState(() {
-        _isSaving = false;
-      });
-    }
+        ),
+      ),
+    );
   }
 
-  /// Populate stats from widget parameters
-  void _populateStats() {
-    // Stats are already provided as parameters to the widget
-    // No need to fetch from API in this case
+  Widget _buildHeader() {
+    return Center(
+      child: Column(
+        children: [
+          const Icon(Icons.check_circle, color: Colors.green, size: 72),
+          const SizedBox(height: 16),
+          Text('Great job rucker!', style: AppTextStyles.headlineLarge.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text('You completed your ruck', style: AppTextStyles.titleLarge),
+        ],
+      ),
+    );
   }
 
-  // Helper method to get heart rate widgets as a list for spreading into the column
-  List<Widget> _getHeartRateWidgets() {
-    debugPrint('[SESSION-COMPLETE] _getHeartRateWidgets called, samples: ${_heartRateSamples?.length ?? 0}');
-    if (_heartRateSamples == null || _heartRateSamples!.isEmpty) {
-      debugPrint('[SESSION-COMPLETE] No heart rate samples to show');
-      return [];
-    }
-    
-    return [
-      const SizedBox(height: 16),
-      Text('Heart Rate', style: AppTextStyles.titleMedium),
-      const SizedBox(height: 16),
-      // Enhanced heart rate chart with larger height and padding
-      Container(
-        height: 240, // 20% larger than standard 200
-        child: ClipRect(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: _AnimatedHeartRateChart(
+  Widget _buildStatsGrid(bool preferMetric) {
+    return GridView.count(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 1.1,
+      children: [
+        StatCard(title: 'Time', value: _formatDuration(widget.duration), icon: Icons.timer, color: _getLadyModeColor(context), centerContent: true, valueFontSize: 36),
+        StatCard(title: 'Distance', value: MeasurementUtils.formatDistance(widget.distance, metric: preferMetric), icon: Icons.straighten, color: _getLadyModeColor(context), centerContent: true, valueFontSize: 36),
+        StatCard(title: 'Calories', value: widget.caloriesBurned.toString(), icon: Icons.local_fire_department, color: AppColors.accent, centerContent: true, valueFontSize: 36),
+        StatCard(title: 'Pace', value: _formatPace(preferMetric), icon: Icons.speed, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
+        StatCard(title: 'Elevation', value: MeasurementUtils.formatElevationCompact(widget.elevationGain, widget.elevationLoss, metric: preferMetric), icon: Icons.terrain, color: AppColors.success, centerContent: true, valueFontSize: 28),
+        StatCard(title: 'Ruck Weight', value: MeasurementUtils.formatWeight(widget.ruckWeight, metric: preferMetric), icon: Icons.fitness_center, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
+        if (_heartRateSamples?.isNotEmpty ?? false)
+          StatCard(title: 'Avg HR', value: _avgHeartRate?.toString() ?? '--', icon: Icons.favorite, color: AppColors.error, centerContent: true, valueFontSize: 36),
+        if (_heartRateSamples?.isNotEmpty ?? false)
+          StatCard(title: 'Max HR', value: _maxHeartRate?.toString() ?? '--', icon: Icons.favorite_border, color: AppColors.error, centerContent: true, valueFontSize: 36),
+      ],
+    );
+  }
+
+  Widget _buildHeartRateSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.favorite, color: AppColors.error, size: 20),
+              const SizedBox(width: 8),
+              Text('Heart Rate', style: AppTextStyles.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildStatCard('Avg', _avgHeartRate?.toString() ?? '--', 'bpm'),
+              _buildStatCard('Max', _maxHeartRate?.toString() ?? '--', 'bpm'),
+              _buildStatCard('Min', _minHeartRate?.toString() ?? '--', 'bpm'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 180,
+            child: AnimatedHeartRateChart(
               heartRateSamples: _heartRateSamples!,
               avgHeartRate: _avgHeartRate,
               maxHeartRate: _maxHeartRate,
@@ -332,31 +342,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
               getLadyModeColor: _getLadyModeColor,
             ),
           ),
-        ),
-      ),
-      const SizedBox(height: 16),
-      // Heart rate stats below chart
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildHeartRateStat('Average', _avgHeartRate),
-          _buildHeartRateStat('Maximum', _maxHeartRate),
-          _buildHeartRateStat('Minimum', _minHeartRate),
         ],
       ),
-      const SizedBox(height: 8),
-    ];
-  }
-  
-  // Keep this for backward compatibility
-  Widget _buildHeartRateSection() {
-    debugPrint('[SESSION-COMPLETE] _buildHeartRateSection called, samples: ${_heartRateSamples?.length ?? 0}');
-    if (_heartRateSamples == null || _heartRateSamples!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: _getHeartRateWidgets(),
     );
   }
 
@@ -377,625 +364,165 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     );
   }
 
-  Widget _buildHeartRateStat(String label, int? value) {
+  Widget _buildPhotoUploadSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: PhotoUploadSection(
+        ruckId: widget.ruckId,
+        onPhotosSelected: (photos) => setState(() => _selectedPhotos = photos.map((file) => file.path).toList()),
+        isUploading: _isUploadingPhotos,
+      ),
+    );
+  }
+
+  Widget _buildRatingSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('How would you rate this session?', style: AppTextStyles.titleMedium),
+        const SizedBox(height: 8),
+        Center(
+          child: RatingBar.builder(
+            initialRating: _rating.toDouble(),
+            minRating: 1,
+            direction: Axis.horizontal,
+            allowHalfRating: false,
+            itemCount: 5,
+            itemPadding: const EdgeInsets.symmetric(horizontal: 4),
+            itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+            onRatingUpdate: (rating) => setState(() => _rating = rating.toInt()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExertionSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('How difficult was this session? (1-10)', style: AppTextStyles.titleMedium),
+        const SizedBox(height: 8),
+        Slider(
+          value: _perceivedExertion.toDouble(),
+          min: 1,
+          max: 10,
+          divisions: 9,
+          label: _perceivedExertion.toString(),
+          onChanged: (value) => setState(() => _perceivedExertion = value.toInt()),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Easy', style: AppTextStyles.bodyMedium),
+            Text('Hard', style: AppTextStyles.bodyMedium),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Notes', style: AppTextStyles.titleMedium),
+        const SizedBox(height: 8),
+        CustomTextField(
+          controller: _notesController,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+          label: 'Add notes about this session',
+          hint: 'How did it feel? What went well? What could be improved?',
+          maxLines: 4,
+          keyboardType: TextInputType.multiline,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons() {
     return Column(
       children: [
-        Text(
-          label,
-          style: TextStyle(fontSize: 14, color: Colors.black54),
-        ),
-        Text(
-          value != null ? '$value bpm' : '--',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  LineChartData _buildHeartRateChart() {
-    debugPrint('[SESSION-COMPLETE] Building heart rate chart with ${_heartRateSamples?.length ?? 0} samples');
-    
-    if (_heartRateSamples == null || _heartRateSamples!.isEmpty) {
-      debugPrint('[SESSION-COMPLETE] No heart rate samples, returning empty chart');
-      return LineChartData();
-    }
-    
-    final firstTimestamp = _heartRateSamples!.first.timestamp.millisecondsSinceEpoch.toDouble();
-    
-    // Find the sample with maximum heart rate for visual emphasis
-    HeartRateSample maxSample = _heartRateSamples!.reduce((a, b) => a.bpm > b.bpm ? a : b);
-    final maxTimeOffset = (maxSample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
-    
-    final spots = _heartRateSamples!.map((sample) {
-      // Convert timestamp to minutes from session start for x-axis
-      final timeOffset = (sample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
-      return FlSpot(timeOffset, sample.bpm.toDouble());
-    }).toList();
-    
-    debugPrint('[SESSION-COMPLETE] Created ${spots.length} chart spots');
-    
-    return LineChartData(
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: true,
-        horizontalInterval: 30,
-        verticalInterval: 5,
-        getDrawingHorizontalLine: (value) {
-          return FlLine(
-            color: Colors.grey[300],
-            strokeWidth: 1,
-          );
-        },
-        getDrawingVerticalLine: (value) {
-          return FlLine(
-            color: Colors.grey[300],
-            strokeWidth: 1,
-          );
-        },
-      ),
-      titlesData: FlTitlesData(
-        show: true,
-        // Remove top titles
-        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        // Remove right titles
-        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        bottomTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 30,
-            getTitlesWidget: (value, meta) {
-              // Round to nearest integer
-              return SideTitleWidget(
-                axisSide: meta.axisSide,
-                child: Text(
-                  '${value.round()}m',
-                  style: TextStyle(fontSize: 10),
-                ),
-              );
-            },
-            interval: 5,
+        Center(
+          child: CustomButton(
+            onPressed: _isSaving ? null : _saveAndContinue,
+            text: 'Save and Continue',
+            icon: Icons.save,
+            color: _getLadyModeColor(context),
+            isLoading: _isSaving,
+            width: 250,
           ),
         ),
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            getTitlesWidget: (value, meta) {
-              return SideTitleWidget(
-                axisSide: meta.axisSide,
-                child: Text(
-                  '${value.toInt()}',
-                  style: TextStyle(fontSize: 10),
-                ),
-              );
-            },
-            reservedSize: 30,
-          ),
-        ),
-      ),
-      borderData: FlBorderData(show: true),
-      minX: 0,
-      maxX: spots.isEmpty ? 10 : spots.last.x,
-      minY: (_minHeartRate?.toDouble() ?? 60.0) - 10.0,
-      maxY: (_maxHeartRate?.toDouble() ?? 180.0) + 10.0,
-      lineBarsData: [
-        LineChartBarData(
-          spots: spots,
-          isCurved: true,
-          color: _getLadyModeColor(context),
-          barWidth: 3,
-          isStrokeCapRound: true,
-          dotData: FlDotData(show: false),
-          belowBarData: BarAreaData(show: true, color: _getLadyModeColor(context).withOpacity(0.2)),
-        ),
-      ],
-      // Add a marker for the maximum heart rate
-      extraLinesData: ExtraLinesData(
-        horizontalLines: [
-          HorizontalLine(
-            y: _maxHeartRate?.toDouble() ?? 0.0,
-            color: Colors.red.withOpacity(0.8),
-            strokeWidth: 1,
-            dashArray: [5, 5],
-            label: HorizontalLineLabel(
-              show: true,
-              alignment: Alignment.topRight,
-              padding: const EdgeInsets.only(right: 5, bottom: 5),
-              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
-              labelResolver: (line) => 'Max: ${_maxHeartRate ?? 0} bpm',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Show delete confirmation dialog
-  void _showDeleteConfirmationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Discard Ruck?'),
-        content: const Text(
-          'This will delete this ruck session and all associated data including heart rate and location points. This action cannot be undone, rucker.'
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(true);
-              _discardSession(context);
-            },
-            child: Text(
-              'Discard',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Handle session discard/deletion
-  void _discardSession(BuildContext context) {
-    // Verify session has an ID
-    if (widget.ruckId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error: Session ID is missing'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Dispatch delete event to SessionBloc
-    context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.ruckId));
-  }
-
-  @override
-  // Helper method to get the appropriate color based on user gender
-  Color _getLadyModeColor(BuildContext context) {
-    try {
-      final authState = context.read<AuthBloc>().state;
-      if (authState is Authenticated && authState.user.gender == 'female') {
-        return AppColors.ladyPrimary;
-      }
-    } catch (e) {
-      // If we can't access the AuthBloc, fall back to default color
-    }
-    return AppColors.primary;
-  }
-
-  Widget build(BuildContext context) {
-    // Get user measurement preference
-    bool preferMetric = true;
-    String? userGender;
-    final authState = context.read<AuthBloc>().state;
-    if (authState is Authenticated) {
-      preferMetric = authState.user.preferMetric;
-      userGender = authState.user.gender;
-    }
-
-    return MultiBlocListener(
-      listeners: [
-        BlocListener<SessionBloc, SessionState>(
-          listener: (context, state) {
-            if (state is SessionOperationInProgress) {
-              // Show loading indicator
-              StyledSnackBar.show(
-                context: context,
-                message: 'Discarding session...',
-                duration: const Duration(seconds: 1),
-              );
-            } else if (state is SessionDeleteSuccess) {
-              // Show success message and navigate back to home
-              StyledSnackBar.showSuccess(
-                context: context,
-                message: 'The session is gone, rucker. Gone forever.',
-                duration: const Duration(seconds: 2),
-              );
-              Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
-            } else if (state is SessionOperationFailure) {
-              // Show error message
-              StyledSnackBar.showError(
-                context: context,
-                message: 'Error: ${state.message}',
-                duration: const Duration(seconds: 3),
-              );
-            }
-          },
-        ),
-        BlocListener<HealthBloc, HealthState>(
-          listener: (context, state) {
-            if (state is HealthDataWriteStatus) {
-              if (state.success) {
-                StyledSnackBar.showSuccess(
-                  context: context,
-                  message: 'Session data successfully saved to Apple Health',
-                  duration: const Duration(seconds: 2),
-                );
-              } else {
-                StyledSnackBar.showError(
-                  context: context,
-                  message: 'Failed to save session data to Apple Health',
-                  duration: const Duration(seconds: 3),
-                );
-              }
-            }
-          },
-        ),
-      ],
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Session Complete'),
-          centerTitle: true,
-          backgroundColor: _getLadyModeColor(context),
-          foregroundColor: Colors.white,
-          automaticallyImplyLeading: false,
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Congratulations header
-                  Center(
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 72,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Great job rucker!',
-                        style: AppTextStyles.headlineLarge.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'You completed your ruck',
-                        style: AppTextStyles.titleLarge,
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Session stats
-                GridView.count(
-                  physics: const NeverScrollableScrollPhysics(),
-                  shrinkWrap: true,
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1.1,
-                  children: [
-                    StatCard(
-                      title: 'Time',
-                      value: _formatDuration(widget.duration),
-                      icon: Icons.timer,
-                      color: _getLadyModeColor(context),
-                      centerContent: true,
-                      valueFontSize: 36,
-                    ),
-                    StatCard(
-                      title: 'Distance',
-                      value: MeasurementUtils.formatDistance(widget.distance, metric: preferMetric),
-                      icon: Icons.straighten,
-                      color: _getLadyModeColor(context),
-                      centerContent: true,
-                      valueFontSize: 36,
-                    ),
-                    StatCard(
-                      title: 'Calories',
-                      value: widget.caloriesBurned.toString(),
-                      icon: Icons.local_fire_department,
-                      color: AppColors.accent,
-                      centerContent: true,
-                      valueFontSize: 36,
-                    ),
-                    StatCard(
-                      title: 'Pace',
-                      value: _formatPace(preferMetric),
-                      icon: Icons.speed,
-                      color: AppColors.secondary,
-                      centerContent: true,
-                      valueFontSize: 36,
-                    ),
-                    StatCard(
-                      title: 'Elevation',
-                      value: MeasurementUtils.formatElevationCompact(widget.elevationGain, widget.elevationLoss, metric: preferMetric),
-                      icon: Icons.terrain,
-                      color: AppColors.success,
-                      centerContent: true,
-                      valueFontSize: 28,
-                    ),
-                    StatCard(
-                      title: 'Ruck Weight',
-                      value: MeasurementUtils.formatWeight(widget.ruckWeight, metric: preferMetric),
-                      icon: Icons.fitness_center,
-                      color: AppColors.secondary,
-                      centerContent: true,
-                      valueFontSize: 36,
-                    ),
-                    // Heart Rate summary (if available)
-                    if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty) ...[
-                      StatCard(
-                        title: 'Avg HR',
-                        value: _avgHeartRate?.toString() ?? '--',
-                        icon: Icons.favorite,
-                        color: AppColors.error,
-                        centerContent: true,
-                        valueFontSize: 36,
-                      ),
-                      StatCard(
-                        title: 'Max HR',
-                        value: _maxHeartRate?.toString() ?? '--',
-                        icon: Icons.favorite_border,
-                        color: AppColors.error,
-                        centerContent: true,
-                        valueFontSize: 36,
-                      ),
-                    ],
-                  ],
-                ),
-                
-                // Heart Rate Section 
-                if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-                  padding: const EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.favorite, color: AppColors.error, size: 20),
-                          const SizedBox(width: 8),
-                          Text('Heart Rate', style: AppTextStyles.titleMedium),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStatCard('Avg', _avgHeartRate?.toString() ?? '--', 'bpm'),
-                          _buildStatCard('Max', _maxHeartRate?.toString() ?? '--', 'bpm'),
-                          _buildStatCard('Min', _minHeartRate?.toString() ?? '--', 'bpm'),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 180,
-                        child: _heartRateSamples!.isNotEmpty
-                          ? LineChart(_buildHeartRateChart())
-                          : Center(child: Text('No heart rate data available', style: TextStyle(color: Colors.grey[600]))),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Ruck Shots Photo Section
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
-                  padding: const EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: PhotoUploadSection(
-                    ruckId: widget.ruckId,
-                    onPhotosSelected: (photos) {
-                      setState(() {
-                        _selectedPhotos.clear();
-                        _selectedPhotos.addAll(photos);
-                      });
-                    },
-                    isUploading: _isUploadingPhotos,
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Rating
-                Text(
-                  'How would you rate this session?',
-                  style: AppTextStyles.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Center(
-                  child: RatingBar.builder(
-                    initialRating: _rating.toDouble(),
-                    minRating: 1,
-                    direction: Axis.horizontal,
-                    allowHalfRating: false,
-                    itemCount: 5,
-                    itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    itemBuilder: (context, _) => const Icon(
-                      Icons.star,
-                      color: Colors.amber,
-                    ),
-                    onRatingUpdate: (rating) {
-                      setState(() {
-                        _rating = rating.toInt();
-                      });
-                    },
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Perceived exertion
-                Text(
-                  'How difficult was this session? (1-10)',
-                  style: AppTextStyles.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Slider(
-                  value: _perceivedExertion.toDouble(),
-                  min: 1,
-                  max: 10,
-                  divisions: 9,
-                  label: _perceivedExertion.toString(),
-                  onChanged: (value) {
-                    setState(() {
-                      _perceivedExertion = value.toInt();
-                    });
-                  },
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Easy', style: AppTextStyles.bodyMedium),
-                    Text('Hard', style: AppTextStyles.bodyMedium),
-                  ],
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Tags section removed
-                const SizedBox(height: 12),
-                
-                // Notes
-                Text(
-                  'Notes',
-                  style: AppTextStyles.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                CustomTextField(
-                  controller: _notesController,
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
-                  label: 'Add notes about this session',
-                  hint: 'How did it feel? What went well? What could be improved?',
-                  maxLines: 4,
-                  keyboardType: TextInputType.multiline,
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Photo upload section moved above
-                
-                const SizedBox(height: 32),
-                
-                // Save button
-                Center(
-                  child: CustomButton(
+        const SizedBox(height: 24),
+        Center(
+          child: TextButton(
+            onPressed: () => showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Discard Ruck?'),
+                content: const Text('This will delete this ruck session and all associated data. This action cannot be undone.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                  TextButton(
                     onPressed: () {
-                      if (!_isSaving) {
-                        _saveAndContinue();
-                      }
+                      Navigator.pop(context);
+                      _discardSession(context);
                     },
-                    text: 'Save and Continue',
-                    icon: Icons.save,
-                    color: _getLadyModeColor(context),
-                    isLoading: _isSaving,
-                    width: 250,
+                    child: const Text('Discard', style: TextStyle(color: Colors.red)),
                   ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Discard this ruck option (red text, centered)
-                Center(
-                  child: TextButton(
-                    onPressed: () => _showDeleteConfirmationDialog(context),
-                    child: const Text(
-                      'Discard this ruck',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 16),
-              ],
+                ],
+              ),
             ),
+            child: const Text('Discard this ruck', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
-// Animated heart rate chart that draws from left to right
-class _AnimatedHeartRateChart extends StatefulWidget {
+class AnimatedHeartRateChart extends StatefulWidget {
   final List<HeartRateSample> heartRateSamples;
   final int? avgHeartRate;
   final int? maxHeartRate;
   final int? minHeartRate;
   final Color Function(BuildContext) getLadyModeColor;
 
-  const _AnimatedHeartRateChart({
+  const AnimatedHeartRateChart({
+    super.key,
     required this.heartRateSamples,
-    required this.avgHeartRate,
-    required this.maxHeartRate,
-    required this.minHeartRate,
+    this.avgHeartRate,
+    this.maxHeartRate,
+    this.minHeartRate,
     required this.getLadyModeColor,
   });
 
   @override
-  State<_AnimatedHeartRateChart> createState() => _AnimatedHeartRateChartState();
+  State<AnimatedHeartRateChart> createState() => _AnimatedHeartRateChartState();
 }
 
-class _AnimatedHeartRateChartState extends State<_AnimatedHeartRateChart> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _animation;
+class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
-    
-    // Set up animation controller to run for 2 seconds - slower for smoother animation
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    );
-    
-    // Create animation that goes from 0.0 to 1.0 with a smoother curve
-    _animation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutQuad, // Using a smoother curve for animation
-    );
-    
-    // Start the animation when widget is built
-    _animationController.forward();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000));
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOutQuad);
+    _controller.forward();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -1003,102 +530,59 @@ class _AnimatedHeartRateChartState extends State<_AnimatedHeartRateChart> with S
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _animation,
-      builder: (context, child) {
-        return LineChart(
-          _buildHeartRateChart(_animation.value),
-        );
-      },
+      builder: (context, child) => LineChart(_buildChartData(_animation.value)),
     );
   }
 
-  LineChartData _buildHeartRateChart(double animationValue) {
-    if (widget.heartRateSamples.isEmpty) {
-      return LineChartData();
-    }
-    
-    // Calculate how many points to show based on animation value
-    int pointsToShow = (widget.heartRateSamples.length * animationValue).round();
-    pointsToShow = pointsToShow.clamp(1, widget.heartRateSamples.length);
-    
-    // Get the subset of samples to show for the current animation frame
+  LineChartData _buildChartData(double animationValue) {
+    if (widget.heartRateSamples.isEmpty) return LineChartData();
+
+    final pointsToShow = (widget.heartRateSamples.length * animationValue).round().clamp(1, widget.heartRateSamples.length);
     final visibleSamples = widget.heartRateSamples.sublist(0, pointsToShow);
-    
     final firstTimestamp = widget.heartRateSamples.first.timestamp.millisecondsSinceEpoch.toDouble();
-    
+
     final spots = visibleSamples.map((sample) {
-      // Convert timestamp to minutes from session start for x-axis
       final timeOffset = (sample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
       return FlSpot(timeOffset, sample.bpm.toDouble());
     }).toList();
-    
-    // debugPrint('[SESSION-COMPLETE] Created ${spots.length} spots for the heart rate chart'); // This debug line can be removed if not needed
-    
-    // Add safety checks for min/max values using widget properties
+
+    final safeMaxX = spots.isNotEmpty ? spots.last.x : 10.0;
     final safeMinY = (widget.minHeartRate?.toDouble() ?? 60.0) - 10.0;
     final safeMaxY = (widget.maxHeartRate?.toDouble() ?? 180.0) + 10.0;
-    final safeMaxX = spots.isNotEmpty ? spots.last.x : 10.0; // Ensure spots is not empty before accessing last.x
-    
-    // debugPrint('[SESSION-COMPLETE] Chart Y range: $safeMinY to $safeMaxY'); // These debug lines can be removed
-    // debugPrint('[SESSION-COMPLETE] Chart X range: 0 to $safeMaxX');
-    
-    final lineColor = widget.getLadyModeColor(context);
-    
+
     return LineChartData(
       gridData: FlGridData(
         show: true,
         drawVerticalLine: true,
         horizontalInterval: 30,
         verticalInterval: 5,
-        getDrawingHorizontalLine: (value) {
-          return FlLine(
-            color: Colors.grey.shade300,
-            strokeWidth: 1,
-          );
-        },
-        getDrawingVerticalLine: (value) {
-          return FlLine(
-            color: Colors.grey.shade300,
-            strokeWidth: 1,
-          );
-        },
+        getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade300, strokeWidth: 1),
+        getDrawingVerticalLine: (_) => FlLine(color: Colors.grey.shade300, strokeWidth: 1),
       ),
       titlesData: FlTitlesData(
         show: true,
-        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 22, // Adjusted for better fit
-            getTitlesWidget: (value, meta) {
-              return SideTitleWidget(
-                axisSide: meta.axisSide,
-                child: Text(
-                  '${value.round()}m',
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                ),
-              );
-            },
-            // Dynamic interval based on data range, clamped for sanity
-            interval: spots.isNotEmpty && spots.last.x > 10 
-                      ? (spots.last.x / 5).roundToDouble().clamp(1.0, 20.0) 
-                      : 5,
+            reservedSize: 22,
+            interval: spots.isNotEmpty && spots.last.x > 10 ? (spots.last.x / 5).roundToDouble().clamp(1.0, 20.0) : 5,
+            getTitlesWidget: (value, meta) => SideTitleWidget(
+              axisSide: meta.axisSide,
+              child: Text('${value.round()}m', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+            ),
           ),
         ),
         leftTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            getTitlesWidget: (value, meta) {
-              return SideTitleWidget(
-                axisSide: meta.axisSide,
-                child: Text(
-                  '${value.toInt()}',
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                ),
-              );
-            },
-            reservedSize: 30, // Adjusted for better fit
+            reservedSize: 30,
             interval: 30,
+            getTitlesWidget: (value, meta) => SideTitleWidget(
+              axisSide: meta.axisSide,
+              child: Text('${value.toInt()}', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+            ),
           ),
         ),
       ),
@@ -1111,19 +595,19 @@ class _AnimatedHeartRateChartState extends State<_AnimatedHeartRateChart> with S
         LineChartBarData(
           spots: spots,
           isCurved: true,
-          curveSmoothness: 0.25, // Adjust curve smoothness to match session detail
-          color: lineColor,
-          barWidth: 3.5, // Slightly thicker to match session detail
+          curveSmoothness: 0.25,
+          color: widget.getLadyModeColor(context),
+          barWidth: 3.5,
           isStrokeCapRound: true,
-          dotData: FlDotData(show: false),
-          belowBarData: BarAreaData(show: true, color: lineColor.withOpacity(0.2)),
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(show: true, color: widget.getLadyModeColor(context).withOpacity(0.2)),
         ),
       ],
       extraLinesData: ExtraLinesData(
         horizontalLines: [
-          if (widget.maxHeartRate != null) // Ensure maxHeartRate is not null before using it
+          if (widget.maxHeartRate != null)
             HorizontalLine(
-              y: widget.maxHeartRate!.toDouble(), // Use ! because of the null check
+              y: widget.maxHeartRate!.toDouble(),
               color: Colors.red.withOpacity(0.6),
               strokeWidth: 1,
               dashArray: [5, 5],
@@ -1132,7 +616,7 @@ class _AnimatedHeartRateChartState extends State<_AnimatedHeartRateChart> with S
                 alignment: Alignment.topRight,
                 padding: const EdgeInsets.only(right: 5, bottom: 5),
                 style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
-                labelResolver: (line) => 'Max: ${widget.maxHeartRate} bpm', // Add bpm unit to match session detail screen
+                labelResolver: (_) => 'Max: ${widget.maxHeartRate} bpm',
               ),
             ),
         ],

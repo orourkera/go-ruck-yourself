@@ -98,6 +98,15 @@ class HeartRateUpdated extends ActiveSessionEvent {
   List<Object?> get props => [sample];
 }
 
+/// Event for batch processing of heart-rate samples
+class HeartRateBufferProcessed extends ActiveSessionEvent {
+  final List<HeartRateSample> samples;
+  const HeartRateBufferProcessed(this.samples);
+
+  @override
+  List<Object?> get props => [samples];
+}
+
 /// Internal ticker (1-second) to update elapsed time & derived metrics
 class Tick extends ActiveSessionEvent {
   const Tick();
@@ -105,11 +114,17 @@ class Tick extends ActiveSessionEvent {
 
 class SessionFailed extends ActiveSessionEvent {
   final String errorMessage;
+  final String sessionId;
+  final RuckSession? session;
   
-  const SessionFailed({required this.errorMessage});
+  const SessionFailed({
+    required this.errorMessage,
+    required this.sessionId,
+    this.session,
+  });
   
   @override
-  List<Object?> get props => [errorMessage];
+  List<Object?> get props => [errorMessage, sessionId, session];
 }
 
 class SessionErrorCleared extends ActiveSessionEvent {

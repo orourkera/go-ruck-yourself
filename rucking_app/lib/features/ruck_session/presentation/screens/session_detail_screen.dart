@@ -680,6 +680,69 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       ),
     );
   }
+
+  // Build a card containing a title and a list of stat items
+  Widget _buildStatCard(
+    BuildContext context,
+    String title,
+    List<Widget> statItems,
+  ) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...statItems,
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // Build an individual stat item row inside a stat card
+  Widget _buildStatItem(
+    BuildContext context,
+    String label,
+    String value,
+    IconData? icon, {
+    Color? iconColor
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[  
+                Icon(icon, size: 16, color: iconColor ?? Colors.grey[600]),
+                const SizedBox(width: 8),
+              ],
+              Text(label, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              // We no longer have a valueColor parameter, just use the default text color
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   
   void _shareSession(BuildContext context) {
     AppLogger.info('Sharing session ${widget.session.id}');

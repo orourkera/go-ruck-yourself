@@ -44,7 +44,12 @@ class ActiveSessionInitial extends ActiveSessionState {
   }
 }
 
-class ActiveSessionLoading extends ActiveSessionState {}
+class ActiveSessionLoading extends ActiveSessionState {
+  const ActiveSessionLoading();
+  
+  @override
+  List<Object?> get props => [];
+}
 
 class ActiveSessionRunning extends ActiveSessionState {
   final List<String>? tags;
@@ -65,6 +70,8 @@ class ActiveSessionRunning extends ActiveSessionState {
   final bool isPaused;
   final double? pace;
   final int? latestHeartRate;
+  final int? minHeartRate;
+  final int? maxHeartRate;
   final String? validationMessage;
   final DateTime originalSessionStartTimeUtc; // Tracks when the session originally started
   final Duration totalPausedDuration;      // Accumulates total time paused
@@ -74,6 +81,7 @@ class ActiveSessionRunning extends ActiveSessionState {
   final List<RuckPhoto> photos;
   final bool isPhotosLoading;
   final String? photosError;
+  final String? errorMessage;
   
   // Photo upload fields
   final bool isUploading;
@@ -83,6 +91,9 @@ class ActiveSessionRunning extends ActiveSessionState {
   // Photo deletion fields
   final bool isDeleting;
   final String? deleteError;
+  
+  // Split tracking
+  final List<dynamic> splits;
 
   static const _unset = Object();
 
@@ -111,6 +122,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     this.photos = const [],
     this.isPhotosLoading = false,
     this.photosError,
+    this.errorMessage,
     // Photo upload fields
     this.isUploading = false,
     this.uploadError,
@@ -118,9 +130,12 @@ class ActiveSessionRunning extends ActiveSessionState {
     // Photo deletion fields
     this.isDeleting = false,
     this.deleteError,
+    this.splits = const [],
     this.currentPauseStartTimeUtc,
     this.notes,
     this.latestHeartRate,
+    this.minHeartRate,
+    this.maxHeartRate,
     this.validationMessage,
     this.isGpsReady = false, // Default to false
   });
@@ -144,6 +159,8 @@ class ActiveSessionRunning extends ActiveSessionState {
     isPaused,
     pace,
     latestHeartRate,
+    minHeartRate,
+    maxHeartRate,
     validationMessage,
     plannedDuration,
     originalSessionStartTimeUtc,
@@ -154,6 +171,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     photos,
     isPhotosLoading,
     photosError,
+    errorMessage,
     // Photo upload fields
     isUploading,
     uploadError,
@@ -161,6 +179,8 @@ class ActiveSessionRunning extends ActiveSessionState {
     // Photo deletion fields
     isDeleting,
     deleteError,
+    // Split tracking
+    splits,
   ];
   
   ActiveSessionRunning copyWith({
@@ -181,11 +201,15 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool? isPaused,
     Object? pace = _unset,
     int? latestHeartRate,
+    int? minHeartRate,
+    int? maxHeartRate,
     List<HeartRateSample>? heartRateSamples,
     List<RuckPhoto>? photos,
     bool? isPhotosLoading,
     String? photosError,
     bool clearPhotosError = false,
+    String? errorMessage,
+    bool clearErrorMessage = false,
     // Photo upload fields
     bool? isUploading,
     String? uploadError,
@@ -195,6 +219,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool? isDeleting,
     String? deleteError,
     bool clearDeleteError = false,
+    List<dynamic>? splits,
     String? validationMessage,
     bool clearValidationMessage = false,
     DateTime? originalSessionStartTimeUtc,
@@ -221,18 +246,22 @@ class ActiveSessionRunning extends ActiveSessionState {
       isPaused: isPaused ?? this.isPaused,
       pace: identical(pace, _unset) ? this.pace : pace as double?,
       latestHeartRate: latestHeartRate ?? this.latestHeartRate,
+      minHeartRate: minHeartRate ?? this.minHeartRate,
+      maxHeartRate: maxHeartRate ?? this.maxHeartRate,
       heartRateSamples: heartRateSamples ?? this.heartRateSamples,
       photos: photos ?? this.photos,
       isPhotosLoading: isPhotosLoading ?? this.isPhotosLoading,
       photosError: clearPhotosError ? null : photosError ?? this.photosError,
+      errorMessage: clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       // Photo upload fields
       isUploading: isUploading ?? this.isUploading,
       uploadError: clearUploadError ? null : uploadError ?? this.uploadError,
       uploadSuccess: uploadSuccess ?? this.uploadSuccess,
       // Photo deletion fields
       isDeleting: isDeleting ?? this.isDeleting,
-      deleteError: clearDeleteError ? null : deleteError ?? this.deleteError,
-      validationMessage: clearValidationMessage ? null : validationMessage ?? this.validationMessage,
+      deleteError: clearDeleteError ? null : (deleteError ?? this.deleteError),
+      splits: splits ?? this.splits,
+      validationMessage: clearValidationMessage ? null : (validationMessage ?? this.validationMessage),
       plannedDuration: plannedDuration ?? this.plannedDuration,
       originalSessionStartTimeUtc: originalSessionStartTimeUtc ?? this.originalSessionStartTimeUtc,
       totalPausedDuration: totalPausedDuration ?? this.totalPausedDuration,
@@ -251,6 +280,43 @@ class ActiveSessionComplete extends ActiveSessionState {
   
   @override
   List<Object?> get props => [session];
+}
+
+class SessionSummaryGenerated extends ActiveSessionState {
+  final RuckSession session;
+  final List<RuckPhoto> photos;
+  final bool isPhotosLoading;
+  final String? photosError;
+  final String? errorMessage;
+  
+  const SessionSummaryGenerated({
+    required this.session,
+    this.photos = const [],
+    this.isPhotosLoading = false,
+    this.photosError,
+    this.errorMessage,
+  });
+  
+  @override
+  List<Object?> get props => [session, photos, isPhotosLoading, photosError, errorMessage];
+  
+  SessionSummaryGenerated copyWith({
+    RuckSession? session,
+    List<RuckPhoto>? photos,
+    bool? isPhotosLoading,
+    String? photosError,
+    bool clearPhotosError = false,
+    String? errorMessage,
+    bool clearErrorMessage = false,
+  }) {
+    return SessionSummaryGenerated(
+      session: session ?? this.session,
+      photos: photos ?? this.photos,
+      isPhotosLoading: isPhotosLoading ?? this.isPhotosLoading,
+      photosError: clearPhotosError ? null : (photosError ?? this.photosError),
+      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
 }
 
 class ActiveSessionFailure extends ActiveSessionState {
