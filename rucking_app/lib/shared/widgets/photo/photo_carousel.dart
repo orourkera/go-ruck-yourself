@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:carousel_slider/carousel_slider.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
@@ -91,21 +90,19 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
     
     return Column(
       children: [
-        // Using CarouselSlider instead of PageView for more reliable image carousel
-        CarouselSlider.builder(
-          itemCount: widget.photoUrls.length,
-          itemBuilder: (context, index, realIndex) {
-            return _buildPhotoItem(context, index);
-          },
-          options: CarouselOptions(
-            height: widget.height,
-            viewportFraction: 0.85,
-            enlargeCenterPage: true,
-            enableInfiniteScroll: widget.photoUrls.length > 1,
-            onPageChanged: (index, reason) {
+        // Using enhanced PageView for image carousel
+        SizedBox(
+          height: widget.height,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: widget.photoUrls.length,
+            onPageChanged: (index) {
               setState(() {
                 _currentPage = index;
               });
+            },
+            itemBuilder: (context, index) {
+              return _buildPhotoItem(context, index);
             },
           ),
         ),
