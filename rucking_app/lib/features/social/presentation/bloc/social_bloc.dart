@@ -1,18 +1,24 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
 import 'package:rucking_app/core/error/exceptions.dart';
+import 'package:rucking_app/features/social/domain/models/ruck_like.dart';
 
 /// BLoC for managing social interactions (likes, comments)
 class SocialBloc extends Bloc<SocialEvent, SocialState> {
   final SocialRepository _socialRepository;
+  final AuthBloc _authBloc;
 
-  SocialBloc({required SocialRepository socialRepository})
-      : _socialRepository = socialRepository,
-        super(SocialInitial()) {
+  SocialBloc({
+    required SocialRepository socialRepository,
+    required AuthBloc authBloc,
+  }) : _socialRepository = socialRepository,
+       _authBloc = authBloc,
+       super(SocialInitial()) {
     on<LoadRuckLikes>(_onLoadRuckLikes);
     on<ToggleRuckLike>(_onToggleRuckLike);
     on<CheckUserLikeStatus>(_onCheckUserLikeStatus);
@@ -138,18 +144,54 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     CheckUserLikeStatus event,
     Emitter<SocialState> emit,
   ) async {
+    debugPrint('//////////////////////////////////////////////////////////////////////');
+    debugPrint('[MEGA_DEBUG_BLOC] _onCheckUserLikeStatus CALLED FOR RUCK ID: ${event.ruckId}');
+    debugPrint('//////////////////////////////////////////////////////////////////////');
+    debugPrint('[LIKE_DEBUG_BLOC] _onCheckUserLikeStatus called for ruckId: ${event.ruckId}');
     try {
-      final hasLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
-      
-      // Only emit if we're not already in a loaded state
-      if (state is! LikesLoaded) {
-        final likes = await _socialRepository.getRuckLikes(event.ruckId);
-        emit(LikesLoaded(
-          likes: likes,
-          userHasLiked: hasLiked,
-          ruckId: event.ruckId,
-        ));
+      // Get current user ID from AuthBloc
+      String? currentUserId;
+      if (_authBloc.state is Authenticated) {
+        currentUserId = (_authBloc.state as Authenticated).user.userId;
       }
+
+      if (currentUserId == null) {
+        debugPrint('[LIKE_DEBUG_BLOC] User not authenticated. Emitting LikesError.');
+        emit(const LikesError('User not authenticated. Cannot check like status.'));
+        return;
+      }
+      debugPrint('[LIKE_DEBUG_BLOC] currentUserId: $currentUserId');
+
+      // Always fetch all likes for the ruck
+      final List<RuckLike> likes = await _socialRepository.getRuckLikes(event.ruckId);
+      debugPrint('[LIKE_DEBUG_BLOC] Fetched likes for ruckId ${event.ruckId}: ${likes.map((l) => l.toJson()).toList()}');
+      
+      // Determine if the current user has liked this ruck
+      final bool userHasLiked = likes.any((like) => like.userId == currentUserId);
+      debugPrint('[LIKE_DEBUG_BLOC] userHasLiked: $userHasLiked');
+      
+      // Get the total like count
+      final int totalLikeCount = likes.length;
+      debugPrint('[LIKE_DEBUG_BLOC] totalLikeCount: $totalLikeCount');
+
+      final LikeStatusChecked stateToEmit = LikeStatusChecked(
+        isLiked: userHasLiked,
+        ruckId: event.ruckId,
+        likeCount: totalLikeCount,
+      );
+      debugPrint('[LIKE_DEBUG_BLOC] Emitting LikeStatusChecked: isLiked=${stateToEmit.isLiked}, ruckId=${stateToEmit.ruckId}, likeCount=${stateToEmit.likeCount}');
+      emit(stateToEmit);
+      
+      // The LikesLoaded state emission might need re-evaluation based on overall bloc design.
+      // For now, focusing on getting LikeStatusChecked correct for RuckBuddyDetailScreen.
+      // if (state is! LikesLoaded) { // This condition might not be relevant anymore or needs adjustment
+      //   emit(LikesLoaded(
+      //     likes: likes, // This 'likes' is List<RuckLike>
+      //     userHasLiked: userHasLiked, // Redundant if LikeStatusChecked is the primary state for this event
+      //     ruckId: event.ruckId,
+      //   ));
+      // }
+
     } on UnauthorizedException catch (e) {
       emit(LikesError('Authentication error: ${e.message}'));
     } on ServerException catch (e) {
@@ -173,6 +215,7 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       emit(LikeStatusChecked(
         isLiked: hasLiked,
         ruckId: event.ruckId,
+        likeCount: 0, // This will need to be updated to include the like count
       ));
     } on UnauthorizedException catch (e) {
       debugPrint('❌ Authentication error checking like status: ${e.message}');

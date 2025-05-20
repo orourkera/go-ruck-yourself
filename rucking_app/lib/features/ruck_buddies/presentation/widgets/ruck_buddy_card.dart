@@ -10,8 +10,11 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
+import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -69,60 +72,54 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           context.read<SocialBloc>().add(CheckUserLikeStatus(ruckId));
           developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching CheckUserLikeStatus', name: 'RuckBuddyCard');
           
-          // Fetch photos for this ruck
-          // If the photos are empty, try to fetch them via ActiveSessionBloc
-          if (_photos.isEmpty) { 
-            developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Photos list is empty', name: 'RuckBuddyCard');
-            final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-            
-            // First, convert the RuckBuddy to a RuckSession to properly prime the bloc
-            // This mimics what LoadSessionForViewing does in the detail screen
-            final startedAt = widget.ruckBuddy.startedAt ?? DateTime.now();
-            final completedAt = widget.ruckBuddy.completedAt ?? DateTime.now().add(const Duration(minutes: 30));
-            final sessionDuration = completedAt.difference(startedAt);
-            
-            // Calculate pace manually since RuckBuddy doesn't have averagePace
-            // Handle null safety for all fields
-            final double distanceKm = widget.ruckBuddy.distanceKm ?? 0.0;
-            final int durationSeconds = widget.ruckBuddy.durationSeconds ?? 0;
-            
-            final double calculatedPace = 
-                (distanceKm > 0 && durationSeconds > 0)
-                ? (durationSeconds / 60) / distanceKm 
-                : 0.0;
-            
-            // Store the calculated pace locally for UI display too
-            _calculatedPace = calculatedPace;
-            
-            final ruckSession = RuckSession(
-              id: ruckIdStr,
-              startTime: startedAt,
-              endTime: completedAt,
-              duration: sessionDuration,
-              distance: widget.ruckBuddy.distanceKm,
-              elevationGain: widget.ruckBuddy.elevationGainM,
-              elevationLoss: widget.ruckBuddy.elevationLossM,
-              caloriesBurned: widget.ruckBuddy.caloriesBurned,
-              averagePace: calculatedPace,
-              ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
-              // Must provide RuckStatus
-              status: RuckStatus.completed,
-              // Convert location points if available
-              locationPoints: widget.ruckBuddy.locationPoints?.cast<Map<String, dynamic>>(),
-            );
-            
-            // Load session into bloc first - this sets up the proper state
-            developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching LoadSessionForViewing', name: 'RuckBuddyCard');
-            activeSessionBloc.add(LoadSessionForViewing(sessionId: ruckIdStr, session: ruckSession));
-            
-            // Then request photos for that session
-            // The bloc will now be in the proper state to handle this request
-            developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching FetchSessionPhotosRequested', name: 'RuckBuddyCard');
-            activeSessionBloc.add(FetchSessionPhotosRequested(ruckIdStr));
-          } else {
-            // Photos are already available in the RuckBuddy model
-            developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Photos already present: ${_photos.length}', name: 'RuckBuddyCard');
-          }
+          // Always fetch photos for this ruck to ensure consistency
+          developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Fetching photos regardless of initial state. Initial count: ${_photos.length}', name: 'RuckBuddyCard');
+          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+          
+          // First, convert the RuckBuddy to a RuckSession to properly prime the bloc
+          // This mimics what LoadSessionForViewing does in the detail screen
+          final startedAt = widget.ruckBuddy.startedAt ?? DateTime.now();
+          final completedAt = widget.ruckBuddy.completedAt ?? DateTime.now().add(const Duration(minutes: 30));
+          final sessionDuration = completedAt.difference(startedAt);
+          
+          // Calculate pace manually since RuckBuddy doesn't have averagePace
+          // Handle null safety for all fields
+          final double distanceKm = widget.ruckBuddy.distanceKm ?? 0.0;
+          final int durationSeconds = widget.ruckBuddy.durationSeconds ?? 0;
+          
+          final double calculatedPace = 
+              (distanceKm > 0 && durationSeconds > 0)
+              ? (durationSeconds / 60) / distanceKm 
+              : 0.0;
+          
+          // Store the calculated pace locally for UI display too
+          _calculatedPace = calculatedPace;
+          
+          final ruckSession = RuckSession(
+            id: ruckIdStr,
+            startTime: startedAt,
+            endTime: completedAt,
+            duration: sessionDuration,
+            distance: widget.ruckBuddy.distanceKm,
+            elevationGain: widget.ruckBuddy.elevationGainM,
+            elevationLoss: widget.ruckBuddy.elevationLossM,
+            caloriesBurned: widget.ruckBuddy.caloriesBurned,
+            averagePace: calculatedPace,
+            ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
+            // Must provide RuckStatus
+            status: RuckStatus.completed,
+            // Convert location points if available
+            locationPoints: widget.ruckBuddy.locationPoints?.cast<Map<String, dynamic>>(),
+          );
+          
+          // Load session into bloc first - this sets up the proper state
+          developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching LoadSessionForViewing', name: 'RuckBuddyCard');
+          activeSessionBloc.add(LoadSessionForViewing(sessionId: ruckIdStr, session: ruckSession));
+          
+          // Then request photos for that session
+          // The bloc will now be in the proper state to handle this request
+          developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching FetchSessionPhotosRequested', name: 'RuckBuddyCard');
+          activeSessionBloc.add(FetchSessionPhotosRequested(ruckIdStr));
         }
       }
     });
@@ -322,201 +319,254 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           onTap: widget.onTap,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // User Info Row
-                Builder(builder: (context) {
-                  return Row(
-                    children: [
-                      // Avatar (fallback to circle with first letter if no URL)
-                      _buildAvatar(widget.ruckBuddy.user),
-                      const SizedBox(width: 12),
-                      
-                      // User Name & Time Info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.ruckBuddy.user.username,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (widget.ruckBuddy.completedAt != null) // Added null check here
-                              Text(
-                                _formatCompletedDate(widget.ruckBuddy.completedAt!), // Safely use '!' because of the null check above
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      
-                      // Weight chip
-                      Chip(
-                        backgroundColor: AppColors.secondary,
-                        label: Text(
-                          MeasurementUtils.formatWeightForChip(widget.ruckBuddy.ruckWeightKg, metric: preferMetric),
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
-                  );
-                }), // End of User Info Row Builder
-                
-                const SizedBox(height: 12),
-
-                // Map snippet with photos overlay if available
-                Builder(builder: (context) {
-                  return Stack(
-                    children: [
-                      _RouteMapPreview(
-                        locationPoints: widget.ruckBuddy.locationPoints,
-                        photos: _photos, // Always use the state's photos
-                      ),
-                    ],
-                  );
-                }), // End of Map/Photo Stack Builder
-
-                const Divider(height: 24),
-                
-                // Stats Grid (2x2)
-                Builder(builder: (context) {
-                  return Row(
-                    children: [
-                      // Left column
-                      Expanded(
-                        child: Column(
-                          children: [
-                            _buildStatTile(
-                              context: context,
-                              icon: Icons.straighten, 
-                              label: 'Distance',
-                              value: MeasurementUtils.formatDistance(widget.ruckBuddy.distanceKm ?? 0.0, metric: preferMetric),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildStatTile(
-                              context: context,
-                              icon: Icons.local_fire_department, 
-                              label: 'Calories',
-                              value: '${widget.ruckBuddy.caloriesBurned ?? 0} kcal',
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(width: 24),
-                      
-                      // Right column
-                      Expanded(
-                        child: Column(
-                          children: [
-                            _buildStatTile(
-                              context: context,
-                              icon: Icons.timer, 
-                              label: 'Duration',
-                              value: MeasurementUtils.formatDuration(Duration(seconds: widget.ruckBuddy.durationSeconds ?? 0)),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildStatTile(
-                              context: context,
-                              icon: Icons.terrain, 
-                              label: 'Elevation',
-                              value: MeasurementUtils.formatElevationCompact(widget.ruckBuddy.elevationGainM, widget.ruckBuddy.elevationLossM.abs(), metric: preferMetric),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                }), // End of Stats Grid Builder
-
-                const SizedBox(height: 16),
-
-                // Social interactions row
-                Builder(builder: (context) {
-                  return Row(
-                    children: [
-                      // Like button with count
-                      InkWell(
-                        onTap: _handleLikeTap,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                          child: Row(
+            // Reduce overall padding to save space
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 580.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // Ensure Column is as tall as its content or minHeight
+                children: [
+                  // User Info Row
+                  Builder(builder: (context) {
+                    return Row(
+                      children: [
+                        // Avatar (fallback to circle with first letter if no URL)
+                        _buildAvatar(widget.ruckBuddy.user),
+                        const SizedBox(width: 12),
+                        
+                        // User Name & Time Info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Always show the like icon (never a loading indicator)
-                              // This gives immediate visual feedback
-                              Image.asset(
-                                    _isLiked 
-                                      ? 'assets/images/tactical_ruck_like_icon_active.png' 
-                                      : 'assets/images/tactical_ruck_like_icon_transparent.png',
-                                    width: 40,
-                                    height: 40,
-                                  ),
-                              const SizedBox(width: 4),
                               Text(
-                                '${_likeCount ?? 0}',
-                                style: TextStyle(
-                                  fontFamily: 'Bangers',
-                                  fontSize: 24,
-                                  color: Colors.grey[800],
+                                widget.ruckBuddy.user.username,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              if (widget.ruckBuddy.completedAt != null) // Added null check here
+                                Text(
+                                  _formatCompletedDate(widget.ruckBuddy.completedAt!), // Safely use '!' because of the null check above
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
                             ],
                           ),
                         ),
-                      ),
-                      
-                      const SizedBox(width: 16),
-                      
-                      // Comments count with tap action
-                      InkWell(
-                        onTap: () {
-                          // Navigate to detail screen and focus comment field
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => RuckBuddyDetailScreen(
-                                ruckBuddy: widget.ruckBuddy,
-                                focusComment: true, // Signal to focus comment field
-                              ),
+                        
+                        // Weight chip
+                        Chip(
+                          backgroundColor: AppColors.secondary,
+                          label: Text(
+                            MeasurementUtils.formatWeightForChip(widget.ruckBuddy.ruckWeightKg, metric: preferMetric),
+                            style: AppTextStyles.labelMedium.copyWith(
+                              color: Colors.white,
                             ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                          child: Row(children: [
-                            Icon(
-                              Icons.comment,
-                              size: 40, // Adjusted to 40px as requested
-                              color: AppColors.secondary, // Brownish-orange color
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${widget.ruckBuddy.commentCount}',
-                              style: TextStyle(
-                                fontFamily: 'Bangers',
-                                fontSize: 24,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          ]),
+                          ),
+                          padding: EdgeInsets.zero,
                         ),
+                      ],
+                    );
+                  }), // End of User Info Row Builder
+                
+                  const SizedBox(height: 12),
+
+                  // Map snippet with reduced height
+                  Builder(builder: (context) {
+                    return SizedBox(
+                      // Set a fixed height for the map
+                      height: 220, // Restored original height
+                      child: _RouteMapPreview(
+                        locationPoints: widget.ruckBuddy.locationPoints,
+                        // No longer passing photos to the map preview
                       ),
-                      
-                      const Spacer(),
-                    ],
-                  );
-                }), // End of Action Buttons Builder
-              ],
+                    );
+                  }), // End of Map Builder
+                
+                  // Photos carousel builder
+                  Builder(builder: (context) {
+                    // Log photo count for debugging
+                    developer.log('RuckBuddyCard build: Photos count for ${widget.ruckBuddy.id}: ${_photos.length}', name: 'RuckBuddyCard');
+                    
+                    // Only show carousel if photos exist
+                    if (_photos.isEmpty) return const SizedBox.shrink();
+                    
+                    // Show photo carousel with photos
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 8), // Reduced spacing
+                        Container(
+                          height: 40, // Reduced height to make thumbnails half size
+                          margin: const EdgeInsets.only(bottom: 8), // Reduced margin
+                          child: PhotoCarousel(
+                            photoUrls: _photos.map((photo) => photo.url ?? '').toList(), 
+                            showDeleteButtons: false,
+                            onPhotoTap: (index) {
+                              // View photo full screen
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PhotoViewer(
+                                    photoUrls: _photos.map((photo) => photo.url ?? '').toList(),
+                                    initialIndex: index,
+                                    title: '${widget.ruckBuddy.user.username}\'s Ruck',
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+
+                  const Divider(height: 16), // Reduced divider height
+                
+                  // Ultra-compact Stats Grid - designed to minimize space while keeping information readable
+                  Builder(builder: (context) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      margin: EdgeInsets.zero,
+                      constraints: const BoxConstraints(maxHeight: 100), // Enforce maximum height
+                      child: Row(
+                        children: [
+                          // Left column
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min, // Use minimum vertical space
+                              children: [
+                                _buildStatTile(
+                                  context: context,
+                                  icon: Icons.straighten, 
+                                  label: 'Distance',
+                                  value: MeasurementUtils.formatDistance(widget.ruckBuddy.distanceKm ?? 0.0, metric: preferMetric),
+                                  compact: true, // Use compact mode
+                                ),
+                                const SizedBox(height: 4), // minimal spacing
+                                _buildStatTile(
+                                  context: context,
+                                  icon: Icons.local_fire_department, 
+                                  label: 'Calories',
+                                  value: '${widget.ruckBuddy.caloriesBurned ?? 0} kcal',
+                                  compact: true, // Use compact mode
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(width: 8), // minimal spacing
+                          
+                          // Right column
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min, // Use minimum vertical space
+                              children: [
+                                _buildStatTile(
+                                  context: context,
+                                  icon: Icons.timer, 
+                                  label: 'Duration',
+                                  value: MeasurementUtils.formatDuration(Duration(seconds: widget.ruckBuddy.durationSeconds ?? 0)),
+                                  compact: true, // Use compact mode
+                                ),
+                                const SizedBox(height: 4), // minimal spacing
+                                _buildStatTile(
+                                  context: context,
+                                  icon: Icons.terrain, 
+                                  label: 'Elevation',
+                                  value: MeasurementUtils.formatElevationCompact(widget.ruckBuddy.elevationGainM, widget.ruckBuddy.elevationLossM.abs(), metric: preferMetric),
+                                  compact: true, // Use compact mode
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }), // End of Stats Grid Builder
+
+                  const SizedBox(height: 16),
+
+                  // Ultra compact social interactions row
+                  Builder(builder: (context) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        // Like button with count - more compact
+                        InkWell(
+                          onTap: _handleLikeTap,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 2.0),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Smaller icon
+                                Image.asset(
+                                      _isLiked 
+                                        ? 'assets/images/tactical_ruck_like_icon_active.png' 
+                                        : 'assets/images/tactical_ruck_like_icon_transparent.png',
+                                      width: 30,
+                                      height: 30,
+                                    ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${_likeCount ?? 0}',
+                                  style: TextStyle(
+                                    fontFamily: 'Bangers',
+                                    fontSize: 20, // Smaller font
+                                    color: Colors.grey[800],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 10), // Reduced spacing
+                        
+                        // Comments count with tap action - more compact
+                        InkWell(
+                          onTap: () {
+                            // Navigate to detail screen and focus comment field
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => RuckBuddyDetailScreen(
+                                  ruckBuddy: widget.ruckBuddy,
+                                  focusComment: true, // Signal to focus comment field
+                                ),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 2.0),
+                            child: Row(children: [
+                              Icon(
+                                Icons.comment,
+                                size: 30, // Smaller icon
+                                color: AppColors.secondary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${widget.ruckBuddy.commentCount}',
+                                style: TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: 20, // Smaller font
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ]),
+                          ),
+                        ),
+                      ],
+                    );
+                  }), // End of Action Buttons Builder
+                ],
+              ),
             ),
           ),
         ),
@@ -555,29 +605,33 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     required IconData icon, 
     required String label, 
     required String value,
+    bool compact = false, // Added compact mode parameter
   }) {
     return Row(
       children: [
         Icon(
           icon, 
-          size: 20, 
+          size: compact ? 16 : 20,  // Smaller icon in compact mode
           color: AppColors.secondary,
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: compact ? 4 : 8), // Smaller spacing in compact mode
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // Minimize vertical space
             children: [
               Text(
                 label,
                 style: AppTextStyles.bodySmall.copyWith(
                   color: Colors.grey[600],
+                  fontSize: compact ? 10 : null, // Smaller font in compact mode
                 ),
               ),
               Text(
                 value,
                 style: AppTextStyles.bodyMedium.copyWith(
                   fontWeight: FontWeight.bold,
+                  fontSize: compact ? 12 : null, // Smaller font in compact mode
                 ),
                 overflow: TextOverflow.ellipsis,
               ),

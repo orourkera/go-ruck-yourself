@@ -83,7 +83,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         final ruckId = int.tryParse(widget.ruckBuddy.id);
         if (ruckId != null) {
           // Quietly check if user has liked this ruck
-          context.read<SocialBloc>().add(CheckRuckLikeStatus(ruckId));
+          context.read<SocialBloc>().add(CheckUserLikeStatus(ruckId));
         }
       }
     });
@@ -135,17 +135,15 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   void _submitComment() {
     if (_commentController.text.trim().isEmpty) return;
 
-    // In the future, this would call an API to submit the comment
-    // For now, we'll just clear the input
-    _commentController.clear();
-    
-    // Show a feedback snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Comment feature coming soon!'),
-        duration: Duration(seconds: 2),
+    // Dispatch AddRuckComment to SocialBloc
+    context.read<SocialBloc>().add(
+      AddRuckComment(
+        ruckId: widget.ruckBuddy.id,
+        content: _commentController.text.trim(),
       ),
     );
+
+    _commentController.clear();
   }
 
   String _formatDuration(int durationSeconds) {
@@ -214,8 +212,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
             if (state.ruckId.toString() == widget.ruckBuddy.id) {
               setState(() {
                 _isLiked = state.isLiked;
+                _likeCount = state.likeCount; // Update _likeCount here
               });
-              print('[LIKE_DEBUG] RuckBuddyDetailScreen: LikeStatusChecked for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}');
+              print('[LIKE_DEBUG] RuckBuddyDetailScreen: LikeStatusChecked for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
             }
           } else if (state is LikeActionCompleted) {
             _isProcessingLike = false;
@@ -232,17 +231,17 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         appBar: AppBar(
           title: const Text('Ruck Details'),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.share),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Sharing coming soon!'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
+            // IconButton(
+            //   icon: const Icon(Icons.share),
+            //   onPressed: () {
+            //     ScaffoldMessenger.of(context).showSnackBar(
+            //       const SnackBar(
+            //         content: Text('Sharing coming soon!'),
+            //         duration: Duration(seconds: 2),
+            //       ),
+            //     );
+            //   },
+            // ),
           ],
         ),
         body: SingleChildScrollView(
@@ -332,6 +331,39 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                   },
                 ),
               ),
+              
+              // Photos section - moved directly after map and location
+              if (_photos.isNotEmpty) ...[              
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Photos', style: AppTextStyles.titleMedium),
+                      const SizedBox(height: 8),
+                      PhotoCarousel(
+                        photoUrls: _photos.map((photo) => photo.url ?? '').toList(), 
+                        showDeleteButtons: false,
+                        height: 200, // Medium-sized tiles
+                        onPhotoTap: (index) {
+                          // View photo full screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PhotoViewer(
+                                photoUrls: _photos.map((photo) => photo.url ?? '').toList(),
+                                initialIndex: index,
+                                title: '${widget.ruckBuddy.user.username}\'s Ruck',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+              ],
               
               // Ruck details
               Padding(
@@ -436,38 +468,6 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
               
               const Divider(),
               
-              // Photos section
-              if (_photos.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Photos', style: AppTextStyles.titleMedium),
-                      const SizedBox(height: 8),
-                      PhotoCarousel(
-                        photoUrls: _photos.map((photo) => photo.url ?? '').toList(), 
-                        showDeleteButtons: false,
-                        onPhotoTap: (index) {
-                          // View photo full screen
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => PhotoViewer(
-                                photoUrls: _photos.map((photo) => photo.url ?? '').toList(),
-                                initialIndex: index,
-                                title: '${widget.ruckBuddy.user.username}\'s Ruck',
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-              ],
-              
               // Social section
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -567,7 +567,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: CommentsSection(
-                        ruckId: int.parse(widget.ruckBuddy.id), // Convert string ID to int
+                        ruckId: widget.ruckBuddy.id, // Now directly using string ID
                         maxDisplayed: 5, // Show 5 most recent comments
                         showViewAllButton: true,
                         hideInput: true, // Prevent CommentsSection from rendering its own input field

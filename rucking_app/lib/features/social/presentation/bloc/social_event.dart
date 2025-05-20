@@ -50,7 +50,7 @@ class CheckRuckLikeStatus extends SocialEvent {
 
 /// Event to load comments for a specific ruck session
 class LoadRuckComments extends SocialEvent {
-  final int ruckId;
+  final String ruckId;
 
   const LoadRuckComments(this.ruckId);
 
@@ -60,7 +60,7 @@ class LoadRuckComments extends SocialEvent {
 
 /// Event to add a comment to a ruck session
 class AddRuckComment extends SocialEvent {
-  final int ruckId;
+  final String ruckId;
   final String content;
 
   const AddRuckComment({
@@ -89,7 +89,7 @@ class UpdateRuckComment extends SocialEvent {
 /// Event to delete a comment
 class DeleteRuckComment extends SocialEvent {
   final String commentId;
-  final int ruckId; // For refreshing comments after deletion
+  final String ruckId; // For refreshing comments after deletion
 
   const DeleteRuckComment({
     required this.commentId,
