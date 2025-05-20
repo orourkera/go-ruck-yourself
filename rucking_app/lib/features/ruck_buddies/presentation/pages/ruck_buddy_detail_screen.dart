@@ -7,13 +7,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/location_utils.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
-import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
 import 'package:rucking_app/features/social/presentation/widgets/comments_section.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
@@ -21,6 +21,8 @@ import 'package:rucking_app/features/social/presentation/bloc/social_state.dart'
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 
 class RuckBuddyDetailScreen extends StatefulWidget {
   final RuckBuddy ruckBuddy;
@@ -44,26 +46,21 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   int _likeCount = 0;
   bool _isProcessingLike = false;
 
-  // Helper method to process photo URLs with cache busting
-  List<String> _getProcessedPhotoUrls() {
-    final photoUrls = (_photos)
-        .map((p) => p.url)
-        .where((url) => url != null && url!.isNotEmpty)
-        .cast<String>()
-        .toList();
-        
-    return photoUrls.map((url) {
-      final cacheBuster = DateTime.now().millisecondsSinceEpoch;
-      return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';
-    }).toList();
-  }
-
   @override
   void initState() {
     super.initState();
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser;
     _likeCount = widget.ruckBuddy.likeCount;
     _photos = widget.ruckBuddy.photos ?? [];
+
+    // If photos are initially empty, try to fetch them using ActiveSessionBloc
+    if (_photos.isEmpty && widget.ruckBuddy.id.isNotEmpty) {
+      if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
+        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+        print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Initial photos empty for ${widget.ruckBuddy.id}. Fetching from ActiveSessionBloc.');
+        activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+      }
+    }
     
     // Check current like status through SocialBloc
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -160,365 +157,366 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         ? (authBloc.state as Authenticated).user.preferMetric
         : false;
     
-    return BlocListener<SocialBloc, SocialState>(
-      listenWhen: (previous, current) {
-        // Only respond to states related to THIS specific ruck
-        final thisRuckId = int.tryParse(widget.ruckBuddy.id);
-        if (thisRuckId == null) return false;
-        
-        if (current is LikeActionCompleted) {
-          return thisRuckId == current.ruckId;
-        }
-        if (current is LikeStatusChecked) {
-          return thisRuckId == current.ruckId;
-        }
-        if (current is LikesLoaded) {
-          return thisRuckId == current.ruckId;
-        }
-        return false;
-      },
+    return BlocListener<ActiveSessionBloc, ActiveSessionState>(
       listener: (context, state) {
-        final thisRuckId = int.tryParse(widget.ruckBuddy.id);
-        if (thisRuckId == null) return;
-        
-        if (state is LikeActionCompleted && state.ruckId == thisRuckId) {
-          // Update UI based on the result for THIS specific ruck
-          setState(() {
-            _isLiked = state.isLiked;
-            _likeCount = state.likeCount; // Use the count from the state
-            _isProcessingLike = false;
-          });
-        } else if (state is LikeActionError && state.ruckId == thisRuckId) {
-          // Show error and revert UI
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to like ruck. Server error related to database table.'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          setState(() {
-            _isLiked = !_isLiked; // Revert the optimistic update
-            if (_isLiked) {
-              _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
-            } else {
-              _likeCount += 1;
+        if (state is ActiveSessionInitial && state.viewedSession?.id == widget.ruckBuddy.id) {
+          final sessionPhotos = state.photos;
+          if (sessionPhotos.isNotEmpty) {
+             print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Received photos from ActiveSessionBloc for ${widget.ruckBuddy.id}. Count: ${sessionPhotos.length}');
+            if (mounted) {
+              setState(() {
+                _photos = sessionPhotos;
+              });
             }
-            _isProcessingLike = false;
-          });
-        } else if (state is LikesLoaded && state.ruckId == thisRuckId) {
-          setState(() {
-            _isLiked = state.userHasLiked;
-            _likeCount = state.likes.length;
-            _isProcessingLike = false;
-          });
+          }
         }
       },
-      child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Ruck Details'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Sharing coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // User info and date
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  // Avatar
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.secondary,
-                    child: Text(
-                      widget.ruckBuddy.user.username.isNotEmpty 
-                          ? widget.ruckBuddy.user.username[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+      child: BlocListener<SocialBloc, SocialState>(
+        listenWhen: (previous, current) {
+          // Only respond to states related to THIS specific ruck
+          final thisRuckId = int.tryParse(widget.ruckBuddy.id);
+          if (thisRuckId == null) return false;
+          
+          if (current is LikeActionCompleted) {
+            return thisRuckId == current.ruckId;
+          }
+          if (current is LikeStatusChecked) {
+            return thisRuckId == current.ruckId;
+          }
+          if (current is LikesLoaded) {
+            return thisRuckId == current.ruckId;
+          }
+          return false;
+        },
+        listener: (context, state) {
+          final thisRuckId = int.tryParse(widget.ruckBuddy.id);
+          if (thisRuckId == null) return;
+          
+          if (state is LikeActionCompleted && state.ruckId == thisRuckId) {
+            // Update UI based on the result for THIS specific ruck
+            setState(() {
+              _isLiked = state.isLiked;
+              _likeCount = state.likeCount; // Use the count from the state
+              _isProcessingLike = false;
+            });
+          } else if (state is LikeActionError && state.ruckId == thisRuckId) {
+            // Show error and revert UI
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to like ruck. Server error related to database table.'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+            setState(() {
+              _isLiked = !_isLiked; // Revert the optimistic update
+              if (_isLiked) {
+                _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
+              } else {
+                _likeCount += 1;
+              }
+              _isProcessingLike = false;
+            });
+          } else if (state is LikesLoaded && state.ruckId == thisRuckId) {
+            setState(() {
+              _isLiked = state.userHasLiked;
+              _likeCount = state.likes.length;
+              _isProcessingLike = false;
+            });
+          }
+        },
+        child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Ruck Details'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Sharing coming soon!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // User info and date
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    // Avatar
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.secondary,
+                      child: Text(
+                        widget.ruckBuddy.user.username.isNotEmpty 
+                            ? widget.ruckBuddy.user.username[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  
-                  // User info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.ruckBuddy.user.username,
-                          style: AppTextStyles.titleMedium,
-                        ),
-                        Text(
-                          _formatCompletedDate(widget.ruckBuddy.completedAt),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Route Map
-            SizedBox(
-              height: 250,
-              width: double.infinity,
-              child: _RouteMap(
-                locationPoints: widget.ruckBuddy.locationPoints,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-              child: FutureBuilder<String>(
-                future: LocationUtils.getLocationName(widget.ruckBuddy.locationPoints),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Text(
-                      'Could not determine location',
-                      style: AppTextStyles.bodySmall.copyWith(color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    );
-                  }
-                  if (snapshot.hasData && snapshot.data!.isNotEmpty && snapshot.data! != 'Unknown location') {
-                    return Text(
-                      snapshot.data!,
-                      style: TextStyle(
-                        fontFamily: 'Bangers',
-                        fontSize: 26,
-                        color: AppColors.primary,
-                        letterSpacing: 1.2,
-                      ),
-                      textAlign: TextAlign.center,
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ),
-            
-            // Ruck details
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Weight and duration row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Weight
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          MeasurementUtils.formatWeightForChip(widget.ruckBuddy.ruckWeightKg, metric: preferMetric),
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      
-                      // Duration
-                      Row(
+                    const SizedBox(width: 12),
+                    
+                    // User info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.timer, size: 18),
-                          const SizedBox(width: 4),
                           Text(
-                            _formatDuration(widget.ruckBuddy.durationSeconds),
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              fontWeight: FontWeight.bold,
+                            widget.ruckBuddy.user.username,
+                            style: AppTextStyles.titleMedium,
+                          ),
+                          Text(
+                            _formatCompletedDate(widget.ruckBuddy.completedAt),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: Colors.grey[600],
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Stats grid
-                  Row(
-                    children: [
-                      // Distance
-                      Expanded(
-                        child: _buildStatItem(
-                          icon: Icons.straighten,
-                          label: 'Distance',
-                          value: MeasurementUtils.formatDistance(widget.ruckBuddy.distanceKm, metric: preferMetric),
-                        ),
-                      ),
-                      // Calories
-                      Expanded(
-                        child: _buildStatItem(
-                          icon: Icons.local_fire_department,
-                          label: 'Calories',
-                          value: '${widget.ruckBuddy.caloriesBurned}',
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  Row(
-                    children: [
-                      // Pace
-                      Expanded(
-                        child: _buildStatItem(
-                          icon: Icons.speed,
-                          label: 'Avg Pace',
-                          value: widget.ruckBuddy.distanceKm > 0 
-                            ? MeasurementUtils.formatPace(
-                                widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm, // Calculate seconds per km
-                                metric: preferMetric,
-                              )
-                            : '--',
-                        ),
-                      ),
-                      // Elevation gain
-                      Expanded(
-                        child: _buildStatItem(
-                          icon: Icons.terrain,
-                          label: 'Elevation',
-                          value: MeasurementUtils.formatElevation(
-                            widget.ruckBuddy.elevationGainM, 
-                            0.0, // We don't have elevation loss data, so passing 0
-                            metric: preferMetric
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            const Divider(),
-            
-            // Debug information about photos and test display
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Photo Debug', style: AppTextStyles.titleMedium),
-                  Text('Found ${_photos.length} photos'),
-                  for (var photo in _photos)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Photo: id=${photo.id}, url=${photo.url}'),
-                        if (photo.url != null && photo.url!.isNotEmpty)
-                          Container(
-                            height: 100,
-                            width: double.infinity,
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            child: CachedNetworkImage(
-                              imageUrl: photo.url!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                              errorWidget: (context, url, error) => Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.error, color: Colors.red),
-                                  Text('Error: $error', style: TextStyle(color: Colors.red, fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            // Photos section
-            if (_photos.isNotEmpty) ...[
+              // Route Map
+              SizedBox(
+                height: 250,
+                width: double.infinity,
+                child: _RouteMap(
+                  locationPoints: widget.ruckBuddy.locationPoints,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                child: FutureBuilder<String>(
+                  future: LocationUtils.getLocationName(widget.ruckBuddy.locationPoints),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Text(
+                        'Could not determine location',
+                        style: AppTextStyles.bodySmall.copyWith(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      );
+                    }
+                    if (snapshot.hasData && snapshot.data!.isNotEmpty && snapshot.data! != 'Unknown location') {
+                      return Text(
+                        snapshot.data!,
+                        style: TextStyle(
+                          fontFamily: 'Bangers',
+                          fontSize: 26,
+                          color: AppColors.primary,
+                          letterSpacing: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+              
+              // Ruck details
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Photos', style: AppTextStyles.titleMedium),
-                    const SizedBox(height: 8),
-                    PhotoCarousel(
-                      photoUrls: _getProcessedPhotoUrls(),
-                      showDeleteButtons: false,
-                      onPhotoTap: (index) {
-                        // View photo full screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PhotoViewer(
-                              photoUrls: _getProcessedPhotoUrls(),
-                              initialIndex: index,
-                              title: '${widget.ruckBuddy.user.username}\'s Ruck',
+                    // Weight and duration row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Weight
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            MeasurementUtils.formatWeightForChip(widget.ruckBuddy.ruckWeightKg, metric: preferMetric),
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        
+                        // Duration
+                        Row(
+                          children: [
+                            const Icon(Icons.timer, size: 18),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatDuration(widget.ruckBuddy.durationSeconds),
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Stats grid
+                    Row(
+                      children: [
+                        // Distance
+                        Expanded(
+                          child: _buildStatItem(
+                            icon: Icons.straighten,
+                            label: 'Distance',
+                            value: MeasurementUtils.formatDistance(widget.ruckBuddy.distanceKm, metric: preferMetric),
+                          ),
+                        ),
+                        // Calories
+                        Expanded(
+                          child: _buildStatItem(
+                            icon: Icons.local_fire_department,
+                            label: 'Calories',
+                            value: '${widget.ruckBuddy.caloriesBurned}',
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    Row(
+                      children: [
+                        // Pace
+                        Expanded(
+                          child: _buildStatItem(
+                            icon: Icons.speed,
+                            label: 'Avg Pace',
+                            value: widget.ruckBuddy.distanceKm > 0 
+                              ? MeasurementUtils.formatPace(
+                                  widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm, // Calculate seconds per km
+                                  metric: preferMetric,
+                                )
+                              : '--',
+                          ),
+                        ),
+                        // Elevation gain
+                        Expanded(
+                          child: _buildStatItem(
+                            icon: Icons.terrain,
+                            label: 'Elevation',
+                            value: MeasurementUtils.formatElevation(
+                              widget.ruckBuddy.elevationGainM, 
+                              0.0, // We don't have elevation loss data, so passing 0
+                              metric: preferMetric
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
+              
               const Divider(),
-            ],
-            
-            // Social section
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Like and comment counts
-                  Row(
+              
+              // Photos section
+              if (_photos.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Like button with same styling as card
-                      InkWell(
-                        onTap: _handleLikeTap,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
+                      Text('Photos', style: AppTextStyles.titleMedium),
+                      const SizedBox(height: 8),
+                      PhotoCarousel(
+                        photoUrls: (widget.ruckBuddy.photos ?? []).map((photo) => photo.url ?? '').toList(), 
+                        showDeleteButtons: false,
+                        onPhotoTap: (index) {
+                          // View photo full screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PhotoViewer(
+                                photoUrls: (widget.ruckBuddy.photos ?? []).map((photo) => photo.url ?? '').toList(),
+                                initialIndex: index,
+                                title: '${widget.ruckBuddy.user.username}\'s Ruck',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+              ],
+              
+              // Social section
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Like and comment counts
+                    Row(
+                      children: [
+                        // Like button with same styling as card
+                        InkWell(
+                          onTap: _handleLikeTap,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                            child: Row(
+                              children: [
+                                // Use same image assets with same size as card
+                                Image.asset(
+                                  _isLiked 
+                                    ? 'assets/images/tactical_ruck_like_icon_active.png' 
+                                    : 'assets/images/tactical_ruck_like_icon_transparent.png',
+                                  width: 40,
+                                  height: 40,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$_likeCount',
+                                  style: TextStyle(
+                                    fontFamily: 'Bangers',
+                                    fontSize: 24,
+                                    color: Colors.grey[800],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Comments count with same styling as card
+                        Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
                           child: Row(
                             children: [
-                              // Use same image assets with same size as card
-                              Image.asset(
-                                _isLiked 
-                                  ? 'assets/images/tactical_ruck_like_icon_active.png' 
-                                  : 'assets/images/tactical_ruck_like_icon_transparent.png',
-                                width: 40,
-                                height: 40,
+                              Icon(
+                                Icons.comment,
+                                size: 40, // Same size as in card
+                                color: AppColors.secondary, // Same color as in card
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '$_likeCount',
+                                '${widget.ruckBuddy.commentCount}',
                                 style: TextStyle(
                                   fontFamily: 'Bangers',
                                   fontSize: 24,
@@ -528,78 +526,55 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             ],
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      // Comments count with same styling as card
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.comment,
-                              size: 40, // Same size as in card
-                              color: AppColors.secondary, // Same color as in card
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${widget.ruckBuddy.commentCount}',
-                              style: TextStyle(
-                                fontFamily: 'Bangers',
-                                fontSize: 24,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Comment input
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _commentController,
-                          focusNode: _commentFocusNode,
-                          decoration: const InputDecoration(
-                            hintText: 'Add a comment...',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(20.0)),
-                            ),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                            isDense: true,
-                          ),
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => _submitComment(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.send),
-                        onPressed: _submitComment,
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Comments section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: CommentsSection(
-                      ruckId: int.parse(widget.ruckBuddy.id), // Convert string ID to int
-                      maxDisplayed: 5, // Show 5 most recent comments
-                      showViewAllButton: true,
-                      hideInput: true, // Hide the built-in comment input since we have our own
+                      ],
                     ),
-                  ),
-                ],
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Comment input
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _commentController,
+                            focusNode: _commentFocusNode,
+                            decoration: const InputDecoration(
+                              hintText: 'Add a comment...',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                              ),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                              isDense: true,
+                            ),
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => _submitComment(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.send),
+                          onPressed: _submitComment,
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Comments section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: CommentsSection(
+                        ruckId: int.parse(widget.ruckBuddy.id), // Convert string ID to int
+                        maxDisplayed: 5, // Show 5 most recent comments
+                        showViewAllButton: true,
+                        hideInput: true, // Prevent CommentsSection from rendering its own input field
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ), // close Scaffold
