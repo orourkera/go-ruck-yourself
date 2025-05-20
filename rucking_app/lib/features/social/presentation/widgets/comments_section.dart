@@ -22,6 +22,9 @@ class CommentsSection extends StatefulWidget {
   
   /// Callback when "View All" is tapped
   final VoidCallback? onViewAllTapped;
+  
+  /// Whether to hide the comment input field
+  final bool hideInput;
 
   /// Creates a comment section for ruck sessions
   const CommentsSection({
@@ -30,6 +33,7 @@ class CommentsSection extends StatefulWidget {
     this.maxDisplayed,
     this.showViewAllButton = true,
     this.onViewAllTapped,
+    this.hideInput = false,
   }) : super(key: key);
 
   @override
@@ -241,7 +245,8 @@ class _CommentsSectionState extends State<CommentsSection> {
                 child: Text('No comments yet. Be the first to comment!'),
               ),
             
-            // Add comment section
+            // Add comment section - only show if hideInput is false
+            if (!widget.hideInput)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(

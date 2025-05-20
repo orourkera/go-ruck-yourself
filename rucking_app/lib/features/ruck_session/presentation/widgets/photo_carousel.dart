@@ -50,6 +50,21 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   }
   
   @override
+  void didUpdateWidget(PhotoCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Reset the carousel when the photoUrls list changes (e.g., after a deletion)
+    if (widget.photoUrls.length != oldWidget.photoUrls.length) {
+      // If we're currently viewing a page that no longer exists, reset to the max available index
+      if (_currentPage >= widget.photoUrls.length && widget.photoUrls.isNotEmpty) {
+        _currentPage = widget.photoUrls.length - 1;
+        _pageController.jumpToPage(_currentPage);
+      }
+      setState(() {});
+    }
+  }
+  
+  @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
