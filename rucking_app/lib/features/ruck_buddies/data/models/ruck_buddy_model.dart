@@ -104,27 +104,54 @@ class RuckBuddyModel extends RuckBuddy {
       locationPoints = json['route'] as List<dynamic>;
     }
 
-    // Parse photos if available
-    // Parse photos - using proper error handling and no fallbacks
+    // Parse photos if available - with enhanced handling for more formats
     List<RuckPhoto>? photos;
     if (json['photos'] != null) {
       try {
+        print('Photo data type: ${json['photos'].runtimeType}');
+        print('Photo data: ${json['photos']}');
+        
         if (json['photos'] is List) {
           photos = (json['photos'] as List)
               .where((item) => item != null)
               .map((photoJson) => RuckPhoto.fromJson(photoJson))
               .toList();
+          print('Parsed ${photos.length} photos from list');
         } else if (json['photos'] is String) {
           // Sometimes the backend might return JSON serialized string
-          final List<dynamic> photosList = jsonDecode(json['photos'] as String);
-          photos = photosList
-              .where((item) => item != null)
-              .map((photoJson) => RuckPhoto.fromJson(photoJson))
-              .toList();
+          try {
+            final List<dynamic> photosList = jsonDecode(json['photos'] as String);
+            photos = photosList
+                .where((item) => item != null)
+                .map((photoJson) => RuckPhoto.fromJson(photoJson))
+                .toList();
+            print('Parsed ${photos.length} photos from JSON string');
+          } catch (jsonErr) {
+            print('Error decoding photos JSON string: $jsonErr');
+            // Try treating this as a comma-separated string of URLs
+            if ((json['photos'] as String).contains(',') || (json['photos'] as String).contains('http')) {
+              final List<String> urls = (json['photos'] as String).split(',');
+              photos = urls.where((url) => url.trim().isNotEmpty).map((url) {
+                return RuckPhoto(
+                  id: 'generated-${DateTime.now().millisecondsSinceEpoch}-${urls.indexOf(url)}',
+                  ruckId: json['id']?.toString() ?? '',
+                  userId: json['user_id']?.toString() ?? '',
+                  filename: url.split('/').last,
+                  url: url.trim(),
+                  thumbnailUrl: url.trim(),
+                  createdAt: DateTime.now(),
+                );
+              }).toList();
+              print('Created ${photos.length} photos from comma-separated URLs');
+            }
+          }
+        } else if (json['photos'] is Map) {
+          // Handle case where it might be a single photo as a Map
+          photos = [RuckPhoto.fromJson(json['photos'])];
+          print('Parsed a single photo from Map');
         }
       } catch (e) {
         print('Error parsing photos: $e');
-        // Don't use fallbacks, let it be null if there's a parsing error
         photos = null;
       }
     }
