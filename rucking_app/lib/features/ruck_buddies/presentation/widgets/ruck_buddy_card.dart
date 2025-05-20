@@ -562,7 +562,7 @@ class _RouteMapPreview extends StatelessWidget {
 
   List<LatLng> _getRoutePoints() {
     final pts = <LatLng>[];
-    final lp = ruckBuddy.locationPoints;
+    final lp = locationPoints;
     if (lp == null || lp.isEmpty) {
       // No location data available
       return pts;
