@@ -53,13 +53,28 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     _likeCount = widget.ruckBuddy.likeCount;
     _photos = widget.ruckBuddy.photos ?? [];
 
-    // If photos are initially empty, try to fetch them using ActiveSessionBloc
-    if (_photos.isEmpty && widget.ruckBuddy.id.isNotEmpty) {
-      if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
-        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-        print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Initial photos empty for ${widget.ruckBuddy.id}. Fetching from ActiveSessionBloc.');
-        activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
-      }
+    // Always fetch photos for ruck buddies, as they're not included in the initial RuckBuddy model
+    if (widget.ruckBuddy.id.isNotEmpty) {
+      // Make sure we get photos on screen initialization with a small delay to ensure the bloc is ready
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && GetIt.I.isRegistered<ActiveSessionBloc>()) {
+          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Fetching photos for ${widget.ruckBuddy.id} from ActiveSessionBloc.');
+          // Request photos from the bloc
+          try {
+            final ruckId = widget.ruckBuddy.id;
+            print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Dispatching FetchSessionPhotosRequested event with ruckId: $ruckId');
+            // Force the bloc to fetch fresh photos
+            activeSessionBloc.add(FetchSessionPhotosRequested(ruckId));
+          } catch (e) {
+            print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Error requesting photos for ID ${widget.ruckBuddy.id}: $e');
+          }
+        } else {
+          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: ActiveSessionBloc not registered or widget not mounted');
+        }
+      });
+    } else {
+      print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Empty ruckBuddy.id, can\'t fetch photos');
     }
     
     // Check current like status through SocialBloc
@@ -158,73 +173,61 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         : false;
     
     return BlocListener<ActiveSessionBloc, ActiveSessionState>(
+      bloc: GetIt.instance<ActiveSessionBloc>(),
+      listenWhen: (previous, current) {
+        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: previousPhotos=${previous is ActiveSessionInitial ? previous.photos.length : (previous is ActiveSessionRunning ? previous.photos.length : 0)}, currentPhotos=${current is ActiveSessionInitial ? current.photos.length : (current is ActiveSessionRunning ? current.photos.length : 0)}');
+        
+        final bool photosChanged = 
+          (previous is ActiveSessionInitial && current is ActiveSessionInitial && previous.photos != current.photos) ||
+          (previous is ActiveSessionRunning && current is ActiveSessionRunning && previous.photos != current.photos) ||
+          (previous is ActiveSessionInitial && current is ActiveSessionRunning) ||
+          (previous is ActiveSessionRunning && current is ActiveSessionInitial);
+        
+        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: ${photosChanged ? "PHOTOS CHANGED" : "no change"}');
+        return photosChanged;
+      },
       listener: (context, state) {
-        if (state is ActiveSessionInitial && state.viewedSession?.id == widget.ruckBuddy.id) {
-          final sessionPhotos = state.photos;
-          if (sessionPhotos.isNotEmpty) {
-             print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Received photos from ActiveSessionBloc for ${widget.ruckBuddy.id}. Count: ${sessionPhotos.length}');
-            if (mounted) {
-              setState(() {
-                _photos = sessionPhotos;
-              });
-            }
+        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listener: Received state ${state.runtimeType}');
+        
+        List<RuckPhoto> statePhotos = [];
+        if (state is ActiveSessionInitial) {
+          statePhotos = state.photos;
+          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in ActiveSessionInitial state');
+        } else if (state is ActiveSessionRunning) {
+          statePhotos = state.photos;
+          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in ActiveSessionRunning state');
+        }
+        
+        // Check if new photos are available and update
+        if (statePhotos.isNotEmpty) {
+          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Updating UI with ${statePhotos.length} photos');
+          if (mounted) {
+            setState(() {
+              _photos = statePhotos;
+            });
           }
         }
       },
       child: BlocListener<SocialBloc, SocialState>(
-        listenWhen: (previous, current) {
-          // Only respond to states related to THIS specific ruck
-          final thisRuckId = int.tryParse(widget.ruckBuddy.id);
-          if (thisRuckId == null) return false;
-          
-          if (current is LikeActionCompleted) {
-            return thisRuckId == current.ruckId;
-          }
-          if (current is LikeStatusChecked) {
-            return thisRuckId == current.ruckId;
-          }
-          if (current is LikesLoaded) {
-            return thisRuckId == current.ruckId;
-          }
-          return false;
-        },
         listener: (context, state) {
-          final thisRuckId = int.tryParse(widget.ruckBuddy.id);
-          if (thisRuckId == null) return;
-          
-          if (state is LikeActionCompleted && state.ruckId == thisRuckId) {
-            // Update UI based on the result for THIS specific ruck
-            setState(() {
-              _isLiked = state.isLiked;
-              _likeCount = state.likeCount; // Use the count from the state
-              _isProcessingLike = false;
-            });
-          } else if (state is LikeActionError && state.ruckId == thisRuckId) {
-            // Show error and revert UI
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to like ruck. Server error related to database table.'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-            setState(() {
-              _isLiked = !_isLiked; // Revert the optimistic update
-              if (_isLiked) {
-                _likeCount = _likeCount > 0 ? _likeCount - 1 : 0;
-              } else {
-                _likeCount += 1;
-              }
-              _isProcessingLike = false;
-            });
-          } else if (state is LikesLoaded && state.ruckId == thisRuckId) {
-            setState(() {
-              _isLiked = state.userHasLiked;
-              _likeCount = state.likes.length;
-              _isProcessingLike = false;
-            });
+          if (state is LikeStatusChecked) {
+            if (state.ruckId.toString() == widget.ruckBuddy.id) {
+              setState(() {
+                _isLiked = state.isLiked;
+              });
+              print('[LIKE_DEBUG] RuckBuddyDetailScreen: LikeStatusChecked for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}');
+            }
+          } else if (state is LikeActionCompleted) {
+            _isProcessingLike = false;
+            if (state.ruckId.toString() == widget.ruckBuddy.id) {
+              setState(() {
+                _isLiked = state.isLiked;
+                _likeCount = state.likeCount;
+              });
+              print('[LIKE_DEBUG] RuckBuddyDetailScreen: LikeActionCompleted for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
+            }
           }
-        },
+        },  
         child: Scaffold(
         appBar: AppBar(
           title: const Text('Ruck Details'),
@@ -443,7 +446,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       Text('Photos', style: AppTextStyles.titleMedium),
                       const SizedBox(height: 8),
                       PhotoCarousel(
-                        photoUrls: (widget.ruckBuddy.photos ?? []).map((photo) => photo.url ?? '').toList(), 
+                        photoUrls: _photos.map((photo) => photo.url ?? '').toList(), 
                         showDeleteButtons: false,
                         onPhotoTap: (index) {
                           // View photo full screen
@@ -451,7 +454,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => PhotoViewer(
-                                photoUrls: (widget.ruckBuddy.photos ?? []).map((photo) => photo.url ?? '').toList(),
+                                photoUrls: _photos.map((photo) => photo.url ?? '').toList(),
                                 initialIndex: index,
                                 title: '${widget.ruckBuddy.user.username}\'s Ruck',
                               ),

@@ -279,61 +279,128 @@ class SessionRepository {
   
   /// Get photos for a ruck session
   Future<List<RuckPhoto>> getSessionPhotos(String ruckId) async {
-    AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Attempting to fetch photos for ruckId: $ruckId');
+    AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Attempting to fetch photos for ruckId: $ruckId');
     AppLogger.info('===== BEGIN FETCH PHOTOS DETAIL (ruckId: $ruckId) =====');
     try {
-      final endpointPath = '/ruck-photos'; 
-      final queryParams = {'ruck_id': ruckId};
-      AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Calling _apiClient.get with endpoint: $endpointPath and params: $queryParams');
+      // Ensure we're working with a valid ruckId
+      if (ruckId.isEmpty) {
+        AppLogger.error('[PHOTO_DEBUG] SessionRepository: Empty ruckId provided');
+        throw ApiException(message: 'Invalid ruckId: empty string');
+      }
       
-      dynamic response; // Declare response here to ensure it's in scope for the catch block
+      // The backend expects an integer ruckId
+      // Make sure we're passing a clean integer value (no whitespace, etc.)
+      final parsedRuckId = int.tryParse(ruckId.trim());
+      if (parsedRuckId == null) {
+        AppLogger.error('[PHOTO_DEBUG] SessionRepository: Unable to parse ruckId: $ruckId as integer');
+        throw ApiException(message: 'Invalid ruckId format. Expected integer value, got: $ruckId');
+      }
+      
+      final endpointPath = '/ruck-photos'; 
+      final queryParams = {'ruck_id': parsedRuckId.toString()};
+      AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Calling API with endpoint: $endpointPath and params: $queryParams');
+      
+      dynamic response;
       try {
-        response = await _apiClient.get(endpointPath, queryParams: queryParams); // Corrected: queryParams
-        AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Received response from _apiClient.get: $response');
+        // Make API request with detailed logging
+        print('[PHOTO_DEBUG] Sending API request to $endpointPath with params $queryParams');
+        response = await _apiClient.get(endpointPath, queryParams: queryParams);
+        print('[PHOTO_DEBUG] Full API response: $response');
+        AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Received response from API: $response');
       } catch (e, stackTrace) {
-        AppLogger.error('[CASCADE_TRACE] SessionRepository getSessionPhotos: Error calling _apiClient.get: $e. StackTrace: $stackTrace');
+        AppLogger.error('[PHOTO_DEBUG] SessionRepository: Error calling API: $e');
+        AppLogger.error('[PHOTO_DEBUG] StackTrace: $stackTrace');
+        print('[PHOTO_DEBUG] API call error: $e');
         rethrow; 
       }
 
-      // Handle potential Map response structure (as seen in other parts of the app)
-      // Based on existing code, it seems like the response can sometimes be a Map with 'data' or directly a List.
+      // Handle potential response structure variations
       if (response == null) {
-        AppLogger.warning('[CASCADE_TRACE] SessionRepository getSessionPhotos: API response is null. Returning empty list.');
+        AppLogger.warning('[PHOTO_DEBUG] SessionRepository: API response is null. Returning empty list.');
+        print('[PHOTO_DEBUG] API response is null, returning empty list');
         return [];
       }
 
-      List<dynamic> photoDataList;
-      if (response is Map && response.containsKey('data') && response['data'] is List) {
-        AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Response is a Map, extracting data list.');
+      // Print the raw response to understand its structure
+      print('[PHOTO_DEBUG] Raw API response type: ${response.runtimeType}');
+      if (response is Map) {
+        print('[PHOTO_DEBUG] Response map keys: ${response.keys.join(', ')}');
+      }
+
+      // Initialize photoDataList as an empty list to avoid null issues
+      List<dynamic> photoDataList = [];
+      
+      if (response is Map && response.containsKey('photos') && response['photos'] is List) {
+        // Handle the case where the response is {"photos": [...]} which is the most likely structure
+        print('[PHOTO_DEBUG] Found "photos" key in response map');
+        photoDataList = response['photos'] as List<dynamic>;
+      } else if (response is Map && response.containsKey('data') && response['data'] is List) {
+        AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Response is a Map with "data" key, extracting data list.');
+        print('[PHOTO_DEBUG] Found "data" key in response map');
         photoDataList = response['data'] as List<dynamic>;
       } else if (response is List) {
-        AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Response is a direct List.');
+        AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Response is a direct List.');
+        print('[PHOTO_DEBUG] Response is a direct List');
         photoDataList = response;
+      } else if (response is Map) {
+        // Try to extract any list from the response as a last resort
+        AppLogger.warning('[PHOTO_DEBUG] SessionRepository: Unexpected response format: ${response.runtimeType}.');
+        print('[PHOTO_DEBUG] Unexpected response format, looking for any list in response');
+        
+        // Look for any key with a list value
+        bool foundList = false;
+        for (final entry in response.entries) {
+          if (entry.value is List && (entry.value as List).isNotEmpty) {
+            print('[PHOTO_DEBUG] Found list in response under key: ${entry.key}');
+            photoDataList = entry.value as List<dynamic>;
+            foundList = true;
+            break;
+          }
+        }
+        
+        if (!foundList) {
+          print('[PHOTO_DEBUG] No suitable list found in response, returning empty list');
+          return [];
+        }
       } else {
-        AppLogger.warning('[CASCADE_TRACE] SessionRepository getSessionPhotos: Unexpected response format: ${response.runtimeType}. Returning empty list.');
+        print('[PHOTO_DEBUG] Response is not a map or list, returning empty list');
         return [];
       }
 
-      AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Parsing ${photoDataList.length} photo data items.');
+      // Print some example data to help debug the parsing
+      if (photoDataList.isNotEmpty) {
+        print('[PHOTO_DEBUG] First photo data: ${photoDataList.first}');
+      }
+
+      AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Parsing ${photoDataList.length} photo data items.');
       final photos = photoDataList.map((photoJson) { 
         try {
-          return RuckPhoto.fromJson(photoJson as Map<String, dynamic>);
+          if (photoJson is Map<String, dynamic>) {
+            return RuckPhoto.fromJson(photoJson);
+          } else {
+            print('[PHOTO_DEBUG] Photo data is not a Map: ${photoJson.runtimeType}');
+            return null;
+          }
         } catch (e) {
-          AppLogger.error('[CASCADE_TRACE] SessionRepository getSessionPhotos: Error parsing photo JSON: $photoJson. Error: $e');
+          AppLogger.error('[PHOTO_DEBUG] SessionRepository: Error parsing photo JSON: $photoJson. Error: $e');
+          print('[PHOTO_DEBUG] Error parsing photo: $e');
           return null; 
         }
       }).whereType<RuckPhoto>().toList(); 
       
-      AppLogger.debug('[CASCADE_TRACE] SessionRepository getSessionPhotos: Successfully parsed ${photos.length} photos.');
+      AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Successfully parsed ${photos.length} photos.');
+      print('[PHOTO_DEBUG] Successfully processed ${photos.length} photos');
       _logPhotoDetails(photos); 
       return photos;
     } on ApiException catch (e, stackTrace) {
-      AppLogger.error('[CASCADE_TRACE] SessionRepository getSessionPhotos: ApiException: ${e.message}. Exception: $e. StackTrace: $stackTrace');
+      AppLogger.error('[PHOTO_DEBUG] SessionRepository: ApiException: ${e.message}');
+      AppLogger.error('[PHOTO_DEBUG] StackTrace: $stackTrace');
+      print('[PHOTO_DEBUG] API exception: ${e.message}');
       rethrow; // Rethrow to be handled by the BLoC
     } catch (e, stackTrace) {
-      AppLogger.error('[CASCADE_TRACE] SessionRepository getSessionPhotos: Exception: $e. StackTrace: $stackTrace');
-      // Consider rethrowing or returning an empty list based on error handling strategy
-      // For now, rethrowing to ensure the BLoC is aware of the failure.
+      AppLogger.error('[PHOTO_DEBUG] SessionRepository: Exception: $e');
+      AppLogger.error('[PHOTO_DEBUG] StackTrace: $stackTrace');
+      print('[PHOTO_DEBUG] General exception: $e');
       rethrow;
     } finally {
       AppLogger.info('===== END FETCH PHOTOS DETAIL (ruckId: $ruckId) =====');
