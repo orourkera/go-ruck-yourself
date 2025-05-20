@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
@@ -195,37 +196,69 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+    
+    // Get user preferences for metric/imperial
+    final authState = context.read<AuthBloc>().state;
+    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
 
-    return BlocListener<ActiveSessionBloc, ActiveSessionState>(
-      bloc: activeSessionBloc, // Provide the bloc instance
-      listener: (context, state) {
-        AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Received state: $state');
-        final currentRuckId = widget.session.id;
-        if (currentRuckId == null) return;
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ActiveSessionBloc, ActiveSessionState>(
+          bloc: activeSessionBloc, // Provide the bloc instance
+          listener: (context, state) {
+            AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Received state: $state');
+            final currentRuckId = widget.session.id;
+            if (currentRuckId == null) return;
 
-        bool sessionReadyForPhotoLoad = false;
-        if (state is ActiveSessionRunning && state.sessionId == currentRuckId) {
-          AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionRunning for current session.');
-          sessionReadyForPhotoLoad = true;
-        } else if (state is ActiveSessionInitial && state.viewedSession?.id == currentRuckId) {
-          AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionInitial with viewedSession loaded.');
-          sessionReadyForPhotoLoad = true;
-        }
-
-        if (sessionReadyForPhotoLoad) {
-          // Check if photos have already been fetched for this session ID in this screen instance to avoid loops.
-          // This simple flag might need to be more robust depending on navigation patterns.
-          if (!_photosLoadAttemptedForThisSession) {
-            AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Session is ready, calling _forceLoadPhotos for $currentRuckId.');
-            _forceLoadPhotos();
-            if (mounted) {
-              setState(() {
-                _photosLoadAttemptedForThisSession = true;
-              });
+            bool sessionReadyForPhotoLoad = false;
+            if (state is ActiveSessionRunning && state.sessionId == currentRuckId) {
+              AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionRunning for current session.');
+              sessionReadyForPhotoLoad = true;
+            } else if (state is ActiveSessionInitial && state.viewedSession?.id == currentRuckId) {
+              AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionInitial with viewedSession loaded.');
+              sessionReadyForPhotoLoad = true;
             }
-          }
-        }
-      },
+
+            if (sessionReadyForPhotoLoad) {
+              // Check if photos have already been fetched for this session ID in this screen instance to avoid loops.
+              // This simple flag might need to be more robust depending on navigation patterns.
+              if (!_photosLoadAttemptedForThisSession) {
+                AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Session is ready, calling _forceLoadPhotos for $currentRuckId.');
+                _forceLoadPhotos();
+                if (mounted) {
+                  setState(() {
+                    _photosLoadAttemptedForThisSession = true;
+                  });
+                }
+              }
+            }
+          },
+        ),
+        BlocListener<SessionBloc, SessionState>(
+          listener: (context, state) {
+            AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen SessionBloc listener: $state');
+            
+            if (state is SessionDeleteSuccess) {
+              // Show confirmation message using StyledSnackBar
+              StyledSnackBar.showSuccess(
+                context: context,
+                message: error_msgs.sessionDeleteSuccess,
+                animationStyle: SnackBarAnimationStyle.slideUpBounce,
+              );
+              
+              // Navigate back to home screen
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            } else if (state is SessionOperationFailure) {
+              // Show error message using StyledSnackBar
+              StyledSnackBar.showError(
+                context: context,
+                message: state.message,
+                animationStyle: SnackBarAnimationStyle.slideFromTop,
+              );
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Session Details'),
@@ -292,7 +325,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           context,
                           Icons.straighten,
                           'Distance',
-                          MeasurementUtils.formatDistance(widget.session.distance, metric: true),
+                          MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric),
                         ),
                         _buildHeaderStat(
                           context,
@@ -300,7 +333,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           'Pace',
                           MeasurementUtils.formatPace(
                             widget.session.averagePace,
-                            metric: true,
+                            metric: preferMetric,
                           ),
                         ),
                         _buildHeaderStat(
@@ -435,7 +468,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     _buildDetailRow(
                       context,
                       'Ruck Weight',
-                      MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: true),
+                      MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric),
                       Icons.fitness_center,
                     ),
                     // Elevation Gain/Loss rows
@@ -443,14 +476,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       _buildDetailRow(
                         context,
                         'Elevation Gain',
-                        MeasurementUtils.formatSingleElevation(widget.session.elevationGain, metric: true),
+                        MeasurementUtils.formatSingleElevation(widget.session.elevationGain, metric: preferMetric),
                         Icons.trending_up,
                       ),
                     if (widget.session.elevationLoss > 0)
                       _buildDetailRow(
                         context,
                         'Elevation Loss',
-                        MeasurementUtils.formatSingleElevation(-widget.session.elevationLoss, metric: true),
+                        MeasurementUtils.formatSingleElevation(-widget.session.elevationLoss, metric: preferMetric),
                         Icons.trending_down,
                       ),
                     if (widget.session.elevationGain == 0.0 && widget.session.elevationLoss == 0.0)

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
@@ -166,52 +167,48 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       _isSaving = true;
     });
     
-    // Send heart rate samples to backend if available
-    if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty) {
-      try {
-        await _apiClient.post(
-          '/rucks/${widget.ruckId}/heart_rate',
-          _heartRateSamples!.map((e) => e.toJson()).toList(),
-        );
-      } catch (e) {
-        // Ignore errors, do not block session completion
-      }
-    }
+    bool photoUploadFailed = false;
+    bool sessionSaved = false;
     
-    // No session validation - allow saving all sessions regardless of distance
-    
-    // Prepare data for the completion
-    final Map<String, dynamic> updateData = {
-      'completed_at': widget.completedAt.toIso8601String(),
-      'notes': _notesController.text.trim(),
-      // Backend expects these exact keys:
-      'distance_km': widget.distance, // always send for compatibility
-      'final_distance_km': widget.distance, // for final summary
-      'distance_meters': (widget.distance * 1000).round(),
-      'calories_burned': widget.caloriesBurned,
-      'final_calories_burned': widget.caloriesBurned,
-      'elevation_gain_m': widget.elevationGain,
-      'elevation_loss_m': widget.elevationLoss,
-      'final_elevation_gain': widget.elevationGain,
-      'final_elevation_loss': widget.elevationLoss,
-      'final_average_pace': (widget.distance > 0) ? (widget.duration.inSeconds / widget.distance) : null, // seconds per km
-      'rating': _rating,
-      'perceived_exertion': _perceivedExertion,
-      'tags': _selectedTags.isNotEmpty ? _selectedTags : null,
-    };
-
-    // Log the values being sent
-    print('[SESSION_UPDATE] Sending values:');
-    print('[SESSION_UPDATE]   notes: ${updateData['notes']}');
-    print('[SESSION_UPDATE]   rating: ${updateData['rating']}');
-    print('[SESSION_UPDATE]   perceived_exertion: ${updateData['perceived_exertion']}');
-    print('[SESSION_UPDATE]   tags: ${updateData['tags']}');
-
-    // Make a PATCH request to update notes, rating, perceived exertion, and tags after completion
     try {
-      await _apiClient.patch('/rucks/${widget.ruckId}', updateData);
+      AppLogger.info('[SESSION_UPDATE] Updating session with completion details...');
       
-      // Handle photo uploads if any are selected
+      // Create API client
+      final _apiClient = GetIt.I<ApiClient>();
+      
+      // Prepare rating and exertion data
+      final Map<String, dynamic> completionData = {
+        'rating': _rating,
+        'perceived_exertion': _perceivedExertion,
+        'completed': true,
+        'tags': _selectedTags,
+        'notes': _notesController.text.trim(),
+        // Backend expects these exact keys:
+        'distance_km': widget.distance, // always send for compatibility
+        'final_distance_km': widget.distance, // for final summary
+        'distance_meters': (widget.distance * 1000).round(),
+        'calories_burned': widget.caloriesBurned,
+        'final_calories_burned': widget.caloriesBurned,
+        'elevation_gain_m': widget.elevationGain,
+        'elevation_loss_m': widget.elevationLoss,
+        'final_elevation_gain': widget.elevationGain,
+        'final_elevation_loss': widget.elevationLoss,
+        'final_avg_hr': _avgHeartRate,
+        'final_max_hr': _maxHeartRate,
+      };
+      
+      AppLogger.info('[SESSION_UPDATE] Completion data: $completionData');
+      
+      // Send completion data to the API
+      await _apiClient.patch(
+        '/rucks/${widget.ruckId}',
+        completionData,
+      );
+      
+      sessionSaved = true;
+      AppLogger.info('[SESSION_UPDATE] Session completion data saved successfully');
+      
+      // Upload photos if any were selected
       if (_selectedPhotos.isNotEmpty) {
         setState(() {
           _isUploadingPhotos = true;
@@ -220,14 +217,31 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         try {
           AppLogger.info('Uploading ${_selectedPhotos.length} photos for session ${widget.ruckId}');
           
+          // Verify the selected photos exist and are valid
+          for (int i = 0; i < _selectedPhotos.length; i++) {
+            final file = _selectedPhotos[i];
+            final exists = await file.exists();
+            final size = exists ? await file.length() : 0;
+            AppLogger.debug('[CASCADE_TRACE] Photo ${i+1}: path=${file.path}, exists=$exists, size=$size bytes');
+          }
+          
           // Create session repository for photo uploads
           final sessionRepo = SessionRepository(apiClient: _apiClient);
           
-          // Upload photos
+          // Log the upload attempt
+          AppLogger.debug('[CASCADE_TRACE] SessionCompleteScreen: Uploading ${_selectedPhotos.length} photos for ruckId ${widget.ruckId}');
+          
+          // Upload photos - ensure we're using the same parameters and logic that works in session_detail_screen
           final uploadedPhotos = await sessionRepo.uploadSessionPhotos(
             widget.ruckId, 
             _selectedPhotos,
           );
+          
+          // Log success
+          AppLogger.debug('[CASCADE_TRACE] SessionCompleteScreen: Successfully uploaded ${uploadedPhotos.length} photos');
+          uploadedPhotos.forEach((photo) {
+            AppLogger.debug('[CASCADE_TRACE] Uploaded photo: ${photo.id}, URL: ${photo.url}');
+          });
           
           AppLogger.info('Uploaded ${uploadedPhotos.length} photos successfully');
           
@@ -239,13 +253,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             );
           }
         } catch (e) {
+          photoUploadFailed = true;
           AppLogger.error('Error uploading photos: $e');
-          // Show message but don't block navigation - user can try again later
-          StyledSnackBar.show(
-            context: context,
-            message: 'Session saved, but there was an issue uploading photos. You can try again from the session details screen.',
-            duration: const Duration(seconds: 3),
-          );
         } finally {
           setState(() {
             _isUploadingPhotos = false;
@@ -253,11 +262,29 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         }
       }
       
-      // Navigate home on success
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-        (route) => false,
-      );
+      // Navigate home on success, with appropriate messaging based on upload status
+      if (photoUploadFailed) {
+        // Navigate home but include an error message about the photo upload
+        AppLogger.debug('[CASCADE_TRACE] Navigation with photo upload error flag');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const HomeScreen(),
+            settings: const RouteSettings(
+              arguments: {
+                'showPhotoUploadError': true,
+              },
+            ),
+          ),
+        );
+      } else {
+        // Just navigate home with success (no error message)
+        AppLogger.debug('[CASCADE_TRACE] Navigation with success (no errors)');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
     } catch (error) {
       AppLogger.error('[SESSION_UPDATE] Error: $error');
       // Show error and reset saving state
