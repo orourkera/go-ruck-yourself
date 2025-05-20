@@ -122,7 +122,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _validLocationCount = 0;
     _paceTickCounter = 0;
 
-    AppLogger.info('SessionStarted event. Weight: ${event.ruckWeightKg}kg, Notes: ${event.notes}');
+    AppLogger.debug('SessionStarted event. Weight: ${event.ruckWeightKg}kg, Notes: ${event.notes}');
     emit(ActiveSessionLoading());
     String? sessionId;
 
@@ -140,10 +140,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       });
       sessionId = createResponse['id']?.toString();
       if (sessionId == null || sessionId.isEmpty) throw Exception('Failed to create session: No ID.');
-      AppLogger.info('Created new session with ID: $sessionId');
+      AppLogger.debug('Created new session with ID: $sessionId');
 
       await _apiClient.post('/rucks/$sessionId/start', {});
-      AppLogger.info('Backend notified of session start for $sessionId');
+      AppLogger.debug('Backend notified of session start for $sessionId');
 
       final initialSessionState = ActiveSessionRunning(
         sessionId: sessionId,
@@ -166,12 +166,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         minHeartRate: null,
         maxHeartRate: null,
         isGpsReady: false,
-        sessionPhotos: const [],
-        photoLoadingStatus: PhotoLoadingStatus.initial,
+        photos: const [],
+        isPhotosLoading: false,
         splits: const [],
       );
       emit(initialSessionState);
-      AppLogger.info('ActiveSessionRunning emitted for $sessionId');
+      AppLogger.debug('ActiveSessionRunning emitted for $sessionId');
 
       await _watchService.startSessionOnWatch(event.ruckWeightKg);
       await _watchService.sendSessionIdToWatch(sessionId);
@@ -182,8 +182,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       add(TimerStarted());
 
     } catch (e, stackTrace) {
-      String errorMessage = ErrorHandler.extractErrorMessage(e, defaultMessage: 'Failed to start session');
-      AppLogger.error('Error starting session: $errorMessage', error: e, stackTrace: stackTrace);
+      String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Start');
+      AppLogger.error('Error starting session: $errorMessage\nError: $e\n$stackTrace');
       if (sessionId != null && sessionId.isNotEmpty) {
          try {
             await _apiClient.post('/rucks/$sessionId/fail', {'error_message': errorMessage});
@@ -197,11 +197,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   void _startLocationUpdates(String sessionId) {
     _locationSubscription?.cancel();
-    _locationSubscription = _locationService.onLocationChanged.listen((location) {
+    _locationSubscription = _locationService.startLocationTracking().listen((location) {
       add(LocationUpdated(location));
     });
-    _locationService.startLocationTracking();
-    AppLogger.info('Location tracking started for session $sessionId.');
+    AppLogger.debug('Location tracking started for session $sessionId.');
   }
 
   Future<void> _onLocationUpdated(
@@ -215,9 +214,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final LocationPoint newPoint = event.locationPoint;
       _lastLocationTimestamp = DateTime.now();
       
-      bool isValidLocation = _validationService.isValidLocation(newPoint, _lastValidLocation);
-      if (!isValidLocation) {
-        AppLogger.debug('Invalid location discarded: Acc ${newPoint.accuracy}');
+      final validationResult = _validationService.validateLocationPoint(newPoint, _lastValidLocation);
+      if (!(validationResult['isValid'] as bool? ?? false)) { // Safely access 'isValid'
+        final String message = validationResult['message'] as String? ?? 'Validation failed, no specific message';
+        AppLogger.debug('Invalid location discarded: $message. Acc ${newPoint.accuracy}');
         return;
       }
       _validLocationCount++;
@@ -230,18 +230,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       if (newLocationPoints.length > 1) {
         final prevPoint = newLocationPoints[newLocationPoints.length - 2];
-        newDistanceKm += _locationService.calculateDistance(
-          prevPoint.latitude, prevPoint.longitude, newPoint.latitude, newPoint.longitude
-        ) / 1000.0;
+        newDistanceKm += _locationService.calculateDistance(prevPoint, newPoint);
 
-        if (newPoint.altitude != null && prevPoint.altitude != null) {
-          double altitudeChange = newPoint.altitude! - prevPoint.altitude!;
-          if (altitudeChange > 0) newElevationGain += altitudeChange;
-          else newElevationLoss += altitudeChange.abs();
-        }
+        // Elevation is non-nullable in LocationPoint, direct access is safe if prevPoint and newPoint are valid.
+        double elevationChange = newPoint.elevation - prevPoint.elevation;
+        if (elevationChange > 0) newElevationGain += elevationChange;
+        else newElevationLoss += elevationChange.abs();
       }
       
-      _splitTrackingService.updateDistance(newDistanceKm);
+      _splitTrackingService.checkForMilestone(
+        currentDistanceKm: newDistanceKm,
+        sessionStartTime: currentState.originalSessionStartTimeUtc,
+        elapsedSeconds: currentState.elapsedSeconds,
+        isPaused: currentState.isPaused,
+      );
 
       _apiClient.post('/rucks/${currentState.sessionId}/location', newPoint.toJson())
         .catchError((e) => AppLogger.warning('Failed to send location to backend: $e'));
@@ -252,15 +254,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elevationGain: newElevationGain,
         elevationLoss: newElevationLoss,
         isGpsReady: _validLocationCount > 5,
-        splits: _splitTrackingService.getCurrentSplits(),
+        splits: _splitTrackingService.getSplits(),
       ));
     }
   }
   
   Future<void> _onTimerStarted(TimerStarted event, Emitter<ActiveSessionState> emit) async {
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) => add(Tick(timer.tick)));
-    AppLogger.info('Master timer started.');
+    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) => add(const Tick()));
 
     _watchdogTimer?.cancel();
     _watchdogTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
@@ -278,7 +279,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   void _stopTickerAndWatchdog() {
     _ticker?.cancel(); _ticker = null;
     _watchdogTimer?.cancel(); _watchdogTimer = null;
-    AppLogger.info('Master timer and watchdog stopped.');
+    AppLogger.debug('Master timer and watchdog stopped.');
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
@@ -296,7 +297,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final int trueElapsed = wallClockElapsed.inSeconds - currentState.totalPausedDuration.inSeconds;
         if ((trueElapsed - _elapsedCounter).abs() > 2) {
           _elapsedCounter = trueElapsed; newElapsed = trueElapsed;
-          AppLogger.info('Elapsed counter synced (diff ${(trueElapsed - _elapsedCounter).abs()}s)');
+          AppLogger.debug('Elapsed counter synced (diff ${(trueElapsed - _elapsedCounter).abs()}s)');
         }
         _ticksSinceTruth = 0;
       }
@@ -310,18 +311,34 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         } else { newPace = null; }
       }
 
-      User? currentUser = GetIt.I<AuthBloc>().state.user;
+      // Check if auth state is Authenticated before accessing user property
+      final authState = GetIt.I<AuthBloc>().state;
+      User? currentUser = authState is Authenticated ? authState.user : null;
       double userWeightKg = currentUser?.weightKg ?? 70.0;
-      double metValue = METCalculator.calculateMETs(
-        speedKmh: newPace != null && newPace > 0 ? (60 / newPace) : 0,
-        ruckWeightKg: currentState.ruckWeightKg,
-        userWeightKg: userWeightKg,
-        heartRate: _latestHeartRate, // Pass HR to METs for potentially more accurate calorie calc
+      // Convert km/h to mph for MetCalculator
+      double speedMph = MetCalculator.kmhToMph(newPace != null && newPace > 0 ? (60 / newPace) : 0);
+      // Convert kg to lbs for rucksack weight
+      double ruckWeightLbs = currentState.ruckWeightKg * 2.20462;
+
+      double metValue = MetCalculator.calculateRuckingMetByGrade(
+        speedMph: speedMph,
+        grade: 0, // Assuming flat ground if no grade info available
+        ruckWeightLbs: ruckWeightLbs,
       );
-      double caloriesPerMinute = METCalculator.calculateCaloriesPerMinute(metValue, userWeightKg);
+
+      // Calculate calories per minute using the standard MET formula
+      // MET formula: Calories = MET value × Weight (kg) × Duration (hours)
+      // For calories per minute: Calories = MET value × Weight (kg) / 60
+      double caloriesPerMinute = metValue * (userWeightKg + currentState.ruckWeightKg) / 60;
       double newCalories = currentState.calories + (caloriesPerMinute / 60.0);
 
-      _splitTrackingService.updateDuration(Duration(seconds:newElapsed));
+      // Duration is now tracked via checkForMilestone instead of updateDuration
+      _splitTrackingService.checkForMilestone(
+        currentDistanceKm: currentState.distanceKm,
+        sessionStartTime: currentState.originalSessionStartTimeUtc,
+        elapsedSeconds: newElapsed,
+        isPaused: currentState.isPaused,
+      );
 
       emit(currentState.copyWith(
         elapsedSeconds: newElapsed,
@@ -331,7 +348,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         minHeartRate: _minHeartRate,
         maxHeartRate: _maxHeartRate,
         heartRateSamples: _allHeartRateSamples.toList(),
-        splits: _splitTrackingService.getCurrentSplits(),
+        splits: _splitTrackingService.getSplits(),
       ));
     }
   }
@@ -342,7 +359,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      _heartRateService.pauseMonitoring(); // Pause HR data collection/posting
+      _heartRateService.stopHeartRateMonitoring(); // Stop HR monitoring during pause
       // Send any buffered heart rate samples before pausing
       if (_heartRateService.heartRateBuffer.isNotEmpty) {
          await _sendHeartRateSamplesToApi(currentState.sessionId, _heartRateService.heartRateBuffer);
@@ -350,7 +367,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
       
       await _apiClient.post('/rucks/${currentState.sessionId}/pause', {});
-      AppLogger.info('Session ${currentState.sessionId} paused.');
+      AppLogger.debug('Session ${currentState.sessionId} paused.');
       
       emit(currentState.copyWith(
         isPaused: true,
@@ -372,10 +389,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final Duration currentPauseDuration = pauseEndTime.difference(currentState.currentPauseStartTimeUtc!);
       final Duration newTotalPausedDuration = currentState.totalPausedDuration + currentPauseDuration;
       
-      _heartRateService.resumeMonitoring(); // Resume HR data collection/posting
+      _heartRateService.startHeartRateMonitoring(); // Restart HR monitoring after pause
       
       await _apiClient.post('/rucks/${currentState.sessionId}/resume', {});
-      AppLogger.info('Session ${currentState.sessionId} resumed.');
+      AppLogger.debug('Session ${currentState.sessionId} resumed.');
 
       emit(currentState.copyWith(
         isPaused: false,
@@ -406,15 +423,23 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final int finalDurationSeconds = _elapsedCounter; // Use the BLoC's tracked elapsed time
 
         final double finalDistanceKm = currentState.distanceKm;
-        final User? currentUser = GetIt.I<AuthBloc>().state.user;
+        // Check if auth state is Authenticated before accessing user property
+        final authState = GetIt.I<AuthBloc>().state;
+        final User? currentUser = authState is Authenticated ? authState.user : null;
         final double userWeightKg = currentUser?.weightKg ?? 70.0;
-        final double metValue = METCalculator.calculateMETs(
-            speedKmh: currentState.pace != null && currentState.pace! > 0 ? (60 / currentState.pace!) : 0,
-            ruckWeightKg: currentState.ruckWeightKg,
-            userWeightKg: userWeightKg,
-            heartRate: _latestHeartRate,
+        // Convert km/h to mph for MetCalculator
+        double speedMph = MetCalculator.kmhToMph(currentState.pace != null && currentState.pace! > 0 ? (60 / currentState.pace!) : 0);
+        // Convert kg to lbs for rucksack weight
+        double ruckWeightLbs = currentState.ruckWeightKg * 2.20462;
+
+        final double metValue = MetCalculator.calculateRuckingMetByGrade(
+            speedMph: speedMph,
+            grade: 0, // Assuming flat ground if no grade info available
+            ruckWeightLbs: ruckWeightLbs,
         );
-        final double caloriesPerMinute = METCalculator.calculateCaloriesPerMinute(metValue, userWeightKg);
+
+        // Calculate calories per minute using the standard MET formula
+        final double caloriesPerMinute = metValue * (userWeightKg + currentState.ruckWeightKg) / 60;
         final double finalCalories = (caloriesPerMinute / 60.0) * finalDurationSeconds;
 
         int? avgHeartRate;
@@ -434,38 +459,38 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           'average_heart_rate': avgHeartRate,
           'min_heart_rate': _minHeartRate,
           'max_heart_rate': _maxHeartRate,
-          'session_photos': currentState.sessionPhotos.map((p) => p.id).toList(),
-          'splits': _splitTrackingService.getFinalSplits().map((s) => s.toJson()).toList(),
+          'session_photos': currentState.photos.map((p) => p.id).toList(),
+          'splits': _splitTrackingService.getSplits(), // Already a List<Map<String, dynamic>>
         };
         
-        AppLogger.info('Completing session ${currentState.sessionId} with payload...');
+        AppLogger.debug('Completing session ${currentState.sessionId} with payload...');
         final response = await _apiClient.post('/rucks/${currentState.sessionId}/complete', payload);
         final RuckSession completedSession = RuckSession.fromJson(response);
         
-        AppLogger.info('Session ${currentState.sessionId} completed successfully.');
-        emit(SessionSummaryGenerated(session: completedSession, photos: currentState.sessionPhotos, photoLoadingStatus: currentState.photoLoadingStatus));
+        AppLogger.debug('Session ${currentState.sessionId} completed successfully.');
+        emit(SessionSummaryGenerated(session: completedSession, photos: currentState.photos, isPhotosLoading: false));
         await _watchService.endSessionOnWatch();
         await _healthService.saveWorkout(
-            startTime: completedSession.startTime ?? currentState.originalSessionStartTimeUtc.subtract(finalTotalPausedDuration),
-            endTime: completedSession.endTime ?? DateTime.now().toUtc(),
-            distanceKm: completedSession.distanceKm,
-            caloriesKcal: completedSession.caloriesBurned?.toDouble() ?? 0.0,
-            metadata: {
-              'ruck_id': completedSession.id,
-              'ruck_weight_kg': completedSession.ruckWeightKg.toString(),
-              'average_heart_rate': completedSession.averageHeartRate?.toString(),
-            }
+            startDate: completedSession.startTime ?? currentState.originalSessionStartTimeUtc.subtract(finalTotalPausedDuration),
+            endDate: completedSession.endTime ?? DateTime.now().toUtc(),
+            distanceKm: completedSession.distance,
+            caloriesBurned: completedSession.caloriesBurned,
+            heartRate: completedSession.avgHeartRate?.toDouble(), // Convert int? to double?
+            ruckWeightKg: completedSession.ruckWeightKg,
+            elevationGainMeters: completedSession.elevationGain,
+            elevationLossMeters: completedSession.elevationLoss
         );
 
       } catch (e, stackTrace) {
-        String errorMessage = ErrorHandler.extractErrorMessage(e, defaultMessage: 'Failed to complete session');
-        AppLogger.error('Error completing session: $errorMessage', error: e, stackTrace: stackTrace);
+        String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Complete');
+        AppLogger.error('Error completing session: $errorMessage\nError: $e\n$stackTrace');
         try {
             await _apiClient.post('/rucks/${currentState.sessionId}/fail', {'error_message': 'Completion API call failed: $errorMessage'});
         } catch (failError) {
             AppLogger.error('Additionally, failed to mark session ${currentState.sessionId} as failed: $failError');
         }
-        emit(ActiveSessionFailure(errorMessage: errorMessage, sessionDetails: currentState.toRuckSession(finalHeartRateSamples: _allHeartRateSamples)));
+        // Pass the current state directly instead of trying to convert it
+        emit(ActiveSessionFailure(errorMessage: errorMessage, sessionDetails: currentState));
       }
     } else {
       emit(ActiveSessionInitial());
@@ -482,24 +507,24 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _locationService.stopLocationTracking();
     await _stopHeartRateMonitoring();
 
-    RuckSession? sessionDetails;
+    ActiveSessionRunning? sessionDetails;
     if (state is ActiveSessionRunning) {
-        sessionDetails = (state as ActiveSessionRunning).toRuckSession(finalHeartRateSamples: _allHeartRateSamples);
+        sessionDetails = state as ActiveSessionRunning;
     }
 
-    if (event.sessionId != null && event.sessionId!.isNotEmpty) {
-      try {
-        await _apiClient.post('/rucks/${event.sessionId}/fail', {'error_message': event.errorMessage});
-        AppLogger.info('Marked session ${event.sessionId} as failed on backend.');
-      } catch (e) {
-        AppLogger.error('Failed to mark session ${event.sessionId} as failed on backend: $e');
-      }
+    try {
+      await _apiClient.post('/rucks/${event.sessionId}/fail', {'error_message': event.errorMessage});
+      AppLogger.debug('Marked session ${event.sessionId} as failed on backend.');
+    } catch (e) {
+      AppLogger.error('Failed to mark session ${event.sessionId} as failed on backend: $e');
     }
+    
     emit(ActiveSessionFailure(errorMessage: event.errorMessage, sessionDetails: sessionDetails));
-    await _watchService.discardSessionOnWatch();
+    // End the session on the watch (discardSessionOnWatch no longer exists)
+    await _watchService.endSessionOnWatch();
   }
 
-  void _startHeartRateMonitoring(String sessionId) {
+  Future<void> _startHeartRateMonitoring(String sessionId) async {
     if (_isHeartRateMonitoringStarted) return;
     _heartRateSubscription?.cancel();
     _heartRateSubscription = _heartRateService.heartRateStream.listen((sample) {
@@ -515,9 +540,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.error('Error in heart rate buffer stream: $error');
     });
 
-    _heartRateService.startMonitoring(sessionId: sessionId);
+    await _heartRateService.startHeartRateMonitoring();
     _isHeartRateMonitoringStarted = true;
-    AppLogger.info('Heart rate monitoring started for session $sessionId.');
+    AppLogger.debug('Heart rate monitoring started for session $sessionId.');
   }
 
   Future<void> _stopHeartRateMonitoring() async {
@@ -528,9 +553,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (state is ActiveSessionRunning && _heartRateService.heartRateBuffer.isNotEmpty) {
         await _sendHeartRateSamplesToApi((state as ActiveSessionRunning).sessionId, _heartRateService.heartRateBuffer);
     }
-    _heartRateService.stopMonitoring();
+    _heartRateService.stopHeartRateMonitoring();
     _isHeartRateMonitoringStarted = false;
-    AppLogger.info('Heart rate monitoring stopped.');
+    AppLogger.debug('Heart rate monitoring stopped.');
   }
 
   Future<void> _onHeartRateUpdated(
@@ -570,9 +595,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     try {
       final List<Map<String, dynamic>> samplesJson = samples.map((s) => s.toJsonForApi()).toList();
       await _apiClient.post('/rucks/$sessionId/heart_rate', {'samples': samplesJson});
-      AppLogger.info('Sent ${samples.length} heart rate samples to API for $sessionId.');
+      AppLogger.debug('Sent ${samples.length} heart rate samples to API for $sessionId.');
     } catch (e, stackTrace) {
-      AppLogger.error('Failed to send heart rate samples to API', error: e, stackTrace: stackTrace);
+      AppLogger.error('Failed to send heart rate samples to API: $e\n$stackTrace');
     }
   }
 
@@ -580,23 +605,30 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       FetchSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      emit(currentState.copyWith(photoLoadingStatus: PhotoLoadingStatus.loading));
+      emit(currentState.copyWith(isPhotosLoading: true));
       try {
         final photos = await _sessionRepository.getSessionPhotos(currentState.sessionId);
-        emit(currentState.copyWith(sessionPhotos: photos, photoLoadingStatus: PhotoLoadingStatus.success));
+        emit(currentState.copyWith(photos: photos, isPhotosLoading: false));
       } catch (e) {
         AppLogger.error('Failed to fetch session photos: $e');
-        emit(currentState.copyWith(photoLoadingStatus: PhotoLoadingStatus.failure));
+        emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to load photos'));
       }
     } else if (state is SessionSummaryGenerated) {
       final currentState = state as SessionSummaryGenerated;
-      emit(currentState.copyWith(photoLoadingStatus: PhotoLoadingStatus.loading));
+      emit(currentState.copyWith(isPhotosLoading: true));
        try {
-        final photos = await _sessionRepository.getSessionPhotos(currentState.session.id);
-        emit(currentState.copyWith(photos: photos, photoLoadingStatus: PhotoLoadingStatus.success));
+        // Add null check for session id
+        final sessionId = currentState.session.id;
+        if (sessionId == null) {
+          emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Session ID is missing'));
+          return;
+        }
+        
+        final photos = await _sessionRepository.getSessionPhotos(sessionId);
+        emit(currentState.copyWith(photos: photos, isPhotosLoading: false));
       } catch (e) {
         AppLogger.error('Failed to fetch session photos for summary: $e');
-        emit(currentState.copyWith(photoLoadingStatus: PhotoLoadingStatus.failure));
+        emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to load photos'));
       }
     }
   }
@@ -605,14 +637,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       UploadSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      emit(currentState.copyWith(photoLoadingStatus: PhotoLoadingStatus.loading));
+      emit(currentState.copyWith(isPhotosLoading: true));
       try {
         final uploadedPhotos = await _sessionRepository.uploadSessionPhotos(currentState.sessionId, event.photos);
-        final currentPhotos = List<RuckPhoto>.from(currentState.sessionPhotos)..addAll(uploadedPhotos);
-        emit(currentState.copyWith(sessionPhotos: currentPhotos, photoLoadingStatus: PhotoLoadingStatus.success));
+        final currentPhotos = List<RuckPhoto>.from(currentState.photos)..addAll(uploadedPhotos);
+        emit(currentState.copyWith(photos: currentPhotos, isPhotosLoading: false));
       } catch (e) {
         AppLogger.error('Failed to upload session photos: $e');
-        emit(currentState.copyWith(photoLoadingStatus: PhotoLoadingStatus.failure));
+        emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to upload photos'));
       }
     }
   }
@@ -621,18 +653,40 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       DeleteSessionPhotoRequested event, Emitter<ActiveSessionState> emit) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      emit(currentState.copyWith(photoLoadingStatus: PhotoLoadingStatus.loading));
+      emit(currentState.copyWith(isPhotosLoading: true));
       try {
-        final success = await _sessionRepository.deleteSessionPhoto(event.photoId);
+        // Extract photoId from the photo object if it's a RuckPhoto
+        String photoId = '';
+        if (event.photo is RuckPhoto) {
+          photoId = (event.photo as RuckPhoto).id;
+        } else if (event.photo is String) {
+          photoId = event.photo as String;
+        } else if (event.photo is Map && event.photo['id'] != null) {
+          photoId = event.photo['id'].toString();
+        }
+        
+        if (photoId.isEmpty) {
+          throw Exception('Invalid photo ID for deletion');
+        }
+        
+        // Create a RuckPhoto object to pass to the deletePhoto method
+        final photo = RuckPhoto(
+          id: photoId,
+          ruckId: event.sessionId, // Use ruckId instead of sessionId
+          userId: '', // Required field
+          filename: '', // Required field
+          createdAt: DateTime.now(), // Required field
+        );
+        final success = await _sessionRepository.deletePhoto(photo);
         if (success) {
-          final updatedPhotos = currentState.sessionPhotos.where((p) => p.id != event.photoId).toList();
-          emit(currentState.copyWith(sessionPhotos: updatedPhotos, photoLoadingStatus: PhotoLoadingStatus.success));
+          final updatedPhotos = currentState.photos.where((p) => p.id != photoId).toList();
+          emit(currentState.copyWith(photos: updatedPhotos, isPhotosLoading: false));
         } else {
           throw Exception('Failed to delete photo from repository');
         }
       } catch (e) {
         AppLogger.error('Failed to delete session photo: $e');
-        emit(currentState.copyWith(photoLoadingStatus: PhotoLoadingStatus.failure));
+        emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to delete photo'));
       }
     }
   }
@@ -640,68 +694,89 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   void _onClearSessionPhotos(ClearSessionPhotos event, Emitter<ActiveSessionState> emit) {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      emit(currentState.copyWith(sessionPhotos: [], photoLoadingStatus: PhotoLoadingStatus.initial));
+      emit(currentState.copyWith(photos: []));
     }
   }
 
   Future<void> _onTakePhotoRequested(TakePhotoRequested event, Emitter<ActiveSessionState> emit) async {
+    if (state is! ActiveSessionRunning) return;
+    final currentState = state as ActiveSessionRunning;
+    
     final ImagePicker picker = ImagePicker();
     try {
       final XFile? photo = await picker.pickImage(source: ImageSource.camera);
       if (photo != null) {
-        add(UploadSessionPhotosRequested(photos: [File(photo.path)]));
+        add(UploadSessionPhotosRequested(
+          sessionId: currentState.sessionId,
+          photos: [File(photo.path)]
+        ));
       }
     } catch (e) {
       AppLogger.error('Error taking photo: $e');
-      // Optionally emit a state indicating failure to take photo
+      emit(currentState.copyWith(photosError: 'Failed to take photo'));
     }
   }
 
   Future<void> _onPickPhotoRequested(PickPhotoRequested event, Emitter<ActiveSessionState> emit) async {
+    if (state is! ActiveSessionRunning) return;
+    final currentState = state as ActiveSessionRunning;
+    
     final ImagePicker picker = ImagePicker();
     try {
       final List<XFile> photos = await picker.pickMultiImage();
       if (photos.isNotEmpty) {
-        add(UploadSessionPhotosRequested(photos: photos.map((p) => File(p.path)).toList()));
+        add(UploadSessionPhotosRequested(
+          sessionId: currentState.sessionId,
+          photos: photos.map((p) => File(p.path)).toList()
+        ));
       }
     } catch (e) {
       AppLogger.error('Error picking photos: $e');
-      // Optionally emit a state indicating failure to pick photos
+      emit(currentState.copyWith(photosError: 'Failed to pick photos'));
     }
   }
   
   Future<void> _onLoadSessionForViewing(LoadSessionForViewing event, Emitter<ActiveSessionState> emit) async {
-    AppLogger.info('Loading session for viewing: ${event.session.id}');
+    AppLogger.debug('Loading session for viewing: ${event.session.id}');
     // This event is primarily for UI to switch to a view mode with existing session data.
     // The BLoC might not need to do much other than emit a state that represents this mode.
     // For now, we assume the UI will use the provided session data directly.
     // If backend fetching is needed for this view, that logic would go here.
 
     // We can emit a SessionSummaryGenerated state, as it's designed to hold a completed session.
-    // Fetch photos associated with this session if not already loaded.
-    List<RuckPhoto> photos = event.session.photos ?? [];
-    PhotoLoadingStatus photoStatus = PhotoLoadingStatus.initial;
+    // Initialize photos as empty - RuckSession doesn't have a photos property
+    List<RuckPhoto> photos = [];
+    bool isLoading = false;
+    String? photosError;
 
-    if (photos.isEmpty && event.session.id.isNotEmpty) {
-        emit(SessionSummaryGenerated(session: event.session, photos: photos, photoLoadingStatus: PhotoLoadingStatus.loading));
+    // Check if session id is not null and not empty
+    if (photos.isEmpty && event.session.id != null && event.session.id!.isNotEmpty) {
+        emit(SessionSummaryGenerated(session: event.session, photos: photos, isPhotosLoading: true));
         try {
-            photos = await _sessionRepository.getSessionPhotos(event.session.id);
-            photoStatus = PhotoLoadingStatus.success;
+            // Add null assertion operator (!) since we've already checked id isn't null
+            photos = await _sessionRepository.getSessionPhotos(event.session.id!);
+            isLoading = false;
         } catch (e) {
-            AppLogger.error('Failed to fetch photos for viewed session ${event.session.id}: $e');
-            photoStatus = PhotoLoadingStatus.failure;
+            AppLogger.error('Failed to fetch photos for viewed session ${event.session.id ?? "unknown"}: $e');
+            isLoading = false;
+            photosError = 'Failed to load photos';
         }
     }
-    emit(SessionSummaryGenerated(session: event.session, photos: photos, photoLoadingStatus: photoStatus));
+    emit(SessionSummaryGenerated(session: event.session, photos: photos, isPhotosLoading: isLoading, photosError: photosError));
   }
 
   void _onUpdateStateWithSessionPhotos(UpdateStateWithSessionPhotos event, Emitter<ActiveSessionState> emit) {
+      // Cast List<dynamic> to List<RuckPhoto> to fix type mismatch
+      final List<RuckPhoto> typedPhotos = event.photos.map((photo) => 
+          photo is RuckPhoto ? photo : RuckPhoto.fromJson(photo as Map<String, dynamic>)
+      ).toList();
+      
       if (state is ActiveSessionRunning) {
         final currentState = state as ActiveSessionRunning;
-        emit(currentState.copyWith(sessionPhotos: event.photos, photoLoadingStatus: PhotoLoadingStatus.success));
+        emit(currentState.copyWith(photos: typedPhotos, isPhotosLoading: false));
       } else if (state is SessionSummaryGenerated) {
         final currentState = state as SessionSummaryGenerated;
-        emit(currentState.copyWith(photos: event.photos, photoLoadingStatus: PhotoLoadingStatus.success));
+        emit(currentState.copyWith(photos: typedPhotos, isPhotosLoading: false));
       }
   }
 
@@ -723,10 +798,25 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   @override
   Future<void> close() async {
     _stopTickerAndWatchdog();
+    // Remove reference to non-existent _sessionSubscription
     _locationSubscription?.cancel();
+    _heartRateSubscription?.cancel();
+    _heartRateBufferSubscription?.cancel();
     _locationService.stopLocationTracking();
     await _stopHeartRateMonitoring(); 
-    AppLogger.info('ActiveSessionBloc closed, all resources released.');
+    _log('ActiveSessionBloc closed, all resources released.');
     super.close();
+  }
+
+  // Helper method to work around analyzer issue with AppLogger
+  void _log(String message) {
+    // Using try-catch to ensure this doesn't cause further issues
+    try {
+      if (kDebugMode) {
+        debugPrint('[DEBUG] $message');
+      }
+    } catch (e) {
+      // Silent catch - last resort to prevent logging issues from breaking functionality
+    }
   }
 }

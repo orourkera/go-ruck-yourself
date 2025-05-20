@@ -17,4 +17,10 @@ class HeartRateSample {
         'timestamp': timestamp.toIso8601String(),
         'bpm': bpm,
       };
+      
+  /// Formats the heart rate sample for API submission
+  Map<String, dynamic> toJsonForApi() => {
+        'timestamp': timestamp.toUtc().toIso8601String(),
+        'bpm': bpm,
+      };
 }
