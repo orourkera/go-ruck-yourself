@@ -12,7 +12,7 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 /// A widget for displaying and interacting with comments on a ruck session
 class CommentsSection extends StatefulWidget {
   /// ID of the ruck session
-  final int ruckId;
+  final String ruckId;
   
   /// Maximum number of comments to display at once
   final int? maxDisplayed;
@@ -104,8 +104,12 @@ class _CommentsSectionState extends State<CommentsSection> {
       );
     }
     
-    _commentController.clear();
-    _commentFocusNode.unfocus();
+    Future.microtask(() {
+      if (mounted) {
+        _commentController.clear();
+        _commentFocusNode.unfocus();
+      }
+    });
   }
 
   void _handleEditComment(RuckComment comment) {

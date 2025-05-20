@@ -1225,46 +1225,87 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     FetchSessionPhotosRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Received event for ruckId ${event.ruckId}');
+    AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc _onFetchSessionPhotosRequested: Received event for ruckId ${event.ruckId}');
     final initialBlocState = state; // Capture state at the beginning of the handler
 
     try {
-      // Emit Loading state BEFORE the async call
-      if (initialBlocState is ActiveSessionRunning) {
-        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionRunning with isPhotosLoading: true for sessionId: ${initialBlocState.sessionId}');
-        emit(initialBlocState.copyWith(isPhotosLoading: true, clearPhotosError: true));
-      } else if (initialBlocState is ActiveSessionInitial && initialBlocState.viewedSession != null) {
-        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionInitial with photosStatus: loading for viewedSessionId: ${initialBlocState.viewedSession!.id}');
-        emit(initialBlocState.copyWith(photosStatus: PhotoLoadingStatus.loading));
-      } else {
-        AppLogger.warning('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Initial state is not suitable for fetching photos. State: $initialBlocState');
-        return; // Cannot proceed if state is not valid
+      // Ensure we're working with a valid ruckId string
+      final String ruckId = event.ruckId.trim();
+      AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc: Processing photo fetch for ruckId $ruckId');
+      
+      if (ruckId.isEmpty) {
+        throw Exception('Invalid ruckId: empty string');
       }
-
-      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Calling _sessionRepository.getSessionPhotos for ruckId: ${event.ruckId}');
-      final photos = await _sessionRepository.getSessionPhotos(event.ruckId);
-      AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Received ${photos.length} photos from repository for ruckId ${event.ruckId}.');
-
-      // Emit Success state, re-checking current BLoC state as it might have changed by other events during await.
-      final currentStateAfterAwait = state;
-      if (currentStateAfterAwait is ActiveSessionRunning) {
-        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionRunning with ${photos.length} photos, isPhotosLoading: false.');
-        emit(currentStateAfterAwait.copyWith(photos: photos, isPhotosLoading: false, clearPhotosError: true));
-      } else if (currentStateAfterAwait is ActiveSessionInitial && currentStateAfterAwait.viewedSession != null) {
-        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionInitial with ${photos.length} photos, photosStatus: success.');
-        emit(currentStateAfterAwait.copyWith(photos: photos, photosStatus: PhotoLoadingStatus.success));
+      
+      // First loading indicator state update
+      if (state is ActiveSessionRunning) {
+        final currentState = state as ActiveSessionRunning;
+        AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc: Emitting ActiveSessionRunning with isPhotosLoading: true for sessionId: ${currentState.sessionId}');
+        
+        emit(currentState.copyWith(
+          isPhotosLoading: true,
+          photosError: null, // Clear any previous errors
+          clearPhotosError: true
+        ));
+      } else if (state is ActiveSessionInitial) {
+        // Also update the photo loading status for ActiveSessionInitial state
+        final currentState = state as ActiveSessionInitial;
+        emit(currentState.copyWith(
+          isPhotosLoading: true,
+          photoLoadingError: null, // Clear any previous errors
+          photosStatus: PhotoLoadingStatus.loading,
+        ));
       }
-
+      
+      // Fetch photos regardless of state - we'll update appropriately when they return
+      AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc: Calling _sessionRepository.getSessionPhotos for ruckId: $ruckId');
+      final photos = await _sessionRepository.getSessionPhotos(ruckId);
+      AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc: Received ${photos.length} photos from repository for ruckId $ruckId.');
+      
+      // IMPORTANT: Get the current state again as it might have changed during the async call
+      final currentState = state;
+      
+      // Update the photos in whichever state we're in now
+      if (currentState is ActiveSessionRunning) {
+        AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc: Emitting ActiveSessionRunning with ${photos.length} photos, isPhotosLoading: false.');
+        
+        emit(currentState.copyWith(
+          photos: photos,
+          isPhotosLoading: false,
+          photosError: null,
+          clearPhotosError: true
+        ));
+      } else if (currentState is ActiveSessionInitial) {
+        // Also handle the Initial state case for when a session was loaded for viewing
+        AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc: Emitting ActiveSessionInitial with ${photos.length} photos, isPhotosLoading: false.');
+        
+        emit(currentState.copyWith(
+          photos: photos,
+          isPhotosLoading: false,
+          photoLoadingError: null,
+          photosStatus: photos.isNotEmpty ? PhotoLoadingStatus.success : PhotoLoadingStatus.initial,
+        ));
+      }
     } catch (e, stackTrace) {
-      AppLogger.error('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Error fetching photos for ruckId ${event.ruckId}. Exception: $e. StackTrace: $stackTrace');
-      // Emit Error state, re-checking current BLoC state.
+      AppLogger.error('[PHOTO_DEBUG] ActiveSessionBloc: Error fetching session photos: $e');
+      AppLogger.error('[PHOTO_DEBUG] StackTrace: $stackTrace');
+      
+      // Emit Error state, using the CURRENT state
       final currentStateAfterError = state;
+      
       if (currentStateAfterError is ActiveSessionRunning) {
-        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionRunning with error, isPhotosLoading: false.');
-        emit(currentStateAfterError.copyWith(isPhotosLoading: false, photosError: e.toString()));
+        AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc: Emitting ActiveSessionRunning with error, isPhotosLoading: false.');
+        emit(currentStateAfterError.copyWith(
+          isPhotosLoading: false, 
+          photosError: e.toString(),
+        ));
       } else if (currentStateAfterError is ActiveSessionInitial && currentStateAfterError.viewedSession != null) {
-        AppLogger.debug('[CASCADE_TRACE] ActiveSessionBloc _onFetchSessionPhotosRequested: Emitting ActiveSessionInitial with photosStatus: failure.');
-        emit(currentStateAfterError.copyWith(photosStatus: PhotoLoadingStatus.failure));
+        AppLogger.debug('[PHOTO_DEBUG] ActiveSessionBloc: Emitting ActiveSessionInitial with photosStatus: failure.');
+        emit(currentStateAfterError.copyWith(
+          isPhotosLoading: false,
+          photoLoadingError: e.toString(),
+          photosStatus: PhotoLoadingStatus.failure,
+        ));
       }
     }
   }
