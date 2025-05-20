@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 
@@ -10,6 +11,7 @@ void initSocialFeature(GetIt sl) {
   sl.registerFactory<SocialBloc>(
     () => SocialBloc(
       socialRepository: sl(),
+      authBloc: sl<AuthBloc>(),
     ),
   );
 

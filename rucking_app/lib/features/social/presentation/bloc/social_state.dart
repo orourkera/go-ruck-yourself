@@ -76,14 +76,16 @@ class LikeActionError extends SocialState {
 class LikeStatusChecked extends SocialState {
   final bool isLiked;
   final int ruckId;
+  final int likeCount;
 
   const LikeStatusChecked({
     required this.isLiked,
     required this.ruckId,
+    required this.likeCount,
   });
 
   @override
-  List<Object?> get props => [isLiked, ruckId];
+  List<Object?> get props => [isLiked, ruckId, likeCount];
 }
 
 /// State for when comments are being loaded
@@ -92,7 +94,7 @@ class CommentsLoading extends SocialState {}
 /// State for when comments have been successfully loaded
 class CommentsLoaded extends SocialState {
   final List<RuckComment> comments;
-  final int ruckId;
+  final String ruckId;
 
   const CommentsLoaded({
     required this.comments,
