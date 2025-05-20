@@ -12,6 +12,63 @@ enum RuckStatus {
 
 /// Model representing a completed ruck session
 class RuckSession {
+  // Returns a copy of this RuckSession with updated fields
+  RuckSession copyWith({
+    String? id,
+    DateTime? startTime,
+    DateTime? endTime,
+    Duration? duration,
+    double? distance,
+    double? elevationGain,
+    double? elevationLoss,
+    int? caloriesBurned,
+    double? averagePace,
+    double? ruckWeightKg,
+    RuckStatus? status,
+    String? notes,
+    int? rating,
+    List<Map<String, dynamic>>? locationPoints,
+    double? finalElevationGain,
+    double? finalElevationLoss,
+    List<HeartRateSample>? heartRateSamples,
+    int? avgHeartRate,
+    int? maxHeartRate,
+    int? minHeartRate,
+    List<String>? tags,
+    int? perceivedExertion,
+    double? weightKg,
+    int? plannedDurationMinutes,
+    int? pausedDurationSeconds,
+  }) {
+    return RuckSession(
+      id: id ?? this.id,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      duration: duration ?? this.duration,
+      distance: distance ?? this.distance,
+      elevationGain: elevationGain ?? this.elevationGain,
+      elevationLoss: elevationLoss ?? this.elevationLoss,
+      caloriesBurned: caloriesBurned ?? this.caloriesBurned,
+      averagePace: averagePace ?? this.averagePace,
+      ruckWeightKg: ruckWeightKg ?? this.ruckWeightKg,
+      status: status ?? this.status,
+      notes: notes ?? this.notes,
+      rating: rating ?? this.rating,
+      locationPoints: locationPoints ?? this.locationPoints,
+      finalElevationGain: finalElevationGain ?? this.finalElevationGain,
+      finalElevationLoss: finalElevationLoss ?? this.finalElevationLoss,
+      heartRateSamples: heartRateSamples ?? this.heartRateSamples,
+      avgHeartRate: avgHeartRate ?? this.avgHeartRate,
+      maxHeartRate: maxHeartRate ?? this.maxHeartRate,
+      minHeartRate: minHeartRate ?? this.minHeartRate,
+      tags: tags ?? this.tags,
+      perceivedExertion: perceivedExertion ?? this.perceivedExertion,
+      weightKg: weightKg ?? this.weightKg,
+      plannedDurationMinutes: plannedDurationMinutes ?? this.plannedDurationMinutes,
+      pausedDurationSeconds: pausedDurationSeconds ?? this.pausedDurationSeconds,
+    );
+  }
+
   // ...existing fields...
   final List<String>? tags;
   final int? perceivedExertion;

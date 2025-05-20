@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_card.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 class SessionHistoryScreen extends StatefulWidget {
   const SessionHistoryScreen({Key? key}) : super(key: key);
@@ -80,13 +84,44 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
     );
   }
   
-  void _navigateToSessionDetail(RuckSession session) {
-    AppLogger.info('Navigating to session detail for session ${session.id}');    
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => SessionDetailScreen(session: session),
-      ),
+  Future<void> _navigateToSessionDetail(RuckSession session) async {
+    AppLogger.info('Navigating to session detail for session ${session.id}');
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+    try {
+      final repo = context.read<SessionRepository>();
+      final fullSession = await repo.fetchSessionById(session.id!);
+      Navigator.of(context).pop(); // Remove loading dialog
+      if (fullSession != null) {
+        // Use direct navigation without MultiBlocProvider (same approach as home screen)
+        Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => SessionDetailScreen(session: fullSession),
+          ),
+        ).then((refreshNeeded) {
+          // If returned with true (session deleted), refresh the data
+          if (refreshNeeded == true) {
+            context.read<SessionHistoryBloc>().add(const LoadSessionHistory());
+          }
+        });
+      } else {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Failed to load session details',
+          duration: const Duration(seconds: 2),
+        );
+      }
+    } catch (e) {
+      Navigator.of(context).pop();
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Error fetching session: $e',
+        duration: const Duration(seconds: 2),
+      );
+    }
   }
   
   Widget _buildEmptyState() {
