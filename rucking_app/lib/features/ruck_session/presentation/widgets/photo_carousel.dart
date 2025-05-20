@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 /// A carousel widget to display ruck session photos
-class PhotoCarousel extends StatelessWidget {
+class PhotoCarousel extends StatefulWidget {
   /// List of photo URLs to display
   final List<String> photoUrls;
   
@@ -107,6 +106,45 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
             }),
           ),
       ],
+    );
+  }
+  
+  // Helper method to load images with error handling
+  Widget _buildImageWithErrorHandling(int index) {
+    final String imageUrl = widget.photoUrls[index];
+    
+    // Log URL for debugging
+    AppLogger.info('Loading image from URL: $imageUrl');
+    
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      // Use a loading placeholder
+      placeholder: (context, url) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+      errorWidget: (context, url, error) {
+        AppLogger.error('Error loading image: $url, error: $error');
+        return Container(
+          color: Colors.grey.shade300,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.broken_image, color: Colors.red, size: 32),
+                const SizedBox(height: 8),
+                Text(
+                  'Image failed to load',
+                  style: TextStyle(color: Colors.red.shade800),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
   
