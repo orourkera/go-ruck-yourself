@@ -228,7 +228,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                   debugPrint('🐞 [_RuckBuddyCardState.build ID: ${widget.ruckBuddy.id}] Building Map/Photo Stack.');
                   return Stack(
                     children: [
-                      _RouteMapPreview(ruckBuddy: widget.ruckBuddy),
+                      _RouteMapPreview(
+                        locationPoints: widget.ruckBuddy.locationPoints,
+                        photos: widget.ruckBuddy.photos,
+                      ),
                       if (hasPhotos)
                         Positioned(
                           top: 8,
@@ -456,6 +459,12 @@ class _PhotoThumbnailsOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Debug photo information
+    debugPrint('🔍 PhotoThumbnailsOverlay: Found ${photos.length} photos');
+    photos.forEach((photo) {
+      debugPrint('🔍 Photo: id=${photo.id}, url=${photo.url}, thumbnailUrl=${photo.thumbnailUrl}');
+    });
+    
     // Show up to maxDisplay photos, with a +X indicator if there are more
     final displayCount = photos.length > maxDisplay ? maxDisplay : photos.length;
     final hasMore = photos.length > maxDisplay;
@@ -535,8 +544,13 @@ class _PhotoThumbnailsOverlay extends StatelessWidget {
 }
 
 class _RouteMapPreview extends StatelessWidget {
-  final RuckBuddy ruckBuddy;
-  const _RouteMapPreview({required this.ruckBuddy});
+  final List<dynamic>? locationPoints;
+  final List<RuckPhoto>? photos;
+
+  const _RouteMapPreview({
+    required this.locationPoints,
+    this.photos,
+  });
 
   // Convert dynamic numeric or string to double, return null if not parseable
   double? _parseCoord(dynamic v) {
@@ -666,12 +680,12 @@ class _RouteMapPreview extends StatelessWidget {
         ),
           ),
           // Show photo thumbnails overlay if available
-          if (ruckBuddy.photos != null && ruckBuddy.photos!.isNotEmpty)
+          if (photos != null && photos!.isNotEmpty)
             Positioned(
               bottom: 8,
               left: 8,
               child: _PhotoThumbnailsOverlay(
-                photos: ruckBuddy.photos!,
+                photos: photos!,
                 maxDisplay: 3,
               ),
             ),

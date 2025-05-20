@@ -418,7 +418,10 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                     Text('Photos', style: AppTextStyles.titleMedium),
                     const SizedBox(height: 8),
                     PhotoCarousel(
-                      photoUrls: (widget.ruckBuddy.photos ?? []).map((photo) => photo.url ?? '').toList(), 
+                      photoUrls: (widget.ruckBuddy.photos ?? [])
+                        .where((photo) => photo.url != null && photo.url!.isNotEmpty)
+                        .map((photo) => photo.url!)
+                        .toList(),
                       showDeleteButtons: false,
                       onPhotoTap: (index) {
                         // View photo full screen
@@ -426,7 +429,10 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => PhotoViewer(
-                              photoUrls: (widget.ruckBuddy.photos ?? []).map((photo) => photo.url ?? '').toList(),
+                              photoUrls: (widget.ruckBuddy.photos ?? [])
+                                .where((photo) => photo.url != null && photo.url!.isNotEmpty)
+                                .map((photo) => photo.url!)
+                                .toList(),
                               initialIndex: index,
                               title: '${widget.ruckBuddy.user.username}\'s Ruck',
                             ),
