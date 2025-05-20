@@ -125,3 +125,92 @@ class TimerStarted extends ActiveSessionEvent {
   @override
   List<Object?> get props => [];
 }
+
+class FetchSessionPhotosRequested extends ActiveSessionEvent {
+  final String ruckId;
+
+  const FetchSessionPhotosRequested(this.ruckId);
+
+  @override
+  List<Object?> get props => [ruckId];
+}
+
+class UploadSessionPhotosRequested extends ActiveSessionEvent {
+  final String sessionId;
+  final List<File> photos;
+
+  const UploadSessionPhotosRequested({
+    required this.sessionId,
+    required this.photos,
+  });
+
+  @override
+  List<Object?> get props => [sessionId, photos];
+}
+
+class ClearSessionPhotos extends ActiveSessionEvent {
+  final String ruckId;
+
+  const ClearSessionPhotos({required this.ruckId});
+
+  @override
+  List<Object?> get props => [ruckId];
+}
+
+class DeleteSessionPhotoRequested extends ActiveSessionEvent {
+  final String sessionId;
+  final dynamic photo; 
+
+  DeleteSessionPhotoRequested({
+    required this.sessionId,
+    required this.photo,
+  });
+
+  @override
+  List<Object?> get props => [sessionId, photo];
+}
+
+// Event to update photos in state without going through the normal clear/fetch cycle
+class UpdateStateWithSessionPhotos extends ActiveSessionEvent {
+  final String sessionId;
+  final List<dynamic> photos;
+
+  UpdateStateWithSessionPhotos({
+    required this.sessionId,
+    required this.photos,
+  });
+
+  @override
+  List<Object?> get props => [sessionId, photos];
+}
+
+class TakePhotoRequested extends ActiveSessionEvent {
+  final String sessionId;
+
+  const TakePhotoRequested({required this.sessionId});
+
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class PickPhotoRequested extends ActiveSessionEvent {
+  final String sessionId;
+
+  const PickPhotoRequested({required this.sessionId});
+
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class LoadSessionForViewing extends ActiveSessionEvent {
+  final String sessionId;
+  final RuckSession session;
+
+  const LoadSessionForViewing({
+    required this.sessionId,
+    required this.session,
+  });
+
+  @override
+  List<Object?> get props => [sessionId, session];
+}

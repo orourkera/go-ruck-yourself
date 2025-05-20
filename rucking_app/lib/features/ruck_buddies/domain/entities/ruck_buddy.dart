@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 
 class RuckBuddy extends Equatable {
   final String id;
@@ -16,6 +17,10 @@ class RuckBuddy extends Equatable {
   final int? avgHeartRate;
   final UserInfo user;
   final List<dynamic>? locationPoints;
+  final List<RuckPhoto>? photos;
+  final int likeCount;
+  final int commentCount;
+  final bool isLikedByCurrentUser;
 
   const RuckBuddy({
     required this.id,
@@ -32,6 +37,10 @@ class RuckBuddy extends Equatable {
     this.avgHeartRate,
     required this.user,
     this.locationPoints,
+    this.photos,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.isLikedByCurrentUser = false,
   });
 
   @override
@@ -39,6 +48,7 @@ class RuckBuddy extends Equatable {
     id, userId, ruckWeightKg, durationSeconds, 
     distanceKm, caloriesBurned, elevationGainM, 
     elevationLossM, startedAt, completedAt, createdAt, 
-    avgHeartRate, user, locationPoints
+    avgHeartRate, user, locationPoints, photos,
+    likeCount, commentCount, isLikedByCurrentUser
   ];
 }

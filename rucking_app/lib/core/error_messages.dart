@@ -33,6 +33,8 @@ const String sessionDistanceTooShortError = 'Distance too short, rucker. Minimum
 const String sessionCaloriesTooLowError = 'Not enough calories burned to save this session, rucker. Move more!';
 const String sessionGenericError = 'An error occurred during the session, rucker. Please try again.';
 const String sessionAutoPaused = 'Auto-paused, rucker. No movement detected for 1+ minute. Get moving!';
+const String sessionPhotoUploadError = 'Session saved, but there was an issue uploading photos. You can try again from the session details screen, rucker.';
+const String sessionDeleteSuccess = 'Ruck session is gone forever, rucker.';
 
 // RevenueCat Service Error Messages
 const String revenueCatApiKeyMissing = 'RevenueCat API Key is missing. Please configure your .env file with REVENUECAT_API_KEY.';

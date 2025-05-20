@@ -20,6 +20,10 @@ def get_ruck_buddies():
     - offset: Pagination offset (default: 0)
     - filter: 'closest' (default), 'calories', 'distance' (furthest), 'duration' (longest), 'elevation' (most elevation)
     """
+    # Ensure g.user is available from auth_required decorator
+    if not hasattr(g, 'user') or not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
     limit = request.args.get('limit', 20, type=int)
     offset = request.args.get('offset', 0, type=int)
     filter_type = request.args.get('filter', 'closest')
@@ -46,7 +50,7 @@ def get_ruck_buddies():
             order_by = "completed_at.desc"  # Default if no coordinates
     
     # Get supabase client
-    supabase = get_supabase_client(g.user.token if hasattr(g.user, 'token') else None)
+    supabase = get_supabase_client(g.access_token if hasattr(g, 'access_token') else None)
 
     
     # Base query getting public ruck sessions that aren't from the current user
@@ -56,7 +60,7 @@ def get_ruck_buddies():
             'id, user_id, ruck_weight_kg, duration_seconds, distance_km, calories_burned,'
             ' elevation_gain_m, elevation_loss_m, started_at, completed_at, created_at,'
             ' avg_heart_rate, '
-            ' user:user_id(id,username,allow_ruck_sharing),'
+            ' user:user_id(id,username,allow_ruck_sharing,gender),'
             ' location_points:location_point!location_point_session_id_fkey(id,latitude,longitude,altitude,timestamp)'
         ) \
         .eq('is_public', True) \

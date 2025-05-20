@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/features/ruck_buddies/data/datasources/mock_ruck_buddies_datasource.dart';
 import 'package:rucking_app/features/ruck_buddies/data/datasources/ruck_buddies_remote_datasource.dart';
 import 'package:rucking_app/features/ruck_buddies/data/repositories/ruck_buddies_repository_impl.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/repositories/ruck_buddies_repository.dart';

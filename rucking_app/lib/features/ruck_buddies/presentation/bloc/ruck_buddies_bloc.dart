@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/usecases/get_ruck_buddies.dart';
 
@@ -22,23 +24,63 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
   ) async {
     emit(RuckBuddiesLoading());
     
+    // Get location if needed for 'closest' filter and not provided in the event
+    double? lat = event.latitude;
+    double? lon = event.longitude;
+    
+    if (event.filter == 'closest' && (lat == null || lon == null)) {
+      try {
+        // Check for permission
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        
+        if (permission == LocationPermission.whileInUse || 
+            permission == LocationPermission.always) {
+          final position = await Geolocator.getCurrentPosition();
+          lat = position.latitude;
+          lon = position.longitude;
+        }
+      } catch (e) {
+        // Handle error or proceed without location
+        print('Error getting location: $e');
+      }
+    }
+    
+    debugPrint('[BLOC] Fetching ruck buddies with filter: ${event.filter}, location: ($lat, $lon)');
     final result = await getRuckBuddies(
       RuckBuddiesParams(
         limit: event.limit,
         offset: 0,
         filter: event.filter,
+        latitude: lat,
+        longitude: lon,
       ),
     );
     
     result.fold(
-      (failure) => emit(RuckBuddiesError(message: failure.message)),
-      (ruckBuddies) => emit(
-        RuckBuddiesLoaded(
-          ruckBuddies: ruckBuddies,
-          hasReachedMax: ruckBuddies.length < event.limit,
-          filter: event.filter,
-        ),
-      ),
+      (failure) {
+        debugPrint('[BLOC] Error fetching ruck buddies: ${failure.message}');
+        emit(RuckBuddiesError(message: failure.message));
+      },
+      (ruckBuddies) {
+        debugPrint('[BLOC] Loaded ${ruckBuddies.length} ruck buddies');
+        if (ruckBuddies.isEmpty) {
+          debugPrint('[BLOC] No ruck buddies found in API response');
+        } else {
+          debugPrint('[BLOC] First buddy: ${ruckBuddies.first.id}, user: ${ruckBuddies.first.user.username}');
+        }
+        emit(
+          RuckBuddiesLoaded(
+            ruckBuddies: ruckBuddies,
+            hasReachedMax: ruckBuddies.length < event.limit,
+            filter: event.filter,
+            latitude: lat,
+            longitude: lon,
+          ),
+        );
+      },
     );
   }
 
@@ -56,6 +98,8 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
         ruckBuddies: currentState.ruckBuddies,
         hasReachedMax: currentState.hasReachedMax,
         filter: currentState.filter,
+        latitude: currentState.latitude,
+        longitude: currentState.longitude,
         isLoadingMore: true,
       ),
     );
@@ -65,6 +109,8 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
         limit: event.limit,
         offset: currentState.ruckBuddies.length,
         filter: currentState.filter,
+        latitude: currentState.latitude,
+        longitude: currentState.longitude,
       ),
     );
     
@@ -95,12 +141,23 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
     RefreshRuckBuddiesEvent event, 
     Emitter<RuckBuddiesState> emit
   ) async {
-    // Get current filter
-    final String currentFilter = state is RuckBuddiesLoaded 
-        ? (state as RuckBuddiesLoaded).filter 
-        : 'recent';
+    // Get current filter and location
+    String currentFilter = 'closest';
+    double? currentLat;
+    double? currentLon;
     
-    // Reset pagination with current filter
-    add(FetchRuckBuddiesEvent(filter: currentFilter));
+    if (state is RuckBuddiesLoaded) {
+      final loadedState = state as RuckBuddiesLoaded;
+      currentFilter = loadedState.filter;
+      currentLat = loadedState.latitude;
+      currentLon = loadedState.longitude;
+    }
+    
+    // Reset pagination with current filter and location
+    add(FetchRuckBuddiesEvent(
+      filter: currentFilter,
+      latitude: currentLat,
+      longitude: currentLon,
+    ));
   }
 }

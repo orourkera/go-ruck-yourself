@@ -89,7 +89,7 @@ limiter.init_app(app)
 
 # Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
 from RuckTracker.api.ruck import HeartRateSampleUploadResource
-from RuckTracker.api.ruck_buddies import ruck_buddies_bp
+
 limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
 
 # Define custom rate limits for specific endpoints
@@ -110,8 +110,9 @@ def rate_limit_resource(resource, limit):
     resource.dispatch_request = wrapped_dispatch_request
     return resource
 
-# Apply rate limiting to Flask-RESTful endpoints
-decorators = [limiter.limit("5 per minute")]
+# Apply rate limiting to Flask-RESTful endpoints - using higher defaults
+# Individual resources can have their own specific limits applied via rate_limit_resource
+decorators = []  # No global rate limit - we'll set specific limits per endpoint
 
 # Enable CORS with specific allowed origins
 allowed_origins = [
@@ -164,6 +165,10 @@ from .api.stats import ( # Import new stats resources
     YearlyStatsResource
 )
 
+from .api.ruck_photos_resource import RuckPhotosResource # Added import for RuckPhotosResource
+from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesResource
+from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
+
 # Apply rate limiting to SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
 
@@ -180,6 +185,7 @@ def load_user():
     # Extract auth token from headers
     auth_header = request.headers.get('Authorization')
     g.user = None
+    g.access_token = None
     
     # Check if this is a development environment
     is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
@@ -199,21 +205,9 @@ def load_user():
                 
                 if user_response.user:
                     g.user = user_response.user
-                    # Store token in g.user for use in Supabase client initialization
-                    try:
-                        setattr(g.user, 'token', token)
-                    except Exception as e:
-                        logger.warning(f"Could not set token on user object: {e}")
-                        # If user is immutable, wrap in SimpleNamespace
-                        from types import SimpleNamespace
-                        user_dict = {}
-                        # Manually copy essential attributes if they exist
-                        for attr in ['id', 'email', 'phone', 'role']:
-                            if hasattr(g.user, attr):
-                                user_dict[attr] = getattr(g.user, attr)
-                        g.user = SimpleNamespace(**user_dict, token=token)
-                    logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
-                    logger.info("Token storage code is active")
+                    g.access_token = token
+                    logger.info(f"Token storage code is active")
+                    logger.debug(f"User {user_response.user.id} loaded successfully.")
                     return
                 else:
                     logger.warning("No user data returned from Supabase")
@@ -225,9 +219,11 @@ def load_user():
                         g.user = SimpleNamespace(
                             id="dev-user-id",
                             email="dev@example.com", 
-                            user_metadata={"name": "Development User"},
-                            token=token
+                            user_metadata={"name": "Development User"}
                         )
+                        g.access_token = token
+                    logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
+                    return
             except Exception as token_error:
                 logger.error(f"Token validation error: {str(token_error)}")
                 
@@ -238,9 +234,11 @@ def load_user():
                     g.user = SimpleNamespace(
                         id="dev-user-id",
                         email="dev@example.com", 
-                        user_metadata={"name": "Development User"},
-                        token=token
+                        user_metadata={"name": "Development User"}
                     )
+                    g.access_token = token
+                logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
+                return
                 
         except Exception as e:
             logger.error(f"Error authenticating user: {str(e)}", exc_info=True)
@@ -253,9 +251,9 @@ def load_user():
                 g.user = SimpleNamespace(
                     id="dev-user-id",
                     email="dev@example.com", 
-                    user_metadata={"name": "Development User"},
-                    token=token
+                    user_metadata={"name": "Development User"}
                 )
+                g.access_token = None
     else:
         logger.debug("No authorization header found")
         
@@ -266,9 +264,9 @@ def load_user():
             g.user = SimpleNamespace(
                 id="dev-user-id",
                 email="dev@example.com", 
-                user_metadata={"name": "Development User"},
-                token=None
+                user_metadata={"name": "Development User"}
             )
+            g.access_token = None
 
 # Force HTTPS redirect in production
 @app.before_request
@@ -289,19 +287,33 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 
 # Ruck session endpoints (prefixed with /api)
 api.add_resource(RuckSessionListResource, '/api/rucks')
-api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
-api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
-api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
-api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
-api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete')
-api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
-api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<string:ruck_id>/heart_rate')
-# api.add_resource(RuckSessionDetailResource, '/api/ruck-details/<string:session_id>') # Commented out
+api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
+api.add_resource(RuckSessionStartResource, '/api/rucks/start')
+api.add_resource(RuckSessionPauseResource, '/api/rucks/<int:ruck_id>/pause')
+api.add_resource(RuckSessionResumeResource, '/api/rucks/<int:ruck_id>/resume')
+api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete')
+api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')
+api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
-# Statistics endpoints (prefixed with /api)
-api.add_resource(WeeklyStatsResource, '/api/statistics/weekly')
-api.add_resource(MonthlyStatsResource, '/api/statistics/monthly')
-api.add_resource(YearlyStatsResource, '/api/statistics/yearly')
+# Stats Endpoints
+api.add_resource(WeeklyStatsResource, '/api/stats/weekly', '/api/statistics/weekly')
+api.add_resource(MonthlyStatsResource, '/api/stats/monthly', '/api/statistics/monthly')
+api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/yearly')
+
+# Ruck Photos Endpoint
+api.add_resource(RuckPhotosResource, '/api/ruck-photos')
+rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
+
+# Ruck Likes Endpoints
+api.add_resource(
+  rate_limit_resource(RuckLikesResource, "500 per minute"),  # Dramatically increased from 100/hour to 500/minute
+  '/api/ruck-likes',
+  '/api/ruck-likes/check'
+)
+
+# Ruck Comments Endpoint
+api.add_resource(RuckCommentsResource, '/api/ruck-comments')
+rate_limit_resource(RuckCommentsResource, "60 per minute") # Apply rate limiting
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
