@@ -81,16 +81,16 @@ migrate.init_app(app, db)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["500 per day", "100 per hour"],  # Increased default limits
+    default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
-    strategy="fixed-window"  # Keep original strategy
+    strategy="fixed-window"
 )
 limiter.init_app(app)
 
-# TEMPORARY FIX: Comment out missing import to prevent server crash
-# Previous import was causing ImportError because HeartRateSampleUploadResource doesn't exist
-# from RuckTracker.api.ruck import HeartRateSampleUploadResource
-# limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
+# Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
+from RuckTracker.api.ruck import HeartRateSampleUploadResource
+
+limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
 
 # Define custom rate limits for specific endpoints
 @app.route("/api/auth/register", methods=["POST"])
@@ -302,18 +302,18 @@ api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/year
 
 # Ruck Photos Endpoint
 api.add_resource(RuckPhotosResource, '/api/ruck-photos')
-rate_limit_resource(RuckPhotosResource, "120 per minute") # Increased from 30/minute to 120/minute
+rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Ruck Likes Endpoints
 api.add_resource(
-  rate_limit_resource(RuckLikesResource, "3000 per minute"),  # Increased from 500/minute to 3000/minute to prevent rate limit errors
+  rate_limit_resource(RuckLikesResource, "500 per minute"),  # Dramatically increased from 100/hour to 500/minute
   '/api/ruck-likes',
   '/api/ruck-likes/check'
 )
 
 # Ruck Comments Endpoint
 api.add_resource(RuckCommentsResource, '/api/ruck-comments')
-rate_limit_resource(RuckCommentsResource, "240 per minute") # Increased from 60/minute to 240/minute
+rate_limit_resource(RuckCommentsResource, "60 per minute") # Apply rate limiting
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
