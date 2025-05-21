@@ -672,15 +672,49 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   Future<void> _onUploadSessionPhotosRequested(
       UploadSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
-    if (state is ActiveSessionRunning) {
-      final currentState = state as ActiveSessionRunning;
-      emit(currentState.copyWith(isPhotosLoading: true));
-      try {
-        final uploadedPhotos = await _sessionRepository.uploadSessionPhotos(currentState.sessionId, event.photos);
-        final currentPhotos = List<RuckPhoto>.from(currentState.photos)..addAll(uploadedPhotos);
-        emit(currentState.copyWith(photos: currentPhotos, isPhotosLoading: false));
-      } catch (e) {
-        AppLogger.error('Failed to upload session photos: $e');
+    AppLogger.info('[PHOTO_DEBUG] _onUploadSessionPhotosRequested called with ${event.photos.length} photos');
+    AppLogger.info('[PHOTO_DEBUG] Current state: ${state.runtimeType}');
+    AppLogger.info('[PHOTO_DEBUG] Session ID: ${event.sessionId}');
+    
+    // Extract sessionId from event, not state (works in all states)
+    final sessionId = event.sessionId;
+    
+    // For any state, we can upload photos and then fetch them again
+    try {
+      AppLogger.info('[PHOTO_DEBUG] About to call _sessionRepository.uploadSessionPhotos with sessionId: $sessionId');
+      
+      // Upload the photos
+      final uploadedPhotos = await _sessionRepository.uploadSessionPhotos(sessionId, event.photos);
+      AppLogger.info('[PHOTO_DEBUG] Upload successful! Got ${uploadedPhotos.length} photos back from server');
+      
+      // Fetch the updated photos to refresh the UI
+      AppLogger.info('[PHOTO_DEBUG] Fetching all photos for session after successful upload');
+      final allSessionPhotos = await _sessionRepository.getSessionPhotos(sessionId);
+      AppLogger.info('[PHOTO_DEBUG] Fetched ${allSessionPhotos.length} total photos for session');
+      
+      // Update state based on current state type
+      if (state is ActiveSessionRunning) {
+        final currentState = state as ActiveSessionRunning;
+        emit(currentState.copyWith(photos: allSessionPhotos, isPhotosLoading: false));
+        AppLogger.info('[PHOTO_DEBUG] Updated ActiveSessionRunning state with photos');
+      } else if (state is SessionSummaryGenerated) {
+        final savedState = state as SessionSummaryGenerated;
+        // The photos are stored separately in the SessionSummaryGenerated state, not in the session object
+        emit(SessionSummaryGenerated(
+          session: savedState.session,
+          photos: allSessionPhotos,
+          isPhotosLoading: false
+        ));
+        AppLogger.info('[PHOTO_DEBUG] Updated SessionSummaryGenerated state with photos');
+      } else {
+        AppLogger.info('[PHOTO_DEBUG] State type not supported for photo updates: ${state.runtimeType}');
+      }
+    } catch (e) {
+      AppLogger.error('[PHOTO_DEBUG] Failed to upload session photos: $e');
+      
+      // Maintain state with error message
+      if (state is ActiveSessionRunning) {
+        final currentState = state as ActiveSessionRunning;
         emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to upload photos'));
       }
     }
@@ -688,43 +722,69 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   Future<void> _onDeleteSessionPhotoRequested(
       DeleteSessionPhotoRequested event, Emitter<ActiveSessionState> emit) async {
+    // Common code for extracting the photo ID
+    String photoId = '';
+    if (event.photo is RuckPhoto) {
+      photoId = (event.photo as RuckPhoto).id;
+    } else if (event.photo is String) {
+      photoId = event.photo as String;
+    } else if (event.photo is Map && event.photo['id'] != null) {
+      photoId = event.photo['id'].toString();
+    }
+    
+    if (photoId.isEmpty) {
+      AppLogger.error('Invalid photo ID for deletion');
+      return;
+    }
+    
+    // Create a RuckPhoto object to pass to the deletePhoto method
+    final photo = RuckPhoto(
+      id: photoId,
+      ruckId: event.sessionId,
+      userId: '', // Required field
+      filename: '', // Required field
+      createdAt: DateTime.now(), // Required field
+    );
+    
+    AppLogger.debug('[PHOTO_DEBUG] Deleting photo with ID: $photoId for session ${event.sessionId}');
+    
+    // Handle both active session and completed session states
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
       emit(currentState.copyWith(isPhotosLoading: true));
+      
       try {
-        // Extract photoId from the photo object if it's a RuckPhoto
-        String photoId = '';
-        if (event.photo is RuckPhoto) {
-          photoId = (event.photo as RuckPhoto).id;
-        } else if (event.photo is String) {
-          photoId = event.photo as String;
-        } else if (event.photo is Map && event.photo['id'] != null) {
-          photoId = event.photo['id'].toString();
-        }
-        
-        if (photoId.isEmpty) {
-          throw Exception('Invalid photo ID for deletion');
-        }
-        
-        // Create a RuckPhoto object to pass to the deletePhoto method
-        final photo = RuckPhoto(
-          id: photoId,
-          ruckId: event.sessionId, // Use ruckId instead of sessionId
-          userId: '', // Required field
-          filename: '', // Required field
-          createdAt: DateTime.now(), // Required field
-        );
         final success = await _sessionRepository.deletePhoto(photo);
         if (success) {
           final updatedPhotos = currentState.photos.where((p) => p.id != photoId).toList();
           emit(currentState.copyWith(photos: updatedPhotos, isPhotosLoading: false));
+          AppLogger.info('[PHOTO_DEBUG] Successfully deleted photo from ActiveSessionRunning state');
         } else {
           throw Exception('Failed to delete photo from repository');
         }
       } catch (e) {
-        AppLogger.error('Failed to delete session photo: $e');
+        AppLogger.error('[PHOTO_DEBUG] Failed to delete session photo: $e');
         emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to delete photo'));
       }
+    } else if (state is SessionSummaryGenerated) {
+      final currentState = state as SessionSummaryGenerated;
+      emit(currentState.copyWith(isPhotosLoading: true));
+      
+      try {
+        final success = await _sessionRepository.deletePhoto(photo);
+        if (success) {
+          final updatedPhotos = currentState.photos.where((p) => p.id != photoId).toList();
+          emit(currentState.copyWith(photos: updatedPhotos, isPhotosLoading: false));
+          AppLogger.info('[PHOTO_DEBUG] Successfully deleted photo from SessionSummaryGenerated state');
+        } else {
+          throw Exception('Failed to delete photo from repository');
+        }
+      } catch (e) {
+        AppLogger.error('[PHOTO_DEBUG] Failed to delete session photo: $e');
+        emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to delete photo'));
+      }
+    } else {
+      AppLogger.error('[PHOTO_DEBUG] Cannot delete photo - unsupported state: ${state.runtimeType}');
     }
   }
 
