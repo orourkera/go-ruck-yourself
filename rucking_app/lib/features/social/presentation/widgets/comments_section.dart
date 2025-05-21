@@ -45,6 +45,7 @@ class _CommentsSectionState extends State<CommentsSection> {
   final FocusNode _commentFocusNode = FocusNode();
   bool _isAddingComment = false;
   String? _editingCommentId;
+  bool _commentsLoaded = false; // Track if comments have been loaded to prevent duplicate requests
   
   // Get the current user ID from the AuthBloc
   String? _getCurrentUserId(BuildContext context) {
@@ -65,7 +66,9 @@ class _CommentsSectionState extends State<CommentsSection> {
     super.initState();
     
     // Load comments on init
+    debugPrint('[COMMENT_DEBUG] CommentsSection initState for ruckId: ${widget.ruckId}');
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugPrint('[COMMENT_DEBUG] CommentsSection loading comments for ruckId: ${widget.ruckId}');
       context.read<SocialBloc>().add(LoadRuckComments(widget.ruckId));
     });
   }
@@ -160,19 +163,49 @@ class _CommentsSectionState extends State<CommentsSection> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[COMMENT_DEBUG] CommentsSection build called for ruckId: ${widget.ruckId}');
+    
+    // Manually trigger load if no comments are loaded yet
+    if (!_commentsLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint('[COMMENT_DEBUG] CommentsSection forcing load of comments for ruckId: ${widget.ruckId}');
+        context.read<SocialBloc>().add(LoadRuckComments(widget.ruckId));
+        _commentsLoaded = true;
+      });
+    }
+    
     return BlocConsumer<SocialBloc, SocialState>(
       listenWhen: (previous, current) {
-        // Listen only for states related to comments
-        return current is CommentsLoaded || 
-               current is CommentActionCompleted || 
-               current is CommentActionError;
+        // Improved listening for any comment-related states
+        final relevantState = current is CommentsLoaded || 
+                            current is CommentActionCompleted || 
+                            current is CommentActionError;
+        
+        // Check if this is for our specific ruck ID
+        bool isForThisRuck = false;
+        if (current is CommentsLoaded) {
+          isForThisRuck = current.ruckId == widget.ruckId;
+        } else if (current is CommentActionCompleted && current.comment != null) {
+          isForThisRuck = current.comment!.ruckId == widget.ruckId;
+        }
+        
+        debugPrint('[COMMENT_DEBUG] CommentsSection listenWhen: previous=${previous.runtimeType}, current=${current.runtimeType}, relevantState=$relevantState, isForThisRuck=$isForThisRuck');
+        
+        return relevantState && (current is CommentActionError || isForThisRuck);
       },
       listener: (context, state) {
+        debugPrint('[COMMENT_DEBUG] CommentsSection listener fired with state: ${state.runtimeType}');
+        
         if (state is CommentActionCompleted) {
           setState(() {
             _isAddingComment = false;
             _editingCommentId = null;
+            _commentController.clear(); // Clear the text field after successful submission
           });
+          
+          // Automatically refresh comments list after an action
+          debugPrint('[COMMENT_DEBUG] CommentActionCompleted, refreshing comments for ruckId: ${widget.ruckId}');
+          context.read<SocialBloc>().add(LoadRuckComments(widget.ruckId));
           
           if (state.actionType == 'add') {
             StyledSnackBar.show(
@@ -203,9 +236,13 @@ class _CommentsSectionState extends State<CommentsSection> {
             message: 'Error: ${state.message}',
             type: SnackBarType.error,
           );
+        } else if (state is CommentsLoaded) {
+          debugPrint('[COMMENT_DEBUG] CommentsLoaded state with ${state.comments.length} comments for ruckId: ${state.ruckId}');
         }
       },
       builder: (context, state) {
+        debugPrint('[COMMENT_DEBUG] CommentsSection builder with state: ${state.runtimeType}');
+        
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -233,7 +270,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                   child: CircularProgressIndicator(),
                 ),
               )
-            else if (state is CommentsLoaded)
+            else if (state is CommentsLoaded && state.ruckId == widget.ruckId)
               _buildCommentsList(state.comments)
             else if (state is CommentsError)
               Padding(
@@ -246,7 +283,7 @@ class _CommentsSectionState extends State<CommentsSection> {
             else
               const Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text('No comments yet. Be the first to comment!'),
+                child: Text('Loading comments...'),
               ),
             
             // Add comment section - only show if hideInput is false

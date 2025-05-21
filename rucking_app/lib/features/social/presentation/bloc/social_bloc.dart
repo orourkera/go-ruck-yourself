@@ -482,8 +482,23 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
           Map<int, int>.from(result['likeCounts'] as Map) : {};
       
       debugPrint('[SOCIAL_DEBUG] Batch like status check completed for ${likeStatusMap.length} rucks');
-      debugPrint('[SOCIAL_DEBUG] Like counts: $likeCountMap');
+      debugPrint('[SOCIAL_DEBUG] Final processed like statuses: $likeStatusMap');
+      debugPrint('[SOCIAL_DEBUG] Final processed like counts: $likeCountMap');
       
+      // Process each ruck ID individually to make sure the state changes are registered properly
+      // This ensures multiple heart icons update correctly across different UI components
+      for (final ruckId in event.ruckIds) {
+        if (likeStatusMap.containsKey(ruckId)) {
+          final isLiked = likeStatusMap[ruckId] ?? false;
+          final likeCount = likeCountMap[ruckId] ?? 0;
+          
+          // Emit individual status updates first so listeners can react
+          emit(LikeStatusChecked(ruckId: ruckId, isLiked: isLiked, likeCount: likeCount));
+          debugPrint('[SOCIAL_DEBUG] Emitted individual status for ruck $ruckId: isLiked=$isLiked, count=$likeCount');
+        }
+      }
+      
+      // Now emit the batch update for components that listen to the batch event
       emit(BatchLikeStatusChecked(likeStatusMap, likeCountMap: likeCountMap));
     } on UnauthorizedException catch (e) {
       debugPrint('[SOCIAL_DEBUG] Authentication error checking batch like status: ${e.message}');

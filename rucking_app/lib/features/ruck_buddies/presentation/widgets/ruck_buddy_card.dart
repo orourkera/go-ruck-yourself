@@ -57,11 +57,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_ruckId != null) {
-        // Use batch check for better performance (also updates other cards)
-        final socialBloc = context.read<SocialBloc>();
-        socialBloc.add(BatchCheckUserLikeStatus([_ruckId!])); 
-        developer.log('[LIKE_DEBUG] RuckBuddyCard initState: Ruck ID $_ruckId - Dispatching BatchCheckUserLikeStatus', name: 'RuckBuddyCard');
-
+        // NOTE: We no longer make individual BatchCheckUserLikeStatus calls here
+        // The parent list screen now makes a single batch call for all cards
+        // This significantly reduces API calls and prevents rate limiting
+        
         developer.log('[PHOTO_DEBUG] RuckBuddyCard initState: Ruck ID ${widget.ruckBuddy.id} - Fetching photos. Initial count: ${_photos.length}', name: 'RuckBuddyCard');
         final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
 
