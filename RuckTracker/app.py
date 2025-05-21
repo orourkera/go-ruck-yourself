@@ -81,9 +81,9 @@ migrate.init_app(app, db)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["500 per day", "100 per hour"],  # Increased default limits
     storage_uri="memory://",
-    strategy="fixed-window"
+    strategy="moving-window"  # Changed to moving-window for smoother rate limiting
 )
 limiter.init_app(app)
 
@@ -306,7 +306,7 @@ rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Ruck Likes Endpoints
 api.add_resource(
-  rate_limit_resource(RuckLikesResource, "500 per minute"),  # Dramatically increased from 100/hour to 500/minute
+  rate_limit_resource(RuckLikesResource, "3000 per minute"),  # Increased from 500/minute to 3000/minute to prevent rate limit errors
   '/api/ruck-likes',
   '/api/ruck-likes/check'
 )
