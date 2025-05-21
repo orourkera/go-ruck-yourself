@@ -720,37 +720,56 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                               Icons.arrow_downward, // Alternative: FontAwesomeIcons.heartbeat with a different style
                               iconColor: Colors.blueAccent // Or a specific color for min HR
                             ),
-                          // Add a debug message about heart rate graph
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16.0),
-                            child: widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty
-                              ? HeartRateGraph(
-                                  samples: widget.session.heartRateSamples!,
+                          // Heart rate graph
+                          BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                            buildWhen: (previous, current) {
+                              // Only rebuild when the session contains heart rate samples
+                              if (current is SessionSummaryGenerated) {
+                                return current.session.heartRateSamples != null;
+                              }
+                              return false;
+                            },
+                            builder: (context, state) {
+                              // Get heart rate samples from the updated state if available
+                              List<HeartRateSample>? heartRateSamples = widget.session.heartRateSamples;
+                              
+                              // Check if we have updated session data in the state
+                              if (state is SessionSummaryGenerated && state.session.id == widget.session.id) {
+                                if (state.session.heartRateSamples != null && state.session.heartRateSamples!.isNotEmpty) {
+                                  heartRateSamples = state.session.heartRateSamples;
+                                  AppLogger.debug('[HEARTRATE_DEBUG] Using ${heartRateSamples!.length} heart rate samples from updated state');
+                                }
+                              }
+                              
+                              if (heartRateSamples != null && heartRateSamples.isNotEmpty) {
+                                return HeartRateGraph(
+                                  samples: heartRateSamples,
                                   height: 150,
                                   showLabels: true,
                                   showTooltips: true,
-                                )
-                              : Container(
+                                );
+                              } else {
+                                return Container(
                                   height: 150,
                                   width: double.infinity,
                                   decoration: BoxDecoration(
                                     color: Colors.grey.shade100,
                                     borderRadius: BorderRadius.circular(8.0),
                                   ),
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.timeline_outlined, size: 36, color: Colors.grey.shade400),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'No heart rate data available',
-                                          style: TextStyle(color: Colors.grey.shade600),
-                                        ),
-                                      ],
-                                    ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.timeline_outlined, size: 36, color: Colors.grey.shade400),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'No heart rate data available',
+                                        style: TextStyle(color: Colors.grey.shade600),
+                                      ),
+                                    ],
                                   ),
-                                ),
+                                );
+                              }
+                            },
                           ),
                         ],
                       );
