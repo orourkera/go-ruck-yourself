@@ -73,8 +73,11 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Dispatching CheckUserLikeStatus', name: 'RuckBuddyCard');
           
           // Always fetch photos for this ruck to ensure consistency
-          developer.log('RuckBuddyCard initState: Ruck ID $ruckId - Fetching photos regardless of initial state. Initial count: ${_photos.length}', name: 'RuckBuddyCard');
+          developer.log('[PHOTO_DEBUG] RuckBuddyCard initState: Ruck ID $ruckIdStr - Fetching photos. Initial count: ${_photos.length}', name: 'RuckBuddyCard');
           final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+          
+          // Request photos from the bloc - must use string ID
+          activeSessionBloc.add(FetchSessionPhotosRequested(ruckIdStr));
           
           // First, convert the RuckBuddy to a RuckSession to properly prime the bloc
           // This mimics what LoadSessionForViewing does in the detail screen
@@ -177,67 +180,149 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         BlocListener<ActiveSessionBloc, ActiveSessionState>(
           bloc: GetIt.instance<ActiveSessionBloc>(),
           listener: (context, state) {
-            developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} received state: $state', name: 'RuckBuddyCard');
+            developer.log('[PHOTO_DEBUG] RuckBuddyCard listener: Received state ${state.runtimeType}', name: 'RuckBuddyCard');
             
-            // After our changes, the bloc should emit these states:
-            // 1. ActiveSessionRunning when LoadSessionForViewing completes
-            // 2. The same ActiveSessionRunning with updated photos when FetchSessionPhotosRequested completes
-            
-            // Handle ActiveSessionRunning state with a matching sessionId
-            if (state is ActiveSessionRunning && state.sessionId == widget.ruckBuddy.id) {
-              developer.log('RuckBuddyCard: Received ActiveSessionRunning for session ${state.sessionId} with ${state.photos.length} photos', name: 'RuckBuddyCard');
+            // Handle SessionSummaryGenerated state - the most common for completed sessions
+            if (state is SessionSummaryGenerated && state.session.id == widget.ruckBuddy.id) {
+              developer.log('[PHOTO_DEBUG] RuckBuddyCard: Received SessionSummaryGenerated for session ${state.session.id} with ${state.photos.length} photos', name: 'RuckBuddyCard');
               
               if (mounted && state.photos.isNotEmpty) {
-                developer.log('RuckBuddyCard: Updating photos for card ${widget.ruckBuddy.id} with ${state.photos.length} photos', name: 'RuckBuddyCard');
+                // Extract photo URLs for logging
+                final photoUrls = state.photos.map((p) {
+                  if (p is RuckPhoto) {
+                    final url = p.url;
+                    final thumbnailUrl = p.thumbnailUrl;
+                    if (url != null && url.isNotEmpty) return url;
+                    if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) return thumbnailUrl;
+                  }
+                  return '';
+                }).where((url) => url.isNotEmpty).toList();
+                
+                if (photoUrls.isNotEmpty) {
+                  developer.log('[PHOTO_DEBUG] RuckBuddyCard: First photo URL: ${photoUrls.first}', name: 'RuckBuddyCard');
+                }
+                
+                developer.log('[PHOTO_DEBUG] RuckBuddyCard: Updating photos for card ${widget.ruckBuddy.id} with ${state.photos.length} photos', name: 'RuckBuddyCard');
                 setState(() {
-                  _photos = state.photos;
+                  // Properly convert each dynamic object to RuckPhoto
+                  _photos = state.photos.map((dynamic photo) {
+                    if (photo is RuckPhoto) {
+                      return photo;
+                    }
+                    // If it's a Map, convert it to RuckPhoto
+                    if (photo is Map<String, dynamic>) {
+                      return RuckPhoto(
+                        id: photo['id'] as String? ?? '',
+                        ruckId: photo['ruck_id'] != null ? photo['ruck_id'].toString() : '',
+                        userId: photo['user_id'] as String? ?? '',
+                        filename: photo['filename'] as String? ?? '',
+                        originalFilename: photo['original_filename'] as String?,
+                        contentType: photo['content_type'] as String?,
+                        size: photo['size'] as int?,
+                        createdAt: photo['created_at'] != null 
+                            ? DateTime.parse(photo['created_at'] as String) 
+                            : DateTime.now(),
+                        url: photo['url'] as String?,
+                        thumbnailUrl: photo['thumbnail_url'] as String?,
+                      );
+                    }
+                    // Fallback empty photo (shouldn't happen)
+                    return RuckPhoto(
+                      id: '',
+                      ruckId: '',
+                      userId: '',
+                      filename: '',
+                      createdAt: DateTime.now(),
+                    );
+                  }).toList().cast<RuckPhoto>();
                 });
               }
             }
-            // Also still handle the ActiveSessionInitial state for backward compatibility
+            // Handle ActiveSessionRunning state
+            else if (state is ActiveSessionRunning && state.sessionId == widget.ruckBuddy.id) {
+              developer.log('[PHOTO_DEBUG] RuckBuddyCard: Received ActiveSessionRunning for session ${state.sessionId} with ${state.photos.length} photos', name: 'RuckBuddyCard');
+              
+              if (mounted && state.photos.isNotEmpty) {
+                developer.log('[PHOTO_DEBUG] RuckBuddyCard: Updating photos for card ${widget.ruckBuddy.id} with ${state.photos.length} photos', name: 'RuckBuddyCard');
+                setState(() {
+                  // Properly convert each dynamic object to RuckPhoto
+                  _photos = state.photos.map((dynamic photo) {
+                    if (photo is RuckPhoto) {
+                      return photo;
+                    }
+                    // If it's a Map, convert it to RuckPhoto
+                    if (photo is Map<String, dynamic>) {
+                      return RuckPhoto(
+                        id: photo['id'] as String? ?? '',
+                        ruckId: photo['ruck_id'] != null ? photo['ruck_id'].toString() : '',
+                        userId: photo['user_id'] as String? ?? '',
+                        filename: photo['filename'] as String? ?? '',
+                        originalFilename: photo['original_filename'] as String?,
+                        contentType: photo['content_type'] as String?,
+                        size: photo['size'] as int?,
+                        createdAt: photo['created_at'] != null 
+                            ? DateTime.parse(photo['created_at'] as String) 
+                            : DateTime.now(),
+                        url: photo['url'] as String?,
+                        thumbnailUrl: photo['thumbnail_url'] as String?,
+                      );
+                    }
+                    // Fallback empty photo
+                    return RuckPhoto(
+                      id: '',
+                      ruckId: '',
+                      userId: '',
+                      filename: '',
+                      createdAt: DateTime.now(),
+                    );
+                  }).toList().cast<RuckPhoto>();
+                });
+              }
+            }
+            // Handle ActiveSessionInitial state
             else if (state is ActiveSessionInitial && state.viewedSession != null && state.photos.isNotEmpty) {
               final sessionId = state.viewedSession?.id;
-              developer.log('RuckBuddyCard: Received ActiveSessionInitial with ${state.photos.length} photos for session $sessionId', name: 'RuckBuddyCard');
+              developer.log('[PHOTO_DEBUG] RuckBuddyCard: Received ActiveSessionInitial with ${state.photos.length} photos for session $sessionId', name: 'RuckBuddyCard');
               
               if (mounted && sessionId == widget.ruckBuddy.id) {
-                developer.log('RuckBuddyCard: Updating photos for card with ${state.photos.length} photos', name: 'RuckBuddyCard');
+                developer.log('[PHOTO_DEBUG] RuckBuddyCard: Updating photos for card with ${state.photos.length} photos', name: 'RuckBuddyCard');
                 setState(() {
-                  _photos = state.photos;
+                  // Properly convert each dynamic object to RuckPhoto
+                  _photos = state.photos.map((dynamic photo) {
+                    if (photo is RuckPhoto) {
+                      return photo;
+                    }
+                    // If it's a Map, convert it to RuckPhoto
+                    if (photo is Map<String, dynamic>) {
+                      return RuckPhoto(
+                        id: photo['id'] as String? ?? '',
+                        ruckId: photo['ruck_id'] != null ? photo['ruck_id'].toString() : '',
+                        userId: photo['user_id'] as String? ?? '',
+                        filename: photo['filename'] as String? ?? '',
+                        originalFilename: photo['original_filename'] as String?,
+                        contentType: photo['content_type'] as String?,
+                        size: photo['size'] as int?,
+                        createdAt: photo['created_at'] != null 
+                            ? DateTime.parse(photo['created_at'] as String) 
+                            : DateTime.now(),
+                        url: photo['url'] as String?,
+                        thumbnailUrl: photo['thumbnail_url'] as String?,
+                      );
+                    }
+                    // Fallback empty photo
+                    return RuckPhoto(
+                      id: '',
+                      ruckId: '',
+                      userId: '',
+                      filename: '',
+                      createdAt: DateTime.now(),
+                    );
+                  }).toList().cast<RuckPhoto>();
                 });
               }
             }
-            
-            // Keep these commented until we can successfully update the ActiveSessionBloc
-            // Uncomment once the Bloc emits these states
-            /*
-            if (state is SessionPhotosLoadingForId && state.sessionId == widget.ruckBuddy.id) {
-              developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - SessionPhotosLoadingForId', name: 'RuckBuddyCard');
-            } else if (state is SessionPhotosLoadedForId && state.sessionId == widget.ruckBuddy.id) {
-              developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - SessionPhotosLoadedForId with ${state.photos.length} photos', name: 'RuckBuddyCard');
-              if (mounted) {
-                setState(() {
-                  _photos = state.photos;
-                });
-              }
-            } else if (state is SessionPhotosErrorForId && state.sessionId == widget.ruckBuddy.id) {
-              developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - SessionPhotosErrorForId: ${state.errorMessage}', name: 'RuckBuddyCard');
-            }
-            */
-            // Keep handling for main state updates if needed for other scenarios, though less critical for RuckBuddyCard now
-            // else if (state is ActiveSessionPhotosLoaded && state.sessionId == widget.ruckBuddy.id) {
-            //   developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - ActiveSessionPhotosLoaded with ${state.photos.length} photos (fallback)', name: 'RuckBuddyCard');
-            //   if (mounted) {
-            //     setState(() {
-            //       _photos = state.photos;
-            //     });
-            //   }
-            // } else if (state is ActiveSessionLoading && state.sessionId == widget.ruckBuddy.id) {
-            //   developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - ActiveSessionLoading (fallback)', name: 'RuckBuddyCard');
-            // } else if (state is ActiveSessionError && state.message.contains(widget.ruckBuddy.id.toString())) { 
-            //   developer.log('RuckBuddyCard ActiveSessionBloc Listener: Ruck ID ${widget.ruckBuddy.id} - ActiveSessionError: ${state.message} (fallback)', name: 'RuckBuddyCard');
-            // }
           },
-        ),
+        ), 
         BlocListener<SocialBloc, SocialState>(
       listenWhen: (previous, current) {
         // Listen for like action completions and status checks
@@ -654,13 +739,29 @@ class _PhotoThumbnailsOverlay extends StatelessWidget {
   
   // Process photo URLs with cache busting parameters
   List<String> _getProcessedUrls() {
-    // Fall back to regular approach
-    final photoUrls = photos
-        .map((p) => p.url)
-        .where((url) => url != null && url!.isNotEmpty)
-        .cast<String>()
-        .toList();
-        
+    developer.log('[PHOTO_DEBUG] _PhotoThumbnailsOverlay: Processing ${photos.length} photos', name: 'RuckBuddyCard');
+    
+    // More robust approach that handles both URLs and falls back to thumbnails
+    final photoUrls = photos.map((p) {
+      final url = p.url;
+      final thumbnailUrl = p.thumbnailUrl;
+      
+      developer.log('[PHOTO_DEBUG] _PhotoThumbnailsOverlay: Photo ${p.id} has URL: $url, thumbnail: $thumbnailUrl', name: 'RuckBuddyCard');
+      
+      // Prefer main URL, fall back to thumbnail if main is empty/null
+      if (url != null && url.isNotEmpty) {
+        return url;
+      } else if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
+        return thumbnailUrl;
+      }
+      return '';
+    })
+    .where((url) => url.isNotEmpty)
+    .toList();
+    
+    developer.log('[PHOTO_DEBUG] _PhotoThumbnailsOverlay: Extracted ${photoUrls.length} valid URLs', name: 'RuckBuddyCard');
+    
+    // Add cache busting parameters to URLs
     return photoUrls.map((url) {
       final cacheBuster = DateTime.now().millisecondsSinceEpoch;
       return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';
