@@ -19,12 +19,12 @@ This document provides a comprehensive list of all API endpoints used in the Ruc
 | `/rucks` | POST | Create a new ruck session |
 | `/rucks/{id}` | GET | Get details of a specific session |
 | `/rucks/{id}` | DELETE | Delete a specific session |
-| `/rucks/{id}/start` | POST | Start a ruck session |
+| `/api/rucks/start` | POST | Start a ruck session (send ruck_id in the request body, not in URL) |
 | `/rucks/{id}/pause` | POST | Pause a ruck session |
 | `/rucks/{id}/resume` | POST | Resume a paused ruck session |
 | `/rucks/{id}/complete` | POST | Complete a ruck session |
 | `/rucks/{id}/location` | POST | Add location point to a session |
-| `/api/rucks/{id}/heart_rate` | POST | Add heart rate samples to a session (NOTE: This endpoint requires a double `/api` prefix!) |
+| `/api/rucks/{id}/heartrate` | POST | Add heart rate samples to a session (NOTE: Uses 'heartrate' without underscore!) |
 
 ### Photos
 

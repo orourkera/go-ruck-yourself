@@ -142,6 +142,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       if (sessionId == null || sessionId.isEmpty) throw Exception('Failed to create session: No ID.');
       AppLogger.debug('Created new session with ID: $sessionId');
 
+      // Use path with explicit ruck_id as URL parameter to match server expectation
       await _apiClient.post('/rucks/$sessionId/start', {});
       AppLogger.debug('Backend notified of session start for $sessionId');
 
@@ -483,9 +484,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final RuckSession completedSession = RuckSession.fromJson(response);
         
         AppLogger.debug('Session ${currentState.sessionId} completed successfully.');
-        emit(SessionSummaryGenerated(session: completedSession, photos: currentState.photos, isPhotosLoading: false));
-        await _watchService.endSessionOnWatch();
-        await _healthService.saveWorkout(
+      emit(SessionSummaryGenerated(session: completedSession, photos: currentState.photos, isPhotosLoading: false));
+      
+      _watchService.endSessionOnWatch().catchError((e) {
+        // Just log the error but don't block UI progression
+        AppLogger.error('Error ending session on watch (non-blocking): $e');
+      });
+      
+      // Health service integration should continue regardless of watch status
+      await _healthService.saveWorkout(
             startDate: completedSession.startTime ?? currentState.originalSessionStartTimeUtc.subtract(finalTotalPausedDuration),
             endDate: completedSession.endTime ?? DateTime.now().toUtc(),
             distanceKm: completedSession.distance,
@@ -609,7 +616,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (samples.isEmpty || sessionId.isEmpty) return;
     try {
       final List<Map<String, dynamic>> samplesJson = samples.map((s) => s.toJsonForApi()).toList();
-      await _apiClient.post('/rucks/$sessionId/heart_rate', {'samples': samplesJson});
+      // Use path without /api prefix since baseUrl already includes it
+      await _apiClient.post('/rucks/$sessionId/heartrate', {'samples': samplesJson});
       AppLogger.debug('Sent ${samples.length} heart rate samples to API for $sessionId.');
     } catch (e, stackTrace) {
       AppLogger.error('Failed to send heart rate samples to API: $e\n$stackTrace');
