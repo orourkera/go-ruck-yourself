@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math' as math;
+import 'package:flutter/painting.dart' show decodeImageFromList;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/services/api_client.dart'; 
 import 'package:rucking_app/core/services/auth_service.dart';
@@ -264,129 +266,162 @@ class SessionRepository {
     final List<RuckPhoto> allUploadedPhotos = [];
     
     try {
-      AppLogger.info('[PHOTO_UPLOAD] Starting upload of ${photos.length} photos for session: $ruckId');
+      AppLogger.info('===== START PHOTO UPLOAD (${photos.length} photos for ruckId: $ruckId) =====');
       
+      // We can only upload 1 photo at a time over multipart form data
+      // This will also help us avoid rate limits
       if (photos.isEmpty) {
-        AppLogger.info('[PHOTO_UPLOAD] No photos to upload, returning empty list');
+        AppLogger.info('[PHOTO_DEBUG] No photos to upload');
         return [];
       }
       
-      // Check if any photos don't exist or are empty
+      // Use the multi-part upload endpoint which is more efficient for photos
+      AppLogger.info('[PHOTO_DEBUG] Getting ready to upload photos with multipart request');
+      
+      // Process one photo at a time to avoid server timeouts and respect rate limits
       for (int i = 0; i < photos.length; i++) {
-        final file = photos[i];
-        final exists = await file.exists();
-        final size = exists ? await file.length() : 0;
-        
-        AppLogger.info('[PHOTO_UPLOAD] Photo ${i+1} check: exists=$exists, size=$size bytes');
-        
-        if (!exists || size == 0) {
-          AppLogger.error('[PHOTO_UPLOAD] Photo ${i+1} is invalid: exists=$exists, size=$size bytes');
+        // Add delay between uploads for rate limiting (5 per minute)
+        if (i > 0) {
+          AppLogger.info('[PHOTO_DEBUG] Waiting for rate limit (12 seconds between uploads)');
+          await Future.delayed(const Duration(seconds: 12));
         }
-      }
       
-      // Get the auth token - we'll need this for each request
-      final authService = GetIt.I<AuthService>();
-      final authToken = await authService.getToken();
-      
-      // For photo upload, we need to use a direct URL approach - we'll use the API host from .env file
-      final apiHost = dotenv.env['API_HOST'] ?? 'https://getrucky.com';
-      final url = '$apiHost${ApiEndpoints.ruckPhotos}';
-      AppLogger.info('Uploading photos to URL: $url');
-      
-      // Upload each photo individually to avoid timeout issues
-      for (int i = 0; i < photos.length; i++) {
-        AppLogger.info('Uploading photo ${i+1} of ${photos.length}');
-        final photo = photos[i];
-        
-        // Create a new request for each photo to prevent connection timeouts
-        bool photoUploaded = false;
-        int retryCount = 0;
-        Exception? lastError;
-        
-        // Try uploading this photo up to 3 times
-        while (!photoUploaded && retryCount < 3) {
-          try {
-            final singlePhotoRequest = http.MultipartRequest(
-              'POST',
-              Uri.parse(url),
-            );
-            
-            // Add timeout settings to the request
-            singlePhotoRequest.persistentConnection = false;
-            
-            // Add the authorization header
-            if (authToken != null && authToken.isNotEmpty) {
-              singlePhotoRequest.headers.addAll({
-                'Authorization': 'Bearer $authToken',
-              });
-            }
-            
-            // Add ruck_id as a form field
-            singlePhotoRequest.fields['ruck_id'] = ruckId;
-            AppLogger.info('Added ruck_id=$ruckId to photo upload request');
-            
-            // Add this single photo to the request
-            final originalFilename = path.basename(photo.path);
-            final contentType = _getContentType(photo.path);
-            
-            singlePhotoRequest.files.add(
-              await http.MultipartFile.fromPath(
-                'photos', // The field name expected by the backend
-                photo.path,
-                filename: originalFilename,
-                contentType: MediaType.parse(contentType),
-              ),
-            );
-            
-            // Send the request with timeout protection
-            AppLogger.info('Sending request for photo ${i+1} (attempt ${retryCount+1})');
-            final client = http.Client();
-            try {
-              final streamedResponse = await client.send(singlePhotoRequest)
-                  .timeout(const Duration(seconds: 30));
-              final response = await http.Response.fromStream(streamedResponse);
-              
-              // Handle the response
-              if (response.statusCode == 201) {
-                photoUploaded = true;
-                final responseData = json.decode(response.body);
-                
-                if (responseData is Map && 
-                    responseData.containsKey('data') && 
-                    responseData['data'] is Map && 
-                    responseData['data'].containsKey('photos')) {
-                  
-                  final photosList = responseData['data']['photos'] as List;
-                  final List<RuckPhoto> uploadedPhotos = photosList
-                      .map((photo) => RuckPhoto.fromJson(photo))
-                      .toList();
-                  
-                  if (uploadedPhotos.isNotEmpty) {
-                    allUploadedPhotos.addAll(uploadedPhotos);
-                    AppLogger.info('Successfully uploaded photo ${i+1}');
-                  }
-                }
-              } else {
-                throw Exception('Photo upload failed with status: ${response.statusCode}, Body: ${response.body}');
-              }
-            } finally {
-              client.close();
-            }
-          } catch (e) {
-            lastError = e is Exception ? e : Exception(e.toString());
-            retryCount++;
-            AppLogger.error('Error uploading photo ${i+1} (attempt $retryCount): $e');
-            await Future.delayed(Duration(seconds: 2 * retryCount)); // Backoff strategy
+        try {
+          final photo = photos[i];
+          final exists = await photo.exists();
+          final size = exists ? await photo.length() : 0;
+          
+          if (!exists || size == 0) {
+            AppLogger.error('[PHOTO_DEBUG] Skipping invalid photo ${i+1}');
+            continue;
           }
-        }
         
-        // If we still couldn't upload this photo after retries, log it but continue with others
-        if (!photoUploaded) {
-          AppLogger.error('Failed to upload photo ${i+1} after 3 attempts: $lastError');
+          AppLogger.info('[PHOTO_DEBUG] Processing photo ${i+1}: ${photo.path}');
+          
+          // For photo upload, we need to use a direct URL approach since ApiClient's built-in
+          // methods don't handle multipart form data well
+          final apiHost = dotenv.env['API_HOST'] ?? 'https://getrucky.com';
+          final endpoint = '/ruck-photos'; // Endpoint without /api prefix
+          final url = '$apiHost/api$endpoint';
+        
+          // Get the auth token
+          final authService = GetIt.I<AuthService>();
+          final authToken = await authService.getToken();
+          
+          if (authToken == null || authToken.isEmpty) {
+            AppLogger.error('[PHOTO_DEBUG] Authentication token is null or empty!');
+            throw ApiException(message: 'Authentication token is missing');
+          }
+          
+          // Create a multipart request
+          final request = http.MultipartRequest('POST', Uri.parse(url));
+          
+          // Add headers
+          request.headers.addAll({
+            'Authorization': 'Bearer $authToken',
+            'Accept': 'application/json',
+          });
+          
+          // Add fields
+          request.fields['ruck_id'] = ruckId;
+        
+          // Upload the original file directly - we'll add proper image compression in a future update if needed
+          File fileToUpload = photo;
+          AppLogger.info('[PHOTO_DEBUG] Using original file: $size bytes');
+          
+          // Add the file
+          final fileName = path.basename(fileToUpload.path);
+          final contentType = _getContentType(fileToUpload.path);
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'photos', // The field name expected by the backend
+              fileToUpload.path,
+              filename: fileName,
+              contentType: MediaType.parse(contentType),
+            ),
+          );
+          
+          AppLogger.info('[PHOTO_DEBUG] Sending multipart request for photo ${i+1}');
+        
+          // Send the request
+          final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+          final response = await http.Response.fromStream(streamedResponse);
+          
+          // Handle rate limiting
+          if (response.statusCode == 429) {
+            AppLogger.warning('[PHOTO_DEBUG] Rate limit hit (${response.body}). Waiting...');
+            await Future.delayed(const Duration(seconds: 15)); // Wait longer to respect rate limit
+            throw ApiException(message: response.body); // Will be caught and retried
+          }
+          
+          // Handle successful response
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            AppLogger.info('[PHOTO_DEBUG] Upload successful for photo ${i+1} with status ${response.statusCode}');
+            
+            // Parse the response
+            final responseData = json.decode(response.body);
+            AppLogger.info('[PHOTO_DEBUG] Response: ${json.encode(responseData).substring(0, math.min(100, json.encode(responseData).length))}...');
+            
+            // Try to parse response formats
+            List<dynamic>? photosList;
+            
+            // Format 1: Direct response is the photo object
+            if (responseData is Map && responseData.containsKey('id') && responseData.containsKey('url')) {
+              photosList = [responseData];
+              AppLogger.debug('[PHOTO_DEBUG] Found direct photo object in response');
+            }
+            // Format 2: {"success": true, "data": {...}}
+            else if (responseData is Map && responseData.containsKey('success') && responseData.containsKey('data')) {
+              AppLogger.debug('[PHOTO_DEBUG] Found success/data format in response');
+              if (responseData['data'] is Map) {
+                photosList = [responseData['data']];
+              } else if (responseData['data'] is List) {
+                photosList = responseData['data'];
+              }
+            }
+            // Format 3: Just a list of photos
+            else if (responseData is List) {
+              photosList = responseData;
+              AppLogger.debug('[PHOTO_DEBUG] Found list format in response');
+            }
+          
+            if (photosList != null) {
+              // Parse each photo from the list
+              List<RuckPhoto> uploadedPhotos = [];
+              
+              for (var photoData in photosList) {
+                try {
+                  if (photoData is Map) {
+                    // Convert to Map<String, dynamic>
+                    final Map<String, dynamic> photoMap = {};
+                    photoData.forEach((key, value) {
+                      if (key is String) {
+                        photoMap[key] = value;
+                      }
+                    });
+                    uploadedPhotos.add(RuckPhoto.fromJson(photoMap));
+                  }
+                } catch (e) {
+                  AppLogger.error('[PHOTO_DEBUG] Error parsing photo data: $e');
+                }
+              }
+              
+              if (uploadedPhotos.isNotEmpty) {
+                allUploadedPhotos.addAll(uploadedPhotos);
+                AppLogger.info('[PHOTO_DEBUG] Successfully uploaded photo ${i+1}');
+              } else {
+                AppLogger.info('[PHOTO_DEBUG] Photo ${i+1} uploaded but no photo data in response');
+              }
+            } else {
+              AppLogger.warning('[PHOTO_DEBUG] Photo ${i+1} uploaded but could not find photo data in response: $response');
+            }
+          }
+        } catch (e) {
+          AppLogger.error('[PHOTO_DEBUG] Error uploading photo ${i+1}: $e');
         }
       }
       
-      AppLogger.info('Successfully uploaded ${allUploadedPhotos.length} photos');
+      AppLogger.info('[PHOTO_DEBUG] Finished uploading ${photos.length} photos, got ${allUploadedPhotos.length} successful uploads');
       return allUploadedPhotos;
       
     } catch (e) {
@@ -533,8 +568,19 @@ class SessionRepository {
       // Initialize photoDataList as an empty list to avoid null issues
       List<dynamic> photoDataList = [];
       
-      if (response is Map && response.containsKey('photos') && response['photos'] is List) {
-        // Handle the case where the response is {"photos": [...]} which is the most likely structure
+      // From the logs, we've seen the response is: {"success": true, "data": []}
+      if (response is Map && response.containsKey('success') && response.containsKey('data')) {
+        AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Found standard API response with success and data keys');
+        print('[PHOTO_DEBUG] Found standard API response with success and data keys');
+        
+        if (response['data'] is List) {
+          photoDataList = response['data'] as List<dynamic>;
+          AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Extracted ${photoDataList.length} items from data list');
+        } else {
+          AppLogger.warning('[PHOTO_DEBUG] SessionRepository: data key exists but is not a list: ${response['data'].runtimeType}');
+        }
+      } else if (response is Map && response.containsKey('photos') && response['photos'] is List) {
+        // Handle the case where the response is {"photos": [...]} which is an alternative structure
         print('[PHOTO_DEBUG] Found "photos" key in response map');
         photoDataList = response['photos'] as List<dynamic>;
       } else if (response is Map && response.containsKey('data') && response['data'] is List) {
@@ -553,8 +599,8 @@ class SessionRepository {
         // Look for any key with a list value
         bool foundList = false;
         for (final entry in response.entries) {
-          if (entry.value is List && (entry.value as List).isNotEmpty) {
-            print('[PHOTO_DEBUG] Found list in response under key: ${entry.key}');
+          if (entry.value is List) {
+            print('[PHOTO_DEBUG] Found list in response under key: ${entry.key} with ${(entry.value as List).length} items');
             photoDataList = entry.value as List<dynamic>;
             foundList = true;
             break;
