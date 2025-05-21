@@ -37,6 +37,116 @@ class SessionRepository {
         _supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '',
         _supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 
+  /// Fetch heart rate samples for a session by its ID.
+  /// This method specifically requests heart rate data from the server.
+  Future<List<HeartRateSample>> fetchHeartRateSamples(String sessionId) async {
+    try {
+      AppLogger.debug('[HEARTRATE FETCH] Attempting to fetch heart rate samples for session: $sessionId');
+      
+      // Try multiple endpoint variations - according to API conventions
+      // Note: No /api prefix (base URL already has it)
+      List<String> endpoints = [
+        '/rucks/$sessionId/heart_rate',  // Primary format with underscore (per API standards)
+        '/rucks/$sessionId/heartrate'    // Alternative format without underscore
+      ];
+      
+      dynamic response;
+      String? successEndpoint;
+      
+      // Try each endpoint until we get a successful response
+      for (final endpoint in endpoints) {
+        try {
+          AppLogger.debug('[HEARTRATE FETCH] Trying endpoint: $endpoint');
+          response = await _apiClient.get(endpoint);
+          
+          if (response != null) {
+            successEndpoint = endpoint;
+            AppLogger.debug('[HEARTRATE FETCH] Successfully retrieved data from: $endpoint');
+            break;
+          }
+        } catch (e) {
+          AppLogger.debug('[HEARTRATE FETCH] Endpoint failed: $endpoint - $e');
+          // Continue to the next endpoint
+        }
+      }
+      
+      if (response == null) {
+        AppLogger.debug('[HEARTRATE FETCH] Could not retrieve heart rate data from any endpoint');
+        return [];
+      }
+      
+      // Parse heart rate samples using a more robust approach
+      List<HeartRateSample> samples = [];
+      
+      try {
+        if (response is List) {
+          // Response is a direct list of samples
+          AppLogger.debug('[HEARTRATE FETCH] Response is a List with ${response.length} items');
+          
+          // Process each sample individually to handle errors
+          for (var item in response) {
+            try {
+              if (item is Map) {
+                // Convert to Map<String, dynamic> before parsing
+                final Map<String, dynamic> sampleMap = {};
+                item.forEach((key, value) {
+                  if (key is String) {
+                    sampleMap[key] = value;
+                  }
+                });
+                samples.add(HeartRateSample.fromJson(sampleMap));
+              } else {
+                AppLogger.debug('[HEARTRATE FETCH] Skipping non-map item: ${item.runtimeType}');
+              }
+            } catch (e) {
+              AppLogger.debug('[HEARTRATE FETCH] Error parsing one sample: $e');
+              // Continue with next sample
+            }
+          }
+        } else if (response is Map && response.containsKey('heart_rate_samples')) {
+          // Response is an object with heart_rate_samples field
+          var samplesData = response['heart_rate_samples'];
+          if (samplesData is List) {
+            AppLogger.debug('[HEARTRATE FETCH] Found heart_rate_samples list with ${samplesData.length} items');
+            
+            for (var item in samplesData) {
+              try {
+                if (item is Map) {
+                  // Convert to Map<String, dynamic> before parsing
+                  final Map<String, dynamic> sampleMap = {};
+                  item.forEach((key, value) {
+                    if (key is String) {
+                      sampleMap[key] = value;
+                    }
+                  });
+                  samples.add(HeartRateSample.fromJson(sampleMap));
+                } else {
+                  AppLogger.debug('[HEARTRATE FETCH] Skipping non-map item in samplesData: ${item.runtimeType}');
+                }
+              } catch (e) {
+                AppLogger.debug('[HEARTRATE FETCH] Error parsing one sample from samplesData: $e');
+                // Continue with next sample
+              }
+            }
+          } else {
+            AppLogger.debug('[HEARTRATE FETCH] heart_rate_samples field is not a List: ${samplesData?.runtimeType}');
+          }
+        } else {
+          AppLogger.debug('[HEARTRATE FETCH] Response is not a List or Map with heart_rate_samples: ${response.runtimeType}');
+        }
+      } catch (e) {
+        AppLogger.error('[HEARTRATE FETCH] Error during samples parsing: $e');
+        // Return whatever samples we managed to parse
+      }
+      
+      AppLogger.debug('[HEARTRATE FETCH] Successfully parsed ${samples.length} heart rate samples');
+      return samples;
+    } catch (e) {
+      AppLogger.error('[HEARTRATE FETCH] Error fetching heart rate samples: $e');
+      return [];
+    }
+  }
+
   /// Fetch a ruck session by its ID, including all heart rate samples.
   Future<RuckSession?> fetchSessionById(String sessionId) async {
     try {

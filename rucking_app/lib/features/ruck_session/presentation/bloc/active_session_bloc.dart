@@ -1,6 +1,7 @@
-import 'dart:math' as math;
 import 'dart:async';
+import 'dart:convert'; // For JSON encoding/decoding
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
@@ -774,31 +775,93 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   
   Future<void> _onLoadSessionForViewing(LoadSessionForViewing event, Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Loading session for viewing: ${event.session.id}');
-    // This event is primarily for UI to switch to a view mode with existing session data.
-    // The BLoC might not need to do much other than emit a state that represents this mode.
-    // For now, we assume the UI will use the provided session data directly.
-    // If backend fetching is needed for this view, that logic would go here.
-
-    // We can emit a SessionSummaryGenerated state, as it's designed to hold a completed session.
-    // Initialize photos as empty - RuckSession doesn't have a photos property
+  
+    // Initialize session and photos as provided
+    RuckSession session = event.session;
     List<RuckPhoto> photos = [];
-    bool isLoading = false;
+    bool isLoading = true;
     String? photosError;
+    String? heartRateError;
 
-    // Check if session id is not null and not empty
-    if (photos.isEmpty && event.session.id != null && event.session.id!.isNotEmpty) {
-        emit(SessionSummaryGenerated(session: event.session, photos: photos, isPhotosLoading: true));
+    // Initial emit with loading state to show activity to the user
+    if (session.id != null && session.id!.isNotEmpty) {
+      emit(SessionSummaryGenerated(session: session, photos: photos, isPhotosLoading: true));
+      
+      try {
+        // IMPROVED: Always try to fetch heart rate samples for better user experience
+        // This will fetch samples even if we don't have avgHeartRate/maxHeartRate/minHeartRate indicators
+        AppLogger.debug('[HEARTRATE DEBUG] Fetching heart rate samples for session ${session.id}');
         try {
-            // Add null assertion operator (!) since we've already checked id isn't null
-            photos = await _sessionRepository.getSessionPhotos(event.session.id!);
-            isLoading = false;
+          // Use our dedicated heart rate fetching method from SessionRepository
+          final heartRateSamples = await _sessionRepository.fetchHeartRateSamples(session.id!);
+          
+          if (heartRateSamples.isNotEmpty) {
+            AppLogger.debug('[HEARTRATE DEBUG] Successfully fetched ${heartRateSamples.length} heart rate samples');
+            
+            // Calculate aggregate values if they're missing
+            int? avgHeartRate = session.avgHeartRate;
+            int? maxHeartRate = session.maxHeartRate;
+            int? minHeartRate = session.minHeartRate;
+            
+            if (avgHeartRate == null && heartRateSamples.isNotEmpty) {
+              avgHeartRate = (heartRateSamples.map((s) => s.bpm).reduce((a, b) => a + b) / heartRateSamples.length).round();
+              AppLogger.debug('[HEARTRATE DEBUG] Calculated avg heart rate: $avgHeartRate');
+            }
+            
+            if (maxHeartRate == null && heartRateSamples.isNotEmpty) {
+              maxHeartRate = heartRateSamples.map((s) => s.bpm).reduce(math.max);
+              AppLogger.debug('[HEARTRATE DEBUG] Calculated max heart rate: $maxHeartRate');
+            }
+            
+            if (minHeartRate == null && heartRateSamples.isNotEmpty) {
+              minHeartRate = heartRateSamples.map((s) => s.bpm).reduce(math.min);
+              AppLogger.debug('[HEARTRATE DEBUG] Calculated min heart rate: $minHeartRate');
+            }
+            
+            // Update session with heart rate data
+            session = session.copyWith(
+              heartRateSamples: heartRateSamples,
+              avgHeartRate: avgHeartRate,
+              maxHeartRate: maxHeartRate,
+              minHeartRate: minHeartRate
+            );
+          } else {
+            AppLogger.debug('[HEARTRATE DEBUG] No heart rate samples found for session ${session.id}');
+          }
         } catch (e) {
-            AppLogger.error('Failed to fetch photos for viewed session ${event.session.id ?? "unknown"}: $e');
-            isLoading = false;
-            photosError = 'Failed to load photos';
+          AppLogger.error('Error fetching heart rate samples: $e');
+          heartRateError = 'Failed to load heart rate data';
         }
+        
+        // Fetch photos
+        try {
+          photos = await _sessionRepository.getSessionPhotos(session.id!);
+        } catch (e) {
+          AppLogger.error('Failed to fetch photos for viewed session ${session.id}: $e');
+          photosError = 'Failed to load photos';
+        }
+        
+        // Final emit with all loaded data
+        emit(SessionSummaryGenerated(
+          session: session, 
+          photos: photos, 
+          isPhotosLoading: false, 
+          photosError: photosError
+        ));
+        
+      } catch (e) {
+        AppLogger.error('Error loading session for viewing: $e');
+        emit(SessionSummaryGenerated(
+          session: session, 
+          photos: photos, 
+          isPhotosLoading: false, 
+          photosError: 'Failed to load session data'
+        ));
+      }
+    } else {
+      // No session ID, just emit what we have
+      emit(SessionSummaryGenerated(session: session, photos: photos, isPhotosLoading: false));
     }
-    emit(SessionSummaryGenerated(session: event.session, photos: photos, isPhotosLoading: isLoading, photosError: photosError));
   }
 
   void _onUpdateStateWithSessionPhotos(UpdateStateWithSessionPhotos event, Emitter<ActiveSessionState> emit) {
