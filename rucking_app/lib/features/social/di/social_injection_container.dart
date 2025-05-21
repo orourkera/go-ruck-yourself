@@ -7,8 +7,8 @@ import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 
 /// Initialize the social feature dependencies
 void initSocialFeature(GetIt sl) {
-  // Register SocialBloc as a factory in GetIt
-  sl.registerFactory<SocialBloc>(
+  // Register SocialBloc as a singleton in GetIt to ensure state is shared across all screens
+  sl.registerLazySingleton<SocialBloc>(
     () => SocialBloc(
       socialRepository: sl(),
       authBloc: sl<AuthBloc>(),

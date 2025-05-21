@@ -57,8 +57,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_ruckId != null) {
-        context.read<SocialBloc>().add(CheckUserLikeStatus(_ruckId!));
-        developer.log('RuckBuddyCard initState: Ruck ID $_ruckId - Dispatching CheckUserLikeStatus', name: 'RuckBuddyCard');
+        // Use batch check for better performance (also updates other cards)
+        final socialBloc = context.read<SocialBloc>();
+        socialBloc.add(BatchCheckUserLikeStatus([_ruckId!])); 
+        developer.log('[LIKE_DEBUG] RuckBuddyCard initState: Ruck ID $_ruckId - Dispatching BatchCheckUserLikeStatus', name: 'RuckBuddyCard');
 
         developer.log('[PHOTO_DEBUG] RuckBuddyCard initState: Ruck ID ${widget.ruckBuddy.id} - Fetching photos. Initial count: ${_photos.length}', name: 'RuckBuddyCard');
         final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
@@ -144,7 +146,12 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     if (_isProcessingLike || _ruckId == null) return;
 
     HapticFeedback.heavyImpact();
+    
+    // Save original values in case we need to revert due to API error
+    final originalIsLiked = _isLiked;
+    final originalLikeCount = _likeCount ?? 0;
 
+    // Optimistically update the UI immediately
     setState(() {
       if (_isLiked) {
         _likeCount = (_likeCount ?? 0) > 0 ? (_likeCount ?? 0) - 1 : 0;
@@ -155,7 +162,22 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
       _isProcessingLike = true;
     });
 
-    context.read<SocialBloc>().add(ToggleRuckLike(_ruckId!));
+    // Important: Use GetIt to ensure we're using the shared singleton instance
+    final socialBloc = GetIt.instance<SocialBloc>();
+    
+    // Handle potential server-side errors (we know there's a 500 error issue)
+    try {
+      socialBloc.add(ToggleRuckLike(_ruckId!));
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Like toggle requested for ruckId $_ruckId');
+    } catch (e) {
+      // Revert UI on error
+      setState(() {
+        _isLiked = originalIsLiked;
+        _likeCount = originalLikeCount;
+        _isProcessingLike = false;
+      });
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Error toggling like: $e');
+    }
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -107,13 +108,22 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
   // Load social data (likes and comments) for the session
   void _loadSocialData(String ruckId) {
-    AppLogger.debug('[CASCADE_TRACE] Loading social data for session $ruckId');
+    AppLogger.debug('[SOCIAL_DEBUG] Loading social data for session $ruckId');
     try {
       final socialBloc = getIt<SocialBloc>();
+      
+      // Use batch checking for likes to ensure state is synchronized across screens
+      final ruckIdInt = int.tryParse(ruckId);
+      if (ruckIdInt != null) {
+        // This will update all screens that display this ruck
+        socialBloc.add(BatchCheckUserLikeStatus([ruckIdInt]));
+      }
+      
+      // Also load the standard likes and comments
       socialBloc.add(LoadRuckLikes(int.parse(ruckId))); 
-      socialBloc.add(LoadRuckComments(ruckId)); 
+      socialBloc.add(LoadRuckComments(ruckId));
     } catch (e) {
-      AppLogger.error('[CASCADE_TRACE] Error loading social data: $e');
+      AppLogger.error('[SOCIAL_DEBUG] Error loading social data: $e');
     }
   }
 
@@ -383,7 +393,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                         
                                         return InkWell(
                                           onTap: () {
-                                            context.read<SocialBloc>().add(ToggleRuckLike(ruckId));
+                                            // Use haptic feedback for better UX
+                                            HapticFeedback.heavyImpact();
+                                            
+                                            // Important: Use the singleton instance from GetIt
+                                            final socialBloc = getIt<SocialBloc>();
+                                            socialBloc.add(ToggleRuckLike(ruckId));
+                                            
+                                            // Log for debugging
+                                            AppLogger.debug('[SOCIAL_DEBUG] SessionDetailScreen: Like toggled for ruckId $ruckId');
                                           },
                                           borderRadius: BorderRadius.circular(10),
                                           child: Padding(
