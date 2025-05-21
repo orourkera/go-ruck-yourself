@@ -136,55 +136,77 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
     
     return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Ruck Buddies'),
         elevation: 0,
-        backgroundColor: primaryColor,
         actions: [
+          // Refresh button
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              debugPrint('🐞 [_RuckBuddiesScreenState.build] Refresh button pressed, dispatching RefreshRuckBuddiesEvent.');
-              context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
+              context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
             },
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          debugPrint('🐞 [_RuckBuddiesScreenState.build] RefreshIndicator onRefresh triggered, dispatching RefreshRuckBuddiesEvent.');
+          debugPrint('🐞 [_RuckBuddiesScreenState.build] RefreshIndicator onRefresh triggered');
           context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
         },
         child: BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
           builder: (context, state) {
-            debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder received state: ${state.runtimeType}');
-            if (state is RuckBuddiesLoading) { // Initial loading or refresh with no data yet
-              debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: State is RuckBuddiesLoading (initial). Showing main loading indicator.');
+            debugPrint('🐞 [_RuckBuddiesScreenState.build] Current state: ${state.runtimeType}');
+            if (state is RuckBuddiesInitial) {
+              debugPrint('🐞 [_RuckBuddiesScreenState.build] State is Initial. Dispatch fetch.');
+              context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
               return const Center(child: CircularProgressIndicator());
-            } else if (state is RuckBuddiesError) {
-              debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: Showing error display: ${state.message}');
-              return ErrorDisplay(message: state.message, onRetry: () {
-                debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder ErrorDisplay: Retry pressed, dispatching FetchRuckBuddiesEvent.');
-                context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
-              });
+            } else if (state is RuckBuddiesLoading) {
+              debugPrint('🐞 [_RuckBuddiesScreenState.build] State is Loading');
+              return const Center(child: CircularProgressIndicator());
             } else if (state is RuckBuddiesLoaded) {
-              final ruckBuddies = state.ruckBuddies;
-              final isLoadingMore = state.isLoadingMore; // Use the flag from RuckBuddiesLoaded state
-              debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: State is RuckBuddiesLoaded. Buddies count: ${ruckBuddies.length}, isLoadingMore: $isLoadingMore');
-
-              if (ruckBuddies.isEmpty && !isLoadingMore) { // Only show empty state if not loading and actually empty
-                debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: RuckBuddies list is empty, showing EmptyState.');
-                return const EmptyState(title: 'No Buddies Yet', message: 'No ruck buddies found. Start rucking to see them here!');
+              debugPrint('🐞 [_RuckBuddiesScreenState.build] State is Loaded. ${state.ruckBuddies.length} buddies');
+              
+              // IMPORTANT: Batch check likes for all ruck buddies to prevent duplicate API calls
+              if (state.ruckBuddies.isNotEmpty) {
+                // Schedule this for after the current build cycle to avoid triggering another rebuild
+                Future.delayed(Duration.zero, () {
+                  if (mounted) {
+                    _batchCheckLikes(state.ruckBuddies);
+                  }
+                });
               }
               
-              // When buddies are loaded, batch check all their like statuses
-              // This is more efficient than individual API calls from each card
-              _batchCheckLikes(ruckBuddies);
+              // Don't show empty state if we're still loading
+              if (state.ruckBuddies.isEmpty && !state.isLoadingMore) {
+                return EmptyState(
+                  icon: Icons.group_off,
+                  title: 'No Ruck Buddies Yet',
+                  message: 'Looks like there are no ruck buddies to show right now.',
+                  action: ElevatedButton(
+                    onPressed: () {
+                      context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+                    },
+                    child: const Text('Refresh'),
+                  ),
+                );
+              }
               
-              return _buildRuckBuddiesList(ruckBuddies, isLoadingMore);
+              return _buildRuckBuddiesList(state.ruckBuddies, state.isLoadingMore);
+            } else if (state is RuckBuddiesError) {
+              debugPrint('🐞 [_RuckBuddiesScreenState.build] State is Error: ${state.message}');
+              return ErrorDisplay(
+                message: state.message,
+                onRetry: () {
+                  debugPrint('🐞 [_RuckBuddiesScreenState.build] Error retry button pressed');
+                  context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+                },
+              );
             }
-            debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder: Unhandled state: ${state.runtimeType}. Returning empty container.');
-            return Container(); // Should ideally not happen
+            
+            debugPrint('🐞 [_RuckBuddiesScreenState.build] State is unknown: ${state.runtimeType}');
+            return const Center(child: CircularProgressIndicator());
           },
         ),
       ),
