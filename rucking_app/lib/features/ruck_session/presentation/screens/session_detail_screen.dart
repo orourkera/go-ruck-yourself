@@ -69,17 +69,33 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     AppLogger.debug('[HEARTRATE DEBUG] maxHeartRate: ${widget.session.maxHeartRate}');
     AppLogger.debug('[HEARTRATE DEBUG] minHeartRate: ${widget.session.minHeartRate}');
 
-    // Only dispatch LoadSessionForViewing - skip all social data for now
+    _tabController = TabController(length: 2, vsync: this);
+    _scrollController = ScrollController()
+      ..addListener(() {
+        setState(() {
+          _isScrolledToTop = _scrollController.offset <= 0;
+        });
+      });
+      
+    // Load session data and photos
     if (widget.session.id != null) {
-      AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState: Dispatching LoadSessionForViewing for session ${widget.session.id}');
-      GetIt.instance<ActiveSessionBloc>().add(LoadSessionForViewing(sessionId: widget.session.id!, session: widget.session));
+      AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState: Loading session ${widget.session.id}');
+      
+      // 1. Load the full session data
+      GetIt.instance<ActiveSessionBloc>().add(LoadSessionForViewing(
+        sessionId: widget.session.id!, 
+        session: widget.session
+      ));
+      
+      // 2. Force a fresh load of photos
+      AppLogger.debug('[PHOTO_DEBUG] Force loading photos in initState for session: ${widget.session.id}');
+      _forceLoadPhotos();
+      
+      // 3. Load social data
+      _loadSocialData(widget.session.id!);
     } else {
-      AppLogger.error('[CASCADE_TRACE] SessionDetailScreen initState: widget.session.id is null');
+      AppLogger.error('[CASCADE_TRACE] SessionDetailScreen initState: Session ID is null, cannot load session data');
     }
-    
-    // Bare minimum initialization
-    _tabController = TabController(length: 1, vsync: this);
-    _scrollController = ScrollController();
   }
 
   @override
@@ -481,12 +497,19 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             child: PhotoUploadSection(
                               ruckId: widget.session.id!,
                               onPhotosSelected: (photos) {
-                                context.read<ActiveSessionBloc>().add(
+                                AppLogger.info('[PHOTO_DEBUG] Session Detail: Preparing to dispatch UploadSessionPhotosRequested event with ${photos.length} photos');
+                                AppLogger.info('[PHOTO_DEBUG] Session ID: ${widget.session.id!}');
+                                
+                                final bloc = context.read<ActiveSessionBloc>();
+                                AppLogger.info('[PHOTO_DEBUG] ActiveSessionBloc instance: ${bloc.hashCode}, Current state: ${bloc.state.runtimeType}');
+                                
+                                bloc.add(
                                   UploadSessionPhotosRequested(
                                     sessionId: widget.session.id!,
                                     photos: photos,
                                   ),
                                 );
+                                AppLogger.info('[PHOTO_DEBUG] Event dispatched to bloc');
                               },
                               isUploading: isUploading,
                             ),
@@ -517,7 +540,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     _buildDetailRow(
                       context,
                       'Ruck Weight',
-                      MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric),
+                      widget.session.ruckWeightKg == 0.0 ? 'Hike' : MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric),
                       Icons.fitness_center,
                     ),
                     // Elevation Gain/Loss rows
@@ -818,7 +841,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 🔄 ${widget.session.formattedDuration}
 📏 ${MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric)}
 🔥 ${widget.session.caloriesBurned} calories
-⚖️ ${MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric)}
+⚖️ ${widget.session.ruckWeightKg == 0.0 ? 'Hike' : MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric)}
 
 Download Go Rucky Yourself from the App Store!
 ''';
