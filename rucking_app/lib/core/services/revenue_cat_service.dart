@@ -6,12 +6,16 @@ class RevenueCatService {
   bool _isInitialized = false;
   bool get _isDebugMode => dotenv.env['REVENUECAT_DEBUG'] == 'true';
 
+  // New flag for managing mock subscription state in debug mode
+  bool _mockUserSubscribed = false;
+
   RevenueCatService();
 
   Future<void> initialize() async {
     if (_isInitialized) return;
     if (_isDebugMode) {
-      debugPrint('RevenueCatService: Debug mode enabled. Using mock offerings.');
+      debugPrint('RevenueCatService: Debug mode enabled.');
+      // In a more advanced scenario, you might load _mockUserSubscribed from prefs
       _isInitialized = true;
       return;
     }
@@ -68,6 +72,7 @@ class RevenueCatService {
     if (!_isInitialized) await initialize();
     if (_isDebugMode) {
       debugPrint('RevenueCatService: Simulating successful purchase in debug mode.');
+      _mockUserSubscribed = true; // Set mock subscription to true
       return true;
     }
     try {
@@ -83,8 +88,8 @@ class RevenueCatService {
   Future<bool> checkSubscriptionStatus() async {
     if (!_isInitialized) await initialize();
     if (_isDebugMode) {
-      debugPrint('RevenueCatService: Always returning false for subscription status in debug mode.');
-      return false;
+      debugPrint('RevenueCatService: Returning mock subscription status: $_mockUserSubscribed');
+      return _mockUserSubscribed; // Return the state of the mock subscription
     }
     try {
       final customerInfo = await Purchases.getCustomerInfo();
@@ -99,12 +104,21 @@ class RevenueCatService {
     if (!_isInitialized) await initialize();
     if (_isDebugMode) {
       debugPrint('RevenueCatService: Simulating restore purchases in debug mode.');
+      _mockUserSubscribed = true; // Assume restore finds a subscription
       return;
     }
     try {
       await Purchases.restorePurchases();
     } catch (e) {
       debugPrint('Error restoring purchases: $e');
+    }
+  }
+
+  // Optional: A helper to reset mock status for testing different scenarios without app restart
+  void resetMockSubscriptionStatusForDebug() {
+    if (_isDebugMode) {
+      _mockUserSubscribed = false;
+      debugPrint('RevenueCatService: Mock subscription status reset.');
     }
   }
 }
