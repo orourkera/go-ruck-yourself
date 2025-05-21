@@ -350,6 +350,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         heartRateSamples: _allHeartRateSamples.toList(),
         splits: _splitTrackingService.getSplits(),
       ));
+      
+      // Update metrics on watch
+      try {
+        await _watchService.updateMetricsOnWatch(
+          distance: currentState.distanceKm,
+          duration: Duration(seconds: newElapsed),
+          pace: newPace ?? 0.0,
+          isPaused: currentState.isPaused,
+          calories: newCalories.round(),
+          elevation: currentState.elevationGain,
+          elevationLoss: currentState.elevationLoss,
+        );
+      } catch (e) {
+        AppLogger.error('Failed to update metrics on watch: $e');
+      }
     }
   }
 
