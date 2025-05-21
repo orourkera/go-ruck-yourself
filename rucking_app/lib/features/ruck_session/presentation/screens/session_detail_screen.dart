@@ -58,6 +58,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   void initState() {
     super.initState();
     AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState called.');
+    
+    // Debug log heart rate data in the initial session
+    AppLogger.debug('[HEARTRATE DEBUG] Initial session heart rate data:');
+    AppLogger.debug('[HEARTRATE DEBUG] Has heartRateSamples: ${widget.session.heartRateSamples != null}');
+    if (widget.session.heartRateSamples != null) {
+      AppLogger.debug('[HEARTRATE DEBUG] Number of samples: ${widget.session.heartRateSamples!.length}');
+    }
+    AppLogger.debug('[HEARTRATE DEBUG] avgHeartRate: ${widget.session.avgHeartRate}');
+    AppLogger.debug('[HEARTRATE DEBUG] maxHeartRate: ${widget.session.maxHeartRate}');
+    AppLogger.debug('[HEARTRATE DEBUG] minHeartRate: ${widget.session.minHeartRate}');
 
     // Only dispatch LoadSessionForViewing - skip all social data for now
     if (widget.session.id != null) {
@@ -553,12 +563,21 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                         ),
                       ),
                     ],
-                    // Heart Rate Card
-                    if (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty ||
-                        widget.session.avgHeartRate != null ||
-                        widget.session.maxHeartRate != null ||
-                        widget.session.minHeartRate != null) ...[
-                      _buildStatCard(
+                    
+                    // Heart Rate Card with diagnostic logging
+                    Builder(builder: (context) {
+                      // Log all heart rate data for debugging
+                      AppLogger.debug('[HEARTRATE DEBUG RENDER] About to render heart rate section with:');
+                      AppLogger.debug('[HEARTRATE DEBUG RENDER] avgHeartRate: ${widget.session.avgHeartRate}');
+                      AppLogger.debug('[HEARTRATE DEBUG RENDER] maxHeartRate: ${widget.session.maxHeartRate}');
+                      AppLogger.debug('[HEARTRATE DEBUG RENDER] minHeartRate: ${widget.session.minHeartRate}');
+                      AppLogger.debug('[HEARTRATE DEBUG RENDER] Has samples: ${widget.session.heartRateSamples != null}');
+                      if (widget.session.heartRateSamples != null) {
+                        AppLogger.debug('[HEARTRATE DEBUG RENDER] Sample count: ${widget.session.heartRateSamples!.length}');
+                      }
+                      
+                      // Always show the heart rate card regardless of data availability
+                      return _buildStatCard(
                         context,
                         'Heart Rate',
                         [
@@ -586,19 +605,41 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                               Icons.arrow_downward, // Alternative: FontAwesomeIcons.heartbeat with a different style
                               iconColor: Colors.blueAccent // Or a specific color for min HR
                             ),
-                          if (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 16.0),
-                              child: HeartRateGraph(
-                                samples: widget.session.heartRateSamples!,
-                                height: 150,
-                                showLabels: true,
-                                showTooltips: true,
-                              ),
-                            ),
+                          // Add a debug message about heart rate graph
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16.0),
+                            child: widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty
+                              ? HeartRateGraph(
+                                  samples: widget.session.heartRateSamples!,
+                                  height: 150,
+                                  showLabels: true,
+                                  showTooltips: true,
+                                )
+                              : Container(
+                                  height: 150,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8.0),
+                                  ),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.timeline_outlined, size: 36, color: Colors.grey.shade400),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'No heart rate data available',
+                                          style: TextStyle(color: Colors.grey.shade600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                          ),
                         ],
-                      ),
-                    ],
+                      );
+                    }),
                   ],
                 ),
               ),
