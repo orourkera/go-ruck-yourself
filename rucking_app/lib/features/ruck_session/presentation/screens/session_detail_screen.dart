@@ -387,12 +387,29 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     photos = state.photos;
                     isPhotosLoading = state.isPhotosLoading;
                     isUploading = state.isUploading;
-                    photoUrls = state.photos
-                        .map((p) => p.url)
-                        .where((url) => url != null && url.isNotEmpty)
-                        .cast<String>()
-                        .toList();
+                  } else if (state is SessionSummaryGenerated) {
+                    photos = state.photos;
+                    isPhotosLoading = state.isPhotosLoading;
                   }
+                  
+                  // Improved URL extraction with better handling of potential nulls - works for both state types
+                  photoUrls = photos.map((p) {
+                    if (p is RuckPhoto) {
+                      // If it's already a RuckPhoto object
+                      final url = p.url;
+                      return url != null && url.isNotEmpty ? url : p.thumbnailUrl;
+                    } else if (p is Map<String, dynamic>) {
+                      // Handle raw map data
+                      final url = p['url'] ?? p['thumbnail_url'];
+                      return url is String && url.isNotEmpty ? url : null;
+                    }
+                    return null;
+                  })
+                  .where((url) => url != null && url.isNotEmpty)
+                  .cast<String>()
+                  .toList();
+                  
+                  // Process the URLs
                   final processedUrls = photoUrls.map((url) {
                     final cacheBuster = DateTime.now().millisecondsSinceEpoch;
                     return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';

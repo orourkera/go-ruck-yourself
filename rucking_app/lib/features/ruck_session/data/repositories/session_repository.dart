@@ -15,6 +15,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/models/api_exception.dart'; // Corrected import for ApiException
+import 'dart:async'; // For Timer
 
 /// Repository class for session-related operations
 class SessionRepository {
@@ -22,6 +23,14 @@ class SessionRepository {
   final String _supabaseUrl;
   final String _supabaseAnonKey;
   final String _photoBucketName = 'ruck-photos';
+  
+  // Photo caching mechanism to prevent excessive API calls
+  static final Map<String, List<RuckPhoto>> _photoCache = {};
+  static final Map<String, DateTime> _lastFetchTime = {};
+  static final Map<String, Completer<List<RuckPhoto>>> _pendingRequests = {};
+  
+  // Rate limiting configuration: max 5 requests per minute per API's restriction
+  static const Duration _minRequestInterval = Duration(seconds: 12); // ~5 per minute
 
   SessionRepository({required ApiClient apiClient})
       : _apiClient = apiClient,

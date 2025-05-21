@@ -173,13 +173,23 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     return BlocListener<ActiveSessionBloc, ActiveSessionState>(
       bloc: GetIt.instance<ActiveSessionBloc>(),
       listenWhen: (previous, current) {
-        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: previousPhotos=${previous is ActiveSessionInitial ? previous.photos.length : (previous is ActiveSessionRunning ? previous.photos.length : 0)}, currentPhotos=${current is ActiveSessionInitial ? current.photos.length : (current is ActiveSessionRunning ? current.photos.length : 0)}');
+        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: previous=${previous.runtimeType}, current=${current.runtimeType}');
         
-        final bool photosChanged = 
-          (previous is ActiveSessionInitial && current is ActiveSessionInitial && previous.photos != current.photos) ||
-          (previous is ActiveSessionRunning && current is ActiveSessionRunning && previous.photos != current.photos) ||
-          (previous is ActiveSessionInitial && current is ActiveSessionRunning) ||
-          (previous is ActiveSessionRunning && current is ActiveSessionInitial);
+        // Helper function to get photos from any state type that might contain them
+        List<dynamic> getPhotosFromState(ActiveSessionState state) {
+          if (state is SessionSummaryGenerated) return state.photos;
+          if (state is ActiveSessionRunning) return state.photos;
+          if (state is ActiveSessionInitial) return state.photos;
+          return [];
+        }
+        
+        final prevPhotos = getPhotosFromState(previous);
+        final currPhotos = getPhotosFromState(current);
+        
+        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: previousPhotos=${prevPhotos.length}, currentPhotos=${currPhotos.length}');
+        
+        // Only trigger listener when photos change
+        final bool photosChanged = prevPhotos != currPhotos;
         
         print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: ${photosChanged ? "PHOTOS CHANGED" : "no change"}');
         return photosChanged;
@@ -187,8 +197,11 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
       listener: (context, state) {
         print('[PHOTO_DEBUG] RuckBuddyDetailScreen listener: Received state ${state.runtimeType}');
         
-        List<RuckPhoto> statePhotos = [];
-        if (state is ActiveSessionInitial) {
+        List<dynamic> statePhotos = [];
+        if (state is SessionSummaryGenerated) {
+          statePhotos = state.photos;
+          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in SessionSummaryGenerated state');
+        } else if (state is ActiveSessionInitial) {
           statePhotos = state.photos;
           print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in ActiveSessionInitial state');
         } else if (state is ActiveSessionRunning) {
@@ -196,14 +209,49 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
           print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in ActiveSessionRunning state');
         }
         
+        // Extract photo URLs and log them for debugging
+        final photoUrls = _extractPhotoUrls(statePhotos);
+        print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Extracted ${photoUrls.length} valid photo URLs from ${statePhotos.length} photos');
+        if (photoUrls.isNotEmpty) {
+          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: First URL: ${photoUrls.first}');
+        }
+        
         // Check if new photos are available and update
-        if (statePhotos.isNotEmpty) {
+        if (statePhotos.isNotEmpty && mounted) {
           print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Updating UI with ${statePhotos.length} photos');
-          if (mounted) {
-            setState(() {
-              _photos = statePhotos;
-            });
-          }
+          setState(() {
+            // Properly convert each dynamic object to RuckPhoto to match the expected type
+            _photos = statePhotos.map((photo) {
+              if (photo is RuckPhoto) {
+                return photo;
+              }
+              // If it's a Map, convert it to RuckPhoto
+              if (photo is Map<String, dynamic>) {
+                return RuckPhoto(
+                  id: photo['id'] ?? '',
+                  ruckId: photo['ruck_id']?.toString() ?? '',
+                  userId: photo['user_id'] ?? '',
+                  filename: photo['filename'] ?? '',
+                  originalFilename: photo['original_filename'],
+                  contentType: photo['content_type'],
+                  size: photo['size'],
+                  createdAt: photo['created_at'] != null 
+                      ? DateTime.parse(photo['created_at']) 
+                      : DateTime.now(),
+                  url: photo['url'],
+                  thumbnailUrl: photo['thumbnail_url'],
+                );
+              }
+              // Fallback empty photo (shouldn't happen)
+              return RuckPhoto(
+                id: '',
+                ruckId: '',
+                userId: '',
+                filename: '',
+                createdAt: DateTime.now(), // Use current time as fallback
+              );
+            }).toList().cast<RuckPhoto>();
+          });
         }
       },
       child: BlocListener<SocialBloc, SocialState>(
@@ -342,7 +390,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       Text('Photos', style: AppTextStyles.titleMedium),
                       const SizedBox(height: 8),
                       PhotoCarousel(
-                        photoUrls: _photos.map((photo) => photo.url ?? '').toList(), 
+                        photoUrls: _extractPhotoUrls(_photos),
                         showDeleteButtons: false,
                         height: 200, // Medium-sized tiles
                         onPhotoTap: (index) {
@@ -351,7 +399,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => PhotoViewer(
-                                photoUrls: _photos.map((photo) => photo.url ?? '').toList(),
+                                photoUrls: _extractPhotoUrls(_photos),
                                 initialIndex: index,
                                 title: '${widget.ruckBuddy.user.username}\'s Ruck',
                               ),
@@ -583,6 +631,24 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     ), // close Scaffold
   );   // close BlocListener
 }
+
+  /// Robustly extract photo URLs from a list of photo objects
+  List<String> _extractPhotoUrls(List<dynamic> photos) {
+    return photos.map((p) {
+      if (p is RuckPhoto) {
+        // If it's already a RuckPhoto object
+        final url = p.url;
+        return url != null && url.isNotEmpty ? url : p.thumbnailUrl ?? '';
+      } else if (p is Map<String, dynamic>) {
+        // Handle raw map data
+        final url = p['url'] ?? p['thumbnail_url'];
+        return url is String && url.isNotEmpty ? url : '';
+      }
+      return '';
+    })
+    .where((url) => url.isNotEmpty)
+    .toList();
+  }
 
   Widget _buildStatItem({
     required IconData icon,
