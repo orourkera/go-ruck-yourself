@@ -63,155 +63,191 @@ class _PaywallScreenState extends State<PaywallScreen> {
     super.dispose();
   }
 
+  // Helper method to determine if we're on a tablet
+  bool _isTablet(BuildContext context) {
+    final data = MediaQuery.of(context);
+    return data.size.shortestSide >= 600;
+  }
+  
+  // Get the appropriate container width based on device
+  double _getContainerWidth(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (_isTablet(context)) {
+      // On tablets, use a percentage of screen width, with min/max constraints
+      return width > 900 ? 500 : width * 0.65;
+    } else {
+      // On phones, use the full width minus padding
+      return width - 40;
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final containerWidth = _getContainerWidth(context);
+    
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: _buildCard(
-                title: _cards[0]['title']!,
-                screenshot: _cards[0]['screenshot']!,
-                valueProp: _cards[0]['valueProp']!,
-              ),
+      // Use MediaQuery.removePadding to eliminate any unexpected padding
+      body: MediaQuery.removePadding(
+        context: context,
+        removeBottom: true,
+        child: SafeArea(
+          bottom: true,
+          // Use simple ListView instead of nested scroll containers
+          child: ListView(
+            // Add generous padding to ensure content doesn't touch edges
+            padding: EdgeInsets.only(
+              bottom: isTablet ? 100 : 80, // Much larger bottom padding
+              top: isTablet ? 20 : 10,
             ),
-            const SizedBox(height: 20),
-            // Subscription Plans Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  Text(
-                    'SUBSCRIPTION PLANS',
-                    style: AppTextStyles.paywallHeadline.copyWith(fontSize: 20),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPlanIndex = 0;
-                            });
-                          },
-                          child: _buildPlanCard('Weekly', getPlanPrice(0), _selectedPlanIndex == 0),
+            children: [
+              Center(
+                child: Container(
+                  width: containerWidth,
+                  // Main content column
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min, // No intrinsic height issues
+                    children: [
+                      // Title section
+                      _buildCard(
+                        title: _cards[0]['title']!,
+                        screenshot: _cards[0]['screenshot']!,
+                        valueProp: _cards[0]['valueProp']!,
+                        isTablet: isTablet,
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Subscription Plans heading
+                      Text(
+                        'SUBSCRIPTION PLANS',
+                        style: AppTextStyles.paywallHeadline.copyWith(
+                          fontSize: isTablet ? 24 : 20,
                         ),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPlanIndex = 1;
-                            });
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 15),
+                      
+                      // Plan options
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedPlanIndex = 0;
+                          });
+                        },
+                        child: _buildPlanCard('Weekly', getPlanPrice(0), _selectedPlanIndex == 0),
+                      ),
+                      SizedBox(height: isTablet ? 12 : 8),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedPlanIndex = 1;
+                          });
+                        },
+                        child: _buildPlanCard('Monthly', getPlanPrice(1), _selectedPlanIndex == 1),
+                      ),
+                      SizedBox(height: isTablet ? 12 : 8),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedPlanIndex = 2;
+                          });
+                        },
+                        child: _buildPlanCard('Annual', getPlanPrice(2), _selectedPlanIndex == 2),
+                      ),
+                      
+                      // CTA button
+                      SizedBox(height: isTablet ? 30 : 25),
+                      SizedBox(
+                        width: isTablet ? containerWidth * 0.8 : double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            await _handleGetRuckyPressed(context);
                           },
-                          child: _buildPlanCard('Monthly', getPlanPrice(1), _selectedPlanIndex == 1),
-                        ),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPlanIndex = 2;
-                            });
-                          },
-                          child: _buildPlanCard('Annual', getPlanPrice(2), _selectedPlanIndex == 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Get Rucky Button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await _handleGetRuckyPressed(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: Size(double.infinity, isTablet ? 60 : 50),
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'GET RUCKY',
+                            style: TextStyle(
+                              fontSize: isTablet ? 22 : 18,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Bangers',
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        'GET RUCKY',
-                        style: TextStyle(
-                          fontSize: 18,
+                      
+                      // Legal text and links
+                      SizedBox(height: isTablet ? 20 : 15),
+                      Text(
+                        'Go Ruck Yourself Premium\nAuto-renewing subscription',
+                        style: AppTextStyles.bodySmall.copyWith(
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'Bangers',
-                          color: Colors.white,
+                          fontSize: isTablet ? 14 : null,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  ),
-                  // Add legal links and subscription info at the bottom
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Go Ruck Yourself Premium\nAuto-renewing subscription',
-                          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
+                      SizedBox(height: isTablet ? 8 : 4),
+                      Text(
+                        'Prices may vary by region. Subscription auto-renews unless cancelled at least 24 hours before the end of the period.',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          fontSize: isTablet ? 13 : null,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Prices may vary by region. Subscription auto-renews unless cancelled at least 24 hours before the end of the period.',
-                          style: AppTextStyles.bodySmall,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            GestureDetector(
-                              onTap: () async {
-                                const url = 'https://getrucky.com/privacy';
-                                if (await canLaunch(url)) {
-                                  await launch(url);
-                                }
-                              },
-                              child: Text(
-                                'Privacy Policy',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  decoration: TextDecoration.underline,
-                                  color: AppColors.primary,
-                                ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: isTablet ? 12 : 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              const url = 'https://getrucky.com/privacy';
+                              if (await canLaunch(url)) {
+                                await launch(url);
+                              }
+                            },
+                            child: Text(
+                              'Privacy Policy',
+                              style: AppTextStyles.labelSmall.copyWith(
+                                decoration: TextDecoration.underline,
+                                fontSize: isTablet ? 12 : 10,
                               ),
                             ),
-                            const SizedBox(width: 18),
-                            GestureDetector(
-                              onTap: () async {
-                                const url = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
-                                if (await canLaunch(url)) {
-                                  await launch(url);
-                                }
-                              },
-                              child: Text(
-                                'Terms of Use',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  decoration: TextDecoration.underline,
-                                  color: AppColors.primary,
-                                ),
+                          ),
+                          SizedBox(width: isTablet ? 20 : 12),
+                          GestureDetector(
+                            onTap: () async {
+                              const url = 'https://getrucky.com/terms';
+                              if (await canLaunch(url)) {
+                                await launch(url);
+                              }
+                            },
+                            child: Text(
+                              'Terms of Use',
+                              style: AppTextStyles.labelSmall.copyWith(
+                                decoration: TextDecoration.underline,
+                                fontSize: isTablet ? 12 : 10,
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                      // Extra bottom padding for safety
+                      SizedBox(height: isTablet ? 60 : 45),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -252,54 +288,56 @@ class _PaywallScreenState extends State<PaywallScreen> {
     required String title,
     required String screenshot,
     required String valueProp,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: AppTextStyles.paywallHeadline.copyWith(fontSize: 32), 
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          // App Screenshot (smaller, no background)
-          SizedBox(
-            height: 95, // Further reduced to save space
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                screenshot,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return const SizedBox.shrink();
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          // Value Proposition Text
-          Text(
-            valueProp,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: Colors.black,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          // Disclaimer below value prop in same style
-          Text(
-            "A subscription is required to use this app. It's by ruckers and for ruckers and that has a price. All plans come with a free trial period so give it a shot, rucker.",
-            style: AppTextStyles.bodySmall,
-            textAlign: TextAlign.center,
-          ),
-        ],
+    bool isTablet = false,
+}) {
+  return Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Text(
+        title,
+        style: AppTextStyles.paywallHeadline.copyWith(
+          fontSize: isTablet ? 42 : 32,
+        ), 
+        textAlign: TextAlign.center,
       ),
-    );
-  }
+      SizedBox(height: isTablet ? 20 : 12),
+      // App Screenshot (adapts to tablet size)
+      SizedBox(
+        height: isTablet ? 160 : 95,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+          child: Image.asset(
+            screenshot,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+      SizedBox(height: isTablet ? 30 : 18),
+      // Value Proposition Text
+      Text(
+        valueProp,
+        style: TextStyle(
+          fontSize: isTablet ? 22 : 18,
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+        ),
+        textAlign: TextAlign.center,
+      ),
+      SizedBox(height: isTablet ? 15 : 10),
+      // Disclaimer below value prop in same style
+      Text(
+        "A subscription is required to use this app. It's by ruckers and for ruckers and that has a price. All plans come with a free trial period so give it a shot, rucker.",
+        style: AppTextStyles.bodySmall.copyWith(
+          fontSize: isTablet ? 15 : null,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    ],
+  );
+}
 
   String getPlanPrice(int index) {
     // Use identifier for robust mapping
@@ -316,36 +354,41 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Widget _buildPlanCard(String planName, String price, bool isSelected) {
-    return Card(
-      elevation: isSelected ? 6 : 2,
-      color: isSelected ? AppColors.secondary : null,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: EdgeInsets.all(isSelected ? 16.0 : 12.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              planName,
-              style: TextStyle(
-                fontSize: isSelected ? 18 : 16, 
-                fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.white : null,
-                fontFamily: isSelected ? 'Bangers' : null,
-              ),
+  final isTablet = _isTablet(context);
+  return Card(
+    elevation: isSelected ? 6 : 2,
+    color: isSelected ? AppColors.secondary : null,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isTablet ? 12 : 10)),
+    child: Padding(
+      padding: EdgeInsets.all(isSelected ? (isTablet ? 20.0 : 16.0) : (isTablet ? 16.0 : 12.0)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            planName,
+            style: TextStyle(
+              fontSize: isSelected 
+                ? (isTablet ? 22 : 18) 
+                : (isTablet ? 20 : 16), 
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : null,
+              fontFamily: isSelected ? 'Bangers' : null,
             ),
-            Text(
-              price,
-              style: TextStyle(
-                fontSize: isSelected ? 18 : 16, 
-                fontWeight: FontWeight.w500,
-                color: isSelected ? Colors.white : null,
-                fontFamily: isSelected ? 'Bangers' : null,
-              ),
+          ),
+          Text(
+            price,
+            style: TextStyle(
+              fontSize: isSelected 
+                ? (isTablet ? 22 : 18) 
+                : (isTablet ? 20 : 16), 
+              fontWeight: FontWeight.w500,
+              color: isSelected ? Colors.white : null,
+              fontFamily: isSelected ? 'Bangers' : null,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
