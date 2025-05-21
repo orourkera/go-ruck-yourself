@@ -82,8 +82,14 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
       if (mounted) {
         final ruckId = int.tryParse(widget.ruckBuddy.id);
         if (ruckId != null) {
-          // Quietly check if user has liked this ruck
-          context.read<SocialBloc>().add(CheckUserLikeStatus(ruckId));
+          // Use the singleton instance of SocialBloc from GetIt
+          final socialBloc = GetIt.instance<SocialBloc>();
+          
+          // First ensure we're getting the latest state
+          socialBloc.add(BatchCheckUserLikeStatus([ruckId]));
+          
+          // Important debug logging
+          print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: Checking like status for ruckId $ruckId');
         }
       }
     });
