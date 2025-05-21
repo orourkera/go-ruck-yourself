@@ -790,43 +790,52 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       try {
         // IMPROVED: Always try to fetch heart rate samples for better user experience
         // This will fetch samples even if we don't have avgHeartRate/maxHeartRate/minHeartRate indicators
-        AppLogger.debug('[HEARTRATE DEBUG] Fetching heart rate samples for session ${session.id}');
+        String? heartRateError;
         try {
-          // Use our dedicated heart rate fetching method from SessionRepository
+          AppLogger.debug('[HEARTRATE DEBUG] Fetching heart rate samples for session ${session.id}');
           final heartRateSamples = await _sessionRepository.fetchHeartRateSamples(session.id!);
           
-          if (heartRateSamples.isNotEmpty) {
-            AppLogger.debug('[HEARTRATE DEBUG] Successfully fetched ${heartRateSamples.length} heart rate samples');
-            
-            // Calculate aggregate values if they're missing
-            int? avgHeartRate = session.avgHeartRate;
-            int? maxHeartRate = session.maxHeartRate;
-            int? minHeartRate = session.minHeartRate;
-            
-            if (avgHeartRate == null && heartRateSamples.isNotEmpty) {
-              avgHeartRate = (heartRateSamples.map((s) => s.bpm).reduce((a, b) => a + b) / heartRateSamples.length).round();
-              AppLogger.debug('[HEARTRATE DEBUG] Calculated avg heart rate: $avgHeartRate');
-            }
-            
-            if (maxHeartRate == null && heartRateSamples.isNotEmpty) {
-              maxHeartRate = heartRateSamples.map((s) => s.bpm).reduce(math.max);
-              AppLogger.debug('[HEARTRATE DEBUG] Calculated max heart rate: $maxHeartRate');
-            }
-            
-            if (minHeartRate == null && heartRateSamples.isNotEmpty) {
-              minHeartRate = heartRateSamples.map((s) => s.bpm).reduce(math.min);
-              AppLogger.debug('[HEARTRATE DEBUG] Calculated min heart rate: $minHeartRate');
-            }
-            
-            // Update session with heart rate data
-            session = session.copyWith(
-              heartRateSamples: heartRateSamples,
-              avgHeartRate: avgHeartRate,
-              maxHeartRate: maxHeartRate,
-              minHeartRate: minHeartRate
-            );
-          } else {
+          if (heartRateSamples.isEmpty) {
             AppLogger.debug('[HEARTRATE DEBUG] No heart rate samples found for session ${session.id}');
+            // If we have existing heart rate stats in the session but no samples, use those
+            if (session.avgHeartRate != null || session.maxHeartRate != null) {
+              AppLogger.debug('[HEARTRATE DEBUG] Using existing heart rate stats from session data');
+            }
+          } else {
+            AppLogger.debug('[HEARTRATE DEBUG] Found ${heartRateSamples.length} heart rate samples for session ${session.id}');
+            
+            // Calculate heart rate statistics if needed
+            if (session.avgHeartRate == null || session.maxHeartRate == null) {
+              AppLogger.debug('[HEARTRATE DEBUG] Calculating heart rate statistics for session ${session.id}');
+              
+              // Find average heart rate
+              final avgHeartRate = heartRateSamples.isNotEmpty
+                ? heartRateSamples.map((s) => s.bpm).reduce((a, b) => a + b) / heartRateSamples.length
+                : 0;
+                
+              // Find max heart rate
+              final maxHeartRate = heartRateSamples.isNotEmpty
+                ? heartRateSamples.map((s) => s.bpm).reduce((a, b) => a > b ? a : b)
+                : 0;
+                
+              // Find min heart rate
+              final minHeartRate = heartRateSamples.isNotEmpty
+                ? heartRateSamples.map((s) => s.bpm).reduce((a, b) => a < b ? a : b)
+                : 0;
+              
+              AppLogger.debug('[HEARTRATE DEBUG] Calculated avg: $avgHeartRate, max: $maxHeartRate, min: $minHeartRate');
+              
+              // Update session with calculated values
+              session = session.copyWith(
+                heartRateSamples: heartRateSamples,
+                avgHeartRate: avgHeartRate.round(),
+                maxHeartRate: maxHeartRate.round(),
+                minHeartRate: minHeartRate.round()
+              );
+            } else {
+              // Just attach the samples to the session
+              session = session.copyWith(heartRateSamples: heartRateSamples);
+            }
           }
         } catch (e) {
           AppLogger.error('Error fetching heart rate samples: $e');

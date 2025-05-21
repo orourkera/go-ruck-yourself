@@ -37,11 +37,33 @@ class SessionRepository {
         _supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '',
         _supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 
+  // Cache for heart rate samples to avoid hitting rate limits
+  static final Map<String, List<HeartRateSample>> _heartRateCache = {};
+  static final Map<String, DateTime> _heartRateCacheTime = {};
+  static const Duration _heartRateCacheValidity = Duration(hours: 1); // Cache for an hour
+  
   /// Fetch heart rate samples for a session by its ID.
   /// This method specifically requests heart rate data from the server.
+  /// Uses caching to avoid hitting rate limits (50 per hour).
   Future<List<HeartRateSample>> fetchHeartRateSamples(String sessionId) async {
     try {
-      AppLogger.debug('[HEARTRATE FETCH] Attempting to fetch heart rate samples for session: $sessionId');
+      // First check if we have cached data for this session
+      if (_heartRateCache.containsKey(sessionId)) {
+        final cacheTime = _heartRateCacheTime[sessionId];
+        final now = DateTime.now();
+        
+        // Check if cache is still valid (less than 1 hour old)
+        if (cacheTime != null && now.difference(cacheTime) < _heartRateCacheValidity) {
+          AppLogger.debug('[HEARTRATE FETCH] Using cached data for session: $sessionId');
+          return _heartRateCache[sessionId]!;
+        } else {
+          AppLogger.debug('[HEARTRATE FETCH] Cache expired for session: $sessionId');
+        }
+      } else {
+        AppLogger.debug('[HEARTRATE FETCH] No cache found for session: $sessionId');
+      }
+
+      AppLogger.debug('[HEARTRATE FETCH] Attempting to fetch heart rate samples from API for session: $sessionId');
       
       // Try multiple endpoint variations - according to API conventions
       // Note: No /api prefix (base URL already has it)
@@ -65,7 +87,12 @@ class SessionRepository {
             break;
           }
         } catch (e) {
-          AppLogger.debug('[HEARTRATE FETCH] Endpoint failed: $endpoint - $e');
+          // Check if this is a rate limit error (429)
+          if (e.toString().contains('429')) {
+            AppLogger.warning('[HEARTRATE FETCH] Rate limit hit for endpoint: $endpoint');
+          } else {
+            AppLogger.debug('[HEARTRATE FETCH] Endpoint failed: $endpoint - $e');
+          }
           // Continue to the next endpoint
         }
       }
@@ -140,6 +167,13 @@ class SessionRepository {
       }
       
       AppLogger.debug('[HEARTRATE FETCH] Successfully parsed ${samples.length} heart rate samples');
+      // Return the collected samples and update cache
+      if (samples.isNotEmpty) {
+        // Update cache with the retrieved data
+        _heartRateCache[sessionId] = samples;
+        _heartRateCacheTime[sessionId] = DateTime.now();
+        AppLogger.debug('[HEARTRATE FETCH] Cached ${samples.length} heart rate samples for session $sessionId');
+      }
       return samples;
     } catch (e) {
       AppLogger.error('[HEARTRATE FETCH] Error fetching heart rate samples: $e');
