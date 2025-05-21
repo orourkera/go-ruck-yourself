@@ -304,6 +304,17 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   }
 
   Widget _buildHeartRateSection() {
+    // Check if heart rate samples are available
+    final bool hasHeartRateData = _heartRateSamples != null && _heartRateSamples!.isNotEmpty;
+    
+    // Log heart rate data for debugging
+    if (!hasHeartRateData) {
+      debugPrint('[SessionCompleteScreen] No heart rate samples available to display');
+    } else {
+      debugPrint('[SessionCompleteScreen] Displaying ${_heartRateSamples!.length} heart rate samples');
+      debugPrint('[SessionCompleteScreen] Avg: $_avgHeartRate, Min: $_minHeartRate, Max: $_maxHeartRate');
+    }
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       padding: const EdgeInsets.all(16),
@@ -334,13 +345,27 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           const SizedBox(height: 16),
           SizedBox(
             height: 180,
-            child: AnimatedHeartRateChart(
-              heartRateSamples: _heartRateSamples!,
-              avgHeartRate: _avgHeartRate,
-              maxHeartRate: _maxHeartRate,
-              minHeartRate: _minHeartRate,
-              getLadyModeColor: _getLadyModeColor,
-            ),
+            child: hasHeartRateData 
+              ? AnimatedHeartRateChart(
+                  heartRateSamples: _heartRateSamples!,
+                  avgHeartRate: _avgHeartRate,
+                  maxHeartRate: _maxHeartRate,
+                  minHeartRate: _minHeartRate,
+                  getLadyModeColor: _getLadyModeColor,
+                )
+              : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.timeline_outlined, size: 48, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No heart rate data available',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
           ),
         ],
       ),

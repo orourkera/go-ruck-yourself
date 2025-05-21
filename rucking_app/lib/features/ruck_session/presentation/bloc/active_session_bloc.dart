@@ -484,7 +484,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final RuckSession completedSession = RuckSession.fromJson(response);
         
         AppLogger.debug('Session ${currentState.sessionId} completed successfully.');
-      emit(SessionSummaryGenerated(session: completedSession, photos: currentState.photos, isPhotosLoading: false));
+      
+      // Create a modified session that includes heart rate data if not present in the API response
+      final RuckSession enrichedSession = completedSession.copyWith(
+        heartRateSamples: completedSession.heartRateSamples ?? _allHeartRateSamples,
+        avgHeartRate: completedSession.avgHeartRate ?? avgHeartRate,
+        maxHeartRate: completedSession.maxHeartRate ?? _maxHeartRate,
+        minHeartRate: completedSession.minHeartRate ?? _minHeartRate
+      );
+      
+      emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
+      
+      // Log heart rate data for debugging
+      AppLogger.debug('Heart rate samples count: ${_allHeartRateSamples.length}');
+      AppLogger.debug('Avg HR: $avgHeartRate, Min HR: $_minHeartRate, Max HR: $_maxHeartRate');
       
       _watchService.endSessionOnWatch().catchError((e) {
         // Just log the error but don't block UI progression

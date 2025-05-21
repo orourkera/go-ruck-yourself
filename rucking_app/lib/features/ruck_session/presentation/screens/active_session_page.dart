@@ -264,7 +264,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                     },
                     listenWhen: (prev, curr) => 
                       (prev is ActiveSessionFailure != curr is ActiveSessionFailure) || 
-                      (curr is ActiveSessionComplete) ||
+                      (curr is SessionSummaryGenerated) ||
                       (curr is ActiveSessionRunning && !sessionRunning),
                     listener: (context, state) {
                       if (state is ActiveSessionFailure) {
@@ -273,7 +273,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           message: state.errorMessage,
                           duration: const Duration(seconds: 3),
                         );
-                      } else if (state is ActiveSessionComplete) {
+                      } else if (state is SessionSummaryGenerated) {
                         final endTime = state.session.endTime ?? DateTime.now();
                         final ruckId = state.session.id ?? '';
                         final duration = state.session.duration ?? Duration.zero;
