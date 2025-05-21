@@ -259,9 +259,13 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
               });
             } else if (state is BatchLikeStatusChecked && state.likeStatusMap.containsKey(_ruckId)) {
               final isLiked = state.likeStatusMap[_ruckId] ?? false;
-              developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID $_ruckId - BatchLikeStatusChecked', name: 'RuckBuddyCard');
+              final likeCount = state.likeCountMap[_ruckId];
+              developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID $_ruckId - BatchLikeStatusChecked, isLiked: $isLiked, likeCount: $likeCount', name: 'RuckBuddyCard');
               setState(() {
                 _isLiked = isLiked;
+                if (likeCount != null) {
+                  _likeCount = likeCount;
+                }
                 _isProcessingLike = false;
               });
             }
