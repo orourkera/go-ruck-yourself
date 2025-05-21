@@ -23,6 +23,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart'
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/features/social/presentation/widgets/like_button.dart';
 import 'package:rucking_app/features/social/presentation/widgets/comments_section.dart';
 import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
@@ -338,9 +339,82 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              MeasurementUtils.formatDate(widget.session.startTime),
-                              style: Theme.of(context).textTheme.titleLarge,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  MeasurementUtils.formatDate(widget.session.startTime),
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                // Add the like button here
+                                if (widget.session.id != null)
+                                  BlocProvider.value(
+                                    value: getIt<SocialBloc>(),
+                                    child: BlocBuilder<SocialBloc, SocialState>(
+                                      buildWhen: (previous, current) {
+                                        final ruckId = int.tryParse(widget.session.id!);
+                                        if (ruckId == null) return false;
+                                        
+                                        return (current is LikeActionCompleted && current.ruckId == ruckId) ||
+                                            (current is LikeStatusChecked && current.ruckId == ruckId) ||
+                                            (current is LikesLoaded && current.ruckId == ruckId) ||
+                                            (current is BatchLikeStatusChecked && current.likeStatusMap.containsKey(ruckId));
+                                      },
+                                      builder: (context, state) {
+                                        final ruckId = int.tryParse(widget.session.id!);
+                                        if (ruckId == null) return const SizedBox.shrink();
+                                        
+                                        bool isLiked = false;
+                                        int likeCount = 0;
+                                        
+                                        if (state is LikesLoaded && state.ruckId == ruckId) {
+                                          isLiked = state.userHasLiked;
+                                          likeCount = state.likes.length;
+                                        } else if (state is LikeActionCompleted && state.ruckId == ruckId) {
+                                          isLiked = state.isLiked;
+                                          likeCount = state.likeCount;
+                                        } else if (state is LikeStatusChecked && state.ruckId == ruckId) {
+                                          isLiked = state.isLiked;
+                                          likeCount = state.likeCount;
+                                        } else if (state is BatchLikeStatusChecked) {
+                                          isLiked = state.likeStatusMap[ruckId] ?? false;
+                                          likeCount = state.likeCountMap[ruckId] ?? 0;
+                                        }
+                                        
+                                        return InkWell(
+                                          onTap: () {
+                                            context.read<SocialBloc>().add(ToggleRuckLike(ruckId));
+                                          },
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Image.asset(
+                                                  isLiked
+                                                      ? 'assets/images/tactical_ruck_like_icon_active.png'
+                                                      : 'assets/images/tactical_ruck_like_icon_transparent.png',
+                                                  width: 30,
+                                                  height: 30,
+                                                ),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  '$likeCount',
+                                                  style: TextStyle(
+                                                    fontFamily: 'Bangers',
+                                                    fontSize: 20,
+                                                    color: Colors.grey[800],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 8),
                             Text(

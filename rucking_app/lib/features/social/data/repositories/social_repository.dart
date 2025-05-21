@@ -39,7 +39,10 @@ class SocialRepository {
       if (token == null) {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
+      
+      debugPrint('[SOCIAL_DEBUG] Getting likes for ruck $ruckId');
 
+      // Don't include /api in the path as it's already in the base URL
       final response = await _httpClient.get(
         Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId'),
         headers: {
@@ -158,66 +161,95 @@ class SocialRepository {
     }
   }
 
-  /// Check if the current user has liked a specific ruck session
+  /// Check if the current user has liked a specific ruck
   Future<bool> hasUserLikedRuck(int ruckId) async {
-    debugPrint('🔍 SocialRepository.hasUserLikedRuck called for ruckId: $ruckId');
+    debugPrint('[SOCIAL_DEBUG] hasUserLikedRuck called for ruckId: $ruckId');
     final result = await batchCheckUserLikes([ruckId]);
-    return result[ruckId] ?? false;
+    
+    // Handle potential null with proper null safety
+    final likeStatusMap = result['likeStatus'];
+    if (likeStatusMap == null) return false;
+    
+    return likeStatusMap[ruckId] ?? false;
   }
   
   /// Batch check if the current user has liked multiple ruck sessions
-  /// Returns a map of ruckId -> hasLiked
-  Future<Map<int, bool>> batchCheckUserLikes(List<int> ruckIds) async {
-    if (ruckIds.isEmpty) return {};
+  /// Returns a map with 'likeStatus' containing ruckId -> hasLiked mapping
+  /// and 'likeCounts' containing ruckId -> count mapping
+  Future<Map<String, Map<int, dynamic>>> batchCheckUserLikes(List<int> ruckIds) async {
+    if (ruckIds.isEmpty) return {
+      'likeStatus': {},
+      'likeCounts': {},
+    };
     
-    debugPrint('🔍 SocialRepository.batchCheckUserLikes called for ${ruckIds.length} rucks');
+    debugPrint('[SOCIAL_DEBUG] batchCheckUserLikes called for ${ruckIds.length} rucks');
     try {
-      debugPrint('🔍 Getting auth token...');
       final token = await _authToken;
-      debugPrint('🔍 Auth token retrieved: ${token != null ? 'YES' : 'NO'}');
-      
       if (token == null) {
-        debugPrint('⚠ No auth token available');
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      // Convert ruckIds to comma-separated string
-      final ruckIdsParam = ruckIds.join(',');
-      debugPrint('🔍 Making batch API request to check if user liked rucks');
-      final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes/batch-check?ruck_ids=$ruckIdsParam';
-      debugPrint('🔍 Endpoint: $endpoint');
+      // Maps to store results
+      Map<int, bool> likeStatusMap = {};
+      Map<int, int> likeCountMap = {};
       
-      // Use regular endpoint for single ruck check as fallback if batch endpoint doesn't exist
-      if (ruckIds.length == 1) {
-        return _fallbackSingleRuckCheck(ruckIds.first, token);
-      }
-      
-      // Start with individual checks for now, until backend supports batch endpoint
-      // We'll do this sequentially to avoid rate limiting
-      Map<int, bool> results = {};
+      // Process each ruck individually as the API doesn't support true batch operations
       for (final ruckId in ruckIds) {
         try {
-          // Add a small delay between requests to avoid rate limiting
-          if (results.isNotEmpty) {
-            await Future.delayed(const Duration(milliseconds: 100));
+          // Check like status
+          debugPrint('[SOCIAL_DEBUG] Checking like status for ruck $ruckId');
+          final hasLikedResponse = await _httpClient.get(
+            Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes/check?ruck_id=$ruckId'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          ).timeout(const Duration(seconds: 5));
+          
+          if (hasLikedResponse.statusCode == 200) {
+            final Map<String, dynamic> data = json.decode(hasLikedResponse.body);
+            if (data['success'] == true) {
+              likeStatusMap[ruckId] = data['data'] == true || data['data'] == 'true' || data['data'] == 1;
+              debugPrint('[SOCIAL_DEBUG] User has liked ruck $ruckId: ${likeStatusMap[ruckId]}');
+            }
           }
-          final hasLiked = await _fallbackSingleRuckCheck(ruckId, token);
-          results[ruckId] = hasLiked[ruckId] ?? false;
+          
+          // Get like count
+          debugPrint('[SOCIAL_DEBUG] Getting like count for ruck $ruckId');
+          final likesResponse = await _httpClient.get(
+            Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          ).timeout(const Duration(seconds: 5));
+          
+          if (likesResponse.statusCode == 200) {
+            final Map<String, dynamic> data = json.decode(likesResponse.body);
+            if (data['success'] == true && data['data'] is List) {
+              likeCountMap[ruckId] = (data['data'] as List).length;
+              debugPrint('[SOCIAL_DEBUG] Like count for ruck $ruckId: ${likeCountMap[ruckId]}');
+            }
+          }
         } catch (e) {
-          // If we hit rate limit, just return what we have so far
-          if (e is ServerException && e.message.contains('429')) {
-            debugPrint('⚠ Rate limit hit, returning partial results');
-            return results;
-          }
-          results[ruckId] = false;
+          debugPrint('[SOCIAL_DEBUG] Error processing ruck $ruckId: $e');
+          // Continue with other rucks
         }
       }
       
-      return results;
+      return {
+        'likeStatus': likeStatusMap,
+        'likeCounts': likeCountMap,
+      };
     } catch (e) {
-      debugPrint('🐞 Error in batch checking like status: $e');
+      debugPrint('[SOCIAL_DEBUG] Error in batch checking like status: $e');
       if (e is UnauthorizedException) rethrow;
-      throw ServerException(message: 'Failed to batch check like status: $e');
+      
+      // Return empty maps to avoid crashing the app
+      return {
+        'likeStatus': {},
+        'likeCounts': {},
+      };
     }
   }
   

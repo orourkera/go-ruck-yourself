@@ -132,6 +132,21 @@ class CommentActionCompleted extends SocialState {
   List<Object?> get props => [comment, actionType];
 }
 
+/// State for when comment count is updated
+/// This helps in synchronizing comment counts across different screens
+class CommentCountUpdated extends SocialState {
+  final int ruckId;
+  final int count;
+
+  const CommentCountUpdated({
+    required this.ruckId,
+    required this.count,
+  });
+
+  @override
+  List<Object?> get props => [ruckId, count];
+}
+
 /// State for when a comment action fails
 class CommentActionError extends SocialState {
   final String message;
@@ -143,13 +158,16 @@ class CommentActionError extends SocialState {
 }
 
 /// State for when a batch like status check is completed
-/// This stores the like status for multiple ruck IDs
+/// State for when a batch check for like status is completed
 class BatchLikeStatusChecked extends SocialState {
-  /// Map of ruckId -> isLiked status
+  /// Map of ruckId to isLiked status
   final Map<int, bool> likeStatusMap;
+  
+  /// Map of ruckId to like count
+  final Map<int, int> likeCountMap;
 
-  const BatchLikeStatusChecked(this.likeStatusMap);
+  const BatchLikeStatusChecked(this.likeStatusMap, {this.likeCountMap = const {}});
 
   @override
-  List<Object?> get props => [likeStatusMap];
+  List<Object?> get props => [likeStatusMap, likeCountMap];
 }

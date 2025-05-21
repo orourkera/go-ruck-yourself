@@ -294,8 +294,11 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
           
           // Notify callback of photos selected
           if (widget.onPhotosSelected != null) {
-            AppLogger.info('[PHOTO_UPLOAD] Notifying listener of ${filesToAdd.length} photos selected');
+            AppLogger.info('[PHOTO_DEBUG] Notifying listener of ${filesToAdd.length} photos selected');
+            AppLogger.info('[PHOTO_DEBUG] Selected photos paths: ${_selectedPhotos.map((f) => f.path).toList()}');
+            AppLogger.info('[PHOTO_DEBUG] About to call onPhotosSelected callback...');
             widget.onPhotosSelected?.call(_selectedPhotos);
+            AppLogger.info('[PHOTO_DEBUG] onPhotosSelected callback completed');
           }
         }
       } else {

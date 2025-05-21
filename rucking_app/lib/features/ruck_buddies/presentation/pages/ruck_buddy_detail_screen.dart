@@ -256,22 +256,41 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
       },
       child: BlocListener<SocialBloc, SocialState>(
         listener: (context, state) {
+          final ruckId = int.tryParse(widget.ruckBuddy.id);
+          if (ruckId == null) return;
+          
           if (state is LikeStatusChecked) {
-            if (state.ruckId.toString() == widget.ruckBuddy.id) {
-              setState(() {
-                _isLiked = state.isLiked;
-                _likeCount = state.likeCount; // Update _likeCount here
-              });
-              print('[LIKE_DEBUG] RuckBuddyDetailScreen: LikeStatusChecked for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
-            }
-          } else if (state is LikeActionCompleted) {
-            _isProcessingLike = false;
-            if (state.ruckId.toString() == widget.ruckBuddy.id) {
+            if (state.ruckId == ruckId) {
               setState(() {
                 _isLiked = state.isLiked;
                 _likeCount = state.likeCount;
+                _isProcessingLike = false;
               });
-              print('[LIKE_DEBUG] RuckBuddyDetailScreen: LikeActionCompleted for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
+              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: LikeStatusChecked for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
+            }
+          } else if (state is LikeActionCompleted) {
+            if (state.ruckId == ruckId) {
+              setState(() {
+                _isLiked = state.isLiked;
+                _likeCount = state.likeCount;
+                _isProcessingLike = false;
+              });
+              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: LikeActionCompleted for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
+            }
+          } else if (state is BatchLikeStatusChecked) {
+            // Handle batch updates to keep likes in sync across all screens
+            if (state.likeStatusMap.containsKey(ruckId)) {
+              final isLiked = state.likeStatusMap[ruckId] ?? false;
+              final likeCount = state.likeCountMap[ruckId];
+              
+              setState(() {
+                _isLiked = isLiked;
+                if (likeCount != null) {
+                  _likeCount = likeCount;
+                }
+                _isProcessingLike = false;
+              });
+              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: BatchLikeStatusChecked for ruckId: $ruckId, isLiked: $isLiked, likeCount: $likeCount');
             }
           }
         },  
