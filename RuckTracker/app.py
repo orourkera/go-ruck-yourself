@@ -87,10 +87,10 @@ limiter = Limiter(
 )
 limiter.init_app(app)
 
-# Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
-from RuckTracker.api.ruck import HeartRateSampleUploadResource
-
-limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
+# TEMPORARY FIX: Comment out missing import to prevent server crash
+# Previous import was causing ImportError because HeartRateSampleUploadResource doesn't exist
+# from RuckTracker.api.ruck import HeartRateSampleUploadResource
+# limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
 
 # Define custom rate limits for specific endpoints
 @app.route("/api/auth/register", methods=["POST"])
