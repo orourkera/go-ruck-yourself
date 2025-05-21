@@ -83,7 +83,7 @@ limiter = Limiter(
     app=app,
     default_limits=["500 per day", "100 per hour"],  # Increased default limits
     storage_uri="memory://",
-    strategy="moving-window"  # Changed to moving-window for smoother rate limiting
+    strategy="fixed-window"  # Keep original strategy
 )
 limiter.init_app(app)
 
@@ -302,7 +302,7 @@ api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/year
 
 # Ruck Photos Endpoint
 api.add_resource(RuckPhotosResource, '/api/ruck-photos')
-rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
+rate_limit_resource(RuckPhotosResource, "120 per minute") # Increased from 30/minute to 120/minute
 
 # Ruck Likes Endpoints
 api.add_resource(
@@ -313,7 +313,7 @@ api.add_resource(
 
 # Ruck Comments Endpoint
 api.add_resource(RuckCommentsResource, '/api/ruck-comments')
-rate_limit_resource(RuckCommentsResource, "60 per minute") # Apply rate limiting
+rate_limit_resource(RuckCommentsResource, "240 per minute") # Increased from 60/minute to 240/minute
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
