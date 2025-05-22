@@ -306,8 +306,13 @@ api.add_resource(MonthlyStatsResource, '/api/stats/monthly', '/api/statistics/mo
 api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/yearly')
 
 # Ruck Photos Endpoint
+app.logger.info(f"Setting RuckPhotosResource rate limit to: 30 per minute")
+# Directly patch the RuckPhotosResource methods with the limiter decorator
+RuckPhotosResource.get = limiter.limit("30 per minute", override_defaults=True)(RuckPhotosResource.get)
+RuckPhotosResource.post = limiter.limit("30 per minute", override_defaults=True)(RuckPhotosResource.post)
+
+# Now register the resource with modified methods
 api.add_resource(RuckPhotosResource, '/api/ruck-photos')
-rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Ruck Likes Endpoints
 app.logger.info(f"Setting RuckLikesResource rate limit to: 2000 per minute")
