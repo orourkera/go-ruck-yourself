@@ -305,15 +305,16 @@ api.add_resource(RuckPhotosResource, '/api/ruck-photos')
 rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Ruck Likes Endpoints
+app.logger.info(f"Setting RuckLikesResource rate limit to: 2000 per minute")
 api.add_resource(
-  rate_limit_resource(RuckLikesResource, "500 per minute"),  # Dramatically increased from 100/hour to 500/minute
+  rate_limit_resource(RuckLikesResource, "2000 per minute"),  # Dramatically increased from 500/minute to 2000/minute
   '/api/ruck-likes',
   '/api/ruck-likes/check'
 )
 
 # Ruck Comments Endpoint
 api.add_resource(RuckCommentsResource, '/api/ruck-comments')
-rate_limit_resource(RuckCommentsResource, "60 per minute") # Apply rate limiting
+rate_limit_resource(RuckCommentsResource, "500 per minute") # Dramatically increased from 60/minute to 500/minute
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
