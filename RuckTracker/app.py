@@ -311,8 +311,13 @@ rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Ruck Likes Endpoints
 app.logger.info(f"Setting RuckLikesResource rate limit to: 2000 per minute")
+# Directly patch the RuckLikesResource methods with the limiter decorator
+RuckLikesResource.get = limiter.limit("2000 per minute", override_defaults=True)(RuckLikesResource.get)
+RuckLikesResource.post = limiter.limit("2000 per minute", override_defaults=True)(RuckLikesResource.post)
+RuckLikesResource.delete = limiter.limit("2000 per minute", override_defaults=True)(RuckLikesResource.delete)
+
+# Now register the resource with modified methods
 api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
-rate_limit_resource(RuckLikesResource, "2000 per minute")  # Dramatically increased from 500/minute to 2000/minute
 
 # Ruck Comments Endpoint
 api.add_resource(RuckCommentsResource, '/api/ruck-comments')
