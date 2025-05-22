@@ -465,22 +465,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           },
                           child: Row(
                             children: [
-                              Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // White outline version of chat bubble
-                                  Icon(
-                                    Icons.chat_bubble_outline,
-                                    color: Colors.white,
-                                    size: 40, // Exactly 40px as requested
-                                  ),
-                                  // Slightly smaller solid icon to create a white outline effect
-                                  Icon(
-                                    Icons.chat_bubble,
-                                    color: AppColors.secondary,
-                                    size: 36,
-                                  ),
-                                ],
+                              Icon(
+                                Icons.comment,
+                                size: 40,
+                                color: AppColors.secondary,
                               ),
                               const SizedBox(width: 4),
                               Text(
