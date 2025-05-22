@@ -44,6 +44,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   bool _isLiked = false;
   List<RuckPhoto> _photos = [];
   int _likeCount = 0;
+  int _commentCount = 0; // Added comment count state variable
   bool _isProcessingLike = false;
 
   @override
@@ -51,6 +52,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     super.initState();
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser;
     _likeCount = widget.ruckBuddy.likeCount;
+    _commentCount = widget.ruckBuddy.commentCount; // Initialize comment count
     _photos = widget.ruckBuddy.photos ?? [];
 
     // Always fetch photos for ruck buddies, as they're not included in the initial RuckBuddy model
@@ -282,6 +284,13 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                 _isProcessingLike = false;
               });
               print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: LikeActionCompleted for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
+            }
+          } else if (state is CommentCountUpdated) { // Handle CommentCountUpdated
+            if (state.ruckId == ruckId) {
+              setState(() {
+                _commentCount = state.count;
+              });
+              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: CommentCountUpdated for ruckId: ${state.ruckId}, new commentCount: ${state.count}');
             }
           } else if (state is BatchLikeStatusChecked) {
             // Handle batch updates to keep likes in sync across all screens
@@ -592,7 +601,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '${widget.ruckBuddy.commentCount}',
+                                '$_commentCount',
                                 style: TextStyle(
                                   fontFamily: 'Bangers',
                                   fontSize: 24,
