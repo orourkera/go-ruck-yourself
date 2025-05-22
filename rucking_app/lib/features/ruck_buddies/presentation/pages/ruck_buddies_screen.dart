@@ -41,65 +41,6 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     });
   }
   
-  // Batch check likes for all displayed ruck buddies to avoid rate limiting
-  // Use an efficient caching strategy to minimize API calls
-  void _batchCheckLikes(List<RuckBuddy> ruckBuddies) {
-    if (ruckBuddies.isEmpty) return;
-    
-    // Extract all ruck IDs
-    final List<int> ruckIds = [];
-    for (final buddy in ruckBuddies) {
-      final ruckId = int.tryParse(buddy.id);
-      if (ruckId != null) {
-        ruckIds.add(ruckId);
-      }
-    }
-    debugPrint('🐞 [RuckBuddiesScreen._batchCheckLikes] Checking likes for ${ruckIds.length} ruck buddies');
-    
-    // IMPORTANT: Immediately check all likes and comments in one batch to avoid staggered updates
-    if (ruckIds.isNotEmpty) {
-      // First, check all likes in a single batch - this updates the cache right away
-      context.read<SocialBloc>().add(BatchCheckUserLikeStatus(ruckIds));
-      
-      // Then immediately load all like counts in a single call
-      for (final ruckId in ruckIds) {
-        context.read<SocialBloc>().add(LoadRuckLikes(ruckId));
-      }
-      
-      // And load all comments counts in a single pass
-      for (final ruckId in ruckIds) {
-        context.read<SocialBloc>().add(LoadRuckComments(ruckId.toString()));
-      }
-    }
-  }
-  
-  /// Fetches comment counts for all rucks
-  /// This is needed to display comment counts on RuckBuddyCards
-  void _batchLoadCommentCounts(List<int> ruckIds) {
-    if (ruckIds.isEmpty) return;
-    
-    debugPrint('🐞 [_RuckBuddiesScreenState._batchLoadCommentCounts] Loading comment counts for ${ruckIds.length} rucks');
-    
-    // Process in small batches to avoid rate limiting
-    const batchSize = 5;
-    
-    for (int i = 0; i < ruckIds.length; i += batchSize) {
-      // Create a sublist for this batch
-      final end = (i + batchSize < ruckIds.length) ? i + batchSize : ruckIds.length;
-      final batch = ruckIds.sublist(i, end);
-      
-      // Add a small delay between batches to prevent rate limiting
-      Future.delayed(Duration(milliseconds: i > 0 ? 500 : 0), () {
-        if (!mounted) return;
-        
-        // Load comments for each ruck in this batch
-        for (final ruckId in batch) {
-          context.read<SocialBloc>().add(LoadRuckComments(ruckId.toString()));
-        }
-      });
-    }
-  }
-  
   void _preloadDemoImages() {
     // This would be removed when real photo support is implemented
     // Preload sample images
@@ -215,10 +156,12 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                           current.ruckBuddies.length != (previous as RuckBuddiesLoaded).ruckBuddies.length));
                 },
                 listener: (context, state) {
-                  // Only perform batch check when we have loaded data
-                  if (state is RuckBuddiesLoaded && state.ruckBuddies.isNotEmpty) {
-                    debugPrint('🐞 [RuckBuddiesScreen] Data loaded, checking likes in batch');
-                    _batchCheckLikes(state.ruckBuddies);
+                  if (state is RuckBuddiesError) {
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(content: Text(state.message)),
+                      );
                   }
                 },
                 builder: (context, state) {
@@ -314,8 +257,6 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                       debugPrint('🔄 Returned to RuckBuddiesScreen from detail view - refreshing social states');
                       final ruckId = int.tryParse(ruckBuddy.id);
                       if (ruckId != null) {
-                        // Explicitly request updated comment count for this specific ruck
-                        context.read<SocialBloc>().add(CheckRuckLikeStatus(ruckId));
                         // Also reload all ruck buddies to ensure we have the latest data
                         context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
                       }

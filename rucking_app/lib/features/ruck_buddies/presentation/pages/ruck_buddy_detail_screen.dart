@@ -88,7 +88,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
           final socialBloc = GetIt.instance<SocialBloc>();
           
           // First ensure we're getting the latest state
-          socialBloc.add(BatchCheckUserLikeStatus([ruckId]));
+          socialBloc.add(CheckRuckLikeStatus(ruckId));
           
           // Important debug logging
           print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: Checking like status for ruckId $ruckId');
@@ -292,22 +292,16 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
               });
               print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: CommentCountUpdated for ruckId: ${state.ruckId}, new commentCount: ${state.count}');
             }
-          } else if (state is BatchLikeStatusChecked) {
-            // Handle batch updates to keep likes in sync across all screens
-            if (state.likeStatusMap.containsKey(ruckId)) {
-              final isLiked = state.likeStatusMap[ruckId] ?? false;
-              final likeCount = state.likeCountMap[ruckId];
-              
+          } else if (state is LikeStatusChecked) {
+            if (state.ruckId == ruckId) { // Ensure this is the correct ruckId for the screen
               setState(() {
-                _isLiked = isLiked;
-                if (likeCount != null) {
-                  _likeCount = likeCount;
-                }
-                _isProcessingLike = false;
+                _isLiked = state.isLiked;
+                _likeCount = state.likeCount;
+                _isProcessingLike = false; // Assuming a status check might conclude an implicit action
               });
-              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: BatchLikeStatusChecked for ruckId: $ruckId, isLiked: $isLiked, likeCount: $likeCount');
+              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: LikeStatusChecked for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
             }
-          }
+          } 
         },  
         child: Scaffold(
         appBar: AppBar(

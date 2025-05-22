@@ -24,7 +24,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     on<ToggleRuckLike>(_onToggleRuckLike);
     on<CheckUserLikeStatus>(_onCheckUserLikeStatus);
     on<CheckRuckLikeStatus>(_onCheckRuckLikeStatus);
-    on<BatchCheckUserLikeStatus>(_onBatchCheckUserLikeStatus);
     on<LoadRuckComments>(_onLoadRuckComments);
     on<AddRuckComment>(_onAddRuckComment);
     on<UpdateRuckComment>(_onUpdateRuckComment);
@@ -64,9 +63,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
   ) async {
     debugPrint('[SOCIAL_DEBUG] ToggleRuckLike called for ruckId: ${event.ruckId}');
     
-    // Capture initial batch state if present
-    final BatchLikeStatusChecked? initialBatchState = state is BatchLikeStatusChecked ? state as BatchLikeStatusChecked : null;
-
     bool isCurrentlyLiked = false;
     int currentLikeCount = 0;
     
@@ -79,11 +75,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     } else if (state is LikeStatusChecked && (state as LikeStatusChecked).ruckId == event.ruckId) {
       isCurrentlyLiked = (state as LikeStatusChecked).isLiked;
       currentLikeCount = (state as LikeStatusChecked).likeCount;
-    } else if (initialBatchState != null) { // Use captured initialBatchState
-      final likeStatus = initialBatchState.likeStatusMap[event.ruckId];
-      final likeCount = initialBatchState.likeCountMap[event.ruckId];
-      if (likeStatus != null) isCurrentlyLiked = likeStatus;
-      if (likeCount != null) currentLikeCount = likeCount;
     } else {
       debugPrint('[SOCIAL_DEBUG] No existing like status in state, checking with API for toggle');
       try {
@@ -109,14 +100,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       likeCount: newLikeCount,
     ));
     
-    if (initialBatchState != null) {
-      final updatedStatusMap = Map<int, bool>.from(initialBatchState.likeStatusMap);
-      final updatedCountMap = Map<int, int>.from(initialBatchState.likeCountMap);
-      updatedStatusMap[event.ruckId] = newLikeStatus;
-      updatedCountMap[event.ruckId] = newLikeCount;
-      emit(BatchLikeStatusChecked(updatedStatusMap, likeCountMap: updatedCountMap));
-    }
-    
     try {
       bool success = false;
       if (isCurrentlyLiked) {
@@ -133,14 +116,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
           ruckId: event.ruckId,
           likeCount: currentLikeCount, // Revert to original
         ));
-        if (initialBatchState != null) {
-          final revertedStatusMap = Map<int, bool>.from(initialBatchState.likeStatusMap);
-          final revertedCountMap = Map<int, int>.from(initialBatchState.likeCountMap);
-          // Ensure the maps are reverted to original state for this ruckId
-          revertedStatusMap[event.ruckId] = isCurrentlyLiked;
-          revertedCountMap[event.ruckId] = currentLikeCount;
-          emit(BatchLikeStatusChecked(revertedStatusMap, likeCountMap: revertedCountMap));
-        }
         emit(LikeActionError('Failed to toggle like', event.ruckId));
       } else {
         debugPrint('[SOCIAL_DEBUG] Like toggle API call succeeded');
@@ -149,11 +124,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         // final definitiveCount = definitiveLikes.length;
         // if (definitiveCount != newLikeCount) {
         //   emit(LikeActionCompleted(isLiked: newLikeStatus, ruckId: event.ruckId, likeCount: definitiveCount));
-        //   if (initialBatchState != null) {
-        //      final finalStatusMap = Map<int, bool>.from(initialBatchState.likeStatusMap)..[event.ruckId] = newLikeStatus;
-        //      final finalCountMap = Map<int, int>.from(initialBatchState.likeCountMap)..[event.ruckId] = definitiveCount;
-        //      emit(BatchLikeStatusChecked(finalStatusMap, likeCountMap: finalCountMap));
-        //   }
         // }
       }
     } catch (e) {
@@ -163,13 +133,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         ruckId: event.ruckId,
         likeCount: currentLikeCount, // Revert to original
       ));
-      if (initialBatchState != null) {
-          final revertedStatusMap = Map<int, bool>.from(initialBatchState.likeStatusMap);
-          final revertedCountMap = Map<int, int>.from(initialBatchState.likeCountMap);
-          revertedStatusMap[event.ruckId] = isCurrentlyLiked;
-          revertedCountMap[event.ruckId] = currentLikeCount;
-          emit(BatchLikeStatusChecked(revertedStatusMap, likeCountMap: revertedCountMap));
-      }
       if (e is ServerException) {
         emit(LikeActionError('Server error: ${e.message}', event.ruckId));
       } else {
@@ -384,13 +347,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     
     // Emit a CommentCountUpdated event to notify all listeners
     emit(CommentCountUpdated(ruckId: ruckIdInt, count: commentCount));
-    
-    // If we have a batch state active, also update it
-    if (state is BatchLikeStatusChecked) {
-      final batchState = state as BatchLikeStatusChecked;
-      // We intentionally don't update this state as it's for likes, not comments
-      // This is handled separately by the CommentCountUpdated state
-    }
   }
 
   /// Handler for updating a comment
@@ -478,84 +434,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       emit(SocialInitial());
     } else if (state is CommentsError || state is CommentActionError) {
       emit(SocialInitial());
-    }
-  }
-  
-  /// Handler for batch checking user like status for multiple rucks
-  /// This is more efficient than individual API calls
-  Future<void> _onBatchCheckUserLikeStatus(
-    BatchCheckUserLikeStatus event,
-    Emitter<SocialState> emit,
-  ) async {
-    debugPrint('[SOCIAL_BLOC_DEBUG] _onBatchCheckUserLikeStatus called for ${event.ruckIds.length} rucks');
-    if (event.ruckIds.isEmpty) return;
-
-    // STEP 1: IMMEDIATELY emit cached data first
-    Map<int, bool> cachedStatusMap = {};
-    Map<int, int> cachedCountMap = {};
-    
-    // Check if we already have cached data in the current state
-    if (state is BatchLikeStatusChecked) {
-      final currentBatchState = state as BatchLikeStatusChecked;
-      cachedStatusMap = Map.from(currentBatchState.likeStatusMap);
-      cachedCountMap = Map.from(currentBatchState.likeCountMap);
-      
-      // Check if we have any cached data for the requested rucks
-      bool hasSomeCachedData = event.ruckIds.any((id) => 
-        cachedStatusMap.containsKey(id) || cachedCountMap.containsKey(id));
-        
-      if (hasSomeCachedData) {
-        debugPrint('[SOCIAL_BLOC_DEBUG] Emitting cached data for ${cachedStatusMap.length} statuses and ${cachedCountMap.length} counts');
-        // Always emit cached data immediately so UI can update as fast as possible
-        // Even if it's partial data, it's better than showing nothing
-        emit(BatchLikeStatusChecked(
-          Map.from(cachedStatusMap),
-          likeCountMap: Map.from(cachedCountMap)
-        ));
-      }
-    }
-
-    try {
-      // Assuming batchCheckUserLikes returns a structure like:
-      // {'likeStatus': Map<int, bool>, 'likeCounts': Map<int, int>}
-      // You might need to adjust this based on your actual repository method.
-      final result = await _socialRepository.batchCheckUserLikes(event.ruckIds);
-      
-      // Ensure result is not null and contains the expected keys
-      final Map<int, bool> likeStatusMap = result['likeStatus'] as Map<int, bool>? ?? {}; 
-      final Map<int, int> likeCountMap = result['likeCounts'] as Map<int, int>? ?? {};
-
-      debugPrint('[SOCIAL_BLOC_DEBUG] Batch check result: Statuses count: ${likeStatusMap.length}, Counts count: ${likeCountMap.length}');
-      
-      // Merge with existing batch state if present, to preserve data for other rucks not in this batch
-      Map<int, bool> finalStatusMap = {};
-      Map<int, int> finalCountMap = {};
-
-      if (state is BatchLikeStatusChecked) {
-        final currentBatchState = state as BatchLikeStatusChecked;
-        finalStatusMap.addAll(currentBatchState.likeStatusMap);
-        finalCountMap.addAll(currentBatchState.likeCountMap);
-      }
-      
-      // Update with new data from this batch
-      finalStatusMap.addAll(likeStatusMap);
-      finalCountMap.addAll(likeCountMap);
-      
-      emit(BatchLikeStatusChecked(finalStatusMap, likeCountMap: finalCountMap));
-    } catch (e) {
-      debugPrint('[SOCIAL_BLOC_DEBUG] Error in _onBatchCheckUserLikeStatus: $e');
-      // On error, we still have the cached data, so no need to emit error state
-      // This prevents UI flickering due to errors
-      
-      // Even if there was an API error, we should still emit any cached data we have
-      // to ensure the UI is showing the most up-to-date information available
-      if (cachedStatusMap.isNotEmpty || cachedCountMap.isNotEmpty) {
-        debugPrint('[SOCIAL_BLOC_DEBUG] Emitting cached data after API error');
-        emit(BatchLikeStatusChecked(
-          Map.from(cachedStatusMap),
-          likeCountMap: Map.from(cachedCountMap)
-        ));
-      }
     }
   }
 
