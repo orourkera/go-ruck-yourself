@@ -374,30 +374,19 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       ),
                       
                       // Distance badge at right side of header
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.route,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            MeasurementUtils.formatDistance(
-                              widget.ruckBuddy.distanceKm,
-                              metric: context.read<AuthBloc>().state is Authenticated
-                                ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
-                                : true,
-                            ),
-                            style: TextStyle(
-                              fontFamily: 'Bangers',
-                              fontSize: 20,
-                              color: AppColors.primary,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        MeasurementUtils.formatDistance(
+                          widget.ruckBuddy.distanceKm,
+                          metric: context.read<AuthBloc>().state is Authenticated
+                            ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
+                            : true,
+                        ),
+                        style: TextStyle(
+                          fontFamily: 'Bangers',
+                          fontSize: 28,
+                          color: Colors.black,
+                          letterSpacing: 1.0,
+                        ),
                       ),
                     ],
                   ),
@@ -496,55 +485,20 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Duration row
+                      // Stats grid in a 2x2 layout
+                      
+                      // First row: Time and Elevation
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Duration
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondary,
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Text(
-                              _formatDuration(widget.ruckBuddy.durationSeconds.round()),
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Stats grid
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
+                          // Time
                           Expanded(
                             child: _buildStatItem(
-                              icon: Icons.speed,
-                              label: 'Pace',
-                              value: MeasurementUtils.formatPace(
-                                (widget.ruckBuddy.durationSeconds / 60) / widget.ruckBuddy.distanceKm,
-                                metric: preferMetric,
-                              ),
+                              icon: Icons.timer,
+                              label: 'Time',
+                              value: _formatDuration(widget.ruckBuddy.durationSeconds.round()),
                             ),
                           ),
-                          Expanded(
-                            child: _buildStatItem(
-                              icon: Icons.local_fire_department,
-                              label: 'Calories',
-                              value: '${widget.ruckBuddy.caloriesBurned.round()} kcal',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
+                          // Elevation
                           Expanded(
                             child: _buildStatItem(
                               icon: Icons.trending_up,
@@ -556,7 +510,33 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                               ),
                             ),
                           ),
-                          const Expanded(child: SizedBox()),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Second row: Pace and Calories
+                      Row(
+                        children: [
+                          // Pace
+                          Expanded(
+                            child: _buildStatItem(
+                              icon: Icons.speed,
+                              label: 'Pace',
+                              value: MeasurementUtils.formatPace(
+                                (widget.ruckBuddy.durationSeconds / 60) / widget.ruckBuddy.distanceKm,
+                                metric: preferMetric,
+                              ),
+                            ),
+                          ),
+                          // Calories
+                          Expanded(
+                            child: _buildStatItem(
+                              icon: Icons.local_fire_department,
+                              label: 'Calories',
+                              value: '${widget.ruckBuddy.caloriesBurned.round()} kcal',
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -606,10 +586,22 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
                             child: Row(
                               children: [
-                                Icon(
-                                  Icons.comment,
-                                  size: 40, // Same size as in card
-                                  color: AppColors.secondary, // Same color as in card
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    // White outline version of chat bubble
+                                    Icon(
+                                      Icons.chat_bubble_outline,
+                                      color: Colors.white,
+                                      size: 40, // Exactly 40px as requested
+                                    ),
+                                    // Slightly smaller solid icon to create a white outline effect
+                                    Icon(
+                                      Icons.chat_bubble,
+                                      color: AppColors.secondary,
+                                      size: 36,
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
