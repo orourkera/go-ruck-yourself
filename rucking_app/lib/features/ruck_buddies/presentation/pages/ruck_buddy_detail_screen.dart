@@ -383,35 +383,30 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                     ),
                     
                     // Distance badge at right side of header
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.route,
-                            color: Colors.white,
-                            size: 16,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.route,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          MeasurementUtils.formatDistance(
+                            widget.ruckBuddy.distanceKm,
+                            metric: context.read<AuthBloc>().state is Authenticated
+                              ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
+                              : true,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            MeasurementUtils.formatDistance(
-                              widget.ruckBuddy.distanceKm,
-                              metric: context.read<AuthBloc>().state is Authenticated
-                                ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
-                                : true,
-                            ),
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          style: TextStyle(
+                            fontFamily: 'Bangers',
+                            fontSize: 20,
+                            color: AppColors.primary,
+                            letterSpacing: 1.0,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

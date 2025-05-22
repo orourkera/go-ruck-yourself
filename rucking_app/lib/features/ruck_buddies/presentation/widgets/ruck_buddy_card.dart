@@ -308,30 +308,25 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           ),
                         ),
                         // Distance stat in header
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.route,
-                                color: Colors.white,
-                                size: 16,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.route,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              formattedDistance,
+                              style: TextStyle(
+                                fontFamily: 'Bangers',
+                                fontSize: 20,
+                                color: AppColors.primary,
+                                letterSpacing: 1.0,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                formattedDistance,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -423,37 +418,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                       ],
                     ),
                     
-                    const SizedBox(height: 8),
-                    
-                    // Second stats row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatTile(
-                              context: context,
-                              icon: Icons.speed,
-                              label: 'Pace',
-                              value: formattedPace,
-                              compact: true,
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildStatTile(
-                              context: context,
-                              icon: Icons.local_fire_department,
-                              label: 'Calories',
-                              value: formattedCalories,
-                              compact: true,
-                            ),
-                          ),
-                          const Expanded(child: SizedBox()), // Placeholder for third column
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     
                     // Social interactions
                     Row(
