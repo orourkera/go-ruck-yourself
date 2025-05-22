@@ -196,6 +196,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           listener: (context, state) {
             if (!mounted || _ruckId == null) return;
             
+            // Handle SessionSummaryGenerated state
             if (state is SessionSummaryGenerated && state.session.id == widget.ruckBuddy.id) {
               if (!state.isPhotosLoading && state.photos.isNotEmpty) {
                 setState(() {
@@ -203,11 +204,32 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                   developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionSummaryGenerated: ${_photos.length}', name: 'RuckBuddyCard');
                 });
               }
-            } else if (state is ActiveSessionRunning && state.sessionId == widget.ruckBuddy.id) {
+            } 
+            // Handle ActiveSessionRunning state
+            else if (state is ActiveSessionRunning && state.sessionId == widget.ruckBuddy.id) {
               if (!state.isPhotosLoading && state.photos.isNotEmpty) {
                 setState(() {
                   _photos = state.photos;
                   developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from ActiveSessionRunning: ${_photos.length}', name: 'RuckBuddyCard');
+                });
+              }
+            }
+            // Handle ActiveSessionLoaded state
+            else if (state is ActiveSessionLoaded && state.session.id == widget.ruckBuddy.id) {
+              final List<RuckPhoto> sessionPhotos = state.session.photos ?? [];
+              if (sessionPhotos.isNotEmpty) {
+                setState(() {
+                  _photos = sessionPhotos;
+                  developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from ActiveSessionLoaded: ${_photos.length}', name: 'RuckBuddyCard');
+                });
+              }
+            }
+            // Handle SessionPhotosLoadedForId state
+            else if (state is SessionPhotosLoadedForId && state.sessionId == widget.ruckBuddy.id) {
+              if (state.photos.isNotEmpty) {
+                setState(() {
+                  _photos = state.photos;
+                  developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionPhotosLoadedForId: ${_photos.length}', name: 'RuckBuddyCard');
                 });
               }
             }
@@ -294,20 +316,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            formattedWeight,
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
+                        // Weight removed from header to avoid duplication with map overlay
                       ],
                     ),
                     
@@ -316,6 +325,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                     // Map Preview
                     _RouteMapPreview(
                       locationPoints: widget.ruckBuddy.locationPoints,
+                      ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
                     ),
                     
                     // Photos Carousel (directly after map with minimal spacing)
@@ -419,17 +429,20 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           onTap: widget.onLikeTap ?? _handleLikeTap,
                           child: Row(
                             children: [
-                              Icon(
-                                _isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                                color: _isLiked ? AppColors.secondary : Colors.grey[600],
-                                size: 22,
+                              Image.asset(
+                                _isLiked 
+                                  ? 'assets/images/tactical_ruck_like_icon_active.png'
+                                  : 'assets/images/tactical_ruck_like_icon_transparent.png',
+                                width: 48,
+                                height: 48,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 '${_likeCount ?? 0}',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: Colors.grey[800],
-                                  fontWeight: FontWeight.bold,
+                                style: const TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: 20,
+                                  color: Colors.black,
                                 ),
                               ),
                             ],
@@ -452,16 +465,17 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           child: Row(
                             children: [
                               Icon(
-                                Icons.chat_bubble_outline,
-                                color: Colors.grey[600],
-                                size: 22,
+                                Icons.chat_bubble, // Solid icon instead of outline
+                                color: AppColors.secondary, // Orange color from app theme
+                                size: 48, // Larger size to match like icon
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 '${_commentCount ?? 0}',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: Colors.grey[800],
-                                  fontWeight: FontWeight.bold,
+                                style: const TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: 20,
+                                  color: Colors.black,
                                 ),
                               ),
                             ],
@@ -497,16 +511,32 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           errorWidget: (context, url, error) => Container(
             width: 40,
             height: 40,
+            padding: const EdgeInsets.all(4),
             color: Colors.grey[300],
-            child: Icon(Icons.person),
+            child: Image.asset(
+              user.gender?.toLowerCase() == 'female' 
+                ? 'assets/images/lady rucker profile.png'
+                : 'assets/images/profile.png',
+              fit: BoxFit.contain,
+            ),
           ),
         ),
       );
     } else {
-      return CircleAvatar(
-        radius: 20,
-        backgroundColor: AppColors.secondary.withOpacity(0.2),
-        child: Icon(Icons.person, color: AppColors.secondary),
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 40,
+          height: 40,
+          padding: const EdgeInsets.all(4),
+          color: AppColors.secondary.withOpacity(0.2),
+          child: Image.asset(
+            user?.gender?.toLowerCase() == 'female' 
+              ? 'assets/images/lady rucker profile.png'
+              : 'assets/images/profile.png',
+            fit: BoxFit.contain,
+          ),
+        ),
       );
     }
   }
@@ -559,9 +589,11 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
 class _RouteMapPreview extends StatelessWidget {
   final List<dynamic>? locationPoints;
+  final double? ruckWeightKg; // Add weight parameter
 
   const _RouteMapPreview({
     required this.locationPoints,
+    this.ruckWeightKg,
   });
 
   double? _parseCoord(dynamic v) {
@@ -632,54 +664,103 @@ class _RouteMapPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
+    final String weightText = ruckWeightKg != null ? '${ruckWeightKg!.toStringAsFixed(1)} kg' : '';
 
     if (routePoints.isEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          height: 175,
-          width: double.infinity,
-          color: Colors.grey[200],
-          child: Center(
-            child: Icon(
-              Icons.map_outlined,
-              size: 48,
-              color: Colors.grey[400],
+        child: Stack(
+          children: [
+            Container(
+              height: 175,
+              width: double.infinity,
+              color: Colors.grey[200],
+              child: Center(
+                child: Icon(
+                  Icons.map_outlined,
+                  size: 48,
+                  color: Colors.grey[400],
+                ),
+              ),
             ),
-          ),
+            // Weight chip overlay
+            if (ruckWeightKg != null)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Text(
+                    weightText,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       );
     }
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: SizedBox(
-        height: 175,
-        width: double.infinity,
-        child: FlutterMap(
-          options: MapOptions(
-            initialCenter: _getRouteCenter(routePoints),
-            initialZoom: _getFitZoom(routePoints),
-            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-              userAgentPackageName: 'com.getrucky.gfy',
-              retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-            ),
-            if (routePoints.isNotEmpty)
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: routePoints,
-                    color: AppColors.secondary,
-                    strokeWidth: 4,
-                  )
-                ],
+      child: Stack(
+        children: [
+          SizedBox(
+            height: 175,
+            width: double.infinity,
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: _getRouteCenter(routePoints),
+                initialZoom: _getFitZoom(routePoints),
+                interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
               ),
-          ],
-        ),
+              children: [
+                TileLayer(
+                  urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+                  userAgentPackageName: 'com.getrucky.gfy',
+                  retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+                ),
+                if (routePoints.isNotEmpty)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: routePoints,
+                        color: AppColors.secondary,
+                        strokeWidth: 4,
+                      )
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          // Weight chip overlay
+          if (ruckWeightKg != null)
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Text(
+                  weightText,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
