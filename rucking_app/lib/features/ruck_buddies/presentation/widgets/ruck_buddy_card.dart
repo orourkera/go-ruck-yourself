@@ -53,46 +53,40 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   void initState() {
     super.initState();
     _ruckId = int.tryParse(widget.ruckBuddy.id);
-
-    // Attempt to initialize from SocialBloc state first
+    
+    // IMPORTANT: Immediately use the data from widget.ruckBuddy to prevent initial zero values
+    _likeCount = widget.ruckBuddy.likeCount ?? 0;
+    _commentCount = widget.ruckBuddy.commentCount ?? 0;
+    
+    // Check for cached data in SocialBloc
     final socialBloc = GetIt.instance<SocialBloc>();
     final currentState = socialBloc.state;
-
-    bool initializedFromBloc = false;
+    
+    // Update from cached batch data if available
     if (currentState is BatchLikeStatusChecked && _ruckId != null) {
-      final blocIsLiked = currentState.likeStatusMap[_ruckId!];
-      final blocLikeCount = currentState.likeCountMap[_ruckId!];
-
-      if (blocIsLiked != null) {
-        _isLiked = blocIsLiked;
-        initializedFromBloc = true;
-        developer.log('[SOCIAL_DEBUG] RuckBuddyCard initState: Ruck ID $_ruckId - Initialized _isLiked from SocialBloc: $_isLiked', name: 'RuckBuddyCard');
+      // Update like status if available
+      if (currentState.likeStatusMap.containsKey(_ruckId!)) {
+        _isLiked = currentState.likeStatusMap[_ruckId!]!;
+        developer.log('[SOCIAL_DEBUG] Using cached like status for $_ruckId: $_isLiked', name: 'RuckBuddyCard');
       }
-      if (blocLikeCount != null) {
-        _likeCount = blocLikeCount;
-        // If likeCount is from bloc, isLiked should also be from bloc or consistent
-        // This assumes likeCount implies like status is also known via bloc.
-        developer.log('[SOCIAL_DEBUG] RuckBuddyCard initState: Ruck ID $_ruckId - Initialized _likeCount from SocialBloc: $_likeCount', name: 'RuckBuddyCard');
-      } else if (blocIsLiked != null) {
-        // If only isLiked is known, likeCount might still be from widget or default
-        _likeCount = widget.ruckBuddy.likeCount ?? 0;
+      
+      // Update like count if available
+      if (currentState.likeCountMap.containsKey(_ruckId!)) {
+        _likeCount = currentState.likeCountMap[_ruckId!]!;
+        developer.log('[SOCIAL_DEBUG] Using cached like count for $_ruckId: $_likeCount', name: 'RuckBuddyCard');
       }
     }
-
-    if (!initializedFromBloc) {
-      // Fallback to widget.ruckBuddy properties if not found in SocialBloc state or if state is not BatchLikeStatusChecked
-      _likeCount = widget.ruckBuddy.likeCount ?? 0;
-      // _isLiked typically requires a specific check; widget.ruckBuddy might not have this directly.
-      // For now, if not in bloc, it might default to false or rely on a later CheckUserLikeStatus event if that's the flow.
-      // Let's assume if not in bloc, we don't have an authoritative _isLiked status yet from cache.
-      // It will be updated by the listener or a specific CheckUserLikeStatus call.
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard initState: Ruck ID ${widget.ruckBuddy.id} - Fell back to widget.ruckBuddy for _likeCount: $_likeCount. _isLiked remains default or awaits update.', name: 'RuckBuddyCard');
+    
+    // For comment counts, use CommentsLoaded state if available
+    if (currentState is CommentsLoaded && currentState.ruckId == widget.ruckBuddy.id) {
+      _commentCount = currentState.comments.length;
+      developer.log('[SOCIAL_DEBUG] Using cached comment count for ${widget.ruckBuddy.id}: $_commentCount', name: 'RuckBuddyCard');
+    } else if (currentState is CommentCountUpdated && currentState.ruckId == widget.ruckBuddy.id) {
+      _commentCount = currentState.count;
+      developer.log('[SOCIAL_DEBUG] Using cached updated comment count for ${widget.ruckBuddy.id}: $_commentCount', name: 'RuckBuddyCard');
     }
-
-    // Initialize comment count from widget.ruckBuddy (as before, no batch comment state yet)
-    _commentCount = widget.ruckBuddy.commentCount ?? 0;
-    developer.log('[SOCIAL_DEBUG] RuckBuddyCard initState: Ruck ID ${widget.ruckBuddy.id} - Initial comment count: $_commentCount (from widget.ruckBuddy)', name: 'RuckBuddyCard');
-
+    
+    // Initialize photos
     _photos = widget.ruckBuddy.photos != null ? List<RuckPhoto>.from(widget.ruckBuddy.photos!) : [];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -258,58 +252,64 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           },
         ),
         BlocListener<SocialBloc, SocialState>(
-          listener: (context, state) {
+          listenWhen: (previous, current) {
+            // Only listen for states related to this specific ruck buddy
             final cardRuckId = int.tryParse(widget.ruckBuddy.id);
-            if (cardRuckId == null) {
-              developer.log('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: Failed to parse ruckBuddy.id to int.', name: 'RuckBuddyCard.SocialBloc.listener');
-              return;
-            }
+            if (cardRuckId == null) return false;
             
-            // Handle all types of states that contain social data
-            if (state is CommentCountUpdated && state.ruckId == cardRuckId && state.count != _commentCount) {
-              developer.log('[RUCK_BUDDY_CARD_DEBUG] RuckId $cardRuckId: Received CommentCountUpdated with count: ${state.count}', name: 'RuckBuddyCard.SocialBloc.listener');
+            // Listen for any social state relevant to this card
+            return (current is LikeStatusChecked && current.ruckId == cardRuckId) ||
+                   (current is CommentsLoaded && current.ruckId == widget.ruckBuddy.id) ||
+                   (current is CommentCountUpdated && current.ruckId == widget.ruckBuddy.id) ||
+                   (current is LikeActionCompleted && current.ruckId == cardRuckId) ||
+                   (current is BatchLikeStatusChecked);
+          },
+          listener: (context, state) {
+            // Extract the ruck ID for this card
+            final cardRuckId = int.tryParse(widget.ruckBuddy.id);
+            if (cardRuckId == null) return;
+            
+            if (state is LikeStatusChecked && state.ruckId == cardRuckId) {
+              // Always update the like count when we get it from the API
+              setState(() => _likeCount = state.likeCount);
+            }
+            else if (state is CommentsLoaded && state.ruckId == widget.ruckBuddy.id) {
+              // Update comment count when comments are loaded
+              setState(() => _commentCount = state.comments.length);
+            }
+            else if (state is CommentCountUpdated && state.ruckId == widget.ruckBuddy.id) {
+              // Update comment count when it changes
               setState(() => _commentCount = state.count);
             }
             else if (state is LikeActionCompleted && state.ruckId == cardRuckId) {
-              developer.log('[RUCK_BUDDY_CARD_DEBUG] RuckId $cardRuckId: Received LikeActionCompleted with isLiked: ${state.isLiked}, likeCount: ${state.likeCount}', name: 'RuckBuddyCard.SocialBloc.listener');
+              // When user likes/unlikes, update both status and count
               setState(() {
                 _isLiked = state.isLiked;
                 _likeCount = state.likeCount;
               });
             }
             else if (state is LikeStatusChecked && state.ruckId == cardRuckId) {
-              developer.log('[RUCK_BUDDY_CARD_DEBUG] RuckId $cardRuckId: Received LikeStatusChecked with isLiked: ${state.isLiked}', name: 'RuckBuddyCard.SocialBloc.listener');
+              // Update like status when checked
               setState(() => _isLiked = state.isLiked);
             }
             else if (state is BatchLikeStatusChecked) {
-              // For batch updates, only update if data for this card exists and has changed
-              developer.log('[RUCK_BUDDY_CARD_DEBUG] RuckId $cardRuckId: Processing BatchLikeStatusChecked', name: 'RuckBuddyCard.SocialBloc.listener');
-              
+              // For batch updates, only update if data for this card exists
               bool changed = false;
 
-              // Update like status if available in the batch AND it's different from the current state
+              // Update like status if available
               if (state.likeStatusMap.containsKey(cardRuckId)) {
-                final newIsLiked = state.likeStatusMap[cardRuckId]!;
-                if (_isLiked != newIsLiked) {
-                  _isLiked = newIsLiked;
-                  changed = true;
-                  developer.log('[RUCK_BUDDY_CARD_DEBUG] RuckId $cardRuckId: Batch update - _isLiked set to $_isLiked', name: 'RuckBuddyCard.SocialBloc.listener');
-                }
+                _isLiked = state.likeStatusMap[cardRuckId]!;
+                changed = true;
               }
-              // If not in map, _isLiked retains its current value.
 
-              // Update like count if available in the batch AND it's different from the current state
+              // Update like count if available
               if (state.likeCountMap.containsKey(cardRuckId)) {
-                final newLikeCount = state.likeCountMap[cardRuckId]!;
-                if (_likeCount != newLikeCount) {
-                  _likeCount = newLikeCount;
-                  changed = true;
-                  developer.log('[RUCK_BUDDY_CARD_DEBUG] RuckId $cardRuckId: Batch update - _likeCount set to $_likeCount', name: 'RuckBuddyCard.SocialBloc.listener');
-                }
+                _likeCount = state.likeCountMap[cardRuckId]!;
+                changed = true;
               }
-              // If not in map, _likeCount retains its current value.
               
-              if (changed && mounted) { // Check if widget is still mounted before calling setState
+              // Only trigger rebuild if something changed
+              if (changed && mounted) {
                 setState(() {});
               }
             }  
@@ -536,16 +536,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                                 color: Colors.grey[800],
                               ),
                             ),
-                            if (_likeCount != null && _likeCount! > 0)
-                              Container(
-                                width: 5,
-                                height: 5,
-                                margin: const EdgeInsets.only(left: 2),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.green,
-                                ),
-                              ),
+                            // Green dot removed per user request
                           ],
                         ),
                       ),

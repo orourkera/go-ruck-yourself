@@ -49,30 +49,28 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     // Extract all ruck IDs
     final List<int> ruckIds = [];
     for (final buddy in ruckBuddies) {
-      final id = int.tryParse(buddy.id);
-      if (id != null) ruckIds.add(id);
-    }
-    
-    if (ruckIds.isEmpty) return;
-    
-    // Implement a local debounce mechanism to avoid multiple rapid calls
-    // Use a small microtask delay to ensure all rucks are collected before making API call
-    Future.microtask(() {
-      if (!mounted) return;
-      
-      debugPrint('🐞 [_RuckBuddiesScreenState._batchCheckLikes] Batch checking ${ruckIds.length} rucks');
-      try {
-        // Use the batch checking method instead of individual checks
-        // This reduces API calls and avoids rate limiting
-        context.read<SocialBloc>().add(BatchCheckUserLikeStatus(ruckIds));
-        
-        // Also load comments for each ruck to get the comment counts
-        _batchLoadCommentCounts(ruckIds);
-      } catch (e) {
-        debugPrint('❌ Error batch checking likes: $e');
-        // We don't need to show an error to the user for this background operation
+      final ruckId = int.tryParse(buddy.id);
+      if (ruckId != null) {
+        ruckIds.add(ruckId);
       }
-    });
+    }
+    debugPrint('🐞 [RuckBuddiesScreen._batchCheckLikes] Checking likes for ${ruckIds.length} ruck buddies');
+    
+    // IMPORTANT: Immediately check all likes and comments in one batch to avoid staggered updates
+    if (ruckIds.isNotEmpty) {
+      // First, check all likes in a single batch - this updates the cache right away
+      context.read<SocialBloc>().add(BatchCheckUserLikeStatus(ruckIds));
+      
+      // Then immediately load all like counts in a single call
+      for (final ruckId in ruckIds) {
+        context.read<SocialBloc>().add(LoadRuckLikes(ruckId));
+      }
+      
+      // And load all comments counts in a single pass
+      for (final ruckId in ruckIds) {
+        context.read<SocialBloc>().add(LoadRuckComments(ruckId.toString()));
+      }
+    }
   }
   
   /// Fetches comment counts for all rucks
@@ -176,21 +174,14 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Ruck Buddies'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              // TODO: Show info dialog explaining Ruck Buddies feature
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Ruck Buddies feature info'))
-              );
-            },
-          ),
-        ],
+        // Info icon removed per request
       ),
       body: SafeArea(
         child: Column(
           children: [
+            // Added padding between header and filter chips
+            const SizedBox(height: 12),
+            
             // Filter chips for sorting
             BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
               builder: (context, state) {

@@ -18,18 +18,21 @@ class FilterChipGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _buildFilterChip('closest', 'Closest', Icons.location_on),
-          const SizedBox(width: 8),
-          _buildFilterChip('calories', 'Most Calories', Icons.local_fire_department),
-          const SizedBox(width: 8),
-          _buildFilterChip('distance', 'Furthest', Icons.straighten),
-          const SizedBox(width: 8),
-          _buildFilterChip('duration', 'Longest', Icons.timer),
-          const SizedBox(width: 8),
-          _buildFilterChip('elevation', 'Most Elevation', Icons.terrain),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            _buildFilterChip('closest', 'Closest', Icons.location_on),
+            const SizedBox(width: 8),
+            _buildFilterChip('calories', 'Most Calories', Icons.local_fire_department),
+            const SizedBox(width: 8),
+            _buildFilterChip('distance', 'Furthest', Icons.straighten),
+            const SizedBox(width: 8),
+            _buildFilterChip('duration', 'Longest', Icons.timer),
+            const SizedBox(width: 8),
+            _buildFilterChip('elevation', 'Most Elevation', Icons.terrain),
+          ],
+        ),
       ),
     );
   }

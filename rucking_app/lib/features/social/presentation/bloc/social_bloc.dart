@@ -488,13 +488,31 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     debugPrint('[SOCIAL_BLOC_DEBUG] _onBatchCheckUserLikeStatus called for ${event.ruckIds.length} rucks');
-    if (event.ruckIds.isEmpty) {
-      // If current state is not BatchLikeStatusChecked, emit an empty one to avoid breaking UI
-      // or ensure UI handles SocialInitial or other states gracefully.
-      if (state is! BatchLikeStatusChecked) {
-         emit(const BatchLikeStatusChecked({}, likeCountMap: {}));
+    if (event.ruckIds.isEmpty) return;
+
+    // STEP 1: IMMEDIATELY emit cached data first
+    Map<int, bool> cachedStatusMap = {};
+    Map<int, int> cachedCountMap = {};
+    
+    // Check if we already have cached data in the current state
+    if (state is BatchLikeStatusChecked) {
+      final currentBatchState = state as BatchLikeStatusChecked;
+      cachedStatusMap = Map.from(currentBatchState.likeStatusMap);
+      cachedCountMap = Map.from(currentBatchState.likeCountMap);
+      
+      // Check if we have any cached data for the requested rucks
+      bool hasSomeCachedData = event.ruckIds.any((id) => 
+        cachedStatusMap.containsKey(id) || cachedCountMap.containsKey(id));
+        
+      if (hasSomeCachedData) {
+        debugPrint('[SOCIAL_BLOC_DEBUG] Emitting cached data for ${cachedStatusMap.length} statuses and ${cachedCountMap.length} counts');
+        // Always emit cached data immediately so UI can update as fast as possible
+        // Even if it's partial data, it's better than showing nothing
+        emit(BatchLikeStatusChecked(
+          Map.from(cachedStatusMap),
+          likeCountMap: Map.from(cachedCountMap)
+        ));
       }
-      return;
     }
 
     try {
@@ -526,14 +544,18 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       emit(BatchLikeStatusChecked(finalStatusMap, likeCountMap: finalCountMap));
     } catch (e) {
       debugPrint('[SOCIAL_BLOC_DEBUG] Error in _onBatchCheckUserLikeStatus: $e');
-      // Decide on error state: emit a specific BatchLikeError, or a general LikesError,
-      // or just log and potentially emit an empty/previous state to avoid breaking UI.
-      // For now, just log and emit an empty BatchLikeStatusChecked if no prior batch state exists.
-      if (state is! BatchLikeStatusChecked) {
-         emit(const BatchLikeStatusChecked({}, likeCountMap: {}));
+      // On error, we still have the cached data, so no need to emit error state
+      // This prevents UI flickering due to errors
+      
+      // Even if there was an API error, we should still emit any cached data we have
+      // to ensure the UI is showing the most up-to-date information available
+      if (cachedStatusMap.isNotEmpty || cachedCountMap.isNotEmpty) {
+        debugPrint('[SOCIAL_BLOC_DEBUG] Emitting cached data after API error');
+        emit(BatchLikeStatusChecked(
+          Map.from(cachedStatusMap),
+          likeCountMap: Map.from(cachedCountMap)
+        ));
       }
-      // Optionally, emit a more specific error state if needed for UI feedback.
-      // emit(LikesError('Failed to batch check like statuses: $e'));
     }
   }
 
