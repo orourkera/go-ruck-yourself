@@ -102,12 +102,16 @@ def register_endpoint():
 # Use a decorator function to apply rate limiting to resources
 def rate_limit_resource(resource, limit):
     logger.info(f"Applying rate limit: {limit} to resource: {resource.__name__}")
+    
+    # Store the original dispatch_request method
     original_dispatch_request = resource.dispatch_request
     
-    @limiter.limit(limit)
+    # Create a new dispatch_request method with rate limiting
+    @limiter.limit(limit, override_defaults=True)
     def wrapped_dispatch_request(*args, **kwargs):
         return original_dispatch_request(*args, **kwargs)
     
+    # Replace the original method with our wrapped version
     resource.dispatch_request = wrapped_dispatch_request
     return resource
 
