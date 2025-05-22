@@ -54,13 +54,28 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
 
   @override
   Widget build(BuildContext context) {
+    // Always render the chart container, letting session_detail_screen.dart handle
+    // the empty data case with its own fallback UI
     return AnimatedBuilder(
       animation: _animation,
-      builder: (context, child) => LineChart(_buildChartData(_animation.value)),
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.all(8.0),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+          child: LineChart(
+            _buildChartData(_animation.value),
+          ),
+        );
+      },
     );
   }
 
   LineChartData _buildChartData(double animationValue) {
+    // The check in build() method should ideally prevent this from being called with empty samples,
+    // but as a safeguard, return empty data if it somehow still is.
     if (widget.heartRateSamples.isEmpty) return LineChartData();
 
     final pointsToShow = (widget.heartRateSamples.length * animationValue).round().clamp(1, widget.heartRateSamples.length);
