@@ -59,40 +59,22 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_ruckId != null) {
-        // NOTE: We no longer make individual BatchCheckUserLikeStatus calls here
-        // The parent list screen now makes a single batch call for all cards
-        // This significantly reduces API calls and prevents rate limiting
-        
-        developer.log('[PHOTO_DEBUG] RuckBuddyCard initState: Ruck ID ${widget.ruckBuddy.id} - Fetching photos. Initial count: ${_photos.length}', name: 'RuckBuddyCard');
-        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-
-        final startedAt = widget.ruckBuddy.startedAt ?? DateTime.now();
-        final completedAt = widget.ruckBuddy.completedAt ?? DateTime.now().add(const Duration(minutes: 30));
-        final sessionDuration = completedAt.difference(startedAt);
-
+        // Calculate pace from distance and duration
         final double distanceKm = widget.ruckBuddy.distanceKm ?? 0.0;
         final int durationSeconds = widget.ruckBuddy.durationSeconds ?? 0;
         _calculatedPace = (distanceKm > 0 && durationSeconds > 0) ? (durationSeconds / 60) / distanceKm : 0.0;
-
-        final ruckSession = RuckSession(
-          id: widget.ruckBuddy.id,
-          startTime: startedAt,
-          endTime: completedAt,
-          duration: sessionDuration,
-          distance: widget.ruckBuddy.distanceKm,
-          elevationGain: widget.ruckBuddy.elevationGainM,
-          elevationLoss: widget.ruckBuddy.elevationLossM,
-          caloriesBurned: widget.ruckBuddy.caloriesBurned,
-          averagePace: _calculatedPace,
-          ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
-          status: RuckStatus.completed,
-          locationPoints: widget.ruckBuddy.locationPoints?.cast<Map<String, dynamic>>(),
-        );
-
-        developer.log('RuckBuddyCard initState: Ruck ID $_ruckId - Dispatching LoadSessionForViewing', name: 'RuckBuddyCard');
-        activeSessionBloc.add(LoadSessionForViewing(sessionId: widget.ruckBuddy.id, session: ruckSession));
-        developer.log('RuckBuddyCard initState: Ruck ID $_ruckId - Dispatching FetchSessionPhotosRequested', name: 'RuckBuddyCard');
-        activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+        
+        // Only fetch photos if needed, but skip heart rate data to avoid unnecessary API calls
+        if (_photos.isEmpty) {
+          developer.log('[PHOTO_DEBUG] RuckBuddyCard initState: Ruck ID ${widget.ruckBuddy.id} - Fetching photos.', name: 'RuckBuddyCard');
+          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+          
+          // Only dispatch the photo fetch event, NOT the LoadSessionForViewing event
+          // This avoids the heart rate API calls while still loading photos
+          activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+        } else {
+          developer.log('[PHOTO_DEBUG] RuckBuddyCard: Using photos already in RuckBuddy object. Count: ${_photos.length}', name: 'RuckBuddyCard');
+        }
       }
     });
   }
