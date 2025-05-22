@@ -13,6 +13,7 @@ import 'package:rucking_app/features/social/presentation/bloc/social_state.dart'
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -21,6 +22,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+
 import 'package:get_it/get_it.dart';
 import 'dart:developer' as developer;
 
@@ -75,111 +77,97 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
       }
     }
     
-    // Initialize photos
+    // Initialize photos and log status
     _photos = widget.ruckBuddy.photos != null ? List<RuckPhoto>.from(widget.ruckBuddy.photos!) : [];
+    developer.log('[PHOTO_DEBUG] RuckBuddyCard initState for ruckId: $_ruckId - initial photos count: ${_photos.length}', name: 'RuckBuddyCard');
+    
+    // Explicitly request photos for this ruck session
+    if (_ruckId != null) {
+      try {
+        // Request photos for this ruck from ActiveSessionBloc
+        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+        activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+        developer.log('[PHOTO_DEBUG] RuckBuddyCard requested photos for ruckId: $_ruckId', name: 'RuckBuddyCard');
+      } catch (e) {
+        developer.log('[PHOTO_DEBUG] Error requesting photos in RuckBuddyCard: $e', name: 'RuckBuddyCard');
+      }
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_ruckId != null) {
         // Calculate pace from distance and duration
-        final double distanceKm = widget.ruckBuddy.distanceKm ?? 0.0;
-        final int durationSeconds = widget.ruckBuddy.durationSeconds ?? 0;
-        _calculatedPace = (distanceKm > 0 && durationSeconds > 0) ? (durationSeconds / 60) / distanceKm : 0.0;
-        
-        // Only fetch photos if needed, but skip heart rate data to avoid unnecessary API calls
-        if (_photos.isEmpty) {
-          developer.log('[PHOTO_DEBUG] RuckBuddyCard initState: Ruck ID ${widget.ruckBuddy.id} - Fetching photos.', name: 'RuckBuddyCard');
-          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-          
-          // Only dispatch the photo fetch event, NOT the LoadSessionForViewing event
-          // This avoids the heart rate API calls while still loading photos
-          activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
-        } else {
-          developer.log('[PHOTO_DEBUG] RuckBuddyCard: Using photos already in RuckBuddy object. Count: ${_photos.length}', name: 'RuckBuddyCard');
+        if (widget.ruckBuddy.distanceKm > 0 && widget.ruckBuddy.durationSeconds > 0) {
+          setState(() {
+            _calculatedPace = (widget.ruckBuddy.durationSeconds / 60) / widget.ruckBuddy.distanceKm;
+          });
         }
       }
     });
   }
 
   List<RuckPhoto> _convertToRuckPhotos(List<dynamic> photos) {
-    return photos.map((dynamic photo) {
+    final result = <RuckPhoto>[];
+    for (final photo in photos) {
       if (photo is RuckPhoto) {
-        return photo;
+        result.add(photo);
+      } else if (photo is Map<String, dynamic>) {
+        try {
+          final ruckPhoto = RuckPhoto(
+            id: photo['id'] ?? '',
+            ruckId: photo['ruck_id']?.toString() ?? '',
+            userId: photo['user_id'] ?? '',
+            filename: photo['filename'] ?? '',
+            originalFilename: photo['original_filename'],
+            contentType: photo['content_type'],
+            size: photo['size'],
+            createdAt: photo['created_at'] != null 
+                ? DateTime.parse(photo['created_at']) 
+                : DateTime.now(),
+            url: photo['url'],
+            thumbnailUrl: photo['thumbnail_url'],
+          );
+          result.add(ruckPhoto);
+        } catch (e) {
+          developer.log('[PHOTO_DEBUG] Error converting photo to RuckPhoto: $e', name: 'RuckBuddyCard');
+        }
       }
-      if (photo is Map<String, dynamic>) {
-        return RuckPhoto(
-          id: photo['id'] as String? ?? '',
-          ruckId: photo['ruck_id'] != null ? photo['ruck_id'].toString() : '',
-          userId: photo['user_id'] as String? ?? '',
-          filename: photo['filename'] as String? ?? '',
-          originalFilename: photo['original_filename'] as String?,
-          contentType: photo['content_type'] as String?,
-          size: photo['size'] as int?,
-          createdAt: photo['created_at'] != null ? DateTime.parse(photo['created_at'] as String) : DateTime.now(),
-          url: photo['url'] as String?,
-          thumbnailUrl: photo['thumbnail_url'] as String?,
-        );
-      }
-      return RuckPhoto(
-        id: '',
-        ruckId: '',
-        userId: '',
-        filename: '',
-        createdAt: DateTime.now(),
-      );
-    }).toList().cast<RuckPhoto>();
+    }
+    return result;
   }
 
   List<String> _getProcessedPhotoUrls(List<dynamic> photos, {bool addCacheBuster = false}) {
-    final photoUrls = photos.map((p) {
-      if (p is RuckPhoto) {
-        final url = p.url;
-        final thumbnailUrl = p.thumbnailUrl;
-        if (url != null && url.isNotEmpty) return url;
-        if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) return thumbnailUrl;
+    return photos.map((photo) {
+      String? url;
+      if (photo is RuckPhoto) {
+        url = photo.url;
+      } else if (photo is Map) {
+        url = photo['url'] ?? photo['thumbnail_url'];
       }
-      return '';
+      return url is String && url.isNotEmpty 
+          ? (addCacheBuster ? '$url?cache=${DateTime.now().millisecondsSinceEpoch}' : url) 
+          : '';
     }).where((url) => url.isNotEmpty).toList();
-
-    if (!addCacheBuster) return photoUrls;
-
-    final cacheBuster = DateTime.now().millisecondsSinceEpoch;
-    return photoUrls.map((url) => url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster').toList();
   }
 
   void _handleLikeTap() {
     if (_isProcessingLike || _ruckId == null) return;
 
-    HapticFeedback.heavyImpact();
-    
-    // Save original values in case we need to revert due to API error
-    final originalIsLiked = _isLiked;
-    final originalLikeCount = _likeCount ?? 0;
-
-    // Optimistically update the UI immediately
-    setState(() {
-      if (_isLiked) {
-        _likeCount = (_likeCount ?? 0) > 0 ? (_likeCount ?? 0) - 1 : 0;
-      } else {
-        _likeCount = (_likeCount ?? 0) + 1;
-      }
-      _isLiked = !_isLiked;
-      _isProcessingLike = true;
-    });
-
-    // Important: Use GetIt to ensure we're using the shared singleton instance
-    final socialBloc = GetIt.instance<SocialBloc>();
-    
-    // Handle potential server-side errors (we know there's a 500 error issue)
     try {
-      socialBloc.add(ToggleRuckLike(_ruckId!));
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Like toggle requested for ruckId $_ruckId');
-    } catch (e) {
-      // Revert UI on error
+      // Use ToggleRuckLike event for both liking and unliking
+      context.read<SocialBloc>().add(ToggleRuckLike(_ruckId!));
+      
+      // Optimistically update UI
       setState(() {
-        _isLiked = originalIsLiked;
-        _likeCount = originalLikeCount;
-        _isProcessingLike = false;
+        _isLiked = !_isLiked;
+        _likeCount = _isLiked ? (_likeCount ?? 0) + 1 : (_likeCount ?? 1) - 1;
+        // Ensure like count doesn't go below 0
+        if (_likeCount! < 0) _likeCount = 0;
       });
+      
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Sent ToggleRuckLike event for ruckId: $_ruckId, new status: $_isLiked', name: 'RuckBuddyCard');
+      
+      HapticFeedback.mediumImpact();
+    } catch (e) {
       developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Error toggling like: $e');
     }
   }
@@ -202,69 +190,65 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     final String formattedCalories = '${widget.ruckBuddy.caloriesBurned.round()} kcal';
     final String formattedWeight = MeasurementUtils.formatWeight(widget.ruckBuddy.ruckWeightKg, metric: preferMetric);
 
-    return BlocConsumer<SocialBloc, SocialState>(
-      listener: (context, state) {
-        if (!mounted || _ruckId == null) return;
-
-        if (state is LikeStatusChecked && state.ruckId == _ruckId) {
-          setState(() {
-            _isLiked = state.isLiked;
-            _likeCount = state.likeCount; 
-            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeStatusChecked', name: 'RuckBuddyCard');
-          });
-        }
-        if (state is LikeActionCompleted && state.ruckId == _ruckId) {
-          setState(() {
-            _isProcessingLike = false;
-            _isLiked = state.isLiked;
-            _likeCount = state.likeCount;
-            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeActionCompleted', name: 'RuckBuddyCard');
-          });
-        }
-        if (state is CommentsLoaded && state.ruckId == _ruckId.toString()) {
-          setState(() {
-            _commentCount = state.comments.length;
-            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded', name: 'RuckBuddyCard');
-          });
-        }
-        if (state is LikeActionInProgress) {
-          setState(() => _isProcessingLike = true);
-        }
-        if (state is LikeActionError && state.ruckId == _ruckId) {
-          setState(() => _isProcessingLike = false);
-          developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) encountered LikeActionError: ${state.message}', name: 'RuckBuddyCard');
-        }
-      },
-      builder: (context, socialState) {
-        return BlocListener<ActiveSessionBloc, ActiveSessionState>(
-          bloc: GetIt.instance<ActiveSessionBloc>(),
-          listener: (context, activeSessionState) {
-            if (!mounted) return;
-            final cardSessionId = widget.ruckBuddy.id;
-            developer.log('[PHOTO_DEBUG] RuckBuddyCard (ID: $cardSessionId) listener: Received ActiveSessionState ${activeSessionState.runtimeType}', name: 'RuckBuddyCard');
-
-            if (activeSessionState is SessionSummaryGenerated && activeSessionState.session.id == cardSessionId) {
-              developer.log('[PHOTO_DEBUG] RuckBuddyCard (ID: $cardSessionId): SessionSummaryGenerated with ${activeSessionState.photos.length} photos', name: 'RuckBuddyCard');
-              if (activeSessionState.photos.isNotEmpty) {
-                setState(() => _photos = _convertToRuckPhotos(activeSessionState.photos));
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ActiveSessionBloc, ActiveSessionState>(
+          listener: (context, state) {
+            if (!mounted || _ruckId == null) return;
+            
+            if (state is SessionSummaryGenerated && state.session.id == widget.ruckBuddy.id) {
+              if (!state.isPhotosLoading && state.photos.isNotEmpty) {
+                setState(() {
+                  _photos = state.photos;
+                  developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionSummaryGenerated: ${_photos.length}', name: 'RuckBuddyCard');
+                });
               }
-            } else if (activeSessionState is ActiveSessionRunning && activeSessionState.sessionId == cardSessionId) {
-              developer.log('[PHOTO_DEBUG] RuckBuddyCard (ID: $cardSessionId): ActiveSessionRunning with ${activeSessionState.photos.length} photos', name: 'RuckBuddyCard');
-              if (activeSessionState.photos.isNotEmpty) {
-                setState(() => _photos = _convertToRuckPhotos(activeSessionState.photos));
+            } else if (state is ActiveSessionRunning && state.sessionId == widget.ruckBuddy.id) {
+              if (!state.isPhotosLoading && state.photos.isNotEmpty) {
+                setState(() {
+                  _photos = state.photos;
+                  developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from ActiveSessionRunning: ${_photos.length}', name: 'RuckBuddyCard');
+                });
               }
-            } else if (activeSessionState is ActiveSessionInitial && activeSessionState.viewedSession?.id == cardSessionId) {
-              developer.log('[PHOTO_DEBUG] RuckBuddyCard (ID: $cardSessionId): ActiveSessionInitial with ${activeSessionState.photos.length} photos for viewed session', name: 'RuckBuddyCard');
-              if (activeSessionState.photos.isNotEmpty) {
-                setState(() => _photos = _convertToRuckPhotos(activeSessionState.photos));
-              }
-            } else if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.sessionId == cardSessionId) {
-              developer.log('[PHOTO_DEBUG] RuckBuddyCard (ID: $cardSessionId): SessionPhotosLoadedForId with ${activeSessionState.photos.length} photos', name: 'RuckBuddyCard');
-               // SessionPhotosLoadedForId carries a List<RuckPhoto>
-              setState(() => _photos = activeSessionState.photos); // No conversion needed if it's already List<RuckPhoto>
             }
           },
-          child: Card(
+        ),
+      ],
+      child: BlocConsumer<SocialBloc, SocialState>(
+        listener: (context, state) {
+          if (!mounted || _ruckId == null) return;
+
+          if (state is LikeStatusChecked && state.ruckId == _ruckId) {
+            setState(() {
+              _isLiked = state.isLiked;
+              _likeCount = state.likeCount; 
+              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeStatusChecked', name: 'RuckBuddyCard');
+            });
+          }
+          if (state is LikeActionCompleted && state.ruckId == _ruckId) {
+            setState(() {
+              _isProcessingLike = false;
+              _isLiked = state.isLiked;
+              _likeCount = state.likeCount;
+              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeActionCompleted', name: 'RuckBuddyCard');
+            });
+          }
+          if (state is CommentsLoaded && state.ruckId == _ruckId.toString()) {
+            setState(() {
+              _commentCount = state.comments.length;
+              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded', name: 'RuckBuddyCard');
+            });
+          }
+          if (state is LikeActionInProgress) {
+            setState(() => _isProcessingLike = true);
+          }
+          if (state is LikeActionError && state.ruckId == _ruckId) {
+            setState(() => _isProcessingLike = false);
+            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) encountered LikeActionError: ${state.message}', name: 'RuckBuddyCard');
+          }
+        },
+        builder: (context, socialState) {
+          return Card(
             elevation: 3,
             margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -295,77 +279,164 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                widget.ruckBuddy.user.username, // Use username here
-                                style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.w600),
+                                widget.ruckBuddy.user?.username ?? 'Anonymous Rucker',
+                                style: AppTextStyles.bodyLarge.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              if (widget.ruckBuddy.completedAt != null)
-                                Text(
-                                  _formatCompletedDate(widget.ruckBuddy.completedAt),
-                                  style: AppTextStyles.bodyMedium.copyWith(fontSize: 12),
+                              Text(
+                                _formatCompletedDate(widget.ruckBuddy.completedAt),
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: Colors.grey[600],
                                 ),
+                              ),
                             ],
                           ),
                         ),
-                        // Like button
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                _isLiked ? Icons.favorite : Icons.favorite_border,
-                                color: _isLiked ? AppColors.primary : Colors.grey[600],
-                                size: 28,
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: _isProcessingLike ? null : _handleLikeTap,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            formattedWeight,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.bold,
                             ),
-                            if (_likeCount != null)
-                              Text(
-                                '$_likeCount', // Use local state variable
-                                style: AppTextStyles.bodyMedium.copyWith(fontSize: 12, color: Colors.grey[700]),
-                              ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
+                    
                     const SizedBox(height: 12),
-
-                    // Map Preview with Ruck Weight Chip
-                    Stack(
-                      children: [
-                        _RouteMapPreview(locationPoints: widget.ruckBuddy.locationPoints),
-                        if (widget.ruckBuddy.ruckWeightKg > 0)
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Chip(
-                              label: Text(formattedWeight, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                              backgroundColor: AppColors.primary.withOpacity(0.85),
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              visualDensity: VisualDensity.compact,
+                    
+                    // Map Preview
+                    _RouteMapPreview(
+                      locationPoints: widget.ruckBuddy.locationPoints,
+                    ),
+                    
+                    // Photos Carousel (directly after map with minimal spacing)
+                    if (_photos.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: PhotoCarousel(
+                          photoUrls: _getProcessedPhotoUrls(_photos),
+                          height: 140,
+                          showDeleteButtons: false,
+                          onPhotoTap: (index) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PhotoViewer(
+                                  photoUrls: _getProcessedPhotoUrls(_photos),
+                                  initialIndex: index,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Stats Grid
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 0.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildStatTile(
+                              context: context,
+                              icon: Icons.route,
+                              label: 'Distance',
+                              value: formattedDistance,
+                              compact: true,
                             ),
                           ),
-                      ],
+                          Expanded(
+                            child: _buildStatTile(
+                              context: context,
+                              icon: Icons.timer,
+                              label: 'Time',
+                              value: formattedDuration,
+                              compact: true,
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildStatTile(
+                              context: context,
+                              icon: Icons.trending_up,
+                              label: 'Elevation',
+                              value: formattedElevation,
+                              compact: true,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Stats Grid
-                    GridView.count(
-                      crossAxisCount: 3,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      childAspectRatio: 2.8, // Adjust for better spacing
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Second stats row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 0.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildStatTile(
+                              context: context,
+                              icon: Icons.speed,
+                              label: 'Pace',
+                              value: formattedPace,
+                              compact: true,
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildStatTile(
+                              context: context,
+                              icon: Icons.local_fire_department,
+                              label: 'Calories',
+                              value: formattedCalories,
+                              compact: true,
+                            ),
+                          ),
+                          const Expanded(child: SizedBox()), // Placeholder for third column
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Social interactions
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        _buildStatTile(context: context, icon: Icons.directions_walk, label: 'Distance', value: formattedDistance, compact: true),
-                        _buildStatTile(context: context, icon: Icons.timer_outlined, label: 'Duration', value: formattedDuration, compact: true),
-                        _buildStatTile(context: context, icon: Icons.local_fire_department_outlined, label: 'Calories', value: formattedCalories, compact: true),
-                        _buildStatTile(context: context, icon: Icons.speed_outlined, label: 'Pace', value: formattedPace, compact: true),
-                        _buildStatTile(context: context, icon: Icons.terrain_outlined, label: 'Elevation', value: formattedElevation, compact: true),
-                        // Comment Count Tile
+                        // Like button
+                        InkWell(
+                          onTap: widget.onLikeTap ?? _handleLikeTap,
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
+                                color: _isLiked ? AppColors.secondary : Colors.grey[600],
+                                size: 22,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${_likeCount ?? 0}',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: Colors.grey[800],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        // Comments count
                         InkWell(
                           onTap: () {
                             Navigator.push(
@@ -373,107 +444,76 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                               MaterialPageRoute(
                                 builder: (context) => RuckBuddyDetailScreen(
                                   ruckBuddy: widget.ruckBuddy,
-                                  focusComment: true, 
+                                  focusComment: true, // Auto-focus the comment input field
                                 ),
                               ),
                             );
                           },
-                          child: _buildStatTile(
-                            context: context,
-                            icon: Icons.comment_outlined,
-                            label: 'Comments',
-                            value: '${_commentCount ?? 0}', // Use local state variable
-                            compact: true,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline,
+                                color: Colors.grey[600],
+                                size: 22,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${_commentCount ?? 0}',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: Colors.grey[800],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    
-                    // Photos Preview (if any)
-                    // This part would also use local _photos state, updated by ActiveSessionBloc listener if integrated
-                    if (_photos.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12.0),
-                        child: SizedBox(
-                          height: 80,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _photos.length,
-                            itemBuilder: (context, index) {
-                              final photo = _photos[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: InkWell(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => PhotoViewer(
-                                          photoUrls: _photos.map((photo) => photo.url ?? photo.thumbnailUrl ?? '').where((url) => url.isNotEmpty).toList(),
-                                          initialIndex: index,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8.0),
-                                    child: CachedNetworkImage(
-                                      imageUrl: photo.thumbnailUrl ?? photo.url ?? '',
-                                      width: 80,
-                                      height: 80,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) => Container(color: Colors.grey[300]),
-                                      errorWidget: (context, url, error) => Container(
-                                        color: Colors.grey[300],
-                                        child: const Icon(Icons.broken_image, color: Colors.grey),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   Widget _buildAvatar(UserInfo? user) {
-    if (user == null) {
-      return CircleAvatar(
-        radius: 24,
-        backgroundColor: Colors.grey[200],
-        backgroundImage: const AssetImage('assets/images/profile.png'),
-      );
-    }
-    if (user.photoUrl != null && user.photoUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 24,
-        backgroundColor: Colors.grey[200],
-        backgroundImage: CachedNetworkImageProvider(user.photoUrl!),
+    if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: CachedNetworkImage(
+          imageUrl: user.photoUrl!,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            width: 40,
+            height: 40,
+            color: Colors.grey[300],
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+          errorWidget: (context, url, error) => Container(
+            width: 40,
+            height: 40,
+            color: Colors.grey[300],
+            child: Icon(Icons.person),
+          ),
+        ),
       );
     } else {
-      final String imagePath = user.gender == 'female'
-          ? 'assets/images/lady rucker profile.png'
-          : 'assets/images/profile.png';
       return CircleAvatar(
-        radius: 24,
-        backgroundColor: Colors.grey[200],
-        backgroundImage: AssetImage(imagePath),
+        radius: 20,
+        backgroundColor: AppColors.secondary.withOpacity(0.2),
+        child: Icon(Icons.person, color: AppColors.secondary),
       );
     }
   }
 
   String _formatCompletedDate(DateTime? completedAt) {
-    if (completedAt == null) return 'Date unknown';
-    return DateFormat('MMM d, yyyy').format(completedAt);
+    if (completedAt == null) return 'Unknown date';
+    return DateFormat('MMM d, yyyy • h:mm a').format(completedAt);
   }
 
   Widget _buildStatTile({
@@ -483,36 +523,34 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     required String value,
     bool compact = false,
   }) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: compact ? 22 : 28,
-          color: AppColors.secondary,
+        Row(
+          children: [
+            Icon(
+              icon,
+              color: AppColors.secondary,
+              size: compact ? 16 : 20,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: Colors.grey[600],
+                fontSize: compact ? 12 : 14,
+              ),
+            ),
+          ],
         ),
-        SizedBox(width: compact ? 4 : 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: Colors.grey[600],
-                  fontSize: compact ? 14 : 18,
-                ),
-              ),
-              Text(
-                value,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: compact ? 16 : 22,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: AppTextStyles.bodyMedium.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: compact ? 16 : 22,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

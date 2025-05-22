@@ -1,4 +1,4 @@
-part of 'active_session_bloc.dart';
+part of active_session_bloc;
 
 @immutable
 abstract class ActiveSessionEvent extends Equatable {
