@@ -4,14 +4,19 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/usecases/get_ruck_buddies.dart';
+import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
 
 part 'ruck_buddies_event.dart';
 part 'ruck_buddies_state.dart';
 
 class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
   final GetRuckBuddies getRuckBuddies;
-  
-  RuckBuddiesBloc({required this.getRuckBuddies}) : super(RuckBuddiesInitial()) {
+  final SocialRepository socialRepository;
+
+  RuckBuddiesBloc({
+    required this.getRuckBuddies,
+    required this.socialRepository,
+  }) : super(RuckBuddiesInitial()) {
     on<FetchRuckBuddiesEvent>(_onFetchRuckBuddies);
     on<FetchMoreRuckBuddiesEvent>(_onFetchMoreRuckBuddies);
     on<FilterRuckBuddiesEvent>(_onFilterRuckBuddies);
