@@ -101,6 +101,7 @@ def register_endpoint():
 
 # Use a decorator function to apply rate limiting to resources
 def rate_limit_resource(resource, limit):
+    logger.info(f"Applying rate limit: {limit} to resource: {resource.__name__}")
     original_dispatch_request = resource.dispatch_request
     
     @limiter.limit(limit)
@@ -306,11 +307,8 @@ rate_limit_resource(RuckPhotosResource, "30 per minute") # Apply rate limiting
 
 # Ruck Likes Endpoints
 app.logger.info(f"Setting RuckLikesResource rate limit to: 2000 per minute")
-api.add_resource(
-  rate_limit_resource(RuckLikesResource, "2000 per minute"),  # Dramatically increased from 500/minute to 2000/minute
-  '/api/ruck-likes',
-  '/api/ruck-likes/check'
-)
+api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
+rate_limit_resource(RuckLikesResource, "2000 per minute")  # Dramatically increased from 500/minute to 2000/minute
 
 # Ruck Comments Endpoint
 api.add_resource(RuckCommentsResource, '/api/ruck-comments')
