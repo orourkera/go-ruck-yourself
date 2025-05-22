@@ -114,11 +114,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     try {
       final socialBloc = getIt<SocialBloc>();
       
-      // Use batch checking for likes to ensure state is synchronized across screens
+      // Use CheckRuckLikeStatus for likes to ensure state is synchronized across screens
       final ruckIdInt = int.tryParse(ruckId);
       if (ruckIdInt != null) {
         // This will update all screens that display this ruck
-        socialBloc.add(BatchCheckUserLikeStatus([ruckIdInt]));
+        socialBloc.add(CheckRuckLikeStatus(ruckIdInt));
       }
       
       // Also load the standard likes and comments
@@ -395,8 +395,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                         
                                         return (current is LikeActionCompleted && current.ruckId == ruckId) ||
                                             (current is LikeStatusChecked && current.ruckId == ruckId) ||
-                                            (current is LikesLoaded && current.ruckId == ruckId) ||
-                                            (current is BatchLikeStatusChecked && current.likeStatusMap.containsKey(ruckId));
+                                            (current is LikesLoaded && current.ruckId == ruckId);
                                       },
                                       builder: (context, state) {
                                         final ruckId = int.tryParse(widget.session.id!);
@@ -414,9 +413,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                         } else if (state is LikeStatusChecked && state.ruckId == ruckId) {
                                           isLiked = state.isLiked;
                                           likeCount = state.likeCount;
-                                        } else if (state is BatchLikeStatusChecked) {
-                                          isLiked = state.likeStatusMap[ruckId] ?? false;
-                                          likeCount = state.likeCountMap[ruckId] ?? 0;
                                         }
                                         
                                         return InkWell(
