@@ -342,56 +342,49 @@ class SocialRepository {
         ).timeout(const Duration(seconds: 10));
         
         if (batchLikeCountResponse.statusCode == 200) {
+          debugPrint('[SOCIAL_DEBUG] Batch like count response: ${batchLikeCountResponse.body}');
           final Map<String, dynamic> data = json.decode(batchLikeCountResponse.body);
           if (data['success'] == true && data['data'] is Map) {
             final Map<String, dynamic> countsData = data['data'] as Map<String, dynamic>;
-            
-            // Convert string keys to int keys
+            debugPrint('[SOCIAL_DEBUG] Raw like count data: $countsData');
             countsData.forEach((key, value) {
-              // Convert key to int
               final intKey = int.tryParse(key);
-              if (intKey != null) {
-                final count = value is int ? value : int.tryParse(value.toString()) ?? 0;
-                likeCountMap[intKey] = count;
-                
-                // Update cache
-                _likeCountCache[intKey] = count;
-                // Already updated timestamp when setting like status
+              if (intKey != null && value is int) {
+                likeCountMap[intKey] = value;
+                _likeCountCache[intKey] = value;
+                // Ensure _likeCacheTimestamps is updated for counts as well if not already set by status check
+                _likeCacheTimestamps[intKey] ??= now;
+                debugPrint('[SOCIAL_DEBUG] Processed like count for ruck $intKey: $value');
               }
             });
-            
             debugPrint('[SOCIAL_DEBUG] Successfully processed batch like counts for ${countsData.length} rucks');
+          } else {
+            debugPrint('[SOCIAL_DEBUG] Invalid data format in batch like count response: success=${data['success']}, data type=${data['data']?.runtimeType}. Falling back.');
+            await _fallbackBatchLikeCountCheck(uncachedRuckIds, likeCountMap, token);
           }
         } else {
-          // Fall back to individual like count checks (legacy approach)
+          debugPrint('[SOCIAL_DEBUG] Batch like count endpoint failed with status ${batchLikeCountResponse.statusCode}. Falling back.');
           await _fallbackBatchLikeCountCheck(uncachedRuckIds, likeCountMap, token);
-          
-          // Update cache for individual checks
-          for (final ruckId in uncachedRuckIds) {
-            if (likeCountMap.containsKey(ruckId)) {
-              _likeCountCache[ruckId] = likeCountMap[ruckId]!;
-              // Timestamp already updated when setting like status
-            }
-          }
         }
+
       } catch (e) {
-        debugPrint('[SOCIAL_DEBUG] Error in batch API call: $e');
-        // Fall back to individual calls for any rucks we couldn't process
-        final stillUnprocessedRuckIds = uncachedRuckIds.where((id) => !likeStatusMap.containsKey(id)).toList();
-        await _fallbackBatchLikeStatusCheck(stillUnprocessedRuckIds, likeStatusMap, token);
-        
-        final stillUnprocessedCountRuckIds = uncachedRuckIds.where((id) => !likeCountMap.containsKey(id)).toList();
-        await _fallbackBatchLikeCountCheck(stillUnprocessedCountRuckIds, likeCountMap, token);
-        
-        // Update cache for any successfully processed fallback items
-        for (final ruckId in uncachedRuckIds) {
-          if (likeStatusMap.containsKey(ruckId)) {
-            _likeStatusCache[ruckId] = likeStatusMap[ruckId]!;
-            _likeCacheTimestamps[ruckId] = now;
-          }
-          if (likeCountMap.containsKey(ruckId)) {
-            _likeCountCache[ruckId] = likeCountMap[ruckId]!;
-          }
+        debugPrint('[SOCIAL_DEBUG] Error during batch API calls: $e. Falling back for both status and count.');
+        // Fallback for status if not already populated
+        List<int> statusFallbackNeeded = uncachedRuckIds.where((id) => !likeStatusMap.containsKey(id)).toList();
+        if (statusFallbackNeeded.isNotEmpty) {
+           await _fallbackBatchLikeStatusCheck(statusFallbackNeeded, likeStatusMap, token);
+        }
+        // Fallback for counts if not already populated
+        List<int> countFallbackNeeded = uncachedRuckIds.where((id) => !likeCountMap.containsKey(id)).toList();
+        if (countFallbackNeeded.isNotEmpty) {
+          await _fallbackBatchLikeCountCheck(countFallbackNeeded, likeCountMap, token);
+        }
+      }
+
+      // Update cache timestamps for all processed uncached items
+      for (final ruckId in uncachedRuckIds) {
+        if (likeStatusMap.containsKey(ruckId) || likeCountMap.containsKey(ruckId)) {
+           _likeCacheTimestamps[ruckId] = now;
         }
       }
       
@@ -401,13 +394,11 @@ class SocialRepository {
         'likeCounts': likeCountMap,
       };
     } catch (e) {
-      debugPrint('[SOCIAL_DEBUG] Error in batch checking like status: $e');
-      if (e is UnauthorizedException) rethrow;
-      
-      // Return empty maps to avoid crashing the app
+      debugPrint('[SOCIAL_DEBUG] Outer error in batchCheckUserLikes: $e');
+      // In case of a broader error (e.g., token issue), return empty maps or rethrow
       return {
-        'likeStatus': {},
-        'likeCounts': {},
+        'likeStatus': likeStatusMap, // Potentially partially filled from cache
+        'likeCounts': likeCountMap,   // Potentially partially filled from cache
       };
     }
   }
