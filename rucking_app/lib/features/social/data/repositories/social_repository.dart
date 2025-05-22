@@ -328,45 +328,10 @@ class SocialRepository {
           }
         }
         
-        // Next get the like counts for all rucks in one call
-        final batchLikeCountUrl = '${AppConfig.apiBaseUrl}/ruck-likes/counts?ids=$ruckIdsStr';
-        debugPrint('[SOCIAL_DEBUG] Batch like count URL: $batchLikeCountUrl');
-        
-        // Attempt to get like counts from batch endpoint
-        final batchLikeCountResponse = await _httpClient.get(
-          Uri.parse(batchLikeCountUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ).timeout(const Duration(seconds: 10));
-        
-        if (batchLikeCountResponse.statusCode == 200) {
-          debugPrint('[SOCIAL_DEBUG] Batch like count response: ${batchLikeCountResponse.body}');
-          final Map<String, dynamic> data = json.decode(batchLikeCountResponse.body);
-          if (data['success'] == true && data['data'] is Map) {
-            final Map<String, dynamic> countsData = data['data'] as Map<String, dynamic>;
-            debugPrint('[SOCIAL_DEBUG] Raw like count data: $countsData');
-            countsData.forEach((key, value) {
-              final intKey = int.tryParse(key);
-              if (intKey != null && value is int) {
-                likeCountMap[intKey] = value;
-                _likeCountCache[intKey] = value;
-                // Ensure _likeCacheTimestamps is updated for counts as well if not already set by status check
-                _likeCacheTimestamps[intKey] ??= now;
-                debugPrint('[SOCIAL_DEBUG] Processed like count for ruck $intKey: $value');
-              }
-            });
-            debugPrint('[SOCIAL_DEBUG] Successfully processed batch like counts for ${countsData.length} rucks');
-          } else {
-            debugPrint('[SOCIAL_DEBUG] Invalid data format in batch like count response: success=${data['success']}, data type=${data['data']?.runtimeType}. Falling back.');
-            await _fallbackBatchLikeCountCheck(uncachedRuckIds, likeCountMap, token);
-          }
-        } else {
-          debugPrint('[SOCIAL_DEBUG] Batch like count endpoint failed with status ${batchLikeCountResponse.statusCode}. Falling back.');
-          await _fallbackBatchLikeCountCheck(uncachedRuckIds, likeCountMap, token);
-        }
-
+        // The batch endpoint for counts doesn't exist in the backend yet
+        // Skip trying to use it and directly use the fallback method
+        debugPrint('[SOCIAL_DEBUG] Skipping non-existent batch count endpoint and using fallback method');
+        await _fallbackBatchLikeCountCheck(uncachedRuckIds, likeCountMap, token);
       } catch (e) {
         debugPrint('[SOCIAL_DEBUG] Error during batch API calls: $e. Falling back for both status and count.');
         // Fallback for status if not already populated
