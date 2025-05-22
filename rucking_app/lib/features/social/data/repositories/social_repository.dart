@@ -413,63 +413,157 @@ class SocialRepository {
   }
   
   /// Fallback method to check individual like status when batch fails
+  /// Uses an adaptive approach to avoid rate limiting
   Future<void> _fallbackBatchLikeStatusCheck(List<int> ruckIds, Map<int, bool> likeStatusMap, String token) async {
     debugPrint('[SOCIAL_DEBUG] Falling back to individual like status checks for ${ruckIds.length} rucks');
     
-    // Process in smaller batches to avoid rate limits
-    final batchSize = 2;
-    for (var i = 0; i < ruckIds.length; i += batchSize) {
-      final end = (i + batchSize < ruckIds.length) ? i + batchSize : ruckIds.length;
-      final batch = ruckIds.sublist(i, end);
+    // Get current timestamp to update cache
+    final now = DateTime.now();
+    
+    // Use a much smaller batch size to avoid rate limits
+    final batchSize = 1; // Process one at a time to minimize rate limit issues
+    
+    // Check which ruckIds are already in cache to reduce API calls
+    final List<int> uncachedRuckIds = [];
+    for (final ruckId in ruckIds) {
+      // Check if we already have a valid cache entry
+      if (_isValidCache(ruckId)) {
+        likeStatusMap[ruckId] = _likeStatusCache[ruckId]!;
+        debugPrint('[SOCIAL_DEBUG] Using cached like status for ruck $ruckId: ${_likeStatusCache[ruckId]}');
+      } else {
+        uncachedRuckIds.add(ruckId);
+      }
+    }
+    
+    if (uncachedRuckIds.isEmpty) {
+      debugPrint('[SOCIAL_DEBUG] All like statuses were in cache, no need for fallback API calls');
+      return;
+    }
+    
+    debugPrint('[SOCIAL_DEBUG] Need to fetch ${uncachedRuckIds.length} uncached ruck statuses');
+    
+    // Process in tiny batches with increasing delays between requests
+    int consecutiveErrors = 0;
+    int baseDelay = 500; // Start with 500ms delay
+    
+    for (var i = 0; i < uncachedRuckIds.length; i += batchSize) {
+      final end = (i + batchSize < uncachedRuckIds.length) ? i + batchSize : uncachedRuckIds.length;
+      final batch = uncachedRuckIds.sublist(i, end);
       
       for (final ruckId in batch) {
         try {
+          // Calculate delay with exponential backoff if we've had errors
+          final currentDelay = consecutiveErrors > 0 ? 
+              baseDelay * (1 << (consecutiveErrors - 1)) : // Exponential backoff
+              baseDelay;
+              
+          // Apply delay before request to avoid rate limits
+          if (i > 0 || consecutiveErrors > 0) {
+            debugPrint('[SOCIAL_DEBUG] Waiting ${currentDelay}ms before checking ruck $ruckId');
+            await Future.delayed(Duration(milliseconds: currentDelay));
+          }
+          
           final result = await _fallbackSingleRuckCheck(ruckId, token);
           if (result != null) {
             likeStatusMap[ruckId] = result;
+            _likeStatusCache[ruckId] = result;
+            _likeCacheTimestamps[ruckId] = now;
+            consecutiveErrors = 0; // Reset error counter on success
           }
         } catch (e) {
           debugPrint('[SOCIAL_DEBUG] Error checking like status for ruck $ruckId: $e');
+          consecutiveErrors++; // Increment error counter
+          
+          // Default to false on error to avoid showing incorrect UI
+          // This will be updated when the rate limit window expires
+          likeStatusMap[ruckId] = false;
+          
+          // If we hit 3 consecutive errors, stop to avoid wasting resources
+          if (consecutiveErrors >= 3) {
+            debugPrint('[SOCIAL_DEBUG] Too many consecutive errors (${consecutiveErrors}), aborting remaining checks');
+            return;
+          }
         }
-        
-        // Add a small delay to avoid hitting rate limits
-        if (batch.length > 1) await Future.delayed(const Duration(milliseconds: 250));
       }
-      
-      // Add delay between batches
-      if (ruckIds.length > batchSize) await Future.delayed(const Duration(seconds: 1));
     }
   }
   
   /// Fallback method to check individual like counts when batch fails
+  /// Uses an adaptive approach to avoid rate limiting
   Future<void> _fallbackBatchLikeCountCheck(List<int> ruckIds, Map<int, int> likeCountMap, String token) async {
     debugPrint('[SOCIAL_DEBUG] Falling back to individual like count checks for ${ruckIds.length} rucks');
     
-    // Process in smaller batches to avoid rate limits
-    final batchSize = 2;
-    for (var i = 0; i < ruckIds.length; i += batchSize) {
-      final end = (i + batchSize < ruckIds.length) ? i + batchSize : ruckIds.length;
-      final batch = ruckIds.sublist(i, end);
+    // Get current timestamp to update cache
+    final now = DateTime.now();
+    
+    // Use a much smaller batch size to avoid rate limits
+    final batchSize = 1; // Process one at a time to minimize rate limit issues
+    
+    // Check which ruckIds are already in cache to reduce API calls
+    final List<int> uncachedRuckIds = [];
+    for (final ruckId in ruckIds) {
+      // Check if we already have a valid cache entry for the count
+      if (_isValidCache(ruckId) && _likeCountCache.containsKey(ruckId)) {
+        likeCountMap[ruckId] = _likeCountCache[ruckId]!;
+        debugPrint('[SOCIAL_DEBUG] Using cached like count for ruck $ruckId: ${_likeCountCache[ruckId]}');
+      } else {
+        uncachedRuckIds.add(ruckId);
+      }
+    }
+    
+    if (uncachedRuckIds.isEmpty) {
+      debugPrint('[SOCIAL_DEBUG] All like counts were in cache, no need for fallback API calls');
+      return;
+    }
+    
+    debugPrint('[SOCIAL_DEBUG] Need to fetch ${uncachedRuckIds.length} uncached ruck counts');
+    
+    // Process in tiny batches with increasing delays between requests
+    int consecutiveErrors = 0;
+    int baseDelay = 500; // Start with 500ms delay
+    
+    for (var i = 0; i < uncachedRuckIds.length; i += batchSize) {
+      final end = (i + batchSize < uncachedRuckIds.length) ? i + batchSize : uncachedRuckIds.length;
+      final batch = uncachedRuckIds.sublist(i, end);
       
       for (final ruckId in batch) {
         try {
+          // Calculate delay with exponential backoff if we've had errors
+          final currentDelay = consecutiveErrors > 0 ? 
+              baseDelay * (1 << (consecutiveErrors - 1)) : // Exponential backoff
+              baseDelay;
+              
+          // Apply delay before request to avoid rate limits
+          if (i > 0 || consecutiveErrors > 0) {
+            debugPrint('[SOCIAL_DEBUG] Waiting ${currentDelay}ms before checking like count for ruck $ruckId');
+            await Future.delayed(Duration(milliseconds: currentDelay));
+          }
+          
           final count = await _fallbackSingleRuckLikeCount(ruckId, token);
           if (count != null) {
             likeCountMap[ruckId] = count;
+            _likeCountCache[ruckId] = count;
+            _likeCacheTimestamps[ruckId] = now;
+            consecutiveErrors = 0; // Reset error counter on success
           }
         } catch (e) {
           debugPrint('[SOCIAL_DEBUG] Error checking like count for ruck $ruckId: $e');
+          consecutiveErrors++; // Increment error counter
+          
+          // Default to 0 on error to avoid showing incorrect UI
+          // This will be updated when the rate limit window expires
+          likeCountMap[ruckId] = 0;
+          
+          // If we hit 3 consecutive errors, stop to avoid wasting resources
+          if (consecutiveErrors >= 3) {
+            debugPrint('[SOCIAL_DEBUG] Too many consecutive errors (${consecutiveErrors}), aborting remaining like count checks');
+            return;
+          }
         }
-        
-        // Add a small delay to avoid hitting rate limits
-        if (batch.length > 1) await Future.delayed(const Duration(milliseconds: 250));
       }
-      
-      // Add delay between batches
-      if (ruckIds.length > batchSize) await Future.delayed(const Duration(seconds: 1));
     }
   }
-  
+
   /// Fallback method for checking a single ruck like status
   /// Returns true/false if user has liked the ruck, or null on error
   Future<bool?> _fallbackSingleRuckCheck(int ruckId, String token) async {

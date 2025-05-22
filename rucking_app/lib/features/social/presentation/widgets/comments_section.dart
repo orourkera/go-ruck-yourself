@@ -47,6 +47,9 @@ class _CommentsSectionState extends State<CommentsSection> {
   String? _editingCommentId;
   bool _commentsLoaded = false; // Track if comments have been loaded to prevent duplicate requests
   
+  // Store loaded comments locally to keep them across all state changes
+  List<RuckComment> _currentComments = [];
+  
   // Get the current user ID from the AuthBloc
   String? _getCurrentUserId(BuildContext context) {
     try {
@@ -238,6 +241,12 @@ class _CommentsSectionState extends State<CommentsSection> {
           );
         } else if (state is CommentsLoaded) {
           debugPrint('[COMMENT_DEBUG] CommentsLoaded state with ${state.comments.length} comments for ruckId: ${state.ruckId}');
+          // Store comments in local state when they're loaded
+          if (state.ruckId == widget.ruckId) {
+            setState(() {
+              _currentComments = List<RuckComment>.from(state.comments);
+            });
+          }
         }
       },
       builder: (context, state) {
@@ -263,7 +272,7 @@ class _CommentsSectionState extends State<CommentsSection> {
             ),
             
             // Comments list
-            if (state is CommentsLoading)
+            if (state is CommentsLoading && _currentComments.isEmpty)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(16.0),
@@ -272,6 +281,9 @@ class _CommentsSectionState extends State<CommentsSection> {
               )
             else if (state is CommentsLoaded && state.ruckId == widget.ruckId)
               _buildCommentsList(state.comments)
+            // Use stored comments when we have a CommentCountUpdated state or other states
+            else if (_currentComments.isNotEmpty)
+              _buildCommentsList(_currentComments)
             else if (state is CommentsError)
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -288,12 +300,12 @@ class _CommentsSectionState extends State<CommentsSection> {
             
             // Add comment section - only show if hideInput is false
             if (!widget.hideInput)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
                     child: TextField(
                       controller: _commentController,
                       focusNode: _commentFocusNode,
