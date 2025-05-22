@@ -325,8 +325,16 @@ RuckLikesResource.delete = limiter.limit("2000 per minute", override_defaults=Tr
 api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
 
 # Ruck Comments Endpoint
+# Ruck Comments Endpoints
+app.logger.info(f"Setting RuckCommentsResource rate limit to: 500 per minute")
+# Directly patch the RuckCommentsResource methods with the limiter decorator
+RuckCommentsResource.get = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.get)
+RuckCommentsResource.post = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.post)
+RuckCommentsResource.put = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.put)
+RuckCommentsResource.delete = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.delete)
+
+# Now register the resource with modified methods
 api.add_resource(RuckCommentsResource, '/api/ruck-comments')
-rate_limit_resource(RuckCommentsResource, "500 per minute") # Dramatically increased from 60/minute to 500/minute
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
