@@ -342,6 +342,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                     // Photos Carousel (directly after map with minimal spacing)
                     if (_photos.isNotEmpty)
                       Padding(
+                        // Apply padding only on top
                         padding: const EdgeInsets.only(top: 5.0),
                         child: PhotoCarousel(
                           photoUrls: _getProcessedPhotoUrls(_photos),
