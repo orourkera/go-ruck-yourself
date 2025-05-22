@@ -255,21 +255,7 @@ class _CommentsSectionState extends State<CommentsSection> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section title
-            Padding(
-              padding: const EdgeInsets.only(
-                left: 16.0, 
-                right: 16.0,
-                top: 16.0,
-                bottom: 8.0,
-              ),
-              child: Text(
-                'Comments',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+            // Section title removed per user request
             
             // Comments list
             if (state is CommentsLoading && _currentComments.isEmpty)
@@ -293,10 +279,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                 ),
               )
             else
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('Loading comments...'),
-              ),
+              const SizedBox(), // Empty placeholder instead of 'Loading comments...'
             
             // Add comment section - only show if hideInput is false
             if (!widget.hideInput)
