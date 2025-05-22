@@ -718,7 +718,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       
                       // Heart rate section with Bangers font and no card container
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.only(top: 8, bottom: 8),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -811,7 +811,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                         height: 270,
                                         width: double.infinity,
                                         child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                          padding: EdgeInsets.zero,
                                           child: AnimatedHeartRateChart(
                                             heartRateSamples: safeHeartRateSamples,
                                             avgHeartRate: avgHeartRate,
@@ -826,7 +826,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                       Container(
                                         height: 220,
                                         width: double.infinity,
-                                        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        margin: EdgeInsets.zero,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade100,
                                           borderRadius: BorderRadius.circular(12.0),
