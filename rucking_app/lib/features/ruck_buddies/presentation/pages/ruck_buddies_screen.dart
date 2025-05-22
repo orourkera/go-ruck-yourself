@@ -279,12 +279,26 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
               try {
                 return RuckBuddyCard(
                   ruckBuddy: ruckBuddy,
-                  onTap: () {
-                    Navigator.of(context).push(
+                  onTap: () async {
+                    // Navigate to detail screen and await return
+                    await Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => RuckBuddyDetailScreen(ruckBuddy: ruckBuddy),
                       ),
                     );
+                    
+                    // When we return, explicitly trigger a batch check for updated like status and comment counts
+                    // This ensures our cards reflect the latest state even if they missed updates while off-screen
+                    if (mounted) {
+                      debugPrint('🔄 Returned to RuckBuddiesScreen from detail view - refreshing social states');
+                      final ruckId = int.tryParse(ruckBuddy.id);
+                      if (ruckId != null) {
+                        // Explicitly request updated comment count for this specific ruck
+                        context.read<SocialBloc>().add(CheckRuckLikeStatus(ruckId));
+                        // Also reload all ruck buddies to ensure we have the latest data
+                        context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+                      }
+                    }
                   },
                   onLikeTap: () {
                     // Use the actual like functionality

@@ -64,144 +64,112 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
   ) async {
     debugPrint('[SOCIAL_DEBUG] ToggleRuckLike called for ruckId: ${event.ruckId}');
     
-    // Check the current state to determine if we're already liked
+    // Capture initial batch state if present
+    final BatchLikeStatusChecked? initialBatchState = state is BatchLikeStatusChecked ? state as BatchLikeStatusChecked : null;
+
     bool isCurrentlyLiked = false;
     int currentLikeCount = 0;
     
-    // Try to determine current like status from state first
     if (state is LikesLoaded && (state as LikesLoaded).ruckId == event.ruckId) {
       isCurrentlyLiked = (state as LikesLoaded).userHasLiked;
       currentLikeCount = (state as LikesLoaded).likes.length;
-      debugPrint('[SOCIAL_DEBUG] Current like status from LikesLoaded state: $isCurrentlyLiked');
     } else if (state is LikeActionCompleted && (state as LikeActionCompleted).ruckId == event.ruckId) {
       isCurrentlyLiked = (state as LikeActionCompleted).isLiked;
       currentLikeCount = (state as LikeActionCompleted).likeCount;
-      debugPrint('[SOCIAL_DEBUG] Current like status from LikeActionCompleted state: $isCurrentlyLiked');
     } else if (state is LikeStatusChecked && (state as LikeStatusChecked).ruckId == event.ruckId) {
       isCurrentlyLiked = (state as LikeStatusChecked).isLiked;
       currentLikeCount = (state as LikeStatusChecked).likeCount;
-      debugPrint('[SOCIAL_DEBUG] Current like status from LikeStatusChecked state: $isCurrentlyLiked');
-    } else if (state is BatchLikeStatusChecked) {
-      // Try to get the like status from a batch check
-      final batchState = state as BatchLikeStatusChecked;
-      final likeStatus = batchState.likeStatusMap[event.ruckId];
-      final likeCount = batchState.likeCountMap[event.ruckId];
-      
-      if (likeStatus != null) {
-        isCurrentlyLiked = likeStatus;
-        debugPrint('[SOCIAL_DEBUG] Current like status from BatchLikeStatusChecked: $isCurrentlyLiked');
-      }
-      
-      if (likeCount != null) {
-        currentLikeCount = likeCount;
-        debugPrint('[SOCIAL_DEBUG] Current like count from BatchLikeStatusChecked: $currentLikeCount');
-      }
+    } else if (initialBatchState != null) { // Use captured initialBatchState
+      final likeStatus = initialBatchState.likeStatusMap[event.ruckId];
+      final likeCount = initialBatchState.likeCountMap[event.ruckId];
+      if (likeStatus != null) isCurrentlyLiked = likeStatus;
+      if (likeCount != null) currentLikeCount = likeCount;
     } else {
-      // No existing state with like info, need to check with API
-      debugPrint('[SOCIAL_DEBUG] No existing like status in state, checking with API');
+      debugPrint('[SOCIAL_DEBUG] No existing like status in state, checking with API for toggle');
       try {
         isCurrentlyLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
-        final likes = await _socialRepository.getRuckLikes(event.ruckId);
+        // To get count, we might need getRuckLikes or a dedicated count method
+        final likes = await _socialRepository.getRuckLikes(event.ruckId); 
         currentLikeCount = likes.length;
-        debugPrint('[SOCIAL_DEBUG] Current like status from API: $isCurrentlyLiked, count: $currentLikeCount');
       } catch (e) {
-        debugPrint('[SOCIAL_DEBUG] Error fetching current like status: $e');
-        // Continue with toggle anyway, assuming not liked
-        isCurrentlyLiked = false;
+        debugPrint('[SOCIAL_DEBUG] Error fetching current like status for toggle: $e');
+        isCurrentlyLiked = false; // Assume not liked if check fails
         currentLikeCount = 0;
       }
     }
 
-    // Calculate the new like state and count
     final newLikeStatus = !isCurrentlyLiked;
     final newLikeCount = newLikeStatus 
         ? currentLikeCount + 1 
         : (currentLikeCount > 0 ? currentLikeCount - 1 : 0);
     
-    // OPTIMISTIC UPDATE: Immediately update UI for better user experience
-    debugPrint('[SOCIAL_DEBUG] Applying optimistic update. New status: $newLikeStatus');
-    
-    // Emit the new like state immediately for responsive UI
     emit(LikeActionCompleted(
       isLiked: newLikeStatus,
       ruckId: event.ruckId,
       likeCount: newLikeCount,
     ));
     
-    // Update batch state immediately for all screens
-    if (state is BatchLikeStatusChecked) {
-      final batchState = state as BatchLikeStatusChecked;
-      final updatedStatusMap = Map<int, bool>.from(batchState.likeStatusMap);
-      final updatedCountMap = Map<int, int>.from(batchState.likeCountMap);
-      
+    if (initialBatchState != null) {
+      final updatedStatusMap = Map<int, bool>.from(initialBatchState.likeStatusMap);
+      final updatedCountMap = Map<int, int>.from(initialBatchState.likeCountMap);
       updatedStatusMap[event.ruckId] = newLikeStatus;
       updatedCountMap[event.ruckId] = newLikeCount;
-      
       emit(BatchLikeStatusChecked(updatedStatusMap, likeCountMap: updatedCountMap));
     }
     
-    // Now try the actual API call, and revert if it fails
     try {
-      debugPrint('[SOCIAL_DEBUG] Sending API request to toggle like from: $isCurrentlyLiked');
       bool success = false;
-      
       if (isCurrentlyLiked) {
         success = await _socialRepository.removeRuckLike(event.ruckId);
       } else {
-        // This method returns a RuckLike object, not a boolean
         final like = await _socialRepository.addRuckLike(event.ruckId);
-        // If we get here without an exception, consider it successful
         success = like != null && like.id.isNotEmpty;
       }
       
       if (!success) {
         debugPrint('[SOCIAL_DEBUG] Like toggle API call failed - reverting optimistic update');
-        
-        // Revert to the original state
         emit(LikeActionCompleted(
-          isLiked: isCurrentlyLiked,
+          isLiked: isCurrentlyLiked, // Revert to original
           ruckId: event.ruckId,
-          likeCount: currentLikeCount,
+          likeCount: currentLikeCount, // Revert to original
         ));
-        
-        // Also revert the batch state
-        if (state is BatchLikeStatusChecked) {
-          final batchState = state as BatchLikeStatusChecked;
-          final updatedStatusMap = Map<int, bool>.from(batchState.likeStatusMap);
-          final updatedCountMap = Map<int, int>.from(batchState.likeCountMap);
-          
-          updatedStatusMap[event.ruckId] = isCurrentlyLiked;
-          updatedCountMap[event.ruckId] = currentLikeCount;
-          
-          emit(BatchLikeStatusChecked(updatedStatusMap, likeCountMap: updatedCountMap));
+        if (initialBatchState != null) {
+          final revertedStatusMap = Map<int, bool>.from(initialBatchState.likeStatusMap);
+          final revertedCountMap = Map<int, int>.from(initialBatchState.likeCountMap);
+          // Ensure the maps are reverted to original state for this ruckId
+          revertedStatusMap[event.ruckId] = isCurrentlyLiked;
+          revertedCountMap[event.ruckId] = currentLikeCount;
+          emit(BatchLikeStatusChecked(revertedStatusMap, likeCountMap: revertedCountMap));
         }
-        
         emit(LikeActionError('Failed to toggle like', event.ruckId));
       } else {
         debugPrint('[SOCIAL_DEBUG] Like toggle API call succeeded');
+        // Optionally, re-fetch the definitive count from the server after a successful toggle
+        // final definitiveLikes = await _socialRepository.getRuckLikes(event.ruckId);
+        // final definitiveCount = definitiveLikes.length;
+        // if (definitiveCount != newLikeCount) {
+        //   emit(LikeActionCompleted(isLiked: newLikeStatus, ruckId: event.ruckId, likeCount: definitiveCount));
+        //   if (initialBatchState != null) {
+        //      final finalStatusMap = Map<int, bool>.from(initialBatchState.likeStatusMap)..[event.ruckId] = newLikeStatus;
+        //      final finalCountMap = Map<int, int>.from(initialBatchState.likeCountMap)..[event.ruckId] = definitiveCount;
+        //      emit(BatchLikeStatusChecked(finalStatusMap, likeCountMap: finalCountMap));
+        //   }
+        // }
       }
     } catch (e) {
       debugPrint('[SOCIAL_DEBUG] Error toggling like: $e');
-      
-      // Revert to the original state on error
       emit(LikeActionCompleted(
-        isLiked: isCurrentlyLiked,
+        isLiked: isCurrentlyLiked, // Revert to original
         ruckId: event.ruckId,
-        likeCount: currentLikeCount,
+        likeCount: currentLikeCount, // Revert to original
       ));
-      
-      // Also revert the batch state
-      if (state is BatchLikeStatusChecked) {
-        final batchState = state as BatchLikeStatusChecked;
-        final updatedStatusMap = Map<int, bool>.from(batchState.likeStatusMap);
-        final updatedCountMap = Map<int, int>.from(batchState.likeCountMap);
-        
-        updatedStatusMap[event.ruckId] = isCurrentlyLiked;
-        updatedCountMap[event.ruckId] = currentLikeCount;
-        
-        emit(BatchLikeStatusChecked(updatedStatusMap, likeCountMap: updatedCountMap));
+      if (initialBatchState != null) {
+          final revertedStatusMap = Map<int, bool>.from(initialBatchState.likeStatusMap);
+          final revertedCountMap = Map<int, int>.from(initialBatchState.likeCountMap);
+          revertedStatusMap[event.ruckId] = isCurrentlyLiked;
+          revertedCountMap[event.ruckId] = currentLikeCount;
+          emit(BatchLikeStatusChecked(revertedStatusMap, likeCountMap: revertedCountMap));
       }
-      
       if (e is ServerException) {
         emit(LikeActionError('Server error: ${e.message}', event.ruckId));
       } else {
@@ -280,13 +248,16 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     debugPrint('🔍 Checking like status for ruck ID: ${event.ruckId}');
     try {
       final hasLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
-      debugPrint('✅ Like status check complete: $hasLiked');
+      // Fetch the total like count
+      final likes = await _socialRepository.getRuckLikes(event.ruckId);
+      final likeCount = likes.length;
+      debugPrint('✅ Like status check complete: $hasLiked, Count: $likeCount');
       
       // Emit simple state just with like status
       emit(LikeStatusChecked(
         isLiked: hasLiked,
         ruckId: event.ruckId,
-        likeCount: 0, // This will need to be updated to include the like count
+        likeCount: likeCount, // Updated to use the fetched count
       ));
     } on UnauthorizedException catch (e) {
       debugPrint('❌ Authentication error checking like status: ${e.message}');
@@ -331,28 +302,76 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     debugPrint('[SOCIAL_DEBUG] _onAddRuckComment called for ruck ${event.ruckId}');
-    emit(CommentActionInProgress());
+    
+    final ruckId = event.ruckId;
+    final ruckIdInt = int.tryParse(ruckId);
+    if (ruckIdInt == null) {
+      debugPrint('[SOCIAL_DEBUG] Invalid ruckId format: ${event.ruckId}');
+      emit(CommentActionError('Invalid ruck ID format'));
+      return;
+    }
+    
+    // Store the content for optimistic update
+    final commentContent = event.content;
+    
     try {
-      // Add the new comment
+      emit(CommentActionInProgress());
+      
+      // First, get current comment count for optimistic update
+      final currentComments = await _socialRepository.getRuckComments(ruckId);
+      final currentCount = currentComments.length;
+      final newCount = currentCount + 1; // Optimistically assume comment will be added successfully
+      
+      // Optimistically update the comment count BEFORE the API call completes
+      // This ensures the UI updates immediately
+      debugPrint('[SOCIAL_DEBUG] Optimistically updating comment count to $newCount');
+      emit(CommentCountUpdated(ruckId: ruckIdInt, count: newCount));
+      
+      // Now actually add the comment to the backend
       final newComment = await _socialRepository.addRuckComment(
-        event.ruckId,
-        event.content,
+        ruckId,
+        commentContent,
       );
       
       debugPrint('[SOCIAL_DEBUG] Successfully added comment ${newComment.id}');
       
-      // Fetch updated comments list
-      final comments = await _socialRepository.getRuckComments(event.ruckId);      
-      debugPrint('[SOCIAL_DEBUG] Fetched ${comments.length} comments');
+      // Fetch actual updated comments list to confirm the update
+      final updatedComments = await _socialRepository.getRuckComments(ruckId);      
+      final actualCount = updatedComments.length;
       
-      // Emit the completed action and updated comments
+      debugPrint('[SOCIAL_DEBUG] Verified comment count: $actualCount');
+      
+      // Emit the completed action
       emit(CommentActionCompleted(comment: newComment, actionType: 'add'));
-      emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
       
-      // Also update comment count for all screens
-      _updateCommentCount(event.ruckId, comments.length, emit);
+      // Emit updated comments
+      emit(CommentsLoaded(comments: updatedComments, ruckId: ruckId));
+      
+      // Emit the actual comment count in case our optimistic count was wrong
+      if (actualCount != newCount) {
+        debugPrint('[SOCIAL_DEBUG] Correcting optimistic comment count from $newCount to $actualCount');
+        _updateCommentCount(ruckId, actualCount, emit);
+      }
+      
+      // Extra protection: emit the comment count update again after a tiny delay
+      // This helps ensure that even widgets that may be temporarily inactive receive the update
+      await Future.delayed(const Duration(milliseconds: 300));
+      debugPrint('[SOCIAL_DEBUG] Re-emitting CommentCountUpdated after delay with count: $actualCount');
+      _updateCommentCount(ruckId, actualCount, emit);
     } on Exception catch (e) {
       debugPrint('[SOCIAL_DEBUG] Error adding comment: $e');
+      
+      // If error occurs, revert the optimistic update by fetching the actual count
+      try {
+        final revertComments = await _socialRepository.getRuckComments(ruckId);
+        final actualCount = revertComments.length;
+        debugPrint('[SOCIAL_DEBUG] Reverting to actual comment count: $actualCount after error');
+        _updateCommentCount(ruckId, actualCount, emit);
+      } catch (_) {
+        // If we can't get the actual count, just indicate the error
+        debugPrint('[SOCIAL_DEBUG] Unable to revert comment count after error');
+      }
+      
       emit(CommentActionError(e.toString()));
     }
   }
@@ -468,49 +487,55 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     BatchCheckUserLikeStatus event,
     Emitter<SocialState> emit,
   ) async {
-    if (event.ruckIds.isEmpty) return;
-    
-    debugPrint('[SOCIAL_DEBUG] BatchCheckUserLikeStatus called for ${event.ruckIds.length} rucks');
-    
+    debugPrint('[SOCIAL_BLOC_DEBUG] _onBatchCheckUserLikeStatus called for ${event.ruckIds.length} rucks');
+    if (event.ruckIds.isEmpty) {
+      // If current state is not BatchLikeStatusChecked, emit an empty one to avoid breaking UI
+      // or ensure UI handles SocialInitial or other states gracefully.
+      if (state is! BatchLikeStatusChecked) {
+         emit(const BatchLikeStatusChecked({}, likeCountMap: {}));
+      }
+      return;
+    }
+
     try {
-      // Use the repository's batch method to efficiently check multiple rucks
+      // Assuming batchCheckUserLikes returns a structure like:
+      // {'likeStatus': Map<int, bool>, 'likeCounts': Map<int, int>}
+      // You might need to adjust this based on your actual repository method.
       final result = await _socialRepository.batchCheckUserLikes(event.ruckIds);
       
-      // Handle potentially null maps safely
-      final Map<int, bool> likeStatusMap = result['likeStatus'] != null ? 
-          Map<int, bool>.from(result['likeStatus'] as Map) : {};
+      // Ensure result is not null and contains the expected keys
+      final Map<int, bool> likeStatusMap = result['likeStatus'] as Map<int, bool>? ?? {}; 
+      final Map<int, int> likeCountMap = result['likeCounts'] as Map<int, int>? ?? {};
+
+      debugPrint('[SOCIAL_BLOC_DEBUG] Batch check result: Statuses count: ${likeStatusMap.length}, Counts count: ${likeCountMap.length}');
       
-      final Map<int, int> likeCountMap = result['likeCounts'] != null ? 
-          Map<int, int>.from(result['likeCounts'] as Map) : {};
-      
-      debugPrint('[SOCIAL_DEBUG] Batch like status check completed for ${likeStatusMap.length} rucks');
-      debugPrint('[SOCIAL_DEBUG] Final processed like statuses: $likeStatusMap');
-      debugPrint('[SOCIAL_DEBUG] Final processed like counts: $likeCountMap');
-      
-      // Process each ruck ID individually to make sure the state changes are registered properly
-      // This ensures multiple heart icons update correctly across different UI components
-      for (final ruckId in event.ruckIds) {
-        if (likeStatusMap.containsKey(ruckId)) {
-          final isLiked = likeStatusMap[ruckId] ?? false;
-          final likeCount = likeCountMap[ruckId] ?? 0;
-          
-          // Emit individual status updates first so listeners can react
-          emit(LikeStatusChecked(ruckId: ruckId, isLiked: isLiked, likeCount: likeCount));
-          debugPrint('[SOCIAL_DEBUG] Emitted individual status for ruck $ruckId: isLiked=$isLiked, count=$likeCount');
-        }
+      // Merge with existing batch state if present, to preserve data for other rucks not in this batch
+      Map<int, bool> finalStatusMap = {};
+      Map<int, int> finalCountMap = {};
+
+      if (state is BatchLikeStatusChecked) {
+        final currentBatchState = state as BatchLikeStatusChecked;
+        finalStatusMap.addAll(currentBatchState.likeStatusMap);
+        finalCountMap.addAll(currentBatchState.likeCountMap);
       }
       
-      // Now emit the batch update for components that listen to the batch event
-      emit(BatchLikeStatusChecked(likeStatusMap, likeCountMap: likeCountMap));
-    } on UnauthorizedException catch (e) {
-      debugPrint('[SOCIAL_DEBUG] Authentication error checking batch like status: ${e.message}');
-      // Don't emit error state as this is a background operation
-    } on ServerException catch (e) {
-      debugPrint('[SOCIAL_DEBUG] Server error checking batch like status: ${e.message}');
-      // Don't emit error state as this is a background operation
+      // Update with new data from this batch
+      finalStatusMap.addAll(likeStatusMap);
+      finalCountMap.addAll(likeCountMap);
+      
+      emit(BatchLikeStatusChecked(finalStatusMap, likeCountMap: finalCountMap));
     } catch (e) {
-      debugPrint('[SOCIAL_DEBUG] Unknown error checking batch like status: $e');
-      // Don't emit error state as this is a background operation
+      debugPrint('[SOCIAL_BLOC_DEBUG] Error in _onBatchCheckUserLikeStatus: $e');
+      // Decide on error state: emit a specific BatchLikeError, or a general LikesError,
+      // or just log and potentially emit an empty/previous state to avoid breaking UI.
+      // For now, just log and emit an empty BatchLikeStatusChecked if no prior batch state exists.
+      if (state is! BatchLikeStatusChecked) {
+         emit(const BatchLikeStatusChecked({}, likeCountMap: {}));
+      }
+      // Optionally, emit a more specific error state if needed for UI feedback.
+      // emit(LikesError('Failed to batch check like statuses: $e'));
     }
   }
+
+  /// Handler for checking if current user has liked a ruck
 }
