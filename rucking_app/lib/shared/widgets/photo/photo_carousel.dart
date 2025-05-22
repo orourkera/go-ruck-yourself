@@ -148,7 +148,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         }
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 8.0),
+        margin: const EdgeInsets.only(right: 10.0, top: 8.0, bottom: 8.0),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15.0),
           boxShadow: [
