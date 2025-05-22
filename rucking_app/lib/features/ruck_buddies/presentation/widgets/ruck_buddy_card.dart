@@ -282,7 +282,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // User Info Header
+                    // User Info Header with Distance
                     Row(
                       children: [
                         _buildAvatar(widget.ruckBuddy.user),
@@ -307,7 +307,32 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                             ],
                           ),
                         ),
-                        // Weight removed from header to avoid duplication with map overlay
+                        // Distance stat in header
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.route,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                formattedDistance,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     
@@ -322,7 +347,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                     // Photos Carousel (directly after map with minimal spacing)
                     if (_photos.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
+                        padding: const EdgeInsets.only(top: 5.0),
                         child: PhotoCarousel(
                           photoUrls: _getProcessedPhotoUrls(_photos),
                           height: 140,
@@ -341,42 +366,61 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                         ),
                       ),
                     
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     
-                    // Stats Grid
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatTile(
-                              context: context,
-                              icon: Icons.route,
-                              label: 'Distance',
-                              value: formattedDistance,
-                              compact: true,
+                    // Stats in a 2x2 grid layout
+                    Column(
+                      children: [
+                        // First row: Time and Elevation
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildStatTile(
+                                context: context,
+                                icon: Icons.timer,
+                                label: 'Time',
+                                value: formattedDuration,
+                                compact: true,
+                              ),
                             ),
-                          ),
-                          Expanded(
-                            child: _buildStatTile(
-                              context: context,
-                              icon: Icons.timer,
-                              label: 'Time',
-                              value: formattedDuration,
-                              compact: true,
+                            Expanded(
+                              child: _buildStatTile(
+                                context: context,
+                                icon: Icons.trending_up,
+                                label: 'Elevation',
+                                value: formattedElevation,
+                                compact: true,
+                              ),
                             ),
-                          ),
-                          Expanded(
-                            child: _buildStatTile(
-                              context: context,
-                              icon: Icons.trending_up,
-                              label: 'Elevation',
-                              value: formattedElevation,
-                              compact: true,
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 8),
+                        
+                        // Second row: Pace and Calories
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildStatTile(
+                                context: context,
+                                icon: Icons.speed,
+                                label: 'Pace',
+                                value: formattedPace,
+                                compact: true,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                            Expanded(
+                              child: _buildStatTile(
+                                context: context,
+                                icon: Icons.local_fire_department,
+                                label: 'Calories',
+                                value: formattedCalories,
+                                compact: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                     
                     const SizedBox(height: 8),
@@ -455,10 +499,22 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           },
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.chat_bubble, // Solid icon instead of outline
-                                color: AppColors.secondary, // Orange color from app theme
-                                size: 48, // Larger size to match like icon
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // White outline version of chat bubble
+                                  Icon(
+                                    Icons.chat_bubble_outline,
+                                    color: Colors.white,
+                                    size: 40, // Exactly 40px as requested
+                                  ),
+                                  // Slightly smaller solid icon to create a white outline effect
+                                  Icon(
+                                    Icons.chat_bubble,
+                                    color: AppColors.secondary,
+                                    size: 36,
+                                  ),
+                                ],
                               ),
                               const SizedBox(width: 4),
                               Text(
@@ -485,25 +541,28 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   }
 
   Widget _buildAvatar(UserInfo? user) {
+    // Increased size from 40 to 60 (50% larger)
+    final double avatarSize = 60.0;
+    final double borderRadius = 30.0; // Adjusted border radius
+  
     if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(borderRadius),
         child: CachedNetworkImage(
           imageUrl: user.photoUrl!,
-          width: 40,
-          height: 40,
+          width: avatarSize,
+          height: avatarSize,
           fit: BoxFit.cover,
           placeholder: (context, url) => Container(
-            width: 40,
-            height: 40,
-            color: Colors.grey[300],
+            width: avatarSize,
+            height: avatarSize,
             child: const Center(child: CircularProgressIndicator()),
           ),
           errorWidget: (context, url, error) => Container(
-            width: 40,
-            height: 40,
+            width: avatarSize,
+            height: avatarSize,
             padding: const EdgeInsets.all(4),
-            color: Colors.grey[300],
+            // No background color
             child: Image.asset(
               user.gender?.toLowerCase() == 'female' 
                 ? 'assets/images/lady rucker profile.png'
@@ -515,12 +574,12 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
       );
     } else {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(borderRadius),
         child: Container(
-          width: 40,
-          height: 40,
+          width: avatarSize,
+          height: avatarSize,
           padding: const EdgeInsets.all(4),
-          color: AppColors.secondary.withOpacity(0.2),
+          // No background color
           child: Image.asset(
             user?.gender?.toLowerCase() == 'female' 
               ? 'assets/images/lady rucker profile.png'
@@ -529,7 +588,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           ),
         ),
       );
-    }
+    }  
   }
 
   String _formatCompletedDate(DateTime? completedAt) {

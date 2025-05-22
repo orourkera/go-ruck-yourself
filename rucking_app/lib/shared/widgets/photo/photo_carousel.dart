@@ -48,7 +48,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 0, viewportFraction: 0.85);
+    _pageController = PageController(initialPage: 0, viewportFraction: 0.5);
   }
   
   @override
