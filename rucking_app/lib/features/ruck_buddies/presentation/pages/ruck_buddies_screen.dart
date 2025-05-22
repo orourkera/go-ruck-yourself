@@ -42,6 +42,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
   }
   
   // Batch check likes for all displayed ruck buddies to avoid rate limiting
+  // Use an efficient caching strategy to minimize API calls
   void _batchCheckLikes(List<RuckBuddy> ruckBuddies) {
     if (ruckBuddies.isEmpty) return;
     
@@ -52,7 +53,13 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       if (id != null) ruckIds.add(id);
     }
     
-    if (ruckIds.isNotEmpty) {
+    if (ruckIds.isEmpty) return;
+    
+    // Implement a local debounce mechanism to avoid multiple rapid calls
+    // Use a small microtask delay to ensure all rucks are collected before making API call
+    Future.microtask(() {
+      if (!mounted) return;
+      
       debugPrint('🐞 [_RuckBuddiesScreenState._batchCheckLikes] Batch checking ${ruckIds.length} rucks');
       try {
         // Use the batch checking method instead of individual checks
@@ -62,7 +69,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
         debugPrint('❌ Error batch checking likes: $e');
         // We don't need to show an error to the user for this background operation
       }
-    }
+    });
   }
   
   void _preloadDemoImages() {
@@ -139,75 +146,104 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Ruck Buddies'),
-        elevation: 0,
         actions: [
-          // Refresh button
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.info_outline),
             onPressed: () {
-              context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+              // TODO: Show info dialog explaining Ruck Buddies feature
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Ruck Buddies feature info'))
+              );
             },
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          debugPrint('🐞 [_RuckBuddiesScreenState.build] RefreshIndicator onRefresh triggered');
-          context.read<RuckBuddiesBloc>().add(RefreshRuckBuddiesEvent());
-        },
-        child: BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
-          builder: (context, state) {
-            debugPrint('🐞 [_RuckBuddiesScreenState.build] Current state: ${state.runtimeType}');
-            if (state is RuckBuddiesInitial) {
-              debugPrint('🐞 [_RuckBuddiesScreenState.build] State is Initial. Dispatch fetch.');
-              context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
-              return const Center(child: CircularProgressIndicator());
-            } else if (state is RuckBuddiesLoading) {
-              debugPrint('🐞 [_RuckBuddiesScreenState.build] State is Loading');
-              return const Center(child: CircularProgressIndicator());
-            } else if (state is RuckBuddiesLoaded) {
-              debugPrint('🐞 [_RuckBuddiesScreenState.build] State is Loaded. ${state.ruckBuddies.length} buddies');
-              
-              // IMPORTANT: Batch check likes for all ruck buddies to prevent duplicate API calls
-              if (state.ruckBuddies.isNotEmpty) {
-                // Schedule this for after the current build cycle to avoid triggering another rebuild
-                Future.delayed(Duration.zero, () {
-                  if (mounted) {
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Filter chips for sorting
+            BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
+              builder: (context, state) {
+                // Default filter is 'closest'
+                String currentFilter = 'closest';
+                
+                // Extract current filter from state if available
+                if (state is RuckBuddiesLoaded) {
+                  currentFilter = state.filter;
+                }
+                
+                return FilterChipGroup(
+                  selectedFilter: currentFilter,
+                  onFilterSelected: (filter) {
+                    // Clear existing data and load with new filter
+                    context.read<RuckBuddiesBloc>().add(FilterRuckBuddiesEvent(filter: filter));
+                  },
+                );
+              },
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Main content area
+            Expanded(
+              child: BlocConsumer<RuckBuddiesBloc, RuckBuddiesState>(
+                listenWhen: (previous, current) {
+                  // Only trigger batch check when new data is loaded (not on loading states)
+                  return (current is RuckBuddiesLoaded && 
+                         (previous is! RuckBuddiesLoaded || 
+                          current.ruckBuddies.length != (previous as RuckBuddiesLoaded).ruckBuddies.length));
+                },
+                listener: (context, state) {
+                  // Only perform batch check when we have loaded data
+                  if (state is RuckBuddiesLoaded && state.ruckBuddies.isNotEmpty) {
+                    debugPrint('🐞 [RuckBuddiesScreen] Data loaded, checking likes in batch');
                     _batchCheckLikes(state.ruckBuddies);
                   }
-                });
-              }
-              
-              // Don't show empty state if we're still loading
-              if (state.ruckBuddies.isEmpty && !state.isLoadingMore) {
-                return EmptyState(
-                  icon: Icons.group_off,
-                  title: 'No Ruck Buddies Yet',
-                  message: 'Looks like there are no ruck buddies to show right now.',
-                  action: ElevatedButton(
-                    onPressed: () {
-                      context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
-                    },
-                    child: const Text('Refresh'),
-                  ),
-                );
-              }
-              
-              return _buildRuckBuddiesList(state.ruckBuddies, state.isLoadingMore);
-            } else if (state is RuckBuddiesError) {
-              debugPrint('🐞 [_RuckBuddiesScreenState.build] State is Error: ${state.message}');
-              return ErrorDisplay(
-                message: state.message,
-                onRetry: () {
-                  debugPrint('🐞 [_RuckBuddiesScreenState.build] Error retry button pressed');
-                  context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
                 },
-              );
-            }
-            
-            debugPrint('🐞 [_RuckBuddiesScreenState.build] State is unknown: ${state.runtimeType}');
-            return const Center(child: CircularProgressIndicator());
-          },
+                builder: (context, state) {
+                  debugPrint('🐞 [_RuckBuddiesScreenState.build] BlocBuilder state: ${state.runtimeType}');
+                  
+                  // Handle initial and loading states
+                  if (state is RuckBuddiesInitial || state is RuckBuddiesLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  } 
+                  // Handle loaded state with data
+                  else if (state is RuckBuddiesLoaded) {
+                    final ruckBuddies = state.ruckBuddies;
+                    final isLoadingMore = state.isLoadingMore;
+                    
+                    if (ruckBuddies.isEmpty) {
+                      return EmptyState(
+                        title: 'No Ruck Buddies Yet',
+                        message: 'Be the first to share your rucks with the community!',
+                        // TODO: Update with actual sharing instructions
+                        action: ElevatedButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Sharing feature coming soon!'))
+                            );
+                          },
+                          child: const Text('Share Your Rucks'),
+                        ),
+                      );
+                    }
+                    
+                    return _buildRuckBuddiesList(ruckBuddies, isLoadingMore);
+                  } else if (state is RuckBuddiesError) {
+                    return ErrorDisplay(
+                      message: state.message,
+                      onRetry: () {
+                        context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+                      },
+                    );
+                  }
+                  
+                  // Fallback
+                  return const Center(child: CircularProgressIndicator());
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
