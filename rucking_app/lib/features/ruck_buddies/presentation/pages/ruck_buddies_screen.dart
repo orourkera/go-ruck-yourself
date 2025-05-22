@@ -65,11 +65,41 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
         // Use the batch checking method instead of individual checks
         // This reduces API calls and avoids rate limiting
         context.read<SocialBloc>().add(BatchCheckUserLikeStatus(ruckIds));
+        
+        // Also load comments for each ruck to get the comment counts
+        _batchLoadCommentCounts(ruckIds);
       } catch (e) {
         debugPrint('❌ Error batch checking likes: $e');
         // We don't need to show an error to the user for this background operation
       }
     });
+  }
+  
+  /// Fetches comment counts for all rucks
+  /// This is needed to display comment counts on RuckBuddyCards
+  void _batchLoadCommentCounts(List<int> ruckIds) {
+    if (ruckIds.isEmpty) return;
+    
+    debugPrint('🐞 [_RuckBuddiesScreenState._batchLoadCommentCounts] Loading comment counts for ${ruckIds.length} rucks');
+    
+    // Process in small batches to avoid rate limiting
+    const batchSize = 5;
+    
+    for (int i = 0; i < ruckIds.length; i += batchSize) {
+      // Create a sublist for this batch
+      final end = (i + batchSize < ruckIds.length) ? i + batchSize : ruckIds.length;
+      final batch = ruckIds.sublist(i, end);
+      
+      // Add a small delay between batches to prevent rate limiting
+      Future.delayed(Duration(milliseconds: i > 0 ? 500 : 0), () {
+        if (!mounted) return;
+        
+        // Load comments for each ruck in this batch
+        for (final ruckId in batch) {
+          context.read<SocialBloc>().add(LoadRuckComments(ruckId.toString()));
+        }
+      });
+    }
   }
   
   void _preloadDemoImages() {

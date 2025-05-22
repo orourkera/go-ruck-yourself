@@ -273,6 +273,7 @@ class SocialRepository {
       
       try {
         // First check batch like status (if user liked these rucks)
+        // Use the existing endpoint structure
         final batchLikeStatusUrl = '${AppConfig.apiBaseUrl}/ruck-likes/check/batch?ids=$ruckIdsStr';
         debugPrint('[SOCIAL_DEBUG] Batch like status URL: $batchLikeStatusUrl');
         
@@ -332,12 +333,28 @@ class SocialRepository {
         // Skip trying to use it and directly use the fallback method
         debugPrint('[SOCIAL_DEBUG] Skipping non-existent batch count endpoint and using fallback method');
         await _fallbackBatchLikeCountCheck(uncachedRuckIds, likeCountMap, token);
+        
+        // Debug the final maps that will be returned to show what we're providing to the UI
+        debugPrint('[SOCIAL_DEBUG] FINAL Like Status Map: $likeStatusMap, size: ${likeStatusMap.length}');
+        debugPrint('[SOCIAL_DEBUG] FINAL Like Count Map: $likeCountMap, size: ${likeCountMap.length}');
+        
+        // Double-check that we have like counts for all the requested ruckIds
+        final missingCountIds = ruckIds.where((id) => !likeCountMap.containsKey(id)).toList();
+        if (missingCountIds.isNotEmpty) {
+          debugPrint('[SOCIAL_DEBUG] ⚠️ Missing like counts for these rucks: $missingCountIds');
+          
+          // Ensure we at least have 0 counts for all rucks to avoid UI issues
+          for (final missingId in missingCountIds) {
+            likeCountMap[missingId] = 0;
+            debugPrint('[SOCIAL_DEBUG] Added default count 0 for ruck $missingId');
+          }
+        }
       } catch (e) {
         debugPrint('[SOCIAL_DEBUG] Error during batch API calls: $e. Falling back for both status and count.');
         // Fallback for status if not already populated
         List<int> statusFallbackNeeded = uncachedRuckIds.where((id) => !likeStatusMap.containsKey(id)).toList();
         if (statusFallbackNeeded.isNotEmpty) {
-           await _fallbackBatchLikeStatusCheck(statusFallbackNeeded, likeStatusMap, token);
+          await _fallbackBatchLikeStatusCheck(statusFallbackNeeded, likeStatusMap, token);
         }
         // Fallback for counts if not already populated
         List<int> countFallbackNeeded = uncachedRuckIds.where((id) => !likeCountMap.containsKey(id)).toList();
@@ -569,34 +586,47 @@ class SocialRepository {
   /// Returns the like count for the ruck, or null on error
   Future<int?> _fallbackSingleRuckLikeCount(int ruckId, String token) async {
     try {
-      debugPrint('[SOCIAL_DEBUG] Individual check for like count of ruck $ruckId');
+      final url = '${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId';
+      debugPrint('[SOCIAL_DEBUG] Individual check for like count of ruck $ruckId, URL: $url');
+      
       final response = await _httpClient.get(
-        Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       ).timeout(const Duration(seconds: 5));
 
+      debugPrint('[SOCIAL_DEBUG] Like count API response for ruck $ruckId: ${response.statusCode}');
+      
       if (response.statusCode == 200) {
+        // Log the full response for debugging
+        debugPrint('[SOCIAL_DEBUG] Like count response body: ${response.body}');
+        
         final Map<String, dynamic> data = json.decode(response.body);
+        debugPrint('[SOCIAL_DEBUG] Like count data format check - success: ${data['success']}, data type: ${data['data']?.runtimeType}');
+        
         if (data['success'] == true && data['data'] is List) {
           final count = (data['data'] as List).length;
           debugPrint('[SOCIAL_DEBUG] Like count for ruck $ruckId: $count');
           return count;
+        } else {
+          debugPrint('[SOCIAL_DEBUG] Invalid data format in like count response for ruck $ruckId');
         }
         return 0;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
+        debugPrint('[SOCIAL_DEBUG] Unauthorized request for like count of ruck $ruckId');
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 429) {
-        debugPrint('[SOCIAL_DEBUG] Rate limit hit for ruck $ruckId: ${response.statusCode}');
+        debugPrint('[SOCIAL_DEBUG] Rate limit hit for like count of ruck $ruckId: ${response.statusCode}');
         return null; // Return null on rate limit
       } else {
+        debugPrint('[SOCIAL_DEBUG] Server error for like count of ruck $ruckId: ${response.statusCode} - ${response.body}');
         throw ServerException(
             message: 'Failed to get like count: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('[SOCIAL_DEBUG] Error in _fallbackSingleRuckLikeCount: $e');
+      debugPrint('[SOCIAL_DEBUG] Error in _fallbackSingleRuckLikeCount for ruck $ruckId: $e');
       return null; // Return null on error
     }
   }
@@ -609,7 +639,7 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      // Revert to the original endpoint structure
+      // Use the existing endpoint structure
       final endpoint = '${AppConfig.apiBaseUrl}/ruck-comments?ruck_id=$ruckId';
       debugPrint('[SOCIAL_DEBUG] Getting comments for ruckId $ruckId, endpoint: $endpoint');
 

@@ -6,12 +6,14 @@ import 'package:rucking_app/features/ruck_buddies/data/repositories/ruck_buddies
 import 'package:rucking_app/features/ruck_buddies/domain/repositories/ruck_buddies_repository.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/usecases/get_ruck_buddies.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
+import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
 
 void initRuckBuddiesFeature(GetIt sl) {
   // Bloc
   sl.registerFactory(
     () => RuckBuddiesBloc(
       getRuckBuddies: sl(),
+      socialRepository: sl(),
     ),
   );
 
