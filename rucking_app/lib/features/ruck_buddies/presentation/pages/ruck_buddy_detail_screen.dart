@@ -496,28 +496,10 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Weight and duration row
+                      // Duration row
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Weight
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondary,
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Text(
-                              MeasurementUtils.formatWeight(
-                                widget.ruckBuddy.ruckWeightKg,
-                                metric: preferMetric,
-                              ),
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
                           // Duration
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
