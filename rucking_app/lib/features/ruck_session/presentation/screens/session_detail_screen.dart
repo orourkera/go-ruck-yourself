@@ -256,12 +256,22 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     return Card(
       color: Theme.of(context).primaryColor.withOpacity(0.08),
       elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      // Double the size of the heart rate stat cards with larger padding
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        width: 90, // Make the cards wider
         child: Column(
           children: [
             Text(label, style: AppTextStyles.bodySmall),
-            Text(value, style: AppTextStyles.headlineMedium),
+            const SizedBox(height: 4),
+            Text(
+              value, 
+              style: AppTextStyles.headlineMedium.copyWith(
+                fontSize: 30, // Larger font for the heart rate value
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
             Text(unit, style: AppTextStyles.bodySmall),
           ],
         ),
@@ -698,138 +708,151 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     ],
                     
                     Builder(builder: (context) {
-                      // Log all heart rate data for debugging
-                      AppLogger.debug('[HEARTRATE DEBUG RENDER] About to render heart rate section with:');
-                      AppLogger.debug('[HEARTRATE DEBUG RENDER] avgHeartRate: ${widget.session.avgHeartRate}');
-                      AppLogger.debug('[HEARTRATE DEBUG RENDER] maxHeartRate: ${widget.session.maxHeartRate}');
-                      AppLogger.debug('[HEARTRATE DEBUG RENDER] minHeartRate: ${widget.session.minHeartRate}');
-                      AppLogger.debug('[HEARTRATE DEBUG RENDER] Has samples: ${widget.session.heartRateSamples != null}');
-                      // Log heart rate data for debugging
-                      AppLogger.debug('[HEARTRATE DEBUG RENDER] Checking session ID: ${widget.session.id}');
-                      
+                      // Heart rate debug logging
+                      AppLogger.debug('[HEARTRATE DEBUG] avgHeartRate: ${widget.session.avgHeartRate}');
+                      AppLogger.debug('[HEARTRATE DEBUG] maxHeartRate: ${widget.session.maxHeartRate}');
+                      AppLogger.debug('[HEARTRATE DEBUG] minHeartRate: ${widget.session.minHeartRate}');
                       if (widget.session.heartRateSamples != null) {
-                        AppLogger.debug('[HEARTRATE DEBUG RENDER] Sample count: ${widget.session.heartRateSamples!.length}');
-                      } else {
-                        AppLogger.debug('[HEARTRATE DEBUG RENDER] HeartRateSamples is null');
+                        AppLogger.debug('[HEARTRATE DEBUG] Sample count: ${widget.session.heartRateSamples!.length}');
                       }
                       
-                      // IMPORTANT: We've removed the hasHeartRateData check completely
-                      // because it was incorrectly hiding the heart rate section
-                      // The heart rate chart already has internal logic to show a placeholder
-                      // if there are no samples, and the stat cards have their own visibility checks
-                      
-                      AppLogger.debug('[HEARTRATE DEBUG RENDER] Always showing heart rate section container');
-                      
-                      // Always show the heart rate card regardless of data availability
-                      return _buildStatCard(
-                        context,
-                        'Heart Rate',
-                        [
-                          if (widget.session.avgHeartRate != null && widget.session.avgHeartRate! > 0 || (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty)) 
-                            _buildStatItem(
-                              context,
-                              'Average HR',
-                              '${widget.session.avgHeartRate ?? _calculateAvgHeartRate(widget.session.heartRateSamples ?? [])} bpm',
-                              Icons.favorite,
-                              iconColor: AppColors.error // Or a more neutral/positive color like Colors.pinkAccent
+                      // Heart rate section with Bangers font and no card container
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Title with Bangers font
+                            Text(
+                              'HEART RATE',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontFamily: 'Bangers',
+                                color: const Color(0xFF3E2723),
+                                letterSpacing: 1.0,
+                              ),
                             ),
-                          if (widget.session.maxHeartRate != null && widget.session.maxHeartRate! > 0 || (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty))
-                            _buildStatItem(
-                              context,
-                              'Max HR',
-                              '${widget.session.maxHeartRate ?? _calculateMaxHeartRate(widget.session.heartRateSamples ?? [])} bpm',
-                              Icons.whatshot, // Alternative: Icons.arrow_upward or FontAwesomeIcons.heartPulse
-                              iconColor: AppColors.error // Or a specific color for max HR
-                            ),
-                          if (_getMinHeartRate(widget.session) != null)
-                            _buildStatItem(
-                              context,
-                              'Min HR',
-                              '${_getMinHeartRate(widget.session)} bpm',
-                              Icons.arrow_downward, // Alternative: FontAwesomeIcons.heartbeat with a different style
-                              iconColor: Colors.blueAccent // Or a specific color for min HR
-                            ),
-                          // Heart rate section with stats and graph
-                          BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
-                            buildWhen: (previous, current) {
-                              // Only rebuild when the session contains heart rate samples
-                              if (current is SessionSummaryGenerated) {
-                                return current.session.heartRateSamples != null;
-                              }
-                              return false;
-                            },
-                            builder: (context, state) {
-                              // Get heart rate samples from the updated state if available
-                              List<HeartRateSample>? heartRateSamples = widget.session.heartRateSamples;
-                              int? avgHeartRate = widget.session.avgHeartRate;
-                              int? maxHeartRate = widget.session.maxHeartRate;
-                              int? minHeartRate = widget.session.minHeartRate;
+                            const SizedBox(height: 12),
+                            
+                            // Average HR stat item
+                            if (widget.session.avgHeartRate != null && widget.session.avgHeartRate! > 0 || 
+                                (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty))
+                              _buildStatItem(
+                                context,
+                                'Average HR',
+                                '${widget.session.avgHeartRate ?? _calculateAvgHeartRate(widget.session.heartRateSamples ?? [])} bpm',
+                                Icons.favorite,
+                                iconColor: AppColors.error
+                              ),
                               
-                              // Check if we have updated session data in the state
-                              if (state is SessionSummaryGenerated && state.session.id == widget.session.id) {
-                                if (state.session.heartRateSamples != null && state.session.heartRateSamples!.isNotEmpty) {
-                                  heartRateSamples = state.session.heartRateSamples;
-                                  avgHeartRate = state.session.avgHeartRate;
-                                  maxHeartRate = state.session.maxHeartRate;
-                                  minHeartRate = state.session.minHeartRate;
-                                  AppLogger.debug('[HEARTRATE_DEBUG] Using ${heartRateSamples!.length} heart rate samples from updated state');
+                            // Max HR stat item
+                            if (widget.session.maxHeartRate != null && widget.session.maxHeartRate! > 0 || 
+                                (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty))
+                              _buildStatItem(
+                                context,
+                                'Max HR',
+                                '${widget.session.maxHeartRate ?? _calculateMaxHeartRate(widget.session.heartRateSamples ?? [])} bpm',
+                                Icons.whatshot,
+                                iconColor: AppColors.error
+                              ),
+                              
+                            // Min HR stat item
+                            if (_getMinHeartRate(widget.session) != null)
+                              _buildStatItem(
+                                context,
+                                'Min HR',
+                                '${_getMinHeartRate(widget.session)} bpm',
+                                Icons.arrow_downward,
+                                iconColor: Colors.blueAccent
+                              ),
+                              
+                            // Heart rate graph
+                            BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                              buildWhen: (previous, current) {
+                                if (current is SessionSummaryGenerated) {
+                                  return current.session.heartRateSamples != null;
                                 }
-                              }
-                              
-                              // Create a safe list that's never null - must be outside the widget tree
-                              final List<HeartRateSample> safeHeartRateSamples = heartRateSamples ?? [];
-                              final bool showHeartRateGraph = widget.session.id == 744 || safeHeartRateSamples.isNotEmpty;
-                              
-                              return Column(
-                                children: [
-                                  // Heart rate stat cards
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      _buildHeartRateStatCard('Avg', avgHeartRate?.toString() ?? '--', 'bpm'),
-                                      _buildHeartRateStatCard('Max', maxHeartRate?.toString() ?? '--', 'bpm'),
-                                      _buildHeartRateStatCard('Min', minHeartRate?.toString() ?? '--', 'bpm'),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // Heart rate graph with animation - show chart for session 744 or if samples exist
-                                  if (showHeartRateGraph)
-                                    SizedBox(
-                                      height: 180,
-                                      child: AnimatedHeartRateChart(
-                                        heartRateSamples: safeHeartRateSamples,
-                                        avgHeartRate: avgHeartRate,
-                                        maxHeartRate: maxHeartRate,
-                                        minHeartRate: minHeartRate,
-                                        totalDuration: widget.session.duration,
-                                        getLadyModeColor: (context) => Theme.of(context).primaryColor,
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      height: 150,
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(8.0),
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.timeline_outlined, size: 36, color: Colors.grey.shade400),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'No heart rate data available',
-                                            style: TextStyle(color: Colors.grey.shade600),
-                                          ),
-                                        ],
-                                      ),
+                                return false;
+                              },
+                              builder: (context, state) {
+                                // Get heart rate data
+                                List<HeartRateSample>? heartRateSamples = widget.session.heartRateSamples;
+                                int? avgHeartRate = widget.session.avgHeartRate;
+                                int? maxHeartRate = widget.session.maxHeartRate;
+                                int? minHeartRate = widget.session.minHeartRate;
+                                
+                                if (state is SessionSummaryGenerated && state.session.id == widget.session.id) {
+                                  if (state.session.heartRateSamples != null && state.session.heartRateSamples!.isNotEmpty) {
+                                    heartRateSamples = state.session.heartRateSamples;
+                                    avgHeartRate = state.session.avgHeartRate;
+                                    maxHeartRate = state.session.maxHeartRate;
+                                    minHeartRate = state.session.minHeartRate;
+                                  }
+                                }
+                                
+                                final List<HeartRateSample> safeHeartRateSamples = heartRateSamples ?? [];
+                                final bool showHeartRateGraph = widget.session.id == 744 || safeHeartRateSamples.isNotEmpty;
+                                
+                                return Column(
+                                  children: [
+                                    // Heart rate stat cards
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _buildHeartRateStatCard('Avg', avgHeartRate?.toString() ?? '--', 'bpm'),
+                                        _buildHeartRateStatCard('Max', maxHeartRate?.toString() ?? '--', 'bpm'),
+                                        _buildHeartRateStatCard('Min', minHeartRate?.toString() ?? '--', 'bpm'),
+                                      ],
                                     ),
-                                ],
-                              );
-                            },
-                          ),
-                        ],
+                                    const SizedBox(height: 12),
+                                    
+                                    // Heart rate graph - 50% taller with full width
+                                    if (showHeartRateGraph)
+                                      SizedBox(
+                                        height: 270,
+                                        width: double.infinity,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                          child: AnimatedHeartRateChart(
+                                            heartRateSamples: safeHeartRateSamples,
+                                            avgHeartRate: avgHeartRate,
+                                            maxHeartRate: maxHeartRate,
+                                            minHeartRate: minHeartRate,
+                                            totalDuration: widget.session.duration,
+                                            getLadyModeColor: (context) => Theme.of(context).primaryColor,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        height: 220,
+                                        width: double.infinity,
+                                        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade100,
+                                          borderRadius: BorderRadius.circular(12.0),
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.timeline_outlined, size: 48, color: Colors.grey.shade400),
+                                            const SizedBox(height: 16),
+                                            Text(
+                                              'No heart rate data available',
+                                              style: TextStyle(
+                                                color: Colors.grey.shade600,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       );
                     }),
                   ],
