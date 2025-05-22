@@ -1,4 +1,4 @@
-part of 'active_session_bloc.dart';
+part of active_session_bloc;
 
 abstract class ActiveSessionState extends Equatable {
   const ActiveSessionState();

@@ -1,3 +1,5 @@
+library active_session_bloc;
+
 import 'dart:async';
 import 'dart:convert'; // For JSON encoding/decoding
 import 'dart:io';
