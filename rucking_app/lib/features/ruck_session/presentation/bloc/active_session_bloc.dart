@@ -641,36 +641,66 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onFetchSessionPhotosRequested(
-      FetchSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
-    if (state is ActiveSessionRunning) {
-      final currentState = state as ActiveSessionRunning;
-      emit(currentState.copyWith(isPhotosLoading: true));
-      try {
-        final photos = await _sessionRepository.getSessionPhotos(currentState.sessionId);
+    FetchSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
+  String? sessionId;
+  bool isLoading = false;
+  
+  // Handle different states to fetch photos
+  if (state is ActiveSessionRunning) {
+    final currentState = state as ActiveSessionRunning;
+    emit(currentState.copyWith(isPhotosLoading: true));
+    sessionId = currentState.sessionId;
+    isLoading = true;
+  } else if (state is SessionSummaryGenerated) {
+    final currentState = state as SessionSummaryGenerated;
+    emit(currentState.copyWith(isPhotosLoading: true));
+    sessionId = currentState.session.id;
+    isLoading = true;
+  } else {
+    // If we have a session ID from the event, use that
+    sessionId = event.ruckId;
+  }
+  
+  // If we have a session ID, fetch photos
+  if (sessionId != null && sessionId.isNotEmpty) {
+    try {
+      final photos = await _sessionRepository.getSessionPhotos(sessionId);
+      
+      // Update the state based on the current state type
+      if (state is ActiveSessionRunning) {
+        final currentState = state as ActiveSessionRunning;
         emit(currentState.copyWith(photos: photos, isPhotosLoading: false));
-      } catch (e) {
-        AppLogger.error('Failed to fetch session photos: $e');
-        emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to load photos'));
+      } else if (state is SessionSummaryGenerated) {
+        final currentState = state as SessionSummaryGenerated;
+        emit(currentState.copyWith(photos: photos, isPhotosLoading: false));
       }
-    } else if (state is SessionSummaryGenerated) {
-      final currentState = state as SessionSummaryGenerated;
-      emit(currentState.copyWith(isPhotosLoading: true));
-       try {
-        // Add null check for session id
-        final sessionId = currentState.session.id;
-        if (sessionId == null) {
-          emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Session ID is missing'));
-          return;
-        }
-        
-        final photos = await _sessionRepository.getSessionPhotos(sessionId);
-        emit(currentState.copyWith(photos: photos, isPhotosLoading: false));
-      } catch (e) {
-        AppLogger.error('Failed to fetch session photos for summary: $e');
+      
+      // Always emit SessionPhotosLoadedForId state to ensure photos are accessible
+      // by components listening specifically for this state
+      emit(SessionPhotosLoadedForId(sessionId: sessionId, photos: photos));
+    } catch (e) {
+      AppLogger.error('Failed to fetch session photos: $e');
+      
+      // Update the error state based on the current state type
+      if (state is ActiveSessionRunning) {
+        final currentState = state as ActiveSessionRunning;
+        emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to load photos'));
+      } else if (state is SessionSummaryGenerated) {
+        final currentState = state as SessionSummaryGenerated;
         emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Failed to load photos'));
       }
     }
+  } else if (isLoading) {
+    // Handle missing session ID only for states that were set to loading
+    if (state is SessionSummaryGenerated) {
+      final currentState = state as SessionSummaryGenerated;
+      emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Session ID is missing'));
+    } else if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      emit(currentState.copyWith(isPhotosLoading: false, photosError: 'Session ID is missing'));
+    }
   }
+    }
 
   Future<void> _onUploadSessionPhotosRequested(
       UploadSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {

@@ -214,18 +214,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                 });
               }
             }
-            // Handle ActiveSessionLoaded state
-            else if (state is ActiveSessionLoaded && state.session.id == widget.ruckBuddy.id) {
-              final List<RuckPhoto> sessionPhotos = state.session.photos ?? [];
-              if (sessionPhotos.isNotEmpty) {
-                setState(() {
-                  _photos = sessionPhotos;
-                  developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from ActiveSessionLoaded: ${_photos.length}', name: 'RuckBuddyCard');
-                });
-              }
-            }
+            // We don't need to handle ActiveSessionLoaded since it doesn't exist in this bloc
             // Handle SessionPhotosLoadedForId state
-            else if (state is SessionPhotosLoadedForId && state.sessionId == widget.ruckBuddy.id) {
+            else if (state is SessionPhotosLoadedForId && state.sessionId.toString() == widget.ruckBuddy.id.toString()) {
               if (state.photos.isNotEmpty) {
                 setState(() {
                   _photos = state.photos;
