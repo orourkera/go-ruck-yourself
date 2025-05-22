@@ -47,12 +47,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   List<RuckPhoto> _photos = [];
   double _calculatedPace = 0.0;
   int? _ruckId;
+  int? _commentCount;  // Track comment count locally
 
   @override
   void initState() {
     super.initState();
     _ruckId = int.tryParse(widget.ruckBuddy.id);
     _likeCount = widget.ruckBuddy.likeCount;
+    _commentCount = widget.ruckBuddy.commentCount; // Initialize comment count
     _photos = widget.ruckBuddy.photos != null ? List<RuckPhoto>.from(widget.ruckBuddy.photos!) : [];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -237,24 +239,52 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         ),
         BlocListener<SocialBloc, SocialState>(
           listenWhen: (previous, current) {
-            if (_ruckId == null) return false;
-            return (current is LikeActionCompleted && _ruckId == current.ruckId) ||
-                (current is LikeStatusChecked && _ruckId == current.ruckId) ||
-                (current is LikesLoaded && _ruckId == current.ruckId) ||
-                (current is BatchLikeStatusChecked && current.likeStatusMap.containsKey(_ruckId));
+            final cardRuckId = int.tryParse(widget.ruckBuddy.id);
+            if (cardRuckId == null) {
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: Failed to parse ruckBuddy.id to int in listenWhen.');
+              return false;
+            }
+
+            if (current is CommentCountUpdated && current.ruckId == cardRuckId) {
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: listenWhen for CommentCountUpdated - TRUE');
+              return true;
+            }
+            if (current is LikeActionCompleted && current.ruckId == cardRuckId) {
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: listenWhen for LikeActionCompleted - TRUE');
+              return true;
+            }
+            if (current is LikeStatusChecked && current.ruckId == cardRuckId) {
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: listenWhen for LikeStatusChecked - TRUE');
+              return true;
+            }
+            // Default: don't rebuild for other states if not relevant
+            // debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: listenWhen for other state (${current.runtimeType}) - FALSE');
+            return false;
           },
           listener: (context, state) {
-            if (_ruckId == null) return;
+            final cardRuckId = int.tryParse(widget.ruckBuddy.id);
+            if (cardRuckId == null) {
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: Failed to parse ruckBuddy.id to int in listener.');
+              return;
+            }
 
-            if (state is LikeActionCompleted && state.ruckId == _ruckId) {
-              developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID ${state.ruckId} - LikeActionCompleted', name: 'RuckBuddyCard');
-              setState(() {
-                _isLiked = state.isLiked;
-                _likeCount = state.likeCount;
-                _isProcessingLike = false;
-              });
-            } else if (state is LikeActionError && state.ruckId == _ruckId) {
-              developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID ${state.ruckId} - LikeActionError: ${state.message}', name: 'RuckBuddyCard');
+            if (state is CommentCountUpdated && state.ruckId == cardRuckId) {
+              if (mounted) {
+                setState(() {
+                  _commentCount = state.count;
+                });
+              }
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: Listener reacted to CommentCountUpdated. New _commentCount: ${state.count}');
+            } else if (state is LikeActionCompleted && state.ruckId == cardRuckId) {
+              if (mounted) {
+                setState(() {
+                  _isLiked = state.isLiked;
+                  _likeCount = state.likeCount;
+                  _isProcessingLike = false;
+                });
+              }
+            } else if (state is LikeActionError && state.ruckId == cardRuckId) {
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: Listener reacted to LikeActionError: ${state.message}');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message.isNotEmpty ? state.message : 'Failed to like ruck. Please try again.'),
@@ -271,17 +301,17 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                 }
                 _isProcessingLike = false;
               });
-            } else if (state is LikesLoaded && state.ruckId == _ruckId) {
-              developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID ${state.ruckId} - LikesLoaded', name: 'RuckBuddyCard');
+            } else if (state is LikesLoaded && state.ruckId == cardRuckId) {
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: Listener reacted to LikesLoaded. New _likeCount: ${state.likes.length}');
               setState(() {
                 _isLiked = state.userHasLiked;
                 _likeCount = state.likes.length;
                 _isProcessingLike = false;
               });
-            } else if (state is BatchLikeStatusChecked && state.likeStatusMap.containsKey(_ruckId)) {
-              final isLiked = state.likeStatusMap[_ruckId] ?? false;
-              final likeCount = state.likeCountMap[_ruckId];
-              developer.log('RuckBuddyCard SocialBloc Listener: Ruck ID $_ruckId - BatchLikeStatusChecked, isLiked: $isLiked, likeCount: $likeCount', name: 'RuckBuddyCard');
+            } else if (state is BatchLikeStatusChecked && state.likeStatusMap.containsKey(cardRuckId)) {
+              final isLiked = state.likeStatusMap[cardRuckId] ?? false;
+              final likeCount = state.likeCountMap[cardRuckId];
+              debugPrint('[RUCK_BUDDY_CARD_DEBUG] RuckId ${widget.ruckBuddy.id}: Listener reacted to BatchLikeStatusChecked, isLiked: $isLiked, likeCount: $likeCount');
               setState(() {
                 _isLiked = isLiked;
                 if (likeCount != null) {
@@ -541,7 +571,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                             ),
                             const SizedBox(width: 2),
                             Text(
-                              '${widget.ruckBuddy.commentCount}',
+                              '${_commentCount ?? widget.ruckBuddy.commentCount}',
                               style: TextStyle(
                                 fontFamily: 'Bangers',
                                 fontSize: 20,

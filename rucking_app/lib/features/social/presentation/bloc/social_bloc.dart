@@ -309,16 +309,18 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     
     try {
       final comments = await _socialRepository.getRuckComments(event.ruckId);
-      
-      emit(CommentsLoaded(
-        comments: comments,
-        ruckId: event.ruckId,
-      ));
+      debugPrint('[SOCIAL_DEBUG] Comments API response: 200'); // Assuming success
+      emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
+      // Update the comment count so listeners like RuckBuddyCard can update
+      _updateCommentCount(event.ruckId, comments.length, emit);
     } on UnauthorizedException catch (e) {
+      debugPrint('[SOCIAL_DEBUG] Authentication error loading comments: ${e.message}');
       emit(CommentsError('Authentication error: ${e.message}'));
     } on ServerException catch (e) {
+      debugPrint('[SOCIAL_DEBUG] Server error loading comments: ${e.message}');
       emit(CommentsError('Server error: ${e.message}'));
     } catch (e) {
+      debugPrint('[SOCIAL_DEBUG] Unknown error loading comments: $e');
       emit(CommentsError('Unknown error: $e'));
     }
   }

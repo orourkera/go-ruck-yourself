@@ -71,7 +71,6 @@ class SessionRepository {
       // Note: No /api prefix (base URL already has it)
       List<String> endpoints = [
         '/rucks/$sessionId/heartrate',    // Primary format WITHOUT underscore (per API standards)
-        '/rucks/$sessionId/heart_rate'   // Alternative format with underscore (legacy support)
       ];
       
       dynamic response;

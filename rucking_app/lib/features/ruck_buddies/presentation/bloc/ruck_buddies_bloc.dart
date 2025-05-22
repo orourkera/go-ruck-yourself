@@ -69,7 +69,7 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
         if (ruckBuddies.isEmpty) {
           debugPrint('[BLOC] No ruck buddies found in API response');
         } else {
-          debugPrint('[BLOC] First buddy: ${ruckBuddies.first.id}, user: ${ruckBuddies.first.user.username}');
+          debugPrint('[BLOC] First buddy: ${ruckBuddies.first.id}, user: ${ruckBuddies.first.user.username}, commentCount: ${ruckBuddies.first.commentCount}');
         }
         emit(
           RuckBuddiesLoaded(
