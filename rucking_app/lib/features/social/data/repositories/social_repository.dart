@@ -194,30 +194,41 @@ class SocialRepository {
   }
 
   /// Check if the current user has liked a specific ruck
-  /// Uses caching to reduce API calls
+  /// Uses caching to reduce API calls. If the cache is invalid, it fetches
+  /// fresh data for both the user's like status and the total like count for the ruck,
+  /// updating the respective caches.
   Future<bool> hasUserLikedRuck(int ruckId) async {
     debugPrint('[SOCIAL_DEBUG] hasUserLikedRuck called for ruckId: $ruckId');
-    
+
     // Check cache first if it's valid
     if (_isValidCache(ruckId)) {
-      debugPrint('[SOCIAL_DEBUG] Using cached like status for ruckId: $ruckId');
+      debugPrint('[SOCIAL_DEBUG] Using cached like status for ruckId: $ruckId. Status: ${_likeStatusCache[ruckId]}, Count: ${_likeCountCache[ruckId]}');
       return _likeStatusCache[ruckId] ?? false;
     }
-    
+
+    debugPrint('[SOCIAL_DEBUG] Cache invalid for ruckId: $ruckId. Fetching fresh like status and count.');
     final token = await _authToken;
     if (token == null) {
-      debugPrint('[SOCIAL_DEBUG] No auth token in hasUserLikedRuck for ruckId: $ruckId. Assuming not liked.');
-      _likeStatusCache[ruckId] = false; // Update cache
+      debugPrint('[SOCIAL_DEBUG] No auth token in hasUserLikedRuck for ruckId: $ruckId. Assuming not liked, count 0.');
+      _likeStatusCache[ruckId] = false; // Update status cache
+      _likeCountCache[ruckId] = 0;      // Update count cache
       _likeCacheTimestamps[ruckId] = DateTime.now(); // Update timestamp
       return false; // Not authenticated, so can't have liked it
     }
-    
-    // Now 'token' is guaranteed to be non-null here
-    final result = await _fallbackSingleRuckCheck(ruckId, token);
-    
-    // _likeStatusCache and _likeCacheTimestamps are updated within _fallbackSingleRuckCheck
-    
-    return result ?? false; // If fallback returns null (error), treat as not liked
+
+    // Fetch fresh like status for the user
+    final freshHasLiked = await _fallbackSingleRuckCheck(ruckId, token);
+    // Fetch fresh total like count for the ruck
+    final freshLikeCount = await _fallbackSingleRuckLikeCount(ruckId, token);
+
+    // Update caches with fresh data
+    _likeStatusCache[ruckId] = freshHasLiked ?? false;
+    _likeCountCache[ruckId] = freshLikeCount ?? 0; // Default to 0 if count fetch fails
+    _likeCacheTimestamps[ruckId] = DateTime.now();
+
+    debugPrint('[SOCIAL_DEBUG] Updated cache for ruckId: $ruckId. Status: ${freshHasLiked ?? false}, Count: ${freshLikeCount ?? 0}');
+
+    return freshHasLiked ?? false; // If fallback returns null (error), treat as not liked
   }
   
   /// Checks if cache for a ruckId is still valid
