@@ -29,40 +29,47 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
   ) async {
     emit(RuckBuddiesLoading());
     
-    // Get location if needed for 'closest' filter and not provided in the event
     double? lat = event.latitude;
     double? lon = event.longitude;
-    
-    if (event.filter == 'closest' && (lat == null || lon == null)) {
+    String filterToUse = event.filter;
+
+    // If filter is 'closest' AND lat/lon are NOT in the event, try to get current position
+    if (filterToUse == 'closest' && (lat == null || lon == null)) {
       try {
-        // Check for permission
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-        }
-        
-        if (permission == LocationPermission.whileInUse || 
-            permission == LocationPermission.always) {
-          final position = await Geolocator.getCurrentPosition();
-          lat = position.latitude;
-          lon = position.longitude;
-        }
+        debugPrint('📍 [RuckBuddiesBloc] Attempting to get current location for "closest" filter.');
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          // Consider adding a timeLimit if not already handled by Geolocator defaults
+        );
+        lat = position.latitude;
+        lon = position.longitude;
+        debugPrint('📍 [RuckBuddiesBloc] Current location obtained: ($lat, $lon)');
       } catch (e) {
-        // Handle error or proceed without location
-        print('Error getting location: $e');
+        debugPrint('📍 [RuckBuddiesBloc] Failed to get current location: $e. Proceeding without it.');
+        // Optionally, change filter if location is essential for 'closest'
+        // filterToUse = 'most_recent'; // Example fallback, if desired
+        // emit(RuckBuddiesError('Could not get location for "closest" rucks. Showing most recent instead.'));
       }
     }
     
-    debugPrint('[BLOC] Fetching ruck buddies with filter: ${event.filter}, location: ($lat, $lon)');
-    final result = await getRuckBuddies(
-      RuckBuddiesParams(
-        limit: event.limit,
-        offset: 0,
-        filter: event.filter,
-        latitude: lat,
-        longitude: lon,
-      ),
+    debugPrint('🔄 [RuckBuddiesBloc] Current filter for API: $filterToUse');
+    final params = RuckBuddiesParams(
+      limit: event.limit,
+      offset: 0, // Offset is 0 for a new fetch, managed by FetchMoreRuckBuddiesEvent for pagination
+      filter: filterToUse, // Use the potentially updated filter
+      latitude: lat,
+      longitude: lon,
     );
+
+    // Log the parameters being sent to the use case
+    debugPrint('🌍 [RuckBuddiesBloc] Calling getRuckBuddies with: '
+        'filter=${params.filter}, '
+        'lat=${params.latitude}, '
+        'lon=${params.longitude}, '
+        'limit=${params.limit}, '
+        'offset=${params.offset}');
+
+    final result = await getRuckBuddies(params);
     
     result.fold(
       (failure) {

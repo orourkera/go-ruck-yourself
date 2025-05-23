@@ -104,6 +104,31 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
       }
     });
   }
+  
+  @override
+  void didUpdateWidget(RuckBuddyCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Re-fetch photos when returning to this screen to ensure they display correctly
+    if (_ruckId != null) {
+      try {
+        // 1. Force update photos from the widget if available
+        if (widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty) {
+          setState(() {
+            _photos = List<RuckPhoto>.from(widget.ruckBuddy.photos!);
+            developer.log('[PHOTO_DEBUG] RuckBuddyCard directly updated photos from widget: ${_photos.length}', name: 'RuckBuddyCard');
+          });
+        }
+        
+        // 2. Request fresh photos from ActiveSessionBloc
+        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+        activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+        developer.log('[PHOTO_DEBUG] RuckBuddyCard re-requested photos on update for ruckId: $_ruckId', name: 'RuckBuddyCard');
+      } catch (e) {
+        developer.log('[PHOTO_DEBUG] Error re-requesting photos in RuckBuddyCard.didUpdateWidget: $e', name: 'RuckBuddyCard');
+      }
+    }
+  }
 
   List<RuckPhoto> _convertToRuckPhotos(List<dynamic> photos) {
     final result = <RuckPhoto>[];
@@ -136,6 +161,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   }
 
   List<String> _getProcessedPhotoUrls(List<dynamic> photos, {bool addCacheBuster = false}) {
+    // Always add cache buster when we have photos to ensure they're properly refreshed
+    // This is critical for proper carousel display when returning from detail view
+    final shouldBustCache = addCacheBuster || true; // Force cache busting
+    
     return photos.map((photo) {
       String? url;
       if (photo is RuckPhoto) {
@@ -144,7 +173,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         url = photo['url'] ?? photo['thumbnail_url'];
       }
       return url is String && url.isNotEmpty 
-          ? (addCacheBuster ? '$url?cache=${DateTime.now().millisecondsSinceEpoch}' : url) 
+          ? (shouldBustCache ? '$url?cache=${DateTime.now().millisecondsSinceEpoch}' : url) 
           : '';
     }).where((url) => url.isNotEmpty).toList();
   }
@@ -329,30 +358,37 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                     ),
                     
                     // Photos Carousel (directly after map with minimal spacing)
-                    if (_photos.isNotEmpty)
-                      Container(
-                        // Remove horizontal padding, only keep vertical spacing
-                        margin: EdgeInsets.zero,
-                        padding: const EdgeInsets.only(top: 5.0),
-                        width: MediaQuery.of(context).size.width,
-                        alignment: Alignment.centerLeft,
-                        child: PhotoCarousel(
-                          photoUrls: _getProcessedPhotoUrls(_photos),
-                          height: 140,
-                          showDeleteButtons: false,
-                          onPhotoTap: (index) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PhotoViewer(
-                                  photoUrls: _getProcessedPhotoUrls(_photos),
-                                  initialIndex: index,
+                    if (_photos.isNotEmpty) 
+                      Builder(builder: (context) {
+                        // Force create a new carousel widget each time with unique cache busters
+                        final processedUrls = _getProcessedPhotoUrls(_photos, addCacheBuster: true);
+                        developer.log('[PHOTO_DEBUG] Building photo carousel with ${processedUrls.length} photos', name: 'RuckBuddyCard');
+                        
+                        return Container(
+                          key: ValueKey('photo_carousel_${DateTime.now().millisecondsSinceEpoch}'),
+                          // Remove horizontal padding, only keep vertical spacing
+                          margin: EdgeInsets.zero,
+                          padding: const EdgeInsets.only(top: 5.0),
+                          width: MediaQuery.of(context).size.width,
+                          alignment: Alignment.centerLeft,
+                          child: PhotoCarousel(
+                            photoUrls: processedUrls,
+                            height: 140,
+                            showDeleteButtons: false,
+                            onPhotoTap: (index) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PhotoViewer(
+                                    photoUrls: processedUrls,
+                                    initialIndex: index,
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                              );
+                            },
+                          ),
+                        );
+                      }),
                     
                     const SizedBox(height: 8),
                     
