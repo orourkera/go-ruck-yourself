@@ -307,26 +307,15 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                             ],
                           ),
                         ),
-                        // Distance stat in header
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.route,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              formattedDistance,
-                              style: TextStyle(
-                                fontFamily: 'Bangers',
-                                fontSize: 20,
-                                color: AppColors.primary,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                          ],
+                        // Distance stat in header - matching detail page style
+                        Text(
+                          formattedDistance,
+                          style: TextStyle(
+                            fontFamily: 'Bangers',
+                            fontSize: 28,
+                            color: Colors.black,
+                            letterSpacing: 1.0,
+                          ),
                         ),
                       ],
                     ),
@@ -341,9 +330,12 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                     
                     // Photos Carousel (directly after map with minimal spacing)
                     if (_photos.isNotEmpty)
-                      Padding(
-                        // Apply padding only on top
+                      Container(
+                        // Remove horizontal padding, only keep vertical spacing
+                        margin: EdgeInsets.zero,
                         padding: const EdgeInsets.only(top: 5.0),
+                        width: MediaQuery.of(context).size.width,
+                        alignment: Alignment.centerLeft,
                         child: PhotoCarousel(
                           photoUrls: _getProcessedPhotoUrls(_photos),
                           height: 140,

@@ -209,19 +209,36 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     debugPrint('🔍 Checking like status for ruck ID: ${event.ruckId}');
+    
+    // First emit cached data immediately if available
+    final cachedLikeStatus = _socialRepository.getCachedLikeStatus(event.ruckId);
+    final cachedLikeCount = _socialRepository.getCachedLikeCount(event.ruckId);
+    
+    if (cachedLikeStatus != null && cachedLikeCount != null) {
+      debugPrint('⚡ Using cached like status: $cachedLikeStatus, Count: $cachedLikeCount');
+      // Emit cached state immediately
+      emit(LikeStatusChecked(
+        isLiked: cachedLikeStatus,
+        ruckId: event.ruckId,
+        likeCount: cachedLikeCount,
+      ));
+    }
+    
     try {
+      // Then fetch fresh data (will update cache internally)
       final hasLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
-      // Fetch the total like count
       final likes = await _socialRepository.getRuckLikes(event.ruckId);
       final likeCount = likes.length;
-      debugPrint('✅ Like status check complete: $hasLiked, Count: $likeCount');
+      debugPrint('✅ Fresh like status check complete: $hasLiked, Count: $likeCount');
       
-      // Emit simple state just with like status
-      emit(LikeStatusChecked(
-        isLiked: hasLiked,
-        ruckId: event.ruckId,
-        likeCount: likeCount, // Updated to use the fetched count
-      ));
+      // Only emit again if value changed or we didn't emit cached data
+      if (cachedLikeStatus != hasLiked || cachedLikeCount != likeCount || cachedLikeStatus == null) {
+        emit(LikeStatusChecked(
+          isLiked: hasLiked,
+          ruckId: event.ruckId,
+          likeCount: likeCount,
+        ));
+      }
     } on UnauthorizedException catch (e) {
       debugPrint('❌ Authentication error checking like status: ${e.message}');
       // Don't emit error state for this quietly running check
@@ -234,29 +251,76 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     }
   }
 
-  /// Handler for loading comments for a ruck session
+  /// Handler for loading comments for a ruck session - optimized for faster response
   Future<void> _onLoadRuckComments(
     LoadRuckComments event,
     Emitter<SocialState> emit,
   ) async {
-    emit(CommentsLoading());
+    debugPrint('[SOCIAL_DEBUG] Loading comments for ruck ID: ${event.ruckId}');
+    
+    // First check for cached comments
+    final cachedComments = _socialRepository.getCachedComments(event.ruckId);
+    
+    if (cachedComments != null && cachedComments.isNotEmpty) {
+      debugPrint('[SOCIAL_DEBUG] Using cached comments: ${cachedComments.length} comments');
+      // Skip the loading state if we have cached data
+      emit(CommentsLoaded(comments: cachedComments, ruckId: event.ruckId));
+      
+      // Also update comment count immediately
+      _updateCommentCount(event.ruckId, cachedComments.length, emit);
+    } else {
+      // Only emit loading state if no cached data
+      emit(CommentsLoading());
+    }
     
     try {
+      // Fetch fresh data
       final comments = await _socialRepository.getRuckComments(event.ruckId);
-      debugPrint('[SOCIAL_DEBUG] Comments API response: 200'); // Assuming success
-      emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
-      // Update the comment count so listeners like RuckBuddyCard can update
-      _updateCommentCount(event.ruckId, comments.length, emit);
+      debugPrint('[SOCIAL_DEBUG] Fresh comments loaded: ${comments.length} comments'); 
+      
+      // Only emit if different from cached or no cache was available
+      if (cachedComments == null || 
+          cachedComments.length != comments.length || 
+          _commentsChanged(cachedComments, comments)) {
+        emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
+        // Update the comment count so listeners can update
+        _updateCommentCount(event.ruckId, comments.length, emit);
+      }
     } on UnauthorizedException catch (e) {
       debugPrint('[SOCIAL_DEBUG] Authentication error loading comments: ${e.message}');
-      emit(CommentsError('Authentication error: ${e.message}'));
+      // Only emit error if we didn't already show cached comments
+      if (cachedComments == null) {
+        emit(CommentsError('Authentication error: ${e.message}'));
+      }
     } on ServerException catch (e) {
       debugPrint('[SOCIAL_DEBUG] Server error loading comments: ${e.message}');
-      emit(CommentsError('Server error: ${e.message}'));
+      // Only emit error if we didn't already show cached comments
+      if (cachedComments == null) {
+        emit(CommentsError('Server error: ${e.message}'));
+      }
     } catch (e) {
       debugPrint('[SOCIAL_DEBUG] Unknown error loading comments: $e');
-      emit(CommentsError('Unknown error: $e'));
+      // Only emit error if we didn't already show cached comments
+      if (cachedComments == null) {
+        emit(CommentsError('Unknown error: $e'));
+      }
     }
+  }
+  
+  /// Helper method to determine if comments have changed
+  bool _commentsChanged(List<RuckComment> oldComments, List<RuckComment> newComments) {
+    if (oldComments.length != newComments.length) return true;
+    
+    // Check if any comment IDs or content don't match
+    for (int i = 0; i < oldComments.length; i++) {
+      if (i >= newComments.length) return true;
+      if (oldComments[i].id != newComments[i].id || 
+          oldComments[i].content != newComments[i].content) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   /// Handler for adding a comment to a ruck session
@@ -425,17 +489,11 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     }
   }
 
-  /// Handler for clearing errors
+  /// Handler for clearing social errors
   void _onClearSocialError(
     ClearSocialError event,
     Emitter<SocialState> emit,
   ) {
-    if (state is LikesError || state is LikeActionError) {
-      emit(SocialInitial());
-    } else if (state is CommentsError || state is CommentActionError) {
-      emit(SocialInitial());
-    }
+    emit(SocialInitial());
   }
-
-  /// Handler for checking if current user has liked a ruck
 }

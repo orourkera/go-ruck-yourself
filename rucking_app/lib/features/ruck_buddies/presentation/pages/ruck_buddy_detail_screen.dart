@@ -79,22 +79,19 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
       print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Empty ruckBuddy.id, can\'t fetch photos');
     }
     
-    // Check current like status through SocialBloc
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final ruckId = int.tryParse(widget.ruckBuddy.id);
-        if (ruckId != null) {
-          // Use the singleton instance of SocialBloc from GetIt
-          final socialBloc = GetIt.instance<SocialBloc>();
-          
-          // First ensure we're getting the latest state
-          socialBloc.add(CheckRuckLikeStatus(ruckId));
-          
-          // Important debug logging
-          print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: Checking like status for ruckId $ruckId');
-        }
-      }
-    });
+    // Load social data immediately without waiting for post-frame callback
+    final ruckId = int.tryParse(widget.ruckBuddy.id);
+    if (ruckId != null && GetIt.I.isRegistered<SocialBloc>()) {
+      // Use the singleton instance of SocialBloc from GetIt
+      final socialBloc = GetIt.instance<SocialBloc>();
+      
+      // Load both like status and comments with high priority
+      socialBloc.add(CheckRuckLikeStatus(ruckId));
+      socialBloc.add(LoadRuckComments(ruckId.toString()));
+      
+      // Debug log
+      print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: Immediately dispatched social data loading for ruckId: $ruckId');
+    }
     
     // If focusComment is true, request focus on the comment field after build
     if (widget.focusComment) {
@@ -451,10 +448,12 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           ),
                         ),
                       ),
-                      // Make carousel flush with left edge
+                      // Ensure carousel is flush with left edge
                       Container(
                         margin: EdgeInsets.zero,
                         padding: EdgeInsets.zero,
+                        width: MediaQuery.of(context).size.width,
+                        alignment: Alignment.centerLeft,
                         child: PhotoCarousel(
                           photoUrls: _extractPhotoUrls(_photos),
                           showDeleteButtons: false,
@@ -589,17 +588,11 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                 Stack(
                                   alignment: Alignment.center,
                                   children: [
-                                    // White outline version of chat bubble
+                                    // Using the same comment icon as the card page
                                     Icon(
-                                      Icons.chat_bubble_outline,
-                                      color: Colors.white,
-                                      size: 40, // Exactly 40px as requested
-                                    ),
-                                    // Slightly smaller solid icon to create a white outline effect
-                                    Icon(
-                                      Icons.chat_bubble,
+                                      Icons.comment,
                                       color: AppColors.secondary,
-                                      size: 36,
+                                      size: 40, // Exactly 40px as requested
                                     ),
                                   ],
                                 ),
@@ -848,8 +841,11 @@ class _RouteMap extends StatelessWidget {
               initialCenter: _getRouteCenter(routePoints),
               initialZoom: _getFitZoom(routePoints),
               interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.none,
+                flags: InteractiveFlag.all, // Enable all map interactions including pinch-zoom, pan, etc.
               ),
+              // Set min/max zoom constraints for better user experience
+              minZoom: 3,
+              maxZoom: 18,
             ),
             children: [
               TileLayer(

@@ -96,6 +96,12 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
           child: PageView.builder(
             controller: _pageController,
             itemCount: widget.photoUrls.length,
+            // Remove default padding
+            padEnds: false,
+            // Ensure the photos are flush with left edge
+            pageSnapping: true,
+            // Remove default edge padding
+            clipBehavior: Clip.none,
             onPageChanged: (index) {
               setState(() {
                 _currentPage = index;
@@ -148,7 +154,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         }
       },
       child: Container(
-        margin: const EdgeInsets.only(right: 10.0, top: 8.0, bottom: 8.0),
+        margin: const EdgeInsets.only(right: 10.0, top: 8.0, bottom: 8.0, left: 0),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15.0),
           boxShadow: [
