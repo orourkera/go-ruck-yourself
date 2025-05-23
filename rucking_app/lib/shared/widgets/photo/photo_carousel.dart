@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/shared/widgets/photo/safe_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// A reusable carousel widget for displaying photos
 class PhotoCarousel extends StatefulWidget {
@@ -45,11 +45,18 @@ class PhotoCarousel extends StatefulWidget {
 class _PhotoCarouselState extends State<PhotoCarousel> {
   late PageController _pageController;
   int _currentPage = 0;
+  static int _instanceCounter = 0;
+  late int _instanceId;
   
   @override
   void initState() {
     super.initState();
+    _instanceId = ++_instanceCounter;
+    print('[DEBUG] PhotoCarousel instance $_instanceId initializing with ${widget.photoUrls.length} photos');
+    
+    // Simple initialization - back to basics
     _pageController = PageController(initialPage: 0, viewportFraction: 0.5);
+    _currentPage = 0;
   }
   
   @override
@@ -59,7 +66,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
     // Handle case when returning from detail screen
     // This prevents Infinity/NaN calculations when navigating back
     if (oldWidget.photoUrls != widget.photoUrls) {
-      if (mounted) {
+      if (mounted && _pageController.hasClients) {
         _pageController.dispose();
         _pageController = PageController(initialPage: 0, viewportFraction: 0.5);
         setState(() {
@@ -71,6 +78,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   
   @override
   void dispose() {
+    print('[DEBUG] PhotoCarousel instance $_instanceId disposing');
     if (_pageController.hasClients) {
       _pageController.dispose();
     }
@@ -116,14 +124,13 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
           child: widget.photoUrls.isNotEmpty ? PageView.builder(
             controller: _pageController,
             itemCount: widget.photoUrls.length,
-            // Remove default padding
+            // Remove default padding to eliminate left spacing
             padEnds: false,
-            // Ensure the photos are flush with left edge
             pageSnapping: true,
             // Remove default edge padding
             clipBehavior: Clip.none,
-            onPageChanged: (index) {
-              if (mounted && index >= 0 && index < widget.photoUrls.length) {
+            onPageChanged: (int index) {
+              if (mounted && index >= 0 && index < widget.photoUrls.length && index.isFinite && !index.isNaN) {
                 setState(() {
                   _currentPage = index;
                 });
@@ -135,7 +142,11 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
               }
               return _buildPhotoItem(context, index);
             },
-          ) : Container(),
+          ) : Container(
+            child: widget.photoUrls.isNotEmpty 
+              ? const Center(child: CircularProgressIndicator())
+              : const Center(child: Text('No photos available')),
+          ),
         ),
         const SizedBox(height: 12),
         // Pagination indicators
@@ -256,18 +267,16 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
     
     return ClipRRect(
       borderRadius: BorderRadius.circular(15.0),
-      child: SafeNetworkImage(
+      child: CachedNetworkImage(
         imageUrl: imageUrl,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        forceReload: true, // Always get fresh images
-        borderRadius: BorderRadius.circular(15.0),
         errorWidget: (context, url, error) {
           AppLogger.error('Error loading image: $imageUrl, error: $error');
           return _buildErrorContainer(context, 'Image failed to load');
         },
-        placeholder: Container(
+        placeholder: (context, url) => Container(
           color: Colors.grey.shade200,
           child: const Center(
             child: CircularProgressIndicator(),

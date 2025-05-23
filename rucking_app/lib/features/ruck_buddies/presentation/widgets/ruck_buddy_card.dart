@@ -165,6 +165,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     // This is critical for proper carousel display when returning from detail view
     final shouldBustCache = addCacheBuster || true; // Force cache busting
     
+    // Use a smaller cache value to prevent numerical overflow issues
+    final cacheValue = (DateTime.now().millisecondsSinceEpoch % 1000000); // Keep it under 1M
+    
     return photos.map((photo) {
       String? url;
       if (photo is RuckPhoto) {
@@ -173,7 +176,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         url = photo['url'] ?? photo['thumbnail_url'];
       }
       return url is String && url.isNotEmpty 
-          ? (shouldBustCache ? '$url?cache=${DateTime.now().millisecondsSinceEpoch}' : url) 
+          ? (shouldBustCache ? '$url?cache=$cacheValue' : url) 
           : '';
     }).where((url) => url.isNotEmpty).toList();
   }

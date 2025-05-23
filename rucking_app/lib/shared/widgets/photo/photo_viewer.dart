@@ -35,13 +35,15 @@ class _PhotoViewerState extends State<PhotoViewer> {
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    _currentIndex = widget.initialIndex.clamp(0, widget.photoUrls.length - 1);
+    _pageController = PageController(initialPage: _currentIndex);
   }
   
   @override
   void dispose() {
-    _pageController.dispose();
+    if (_pageController.hasClients) {
+      _pageController.dispose();
+    }
     super.dispose();
   }
   
@@ -95,11 +97,16 @@ class _PhotoViewerState extends State<PhotoViewer> {
           controller: _pageController,
           itemCount: widget.photoUrls.length,
           onPageChanged: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
+            if (mounted && index >= 0 && index < widget.photoUrls.length) {
+              setState(() {
+                _currentIndex = index;
+              });
+            }
           },
           itemBuilder: (context, index) {
+            if (index < 0 || index >= widget.photoUrls.length) {
+              return Container(); // Safety fallback
+            }
             return Center(
               child: InteractiveViewer(
                 minScale: 0.5,
