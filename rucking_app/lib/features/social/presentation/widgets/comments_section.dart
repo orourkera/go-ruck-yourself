@@ -25,6 +25,9 @@ class CommentsSection extends StatefulWidget {
   
   /// Whether to hide the comment input field
   final bool hideInput;
+  
+  /// Callback when a comment edit button is pressed, allows parent to handle editing
+  final Function(RuckComment)? onEditCommentRequest;
 
   /// Creates a comment section for ruck sessions
   const CommentsSection({
@@ -34,6 +37,7 @@ class CommentsSection extends StatefulWidget {
     this.showViewAllButton = true,
     this.onViewAllTapped,
     this.hideInput = false,
+    this.onEditCommentRequest,
   }) : super(key: key);
 
   @override
@@ -388,6 +392,18 @@ class _CommentsSectionState extends State<CommentsSection> {
   Widget _buildCommentItem(RuckComment comment) {
     final isCurrentUserComment = comment.userId == _getCurrentUserId(context);
     final formattedDate = DateFormat('MMM d, yyyy • h:mm a').format(comment.createdAt);
+    final isEditing = _editingCommentId == comment.id;
+    
+    // Create a controller for editing if this comment is being edited
+    if (isEditing && _commentController.text != comment.content) {
+      _commentController.text = comment.content;
+      // Request focus after setting text
+      Future.delayed(Duration.zero, () {
+        if (mounted) {
+          _commentFocusNode.requestFocus();
+        }
+      });
+    }
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -395,104 +411,130 @@ class _CommentsSectionState extends State<CommentsSection> {
       decoration: BoxDecoration(
         color: isCurrentUserComment ? Colors.blue.shade50 : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: isEditing ? AppColors.primary : Colors.grey.shade200, width: isEditing ? 2.0 : 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: username and actions
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // User info
-              Expanded(
-                child: Row(
-                  children: [
-                    // Avatar placeholder
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        shape: BoxShape.circle,
-                      ),
-                      child: comment.userAvatarUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                comment.userAvatarUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.person,
-                              size: 16,
-                              color: Colors.white,
-                            ),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.grey.shade300,
+                    child: const Icon(Icons.person, color: Colors.white),
+                  ),
+                  const SizedBox(width: 8.0),
+                  Text(
+                    comment.userDisplayName.isNotEmpty ? comment.userDisplayName : 'User',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(width: 8),
-                    // Username and timestamp
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            comment.userDisplayName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            formattedDate,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               
-              // Action buttons for user's own comments
-              if (isCurrentUserComment) ...[
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 18),
-                  onPressed: () => _handleEditComment(comment),
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(4.0),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, size: 18),
-                  onPressed: () => _handleDeleteComment(comment),
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(4.0),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
+              // Action buttons - show different buttons based on edit state
+              if (isCurrentUserComment)
+                isEditing
+                  ? Row(
+                      children: [
+                        // Save button
+                        TextButton(
+                          onPressed: () {
+                            // Update the comment
+                            context.read<SocialBloc>().add(
+                              UpdateRuckComment(
+                                commentId: comment.id,
+                                content: _commentController.text.trim(),
+                              ),
+                            );
+                            
+                            // Clear editing state
+                            setState(() {
+                              _editingCommentId = null;
+                            });
+                            _commentController.clear();
+                            _commentFocusNode.unfocus();
+                          },
+                          child: const Text('Save'),
+                        ),
+                        // Cancel button
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _editingCommentId = null;
+                            });
+                            _commentController.clear();
+                            _commentFocusNode.unfocus();
+                          },
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        // Edit button
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 18),
+                          onPressed: () => _handleEditComment(comment),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4.0),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        // Delete button
+                        IconButton(
+                          icon: const Icon(Icons.delete, size: 18),
+                          onPressed: () => _handleDeleteComment(comment),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4.0),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
             ],
           ),
           
-          // Comment content
+          // Date
           Padding(
-            padding: const EdgeInsets.only(top: 8.0, left: 32.0),
-            child: Text(comment.content),
+            padding: const EdgeInsets.only(left: 40.0, top: 4.0),
+            child: Text(
+              formattedDate,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Comment content - either show text or editing field
+          Padding(
+            padding: const EdgeInsets.only(left: 40.0),
+            child: isEditing
+              ? TextField(
+                  controller: _commentController,
+                  focusNode: _commentFocusNode,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  maxLines: null,
+                  textInputAction: TextInputAction.done,
+                )
+              : Text(comment.content),
           ),
           
           // Edited indicator
-          if (comment.isEdited)
+          if (comment.isEdited && !isEditing)
             Padding(
-              padding: const EdgeInsets.only(top: 4.0, left: 32.0),
+              padding: const EdgeInsets.only(top: 4.0, left: 40.0),
               child: Text(
                 '(edited)',
                 style: TextStyle(

@@ -18,6 +18,7 @@ import 'package:rucking_app/features/social/presentation/widgets/comments_sectio
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
+import 'package:rucking_app/features/social/domain/models/ruck_comment.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
@@ -46,6 +47,11 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   int _likeCount = 0;
   int _commentCount = 0; // Added comment count state variable
   bool _isProcessingLike = false;
+  
+  // Comment editing state
+  bool _isEditingComment = false;
+  String? _editingCommentId;
+  RuckComment? _commentBeingEdited;
 
   @override
   void initState() {
@@ -287,6 +293,10 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
               });
               print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: LikeActionCompleted for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
             }
+          } else if (state is CommentActionCompleted) {
+            // Refresh comments when a comment is added, updated, or deleted
+            print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: CommentActionCompleted with actionType: ${state.actionType}');
+            context.read<SocialBloc>().add(LoadRuckComments(ruckId.toString()));
           } else if (state is CommentCountUpdated) {
             if (state.ruckId == ruckId) {
               setState(() {
@@ -613,44 +623,138 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       
                       const SizedBox(height: 16),
                       
-                      // Comment input
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _commentController,
-                              focusNode: _commentFocusNode,
-                              decoration: const InputDecoration(
-                                hintText: 'Add a comment...',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                      // Comment input - only show when not in edit mode
+                      if (!_isEditingComment)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _commentController,
+                                focusNode: _commentFocusNode,
+                                decoration: const InputDecoration(
+                                  hintText: 'Add a comment...',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                                  isDense: true,
                                 ),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                                isDense: true,
+                                textInputAction: TextInputAction.send,
+                                onSubmitted: (_) => _submitComment(),
                               ),
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: (_) => _submitComment(),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.send),
-                            onPressed: _submitComment,
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.send),
+                              onPressed: _submitComment,
+                            ),
+                          ],
+                        ),
                       
                       const SizedBox(height: 16),
                       
                       // Comments section
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: CommentsSection(
-                          ruckId: widget.ruckBuddy.id, // Now directly using string ID
-                          maxDisplayed: 5, // Show 5 most recent comments
-                          showViewAllButton: true,
-                          hideInput: true, // Prevent CommentsSection from rendering its own input field
-                        ),
+                      Column(
+                        children: [
+                          // Comments section
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: CommentsSection(
+                              ruckId: widget.ruckBuddy.id, // Now directly using string ID
+                              maxDisplayed: 5, // Show 5 most recent comments
+                              showViewAllButton: true,
+                              hideInput: true, // Prevent CommentsSection from rendering its own input field
+                              onEditCommentRequest: (comment) {
+                                // Handle edit request from CommentsSection
+                                setState(() {
+                                  _isEditingComment = true;
+                                  _editingCommentId = comment.id;
+                                  _commentBeingEdited = comment;
+                                  _commentController.text = comment.content;
+                                });
+                                _commentFocusNode.requestFocus();
+                              },
+                            ),
+                          ),
+                          
+                          // Custom comment edit input when in edit mode
+                          if (_isEditingComment)
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Edit mode indicator
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Text(
+                                      'Editing comment',
+                                      style: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                  // Input field and action buttons
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      // Text field
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _commentController,
+                                          focusNode: _commentFocusNode,
+                                          maxLines: null,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Edit your comment...',
+                                            border: OutlineInputBorder(),
+                                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          ),
+                                        ),
+                                      ),
+                                      // Save button
+                                      IconButton(
+                                        icon: const Icon(Icons.check, color: Colors.green),
+                                        onPressed: () {
+                                          // Submit the edited comment
+                                          if (_editingCommentId != null && _commentController.text.trim().isNotEmpty) {
+                                            context.read<SocialBloc>().add(
+                                              UpdateRuckComment(
+                                                commentId: _editingCommentId!,
+                                                content: _commentController.text.trim(),
+                                              ),
+                                            );
+                                            
+                                            // Reset state
+                                            setState(() {
+                                              _isEditingComment = false;
+                                              _editingCommentId = null;
+                                              _commentBeingEdited = null;
+                                              _commentController.clear();
+                                            });
+                                          }
+                                        },
+                                      ),
+                                      // Cancel button
+                                      IconButton(
+                                        icon: const Icon(Icons.close, color: Colors.red),
+                                        onPressed: () {
+                                          // Cancel editing
+                                          setState(() {
+                                            _isEditingComment = false;
+                                            _editingCommentId = null;
+                                            _commentBeingEdited = null;
+                                            _commentController.clear();
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),

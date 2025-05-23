@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/shared/widgets/photo/safe_network_image.dart';
 
 /// A reusable carousel widget for displaying photos
 class PhotoCarousel extends StatefulWidget {
@@ -52,8 +53,27 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   }
   
   @override
+  void didUpdateWidget(PhotoCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Handle case when returning from detail screen
+    // This prevents Infinity/NaN calculations when navigating back
+    if (oldWidget.photoUrls != widget.photoUrls) {
+      if (mounted) {
+        _pageController.dispose();
+        _pageController = PageController(initialPage: 0, viewportFraction: 0.5);
+        setState(() {
+          _currentPage = 0;
+        });
+      }
+    }
+  }
+  
+  @override
   void dispose() {
-    _pageController.dispose();
+    if (_pageController.hasClients) {
+      _pageController.dispose();
+    }
     super.dispose();
   }
   
@@ -93,7 +113,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         // Using enhanced PageView for image carousel
         SizedBox(
           height: widget.height,
-          child: PageView.builder(
+          child: widget.photoUrls.isNotEmpty ? PageView.builder(
             controller: _pageController,
             itemCount: widget.photoUrls.length,
             // Remove default padding
@@ -103,14 +123,19 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
             // Remove default edge padding
             clipBehavior: Clip.none,
             onPageChanged: (index) {
-              setState(() {
-                _currentPage = index;
-              });
+              if (mounted && index >= 0 && index < widget.photoUrls.length) {
+                setState(() {
+                  _currentPage = index;
+                });
+              }
             },
             itemBuilder: (context, index) {
+              if (index < 0 || index >= widget.photoUrls.length) {
+                return Container(); // Safety fallback
+              }
               return _buildPhotoItem(context, index);
             },
-          ),
+          ) : Container(),
         ),
         const SizedBox(height: 12),
         // Pagination indicators
@@ -226,51 +251,28 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   // Helper method to build image with fallback options and better error handling
   Widget _buildImageWithFallback(BuildContext context, int index) {
     final String imageUrl = widget.photoUrls[index];
-    // Validate URL first
-    if (imageUrl.isEmpty || !Uri.parse(imageUrl).isAbsolute) {
-      AppLogger.error('Invalid image URL: $imageUrl');
-      return _buildErrorContainer(context, 'Invalid image URL');
-    }
+    // Log the attempt to load the image
+    AppLogger.info('Loading image from URL: $imageUrl');
     
-    // Add a timestamp to force refresh and clean URL if needed
-    final String cleanUrl = imageUrl.split('?')[0] + '?t=${DateTime.now().millisecondsSinceEpoch}';
-    
-    // Log URL for debugging
-    AppLogger.info('Loading image from URL: $cleanUrl');
-    
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15.0),
-        color: Colors.grey.shade200, // Placeholder color when image is loading
-      ),
-      child: Image.network(
-        cleanUrl,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(15.0),
+      child: SafeNetworkImage(
+        imageUrl: imageUrl,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        // Use a loading placeholder
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) {
-            return child; // Image has loaded successfully
-          }
-          return Center(
-            child: CircularProgressIndicator(
-              value: loadingProgress.expectedTotalBytes != null
-                ? loadingProgress.cumulativeBytesLoaded / (loadingProgress.expectedTotalBytes ?? 1)
-                : null,
-            ),
-          );
-        },
-        // Add headers to force reload and bypass cache
-        headers: const {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        },
-        errorBuilder: (context, error, stackTrace) {
-          AppLogger.error('Error loading image: $cleanUrl, error: $error');
+        forceReload: true, // Always get fresh images
+        borderRadius: BorderRadius.circular(15.0),
+        errorWidget: (context, url, error) {
+          AppLogger.error('Error loading image: $imageUrl, error: $error');
           return _buildErrorContainer(context, 'Image failed to load');
         },
+        placeholder: Container(
+          color: Colors.grey.shade200,
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
       ),
     );
   }
