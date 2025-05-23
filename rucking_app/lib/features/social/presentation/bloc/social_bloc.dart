@@ -209,13 +209,13 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     debugPrint('🔍 Checking like status for ruck ID: ${event.ruckId}');
-    
+
     // First emit cached data immediately if available
     final cachedLikeStatus = _socialRepository.getCachedLikeStatus(event.ruckId);
     final cachedLikeCount = _socialRepository.getCachedLikeCount(event.ruckId);
-    
+
     if (cachedLikeStatus != null && cachedLikeCount != null) {
-      debugPrint('⚡ Using cached like status: $cachedLikeStatus, Count: $cachedLikeCount');
+      debugPrint('⚡ Using cached like status: $cachedLikeStatus, Count: $cachedLikeCount for ruck ${event.ruckId}');
       // Emit cached state immediately
       emit(LikeStatusChecked(
         isLiked: cachedLikeStatus,
@@ -223,31 +223,42 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         likeCount: cachedLikeCount,
       ));
     }
-    
+
     try {
-      // Then fetch fresh data (will update cache internally)
-      final hasLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
-      final likes = await _socialRepository.getRuckLikes(event.ruckId);
-      final likeCount = likes.length;
-      debugPrint('✅ Fresh like status check complete: $hasLiked, Count: $likeCount');
-      
-      // Only emit again if value changed or we didn't emit cached data
-      if (cachedLikeStatus != hasLiked || cachedLikeCount != likeCount || cachedLikeStatus == null) {
+      // Then fetch fresh data. hasUserLikedRuck will update caches internally for both status and count.
+      final bool hasLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
+      // After hasUserLikedRuck completes, caches are guaranteed to be updated if they were invalid.
+      // So, we can now safely get the (potentially updated) count from the cache.
+      final int likeCount = _socialRepository.getCachedLikeCount(event.ruckId) ?? 0;
+      debugPrint('✅ Fresh like status check complete for ruck ${event.ruckId}: $hasLiked, Count from cache: $likeCount');
+
+      // Only emit again if value changed or we didn't emit cached data initially
+      if (cachedLikeStatus != hasLiked || cachedLikeCount != likeCount || cachedLikeStatus == null || cachedLikeCount == null) {
+        debugPrint('🔄 Emitting updated LikeStatusChecked for ruck ${event.ruckId}: Liked: $hasLiked, Count: $likeCount');
         emit(LikeStatusChecked(
           isLiked: hasLiked,
           ruckId: event.ruckId,
           likeCount: likeCount,
         ));
+      } else {
+        debugPrint('↔️ No change in like status or count for ruck ${event.ruckId}, no new emit needed.');
       }
     } on UnauthorizedException catch (e) {
-      debugPrint('❌ Authentication error checking like status: ${e.message}');
-      // Don't emit error state for this quietly running check
+      debugPrint('❌ Authentication error checking like status for ruck ${event.ruckId}: ${e.message}');
+      // Don't emit error state for this quietly running check, but ensure a default state if nothing was emitted
+      if (cachedLikeStatus == null || cachedLikeCount == null) {
+        emit(LikeStatusChecked(isLiked: false, ruckId: event.ruckId, likeCount: 0));
+      }
     } on ServerException catch (e) {
-      debugPrint('❌ Server error checking like status: ${e.message}');
-      // Don't emit error state for this quietly running check
+      debugPrint('❌ Server error checking like status for ruck ${event.ruckId}: ${e.message}');
+      if (cachedLikeStatus == null || cachedLikeCount == null) {
+        emit(LikeStatusChecked(isLiked: false, ruckId: event.ruckId, likeCount: 0));
+      }
     } catch (e) {
-      debugPrint('❌ Unknown error checking like status: $e');
-      // Don't emit error state for this quietly running check
+      debugPrint('❌ Unknown error checking like status for ruck ${event.ruckId}: $e');
+      if (cachedLikeStatus == null || cachedLikeCount == null) {
+        emit(LikeStatusChecked(isLiked: false, ruckId: event.ruckId, likeCount: 0));
+      }
     }
   }
 
