@@ -290,13 +290,16 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           }
         },
         builder: (context, socialState) {
+          // Using a key that includes photo count to force complete rebuild when photos change
           return Card(
+            key: ValueKey('ruck_card_${widget.ruckBuddy.id}_${_photos.length}_${DateTime.now().millisecondsSinceEpoch}'),
             elevation: 3,
             margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: InkWell(
-              onTap: widget.onTap ?? () {
-                Navigator.push(
+              onTap: widget.onTap ?? () async {
+                // Use await to wait for navigation to complete
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => RuckBuddyDetailScreen(
@@ -304,6 +307,38 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                     ),
                   ),
                 );
+                
+                // When returning from detail screen, explicitly refresh photos
+                if (mounted && _ruckId != null) {
+                  developer.log('[PHOTO_DEBUG] Returned from detail screen for ruckId: $_ruckId - refreshing photos', name: 'RuckBuddyCard');
+                  try {
+                    // 1. Clear existing photos from state to force a fresh view
+                    setState(() {
+                      _photos = [];
+                    });
+                    
+                    // 2. Request new photos - first try direct update from ruckBuddy
+                    if (widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty) {
+                      setState(() {
+                        _photos = List<RuckPhoto>.from(widget.ruckBuddy.photos!);
+                        developer.log('[PHOTO_DEBUG] Directly updated photos from widget after return: ${_photos.length}', name: 'RuckBuddyCard');
+                      });
+                    }
+                    
+                    // 3. Also request fresh photos from API through ActiveSessionBloc
+                    // This is a belt-and-suspenders approach to ensure we get photos
+                    final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+                    
+                    // Clear any existing photos to force a clean fetch
+                    activeSessionBloc.add(ClearSessionPhotos(ruckId: widget.ruckBuddy.id));
+                    
+                    // Then request new ones
+                    activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+                    developer.log('[PHOTO_DEBUG] Requested fresh photos from API after return', name: 'RuckBuddyCard');
+                  } catch (e) {
+                    developer.log('[PHOTO_DEBUG] Error refreshing photos after return: $e', name: 'RuckBuddyCard');
+                  }
+                }
               },
               borderRadius: BorderRadius.circular(12),
               child: Padding(
