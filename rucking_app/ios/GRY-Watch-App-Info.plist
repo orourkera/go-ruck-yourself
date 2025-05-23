@@ -38,5 +38,9 @@
 	<string>This app reads your heart rate from Apple Health to track your workout intensity.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>This app saves your workout data to Apple Health, including heart rate, calories burned, and distance data.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Resources/Fonts/Bangers-Regular.ttf</string>
+	</array>
 </dict>
 </plist>
