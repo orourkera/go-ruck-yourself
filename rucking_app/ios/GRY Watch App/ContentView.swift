@@ -1,3 +1,4 @@
+#if os(watchOS)
 //
 //  ContentView.swift
 //  GRY Watch App
@@ -249,3 +250,4 @@ struct ContentView_Previews: PreviewProvider {
         ContentView()
     }
 }
+#endif

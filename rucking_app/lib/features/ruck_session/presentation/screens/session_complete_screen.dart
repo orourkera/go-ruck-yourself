@@ -21,7 +21,6 @@ import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sampl
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
-import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_carousel.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -29,6 +28,7 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session

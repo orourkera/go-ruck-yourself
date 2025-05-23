@@ -434,6 +434,7 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
+      // Use the format expected by the backend API with comment_id in the body
       final response = await _httpClient.put(
         Uri.parse('${AppConfig.apiBaseUrl}/ruck-comments'),
         headers: {
@@ -473,6 +474,7 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
+      // Use query parameters as expected by the backend API
       final response = await _httpClient.delete(
         Uri.parse('${AppConfig.apiBaseUrl}/ruck-comments?comment_id=$commentId'),
         headers: {
