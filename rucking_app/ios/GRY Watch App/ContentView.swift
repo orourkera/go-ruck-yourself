@@ -7,6 +7,12 @@
 
 import SwiftUI
 import WatchConnectivity
+import HealthKit  // Added in case there's a dependency
+
+// If the watch app is a separate module, it might need to be imported
+#if canImport(GRY_Watch_App)
+import GRY_Watch_App
+#endif
 
 struct ContentView: View {
     // Use the singleton instance so UI and connectivity logic share the same state
@@ -20,9 +26,10 @@ struct ContentView: View {
             } else {
                 VStack(spacing: 10) {
                     Text("GRY")
-                        .font(.headline)
+                        .font(.custom("Bangers-Regular", size: 28))
                         .foregroundColor(.green)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 4)
                     
                     Spacer()
                     
@@ -111,8 +118,9 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Green left-aligned "GRY" title
                 Text("GRY")
-                    .font(.headline)
+                    .font(.custom("Bangers-Regular", size: 28))
                     .foregroundColor(.green)
+                    .padding(.top, 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 2)
                 
@@ -195,7 +203,7 @@ struct ContentView: View {
                             .padding(.top, 2)
                         Text(sessionManager.elevationText)
                             .font(.system(size: 18, weight: .bold)) // Reduced font size from 24
-                            .foregroundColor(.cyan)
+                            .foregroundColor(Color(red: 0, green: 0.9, blue: 0.9)) // Custom cyan color for compatibility
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, minHeight: 70)

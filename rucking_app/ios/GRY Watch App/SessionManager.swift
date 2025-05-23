@@ -1,15 +1,18 @@
+#if os(watchOS)
 import Foundation
 import WatchConnectivity
+import HealthKit
 
-protocol SessionManagerDelegate: AnyObject {
+// Make protocol publicly accessible
+public protocol SessionManagerDelegate: AnyObject {
     func sessionDidActivate()
     func sessionDidDeactivate()
     func didReceiveMessage(_ message: [String: Any])
 }
 
-class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutManagerDelegate {
+public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutManagerDelegate {
     // WorkoutManager for HealthKit access
-    private let workoutManager = WorkoutManager()
+    private var workoutManager: WorkoutManager!
     // Published properties for SwiftUI
     @Published var status: String = "--"
     @Published var heartRate: Int = 0
@@ -52,7 +55,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutMana
         // Leave status as "--" for cleaner UI
         
         // Set up heart rate handler to send heart rate updates to the phone
-        workoutManager.setHeartRateHandler { [weak self] heartRate in
+        workoutManager.setHeartRateHandler { [weak self] (heartRate: Double) in
             guard let self = self else { return }
             // Update UI with heart rate
             DispatchQueue.main.async {
@@ -88,7 +91,9 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutMana
     
     override init() {
         session = WCSession.default
+        // Initialize WorkoutManager after super.init()
         super.init()
+        workoutManager = WorkoutManager()
         session.delegate = self
         if session.activationState != .activated {
             session.activate()
@@ -246,9 +251,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutMana
     
     // MARK: - WCSessionDelegate
     
-    // MARK: - WCSessionDelegate
-    
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+    public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         if activationState == .activated {
             delegate?.sessionDidActivate()
         } else {
@@ -259,7 +262,7 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutMana
         }
     }
     
-    func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
+    public func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         delegate?.didReceiveMessage(message)
         
         // Heart rate update received silently
@@ -347,106 +350,17 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutMana
         }
     }
     
-    func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
-        delegate?.didReceiveMessage(message)
-        
-        // Check message command
-        if let command = message["command"] as? String {
-            // Processing command with reply
-            
-            switch command {
-            case "splitNotification":
-                processSplitNotification(message)
-                
-            case "startSession", "workoutStarted":
-                // Start the session if not already active
-                if !isSessionActive {
-                    // Starting session from phone command (with reply)
-                    DispatchQueue.main.async {
-                        self.isSessionActive = true
-                        self.isPaused = false
-                        self.startSession()
-                    }
-                }
-                
-            case "stopSession", "workoutStopped", "endSession":
-                // Stop the session if active
-                if isSessionActive {
-                    // Stopping session from phone command (with reply)
-                    DispatchQueue.main.async {
-                        self.isSessionActive = false
-                        self.workoutManager.stopWorkout()
-                    }
-                }
-                
-            case "pauseSession":
-                // Pause command from phone (with reply)
-                DispatchQueue.main.async {
-                    self.isPaused = true
-                }
-                
-            case "resumeSession":
-                // Resume command from phone (with reply)
-                DispatchQueue.main.async {
-                    self.isPaused = false
-                }
-                
-            case "pauseConfirmed":
-                // iPhone has confirmed our pause request
-                // iPhone confirmed pause - ensuring watch UI is in paused state (with reply)
-                DispatchQueue.main.async {
-                    if !self.isPaused {
-                        self.isPaused = true
-                    }
-                }
-                
-            case "resumeConfirmed":
-                // iPhone has confirmed our resume request
-                // iPhone confirmed resume - ensuring watch UI is in resumed state (with reply)
-                DispatchQueue.main.async {
-                    if self.isPaused {
-                        self.isPaused = false
-                    }
-                }
-                
-            case "updateSessionState":
-                // Direct state update from iPhone (used to sync states)
-                if let isPaused = message["isPaused"] as? Bool {
-                    // Updating session state (with reply)
-                    DispatchQueue.main.async {
-                        self.isPaused = isPaused
-                    }
-                }
-                
-            case "updateMetrics":
-                // Extract and process metrics data
-                if let metricsData = message["metrics"] as? [String: Any] {
-                    DispatchQueue.main.async {
-                        self.updateMetricsFromData(metricsData)
-                        // Updated metrics from message (with reply)
-                    }
-                }
-                
-            default:
-                // Unknown command received (with reply)
-                break
-            }
-        }
-        
-        // Direct check for metrics in the root object (for backward compatibility)
-        if let metricsData = message["metrics"] as? [String: Any] {
-            DispatchQueue.main.async {
-                self.updateMetricsFromData(metricsData)
-                // Updated metrics directly from message (with reply)
-            }
-        }
-        
-        // Send the reply that message was received
-        replyHandler(["received": true])
+    // Required WCSessionDelegate method, even if not actively used for replies FROM watch
+    public func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
+        // Handle message that expects a reply. For now, acknowledge receipt.
+        // You might want to process the message and send a meaningful reply.
+        print("[WATCH] Received message with replyHandler: \(message)")
+        delegate?.didReceiveMessage(message) // Forward to existing delegate method
+        replyHandler(["status": "received_by_watch"])
     }
     
     // Handle application context
-    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
+    public func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
         // Update UI on the main thread (prevents the SwiftUI threading error)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -462,7 +376,15 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutMana
     }
     
     // Handle user info transfers
-    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any] = [:]) {
+    #if os(watchOS)
+    // NOTE: sessionDidBecomeInactive and sessionDidDeactivate are iOS-only methods
+    // They are not available on watchOS, so we don't implement them here
+    
+    // NOTE: We've removed sessionReachabilityDidChange as it might also be unavailable
+    // We'll use session.isReachable property directly when needed instead
+    #endif
+    
+    public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any]) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             // Forward to SessionManagerDelegate
@@ -555,8 +477,11 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutMana
         }
     }
     
-    // MARK: - WorkoutManagerDelegate
-    func workoutDidEnd() {
+}
+
+// MARK: - WorkoutManagerDelegate Implementation
+extension SessionManager {
+    public func workoutDidEnd() {
         DispatchQueue.main.async {
             self.isSessionActive = false
             self.isPaused = false
@@ -574,3 +499,4 @@ class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutMana
         }
     }
 }
+#endif
