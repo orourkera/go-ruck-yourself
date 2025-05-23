@@ -13,13 +13,20 @@ class SocialRepository {
   final http.Client _httpClient;
   final AuthService _authService;
   
-  // Cache for like status to prevent repeated API calls
+  // Cache for social data to prevent repeated API calls
   final Map<int, bool> _likeStatusCache = {};
   final Map<int, int> _likeCountCache = {};
+  final Map<String, List<RuckComment>> _commentsCache = {};
   final Map<int, DateTime> _likeCacheTimestamps = {};
+  final Map<String, DateTime> _commentsCacheTimestamps = {};
   
-  // Cache expiration in seconds
-  static const int _cacheExpirationSeconds = 60; // 1 minute cache
+  // Cache expiration in seconds - very short to ensure fresh data while still providing immediate response
+  static const int _cacheExpirationSeconds = 10; // 10 seconds cache
+  
+  // Getters for cached data - these provide immediate access to cached values without network calls
+  bool? getCachedLikeStatus(int ruckId) => _likeStatusCache[ruckId];
+  int? getCachedLikeCount(int ruckId) => _likeCountCache[ruckId];
+  List<RuckComment>? getCachedComments(String ruckId) => _commentsCache[ruckId];
 
   /// Constructor
   SocialRepository({
