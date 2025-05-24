@@ -296,10 +296,12 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         },
         builder: (context, socialState) {
           // Only include stable values in the key to prevent unnecessary rebuilds
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
           return Card(
             key: ValueKey('ruck_card_${widget.ruckBuddy.id}_${_photos.length}'),
             elevation: 3,
             margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
+            color: isDarkMode ? Colors.black : null, // Use black in dark mode
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: InkWell(
               onTap: widget.onTap ?? () async {
@@ -382,7 +384,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           style: TextStyle(
                             fontFamily: 'Bangers',
                             fontSize: 28,
-                            color: Colors.black,
+                            color: isDarkMode ? Colors.white : Colors.black,
                             letterSpacing: 1.0,
                           ),
                         ),
@@ -774,12 +776,12 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
             Container(
               height: 175,
               width: double.infinity,
-              color: Colors.grey[200],
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.grey[200],
               child: Center(
                 child: Icon(
                   Icons.map_outlined,
                   size: 48,
-                  color: Colors.grey[400],
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[600] : Colors.grey[400],
                 ),
               ),
             ),

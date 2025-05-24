@@ -307,6 +307,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
           }
         },  
         child: Scaffold(
+          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
           appBar: AppBar(
             title: const Text('Ruck Details'),
             actions: [
