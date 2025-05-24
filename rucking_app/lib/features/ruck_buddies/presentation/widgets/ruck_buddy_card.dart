@@ -54,6 +54,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   @override
   void initState() {
     super.initState();
+      // Remove the map key initialization from _RuckBuddyCardState
+    
     _ruckId = int.tryParse(widget.ruckBuddy.id);
     
     // IMPORTANT: Immediately use the data from widget.ruckBuddy to prevent initial zero values
@@ -293,9 +295,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           }
         },
         builder: (context, socialState) {
-          // Using a key that includes photo count to force complete rebuild when photos change
+          // Only include stable values in the key to prevent unnecessary rebuilds
           return Card(
-            key: ValueKey('ruck_card_${widget.ruckBuddy.id}_${_photos.length}_${DateTime.now().millisecondsSinceEpoch}'),
+            key: ValueKey('ruck_card_${widget.ruckBuddy.id}_${_photos.length}'),
             elevation: 3,
             margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -657,7 +659,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   }
 }
 
-class _RouteMapPreview extends StatelessWidget {
+class _RouteMapPreview extends StatefulWidget {
   final List<dynamic>? locationPoints;
   final double? ruckWeightKg; // Add weight parameter
 
@@ -665,6 +667,34 @@ class _RouteMapPreview extends StatelessWidget {
     required this.locationPoints,
     this.ruckWeightKg,
   });
+  
+  @override
+  State<_RouteMapPreview> createState() => _RouteMapPreviewState();
+}
+
+class _RouteMapPreviewState extends State<_RouteMapPreview> {
+  // Cache the map widget to prevent rebuilding during scrolling
+  FlutterMap? _cachedMapWidget;
+  List<LatLng>? _cachedRoutePoints;
+  late final Key _mapKey;
+  
+  @override
+  void initState() {
+    super.initState();
+    _mapKey = UniqueKey();
+  }
+  
+  // Helper method to compare route points for equality
+  bool _areRoutePointsEqual(List<LatLng> list1, List<LatLng> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].latitude != list2[i].latitude || 
+          list1[i].longitude != list2[i].longitude) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   double? _parseCoord(dynamic v) {
     if (v == null) return null;
@@ -675,7 +705,7 @@ class _RouteMapPreview extends StatelessWidget {
 
   List<LatLng> _getRoutePoints() {
     final pts = <LatLng>[];
-    final lp = locationPoints;
+    final lp = widget.locationPoints;
     if (lp == null || lp.isEmpty) {
       return pts;
     }
@@ -730,11 +760,11 @@ class _RouteMapPreview extends StatelessWidget {
     if (maxDiff < 1.0) return 11.0;
     return 8.0;
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
-    final String weightText = ruckWeightKg != null ? '${ruckWeightKg!.toStringAsFixed(1)} kg' : '';
+    final String weightText = widget.ruckWeightKg != null ? '${widget.ruckWeightKg!.toStringAsFixed(1)} kg' : '';
 
     if (routePoints.isEmpty) {
       return ClipRRect(
@@ -754,7 +784,7 @@ class _RouteMapPreview extends StatelessWidget {
               ),
             ),
             // Weight chip overlay
-            if (ruckWeightKg != null)
+            if (widget.ruckWeightKg != null)
               Positioned(
                 top: 10,
                 right: 10,
@@ -778,6 +808,40 @@ class _RouteMapPreview extends StatelessWidget {
       );
     }
 
+    // Only rebuild the map if the route points have changed
+    if (_cachedMapWidget == null || 
+        _cachedRoutePoints == null || 
+        !_areRoutePointsEqual(_cachedRoutePoints!, routePoints)) {
+      _cachedRoutePoints = List.from(routePoints);
+      _cachedMapWidget = FlutterMap(
+        key: _mapKey,
+        options: MapOptions(
+          initialCenter: _getRouteCenter(routePoints),
+          initialZoom: _getFitZoom(routePoints),
+          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+            userAgentPackageName: 'com.getrucky.gfy',
+            retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+            // Add tile caching for performance
+            tileProvider: NetworkTileProvider(),
+          ),
+          if (routePoints.isNotEmpty)
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: routePoints,
+                  color: AppColors.secondary,
+                  strokeWidth: 4,
+                )
+              ],
+            ),
+        ],
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Stack(
@@ -785,33 +849,10 @@ class _RouteMapPreview extends StatelessWidget {
           SizedBox(
             height: 175,
             width: double.infinity,
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: _getRouteCenter(routePoints),
-                initialZoom: _getFitZoom(routePoints),
-                interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-                  userAgentPackageName: 'com.getrucky.gfy',
-                  retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-                ),
-                if (routePoints.isNotEmpty)
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: routePoints,
-                        color: AppColors.secondary,
-                        strokeWidth: 4,
-                      )
-                    ],
-                  ),
-              ],
-            ),
+            child: _cachedMapWidget!,
           ),
           // Weight chip overlay
-          if (ruckWeightKg != null)
+          if (widget.ruckWeightKg != null)
             Positioned(
               top: 10,
               right: 10,
