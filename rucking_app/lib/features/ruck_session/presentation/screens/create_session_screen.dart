@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:keyboard_actions/keyboard_actions.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:provider/provider.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -152,10 +153,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       String? ruckId;
       try {
         // Weight is stored internally in KG
+        // Double check the conversion for standard (imperial) weights is correct
         double weightForApiKg = _ruckWeight;
         
-        // Log the weight value being saved to the database
-        
+        // Debug log the exact weight being saved
+        AppLogger.debug('Creating session with ruck weight: ${weightForApiKg.toStringAsFixed(2)} kg');
+        AppLogger.debug('Original selection was: ${_displayRuckWeight} ${_preferMetric ? "kg" : "lbs"}');
         
         // Prepare request data for creation
         Map<String, dynamic> createRequestData = {
@@ -461,9 +464,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       if (selected) {
         HapticFeedback.heavyImpact();
         setState(() {
+          // Store the correctly converted weight in kg for the API
           _selectedRuckWeight = weightInKg;
           _ruckWeight = weightInKg;
-          _displayRuckWeight = isMetric ? weightValue : weightValue;
+          // Store the display weight in the user's preferred unit
+          _displayRuckWeight = weightValue;
+          
+          AppLogger.debug('Selected weight chip: ${weightValue} ${isMetric ? "kg" : "lbs"}');
+          AppLogger.debug('Converted to: ${_ruckWeight.toStringAsFixed(2)} kg for storage');
         });
       }
     },

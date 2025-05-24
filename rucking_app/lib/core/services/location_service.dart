@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' show cos, sqrt, asin;
+import 'dart:math' show cos, sqrt, asin, pi, sin, atan2;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:geolocator/geolocator.dart';
@@ -30,7 +30,7 @@ abstract class LocationService {
 
 /// Implementation of location service using Geolocator
 class LocationServiceImpl implements LocationService {
-  static const double _minDistanceFilter = 5.0; // Filter out updates less than 5 meters apart
+  static const double _minDistanceFilter = 1.0; // Reduced from 5.0 to 1.0 meters for better accuracy
   static const int _batchInterval = 5; // Send batch updates every 5 seconds
   
   final List<LocationPoint> _locationBatch = [];
@@ -90,8 +90,9 @@ class LocationServiceImpl implements LocationService {
     // Raw position stream with distance filter
     final positionStream = Geolocator.getPositionStream(
       locationSettings: AndroidSettings(
-        accuracy: LocationAccuracy.high,
+        accuracy: LocationAccuracy.best, // Changed from high to best for maximum accuracy
         distanceFilter: _minDistanceFilter.toInt(),
+        intervalDuration: const Duration(seconds: 1), // Update every second for better tracking
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Rucking in Progress',
           notificationText: 'Tracking your ruck session',
@@ -142,15 +143,20 @@ class LocationServiceImpl implements LocationService {
   
   @override
   double calculateDistance(LocationPoint point1, LocationPoint point2) {
-    const p = 0.017453292519943295; // Pi/180
-    final c = cos;
-    final a = 0.5 - c((point2.latitude - point1.latitude) * p)/2 + 
-              c(point1.latitude * p) * c(point2.latitude * p) * 
-              (1 - c((point2.longitude - point1.longitude) * p))/2;
-    // Corrected Haversine: use sqrt(a) instead of sqrt(1 - a)
-    final d = 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
+    // Standard Haversine formula for calculating distance between two lat/lng points
+    const double earthRadius = 6371.0; // Earth's radius in kilometers
     
-    return d;
+    final double lat1Rad = point1.latitude * (pi / 180);
+    final double lat2Rad = point2.latitude * (pi / 180);
+    final double deltaLatRad = (point2.latitude - point1.latitude) * (pi / 180);
+    final double deltaLngRad = (point2.longitude - point1.longitude) * (pi / 180);
+    
+    final double a = sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
+        cos(lat1Rad) * cos(lat2Rad) * 
+        sin(deltaLngRad / 2) * sin(deltaLngRad / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a)); // CORRECT: sqrt(1 - a)
+    
+    return earthRadius * c; // Return distance in kilometers
   }
   
   /// Dispose of resources

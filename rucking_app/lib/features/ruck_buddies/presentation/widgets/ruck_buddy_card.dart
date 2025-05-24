@@ -161,9 +161,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   }
 
   List<String> _getProcessedPhotoUrls(List<dynamic> photos, {bool addCacheBuster = false}) {
-    // Always add cache buster when we have photos to ensure they're properly refreshed
-    // This is critical for proper carousel display when returning from detail view
-    final shouldBustCache = addCacheBuster || true; // Force cache busting
+    // Only add cache buster when explicitly requested (e.g., after photo upload/delete)
+    // This preserves normal caching behavior for better performance
+    final shouldBustCache = addCacheBuster; // Only when explicitly requested
     
     // Use a smaller cache value to prevent numerical overflow issues
     final cacheValue = (DateTime.now().millisecondsSinceEpoch % 1000000); // Keep it under 1M

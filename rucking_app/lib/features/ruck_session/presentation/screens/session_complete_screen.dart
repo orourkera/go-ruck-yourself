@@ -117,8 +117,14 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   }
 
   String _formatPace(bool preferMetric) {
-    if (widget.distance <= 0 || widget.duration.inSeconds <= 0) return '--:--';
+    // Return -- for no distance or duration
+    if (widget.distance <= 0.001 || widget.duration.inSeconds <= 0) return '--:--';
+    
     final paceSecondsPerKm = widget.duration.inSeconds / widget.distance;
+    
+    // Cap pace at a reasonable maximum (99:59 per km/mi)
+    if (paceSecondsPerKm > 5999) return '--:--';
+    
     return MeasurementUtils.formatPaceSeconds(paceSecondsPerKm, metric: preferMetric);
   }
 

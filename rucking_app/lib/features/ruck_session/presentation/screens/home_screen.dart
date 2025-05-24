@@ -22,6 +22,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/core/services/session_cache_service.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -200,19 +201,21 @@ class _HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<_HomeTab> with RouteAware {
-  late final ApiClient _apiClient;
-  bool _isLoading = true;
   List<dynamic> _recentSessions = [];
   Map<String, dynamic> _monthlySummaryStats = {};
+  bool _isLoading = true;
+  bool _isRefreshing = false;
+  ApiClient? _apiClient;
+  final SessionCacheService _cacheService = SessionCacheService();
+  final RouteObserver<ModalRoute> _routeObserver = RouteObserver<ModalRoute>();
   
   @override
   void initState() {
     super.initState();
     _apiClient = GetIt.instance<ApiClient>();
-    _fetchData();
     
-    // Check for photo upload error on initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
       _checkForPhotoUploadError();
     });
   }
@@ -242,9 +245,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     }
   }
   
-  /// Fetches both recent sessions and monthly stats
-  Future<void> _fetchData() async {
-    // Prevent setState calls if widget is not attached to widget tree
+  /// Loads data from cache first, then refreshes from network
+  Future<void> _loadData() async {
     if (!mounted) return;
     
     // Safety check: we shouldn't fetch data before we've fully initialized
@@ -255,11 +257,32 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     setState(() {
       _isLoading = true;
     });
+
+    // Try to load from cache first
+    final cachedSessions = await _cacheService.getCachedSessions();
+    final cachedStats = await _cacheService.getCachedStats();
+    
+    if (cachedSessions != null && cachedStats != null) {
+      // We have cache data, show it immediately
+      setState(() {
+        _recentSessions = cachedSessions;
+        _monthlySummaryStats = cachedStats;
+        _isLoading = false;
+        _isRefreshing = true; // Mark that we're refreshing in background
+      });
+    }
+    
+    // Fetch fresh data from the network
+    await _fetchFromNetwork();
+  }
+
+  /// Fetches fresh data from network and updates cache
+  Future<void> _fetchFromNetwork() async {
+    if (!mounted) return;
     
     try {
       // Fetch recent sessions
-      
-      final sessionsResponse = await _apiClient.get('/rucks?limit=20');
+      final sessionsResponse = await _apiClient!.get('/rucks?limit=20');
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
 
       // Filter out incomplete sessions
@@ -268,37 +291,51 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           .toList();
 
       // Fetch monthly stats
-      final statsResponse = await _apiClient.get('/stats/monthly');
+      final statsResponse = await _apiClient!.get('/stats/monthly');
       
       Map<String, dynamic> processedStats = {};
       if (statsResponse is Map && statsResponse.containsKey('data') && statsResponse['data'] is Map) {
           processedStats = statsResponse['data'] as Map<String, dynamic>;
-          
-      } else {
-          
       }
 
-      // Add another safety check in case widget is disposed during the async operation
+      // Cache the results
+      await _cacheService.cacheRecentSessions(completedSessions);
+      await _cacheService.cacheMonthlyStats(processedStats);
+
+      // Add safety check in case widget is disposed during the async operation
       if (!mounted) return;
       
       setState(() {
-        _recentSessions = completedSessions; // Use the filtered list
+        _recentSessions = completedSessions;
         _monthlySummaryStats = processedStats;
         _isLoading = false;
+        _isRefreshing = false;
       });
     } catch (e, stack) {
-      
-      
+      debugPrint('Error fetching data: $e');
+      debugPrint('Stack trace: $stack');
       
       // Final safety check before setState
       if (!mounted) return;
       
-      setState(() {
-        _recentSessions = [];
-        _monthlySummaryStats = {};
-        _isLoading = false;
-      });
+      // Only update state if we don't have cached data
+      if (_recentSessions.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+        });
+      } else {
+        // We already showed cached data, just stop refreshing indicator
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
     }
+  }
+
+  /// Legacy method for backward compatibility
+  Future<void> _fetchData() async {
+    return _loadData();
   }
 
   // Helper function to process session response
@@ -366,15 +403,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
 
   @override
   void didPopNext() {
-    // Called when returning to this screen
-    // Wrap in a Future.microtask to ensure it's not called during build
-    if (mounted) {
-      Future.microtask(() {
-        if (mounted) _fetchData();
-      });
-    }
+    super.didPopNext();
+    
+    // Refresh data when user returns to this screen
+    _fetchFromNetwork();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
@@ -387,320 +421,322 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       },
       child: Scaffold(
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with user greeting
-                BlocBuilder<AuthBloc, AuthState>(
-                  builder: (context, state) {
-                    String userName = 'Rucker'; // Default
-                    if (state is Authenticated) {
-                      // Use the username from the user model if available
-                      if (state.user.username.isNotEmpty) {
-                        userName = state.user.username; 
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _fetchFromNetwork();
+            },
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with user greeting
+                  BlocBuilder<AuthBloc, AuthState>(
+                    builder: (context, state) {
+                      String userName = 'Rucker'; // Default
+                      if (state is Authenticated) {
+                        // Use the username from the user model if available
+                        if (state.user.username.isNotEmpty) {
+                          userName = state.user.username; 
+                        } else {
+                           userName = 'Rucker'; // Fallback if username is somehow empty
+                        }
                       } else {
-                         userName = 'Rucker'; // Fallback if username is somehow empty
+                         // Handle non-authenticated state if necessary
                       }
-                    } else {
-                       // Handle non-authenticated state if necessary
-                    }
-                    
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Welcome back,',
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome back,',
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          userName,
-                          style: AppTextStyles.displayLarge.copyWith(
-                            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 32),
-                
-                // Quick stats section (USE _monthlySummaryStats)
-                BlocBuilder<AuthBloc, AuthState>(
-                  builder: (context, state) {
-                    // Determine if user is in lady mode
-                    bool isLadyMode = false;
-                    if (state is Authenticated && state.user.gender == 'female') {
-                      isLadyMode = true;
-                    }
-                    
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isLadyMode ? AppColors.ladyPrimaryGradient : AppColors.primaryGradient,
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: isLadyMode ? AppColors.ladyPrimary.withOpacity(0.3) : AppColors.primary.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                          const SizedBox(height: 4),
+                          Text(
+                            userName,
+                            style: AppTextStyles.displayLarge.copyWith(
+                              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+                            ),
                           ),
                         ],
-                      ),
-                      child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _monthlySummaryStats['date_range'] ?? 'This Month',
-                        style: AppTextStyles.titleMedium.copyWith(
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Builder( // Use Builder to get context with AuthBloc state
-                         builder: (innerContext) {
-                           bool preferMetric = true;
-                           final authState = innerContext.read<AuthBloc>().state;
-                           if (authState is Authenticated) {
-                             preferMetric = authState.user.preferMetric;
-                           }
-                           
-                           // Use data from _monthlySummaryStats
-                           final rucks = _monthlySummaryStats['total_sessions']?.toString() ?? '0';
-                           final distanceKm = (_monthlySummaryStats['total_distance_km'] ?? 0.0).toDouble();
-                           final distance = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
-                           final calories = (_monthlySummaryStats['total_calories'] ?? 0).round().toString();
-                            
-                           return Row(
-                             mainAxisAlignment: MainAxisAlignment.spaceAround,
-                             children: [
-                               _buildStatItem('Rucks', rucks, Icons.directions_walk),
-                               _buildStatItem('Distance', distance, Icons.straighten),
-                               _buildStatItem('Calories', calories, Icons.local_fire_department),
-                             ],
-                           );
-                         }
-                      ),
-                    ],
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 32),
-                
-                // Create session button - full width and orange
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: Text(
-                      'START NEW RUCK', 
-                      style: AppTextStyles.labelLarge.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CreateSessionScreen(),
-                        ),
                       );
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      minimumSize: const Size.fromHeight(56),
-                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Recent sessions section
-                Text(
-                  'Recent Sessions',
-                  style: AppTextStyles.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                
-                // Show loading indicator or sessions list
-                _isLoading
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 30),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                : _recentSessions.isEmpty
-                  ? // Placeholder for when there are no recent sessions
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 30),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.history_outlined,
-                              size: 48,
-                              color: AppColors.grey,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No recent sessions',
-                              style: AppTextStyles.bodyLarge.copyWith(
-                                color: AppColors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Your completed sessions will appear here',
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.greyDark,
-                              ),
+                  const SizedBox(height: 32),
+                  
+                  // Quick stats section (USE _monthlySummaryStats)
+                  BlocBuilder<AuthBloc, AuthState>(
+                    builder: (context, state) {
+                      // Determine if user is in lady mode
+                      bool isLadyMode = false;
+                      if (state is Authenticated && state.user.gender == 'female') {
+                        isLadyMode = true;
+                      }
+                      
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isLadyMode ? AppColors.ladyPrimaryGradient : AppColors.primaryGradient,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: isLadyMode ? AppColors.ladyPrimary.withOpacity(0.3) : AppColors.primary.withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _monthlySummaryStats['date_range'] ?? 'This Month',
+                              style: AppTextStyles.titleMedium.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Builder( // Use Builder to get context with AuthBloc state
+                              builder: (innerContext) {
+                                bool preferMetric = true;
+                                final authState = innerContext.read<AuthBloc>().state;
+                                if (authState is Authenticated) {
+                                  preferMetric = authState.user.preferMetric;
+                                }
+                                
+                                // Use data from _monthlySummaryStats
+                                final rucks = _monthlySummaryStats['total_sessions']?.toString() ?? '0';
+                                final distanceKm = (_monthlySummaryStats['total_distance_km'] ?? 0.0).toDouble();
+                                final distance = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
+                                final calories = (_monthlySummaryStats['total_calories'] ?? 0).round().toString();
+                                
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                  children: [
+                                    _buildStatItem('Rucks', rucks, Icons.directions_walk),
+                                    _buildStatItem('Distance', distance, Icons.straighten),
+                                    _buildStatItem('Calories', calories, Icons.local_fire_department),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // Create session button - full width and orange
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: Text(
+                        'START NEW RUCK', 
+                        style: AppTextStyles.labelLarge.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CreateSessionScreen()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: const Size.fromHeight(56),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Recent sessions section
+                  Text(
+                    'Recent Sessions',
+                    style: AppTextStyles.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Show loading indicator or sessions list
+                  _isLoading
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 30),
+                        child: CircularProgressIndicator(),
                       ),
                     )
-                  : // List of recent sessions
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _recentSessions.length,
-                      itemBuilder: (context, index) {
-                        final session = _recentSessions[index];
-                        
-                        // Ensure session is a Map
-                        if (session is! Map<String, dynamic>) {
-                          
-                          return const SizedBox.shrink(); // Skip non-map items
-                        }
-                        
-                        // Get session date
-                        final dateString = session['created_at'] as String? ?? '';
-                        final date = DateTime.tryParse(dateString) ?? DateTime.now();
-                        final formattedDate = DateFormat('MMM d, yyyy').format(date);
-                        
-                        // Get session duration directly from session map
-                        final durationSecs = session['duration_seconds'] as int? ?? 0;
-                        final duration = Duration(seconds: durationSecs);
-                        final hours = duration.inHours;
-                        final minutes = duration.inMinutes % 60;
-                        final durationText = hours > 0 
-                            ? '${hours}h ${minutes}m' 
-                            : '${minutes}m';
-                        
-                        // Get distance directly from session map based on user preference
-                        final distanceKmRaw = session['distance_km'];
-                        final double distanceKm = distanceKmRaw is int
-                            ? distanceKmRaw.toDouble()
-                            : (distanceKmRaw as double? ?? 0.0);
-                        bool preferMetric = true;
-                        final authState = context.read<AuthBloc>().state;
-                        if (authState is Authenticated) {
-                          preferMetric = authState.user.preferMetric;
-                        }
-                        
-                        final distanceValue = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
-                        
-                        // Get calories directly from session map
-                        final calories = session['calories_burned']?.toString() ?? '0';
-                        
-                        // Pace display (use exact API field name from data model)
-                        final paceRaw = session['average_pace'] ?? 0.0;
-                        final pace = paceRaw is int ? paceRaw.toDouble() : paceRaw;
-                        final paceDisplay = (pace != null && pace > 0)
-                            ? MeasurementUtils.formatPace(pace, metric: preferMetric)
-                            : '--';
-                        
-                        // Elevation display (use exact API field names from data model)
-                        final elevationGainRaw = session['elevation_gain_m'] ?? 0.0;
-                        double elevationGain = elevationGainRaw is int ? elevationGainRaw.toDouble() : elevationGainRaw;
-                        final elevationLossRaw = session['elevation_loss_m'] ?? 0.0;
-                        double elevationLoss = elevationLossRaw is int ? elevationLossRaw.toDouble() : elevationLossRaw;
-                        String elevationDisplay = (elevationGain == 0.0 && elevationLoss == 0.0)
-                          ? '--'
-                          : MeasurementUtils.formatElevationCompact(elevationGain, elevationLoss, metric: preferMetric);
-                        
-                        // Map route points
-                        List<LatLng> routePoints = [];
-                        if (session['route'] is List && (session['route'] as List).isNotEmpty) {
-                          try {
-                            routePoints = (session['route'] as List)
-                                .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
-                                .map((p) => LatLng(
-                                  (p['lat'] as num).toDouble(),
-                                  (p['lng'] as num).toDouble(),
-                                ))
-                                .toList();
-                          } catch (e) {
-                            
-                          }
-                        } else if (session['location_points'] is List && (session['location_points'] as List).isNotEmpty) {
-                          try {
-                            routePoints = (session['location_points'] as List)
-                                .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
-                                .map((p) => LatLng(
-                                  (p['lat'] as num).toDouble(),
-                                  (p['lng'] as num).toDouble(),
-                                ))
-                                .toList();
-                          } catch (e) {
-                            
-                          }
-                        } else if (session['locationPoints'] is List && (session['locationPoints'] as List).isNotEmpty) {
-                          try {
-                            routePoints = (session['locationPoints'] as List)
-                                .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
-                                .map((p) => LatLng(
-                                  (p['lat'] as num).toDouble(),
-                                  (p['lng'] as num).toDouble(),
-                                ))
-                                .toList();
-                          } catch (e) {
-                            
-                          }
-                        }
-                        if (routePoints.isEmpty) {
-                          
-                          routePoints = [
-                            LatLng(40.421, -3.678),
-                            LatLng(40.422, -3.678),
-                            LatLng(40.423, -3.677),
-                            LatLng(40.424, -3.676),
-                          ];
-                        }
-                        return GestureDetector(
-                          onTap: () {
-                            try {
-                              final sessionModel = RuckSession.fromJson(session);
-                              // Navigate to detail screen and handle the result
-                              Navigator.of(context).push<bool>(
-                                MaterialPageRoute(
-                                  builder: (context) => SessionDetailScreen(session: sessionModel),
+                  : _recentSessions.isEmpty
+                    ? // Placeholder for when there are no recent sessions
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 30),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.history_outlined,
+                                size: 48,
+                                color: AppColors.grey,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No recent sessions',
+                                style: AppTextStyles.bodyLarge.copyWith(
+                                  color: AppColors.grey,
                                 ),
-                              ).then((refreshNeeded) {
-                                // If returned with true (session deleted), refresh the data
-                                if (refreshNeeded == true) {
-                                  _fetchData();
-                                }
-                              });
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Your completed sessions will appear here',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.greyDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _recentSessions.length,
+                        itemBuilder: (context, index) {
+                          final session = _recentSessions[index];
+                          
+                          // Ensure session is a Map
+                          if (session is! Map<String, dynamic>) {
+                            return const SizedBox.shrink(); // Skip non-map items
+                          }
+                          
+                          // Get session date
+                          final dateString = session['started_at'] as String? ?? '';
+                          final date = DateTime.tryParse(dateString);
+                          final formattedDate = date != null 
+                              ? DateFormat('MMM d, yyyy').format(date)
+                              : 'Unknown date';
+                          
+                          // Get session duration directly from session map
+                          final durationSecs = session['duration_seconds'] as int? ?? 0;
+                          final duration = Duration(seconds: durationSecs);
+                          final hours = duration.inHours;
+                          final minutes = duration.inMinutes % 60;
+                          final durationText = hours > 0 
+                              ? '${hours}h ${minutes}m' 
+                              : '${minutes}m';
+                          
+                          // Get distance directly from session map based on user preference
+                          final distanceKmRaw = session['distance_km'];
+                          final double distanceKm = distanceKmRaw is int
+                              ? distanceKmRaw.toDouble()
+                              : (distanceKmRaw as double? ?? 0.0);
+                          bool preferMetric = true;
+                          final authState = context.read<AuthBloc>().state;
+                          if (authState is Authenticated) {
+                            preferMetric = authState.user.preferMetric;
+                          }
+                          
+                          final distanceValue = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
+                          
+                          // Get calories directly from session map
+                          final calories = session['calories_burned']?.toString() ?? '0';
+                          
+                          // Pace display (use exact API field name from data model)
+                          final paceRaw = session['average_pace'] ?? 0.0;
+                          final pace = paceRaw is int ? paceRaw.toDouble() : paceRaw;
+                          final paceDisplay = (pace != null && pace > 0)
+                              ? MeasurementUtils.formatPace(pace, metric: preferMetric)
+                              : '--';
+                          
+                          // Elevation display (use exact API field names from data model)
+                          final elevationGainRaw = session['elevation_gain_m'] ?? 0.0;
+                          double elevationGain = elevationGainRaw is int ? elevationGainRaw.toDouble() : elevationGainRaw;
+                          final elevationLossRaw = session['elevation_loss_m'] ?? 0.0;
+                          double elevationLoss = elevationLossRaw is int ? elevationLossRaw.toDouble() : elevationLossRaw;
+                          String elevationDisplay = (elevationGain == 0.0 && elevationLoss == 0.0)
+                            ? '--'
+                            : MeasurementUtils.formatElevationCompact(elevationGain, elevationLoss, metric: preferMetric);
+                          
+                          // Map route points
+                          List<LatLng> routePoints = [];
+                          if (session['route'] is List && (session['route'] as List).isNotEmpty) {
+                            try {
+                              routePoints = (session['route'] as List)
+                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
+                                  .map((p) => LatLng(
+                                    (p['lat'] as num).toDouble(),
+                                    (p['lng'] as num).toDouble(),
+                                  ))
+                                  .toList();
                             } catch (e) {
-                              
+                              // Ignore errors
                             }
-                          },
-                          child: Card(
+                          } else if (session['location_points'] is List && (session['location_points'] as List).isNotEmpty) {
+                            try {
+                              routePoints = (session['location_points'] as List)
+                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
+                                  .map((p) => LatLng(
+                                    (p['lat'] as num).toDouble(),
+                                    (p['lng'] as num).toDouble(),
+                                  ))
+                                  .toList();
+                            } catch (e) {
+                              // Ignore errors
+                            }
+                          } else if (session['locationPoints'] is List && (session['locationPoints'] as List).isNotEmpty) {
+                            try {
+                              routePoints = (session['locationPoints'] as List)
+                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
+                                  .map((p) => LatLng(
+                                    (p['lat'] as num).toDouble(),
+                                    (p['lng'] as num).toDouble(),
+                                  ))
+                                  .toList();
+                            } catch (e) {
+                              // Ignore errors
+                            }
+                          }
+                          if (routePoints.isEmpty) {
+                            // Use default points for visual testing
+                            routePoints = [
+                              LatLng(40.421, -3.678),
+                              LatLng(40.422, -3.678),
+                              LatLng(40.423, -3.677),
+                              LatLng(40.424, -3.676),
+                            ];
+                          }
+                          return GestureDetector(
+                            onTap: () {
+                              try {
+                                final sessionModel = RuckSession.fromJson(session);
+                                // Navigate to detail screen and handle the result
+                                Navigator.of(context).push<bool>(
+                                  MaterialPageRoute(
+                                    builder: (context) => SessionDetailScreen(session: sessionModel),
+                                  ),
+                                ).then((refreshNeeded) {
+                                  // If returned with true (session deleted), refresh the data
+                                  if (refreshNeeded == true) {
+                                    _fetchFromNetwork();
+                                  }
+                                });
+                              } catch (e) {
+                                // Ignore errors
+                              }
+                            },
+                            child: Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             elevation: 1,
                             color: Theme.of(context).cardColor, // Use theme card color (tan in dark mode)
@@ -843,9 +879,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
             ),
           ),
         ),
-      ),
-    );
-  }
+      ), // Closes SafeArea
+    ), // Closes Scaffold
+  ); // Closes BlocListener
+  } // Closes build method
 
   /// Builds a statistics item for the quick stats section
   Widget _buildStatItem(String label, String value, IconData icon) {
@@ -918,4 +955,4 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
     return '${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds';
   }
-} 
+} // Closes _HomeTabState class
