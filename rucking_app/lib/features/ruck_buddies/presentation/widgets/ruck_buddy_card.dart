@@ -510,10 +510,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                               const SizedBox(width: 4),
                               Text(
                                 '${_likeCount ?? 0}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'Bangers',
                                   fontSize: 20,
-                                  color: Colors.black,
+                                  color: isDarkMode ? Colors.white : Colors.black,
                                 ),
                               ),
                             ],
@@ -543,10 +543,10 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                               const SizedBox(width: 4),
                               Text(
                                 '${_commentCount ?? 0}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'Bangers',
                                   fontSize: 20,
-                                  color: Colors.black,
+                                  color: isDarkMode ? Colors.white : Colors.black,
                                 ),
                               ),
                             ],

@@ -427,6 +427,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             itemCount: 5,
             itemPadding: const EdgeInsets.symmetric(horizontal: 4),
             itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+            unratedColor: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.grey.shade600 // Light gray in dark mode for visibility
+                : Colors.grey.shade300, // Original light gray in light mode
             onRatingUpdate: (rating) => setState(() => _rating = rating.toInt()),
           ),
         ),

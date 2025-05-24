@@ -295,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         label: const Text('Manage Subscription'),
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 50),
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: isLadyMode ? AppColors.ladyPrimary : AppColors.primary,
                           foregroundColor: Colors.white,
                           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
