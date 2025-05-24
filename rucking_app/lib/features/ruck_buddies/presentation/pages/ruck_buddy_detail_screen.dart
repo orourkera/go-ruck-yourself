@@ -392,7 +392,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                         style: TextStyle(
                           fontFamily: 'Bangers',
                           fontSize: 28,
-                          color: Colors.black,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                           letterSpacing: 1.0,
                         ),
                       ),

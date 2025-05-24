@@ -162,7 +162,9 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
                   shape: BoxShape.circle,
                   color: _currentPage == index
                     ? Theme.of(context).colorScheme.primary
-                    : Colors.grey.shade300,
+                    : Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade300,
                 ),
               );
             }),
