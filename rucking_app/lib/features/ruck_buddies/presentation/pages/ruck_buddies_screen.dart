@@ -112,7 +112,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
     
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Ruck Buddies'),
         // Info icon removed per request
