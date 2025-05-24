@@ -318,18 +318,19 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       // Final safety check before setState
       if (!mounted) return;
       
-      // Only update state if we don't have cached data
-      if (_recentSessions.isEmpty) {
-        setState(() {
-          _isLoading = false;
-          _isRefreshing = false;
-        });
-      } else {
-        // We already showed cached data, just stop refreshing indicator
-        setState(() {
-          _isRefreshing = false;
-        });
-      }
+      // If this was triggered after a session deletion, we should show empty state
+      // rather than potentially stale data from the cache
+      final wasManualRefresh = _isRefreshing;
+      
+      setState(() {
+        _isLoading = false;
+        _isRefreshing = false;
+        
+        // Clear cache if it was a manual refresh (e.g., after delete)
+        if (wasManualRefresh) {
+          _recentSessions = [];
+        }
+      });
     }
   }
 
@@ -369,6 +370,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    
+    // Refresh data when returning to this screen (e.g., after deleting a session)
+    if (!_isLoading && !_isRefreshing) {
+      _fetchFromNetwork();
+    }
     
     // Only attempt to subscribe to route if the context is still valid
     if (mounted) {

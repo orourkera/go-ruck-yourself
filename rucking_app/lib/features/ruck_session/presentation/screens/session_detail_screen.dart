@@ -333,8 +333,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 animationStyle: SnackBarAnimationStyle.slideUpBounce,
               );
               
-              // Navigate back to home screen
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              // Navigate back with result to trigger refresh
+              Navigator.of(context).pop(true); // Pass true to indicate data change
             } else if (state is SessionOperationFailure) {
               // Show error message using StyledSnackBar
               StyledSnackBar.showError(
