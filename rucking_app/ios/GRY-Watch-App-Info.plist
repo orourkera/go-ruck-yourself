@@ -50,7 +50,6 @@
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>background-processing</string>
 		<string>workout-processing</string>
 	</array>
 </dict>
