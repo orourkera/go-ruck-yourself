@@ -44,6 +44,14 @@ class WatchService {
   final _heartRateController = StreamController<double>.broadcast();
   StreamSubscription? _nativeHeartRateSubscription;
   
+  // Constants for heart rate sampling
+  static const Duration _heartRateSampleInterval = Duration(seconds: 30); // Sample every 30 seconds
+  static const int _heartRateSignificantChangeBpm = 10; // Consider changes of 10+ BPM significant
+  
+  // Heart rate sampling variables
+  DateTime? _lastHeartRateSampleTime;
+  double? _lastSampledHeartRate;
+  
   // Flag to track if we've attempted to reconnect the heart rate listener
   bool _isReconnectingHeartRate = false;
   int _heartRateReconnectAttempts = 0;
@@ -193,12 +201,20 @@ class WatchService {
     }
   }
 
+  /// Reset heart rate sampling tracking variables
+  void _resetHeartRateSamplingVariables() {
+    _lastHeartRateSampleTime = null;
+    _lastSampledHeartRate = null;
+    AppLogger.debug('[WATCH_SERVICE] Reset heart rate sampling variables');
+  }
+
   /// Start a new rucking session on the watch
   Future<void> startSessionOnWatch(double ruckWeight) async {
     debugPrint('[PAUSE_DEBUG] WatchService: startSessionOnWatch called with ruckWeight: $ruckWeight. Setting _isSessionActive = true.');
     _isSessionActive = true;
     _isPaused = false;
     _ruckWeight = ruckWeight;
+    _resetHeartRateSamplingVariables();
     _currentSessionHeartRateSamples = []; // Clear samples for the new session
 
     try {
@@ -425,7 +441,8 @@ class WatchService {
   Future<bool> endSessionOnWatch() async {
     // Update local state
     _isSessionActive = false;
-    // End session on watch
+    _isPaused = false;
+    _resetHeartRateSamplingVariables();
     
     // First save heart rate samples (outside the try-catch for the API call)
     try {
@@ -460,25 +477,55 @@ class WatchService {
   void handleWatchHeartRateUpdate(double heartRate) {
     // Update our local heart rate value
     _currentHeartRate = heartRate;
-    // Add to heart rate stream for UI components
+    // Add to heart rate stream for UI components (always update UI in real-time)
     _heartRateController.add(heartRate);
     
-    // Add to session heart rate samples
+    // Add to session heart rate samples with throttling to reduce database load
     if (_isSessionActive) {
-      final sample = HeartRateSample(
-        bpm: heartRate.toInt(),
-        timestamp: DateTime.now().toUtc(),
-      );
-      _currentSessionHeartRateSamples.add(sample);
+      final now = DateTime.now().toUtc();
+      final int currentBpm = heartRate.toInt();
       
-      // Store heart rate samples for processing
-      try {
-        // Just add to our local list for now - we'll save the entire list later
-        // HeartRateSampleStorage has static methods only, not instance methods
-        // We'll call HeartRateSampleStorage.saveSamples() when the session ends
-      } catch (e) {
-        // Only log errors for heart rate storage
-        AppLogger.error('[WATCH_SERVICE] Failed to store heart rate sample: $e');
+      // Determine if we should save this sample based on time interval or significant change
+      bool shouldSaveSample = false;
+      
+      // Always save the first sample
+      if (_lastHeartRateSampleTime == null || _lastSampledHeartRate == null) {
+        shouldSaveSample = true;
+        AppLogger.debug('[WATCH_SERVICE] Saving initial heart rate sample: $currentBpm BPM');
+      } 
+      // Save if enough time has passed since last sample
+      else if (now.difference(_lastHeartRateSampleTime!) >= _heartRateSampleInterval) {
+        shouldSaveSample = true;
+        AppLogger.debug('[WATCH_SERVICE] Saving heart rate sample after interval: $currentBpm BPM');
+      }
+      // Save if there's a significant change in heart rate, even if interval hasn't passed
+      else if (_lastSampledHeartRate != null && 
+               (currentBpm - _lastSampledHeartRate!).abs() >= _heartRateSignificantChangeBpm) {
+        shouldSaveSample = true;
+        AppLogger.debug('[WATCH_SERVICE] Saving heart rate sample due to significant change: $currentBpm BPM (changed from ${_lastSampledHeartRate!.toInt()} BPM)');
+      }
+      
+      // If we should save this sample, add it to our collection
+      if (shouldSaveSample) {
+        final sample = HeartRateSample(
+          bpm: currentBpm,
+          timestamp: now,
+        );
+        _currentSessionHeartRateSamples.add(sample);
+        
+        // Update our tracking variables
+        _lastHeartRateSampleTime = now;
+        _lastSampledHeartRate = heartRate;
+        
+        // Store heart rate samples for processing
+        try {
+          // Just add to our local list for now - we'll save the entire list later
+          // HeartRateSampleStorage has static methods only, not instance methods
+          // We'll call HeartRateSampleStorage.saveSamples() when the session ends
+        } catch (e) {
+          // Only log errors for heart rate storage
+          AppLogger.error('[WATCH_SERVICE] Failed to store heart rate sample: $e');
+        }
       }
     }
   }
