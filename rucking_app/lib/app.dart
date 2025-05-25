@@ -20,6 +20,8 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
+import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
+import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 
 /// Main application widget
 class RuckingApp extends StatelessWidget {
@@ -49,6 +51,9 @@ class RuckingApp extends StatelessWidget {
         ),
         BlocProvider<SocialBloc>(
           create: (context) => getIt<SocialBloc>(),
+        ),
+        BlocProvider<NotificationBloc>(
+          create: (context) => getIt<NotificationBloc>()..add(const NotificationsRequested()),
         ),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(

@@ -41,5 +41,18 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    
+    # Force modular headers for all Firebase-related pods
+    target.build_configurations.each do |config|
+      if target.name.start_with?('Firebase') || target.name.include?('Firebase') || target.name.include?('firebase')
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      end
+      
+      # Increase iOS deployment target to at least 12.0 for all pods
+      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 12.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      end
+    end
   end
 end
