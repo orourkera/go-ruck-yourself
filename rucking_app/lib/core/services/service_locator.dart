@@ -39,22 +39,40 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<Dio>(_configureDio());
   final apiClient = ApiClient(getIt<Dio>());
   getIt.registerSingleton<ApiClient>(apiClient);
-  getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
-  getIt.registerSingleton<AuthService>(AuthServiceImpl(getIt<ApiClient>(), getIt<StorageService>()));
-  
-  // Connect services to resolve circular dependencies
-  apiClient.setStorageService(getIt<StorageService>());
-  
-  // Add token refresh interceptor after auth service is initialized
-  final tokenRefreshInterceptor = TokenRefreshInterceptor(
-    getIt<Dio>(), 
-    getIt<AuthService>(), 
-    getIt<StorageService>()
+
+  // ---- Auth / Storage wiring ----
+  // Create storage service first, then inject it into ApiClient
+  final storageService =
+      StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>());
+  getIt.registerSingleton<StorageService>(storageService);
+
+  // Allow ApiClient & interceptors to access secure storage
+  apiClient.setStorageService(storageService);
+
+  // Register AuthService after its dependencies are ready
+  getIt.registerSingleton<AuthService>(
+    AuthServiceImpl(apiClient, storageService),
   );
-  getIt<Dio>().interceptors.add(tokenRefreshInterceptor);
+
+  // Add automatic token-refresh support on 401 responses
+  getIt<Dio>().interceptors.add(
+    TokenRefreshInterceptor(
+      getIt<Dio>(),
+      getIt<AuthService>(),
+      storageService,
+    ),
+  );
+  // ---- end wiring ----
+
+  // Connect services to resolve circular dependencies
   
+  // Location service
   getIt.registerSingleton<LocationService>(LocationServiceImpl());
+  
+  // Health service
   getIt.registerSingleton<HealthService>(HealthService());
+  
+  // RevenueCat service
   getIt.registerSingleton<RevenueCatService>(RevenueCatService());
   
   // Watch service depends on location, health, auth

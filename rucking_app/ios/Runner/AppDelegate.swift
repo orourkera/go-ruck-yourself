@@ -185,54 +185,28 @@ import WatchConnectivity
             return
         }
         
-        // Log the current activation state
-        let stateString: String
-        switch session.activationState {
-        case .notActivated: stateString = "Not Activated"
-        case .inactive: stateString = "Inactive"
-        case .activated: stateString = "Activated"
-        @unknown default: stateString = "Unknown"
-        }
-        
-        print("[WATCH] Current session state: \(stateString)")
-        print("[WATCH] Is watch reachable: \(session.isReachable)")
-        print("[WATCH] Is paired: \(session.isPaired)")
-        print("[WATCH] Is complication enabled: \(session.isComplicationEnabled)")
-        
-        // Try to send even if not activated as a test
+        // Send the message: live when reachable, context/queued otherwise
         if session.isReachable {
-            print("[WATCH] Sending message to watch: \(message)")
-            session.sendMessage(message, replyHandler: { reply in
-                print("[WATCH] Watch replied: \(reply)")
-            }) { error in
-                print("[WATCH] Error sending message to Watch: \(error.localizedDescription)")
-                
-                // Try application context as fallback
+            print("[WATCH] sendMessageToWatch: live send → \(message)")
+            session.sendMessage(message, replyHandler: nil) { error in
+                print("[WATCH] Live send failed (\(error.localizedDescription)); falling back to applicationContext")
                 do {
                     try session.updateApplicationContext(message)
-                    print("[WATCH] Updated application context after send error")
                 } catch {
-                    print("[WATCH] Failed to update context after send error: \(error.localizedDescription)")
+                    print("[WATCH] updateApplicationContext fallback failed: \(error.localizedDescription)")
                 }
             }
         } else {
-            print("[WATCH] Watch is not reachable. Trying alternative methods.")
-            
-            // Try to transfer as application context as fallback
+            print("[WATCH] sendMessageToWatch: watch not reachable – using applicationContext\(launchApp ? " + transferUserInfo" : "")")
             do {
                 try session.updateApplicationContext(message)
-                print("[WATCH] Updated application context instead")
             } catch {
-                print("[WATCH] Failed to update application context: \(error.localizedDescription)")
+                print("[WATCH] updateApplicationContext failed: \(error.localizedDescription)")
             }
-            
-            // Always use transferUserInfo since this works even when watch app is not running
-            var userInfo = message
+            // Only queue with transferUserInfo when explicitly requested (e.g., auto-launch)
             if launchApp {
-                print("[WATCH] Setting launchApp flag to auto-launch Watch app")
+                session.transferUserInfo(message)
             }
-            session.transferUserInfo(userInfo)
-            print("[WATCH] Attempted transferUserInfo\(launchApp ? " with auto-launch flag" : "")")
         }
     }
     
