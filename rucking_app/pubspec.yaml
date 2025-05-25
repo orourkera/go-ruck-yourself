@@ -65,8 +65,9 @@ dependencies:
   permission_handler: ^12.0.0+1
   flutter_local_notifications: ^19.1.0
   get_it: ^8.0.3
-  firebase_core: ^3.13.0
-  firebase_analytics: ^11.4.5
+  firebase_core: ^2.32.0
+  firebase_analytics: ^10.8.0
+  firebase_crashlytics: ^3.5.7
   keyboard_actions: ^4.2.0
   email_launcher: ^1.1.1
   flutter_dotenv: ^5.1.0
