@@ -173,7 +173,6 @@ from .api.stats import ( # Import new stats resources
 from .api.ruck_photos_resource import RuckPhotosResource # Added import for RuckPhotosResource
 from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesResource
 from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
-from .api.notifications_resource import NotificationsResource, NotificationReadResource, ReadAllNotificationsResource # Import for Notification resources
 
 # Apply rate limiting to SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
@@ -336,18 +335,6 @@ RuckCommentsResource.delete = limiter.limit("500 per minute", override_defaults=
 
 # Now register the resource with modified methods
 api.add_resource(RuckCommentsResource, '/api/ruck-comments')
-
-# Notification Endpoints
-app.logger.info(f"Setting NotificationsResource rate limit to: 120 per minute")
-# Apply rate limits to notification resources
-NotificationsResource.get = limiter.limit("120 per minute", override_defaults=True)(NotificationsResource.get)
-NotificationReadResource.put = limiter.limit("120 per minute", override_defaults=True)(NotificationReadResource.put)
-ReadAllNotificationsResource.put = limiter.limit("60 per minute", override_defaults=True)(ReadAllNotificationsResource.put)
-
-# Register notification resources
-api.add_resource(NotificationsResource, '/api/notifications')
-api.add_resource(NotificationReadResource, '/api/notifications/<string:notification_id>/read')
-api.add_resource(ReadAllNotificationsResource, '/api/notifications/read_all')
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
