@@ -5,12 +5,15 @@ import 'package:flutter/material.dart'; // For GlobalKey, NavigatorState
 import 'package:get_it/get_it.dart'; // For GetIt
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_state.dart';
 
 /// Implementation of the RuckingApi for handling watch messages
 class RuckingApiHandler extends RuckingApi {
   final WatchService _watchService;
+  final AuthBloc _authBloc;
   
-  RuckingApiHandler(this._watchService);
+  RuckingApiHandler(this._watchService) : _authBloc = GetIt.instance<AuthBloc>();
   
   @override
   Future<bool> startSessionFromWatch(double ruckWeight) async {
@@ -111,6 +114,11 @@ class RuckingApiHandler extends RuckingApi {
 
   @override
   Future<bool> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused, double calories, double elevationGain, double elevationLoss) async {
+    // Get user's metric preference from the auth service
+    // Default to metric (true) if not available
+    final authState = _authBloc.state;
+    final isMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    
     return _watchService.updateSessionOnWatch(
       distance: distance,
       duration: Duration(seconds: duration.toInt()),
@@ -119,6 +127,7 @@ class RuckingApiHandler extends RuckingApi {
       calories: calories, // Pass as double directly, no .toInt() conversion
       elevationGain: elevationGain,
       elevationLoss: elevationLoss,
+      isMetric: isMetric, // Pass the user's metric preference
     );
   }
 }
