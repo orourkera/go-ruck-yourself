@@ -10,6 +10,9 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/session_d
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_history_screen.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
+import 'package:rucking_app/features/notifications/presentation/widgets/notification_bell.dart';
+import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
+import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
@@ -217,6 +220,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
       _checkForPhotoUploadError();
+      
+      // Start polling for notifications
+      final notificationBloc = GetIt.instance<NotificationBloc>();
+      notificationBloc.add(const NotificationsRequested());
+      notificationBloc.startPolling();
     });
   }
   
@@ -451,22 +459,41 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                          // Handle non-authenticated state if necessary
                       }
                       
+                      // Check for gender-specific styling
+                      final isLadyMode = state is Authenticated && state.user.gender == 'female';
+
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Welcome back,',
-                            style: AppTextStyles.bodyLarge.copyWith(
-                              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Welcome back,',
+                                      style: AppTextStyles.bodyLarge.copyWith(
+                                        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      userName,
+                                      style: AppTextStyles.displayLarge.copyWith(
+                                        color: AppColors.textDark,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Notification bell with unread count
+                              NotificationBell(useLadyMode: isLadyMode),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            userName,
-                            style: AppTextStyles.displayLarge.copyWith(
-                              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
-                            ),
-                          ),
+                          const SizedBox(height: 16),
                         ],
                       );
                     },
