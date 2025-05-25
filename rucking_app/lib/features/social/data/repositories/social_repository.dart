@@ -387,11 +387,7 @@ class SocialRepository {
 
       debugPrint('[SOCIAL_DEBUG] Adding comment to ruck $ruckId with content: $content');
       
-      // Don't include /api in the path as it's already in the base URL
-      final endpoint = '${AppConfig.apiBaseUrl}/ruck-comments';
-      debugPrint('[SOCIAL_DEBUG] Comment endpoint: $endpoint');
-      
-      // Ensure ruck_id is parsed as an integer if possible, as the backend expects an integer
+      // Parse the ruck ID to an integer if possible
       int? ruckIdInt;
       try {
         ruckIdInt = int.parse(ruckId);
@@ -399,8 +395,13 @@ class SocialRepository {
         debugPrint('[SOCIAL_DEBUG] Could not parse ruckId to int: $e');
       }
       
+      // Don't include /api in the path as it's already in the base URL
+      // Use the correct endpoint format: /rucks/{id}/comments
+      final endpoint = '${AppConfig.apiBaseUrl}/rucks/${ruckIdInt ?? ruckId}/comments';
+      debugPrint('[SOCIAL_DEBUG] Comment endpoint: $endpoint');
+      
+      // Only send the content in the payload, not the ruck_id (as it's in the URL path)
       final payload = {
-        'ruck_id': ruckIdInt ?? ruckId, // Use integer if parsed successfully, otherwise use the string
         'content': content,
       };
       debugPrint('[SOCIAL_DEBUG] Comment payload: ${json.encode(payload)}');
@@ -445,6 +446,10 @@ class SocialRepository {
 
       debugPrint('[SOCIAL_DEBUG] Updating comment $commentId with content: $content');
       
+      // To update a comment, we need to know which ruck it belongs to
+      // We'll need to extract the ruck ID from the comment ID format (if possible)
+      // For now, let's use the PUT method on the specific comment endpoint
+      
       // Try to parse the comment ID as an integer if possible
       int? commentIdInt;
       try {
@@ -453,15 +458,16 @@ class SocialRepository {
         debugPrint('[SOCIAL_DEBUG] Could not parse commentId to int: $e');
       }
       
-      // Use the format expected by the backend API with comment_id in the body
+      // Since the correct endpoint would be /rucks/{ruck_id}/comments/{comment_id}
+      // but we don't have the ruck_id here, we'll use the API's ability to 
+      // identify comments directly by ID
       final response = await _httpClient.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/ruck-comments'),
+        Uri.parse('${AppConfig.apiBaseUrl}/comments/${commentIdInt ?? commentId}'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
         body: json.encode({
-          'comment_id': commentIdInt ?? commentId, // Use integer if parsed successfully, otherwise use the string
           'content': content,
         }),
       );
@@ -505,12 +511,13 @@ class SocialRepository {
         debugPrint('[SOCIAL_DEBUG] Could not parse commentId to int: $e');
       }
       
-      // Use the parsed integer if available, otherwise use the original string
+      // The correct endpoint format is /comments/{id} for direct comment management
+      // without knowing the ruck_id
       final commentParam = commentIdInt != null ? commentIdInt.toString() : commentId;
       
-      // Use query parameters as expected by the backend API
+      // Use the DELETE method on the specific comment endpoint
       final response = await _httpClient.delete(
-        Uri.parse('${AppConfig.apiBaseUrl}/ruck-comments?comment_id=$commentParam'),
+        Uri.parse('${AppConfig.apiBaseUrl}/comments/$commentParam'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
