@@ -77,9 +77,11 @@ This document provides a comprehensive list of all API endpoints used in the Ruc
 
 | Endpoint | HTTP Method | Description |
 |----------|------------|-------------|
-| `/notifications` | GET | Get user notifications |
+| `/notifications/` | GET | Get user notifications |
 | `/notifications/{id}/read` | POST | Mark notification as read |
-| `/notifications/read_all` | POST | Mark all notifications as read |
+| `/notifications/read-all` | POST | Mark all notifications as read |
+
+> **NOTE**: The notifications table in the database uses `recipient_id` (not `user_id`) to store the user ID.
 
 ---
 
