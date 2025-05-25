@@ -50,7 +50,7 @@
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>workout-processing</string>
+		<string>workout</string>
 	</array>
 </dict>
 </plist>
