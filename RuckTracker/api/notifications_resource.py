@@ -20,8 +20,8 @@ def require_auth(f):
 
 # Helper to get user ID from the session
 def get_user_id():
-    if g.user and 'id' in g.user:
-        return g.user['id']
+    if g.user and hasattr(g.user, 'id'):
+        return g.user.id
     return None
 
 class NotificationsResource(Resource):
