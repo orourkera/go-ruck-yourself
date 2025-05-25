@@ -385,13 +385,22 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      // Use the original endpoint structure with proper URL formatting
-      final endpoint = '${AppConfig.apiBaseUrl}/ruck-comments';
-      debugPrint('[SOCIAL_DEBUG] Adding comment for ruckId $ruckId, endpoint: $endpoint');
+      debugPrint('[SOCIAL_DEBUG] Adding comment to ruck $ruckId with content: $content');
       
-      // Include ruck_id in the payload as the original implementation did
+      // Don't include /api in the path as it's already in the base URL
+      final endpoint = '${AppConfig.apiBaseUrl}/ruck-comments';
+      debugPrint('[SOCIAL_DEBUG] Comment endpoint: $endpoint');
+      
+      // Ensure ruck_id is parsed as an integer if possible, as the backend expects an integer
+      int? ruckIdInt;
+      try {
+        ruckIdInt = int.parse(ruckId);
+      } catch (e) {
+        debugPrint('[SOCIAL_DEBUG] Could not parse ruckId to int: $e');
+      }
+      
       final payload = {
-        'ruck_id': ruckId,
+        'ruck_id': ruckIdInt ?? ruckId, // Use integer if parsed successfully, otherwise use the string
         'content': content,
       };
       debugPrint('[SOCIAL_DEBUG] Comment payload: ${json.encode(payload)}');
@@ -434,6 +443,16 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
+      debugPrint('[SOCIAL_DEBUG] Updating comment $commentId with content: $content');
+      
+      // Try to parse the comment ID as an integer if possible
+      int? commentIdInt;
+      try {
+        commentIdInt = int.parse(commentId);
+      } catch (e) {
+        debugPrint('[SOCIAL_DEBUG] Could not parse commentId to int: $e');
+      }
+      
       // Use the format expected by the backend API with comment_id in the body
       final response = await _httpClient.put(
         Uri.parse('${AppConfig.apiBaseUrl}/ruck-comments'),
@@ -442,10 +461,12 @@ class SocialRepository {
           'Authorization': 'Bearer $token',
         },
         body: json.encode({
-          'comment_id': commentId,
+          'comment_id': commentIdInt ?? commentId, // Use integer if parsed successfully, otherwise use the string
           'content': content,
         }),
       );
+      
+      debugPrint('[SOCIAL_DEBUG] Update comment API response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
@@ -474,14 +495,29 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
+      debugPrint('[SOCIAL_DEBUG] Deleting comment $commentId');
+      
+      // Try to parse the comment ID as an integer if possible
+      int? commentIdInt;
+      try {
+        commentIdInt = int.parse(commentId);
+      } catch (e) {
+        debugPrint('[SOCIAL_DEBUG] Could not parse commentId to int: $e');
+      }
+      
+      // Use the parsed integer if available, otherwise use the original string
+      final commentParam = commentIdInt != null ? commentIdInt.toString() : commentId;
+      
       // Use query parameters as expected by the backend API
       final response = await _httpClient.delete(
-        Uri.parse('${AppConfig.apiBaseUrl}/ruck-comments?comment_id=$commentId'),
+        Uri.parse('${AppConfig.apiBaseUrl}/ruck-comments?comment_id=$commentParam'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
+      
+      debugPrint('[SOCIAL_DEBUG] Delete comment API response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);

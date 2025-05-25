@@ -41,7 +41,7 @@ class NotificationsResource(Resource):
             supabase_client = get_supabase_admin_client()
             
             # Query notifications from Supabase
-            response = supabase_client.table('notifications').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
+            response = supabase_client.table('notifications').select('*').eq('recipient_id', user_id).order('date', desc=True).execute()
             
             if hasattr(response, 'error') and response.error:
                 logger.error(f"Error fetching notifications: {response.error}")
@@ -76,7 +76,7 @@ class NotificationReadResource(Resource):
             supabase_client = get_supabase_admin_client()
                 
             # Update the notification in Supabase
-            response = supabase_client.table('notifications').update({"is_read": True}).eq('id', notification_id).eq('user_id', user_id).execute()
+            response = supabase_client.table('notifications').update({"is_read": True}).eq('id', notification_id).eq('recipient_id', user_id).execute()
             
             if hasattr(response, 'error') and response.error:
                 logger.error(f"Error marking notification as read: {response.error}")
@@ -105,7 +105,7 @@ class ReadAllNotificationsResource(Resource):
             supabase_client = get_supabase_admin_client()
                 
             # Update all notifications for this user in Supabase
-            response = supabase_client.table('notifications').update({"is_read": True}).eq('user_id', user_id).execute()
+            response = supabase_client.table('notifications').update({"is_read": True}).eq('recipient_id', user_id).execute()
             
             if hasattr(response, 'error') and response.error:
                 logger.error(f"Error marking all notifications as read: {response.error}")
