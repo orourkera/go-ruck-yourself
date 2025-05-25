@@ -34,8 +34,6 @@
 	<string>4.0</string>
 	<key>WKApplication</key>
 	<true/>
-	<key>WKWatchKitApp</key>
-	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>com.getrucky.gfy</string>
 	<key>UISupportedInterfaceOrientations</key>
@@ -49,6 +47,11 @@
 	<key>UIAppFonts</key>
 	<array>
 		<string>Bangers-Regular.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>background-processing</string>
+		<string>workout-processing</string>
 	</array>
 </dict>
 </plist>
