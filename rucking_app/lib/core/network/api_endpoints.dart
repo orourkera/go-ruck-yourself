@@ -22,9 +22,9 @@ class ApiEndpoints {
   static const String ruckPhotos = '$baseApi/ruck-photos';
   
   // Notifications
-  static const String notifications = '$baseApi/notifications';
+  static const String notifications = '$baseApi/notifications/';
   static const String notificationRead = '$baseApi/notifications/{id}/read'; // Replace {id} with notification ID
-  static const String readAllNotifications = '$baseApi/notifications/read_all';
+  static const String readAllNotifications = '$baseApi/notifications/read-all';
   
   // Helper methods for path parameters
   static String getRuckEndpoint(String ruckId) => '$ruckById/$ruckId';
