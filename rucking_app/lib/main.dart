@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/app.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
@@ -7,6 +8,7 @@ import 'package:rucking_app/core/services/tracking_transparency_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,8 +55,20 @@ void main() async {
   Purchases.setDebugLogsEnabled(false);
   // Removed Purchases.configure from main.dart. Now handled in RevenueCatService.
   
-  // Initialize Firebase
+  // Initialize Firebase and Crashlytics
   await Firebase.initializeApp();
+  
+  // Pass all uncaught Flutter errors to Crashlytics
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  
+  // Pass all uncaught asynchronous errors to Crashlytics
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+  
+  // Enable collection of crash reports
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
   
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
