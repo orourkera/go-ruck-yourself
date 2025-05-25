@@ -24,6 +24,7 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/ruck_buddies/di/ruck_buddies_injection_container.dart';
 import 'package:rucking_app/features/social/di/social_injection_container.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/features/notifications/di/notification_injection_container.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -116,6 +117,9 @@ Future<void> setupServiceLocator() async {
   
   // Initialize Social feature
   initSocialFeature(getIt);
+  
+  // Initialize Notification feature
+  initNotificationFeature(getIt);
 }
 
 /// Configures Dio with base options and interceptors

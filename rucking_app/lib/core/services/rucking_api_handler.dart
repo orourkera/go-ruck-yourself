@@ -6,14 +6,13 @@ import 'package:get_it/get_it.dart'; // For GetIt
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/features/auth/presentation/bloc/auth_state.dart';
 
 /// Implementation of the RuckingApi for handling watch messages
 class RuckingApiHandler extends RuckingApi {
   final WatchService _watchService;
-  final AuthBloc _authBloc;
+  final GetIt _getIt = GetIt.instance;
   
-  RuckingApiHandler(this._watchService) : _authBloc = GetIt.instance<AuthBloc>();
+  RuckingApiHandler(this._watchService);
   
   @override
   Future<bool> startSessionFromWatch(double ruckWeight) async {
@@ -116,8 +115,27 @@ class RuckingApiHandler extends RuckingApi {
   Future<bool> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused, double calories, double elevationGain, double elevationLoss) async {
     // Get user's metric preference from the auth service
     // Default to metric (true) if not available
-    final authState = _authBloc.state;
-    final isMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    bool isMetric = true; // Default to metric
+    
+    try {
+      // Try to get AuthBloc from GetIt if available
+      if (_getIt.isRegistered<AuthBloc>()) {
+        final authBloc = _getIt<AuthBloc>();
+        final authState = authBloc.state;
+        if (authState is Authenticated) {
+          isMetric = authState.user.preferMetric;
+        }
+      } else {
+        // If AuthBloc isn't registered yet, try to get metric preference directly from AuthService
+        final authService = _getIt<AuthService>();
+        final user = await authService.getCurrentUser();
+        if (user != null) {
+          isMetric = user.preferMetric;
+        }
+      }
+    } catch (e) {
+      AppLogger.warning('[API_HANDLER] Could not access user preferences, defaulting to metric: $e');
+    }
     
     return _watchService.updateSessionOnWatch(
       distance: distance,

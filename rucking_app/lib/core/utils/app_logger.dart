@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:rucking_app/core/utils/crashlytics_helper.dart';
 
 /// A utility class for handling logging throughout the app
 /// Automatically disables detailed logs in production builds
@@ -31,30 +30,30 @@ class AppLogger {
     }
   }
 
-  /// Logs error messages and reports to Crashlytics in release mode
+  /// Logs error messages
   static void error(String message, {dynamic exception, StackTrace? stackTrace}) {
-    if (kDebugMode) {
-      debugPrint('$_errorPrefix $message');
+    // In both debug and release mode, we log to console
+    debugPrint('$_errorPrefix $message');
+    if (exception != null) {
+      debugPrint('$_errorPrefix Exception: $exception');
     }
-    
-    // Always report errors to Crashlytics in release mode
-    if (!kDebugMode) {
-      CrashlyticsHelper.logError(message, error: exception, stackTrace: stackTrace);
+    if (stackTrace != null) {
+      debugPrint('$_errorPrefix Stack trace: $stackTrace');
     }
   }
 
-  /// Logs critical errors even in release mode and always reports to Crashlytics
+  /// Logs critical errors even in release mode
   /// Only use for critical issues that need immediate reporting
   static void critical(String message, {dynamic exception, StackTrace? stackTrace}) {
     // Always log to console in both debug and release modes
     debugPrint('$_errorPrefix [CRITICAL] $message');
     
-    // Always report critical errors to Crashlytics
-    CrashlyticsHelper.logError(
-      message, 
-      error: exception ?? 'CRITICAL: $message', 
-      stackTrace: stackTrace ?? StackTrace.current,
-      customKeys: {'severity': 'critical'},
-    );
+    if (exception != null) {
+      debugPrint('$_errorPrefix [CRITICAL] Exception: $exception');
+    }
+    
+    // Log stack trace for critical errors to help with debugging
+    final trace = stackTrace ?? StackTrace.current;
+    debugPrint('$_errorPrefix [CRITICAL] Stack trace: $trace');
   }
 }
