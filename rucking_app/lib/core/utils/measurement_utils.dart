@@ -53,15 +53,16 @@ class MeasurementUtils {
 
   /// Pace formatted as minutes:seconds per unit (km/mi).
   static String formatPace(double paceSeconds, {required bool metric}) {
-    // Return dashes for invalid pace values
-    if (paceSeconds <= 0) return '--';
+    // Return dashes for invalid pace values (non-finite, zero, or negative)
+    if (!paceSeconds.isFinite || paceSeconds <= 0) return '--';
     
     // Convert from seconds/km to seconds/mile if not metric
     // For conversion: seconds/mile = seconds/km * 0.621371 (km to mile factor)
     final pace = metric ? paceSeconds : paceSeconds * 0.621371;
     
     // Cap extremely slow paces (>60min/km or mile) to avoid UI glitches
-    if (pace > 3600) return '--';
+    // Also handles if conversion resulted in non-finite or if original pace was too high
+    if (!pace.isFinite || pace > 3600) return '--';
     
     // Format pace as minutes:seconds
     final minutes = (pace / 60).floor();

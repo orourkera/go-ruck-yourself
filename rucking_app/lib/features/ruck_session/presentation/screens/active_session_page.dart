@@ -621,18 +621,23 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     const int minTimeSeconds = 60; // 1 minute
     const double minDistanceKm = 0.2; // 200 meters
 
-    // 60 min/km = 3600 seconds/km (or seconds/mi)
-    final bool paceTooHigh = pace != null && pace > 3600;
-    final bool showPace = elapsedSeconds >= minTimeSeconds && distanceKm >= minDistanceKm && pace != null && !paceTooHigh;
+    // Determine if pace should be shown and is valid
+    final bool canShowPace = 
+        elapsedSeconds >= minTimeSeconds && 
+        distanceKm >= minDistanceKm && 
+        pace != null && 
+        pace.isFinite && 
+        pace > 0 && 
+        pace <= 3600; // Corresponds to 60 min/km or 60 min/mi
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Text('Pace', style: TextStyle(fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 4),
-        showPace
+        canShowPace
             ? Text(
-                MeasurementUtils.formatPace(pace!, metric: preferMetric),
+                MeasurementUtils.formatPace(pace!, metric: preferMetric), // pace is non-null here due to canShowPace check
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               )
             : const Text('--', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
