@@ -218,9 +218,11 @@ class WatchService {
     _currentSessionHeartRateSamples = []; // Clear samples for the new session
 
     try {
+      // Store ruckWeight locally for calorie calculations, but don't send to watch
+      // to prevent it from being displayed on the watch face
       await _sendMessageToWatch({
         'command': 'workoutStarted',
-        'ruckWeight': ruckWeight,
+        // ruckWeight intentionally omitted to prevent display on watch
       });
     } catch (e) {
       AppLogger.error('[ERROR] Failed to start session on Watch: $e');
@@ -308,13 +310,17 @@ class WatchService {
     required int calories,
     required double elevation,
     double? elevationLoss, // Optional parameter for elevation loss
+    required bool isMetric, // Used to convert values before sending to watch
   }) async {
     try {
       AppLogger.info('[WATCH] Sending updated metrics to watch');
+      // Convert km to miles if user prefers imperial units
+      // distance is always stored in km in the app, but we send it in the user's preferred unit
+      double displayDistance = isMetric ? distance : distance / 1.60934; // km to miles
       await _sendMessageToWatch({
         'command': 'updateMetrics',
         'metrics': {
-          'distance': distance,
+          'distance': displayDistance,
           'duration': duration.inSeconds,
           'pace': pace,
           'isPaused': isPaused ? 1 : 0, // Convert bool to int for Swift compatibility
@@ -342,6 +348,7 @@ class WatchService {
     required double calories,
     required double elevationGain,
     required double elevationLoss,
+    required bool isMetric, // Add user's metric preference
   }) async {
     // Attempt to update session on watch
     
@@ -361,6 +368,7 @@ class WatchService {
         calories: calories.toInt(), // Convert to int since updateMetricsOnWatch expects int
         elevation: elevationGain,    // This is for backward compatibility
         elevationLoss: elevationLoss, // Pass elevation loss directly
+        isMetric: isMetric, // Pass user's unit preference
       );
       
       // Successfully sent metrics via WatchConnectivity

@@ -311,7 +311,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       if (_paceTickCounter >= 15) {
          _paceTickCounter = 0;
         if (currentState.distanceKm > 0.05 && newElapsed > 0) {
-            newPace = (newElapsed / 60.0) / currentState.distanceKm;
+            // Calculate pace in minutes per km, then convert to seconds per km for the formatter
+            double minutesPerKm = (newElapsed / 60.0) / currentState.distanceKm;
+            newPace = minutesPerKm * 60.0; // Convert minutes per km to seconds per km
         } else { newPace = null; }
       }
 
@@ -319,8 +321,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final authState = GetIt.I<AuthBloc>().state;
       User? currentUser = authState is Authenticated ? authState.user : null;
       double userWeightKg = currentUser?.weightKg ?? 70.0;
-      // Convert km/h to mph for MetCalculator
-      double speedMph = MetCalculator.kmhToMph(newPace != null && newPace > 0 ? (60 / newPace) : 0);
+      // Convert pace (seconds per km) to speed (km/h), then to mph for MetCalculator
+      // Speed (km/h) = 3600 / pace (seconds per km)
+      double speedKmh = newPace != null && newPace > 0 ? (3600 / newPace) : 0;
+      double speedMph = MetCalculator.kmhToMph(speedKmh);
       // Convert kg to lbs for rucksack weight
       double ruckWeightLbs = currentState.ruckWeightKg * 2.20462;
 
@@ -357,6 +361,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       // Update metrics on watch
       try {
+        // Get the user's metric preference
+        bool preferMetric = currentUser?.preferMetric ?? true;
+        
         await _watchService.updateMetricsOnWatch(
           distance: currentState.distanceKm,
           duration: Duration(seconds: newElapsed),
@@ -365,6 +372,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           calories: newCalories.round(),
           elevation: currentState.elevationGain,
           elevationLoss: currentState.elevationLoss,
+          isMetric: preferMetric, // Pass the user's unit preference
         );
       } catch (e) {
         AppLogger.error('Failed to update metrics on watch: $e');

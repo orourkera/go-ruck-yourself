@@ -12,8 +12,6 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
-import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
-import 'package:rucking_app/features/notifications/presentation/pages/notifications_screen.dart';
 import 'package:rucking_app/shared/theme/app_theme.dart';
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
@@ -52,9 +50,6 @@ class RuckingApp extends StatelessWidget {
         BlocProvider<SocialBloc>(
           create: (context) => getIt<SocialBloc>(),
         ),
-        BlocProvider<NotificationBloc>(
-          create: (context) => getIt<NotificationBloc>(),
-        ),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, authState) {
@@ -87,8 +82,6 @@ class RuckingApp extends StatelessWidget {
                   return MaterialPageRoute(builder: (_) => const PaywallScreen());
                 case '/ruck_buddies':
                   return MaterialPageRoute(builder: (_) => const RuckBuddiesScreen());
-                case '/notifications':
-                  return MaterialPageRoute(builder: (_) => const NotificationsScreen());
                 case '/session_complete':
                   final args = settings.arguments as Map<String, dynamic>?;
                   if (args != null) {

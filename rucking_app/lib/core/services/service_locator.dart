@@ -24,7 +24,6 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/ruck_buddies/di/ruck_buddies_injection_container.dart';
 import 'package:rucking_app/features/social/di/social_injection_container.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
-import 'package:rucking_app/features/notifications/di/notification_injection_container.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -40,40 +39,22 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<Dio>(_configureDio());
   final apiClient = ApiClient(getIt<Dio>());
   getIt.registerSingleton<ApiClient>(apiClient);
-
-  // ---- Auth / Storage wiring ----
-  // Create storage service first, then inject it into ApiClient
-  final storageService =
-      StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>());
-  getIt.registerSingleton<StorageService>(storageService);
-
-  // Allow ApiClient & interceptors to access secure storage
-  apiClient.setStorageService(storageService);
-
-  // Register AuthService after its dependencies are ready
-  getIt.registerSingleton<AuthService>(
-    AuthServiceImpl(apiClient, storageService),
-  );
-
-  // Add automatic token-refresh support on 401 responses
-  getIt<Dio>().interceptors.add(
-    TokenRefreshInterceptor(
-      getIt<Dio>(),
-      getIt<AuthService>(),
-      storageService,
-    ),
-  );
-  // ---- end wiring ----
-
+  getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
+  getIt.registerSingleton<AuthService>(AuthServiceImpl(getIt<ApiClient>(), getIt<StorageService>()));
+  
   // Connect services to resolve circular dependencies
+  apiClient.setStorageService(getIt<StorageService>());
   
-  // Location service
+  // Add token refresh interceptor after auth service is initialized
+  final tokenRefreshInterceptor = TokenRefreshInterceptor(
+    getIt<Dio>(), 
+    getIt<AuthService>(), 
+    getIt<StorageService>()
+  );
+  getIt<Dio>().interceptors.add(tokenRefreshInterceptor);
+  
   getIt.registerSingleton<LocationService>(LocationServiceImpl());
-  
-  // Health service
   getIt.registerSingleton<HealthService>(HealthService());
-  
-  // RevenueCat service
   getIt.registerSingleton<RevenueCatService>(RevenueCatService());
   
   // Watch service depends on location, health, auth
@@ -135,9 +116,6 @@ Future<void> setupServiceLocator() async {
   
   // Initialize Social feature
   initSocialFeature(getIt);
-  
-  // Initialize Notifications feature
-  initNotificationFeature(getIt);
 }
 
 /// Configures Dio with base options and interceptors
