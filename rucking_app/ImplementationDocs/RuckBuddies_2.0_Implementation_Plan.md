@@ -21,8 +21,8 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 - **Activity tracking**: Record all social interactions for notification purposes
 
 ### 2.4. Notifications
-- Implement a notification system to alert users when someone interacts with their content
-- Display a notification bell on the homepage with unread count indicator
+- ✅ Implement a notification system to alert users when someone interacts with their content
+- ✅ Display a notification bell on the homepage with unread count indicator
 
 ## 3. Frontend Implementation
 
@@ -106,27 +106,26 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 ### 3.4. Notification System
 
 #### 3.4.1. Notification Bell (`notification_bell.dart`)
-- Create a widget for the notification bell:
-  - Bell icon with unread count indicator
-  - Animation for new notifications
-  - Tap action to navigate to notification screen
+- ✅ Created a widget for the notification bell:
+  - ✅ Bell icon with unread count indicator
+  - ✅ Animation for new notifications
+  - ✅ Tap action to navigate to notification screen
 
 #### 3.4.2. Notification Screen (`notifications_screen.dart`)
-- Implement a screen to display all notifications:
-  - List of notifications sorted by date (newest first)
-  - Different visual styling for read/unread notifications
-  - Action buttons to:
-    - Mark all as read
-    - Navigate to the related content
+- ✅ Implemented a screen to display all notifications:
+  - ✅ List of notifications sorted by date (newest first)
+  - ✅ Different visual styling for read/unread notifications
+  - ✅ Action buttons to:
+    - ✅ Mark all as read
+    - ✅ Navigate to the related content
   - Pull-to-refresh functionality
 
 #### 3.4.3. Notification Card (`notification_card.dart`)
-- Create a reusable card for displaying individual notifications:
-  - User identifier with man/lady rucker profile image based on user gender (no custom avatars)
-  - Action type (like, comment)
-  - Preview of content (comment text, photo thumbnail)
-  - Timestamp
-  - Read/unread status indicator
+- ✅ Created a reusable card for displaying individual notifications:
+  - ✅ User identifier with profile images based on gender
+  - ✅ Action type (like, comment)
+  - ✅ Preview of content (comment text, photo thumbnail)
+  - ✅ Timestamp and read/unread status indicator
 
 ### 3.5. Navigation Updates
 - Add notification bell to the app bar on the home screen
@@ -148,17 +147,17 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
   - ✅ Added states to track interaction status, loading states, and error handling
   - ✅ Implemented optimistic updates for responsive UX
 
-#### 3.6.3. UI Integration
+#### 3.6.3. Notifications
+- ✅ Created a `NotificationBloc` to manage notification state:
+  - ✅ Events: `NotificationsRequested`, `NotificationRead`, `AllNotificationsRead`
+  - ✅ States: `NotificationsLoading`, `NotificationsLoaded`, `NotificationsError`
+  - ✅ Handle background polling for new notifications
+
+#### 3.6.4. UI Integration
 - Next step: Integrate social components into the Ruck Buddies detail screen
   - Connect `PhotoCarousel`, `RuckLikeButton`, and `CommentsSection` components
   - Wire up the BLoCs to the UI components
   - Test the end-to-end flow for all features
-
-#### 3.6.4. Notifications (Future Work)
-- Create `NotificationBloc` to manage notification state:
-  - Add events: `NotificationsRequested`, `NotificationRead`, `AllNotificationsRead`
-  - Add states: `NotificationsLoading`, `NotificationsLoaded`, `NotificationsError`
-  - Handle background polling for new notifications
 
 ## 4. Backend Implementation
 
@@ -407,6 +406,6 @@ The "Ruck Buddies 2.0" update aims to enhance the social features of the Rucking
 - ⬜ Create backend support for social interactions
 
 ### Phase 4: Notifications
-- ⬜ Implement notification data structure and API
-- ⬜ Create notification UI (bell icon, notification screen)
-- ⬜ Integrate notification system with social features
+- ✅ Implemented notification data structure and API
+- ✅ Created notification UI (bell icon, notification screen)
+- ✅ Integrated notification system with social features
