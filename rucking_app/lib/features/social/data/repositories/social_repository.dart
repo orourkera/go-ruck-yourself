@@ -396,13 +396,15 @@ class SocialRepository {
       }
       
       // Don't include /api in the path as it's already in the base URL
-      // Use the correct endpoint format: /rucks/{id}/comments
-      final endpoint = '${AppConfig.apiBaseUrl}/rucks/${ruckIdInt ?? ruckId}/comments';
+      // Use the endpoint format that actually works with our backend
+      // NOTE: The API has an inconsistency - GET uses /ruck-comments?ruck_id=X but we need to match that here
+      final endpoint = '${AppConfig.apiBaseUrl}/ruck-comments';
       debugPrint('[SOCIAL_DEBUG] Comment endpoint: $endpoint');
       
-      // Only send the content in the payload, not the ruck_id (as it's in the URL path)
+      // Since we're using the ruck-comments endpoint, we need to include ruck_id in the payload
       final payload = {
         'content': content,
+        'ruck_id': ruckId, // Include the ruck_id in the payload
       };
       debugPrint('[SOCIAL_DEBUG] Comment payload: ${json.encode(payload)}');
       

@@ -2,6 +2,7 @@
 import Foundation
 import WatchConnectivity
 import HealthKit
+import WatchKit  // Added for WKInterfaceDevice vibration
 
 // Make protocol publicly accessible
 public protocol SessionManagerDelegate: AnyObject {
@@ -48,8 +49,24 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         distanceValue > 0 ? String(format: "%.2f", distanceValue) : "--"
     }
     var pace: String {
-        paceValue > 0 ? String(format: "%.1f", paceValue) : "--"
+        if paceValue <= 0 {
+            return "--"
+        }
+        
+        // Convert seconds to minutes:seconds format
+        let minutes = Int(paceValue) / 60
+        let seconds = Int(paceValue) % 60
+        
+        // Get user's preferred unit (metric or imperial)
+        // If we can't determine the preference, default to metric (km)
+        let unit = self.isMetric ? "km" : "mi"
+        
+        // Format as MM:SS/unit
+        return String(format: "%d:%02d/%@", minutes, seconds, unit)
     }
+    
+    // Store user's metric preference
+    private var isMetric: Bool = true // Default to metric
 
     func startSession() {
         // Leave status as "--" for cleaner UI
@@ -430,6 +447,11 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             self.paceValue = pace
         }
         
+        // Update metric/imperial preference when present
+        if let isMetricValue = metrics["isMetric"] as? Bool {
+            self.isMetric = isMetricValue
+        }
+        
         // Update paused state when present
         if let paused = metrics["isPaused"] as? Int {
             self.isPaused = paused == 1
@@ -467,7 +489,20 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 // Show the notification
                 self.showingSplitNotification = true
                 
-                // Received split notification
+                // Check if should vibrate (defaulting to true if not specified)
+                let shouldVibrate = message["shouldVibrate"] as? Bool ?? true
+                
+                // Play haptic feedback for the split notification if requested
+                if shouldVibrate {
+                    // Play notification haptic feedback
+                    WKInterfaceDevice.current().play(.notification)
+                    
+                    // For stronger feedback, you could use success + notification
+                    // Uncomment if you want a stronger double-haptic
+                    // DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    //    WKInterfaceDevice.current().play(.success)
+                    // }
+                }
                 
                 // Auto-dismiss after 5 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5) {

@@ -26,11 +26,15 @@ struct ContentView: View {
                 self.activeSessionView // Call the extracted view
             } else {
                 VStack(spacing: 10) {
-                    Text("GRY")
-                        .font(.custom("Bangers-Regular", size: 28))
-                        .foregroundColor(.green)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 4)
+                    HStack {
+                        Text("GRY")
+                            .font(.custom("Bangers-Regular", size: 26))
+                            .foregroundColor(.green)
+                            .fixedSize(horizontal: true, vertical: false) // Prevent text truncation
+                            .padding(.leading, 4) // Add some left padding
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
                     
                     Spacer()
                     
