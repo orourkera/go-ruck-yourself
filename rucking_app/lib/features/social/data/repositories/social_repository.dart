@@ -339,8 +339,8 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      // Use the existing endpoint structure
-      final endpoint = '${AppConfig.apiBaseUrl}/ruck-comments?ruck_id=$ruckId';
+      // Update to the new endpoint structure /rucks/{id}/comments
+      final endpoint = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments';
       debugPrint('[SOCIAL_DEBUG] Getting comments for ruckId $ruckId, endpoint: $endpoint');
 
       final response = await _httpClient.get(
@@ -395,16 +395,13 @@ class SocialRepository {
         debugPrint('[SOCIAL_DEBUG] Could not parse ruckId to int: $e');
       }
       
-      // Don't include /api in the path as it's already in the base URL
-      // Use the endpoint format that actually works with our backend
-      // NOTE: The API has an inconsistency - GET uses /ruck-comments?ruck_id=X but we need to match that here
-      final endpoint = '${AppConfig.apiBaseUrl}/ruck-comments';
+      // Use the correct endpoint format according to API documentation
+      final endpoint = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments';
       debugPrint('[SOCIAL_DEBUG] Comment endpoint: $endpoint');
       
-      // Since we're using the ruck-comments endpoint, we need to include ruck_id in the payload
+      // The ruck_id is now in the URL path, so we only need to include content in the payload
       final payload = {
         'content': content,
-        'ruck_id': ruckId, // Include the ruck_id in the payload
       };
       debugPrint('[SOCIAL_DEBUG] Comment payload: ${json.encode(payload)}');
       
