@@ -53,7 +53,9 @@ class RuckingApp extends StatelessWidget {
           create: (context) => getIt<SocialBloc>(),
         ),
         BlocProvider<NotificationBloc>(
-          create: (context) => getIt<NotificationBloc>()..add(const NotificationsRequested()),
+          create: (context) => getIt<NotificationBloc>()
+            ..add(const NotificationsRequested())
+            ..startPolling(),
         ),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(
