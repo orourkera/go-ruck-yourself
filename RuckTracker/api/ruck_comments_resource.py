@@ -49,7 +49,7 @@ class RuckCommentsResource(Resource):
         # Get comments for the ruck
         try:
             query_result = supabase.table('ruck_comments') \
-                                 .select('id, ruck_id, user_id, user_display_name, user_avatar_url, content, created_at, updated_at') \
+                                 .select('id, ruck_id, user_id, username, avatar_url, comment_text, created_at, updated_at') \
                                  .eq('ruck_id', ruck_id) \
                                  .order('created_at', desc=True) \
                                  .execute()
@@ -115,39 +115,34 @@ class RuckCommentsResource(Resource):
             logger.info("RuckCommentsResource: Content too long.")
             return build_api_response(success=False, error="Comment content exceeds maximum length (500 characters)", status_code=400)
             
-        # Get user display info from the profile table
+        # Fetch user profile information (username)
+        # Fallback to a default if the profile doesn't exist or an error occurs
+        user_profile = {'username': 'Unknown User', 'avatar_url': None} 
         try:
-            profile_response = supabase.table('profiles') \
-                                      .select('username, avatar_url') \
-                                      .eq('id', user_id) \
-                                      .execute()
+            profile_response = supabase.table('user') \
+                .select('username') \
+                .eq('id', user_id) \
+                .execute()
             
-            if hasattr(profile_response, 'error') and profile_response.error:
-                logger.error(f"RuckCommentsResource: Error fetching user profile: {profile_response.error}")
-                user_display_name = user_email.split('@')[0]  # Fallback
-                user_avatar_url = None
-            elif profile_response.data:
-                user_profile = profile_response.data[0]
-                user_display_name = user_profile.get('username') or user_email.split('@')[0]
-                user_avatar_url = user_profile.get('avatar_url')
+            if profile_response.data and len(profile_response.data) > 0:
+                user_profile['username'] = profile_response.data[0].get('username', 'Unknown User')
             else:
-                user_display_name = user_email.split('@')[0]  # Fallback
-                user_avatar_url = None
-                
+                logger.warning(f"RuckCommentsResource: User profile not found for user_id: {user_id}")
+
         except Exception as e:
-            logger.warning(f"RuckCommentsResource: Error fetching user profile, using fallback: {e}")
-            user_display_name = user_email.split('@')[0]  # Fallback
-            user_avatar_url = None
-        
+            logger.error(f"RuckCommentsResource: Error fetching user profile: {e}")
+
         # Create the comment
         try:
             insert_data = {
                 'ruck_id': ruck_id,
                 'user_id': user_id,
-                'user_display_name': user_display_name,
-                'user_avatar_url': user_avatar_url,
-                'content': content
+                'username': user_profile['username'],
+                'avatar_url': user_profile.get('avatar_url'), # Will be None as per users table
+                'comment_text': content
             }
+            
+            logger.debug(f"RuckCommentsResource: Inserting comment data: {insert_data}")
             
             insert_result = supabase.table('ruck_comments') \
                                    .insert(insert_data) \
@@ -248,7 +243,7 @@ class RuckCommentsResource(Resource):
         # Update the comment
         try:
             update_data = {
-                'content': content,
+                'comment_text': content,
                 'updated_at': 'now()'  # Supabase will interpret this as the current timestamp
             }
             
