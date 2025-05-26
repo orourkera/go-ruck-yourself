@@ -3,6 +3,7 @@ import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:flutter/foundation.dart';
+import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 
 /// Client for handling API requests to the backend
 class ApiClient {
@@ -277,6 +278,22 @@ class ApiClient {
     // Match the pattern of addLocationPoint, which is working
     // The base URL already handles the /api prefix correctly
     return await post('/rucks/$ruckId/heartrate', {'samples': heartRateSamples});
+  }
+  
+  /// Fetches the current authenticated user's profile
+  Future<UserInfo> getCurrentUserProfile() async {
+    try {
+      // Ensure the token is available before making the request
+      // The generic 'get' method will handle adding the auth token to headers if configured
+      final response = await get('/api/me'); 
+      // Assuming response is a Map<String, dynamic> representing the user
+      return UserInfo.fromJson(response as Map<String, dynamic>);
+    } catch (e) {
+      // Log or handle the error appropriately
+      debugPrint('[API] Error fetching current user profile: $e');
+      // Re-throw or return a default/error UserInfo object if needed
+      throw _handleError(e); 
+    }
   }
   
   /// Returns headers for API requests
