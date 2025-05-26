@@ -335,7 +335,7 @@ RuckCommentsResource.put = limiter.limit("500 per minute", override_defaults=Tru
 RuckCommentsResource.delete = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.delete)
 
 # Now register the resource with modified methods
-api.add_resource(RuckCommentsResource, '/api/ruck-comments')
+api.add_resource(RuckCommentsResource, '/api/rucks/<int:ruck_id>/comments')
 
 # Register notification resources
 api.add_resource(NotificationsResource, '/api/notifications')

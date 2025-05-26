@@ -18,11 +18,11 @@ def build_api_response(data=None, success=True, error=None, status_code=200):
     return response_body, status_code
 
 class RuckCommentsResource(Resource):
-    def get(self):
+    def get(self, ruck_id):
         """
         Get comments for a specific ruck session.
         
-        Expects 'ruck_id' as a query parameter.
+        Expects 'ruck_id' from the URL path.
         The user must be authenticated.
         """
         auth_header = request.headers.get('Authorization')
@@ -46,18 +46,6 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {e}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
 
-        # Get ruck_id from query parameters
-        ruck_id_str = request.args.get('ruck_id')
-        if not ruck_id_str:
-            logger.info("RuckCommentsResource: Missing ruck_id query parameter.")
-            return build_api_response(success=False, error="Missing ruck_id query parameter", status_code=400)
-        
-        try:
-            ruck_id = int(ruck_id_str)
-        except ValueError:
-            logger.info(f"RuckCommentsResource: Invalid ruck_id format: {ruck_id_str}")
-            return build_api_response(success=False, error="Invalid ruck_id format, must be an integer.", status_code=400)
-
         # Get comments for the ruck
         try:
             query_result = supabase.table('ruck_comments') \
@@ -76,11 +64,11 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Error fetching ruck comments: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while fetching comments.", status_code=500)
     
-    def post(self):
+    def post(self, ruck_id):
         """
         Add a comment to a ruck session.
         
-        Expects JSON body with 'ruck_id' and 'content'.
+        Expects 'ruck_id' from the URL path and JSON body with 'content'.
         The user must be authenticated.
         """
         auth_header = request.headers.get('Authorization')
@@ -112,13 +100,8 @@ class RuckCommentsResource(Resource):
             return build_api_response(success=False, error="Missing request body", status_code=400)
 
         # Validate required fields
-        ruck_id = request_data.get('ruck_id')
         content = request_data.get('content')
 
-        if ruck_id is None:
-            logger.info("RuckCommentsResource: Missing ruck_id field.")
-            return build_api_response(success=False, error="Missing ruck_id field", status_code=400)
-        
         if content is None:
             logger.info("RuckCommentsResource: Missing content field.")
             return build_api_response(success=False, error="Missing content field", status_code=400)
@@ -182,11 +165,11 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Error creating comment: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while creating the comment.", status_code=500)
     
-    def put(self):
+    def put(self, ruck_id):
         """
         Update an existing comment.
         
-        Expects JSON body with 'comment_id' and 'content'.
+        Expects 'ruck_id' from URL path and JSON body with 'comment_id' and 'content'.
         The user must be authenticated and must be the author of the comment.
         """
         auth_header = request.headers.get('Authorization')
@@ -286,11 +269,11 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Error updating comment: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while updating the comment.", status_code=500)
     
-    def delete(self):
+    def delete(self, ruck_id):
         """
         Delete a comment.
         
-        Expects 'comment_id' as a query parameter.
+        Expects 'ruck_id' from URL path and 'comment_id' as a query parameter.
         The user must be authenticated and must be the author of the comment.
         """
         auth_header = request.headers.get('Authorization')
