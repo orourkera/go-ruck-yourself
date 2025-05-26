@@ -125,6 +125,8 @@ struct ContentView: View {
                 Text("GRY")
                     .font(.custom("Bangers-Regular", size: 28))
                     .foregroundColor(.green)
+                    .fixedSize(horizontal: true, vertical: false) // Prevent text truncation
+                    .padding(.leading, 4) // Add some left padding
                     .padding(.top, 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 2)

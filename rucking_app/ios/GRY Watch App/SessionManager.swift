@@ -43,10 +43,32 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         calories > 0 ? "\(calories)" : "--"
     }
     var elevationText: String {
-        elevationGain > 0 ? "+\(Int(elevationGain))/-\(Int(elevationLoss))" : "--"
+        if elevationGain <= 0 {
+            return "--"
+        }
+        
+        // Convert to feet if using imperial units
+        if !self.isMetric {
+            let gainFeet = Int(elevationGain * 3.28084)
+            let lossFeet = Int(elevationLoss * 3.28084)
+            return "+\(gainFeet)/-\(lossFeet) ft"
+        } else {
+            return "+\(Int(elevationGain))/-\(Int(elevationLoss)) m"
+        }
     }
     var distance: String {
-        distanceValue > 0 ? String(format: "%.2f", distanceValue) : "--"
+        if distanceValue <= 0 {
+            return "--"
+        }
+        
+        // Show miles if using imperial units, otherwise kilometers
+        if !self.isMetric {
+            // Convert km to miles (1 km = 0.621371 miles)
+            let miles = distanceValue * 0.621371
+            return String(format: "%.2f mi", miles)
+        } else {
+            return String(format: "%.2f km", distanceValue)
+        }
     }
     var pace: String {
         if paceValue <= 0 {
