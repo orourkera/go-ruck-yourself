@@ -41,7 +41,7 @@ class NotificationsResource(Resource):
             supabase_client = get_supabase_admin_client()
             
             # Query notifications from Supabase
-            response = supabase_client.table('notifications').select('*').eq('recipient_id', user_id).order('date', desc=True).execute()
+            response = supabase_client.table('notifications').select('*').eq('recipient_id', user_id).order('data->>created_at', desc=True).execute()
             
             if hasattr(response, 'error') and response.error:
                 logger.error(f"Error fetching notifications: {response.error}")
