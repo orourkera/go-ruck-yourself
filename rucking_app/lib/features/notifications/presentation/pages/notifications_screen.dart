@@ -25,17 +25,13 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final _notificationBloc = GetIt.I<NotificationBloc>();
 
+  bool _markedAsRead = false;
+
   @override
   void initState() {
     super.initState();
-    // First, request notifications to display them
+    // Request notifications to display them
     _notificationBloc.add(const NotificationsRequested());
-    
-    // Mark all notifications as read when screen is opened
-    // Add a small delay to ensure notifications are loaded first
-    Future.delayed(const Duration(milliseconds: 300), () {
-      _notificationBloc.add(const AllNotificationsRead());
-    });
   }
 
   @override
@@ -76,6 +72,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: CircularProgressIndicator(),
               );
             } else if (state is NotificationsLoaded) {
+              // Don't automatically mark all as read - let the user see them first
+              // They'll be marked as read when the user interacts with them
+              
               if (state.notifications.isEmpty) {
                 return _buildEmptyState();
               }
@@ -198,62 +197,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             // Create the session repository with the API client
             final sessionRepo = SessionRepository(apiClient: GetIt.I<ApiClient>());
             
-            // Fetch the full session details before navigating
-            sessionRepo.fetchSessionById(ruckId).then((session) {
-              // Close loading dialog
-              Navigator.of(context, rootNavigator: true).pop();
-              
-              if (session != null) {
-                // Create a proper RuckBuddy from the session data
-                // Use default/empty values for fields that aren't available in RuckSession
-                final ruckBuddy = RuckBuddy(
-                  id: session.id ?? '',
-                  userId: '', // No userId in RuckSession
-                  ruckWeightKg: session.ruckWeightKg,
-                  durationSeconds: session.duration.inSeconds,
-                  distanceKm: session.distance,
-                  caloriesBurned: session.caloriesBurned,
-                  elevationGainM: session.elevationGain,
-                  elevationLossM: session.elevationLoss,
-                  createdAt: session.startTime,
-                  completedAt: session.endTime,
-                  locationPoints: session.locationPoints,
-                  user: UserInfo(
-                    id: '', // No user info in RuckSession
-                    username: '', // Default empty username
-                    gender: '', // Default empty gender
-                  ),
-                );
-                
-                // Navigate to the detail screen with the full data
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => RuckBuddyDetailScreen(
-                      ruckBuddy: ruckBuddy,
-                      focusComment: notification.type == NotificationType.comment,
-                    ),
-                  ),
-                );
-              } else {
-                // Show error snackbar if session couldn't be loaded
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Could not load ruck details'),
-                    duration: Duration(seconds: 3),
-                  ),
-                );
-              }
-            }).catchError((error) {
-              // Close loading dialog and show error
-              Navigator.of(context, rootNavigator: true).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error loading ruck: ${error.toString()}'),
-                  duration: const Duration(seconds: 3),
+            // Close loading dialog first
+            Navigator.of(context, rootNavigator: true).pop();
+
+            // Create a minimal RuckBuddy with just the ID
+            // This is the approach used by the regular flow
+            // The RuckBuddyDetailScreen will handle loading the full data including username
+            final ruckBuddy = RuckBuddy(
+              id: ruckId,
+              userId: '',
+              ruckWeightKg: 0,
+              durationSeconds: 0,
+              distanceKm: 0,
+              caloriesBurned: 0,
+              elevationGainM: 0,
+              elevationLossM: 0,
+              createdAt: DateTime.now(),
+              user: UserInfo(id: '', username: '', gender: ''),
+            );
+            
+            // Navigate to the detail screen with just the ID
+            // This lets the detail screen's normal data loading flow handle everything
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RuckBuddyDetailScreen(
+                  ruckBuddy: ruckBuddy,
+                  focusComment: notification.type == NotificationType.comment,
                 ),
-              );
-            });
+              ),
+            );
           }
           break;
         

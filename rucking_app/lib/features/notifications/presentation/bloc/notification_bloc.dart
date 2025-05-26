@@ -90,11 +90,18 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   }
 
   /// Start polling for new notifications
-  void startPolling({Duration interval = const Duration(seconds: 30)}) {
+  /// Default interval is 90 seconds to stay under the 50/hour rate limit
+  void startPolling({Duration interval = const Duration(seconds: 90)}) {
+    // Cancel any existing timer
     _pollingTimer?.cancel();
+    
+    // Create new timer with appropriate interval
     _pollingTimer = Timer.periodic(interval, (_) {
       add(const NotificationsRequested());
     });
+    
+    // Log the polling interval for debugging
+    AppLogger.info('Starting notification polling with interval: ${interval.inSeconds} seconds');
   }
 
   /// Stop polling for new notifications
