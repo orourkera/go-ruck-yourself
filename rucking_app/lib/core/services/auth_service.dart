@@ -241,33 +241,65 @@ class AuthServiceImpl implements AuthService {
   
   @override
   Future<String?> refreshToken() async {
-    final storedRefreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
-    // Debug logging to check if refresh token exists
-    print('[AUTH] Attempting token refresh. Refresh token available: ${storedRefreshToken != null}');
-    // Log a redacted version of the token for debugging (first few and last few characters only)
-    if (storedRefreshToken != null) {
-      String redactedToken = storedRefreshToken.length > 10 
-          ? '${storedRefreshToken.substring(0, 5)}...${storedRefreshToken.substring(storedRefreshToken.length - 5)}' 
-          : '[SHORT TOKEN]';
-      print('[AUTH] Refresh token (redacted): $redactedToken');
-    }
-    if (storedRefreshToken == null) {
-      throw UnauthorizedException('Refresh token not found');
-    }
-    final response = await _apiClient.post('/auth/refresh', {'refresh_token': storedRefreshToken});
-    // Log the response from the server for debugging
-    print('[AUTH] Token refresh response: $response');
-    final newToken = response['token'] as String;
-    final newRefreshToken = response['refresh_token'] as String;
+    try {
+      final storedRefreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
+      // Debug logging to check if refresh token exists
+      print('[AUTH] Attempting token refresh. Refresh token available: ${storedRefreshToken != null}');
+      
+      // Log a redacted version of the token for debugging (first few and last few characters only)
+      if (storedRefreshToken != null) {
+        String redactedToken = storedRefreshToken.length > 10 
+            ? '${storedRefreshToken.substring(0, 5)}...${storedRefreshToken.substring(storedRefreshToken.length - 5)}' 
+            : '[SHORT TOKEN]';
+        print('[AUTH] Refresh token (redacted): $redactedToken');
+      }
+      
+      if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
+        print('[AUTH] ERROR: Refresh token not found or empty');
+        throw UnauthorizedException('Refresh token not found or empty');
+      }
+      
+      // Try refreshing with our backend API first
+      try {
+        final response = await _apiClient.post('/auth/refresh', {'refresh_token': storedRefreshToken});
+        print('[AUTH] Token refresh response: $response');
+        
+        if (response == null || !response.containsKey('token') || !response.containsKey('refresh_token')) {
+          print('[AUTH] ERROR: Invalid refresh response format - missing tokens');
+          throw UnauthorizedException('Invalid refresh response format');
+        }
+        
+        final newToken = response['token'] as String;
+        final newRefreshToken = response['refresh_token'] as String;
 
-    // Store new tokens
-    await _storageService.setSecureString(AppConfig.tokenKey, newToken);
-    await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
-    
-    // Set new token in API client
-    _apiClient.setAuthToken(newToken);
-    
-    return newToken;
+        if (newToken.isEmpty || newRefreshToken.isEmpty) {
+          print('[AUTH] ERROR: Received empty tokens from refresh');
+          throw UnauthorizedException('Received empty tokens from refresh');
+        }
+
+        // Store new tokens
+        await _storageService.setSecureString(AppConfig.tokenKey, newToken);
+        await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
+        
+        // Set new token in API client
+        _apiClient.setAuthToken(newToken);
+        
+        print('[AUTH] Token refresh successful!');
+        return newToken;
+      } catch (e) {
+        print('[AUTH] Token refresh through API failed: $e. Will try direct login fallback.');
+        // Fallback to direct refresh if needed
+        throw e;
+      }
+    } catch (e) {
+      print('[AUTH] ERROR in refreshToken: $e');
+      // Force logout on refresh failure
+      await _storageService.removeSecure(AppConfig.tokenKey);
+      await _storageService.removeSecure(AppConfig.refreshTokenKey);
+      // Use empty string instead of null to clear the token
+      _apiClient.setAuthToken("");
+      rethrow;
+    }
   }
   
   @override
