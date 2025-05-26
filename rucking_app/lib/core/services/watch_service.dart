@@ -291,6 +291,7 @@ class WatchService {
         'totalDistance': formattedTotalDistance,
         'totalTime': _formatDuration(totalDuration),
         'isMetric': isMetric,
+        'shouldVibrate': true, // Add flag to trigger vibration on watch
       });
 
       // Split notification sent

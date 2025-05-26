@@ -1,9 +1,12 @@
-import 'dart:io';
+import 'dart:async'; // For Completer and Timer
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/painting.dart' show decodeImageFromList;
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:rucking_app/core/services/api_client.dart'; 
+import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/network/api_endpoints.dart';
@@ -17,7 +20,6 @@ import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/models/api_exception.dart'; // Corrected import for ApiException
-import 'dart:async'; // For Timer
 
 /// Repository class for session-related operations
 class SessionRepository {
@@ -279,12 +281,9 @@ class SessionRepository {
       
       // Process one photo at a time to avoid server timeouts and respect rate limits
       for (int i = 0; i < photos.length; i++) {
-        // Add delay between uploads for rate limiting (5 per minute)
-        if (i > 0) {
-          AppLogger.info('[PHOTO_DEBUG] Waiting for rate limit (12 seconds between uploads)');
-          await Future.delayed(const Duration(seconds: 12));
-        }
-      
+        // Declare tempCompressedPath OUTSIDE the try block so it's accessible in finally
+        String? tempCompressedPath;
+        
         try {
           final photo = photos[i];
           final exists = await photo.exists();
@@ -326,8 +325,36 @@ class SessionRepository {
         
           // Upload the original file directly - we'll add proper image compression in a future update if needed
           File fileToUpload = photo;
-          AppLogger.info('[PHOTO_DEBUG] Using original file: $size bytes');
-          
+          AppLogger.info('[PHOTO_DEBUG] Original file size: ${await photo.length()} bytes for ${photo.path}');
+
+          try {
+            final tempDir = await getTemporaryDirectory();
+            final targetFileName = '${path.basenameWithoutExtension(photo.path)}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            tempCompressedPath = path.join(tempDir.path, targetFileName);
+
+            final XFile? result = await FlutterImageCompress.compressAndGetFile(
+              photo.absolute.path,
+              tempCompressedPath,
+              minWidth: 1920, // Max width 1920px
+              minHeight: 1920, // Max height 1920px
+              quality: 80, // JPEG quality 80%
+              format: CompressFormat.jpeg,
+            );
+
+            if (result != null) {
+              fileToUpload = File(result.path);
+              AppLogger.info('[PHOTO_DEBUG] Compressed photo to: ${fileToUpload.path}, new size: ${await fileToUpload.length()} bytes');
+            } else {
+              AppLogger.warning('[PHOTO_DEBUG] Compression returned null, using original file: ${photo.path}');
+              fileToUpload = photo; // Fallback to original if compression fails or returns null
+              tempCompressedPath = null; // Ensure we don't try to delete a non-existent temp file
+            }
+          } catch (e) {
+            AppLogger.error('[PHOTO_DEBUG] Error during image compression for ${photo.path}: $e. Using original file.');
+            fileToUpload = photo; // Fallback to original on error
+            tempCompressedPath = null; // Ensure we don't try to delete a non-existent temp file
+          }
+        
           // Add the file
           final fileName = path.basename(fileToUpload.path);
           final contentType = _getContentType(fileToUpload.path);
@@ -417,10 +444,23 @@ class SessionRepository {
           }
         } catch (e) {
           AppLogger.error('[PHOTO_DEBUG] Error uploading photo ${i+1}: $e');
+        } finally {
+          // Clean up the temporary compressed file if it was created
+          if (tempCompressedPath != null) {
+            final tempFile = File(tempCompressedPath);
+            if (await tempFile.exists()) {
+              try {
+                await tempFile.delete();
+                AppLogger.info('[PHOTO_DEBUG] Deleted temporary compressed file: $tempCompressedPath');
+              } catch (e) {
+                AppLogger.error('[PHOTO_DEBUG] Failed to delete temporary compressed file $tempCompressedPath: $e');
+              }
+            }
+          }
         }
       }
       
-      AppLogger.info('[PHOTO_DEBUG] Finished uploading ${photos.length} photos, got ${allUploadedPhotos.length} successful uploads');
+      AppLogger.info('===== END PHOTO UPLOAD (${allUploadedPhotos.length} photos uploaded successfully) =====');
       return allUploadedPhotos;
       
     } catch (e) {
