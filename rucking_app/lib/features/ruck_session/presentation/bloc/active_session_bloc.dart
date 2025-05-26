@@ -478,8 +478,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           'duration_seconds': finalDurationSeconds,
           'distance_km': finalDistanceKm,
           'calories_burned': finalCalories.round(),
-          'elevation_gain_meters': currentState.elevationGain,
-          'elevation_loss_meters': currentState.elevationLoss,
+          'elevation_gain_m': currentState.elevationGain, // Changed key
+          'elevation_loss_m': currentState.elevationLoss, // Changed key
           'average_pace_min_km': currentState.pace, 
           'route': currentState.locationPoints.map((p) => p.toJson()).toList(),
           'heart_rate_samples': _allHeartRateSamples.map((s) => s.toJson()).toList(), // Send all collected samples

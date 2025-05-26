@@ -296,6 +296,18 @@ class ApiClient {
     }
   }
   
+  /// Fetches a specific user's public profile by ID
+  Future<UserInfo> getUserProfile(String userId) async {
+    try {
+      // Fix the endpoint path to avoid duplicate /api/api/ issue
+      final response = await get('/users/$userId');
+      return UserInfo.fromJson(response as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('[API] Error fetching user profile ($userId): $e');
+      throw _handleError(e);
+    }
+  }
+  
   /// Returns headers for API requests
   Future<Map<String, String>> _getHeaders() async {
     final headers = {
