@@ -337,6 +337,12 @@ RuckCommentsResource.delete = limiter.limit("500 per minute", override_defaults=
 # Now register the resource with modified methods
 api.add_resource(RuckCommentsResource, '/api/rucks/<int:ruck_id>/comments')
 
+# Register notification resources with higher rate limits
+app.logger.info(f"Setting NotificationsResource rate limit to: 4000 per hour")
+# Apply higher rate limit to notification endpoints
+NotificationsResource.get = limiter.limit("4000 per hour", override_defaults=True)(NotificationsResource.get)
+NotificationsResource.post = limiter.limit("4000 per hour", override_defaults=True)(NotificationsResource.post)
+
 # Register notification resources
 api.add_resource(NotificationsResource, '/api/notifications')
 api.add_resource(NotificationReadResource, '/api/notifications/<string:notification_id>/read')
