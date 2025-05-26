@@ -307,15 +307,38 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
 
         log('RuckBuddyDetailScreen _loadRuckDetails: Parsed completeBuddy | distanceKm: ${completeBuddy.distanceKm}, duration: ${completeBuddy.durationSeconds}, calories: ${completeBuddy.caloriesBurned}, username: ${completeBuddy.user.username}, locationPoints: ${completeBuddy.locationPoints?.length}');
 
+        // Attempt to fetch full user details if username is missing and it's the current user's ruck
+        final authState = context.read<AuthBloc>().state;
+        String? currentAuthUserId;
+        if (authState is AuthAuthenticated) {
+          currentAuthUserId = authState.user.id;
+        }
+
+        RuckBuddy finalBuddy = completeBuddy;
+        if (currentAuthUserId != null &&
+            completeBuddy.userId == currentAuthUserId &&
+            (completeBuddy.user.username == 'Unknown User' || completeBuddy.user.username.isEmpty)) {
+          try {
+            log('RuckBuddyDetailScreen _loadRuckDetails: Username is Unknown for current user. Fetching profile...');
+            final apiClient = GetIt.instance<ApiClient>();
+            final currentUserProfile = await apiClient.getCurrentUserProfile();
+            log('RuckBuddyDetailScreen _loadRuckDetails: Fetched profile username = ${currentUserProfile.username}');
+            finalBuddy = completeBuddy.copyWith(user: currentUserProfile);
+          } catch (e) {
+            log('RuckBuddyDetailScreen _loadRuckDetails: Error fetching current user profile: $e');
+            // Keep using the buddy data from the ruck details if profile fetch fails
+          }
+        }
+
         if (mounted) {
           setState(() {
-            print('RuckBuddyDetailScreen _loadRuckDetails: Calling setState with _completeBuddy');
-            _completeBuddy = completeBuddy;
-            _isLiked = completeBuddy.isLikedByCurrentUser;
-            _likeCount = completeBuddy.likeCount;
-            _commentCount = completeBuddy.commentCount;
-            _photos = completeBuddy.photos ?? [];
-            log('RuckBuddyDetailScreen _loadRuckDetails: setState | _completeBuddy.distanceKm: ${_completeBuddy?.distanceKm}, _completeBuddy.duration: ${_completeBuddy?.durationSeconds}, _completeBuddy.calories: ${_completeBuddy?.caloriesBurned}, _completeBuddy.username: ${_completeBuddy?.user.username}, _completeBuddy.locationPoints: ${_completeBuddy?.locationPoints?.length}');
+            _completeBuddy = finalBuddy; 
+            // Update other local state variables based on the new _completeBuddy
+            _isLiked = _completeBuddy!.isLikedByCurrentUser;
+            _likeCount = _completeBuddy!.likeCount;
+            _commentCount = _completeBuddy!.commentCount;
+            _photos = _completeBuddy!.photos ?? [];
+            log('RuckBuddyDetailScreen _loadRuckDetails: _completeBuddy state updated. Username: ${_completeBuddy?.user.username}, Distance: ${_completeBuddy?.distanceKm}');
           });
         }
       } else {

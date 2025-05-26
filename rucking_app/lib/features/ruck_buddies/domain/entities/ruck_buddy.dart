@@ -43,6 +43,48 @@ class RuckBuddy extends Equatable {
     this.isLikedByCurrentUser = false,
   });
 
+  RuckBuddy copyWith({
+    String? id,
+    String? userId,
+    double? ruckWeightKg,
+    int? durationSeconds,
+    double? distanceKm,
+    int? caloriesBurned,
+    double? elevationGainM,
+    double? elevationLossM,
+    DateTime? startedAt,
+    DateTime? completedAt,
+    DateTime? createdAt,
+    int? avgHeartRate,
+    UserInfo? user,
+    List<dynamic>? locationPoints,
+    List<RuckPhoto>? photos,
+    int? likeCount,
+    int? commentCount,
+    bool? isLikedByCurrentUser,
+  }) {
+    return RuckBuddy(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      ruckWeightKg: ruckWeightKg ?? this.ruckWeightKg,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      distanceKm: distanceKm ?? this.distanceKm,
+      caloriesBurned: caloriesBurned ?? this.caloriesBurned,
+      elevationGainM: elevationGainM ?? this.elevationGainM,
+      elevationLossM: elevationLossM ?? this.elevationLossM,
+      startedAt: startedAt ?? this.startedAt,
+      completedAt: completedAt ?? this.completedAt,
+      createdAt: createdAt ?? this.createdAt,
+      avgHeartRate: avgHeartRate ?? this.avgHeartRate,
+      user: user ?? this.user,
+      locationPoints: locationPoints ?? this.locationPoints,
+      photos: photos ?? this.photos,
+      likeCount: likeCount ?? this.likeCount,
+      commentCount: commentCount ?? this.commentCount,
+      isLikedByCurrentUser: isLikedByCurrentUser ?? this.isLikedByCurrentUser,
+    );
+  }
+
   @override
   List<Object?> get props => [
     id, userId, ruckWeightKg, durationSeconds, 
