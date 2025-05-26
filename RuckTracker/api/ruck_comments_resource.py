@@ -49,7 +49,7 @@ class RuckCommentsResource(Resource):
         # Get comments for the ruck
         try:
             query_result = supabase.table('ruck_comments') \
-                                 .select('id, ruck_id, user_id, username, avatar_url, comment_text, created_at, updated_at') \
+                                 .select('id, ruck_id, user_id, user_display_name, user_avatar_url, content, created_at, updated_at') \
                                  .eq('ruck_id', ruck_id) \
                                  .order('created_at', desc=True) \
                                  .execute()
@@ -137,9 +137,9 @@ class RuckCommentsResource(Resource):
             insert_data = {
                 'ruck_id': ruck_id,
                 'user_id': user_id,
-                'username': user_profile['username'],
-                'avatar_url': user_profile.get('avatar_url'), # Will be None as per users table
-                'comment_text': content
+                'user_display_name': user_profile['username'],
+                'user_avatar_url': user_profile.get('avatar_url'), 
+                'content': content
             }
             
             logger.debug(f"RuckCommentsResource: Inserting comment data: {insert_data}")
@@ -243,9 +243,11 @@ class RuckCommentsResource(Resource):
         # Update the comment
         try:
             update_data = {
-                'comment_text': content,
+                'content': content,
                 'updated_at': 'now()'  # Supabase will interpret this as the current timestamp
             }
+            
+            logger.debug(f"RuckCommentsResource: Updating comment {comment_id} with data: {update_data}")
             
             update_response = supabase.table('ruck_comments') \
                                     .update(update_data) \
