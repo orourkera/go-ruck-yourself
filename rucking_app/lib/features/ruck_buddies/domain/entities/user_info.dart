@@ -12,6 +12,20 @@ class UserInfo extends Equatable {
     this.photoUrl,
     required this.gender,
   });
+
+  UserInfo copyWith({
+    String? id,
+    String? username,
+    String? photoUrl,
+    String? gender,
+  }) {
+    return UserInfo(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      photoUrl: photoUrl ?? this.photoUrl,
+      gender: gender ?? this.gender,
+    );
+  }
   
   factory UserInfo.fromJson(Map<String, dynamic> json) {
     return UserInfo(

@@ -170,6 +170,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
 
       // Fetch session data directly - this gives us all raw fields
       final data = await apiClient.get('/rucks/$ruckId');
+      log('RuckBuddyDetailScreen _loadRuckDetails: API response data for ruckId $ruckId: $data');
 
       print('RuckBuddyDetailScreen _loadRuckDetails: Raw API data = $data'); // Log raw data
 
@@ -191,9 +192,15 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
       Navigator.of(context, rootNavigator: true).pop();
 
       if (data != null) {
+        // Log initial user-related data from getRuckDetails response
+        final initialApiUserId = data['user_id']?.toString();
+        final initialApiUserName = data['user_name']?.toString(); // often from a direct field
+        final initialApiNestedUsername = data['user']?['username']?.toString() ?? data['users']?['username']?.toString(); // from a nested user object
+        log('RuckBuddyDetailScreen _loadRuckDetails: From getRuckDetails - user_id: $initialApiUserId, user_name: $initialApiUserName, nested username: $initialApiNestedUsername');
+
         // Extract user information
         final userId = data['user_id']?.toString() ?? '';
-        final username = data['user_name']?.toString() ?? data['username']?.toString() ?? 'Unknown User';
+        final username = data['user_name']?.toString() ?? data['username']?.toString() ?? ''; // Default to empty string
         final userGender = data['user_gender']?.toString() ?? 'male';
         print('RuckBuddyDetailScreen _loadRuckDetails: Parsed User: id=$userId, name=$username, gender=$userGender');
 
@@ -252,7 +259,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                   ruckId: ruckId,
                   userId: userId,
                   filename: 'photo.jpg',
-                  createdAt: DateTime.now(),
+                  createdAt: DateTime.now(), // Use current time as fallback
                   url: photoData,
                 ));
               }
@@ -300,7 +307,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
           completedAt: completedAt,
           user: UserInfo(
             id: userId,
-            username: username,
+            username: username, // Uses the initially parsed username (now defaults to '')
             gender: userGender,
           ),
           locationPoints: locationPoints,
@@ -331,26 +338,48 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         if (finalBuddy.userId.isNotEmpty) {
           log('RuckBuddyDetailScreen _loadRuckDetails: Fetching user profile for userId = ${finalBuddy.userId}');
           try {
-            final fetched = await _apiClient.getUserProfile(finalBuddy.userId);
-            finalBuddy = finalBuddy.copyWith(user: fetched);
-            log('RuckBuddyDetailScreen _loadRuckDetails: Successfully fetched user profile: ${fetched.username}');
-          } catch (e) {
+            final fetchedUserProfile = await _apiClient.getUserProfile(finalBuddy.userId);
+            log('RuckBuddyDetailScreen _loadRuckDetails: Fetched UserProfile object: id=${fetchedUserProfile.id}, username="${fetchedUserProfile.username}", gender=${fetchedUserProfile.gender}'); // DETAILED LOG OF FETCHED PROFILE
+
+            // Check fetched profile: if its username is empty or "Unknown User", use "Rucker"
+            if (fetchedUserProfile.username.isEmpty || fetchedUserProfile.username == 'Unknown User') {
+              log('RuckBuddyDetailScreen _loadRuckDetails: Fetched profile has empty or "Unknown User" username. Using "Rucker". Profile username was: "${fetchedUserProfile.username}"');
+              finalBuddy = finalBuddy.copyWith(user: fetchedUserProfile.copyWith(username: 'Rucker'));
+            } else {
+              finalBuddy = finalBuddy.copyWith(user: fetchedUserProfile);
+              log('RuckBuddyDetailScreen _loadRuckDetails: Successfully fetched user profile: ${fetchedUserProfile.username}');
+            }
+          } catch (e) { // Profile fetch failed
             log('RuckBuddyDetailScreen _loadRuckDetails: Failed to fetch user profile: $e');
+            // Fallback: Use username from ruck details (data['users']['username']) if available,
+            // otherwise "Rucker". If ruck details username is "Unknown User" or empty, also use "Rucker".
+            Map<String, dynamic> userDataFromRuckDetails = data['users'] ?? data['user'] ?? {};
+            String fallbackUsername = userDataFromRuckDetails['username']?.toString() ?? ''; // Get it, or empty string
             
-            // Fallback to creating user info directly like RuckBuddyModel does
+            if (fallbackUsername.isEmpty || fallbackUsername == 'Unknown User') {
+              log('RuckBuddyDetailScreen _loadRuckDetails: Fallback username from ruck details is empty or "Unknown User". Setting to "Rucker". Was: $fallbackUsername');
+              fallbackUsername = 'Rucker';
+            }
+
             try {
               final updatedUserInfo = UserInfo.fromJson({
-                'id': userData['id'] ?? finalBuddy.userId,
-                'username': userData['username'] ?? 'Rucker',
-                'avatar_url': userData['avatar_url'] ?? null,
-                'gender': userData['gender'] ?? 'male',
+                'id': userDataFromRuckDetails['id']?.toString() ?? finalBuddy.userId,
+                'username': fallbackUsername, // Use the refined fallbackUsername
+                'avatar_url': userDataFromRuckDetails['avatar_url']?.toString(),
+                'gender': userDataFromRuckDetails['gender']?.toString() ?? 'male',
               });
               finalBuddy = finalBuddy.copyWith(user: updatedUserInfo);
               log('RuckBuddyDetailScreen _loadRuckDetails: Created fallback UserInfo with username = ${updatedUserInfo.username}');
             } catch (userInfoErr) {
-              log('RuckBuddyDetailScreen _loadRuckDetails: Error creating fallback user info: $userInfoErr');
+              log('RuckBuddyDetailScreen _loadRuckDetails: Error creating fallback user info: $userInfoErr. Setting username to Rucker.');
+              // Ensure a sane default even if UserInfo.fromJson fails with the refined fallback
+              finalBuddy = finalBuddy.copyWith(user: finalBuddy.user.copyWith(username: 'Rucker'));
             }
           }
+        } else { // userId was empty from getRuckDetails response (or initial widget.ruckBuddy if getRuckDetails failed early)
+          log('RuckBuddyDetailScreen _loadRuckDetails: UserID is empty. Setting username to Rucker. Original username in finalBuddy: ${finalBuddy.user.username}');
+          // finalBuddy.user.username at this point could be '', or 'Unknown User' if data['user_name'] was that and data['user_id'] was null.
+          finalBuddy = finalBuddy.copyWith(user: finalBuddy.user.copyWith(username: 'Rucker'));
         }
 
         if (mounted) {
