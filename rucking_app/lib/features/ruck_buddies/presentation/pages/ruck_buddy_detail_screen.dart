@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Import for HapticFeedback
 import 'package:cached_network_image/cached_network_image.dart';
@@ -13,7 +14,11 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/location_utils.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
+import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/social/presentation/widgets/comments_section.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
@@ -48,6 +53,12 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   int _commentCount = 0; // Added comment count state variable
   bool _isProcessingLike = false;
   
+  // For storing complete data when loaded from a notification
+  RuckBuddy? _completeBuddy;
+  
+  // Getter to use the complete buddy data if available, otherwise fallback to widget.ruckBuddy
+  RuckBuddy get displayBuddy => _completeBuddy ?? widget.ruckBuddy;
+  
   // Comment editing state
   bool _isEditingComment = false;
   String? _editingCommentId;
@@ -56,26 +67,42 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   @override
   void initState() {
     super.initState();
+    // Use widget.ruckBuddy directly here since _completeBuddy isn't set yet
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser;
     _likeCount = widget.ruckBuddy.likeCount;
     _commentCount = widget.ruckBuddy.commentCount; // Initialize comment count
     _photos = widget.ruckBuddy.photos ?? [];
+    
+    // Check if this is a minimal RuckBuddy (e.g., from a notification)
+    bool isMinimalRuckBuddy = widget.ruckBuddy.id.isNotEmpty && 
+                           widget.ruckBuddy.user.username.isEmpty && 
+                           widget.ruckBuddy.distanceKm == 0;
+                           
+    // If this is a minimal RuckBuddy, we need to fetch the complete session data
+    if (isMinimalRuckBuddy) {
+      // Defer _loadRuckDetails to after the first frame to avoid context issues
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadRuckDetails();
+        }
+      });
+    }
 
     // Always fetch photos for ruck buddies, as they're not included in the initial RuckBuddy model
-    if (widget.ruckBuddy.id.isNotEmpty) {
+    if (displayBuddy.id.isNotEmpty) {
       // Make sure we get photos on screen initialization with a small delay to ensure the bloc is ready
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && GetIt.I.isRegistered<ActiveSessionBloc>()) {
           final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Fetching photos for ${widget.ruckBuddy.id} from ActiveSessionBloc.');
+          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Fetching photos for ${displayBuddy.id} from ActiveSessionBloc.');
           // Request photos from the bloc
           try {
-            final ruckId = widget.ruckBuddy.id;
+            final ruckId = displayBuddy.id;
             print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Dispatching FetchSessionPhotosRequested event with ruckId: $ruckId');
             // Force the bloc to fetch fresh photos
             activeSessionBloc.add(FetchSessionPhotosRequested(ruckId));
           } catch (e) {
-            print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Error requesting photos for ID ${widget.ruckBuddy.id}: $e');
+            print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Error requesting photos for ID ${displayBuddy.id}: $e');
           }
         } else {
           print('[PHOTO_DEBUG] RuckBuddyDetailScreen: ActiveSessionBloc not registered or widget not mounted');
@@ -86,7 +113,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     }
     
     // Load social data immediately without waiting for post-frame callback
-    final ruckId = int.tryParse(widget.ruckBuddy.id);
+    final ruckId = int.tryParse(displayBuddy.id);
     if (ruckId != null && GetIt.I.isRegistered<SocialBloc>()) {
       // Use the singleton instance of SocialBloc from GetIt
       final socialBloc = GetIt.instance<SocialBloc>();
@@ -108,9 +135,234 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   }
 
   @override
+  /// Load complete ruck details when opening from notification
+  Future<void> _loadRuckDetails() async {
+    final ruckId = widget.ruckBuddy.id;
+    if (ruckId.isEmpty) return;
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false, // User cannot dismiss by tapping outside
+      builder: (context) => const Dialog(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading details...'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      print('====== LOADING RUCK DETAILS FOR ID: $ruckId ======');
+
+      // Get API client for direct API access
+      final apiClient = GetIt.I<ApiClient>();
+
+      // Fetch session data directly - this gives us all raw fields
+      final data = await apiClient.get('/rucks/$ruckId');
+
+      print('RuckBuddyDetailScreen _loadRuckDetails: Raw API data = $data'); // Log raw data
+
+      // If the widget was disposed while waiting for data,
+      // attempt to pop the dialog if it's still active and then return.
+      if (!mounted) {
+        try {
+          // Check if dialog is part of the current route stack before popping
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+        } catch (_) {
+          // Ignore errors if context is invalid for popping (e.g., already disposed)
+        }
+        return;
+      }
+
+      // Close loading dialog (widget is mounted here)
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (data != null) {
+        // Extract user information
+        final userId = data['user_id']?.toString() ?? '';
+        final username = data['user_name']?.toString() ?? data['username']?.toString() ?? 'Unknown User';
+        final userGender = data['user_gender']?.toString() ?? 'male';
+        print('RuckBuddyDetailScreen _loadRuckDetails: Parsed User: id=$userId, name=$username, gender=$userGender');
+
+        // Extract metrics
+        final distanceKm = _parseDouble(data['distance_km']) ?? 0.0;
+        final durationSeconds = _parseInt(data['duration_seconds']) ?? 0;
+        final caloriesBurned = _parseInt(data['calories_burned']) ?? 0;
+        final ruckWeightKg = _parseDouble(data['ruck_weight_kg']) ?? 0.0;
+        final elevationGainM = _parseDouble(data['elevation_gain_meters']) ?? 0.0;
+        final elevationLossM = _parseDouble(data['elevation_loss_meters']) ?? 0.0;
+        print('RuckBuddyDetailScreen _loadRuckDetails: Parsed Metrics: dist=$distanceKm, dur=$durationSeconds, cal=$caloriesBurned, weight=$ruckWeightKg, elevGain=$elevationGainM, elevLoss=$elevationLossM');
+
+        // Process location points
+        List<Map<String, dynamic>> locationPoints = [];
+        if (data['route'] != null && data['route'] is List) {
+          try {
+            for (final point in data['route']) {
+              if (point is Map) {
+                final lat = _parseDouble(point['lat'] ?? point['latitude']);
+                final lng = _parseDouble(point['lng'] ?? point['longitude'] ?? point['lon']);
+
+                if (lat != null && lng != null) {
+                  locationPoints.add({'lat': lat, 'lng': lng});
+                }
+              }
+            }
+          } catch (e) {
+            print('Error parsing route points: $e');
+          }
+        }
+
+        // Process photos
+        List<RuckPhoto> photos = [];
+        if (data['photos'] != null && data['photos'] is List) {
+          print('RuckBuddyDetailScreen _loadRuckDetails: Processing photos data: ${data['photos']}');
+          try {
+            for (final photoData in data['photos']) {
+              if (photoData is Map<String, dynamic>) {
+                try {
+                  photos.add(RuckPhoto.fromJson(photoData));
+                } catch (e) {
+                  // Fallback for partial photo data
+                  photos.add(RuckPhoto(
+                    id: photoData['id']?.toString() ?? 'photo-${DateTime.now().millisecondsSinceEpoch}',
+                    ruckId: ruckId,
+                    userId: userId,
+                    filename: photoData['filename']?.toString() ?? 'photo.jpg',
+                    createdAt: DateTime.now(),
+                    url: photoData['url']?.toString() ?? '',
+                  ));
+                }
+              } else if (photoData is String) {
+                // Simple URL as photo
+                photos.add(RuckPhoto(
+                  id: 'photo-${DateTime.now().millisecondsSinceEpoch}',
+                  ruckId: ruckId,
+                  userId: userId,
+                  filename: 'photo.jpg',
+                  createdAt: DateTime.now(),
+                  url: photoData,
+                ));
+              }
+            }
+          } catch (e) {
+            print('Error processing photos: $e');
+          }
+        }
+
+        // Parse timestamps
+        DateTime createdAt;
+        try {
+          final timestamp = data['start_time'] ?? data['started_at'] ?? data['created_at'];
+          createdAt = timestamp != null ? DateTime.parse(timestamp.toString()) : DateTime.now();
+        } catch (e) {
+          createdAt = DateTime.now();
+          print('Error parsing timestamp: $e');
+        }
+        print('RuckBuddyDetailScreen _loadRuckDetails: Parsed createdAt: $createdAt');
+        final completedAtTimestamp = data['end_time'];
+        DateTime? completedAt;
+        if (completedAtTimestamp != null) {
+          try {
+            completedAt = DateTime.parse(completedAtTimestamp.toString());
+          } catch (e) {
+            print('Error parsing completedAt timestamp: $e');
+          }
+        }
+        print('RuckBuddyDetailScreen _loadRuckDetails: Parsed completedAt: $completedAt');
+
+        // Create the complete buddy object
+        final completeBuddy = RuckBuddy(
+          id: ruckId,
+          userId: userId,
+          ruckWeightKg: ruckWeightKg,
+          durationSeconds: durationSeconds,
+          distanceKm: distanceKm,
+          caloriesBurned: caloriesBurned,
+          elevationGainM: elevationGainM,
+          elevationLossM: elevationLossM,
+          createdAt: createdAt,
+          completedAt: completedAt,
+          user: UserInfo(
+            id: userId,
+            username: username,
+            gender: userGender,
+          ),
+          locationPoints: locationPoints,
+          photos: photos,
+          likeCount: _parseInt(data['like_count']) ?? 0,
+          isLikedByCurrentUser: data['is_liked_by_current_user'] == true,
+          commentCount: _parseInt(data['comment_count']) ?? 0,
+        );
+        print('RuckBuddyDetailScreen _loadRuckDetails: Created completeBuddy object: $completeBuddy');
+
+        log('RuckBuddyDetailScreen _loadRuckDetails: Parsed completeBuddy | distanceKm: ${completeBuddy.distanceKm}, duration: ${completeBuddy.durationSeconds}, calories: ${completeBuddy.caloriesBurned}, username: ${completeBuddy.user.username}, locationPoints: ${completeBuddy.locationPoints?.length}');
+
+        if (mounted) {
+          setState(() {
+            print('RuckBuddyDetailScreen _loadRuckDetails: Calling setState with _completeBuddy');
+            _completeBuddy = completeBuddy;
+            _isLiked = completeBuddy.isLikedByCurrentUser;
+            _likeCount = completeBuddy.likeCount;
+            _commentCount = completeBuddy.commentCount;
+            _photos = completeBuddy.photos ?? [];
+            log('RuckBuddyDetailScreen _loadRuckDetails: setState | _completeBuddy.distanceKm: ${_completeBuddy?.distanceKm}, _completeBuddy.duration: ${_completeBuddy?.durationSeconds}, _completeBuddy.calories: ${_completeBuddy?.caloriesBurned}, _completeBuddy.username: ${_completeBuddy?.user.username}, _completeBuddy.locationPoints: ${_completeBuddy?.locationPoints?.length}');
+          });
+        }
+      } else {
+        // Handle case where data is null (e.g., API returned 200 but no body)
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to retrieve ruck details. No data received.')),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error in _loadRuckDetails: $e');
+      if (mounted) {
+        // Attempt to pop the dialog if it's still open due to an error
+        try {
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+        } catch (popError) {
+          print('Error popping dialog in catch block: $popError');
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading details: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  // Helper methods for safer parsing
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+  
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.round();
+    return int.tryParse(value.toString());
+  }
+
+  @override
   void dispose() {
     _commentController.dispose();
-    _commentFocusNode.dispose(); // Clean up focus node
+    _commentFocusNode.dispose();
     super.dispose();
   }
 
@@ -136,7 +388,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     });
     
     // Dispatch event to update backend
-    final ruckId = int.tryParse(widget.ruckBuddy.id);
+    final ruckId = int.tryParse(displayBuddy.id);
     if (ruckId != null) {
       // Directly update backend through SocialBloc - this ensures per-ruck state
       context.read<SocialBloc>().add(ToggleRuckLike(ruckId));
@@ -149,7 +401,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     // Dispatch AddRuckComment to SocialBloc
     context.read<SocialBloc>().add(
       AddRuckComment(
-        ruckId: widget.ruckBuddy.id,
+        ruckId: displayBuddy.id,
         content: _commentController.text.trim(),
       ),
     );
@@ -180,7 +432,12 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     final bool preferMetric = authBloc.state is Authenticated
         ? (authBloc.state as Authenticated).user.preferMetric
         : false;
-    
+
+    // Debug print to check displayBuddy's state at build time
+    print('[BUILD_DEBUG] displayBuddy.user.username: ${displayBuddy.user.username}');
+    print('[BUILD_DEBUG] displayBuddy.ruckWeightKg: ${displayBuddy.ruckWeightKg}');
+    print('[BUILD_DEBUG] displayBuddy.distanceKm: ${displayBuddy.distanceKm}');
+
     return BlocListener<ActiveSessionBloc, ActiveSessionState>(
       bloc: GetIt.instance<ActiveSessionBloc>(),
       listenWhen: (previous, current) {
@@ -191,7 +448,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
           if (state is SessionSummaryGenerated) return state.photos;
           if (state is ActiveSessionRunning) return state.photos;
           if (state is ActiveSessionInitial) return state.photos;
-          if (state is SessionPhotosLoadedForId && state.sessionId.toString() == widget.ruckBuddy.id.toString()) return state.photos;
+          if (state is SessionPhotosLoadedForId && state.sessionId.toString() == displayBuddy.id.toString()) return state.photos;
           return [];
         }
         
@@ -219,7 +476,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         } else if (state is ActiveSessionRunning) {
           statePhotos = state.photos;
           print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in ActiveSessionRunning state');
-        } else if (state is SessionPhotosLoadedForId && state.sessionId.toString() == widget.ruckBuddy.id.toString()) {
+        } else if (state is SessionPhotosLoadedForId && state.sessionId.toString() == displayBuddy.id.toString()) {
           // Handle the SessionPhotosLoadedForId state which is emitted by our updated ActiveSessionBloc
           statePhotos = state.photos;
           print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in SessionPhotosLoadedForId state');
@@ -272,7 +529,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
       },
       child: BlocListener<SocialBloc, SocialState>(
         listener: (context, state) {
-          final ruckId = int.tryParse(widget.ruckBuddy.id);
+          final ruckId = int.tryParse(displayBuddy.id);
           if (ruckId == null) return;
           
           if (state is LikeStatusChecked) {
@@ -340,20 +597,20 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           width: 60,
                           height: 60,
                           padding: const EdgeInsets.all(4),
-                          child: widget.ruckBuddy.user?.photoUrl != null && widget.ruckBuddy.user!.photoUrl!.isNotEmpty
+                          child: displayBuddy.user?.photoUrl != null && displayBuddy.user!.photoUrl!.isNotEmpty
                             ? CachedNetworkImage(
-                                imageUrl: widget.ruckBuddy.user!.photoUrl!,
+                                imageUrl: displayBuddy.user!.photoUrl!,
                                 fit: BoxFit.cover,
                                 placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                                 errorWidget: (context, url, error) => Image.asset(
-                                  widget.ruckBuddy.user?.gender?.toLowerCase() == 'female' 
+                                  displayBuddy.user?.gender?.toLowerCase() == 'female' 
                                     ? 'assets/images/lady rucker profile.png'
                                     : 'assets/images/profile.png',
                                   fit: BoxFit.contain,
                                 ),
                               )
                             : Image.asset(
-                                widget.ruckBuddy.user?.gender?.toLowerCase() == 'female' 
+                                displayBuddy.user?.gender?.toLowerCase() == 'female' 
                                   ? 'assets/images/lady rucker profile.png'
                                   : 'assets/images/profile.png',
                                 fit: BoxFit.contain,
@@ -368,11 +625,11 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.ruckBuddy.user.username,
+                              displayBuddy.user.username,
                               style: AppTextStyles.titleMedium,
                             ),
                             Text(
-                              _formatCompletedDate(widget.ruckBuddy.completedAt),
+                              _formatCompletedDate(displayBuddy.completedAt),
                               style: AppTextStyles.bodySmall.copyWith(
                                 color: Colors.grey[600],
                               ),
@@ -384,7 +641,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       // Distance badge at right side of header
                       Text(
                         MeasurementUtils.formatDistance(
-                          widget.ruckBuddy.distanceKm,
+                          displayBuddy.distanceKm,
                           metric: context.read<AuthBloc>().state is Authenticated
                             ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
                             : true,
@@ -405,14 +662,14 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                   height: 250,
                   width: double.infinity,
                   child: _RouteMap(
-                    locationPoints: widget.ruckBuddy.locationPoints,
-                    ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
+                    locationPoints: displayBuddy.locationPoints,
+                    ruckWeightKg: displayBuddy.ruckWeightKg,
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                   child: FutureBuilder<String>(
-                    future: LocationUtils.getLocationName(widget.ruckBuddy.locationPoints),
+                    future: LocationUtils.getLocationName(displayBuddy.locationPoints),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
@@ -477,7 +734,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                 builder: (context) => PhotoViewer(
                                   photoUrls: _extractPhotoUrls(_photos),
                                   initialIndex: index,
-                                  title: '${widget.ruckBuddy.user.username}\'s Ruck',
+                                  title: '${displayBuddy.user.username}\'s Ruck',
                                 ),
                               ),
                             );
@@ -505,7 +762,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             child: _buildStatItem(
                               icon: Icons.timer,
                               label: 'Time',
-                              value: _formatDuration(widget.ruckBuddy.durationSeconds.round()),
+                              value: _formatDuration(displayBuddy.durationSeconds.round()),
                             ),
                           ),
                           // Elevation
@@ -514,7 +771,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                               icon: Icons.trending_up,
                               label: 'Elevation',
                               value: MeasurementUtils.formatElevation(
-                                widget.ruckBuddy.elevationGainM,
+                                displayBuddy.elevationGainM,
                                 0,
                                 metric: preferMetric,
                               ),
@@ -534,7 +791,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                               icon: Icons.speed,
                               label: 'Pace',
                               value: MeasurementUtils.formatPace(
-                                (widget.ruckBuddy.durationSeconds / 60) / widget.ruckBuddy.distanceKm,
+                                displayBuddy.distanceKm > 0 
+                                  ? (displayBuddy.durationSeconds / 60) / displayBuddy.distanceKm 
+                                  : 0,
                                 metric: preferMetric,
                               ),
                             ),
@@ -544,7 +803,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             child: _buildStatItem(
                               icon: Icons.local_fire_department,
                               label: 'Calories',
-                              value: '${widget.ruckBuddy.caloriesBurned.round()} kcal',
+                              value: '${displayBuddy.caloriesBurned.round()} kcal',
                             ),
                           ),
                         ],
@@ -661,7 +920,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16.0),
                             child: CommentsSection(
-                              ruckId: widget.ruckBuddy.id, // Now directly using string ID
+                              ruckId: displayBuddy.id, // Now directly using string ID
                               maxDisplayed: 5, // Show 5 most recent comments
                               showViewAllButton: true,
                               hideInput: true, // Prevent CommentsSection from rendering its own input field
@@ -842,7 +1101,11 @@ class _RouteMap extends StatelessWidget {
   List<LatLng> _getRoutePoints() {
     final pts = <LatLng>[];
     final lp = locationPoints;
-    if (lp == null) return pts;
+    if (lp == null || lp.isEmpty) {
+      // Return default location if no points available
+      return [const LatLng(37.7749, -122.4194)]; // San Francisco as default
+    }
+    
     for (final p in lp) {
       double? lat;
       double? lng;
@@ -856,11 +1119,18 @@ class _RouteMap extends StatelessWidget {
         lng = _parseCoord(p[1]);
       }
 
-      if (lat != null && lng != null) {
+      // Only add point if coordinates are valid (not null, finite, and within range)
+      if (lat != null && lng != null && 
+          lat.isFinite && lng.isFinite && 
+          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
         pts.add(LatLng(lat, lng));
       }
     }
-    return pts;
+    
+    // If we couldn't extract any valid points, return a default
+    return pts.isEmpty
+        ? [const LatLng(37.7749, -122.4194)] // San Francisco as default
+        : pts;
   }
 
   LatLng _getRouteCenter(List<LatLng> points) {
@@ -942,6 +1212,7 @@ class _RouteMap extends StatelessWidget {
       child: Stack(
         children: [
           FlutterMap(
+            key: ObjectKey(routePoints), // Added key here
             options: MapOptions(
               initialCenter: _getRouteCenter(routePoints),
               initialZoom: _getFitZoom(routePoints),
