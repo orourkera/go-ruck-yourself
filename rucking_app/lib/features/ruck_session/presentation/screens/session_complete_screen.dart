@@ -141,16 +141,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'completed': true,
         'notes': _notesController.text.trim(),
         'distance_km': widget.distance,
-        'final_distance_km': widget.distance,
         'distance_meters': (widget.distance * 1000).round(),
         'calories_burned': widget.caloriesBurned,
-        'final_calories_burned': widget.caloriesBurned,
         'elevation_gain_m': widget.elevationGain,
         'elevation_loss_m': widget.elevationLoss,
-        'final_elevation_gain': widget.elevationGain,
-        'final_elevation_loss': widget.elevationLoss,
-        'final_avg_hr': _avgHeartRate,
-        'final_max_hr': _maxHeartRate,
       };
 
       await _apiClient.patch('/rucks/${widget.ruckId}', completionData);

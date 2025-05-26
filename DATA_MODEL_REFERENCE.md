@@ -134,7 +134,7 @@ When navigating to the session completion screen, the following argument mapping
 
 ---
 
-## Detailed Database Schema: `users`
+## Detailed Database Schema: `user`
 
 | Column Name     | Data Type                   | Nullable | Default |
 |-----------------|-----------------------------|----------|---------|
