@@ -12,6 +12,8 @@ import 'package:rucking_app/features/notifications/util/notification_types.dart'
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/core/services/api_client.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -26,7 +28,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    // First, request notifications to display them
     _notificationBloc.add(const NotificationsRequested());
+    
+    // Mark all notifications as read when screen is opened
+    // Add a small delay to ensure notifications are loaded first
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _notificationBloc.add(const AllNotificationsRead());
+    });
   }
 
   @override
@@ -160,6 +169,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // Mark as read first
     _notificationBloc.add(NotificationRead(notification.id));
     
+    // Show loading indicator
+    final loadingDialog = showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Dialog(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading details...'),
+            ],
+          ),
+        ),
+      ),
+    );
+    
     // Then navigate based on notification type and data
     if (notification.data != null) {
       switch (notification.type) {
@@ -167,42 +195,86 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         case NotificationType.comment:
           final ruckId = notification.data!['ruck_id']?.toString();
           if (ruckId != null) {
-            // Create a simple RuckBuddy object with just the ID
-            // The detail screen will load the full data
-            final ruckBuddy = RuckBuddy(
-              id: ruckId,
-              userId: '',
-              ruckWeightKg: 0,
-              durationSeconds: 0,
-              distanceKm: 0,
-              caloriesBurned: 0,
-              elevationGainM: 0,
-              elevationLossM: 0,
-              createdAt: DateTime.now(),
-              user: UserInfo(id: '', username: '', gender: ''),
-            );
+            // Create the session repository with the API client
+            final sessionRepo = SessionRepository(apiClient: GetIt.I<ApiClient>());
             
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => RuckBuddyDetailScreen(ruckBuddy: ruckBuddy),
-              ),
-            );
+            // Fetch the full session details before navigating
+            sessionRepo.fetchSessionById(ruckId).then((session) {
+              // Close loading dialog
+              Navigator.of(context, rootNavigator: true).pop();
+              
+              if (session != null) {
+                // Create a proper RuckBuddy from the session data
+                // Use default/empty values for fields that aren't available in RuckSession
+                final ruckBuddy = RuckBuddy(
+                  id: session.id ?? '',
+                  userId: '', // No userId in RuckSession
+                  ruckWeightKg: session.ruckWeightKg,
+                  durationSeconds: session.duration.inSeconds,
+                  distanceKm: session.distance,
+                  caloriesBurned: session.caloriesBurned,
+                  elevationGainM: session.elevationGain,
+                  elevationLossM: session.elevationLoss,
+                  createdAt: session.startTime,
+                  completedAt: session.endTime,
+                  locationPoints: session.locationPoints,
+                  user: UserInfo(
+                    id: '', // No user info in RuckSession
+                    username: '', // Default empty username
+                    gender: '', // Default empty gender
+                  ),
+                );
+                
+                // Navigate to the detail screen with the full data
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RuckBuddyDetailScreen(
+                      ruckBuddy: ruckBuddy,
+                      focusComment: notification.type == NotificationType.comment,
+                    ),
+                  ),
+                );
+              } else {
+                // Show error snackbar if session couldn't be loaded
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Could not load ruck details'),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            }).catchError((error) {
+              // Close loading dialog and show error
+              Navigator.of(context, rootNavigator: true).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error loading ruck: ${error.toString()}'),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            });
           }
           break;
         
         case NotificationType.follow:
+          Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
           // Navigate to user profile in the future
           break;
           
         case NotificationType.system:
+          Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
           // Handle system notifications
           break;
           
         default:
+          Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
           // No specific handling for unknown types
           break;
       }
+    } else {
+      // No notification data, close loading dialog
+      Navigator.of(context, rootNavigator: true).pop();
     }
   }
 }
