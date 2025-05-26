@@ -155,8 +155,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elapsedSeconds: 0,
         distanceKm: 0.0,
         ruckWeightKg: event.ruckWeightKg,
+        userWeightKg: event.userWeightKg,
         notes: event.notes,
-        calories: 0,
+        calories: 0.0,
         elevationGain: 0.0,
         elevationLoss: 0.0,
         isPaused: false,
@@ -318,9 +319,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
 
       // Check if auth state is Authenticated before accessing user property
-      final authState = GetIt.I<AuthBloc>().state;
-      User? currentUser = authState is Authenticated ? authState.user : null;
-      double userWeightKg = currentUser?.weightKg ?? 70.0;
+      double userWeightKg = currentState.userWeightKg;
+
       // Convert pace (seconds per km) to speed (km/h), then to mph for MetCalculator
       // Speed (km/h) = 3600 / pace (seconds per km)
       double speedKmh = newPace != null && newPace > 0 ? (3600 / newPace) : 0;
@@ -351,7 +351,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       emit(currentState.copyWith(
         elapsedSeconds: newElapsed,
         pace: newPace,
-        calories: newCalories.round(),
+        calories: newCalories,
         latestHeartRate: _latestHeartRate,
         minHeartRate: _minHeartRate,
         maxHeartRate: _maxHeartRate,
@@ -362,7 +362,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Update metrics on watch
       try {
         // Get the user's metric preference
-        bool preferMetric = currentUser?.preferMetric ?? true;
+        bool preferMetric = GetIt.I<AuthBloc>().state is Authenticated ? (GetIt.I<AuthBloc>().state as Authenticated).user.preferMetric ?? true : true;
         
         await _watchService.updateMetricsOnWatch(
           distance: currentState.distanceKm,

@@ -21,16 +21,18 @@ class SessionStarted extends ActiveSessionEvent {
   final double ruckWeightKg;
   final String? notes;
   final LocationPoint? initialLocation;
+  final double userWeightKg;
   
   const SessionStarted({
     required this.ruckWeightKg,
+    required this.userWeightKg,
     this.notes,
     this.plannedDuration,
     this.initialLocation,
   });
   
   @override
-  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation];
+  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg];
 }
 
 class LocationUpdated extends ActiveSessionEvent {

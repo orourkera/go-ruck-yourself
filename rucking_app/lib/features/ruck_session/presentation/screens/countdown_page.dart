@@ -74,6 +74,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       // Start session initialization in the background while countdown runs
       _sessionBloc.add(SessionStarted(
         ruckWeightKg: widget.args.ruckWeight,
+        userWeightKg: widget.args.userWeightKg,
         notes: widget.args.notes ?? '',
         plannedDuration: widget.args.plannedDuration,
       ));
@@ -94,6 +95,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
           // Initiate session during countdown
           _sessionBloc.add(SessionStarted(
             ruckWeightKg: widget.args.ruckWeight,
+            userWeightKg: widget.args.userWeightKg,
             notes: widget.args.notes ?? '',
             plannedDuration: widget.args.plannedDuration,
           ));
@@ -173,6 +175,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       // Inject initialCenter into args to ensure the map centers immediately
       final argsWithCenter = ActiveSessionArgs(
         ruckWeight: widget.args.ruckWeight,
+        userWeightKg: widget.args.userWeightKg,
         notes: widget.args.notes,
         plannedDuration: widget.args.plannedDuration,
         initialCenter: _initialCenter ?? widget.args.initialCenter,

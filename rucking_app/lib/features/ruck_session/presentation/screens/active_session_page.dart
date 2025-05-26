@@ -33,14 +33,16 @@ import 'package:provider/provider.dart';
 class ActiveSessionArgs {
   final double ruckWeight;
   final String? notes;
-  final latlong.LatLng? initialCenter;
-  final int? plannedDuration;
+  final int? plannedDuration; // in seconds
+  final latlong.LatLng? initialCenter; // Optional initial map center
+  final double userWeightKg; // Added user's body weight in kg
 
-  const ActiveSessionArgs({
+  ActiveSessionArgs({
     required this.ruckWeight,
+    required this.userWeightKg, // Made required
     this.notes,
-    this.initialCenter,
     this.plannedDuration,
+    this.initialCenter,
   });
 }
 
@@ -340,6 +342,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         AppLogger.warning('Session was running, UI initialized, but BLoC reset to Initial. Re-triggering SessionStarted.');
                         context.read<ActiveSessionBloc>().add(SessionStarted(
                                 ruckWeightKg: widget.args.ruckWeight,
+                                userWeightKg: widget.args.userWeightKg, // Added missing parameter
                                 notes: widget.args.notes,
                                 plannedDuration: widget.args.plannedDuration,
                                 initialLocation: widget.args.initialCenter == null 
@@ -365,6 +368,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                              AppLogger.info('UI Initialized, starting session with args: ${widget.args.ruckWeight}kg, ${widget.args.plannedDuration}s');
                              context.read<ActiveSessionBloc>().add(SessionStarted(
                                   ruckWeightKg: widget.args.ruckWeight,
+                                  userWeightKg: widget.args.userWeightKg,
                                   notes: widget.args.notes,
                                   plannedDuration: widget.args.plannedDuration,
                                   initialLocation: widget.args.initialCenter == null 

@@ -54,7 +54,7 @@ class ActiveSessionLoading extends ActiveSessionState {
 class ActiveSessionRunning extends ActiveSessionState {
   final List<String>? tags;
   final int? perceivedExertion;
-  final double? weightKg;
+  final double userWeightKg;
   final int? plannedDurationMinutes;
   final int? pausedDurationSeconds;
   final int? plannedDuration; // in seconds
@@ -64,7 +64,7 @@ class ActiveSessionRunning extends ActiveSessionState {
   final double distanceKm;
   final double ruckWeightKg;
   final String? notes;
-  final int calories;
+  final double calories;
   final double elevationGain;
   final double elevationLoss;
   final bool isPaused;
@@ -103,7 +103,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     required this.sessionId,
     this.tags,
     this.perceivedExertion,
-    this.weightKg,
+    required this.userWeightKg,
     this.plannedDurationMinutes,
     this.pausedDurationSeconds,
     this.plannedDuration,
@@ -145,7 +145,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     sessionId,
     tags,
     perceivedExertion,
-    weightKg,
+    userWeightKg,
     plannedDurationMinutes,
     pausedDurationSeconds,
     locationPoints,
@@ -187,7 +187,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     String? sessionId,
     List<String>? tags,
     int? perceivedExertion,
-    double? weightKg,
+    double? userWeightKg,
     int? plannedDurationMinutes,
     int? pausedDurationSeconds,
     List<LocationPoint>? locationPoints,
@@ -195,7 +195,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     double? distanceKm,
     double? ruckWeightKg,
     String? notes,
-    int? calories,
+    double? calories,
     double? elevationGain,
     double? elevationLoss,
     bool? isPaused,
@@ -232,7 +232,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       sessionId: sessionId ?? this.sessionId,
       tags: tags ?? this.tags,
       perceivedExertion: perceivedExertion ?? this.perceivedExertion,
-      weightKg: weightKg ?? this.weightKg,
+      userWeightKg: userWeightKg ?? this.userWeightKg,
       plannedDurationMinutes: plannedDurationMinutes ?? this.plannedDurationMinutes,
       pausedDurationSeconds: pausedDurationSeconds ?? this.pausedDurationSeconds,
       locationPoints: locationPoints ?? this.locationPoints,

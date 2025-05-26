@@ -230,7 +230,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
         final sessionArgs = ActiveSessionArgs(
           ruckWeight: _ruckWeight,
-          notes: _userWeightController.text.isNotEmpty ? _userWeightController.text : null,
+          userWeightKg: userWeightKg, // Pass the calculated userWeightKg (double)
+          notes: null, // Set to null, assuming no dedicated notes input for session args here. Adjust if a notes field exists.
           plannedDuration: plannedDuration,
         );
         
