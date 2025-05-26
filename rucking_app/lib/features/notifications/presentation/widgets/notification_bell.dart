@@ -4,6 +4,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_state.dart';
+import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/features/notifications/presentation/pages/notifications_screen.dart';
 
 class NotificationBell extends StatelessWidget {
@@ -27,39 +28,54 @@ class NotificationBell extends StatelessWidget {
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            IconButton(
-              icon: Icon(
-                Icons.notifications_outlined,
-                color: useLadyMode ? AppColors.ladyPrimary : AppColors.primary,
-                size: 26,
+            SizedBox(
+              width: 96, // 50% larger container
+              height: 96,
+              child: IconButton(
+                iconSize: 96, // 50% larger icon size
+                padding: EdgeInsets.zero, // Remove padding to maximize space
+                constraints: const BoxConstraints(), // Remove constraints to allow full size
+                icon: Image.asset(
+                  'assets/images/notifications.png',
+                  width: 96, // 50% larger (previously 64px)
+                  height: 96, // 50% larger (previously 64px)
+                ),
+                onPressed: () async {
+                  // Navigate to notifications screen
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                  
+                  // When returning from the notifications screen, explicitly request
+                  // notification state refresh to update the counter
+                  if (context.mounted) {
+                    context.read<NotificationBloc>().add(const NotificationsRequested());
+                  }
+                },
               ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const NotificationsScreen(),
-                  ),
-                );
-              },
             ),
             if (unreadCount > 0)
               Positioned(
-                right: 0,
-                top: 0,
+                right: 18,
+                top: 18,
                 child: Container(
-                  padding: const EdgeInsets.all(2),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: AppColors.error,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   constraints: const BoxConstraints(
-                    minWidth: 18,
-                    minHeight: 18,
+                    minWidth: 36,
+                    minHeight: 36,
                   ),
                   child: Text(
                     unreadCount > 99 ? '99+' : '$unreadCount',
-                    style: AppTextStyles.labelSmall.copyWith(
+                    style: AppTextStyles.titleSmall.copyWith(
                       color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                     textAlign: TextAlign.center,
                   ),

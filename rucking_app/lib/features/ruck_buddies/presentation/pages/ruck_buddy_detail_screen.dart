@@ -53,6 +53,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   int _commentCount = 0; // Added comment count state variable
   bool _isProcessingLike = false;
   
+  // API client for user profile fetching
+  final ApiClient _apiClient = GetIt.I<ApiClient>();
+  
   // For storing complete data when loaded from a notification
   RuckBuddy? _completeBuddy;
   
@@ -259,21 +262,24 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
           }
         }
 
-        // Parse timestamps
+        // Parse timestamps - use the exact field names from the database schema
         DateTime createdAt;
         try {
-          final timestamp = data['start_time'] ?? data['started_at'] ?? data['created_at'];
+          final timestamp = data['created_at'];
           createdAt = timestamp != null ? DateTime.parse(timestamp.toString()) : DateTime.now();
         } catch (e) {
           createdAt = DateTime.now();
           print('Error parsing timestamp: $e');
         }
         print('RuckBuddyDetailScreen _loadRuckDetails: Parsed createdAt: $createdAt');
-        final completedAtTimestamp = data['end_time'];
+        
+        // Handle completed timestamp - only use the specific field name from the schema
+        final completedAtTimestamp = data['completed_at'];
         DateTime? completedAt;
         if (completedAtTimestamp != null) {
           try {
             completedAt = DateTime.parse(completedAtTimestamp.toString());
+            print('RuckBuddyDetailScreen _loadRuckDetails: Successfully parsed completedAt: $completedAt');
           } catch (e) {
             print('Error parsing completedAt timestamp: $e');
           }
@@ -307,26 +313,43 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
 
         log('RuckBuddyDetailScreen _loadRuckDetails: Parsed completeBuddy | distanceKm: ${completeBuddy.distanceKm}, duration: ${completeBuddy.durationSeconds}, calories: ${completeBuddy.caloriesBurned}, username: ${completeBuddy.user.username}, locationPoints: ${completeBuddy.locationPoints?.length}');
 
-        // Attempt to fetch full user details if username is missing and it's the current user's ruck
-        final authState = context.read<AuthBloc>().state;
-        String? currentAuthUserId;
-        if (authState is AuthAuthenticated) {
-          currentAuthUserId = authState.user.id;
+        // Get the user data from the API response - this is reliable in all navigation flows
+        final dataUserId = data['user_id']?.toString() ?? '';
+        
+        // Create user info directly matching the approach used in RuckBuddyModel.fromJson
+        Map<String, dynamic> userData = {};
+        if (data.containsKey('users')) {
+          userData = data['users'] ?? {};
+        } else if (data.containsKey('user')) {
+          userData = data['user'] ?? {};
         }
+        
+        log('RuckBuddyDetailScreen _loadRuckDetails: Data API user_id = $dataUserId, completeBuddy.userId = ${completeBuddy.userId}');
 
+        // Always fetch the user profile directly
         RuckBuddy finalBuddy = completeBuddy;
-        if (currentAuthUserId != null &&
-            completeBuddy.userId == currentAuthUserId &&
-            (completeBuddy.user.username == 'Unknown User' || completeBuddy.user.username.isEmpty)) {
+        if (finalBuddy.userId.isNotEmpty) {
+          log('RuckBuddyDetailScreen _loadRuckDetails: Fetching user profile for userId = ${finalBuddy.userId}');
           try {
-            log('RuckBuddyDetailScreen _loadRuckDetails: Username is Unknown for current user. Fetching profile...');
-            final apiClient = GetIt.instance<ApiClient>();
-            final currentUserProfile = await apiClient.getCurrentUserProfile();
-            log('RuckBuddyDetailScreen _loadRuckDetails: Fetched profile username = ${currentUserProfile.username}');
-            finalBuddy = completeBuddy.copyWith(user: currentUserProfile);
+            final fetched = await _apiClient.getUserProfile(finalBuddy.userId);
+            finalBuddy = finalBuddy.copyWith(user: fetched);
+            log('RuckBuddyDetailScreen _loadRuckDetails: Successfully fetched user profile: ${fetched.username}');
           } catch (e) {
-            log('RuckBuddyDetailScreen _loadRuckDetails: Error fetching current user profile: $e');
-            // Keep using the buddy data from the ruck details if profile fetch fails
+            log('RuckBuddyDetailScreen _loadRuckDetails: Failed to fetch user profile: $e');
+            
+            // Fallback to creating user info directly like RuckBuddyModel does
+            try {
+              final updatedUserInfo = UserInfo.fromJson({
+                'id': userData['id'] ?? finalBuddy.userId,
+                'username': userData['username'] ?? 'Rucker',
+                'avatar_url': userData['avatar_url'] ?? null,
+                'gender': userData['gender'] ?? 'male',
+              });
+              finalBuddy = finalBuddy.copyWith(user: updatedUserInfo);
+              log('RuckBuddyDetailScreen _loadRuckDetails: Created fallback UserInfo with username = ${updatedUserInfo.username}');
+            } catch (userInfoErr) {
+              log('RuckBuddyDetailScreen _loadRuckDetails: Error creating fallback user info: $userInfoErr');
+            }
           }
         }
 
@@ -1137,16 +1160,17 @@ class _RouteMap extends StatelessWidget {
         // attempt to handle multiple possible key names and value types
         lat = _parseCoord(p['lat']) ?? _parseCoord(p['latitude']);
         lng = _parseCoord(p['lng']) ?? _parseCoord(p['lon']) ?? _parseCoord(p['longitude']);
+
+        if (lat != null && lng != null) {
+          pts.add(LatLng(lat, lng));
+        }
       } else if (p is List && p.length >= 2) {
         lat = _parseCoord(p[0]);
         lng = _parseCoord(p[1]);
-      }
 
-      // Only add point if coordinates are valid (not null, finite, and within range)
-      if (lat != null && lng != null && 
-          lat.isFinite && lng.isFinite && 
-          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-        pts.add(LatLng(lat, lng));
+        if (lat != null && lng != null) {
+          pts.add(LatLng(lat, lng));
+        }
       }
     }
     

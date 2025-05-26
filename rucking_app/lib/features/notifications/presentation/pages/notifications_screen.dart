@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -25,13 +26,25 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final _notificationBloc = GetIt.I<NotificationBloc>();
 
-  bool _markedAsRead = false;
-
   @override
   void initState() {
     super.initState();
+    // Stop any notification polling while viewing notifications screen
+    _notificationBloc.stopPolling();
+    
     // Request notifications to display them
     _notificationBloc.add(const NotificationsRequested());
+  }
+
+  @override
+  void dispose() {
+    // When leaving screen, restart polling with a delay to ensure our reads are processed
+    Future.delayed(const Duration(seconds: 3), () {
+      if (_notificationBloc.state is NotificationsLoaded) {
+        _notificationBloc.startPolling();
+      }
+    });
+    super.dispose();
   }
 
   @override
@@ -72,8 +85,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: CircularProgressIndicator(),
               );
             } else if (state is NotificationsLoaded) {
-              // Don't automatically mark all as read - let the user see them first
-              // They'll be marked as read when the user interacts with them
+              // Mark all notifications as read when screen is displayed and there are unread ones
+              if (state.unreadCount > 0) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _notificationBloc.add(const AllNotificationsRead());
+                });
+              }
               
               if (state.notifications.isEmpty) {
                 return _buildEmptyState();
@@ -200,12 +217,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             // Close loading dialog first
             Navigator.of(context, rootNavigator: true).pop();
 
-            // Create a minimal RuckBuddy with just the ID
-            // This is the approach used by the regular flow
-            // The RuckBuddyDetailScreen will handle loading the full data including username
+            // Extract the user_id from the notification data if available
+            final userId = notification.data!['user_id']?.toString() ?? '';
+            
+            // Create a minimal RuckBuddy with just the ID and userId
+            // The detail screen will fetch the full data including the proper user profile
             final ruckBuddy = RuckBuddy(
               id: ruckId,
-              userId: '',
+              userId: userId,  // Set the userId from notification data
               ruckWeightKg: 0,
               durationSeconds: 0,
               distanceKm: 0,
@@ -213,7 +232,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               elevationGainM: 0,
               elevationLossM: 0,
               createdAt: DateTime.now(),
-              user: UserInfo(id: '', username: '', gender: ''),
+              user: UserInfo(
+                id: userId,  // Set the ID to match the userId
+                username: '',  // Leave empty to trigger profile fetch in detail screen
+                gender: '',    // Leave empty, will be properly set when profile is fetched
+              ),
             );
             
             // Navigate to the detail screen with just the ID

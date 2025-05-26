@@ -38,8 +38,11 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
   @override
   Future<bool> markAllNotificationsAsRead() async {
+    AppLogger.info('Repository: Attempting to mark all notifications as read');
     try {
-      return await remoteDataSource.markAllNotificationsAsRead();
+      final result = await remoteDataSource.markAllNotificationsAsRead();
+      AppLogger.info('Repository: Mark all notifications as read result: $result');
+      return result;
     } on ServerException catch (e) {
       AppLogger.error('Repository: Failed to mark all notifications as read: ${e.message}');
       return false;
