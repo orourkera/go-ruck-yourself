@@ -3,12 +3,13 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.example.rucking_app"
+    namespace = "com.getruck.app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -20,20 +21,37 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.rucking_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.getruck.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
+    
+    signingConfigs {
+        create("release") {
+            // You'll need to create a keystore file with these exact fingerprints
+            // MD5: A2:92:06:F9:9F:B0:45:FE:59:40:40:39:03:AC:E0:8F
+            // SHA-1: 83:F4:3A:6E:A5:07:C8:8E:A7:C1:95:D0:18:45:E1:34:EA:C7:48:EB
+            // SHA-256: 13:F3:46:51:02:EF:5F:00:A0:1F:A4:CA:94:9D:C8:16:65:50:92:89:CD:4C:54:E5:26:B9:BB:ED:95:2B:CC:47
+            storeFile = file("../keystore.jks")
+            // Try to get password from environment variables first, then fall back to hardcoded values
+            val envStorePassword = System.getenv("KEYSTORE_PASSWORD")
+            val envKeyPassword = System.getenv("KEY_PASSWORD")
+            
+            storePassword = envStorePassword ?: "getruckypassword123" // The password you used in create-keystore.sh
+            keyAlias = "upload"
+            keyPassword = envKeyPassword ?: "getruckypassword123" // The password you used in create-keystore.sh
+        }
+    }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+        }
+        debug {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -41,4 +59,15 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
+
+    // Add Firebase Analytics without specifying version (uses BoM)
+    implementation("com.google.firebase:firebase-analytics")
+
+    // Add the dependencies for any other desired Firebase products
+    // https://firebase.google.com/docs/android/setup#available-libraries
 }

@@ -1,0 +1,11 @@
+// Fix for older plugins using outdated Kotlin versions
+subprojects {
+    project.configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin' && 
+                details.requested.name.startsWith('kotlin-')) {
+                details.useVersion '1.8.22' // Match the version in settings.gradle.kts
+            }
+        }
+    }
+}
