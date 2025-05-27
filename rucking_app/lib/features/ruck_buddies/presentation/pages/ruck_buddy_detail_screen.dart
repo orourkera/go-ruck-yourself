@@ -321,7 +321,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         log('RuckBuddyDetailScreen _loadRuckDetails: Parsed completeBuddy | distanceKm: ${completeBuddy.distanceKm}, duration: ${completeBuddy.durationSeconds}, calories: ${completeBuddy.caloriesBurned}, username: ${completeBuddy.user.username}, locationPoints: ${completeBuddy.locationPoints?.length}');
 
         // Get the user data from the API response - this is reliable in all navigation flows
-        final dataUserId = data['user_id']?.toString() ?? '';
+        final dataUserId = data['user_id']?.toString();
         
         // Create user info directly matching the approach used in RuckBuddyModel.fromJson
         Map<String, dynamic> userData = {};
@@ -750,11 +750,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                         return const Center(child: CircularProgressIndicator());
                       }
                       if (snapshot.hasError) {
-                        return Text(
-                          'Could not determine location',
-                          style: AppTextStyles.bodySmall.copyWith(color: Colors.grey),
-                          textAlign: TextAlign.center,
-                        );
+                        return const SizedBox.shrink();
                       }
                       if (snapshot.hasData && snapshot.data!.isNotEmpty && snapshot.data! != 'Unknown location') {
                         return Text(
@@ -767,8 +763,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           ),
                           textAlign: TextAlign.center,
                         );
+                      } else {
+                        return const SizedBox.shrink();
                       }
-                      return const SizedBox.shrink();
                     },
                   ),
                 ),
@@ -1156,7 +1153,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   }
 }
 
-class _RouteMap extends StatelessWidget {
+class _RouteMap extends StatefulWidget {
   final List<dynamic>? locationPoints;
   final double? ruckWeightKg;
 
@@ -1164,6 +1161,28 @@ class _RouteMap extends StatelessWidget {
     required this.locationPoints,
     this.ruckWeightKg,
   });
+  
+  @override
+  State<_RouteMap> createState() => _RouteMapState();
+}
+
+class _RouteMapState extends State<_RouteMap> {
+  // Cache the map widget to prevent rebuilding during scrolling
+  FlutterMap? _cachedMapWidget;
+  List<LatLng>? _cachedRoutePoints;
+  final GlobalKey _mapKey = GlobalKey();
+
+  // Compare route points for equality to determine if we need to rebuild
+  bool _areRoutePointsEqual(List<LatLng> list1, List<LatLng> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].latitude != list2[i].latitude || 
+          list1[i].longitude != list2[i].longitude) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   // Convert dynamic numeric or string to double, return null if not parseable
   double? _parseCoord(dynamic v) {
@@ -1175,7 +1194,7 @@ class _RouteMap extends StatelessWidget {
 
   List<LatLng> _getRoutePoints() {
     final pts = <LatLng>[];
-    final lp = locationPoints;
+    final lp = widget.locationPoints;
     if (lp == null || lp.isEmpty) {
       // Return default location if no points available
       return [const LatLng(37.7749, -122.4194)]; // San Francisco as default
@@ -1237,7 +1256,7 @@ class _RouteMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
-    final String weightText = ruckWeightKg != null ? '${ruckWeightKg!.toStringAsFixed(1)} kg' : '';
+    final String weightText = widget.ruckWeightKg != null ? '${widget.ruckWeightKg!.toStringAsFixed(1)} kg' : '';
     
     // If no route points, show empty state with weight if available
     if (routePoints.isEmpty) {
@@ -1258,7 +1277,7 @@ class _RouteMap extends StatelessWidget {
               ),
             ),
             // Weight chip overlay
-            if (ruckWeightKg != null)
+            if (widget.ruckWeightKg != null)
               Positioned(
                 top: 10,
                 right: 10,
@@ -1282,43 +1301,53 @@ class _RouteMap extends StatelessWidget {
       );
     }
     
+    // Only rebuild the map if the route points have changed
+    if (_cachedMapWidget == null || 
+        _cachedRoutePoints == null || 
+        !_areRoutePointsEqual(_cachedRoutePoints!, routePoints)) {
+      _cachedRoutePoints = List.from(routePoints);
+      _cachedMapWidget = FlutterMap(
+        key: _mapKey,
+        options: MapOptions(
+          initialCenter: _getRouteCenter(routePoints),
+          initialZoom: _getFitZoom(routePoints),
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.all, // Enable all map interactions including pinch-zoom, pan, etc.
+          ),
+          // Set min/max zoom constraints for better user experience
+          minZoom: 3,
+          maxZoom: 18,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
+            userAgentPackageName: 'com.getrucky.gfy',
+            retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+            // Add tile caching for performance
+            tileProvider: NetworkTileProvider(),
+          ),
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: routePoints,
+                color: AppColors.secondary,
+                strokeWidth: 4,
+              )
+            ],
+          ),
+        ],
+      );
+    }
+
     // Return map with route and weight overlay
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Stack(
         children: [
-          FlutterMap(
-            key: ObjectKey(routePoints), // Added key here
-            options: MapOptions(
-              initialCenter: _getRouteCenter(routePoints),
-              initialZoom: _getFitZoom(routePoints),
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all, // Enable all map interactions including pinch-zoom, pan, etc.
-              ),
-              // Set min/max zoom constraints for better user experience
-              minZoom: 3,
-              maxZoom: 18,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-                userAgentPackageName: 'com.getrucky.gfy',
-                retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-              ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: routePoints,
-                    color: AppColors.secondary,
-                    strokeWidth: 4,
-                  )
-                ],
-              ),
-            ],
-          ),
+          _cachedMapWidget!,
           
           // Weight chip overlay
-          if (ruckWeightKg != null)
+          if (widget.ruckWeightKg != null)
             Positioned(
               top: 10,
               right: 10,

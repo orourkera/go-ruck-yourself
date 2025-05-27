@@ -141,7 +141,6 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'completed': true,
         'notes': _notesController.text.trim(),
         'distance_km': widget.distance,
-        'distance_meters': (widget.distance * 1000).round(),
         'calories_burned': widget.caloriesBurned,
         'elevation_gain_m': widget.elevationGain,
         'elevation_loss_m': widget.elevationLoss,
@@ -293,7 +292,14 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         StatCard(title: 'Distance', value: MeasurementUtils.formatDistance(widget.distance, metric: preferMetric), icon: Icons.straighten, color: _getLadyModeColor(context), centerContent: true, valueFontSize: 36),
         StatCard(title: 'Calories', value: widget.caloriesBurned.toString(), icon: Icons.local_fire_department, color: AppColors.accent, centerContent: true, valueFontSize: 36),
         StatCard(title: 'Pace', value: _formatPace(preferMetric), icon: Icons.speed, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
-        StatCard(title: 'Elevation', value: MeasurementUtils.formatElevationCompact(widget.elevationGain, widget.elevationLoss, metric: preferMetric), icon: Icons.terrain, color: AppColors.success, centerContent: true, valueFontSize: 28),
+        StatCard(
+          title: 'Elevation',
+          value: preferMetric ? '${widget.elevationGain.toStringAsFixed(0)} m' : '${(widget.elevationGain * 3.28084).toStringAsFixed(0)} ft',
+          icon: Icons.terrain,
+          color: AppColors.success,
+          centerContent: true,
+          valueFontSize: 28
+        ),
         StatCard(title: 'Ruck Weight', value: MeasurementUtils.formatWeight(widget.ruckWeight, metric: preferMetric), icon: Icons.fitness_center, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
         if (_heartRateSamples?.isNotEmpty ?? false)
           StatCard(title: 'Avg HR', value: _avgHeartRate?.toString() ?? '--', icon: Icons.favorite, color: AppColors.error, centerContent: true, valueFontSize: 36),

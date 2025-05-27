@@ -271,17 +271,37 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       borderRadius: BorderRadius.circular(15.0),
       child: CachedNetworkImage(
         imageUrl: imageUrl,
+        // Create a stable key based on URL to improve cache hits
+        cacheKey: Uri.parse(imageUrl).pathSegments.last,
+        // Memory cache optimization for thumbnails
+        memCacheWidth: 300,
+        memCacheHeight: 300,
+        // Disk cache optimization
+        maxWidthDiskCache: 600,
+        maxHeightDiskCache: 600,
+        // Visual settings
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
+        // Improve transition between placeholder and final image
+        fadeOutDuration: const Duration(milliseconds: 200),
+        fadeInDuration: const Duration(milliseconds: 300),
+        // Error handling with detailed logging
         errorWidget: (context, url, error) {
           AppLogger.error('Error loading image: $imageUrl, error: $error');
           return _buildErrorContainer(context, 'Image failed to load');
         },
+        // Improved placeholder with fade transition
         placeholder: (context, url) => Container(
           color: Colors.grey.shade200,
           child: const Center(
-            child: CircularProgressIndicator(),
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.0,
+              ),
+            ),
           ),
         ),
       ),

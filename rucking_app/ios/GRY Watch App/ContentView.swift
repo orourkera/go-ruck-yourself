@@ -28,7 +28,7 @@ struct ContentView: View {
                 VStack(spacing: 10) {
                     HStack {
                         Text("GRY")
-                            .font(.custom("Bangers-Regular", size: 26))
+                            .font(.system(size: 26, weight: .regular))
                             .foregroundColor(.green)
                             .fixedSize(horizontal: true, vertical: false) // Prevent text truncation
                             .padding(.leading, 4) // Add some left padding
@@ -97,7 +97,7 @@ struct ContentView: View {
                                 .foregroundColor(.gray)
                             Spacer()
                             Text(sessionManager.totalTime)
-                                .font(.body)
+                                .font(.custom("Bangers-Regular", size: 28))
                         }
                     }
                     .padding(.horizontal)
@@ -123,7 +123,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Green left-aligned "GRY" title
                 Text("GRY")
-                    .font(.custom("Bangers-Regular", size: 28))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.green)
                     .fixedSize(horizontal: true, vertical: false) // Prevent text truncation
                     .padding(.leading, 4) // Add some left padding
@@ -133,7 +133,7 @@ struct ContentView: View {
                 
                 // Full-width timer - simplified, statusText should be valid if session is active
                 Text(sessionManager.statusText)
-                    .font(.system(size: 28, weight: .semibold, design: .monospaced))
+                    .font(.custom("Bangers-Regular", size: 30))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
                     .lineLimit(1)
@@ -150,7 +150,7 @@ struct ContentView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     // Distance - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
-                        Text("DISTANCE")
+                        Text(sessionManager.isMetric ? "DISTANCE (KM)" : "DISTANCE (MI)")
                             .font(.caption2)
                             .foregroundColor(.gray)
                             .padding(.top, 2)
@@ -204,7 +204,7 @@ struct ContentView: View {
                     
                     // Elevation - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
-                        Text("ELEVATION")
+                        Text(sessionManager.isMetric ? "ELEVATION (M)" : "ELEVATION (FT)")
                             .font(.caption2)
                             .foregroundColor(.gray)
                             .padding(.top, 2)
