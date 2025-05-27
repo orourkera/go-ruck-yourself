@@ -291,6 +291,11 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         
         // Heart rate update received silently
         
+        // Update unit preference if present at top level
+        if let unitPref = message["isMetric"] as? Bool {
+            self.isMetric = unitPref
+        }
+        
         // Check message command
         if let command = message["command"] as? String {
             // Processing command from message
@@ -351,12 +356,12 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 }
                 
             case "updateSessionState":
-                // Direct state update from iPhone (used to sync states)
-                if let isPaused = message["isPaused"] as? Bool {
-                    // Updating session state
-                    DispatchQueue.main.async {
-                        self.isPaused = isPaused
-                    }
+                // Direct state or unit update from iPhone (used to sync states)
+                if let isPausedVal = message["isPaused"] as? Bool {
+                    DispatchQueue.main.async { self.isPaused = isPausedVal }
+                }
+                if let unitPref = message["isMetric"] as? Bool {
+                    DispatchQueue.main.async { self.isMetric = unitPref }
                 }
                 
             default:
@@ -391,6 +396,11 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             
             // Process application context the same way as messages
             self.delegate?.didReceiveMessage(applicationContext)
+            
+            // Update unit preference if sent in applicationContext
+            if let unitPref = applicationContext["isMetric"] as? Bool {
+                self.isMetric = unitPref
+            }
             
             // Update metrics when present
             if let metrics = applicationContext["metrics"] as? [String: Any] {
