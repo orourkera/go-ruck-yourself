@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "966278977337",
+    "project_id": "go-ruck-yourself",
+    "storage_bucket": "go-ruck-yourself.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:966278977337:android:29d95cb0e1ddb93014fae8",
+        "android_client_info": {
+          "package_name": "com.getruck.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbw1D1u6zv_P-he9mqsHEzwLElthPpdxY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
