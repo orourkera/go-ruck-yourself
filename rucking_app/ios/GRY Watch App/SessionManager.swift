@@ -48,7 +48,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         }
         
         // Convert to feet if using imperial units
-        if !self.isMetric {
+        if !self._isMetric {
             let gainFeet = Int(elevationGain * 3.28084)
             let lossFeet = Int(elevationLoss * 3.28084)
             return "+\(gainFeet)/-\(lossFeet) ft"
@@ -62,7 +62,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         }
         
         // Show miles if using imperial units, otherwise kilometers
-        if !self.isMetric {
+        if !self._isMetric {
             // Convert km to miles (1 km = 0.621371 miles)
             let miles = distanceValue * 0.621371
             return String(format: "%.2f mi", miles)
@@ -81,14 +81,24 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         
         // Get user's preferred unit (metric or imperial)
         // If we can't determine the preference, default to metric (km)
-        let unit = self.isMetric ? "km" : "mi"
+        let unit = self._isMetric ? "km" : "mi"
         
         // Format as MM:SS/unit
         return String(format: "%d:%02d/%@", minutes, seconds, unit)
     }
     
     // Store user's metric preference
-    private var isMetric: Bool = true // Default to metric
+    private var _isMetric: Bool = true // Default to metric
+    
+    // Public accessor for metric preference with getter and setter
+    var isMetric: Bool {
+        get {
+            return _isMetric
+        }
+        set {
+            _isMetric = newValue
+        }
+    }
 
     func startSession() {
         // Leave status as "--" for cleaner UI
@@ -191,15 +201,15 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             return 
         }
         
-        if isPaused {
-            print("[DEBUG] Session already paused, ignoring pause request")
-            return
-        }
+        // Don't check isPaused here since togglePauseResume has already set it
+        // This prevents the function from returning early when it should continue
         
         print("[DEBUG] Pausing session from watch")
-        // Update the state immediately for UI responsiveness
+        // Make sure isPaused is true (should already be set by togglePauseResume)
         DispatchQueue.main.async {
-            self.isPaused = true
+            if !self.isPaused {
+                self.isPaused = true
+            }
         }
         
         // Send pause command to the iPhone app with a reply handler to confirm
@@ -218,10 +228,10 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 // Pause command acknowledged by iPhone
                 // Verify state was applied correctly
                 DispatchQueue.main.async {
-                    if !self.isPaused {
-                        // Re-applying pause state after confirmation
-                        self.isPaused = true
-                    }
+                    // Always ensure isPaused is true when we get confirmation
+                    // regardless of the current state
+                    self.isPaused = true
+                    print("[DEBUG] Pause confirmed by iPhone, isPaused set to true")
                 }
             }, errorHandler: { error in
                 print("[WATCH] Error sending pause command: \(error.localizedDescription)")
@@ -238,14 +248,22 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     // Toggle between pause and resume states - used by the UI button
     func togglePauseResume() {
         // Toggle pause/resume called
-        if isPaused {
-            resumeSession()
-        } else {
-            pauseSession()
+        print("[DEBUG] togglePauseResume called, current isPaused state: \(isPaused)")
+        
+        // Set local state immediately for responsive UI
+        let newPausedState = !isPaused
+        DispatchQueue.main.async {
+            self.isPaused = newPausedState
         }
         
-        // Debug confirmation
-        // togglePauseResume executed
+        // Then perform the actual action
+        if newPausedState {
+            pauseSession()
+        } else {
+            resumeSession()
+        }
+        
+        print("[DEBUG] togglePauseResume executed, new isPaused state: \(isPaused)")
     }
     
     // Resume the session from the watch
@@ -253,15 +271,20 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         // Emit a debug tap signal to the phone so we can confirm the watch button was pressed.
         sendMessage(["command": "debug_watchResumeTapped"])  // DEBUG ONLY
         
-        guard isSessionActive && isPaused else { 
-            print("[DEBUG] Cannot resume: session not active or not paused")
+        guard isSessionActive else { 
+            print("[DEBUG] Cannot resume: session not active")
             return 
         }
         
+        // Don't check isPaused here since togglePauseResume has already updated it
+        // This prevents the function from returning early when it should continue
+        
         print("[DEBUG] Resuming session from watch")
-        // Update UI immediately for responsiveness
+        // Make sure isPaused is false (should already be set by togglePauseResume)
         DispatchQueue.main.async {
-            self.isPaused = false
+            if self.isPaused {
+                self.isPaused = false
+            }
         }
         
         // Note: Direct Pigeon API not available in Watch extension

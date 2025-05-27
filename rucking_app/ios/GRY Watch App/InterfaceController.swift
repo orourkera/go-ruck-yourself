@@ -40,7 +40,12 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
         if distanceLabel == nil {
             print("distanceLabel outlet is not connected in storyboard!")
         } else {
-            distanceLabel.setText("Distance: -- km")
+            let preferMetric = UserDefaults.standard.bool(forKey: "preferMetric")
+            if preferMetric {
+                distanceLabel.setText("Distance: -- km")
+            } else {
+                distanceLabel.setText("Distance: -- mi")
+            }
         }
         if caloriesLabel == nil {
             print("caloriesLabel outlet is not connected in storyboard!")
@@ -50,12 +55,22 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
         if paceLabel == nil {
             print("paceLabel outlet is not connected in storyboard!")
         } else {
-            paceLabel.setText("Pace: -- min/km")
+            let preferMetric = UserDefaults.standard.bool(forKey: "preferMetric")
+            if preferMetric {
+                paceLabel.setText("Pace: -- min/km")
+            } else {
+                paceLabel.setText("Pace: -- min/mi")
+            }
         }
         if elevationLabel == nil {
             print("elevationLabel outlet is not connected in storyboard!")
         } else {
-            elevationLabel.setText("Elevation: -- m")
+            let preferMetric = UserDefaults.standard.bool(forKey: "preferMetric")
+            if preferMetric {
+                elevationLabel.setText("Elevation: -- m")
+            } else {
+                elevationLabel.setText("Elevation: -- ft")
+            }
         }
         
         // Initialize WorkoutManager for HealthKit
@@ -122,14 +137,30 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
             caloriesLabel.setText(String(format: "Cal: %.0f", calories))
         }
         if let pace = metrics["pace"] as? Double {
-            paceLabel.setText(String(format: "Pace: %.2f min/km", pace))
+            let preferMetric = UserDefaults.standard.bool(forKey: "preferMetric")
+            if preferMetric {
+                paceLabel.setText(String(format: "Pace: %.2f min/km", pace))
+            } else {
+                let paceImperial = pace / 0.621371
+                paceLabel.setText(String(format: "Pace: %.2f min/mi", paceImperial))
+            }
         }
-        // Handle both formats: elevation (old) or elevationGain/elevationLoss (new)
+        let preferMetric = UserDefaults.standard.bool(forKey: "preferMetric")
         if let elevationGain = metrics["elevationGain"] as? Double, let elevationLoss = metrics["elevationLoss"] as? Double {
-            elevationLabel.setText(String(format: "Elev: +%.0f/-%.0f m", elevationGain, elevationLoss))
+            if preferMetric {
+                elevationLabel.setText(String(format: "Elev: +%.0f/-%.0f m", elevationGain, elevationLoss))
+            } else {
+                let gainFeet = elevationGain * 3.28084
+                let lossFeet = elevationLoss * 3.28084
+                elevationLabel.setText(String(format: "Elev: +%.0f/-%.0f ft", gainFeet, lossFeet))
+            }
         } else if let elevation = metrics["elevation"] as? Double {
-            // Fallback for backward compatibility
-            elevationLabel.setText(String(format: "Elev: %.0f m", elevation))
+            if preferMetric {
+                elevationLabel.setText(String(format: "Elev: %.0f m", elevation))
+            } else {
+                let elevationFeet = elevation * 3.28084
+                elevationLabel.setText(String(format: "Elev: %.0f ft", elevationFeet))
+            }
         }
     }
     
