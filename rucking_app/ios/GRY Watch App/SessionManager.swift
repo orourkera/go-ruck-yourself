@@ -31,7 +31,10 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     @Published var splitTime: String = ""
     @Published var totalDistance: String = ""
     @Published var totalTime: String = ""
-
+    
+    // Published user's metric preference (true = metric, false = imperial)
+    @Published var isMetric: Bool = true
+    
     var statusText: String {
         // Status now contains the timer
         status
@@ -48,7 +51,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         }
         
         // Convert to feet if using imperial units
-        if !self._isMetric {
+        if !self.isMetric {
             let gainFeet = Int(elevationGain * 3.28084)
             let lossFeet = Int(elevationLoss * 3.28084)
             return "+\(gainFeet)/-\(lossFeet) ft"
@@ -62,7 +65,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         }
         
         // Show miles if using imperial units, otherwise kilometers
-        if !self._isMetric {
+        if !self.isMetric {
             // Convert km to miles (1 km = 0.621371 miles)
             let miles = distanceValue * 0.621371
             return String(format: "%.2f mi", miles)
@@ -81,25 +84,12 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         
         // Get user's preferred unit (metric or imperial)
         // If we can't determine the preference, default to metric (km)
-        let unit = self._isMetric ? "km" : "mi"
+        let unit = self.isMetric ? "km" : "mi"
         
         // Format as MM:SS/unit
         return String(format: "%d:%02d/%@", minutes, seconds, unit)
     }
     
-    // Store user's metric preference
-    private var _isMetric: Bool = true // Default to metric
-    
-    // Public accessor for metric preference with getter and setter
-    var isMetric: Bool {
-        get {
-            return _isMetric
-        }
-        set {
-            _isMetric = newValue
-        }
-    }
-
     func startSession() {
         // Leave status as "--" for cleaner UI
         
@@ -201,16 +191,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             return 
         }
         
-        // Don't check isPaused here since togglePauseResume has already set it
-        // This prevents the function from returning early when it should continue
-        
         print("[DEBUG] Pausing session from watch")
-        // Make sure isPaused is true (should already be set by togglePauseResume)
-        DispatchQueue.main.async {
-            if !self.isPaused {
-                self.isPaused = true
-            }
-        }
         
         // Send pause command to the iPhone app with a reply handler to confirm
         // Make sure we use a Dictionary with String keys to ensure proper mapping to Dart Map<String, dynamic>
@@ -246,24 +227,14 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     }
     
     // Toggle between pause and resume states - used by the UI button
+    // We now wait for iPhone confirmation before mutating isPaused to avoid UI flicker
     func togglePauseResume() {
-        // Toggle pause/resume called
-        print("[DEBUG] togglePauseResume called, current isPaused state: \(isPaused)")
-        
-        // Set local state immediately for responsive UI
-        let newPausedState = !isPaused
-        DispatchQueue.main.async {
-            self.isPaused = newPausedState
-        }
-        
-        // Then perform the actual action
-        if newPausedState {
-            pauseSession()
-        } else {
+        print("[DEBUG] togglePauseResume tapped. Current isPaused = \(isPaused)")
+        if isPaused {
             resumeSession()
+        } else {
+            pauseSession()
         }
-        
-        print("[DEBUG] togglePauseResume executed, new isPaused state: \(isPaused)")
     }
     
     // Resume the session from the watch
@@ -276,16 +247,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             return 
         }
         
-        // Don't check isPaused here since togglePauseResume has already updated it
-        // This prevents the function from returning early when it should continue
-        
         print("[DEBUG] Resuming session from watch")
-        // Make sure isPaused is false (should already be set by togglePauseResume)
-        DispatchQueue.main.async {
-            if self.isPaused {
-                self.isPaused = false
-            }
-        }
         
         // Note: Direct Pigeon API not available in Watch extension
         // Using WatchConnectivity API instead
@@ -348,7 +310,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     }
                 }
                 
-            case "stopSession", "workoutStopped":
+            case "stopSession", "workoutStopped", "endSession", "sessionEnded", "sessionComplete":
                 // Stop the session if active
                 if isSessionActive {
                     // Stopping session from phone command
@@ -498,8 +460,25 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         }
         
         // Update paused state when present
-        if let paused = metrics["isPaused"] as? Int {
-            self.isPaused = paused == 1
+        if let pausedBool = metrics["isPaused"] as? Bool {
+            self.isPaused = pausedBool
+        } else if let pausedInt = metrics["isPaused"] as? Int {
+            self.isPaused = pausedInt == 1
+        }
+        
+        // Update active state when present (to handle phone-side session end)
+        if let activeBool = metrics["isSessionActive"] as? Bool {
+            self.isSessionActive = activeBool
+            if !activeBool {
+                // Ensure workout is stopped and UI reset
+                self.workoutManager.stopWorkout()
+            }
+        } else if let activeInt = metrics["isSessionActive"] as? Int {
+            let active = activeInt == 1
+            self.isSessionActive = active
+            if !active {
+                self.workoutManager.stopWorkout()
+            }
         }
         
         // Update timer display from duration
