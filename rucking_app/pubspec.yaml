@@ -68,7 +68,6 @@ dependencies:
   firebase_core: ^2.32.0
   firebase_analytics: ^10.8.0
   keyboard_actions: ^4.2.0
-  email_launcher: ^1.1.1
   flutter_dotenv: ^5.1.0
   fl_chart: ^0.65.0
   purchases_flutter: ^8.7.4

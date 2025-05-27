@@ -7,8 +7,6 @@ PODS:
     - Flutter
   - device_info_plus (0.0.1):
     - Flutter
-  - email_launcher (0.0.1):
-    - Flutter
   - Firebase/Analytics (10.25.0):
     - Firebase/Core
   - Firebase/Core (10.25.0):
@@ -172,7 +170,6 @@ DEPENDENCIES:
   - app_tracking_transparency (from `.symlinks/plugins/app_tracking_transparency/ios`)
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
-  - email_launcher (from `.symlinks/plugins/email_launcher/ios`)
   - firebase_analytics (from `.symlinks/plugins/firebase_analytics/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - Flutter (from `Flutter`)
@@ -217,8 +214,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/connectivity_plus/ios"
   device_info_plus:
     :path: ".symlinks/plugins/device_info_plus/ios"
-  email_launcher:
-    :path: ".symlinks/plugins/email_launcher/ios"
   firebase_analytics:
     :path: ".symlinks/plugins/firebase_analytics/ios"
   firebase_core:
@@ -257,7 +252,6 @@ SPEC CHECKSUMS:
   app_tracking_transparency: 3d84f147f67ca82d3c15355c36b1fa6b66ca7c92
   connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
-  email_launcher: 1d3bbc6eb8fae829873c49b419c69c96b83b9138
   Firebase: 0312a2352584f782ea56f66d91606891d4607f06
   firebase_analytics: e7280be84e7ff1c1e5859bd8e48de410b07e0b73
   firebase_core: 3b49a055ff54114cae400581c13671fe53936c36

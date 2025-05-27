@@ -290,7 +290,7 @@ class WatchService {
         'splitTime': _formatDuration(splitDuration),
         'totalDistance': formattedTotalDistance,
         'totalTime': _formatDuration(totalDuration),
-        'isMetric': isMetric,
+        'isMetric': isMetric, // Add flag to trigger vibration on watch
         'shouldVibrate': true, // Add flag to trigger vibration on watch
       });
 
@@ -320,6 +320,7 @@ class WatchService {
       double displayDistance = isMetric ? distance : distance / 1.60934; // km to miles
       await _sendMessageToWatch({
         'command': 'updateMetrics',
+        'isMetric': isMetric, // Add unit preference at top-level for quick access
         'metrics': {
           'distance': displayDistance,
           'duration': duration.inSeconds,
@@ -330,6 +331,7 @@ class WatchService {
           'elevation': elevation,
           'elevationGain': elevation,
           'elevationLoss': elevationLoss ?? 0.0, // Use provided loss or default to 0
+          'isMetric': isMetric, // Embed unit preference in nested metrics map as well
           if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
         },
       });
