@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
-import 'package:email_launcher/email_launcher.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
@@ -26,20 +26,27 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isSending = true; });
     final body = _feedbackController.text;
-    final Email email = Email(
-      to: ['rory@getrucky.com'],
-      subject: 'App Feedback',
-      body: body,
+    final recipient = 'rory@getrucky.com';
+    final subject = 'App Feedback';
+    final emailUri = Uri(
+      scheme: 'mailto',
+      path: recipient,
+      query: 'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}',
     );
+    
     try {
-      await EmailLauncher.launch(email);
-      if (mounted) {
-        StyledSnackBar.showSuccess(
-          context: context,
-          message: 'Feedback sent! Thank you.',
-          duration: const Duration(seconds: 2),
-        );
-        Navigator.of(context).pop();
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+        if (mounted) {
+          StyledSnackBar.showSuccess(
+            context: context,
+            message: 'Feedback sent! Thank you.',
+            duration: const Duration(seconds: 2),
+          );
+          Navigator.of(context).pop();
+        }
+      } else {
+        throw 'Could not launch email app';
       }
     } catch (e) {
       if (mounted) {

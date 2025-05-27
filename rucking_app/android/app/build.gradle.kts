@@ -7,13 +7,15 @@ plugins {
 }
 
 android {
-    namespace = "com.getruck.app"
+    namespace = "com.goruckyourself.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // Enable core library desugaring
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -21,11 +23,15 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.getruck.app"
-        minSdk = flutter.minSdkVersion
+        applicationId = "com.goruckyourself.app"
+        // Setting minSdk to 26 as required by health plugin
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Enable core library desugaring for java.time.* APIs
+        multiDexEnabled = true
     }
     
     signingConfigs {
@@ -70,4 +76,10 @@ dependencies {
 
     // Add the dependencies for any other desired Firebase products
     // https://firebase.google.com/docs/android/setup#available-libraries
+    
+    // Core library desugaring for Java 8+ APIs
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    
+    // MultiDex support
+    implementation("androidx.multidex:multidex:2.0.1")
 }

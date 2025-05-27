@@ -4,7 +4,7 @@ subprojects {
         resolutionStrategy.eachDependency { details ->
             if (details.requested.group == 'org.jetbrains.kotlin' && 
                 details.requested.name.startsWith('kotlin-')) {
-                details.useVersion '1.8.22' // Match the version in settings.gradle.kts
+                details.useVersion '2.0.0' // Match the version in settings.gradle.kts
             }
         }
     }
