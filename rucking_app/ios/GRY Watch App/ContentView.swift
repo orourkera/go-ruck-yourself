@@ -173,7 +173,7 @@ struct ContentView: View {
                             .foregroundColor(.gray)
                             .padding(.top, 2)
                         Text(sessionManager.elevationText)
-                            .font(.system(size: 12, weight: .bold)) // Reduced font size from 24
+                            .font(.system(size: 8, weight: .bold)) // Reduced font size from 24
                             .foregroundColor(Color(red: 0, green: 0.9, blue: 0.9)) // Custom cyan color for compatibility
                             .lineLimit(1)
                     }

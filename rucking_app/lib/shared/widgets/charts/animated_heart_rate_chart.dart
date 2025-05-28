@@ -74,16 +74,15 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
       return FlSpot(timeOffset, sample.bpm.toDouble());
     }).toList();
     
-    // Calculate maximum x value based on total duration if available
+    // Always use the total session duration for x-axis if available
+    // This ensures the graph always extends to the end time of the session
     final double totalMinutes = widget.totalDuration != null
         ? widget.totalDuration!.inMinutes.toDouble()
-        : spots.isNotEmpty ? spots.last.x + 1 : 10.0;
-
-    // Use the greater of the last data point or the total duration
-    // Ensure result is explicitly a double to avoid type errors
-    final double safeMaxX = widget.totalDuration != null
-        ? math.max(totalMinutes, spots.isNotEmpty ? spots.last.x : 0.0).toDouble()
-        : (spots.isNotEmpty ? spots.last.x : 10.0);
+        : spots.isNotEmpty ? spots.last.x + 5 : 10.0;
+        
+    // Always use the total duration as the max X, not just the last data point
+    // This ensures the graph extends to the full session duration even if heart rate data ends earlier
+    final double safeMaxX = totalMinutes;
     // Ensure min and max Y values are proper doubles
     final double safeMinY = ((widget.minHeartRate != null) ? widget.minHeartRate!.toDouble() : 60.0) - 10.0;
     final double safeMaxY = ((widget.maxHeartRate != null) ? widget.maxHeartRate!.toDouble() : 180.0) + 10.0;
@@ -93,7 +92,8 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
         show: true,
         drawVerticalLine: true,
         horizontalInterval: 30,
-        verticalInterval: 5,
+        // Reduce vertical grid lines to match our new x-axis labels
+        verticalInterval: safeMaxX > 5 ? (safeMaxX / 4).roundToDouble().clamp(5.0, 30.0) : 5,
         getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade300, strokeWidth: 1),
         getDrawingVerticalLine: (_) => FlLine(color: Colors.grey.shade300, strokeWidth: 1),
       ),
@@ -105,11 +105,32 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 22,
-            interval: spots.isNotEmpty && spots.last.x > 10 ? (spots.last.x / 5).roundToDouble().clamp(1.0, 20.0) : 5,
-            getTitlesWidget: (value, meta) => SideTitleWidget(
-              axisSide: meta.axisSide,
-              child: Text('${value.round()}m', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-            ),
+            // Significantly reduce the number of x-axis labels by using a larger interval
+            // For a typical session, show only start, 1/4, 1/2, 3/4, and end points
+            interval: safeMaxX > 5 ? (safeMaxX / 4).roundToDouble().clamp(5.0, 30.0) : 5,
+            getTitlesWidget: (value, meta) {
+              // Only show labels at 0, 25%, 50%, 75% and 100% of the duration
+              // Skip other labels to reduce clutter
+              if (safeMaxX > 10) {
+                final percentOfTotal = (value / safeMaxX);
+                if (percentOfTotal < 0.05 || 
+                    (percentOfTotal > 0.23 && percentOfTotal < 0.27) || 
+                    (percentOfTotal > 0.48 && percentOfTotal < 0.52) || 
+                    (percentOfTotal > 0.73 && percentOfTotal < 0.77) ||
+                    percentOfTotal > 0.95) {
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    child: Text('${value.round()}m', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                  );
+                }
+                return const SizedBox.shrink();
+              }
+              
+              return SideTitleWidget(
+                axisSide: meta.axisSide,
+                child: Text('${value.round()}m', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+              );
+            },
           ),
         ),
         leftTitles: AxisTitles(
