@@ -90,7 +90,7 @@ limiter.init_app(app)
 # Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
 from RuckTracker.api.ruck import HeartRateSampleUploadResource
 
-limiter.limit("360 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource)
+limiter.limit("3600 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource) # Increased from 360 to 3600 per hour
 
 # Define custom rate limits for specific endpoints
 @app.route("/api/auth/register", methods=["POST"])
@@ -298,6 +298,13 @@ api.add_resource(RuckSessionStartResource, '/api/rucks/start')
 api.add_resource(RuckSessionPauseResource, '/api/rucks/<int:ruck_id>/pause')
 api.add_resource(RuckSessionResumeResource, '/api/rucks/<int:ruck_id>/resume')
 api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete')
+# Apply high rate limit to location data endpoint
+app.logger.info(f"Setting RuckSessionLocationResource rate limit to: 3600 per hour")
+# Directly patch the RuckSessionLocationResource methods with the limiter decorator
+RuckSessionLocationResource.post = limiter.limit("3600 per hour", override_defaults=True)(RuckSessionLocationResource.post)
+RuckSessionLocationResource.get = limiter.limit("3600 per hour", override_defaults=True)(RuckSessionLocationResource.get)
+
+# Now register the resource with modified methods
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')
 api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
@@ -325,7 +332,6 @@ RuckLikesResource.delete = limiter.limit("2000 per minute", override_defaults=Tr
 # Now register the resource with modified methods
 api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
 
-# Ruck Comments Endpoint
 # Ruck Comments Endpoints
 app.logger.info(f"Setting RuckCommentsResource rate limit to: 500 per minute")
 # Directly patch the RuckCommentsResource methods with the limiter decorator
