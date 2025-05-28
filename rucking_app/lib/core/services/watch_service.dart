@@ -211,6 +211,7 @@ class WatchService {
   /// Start a new rucking session on the watch
   Future<void> startSessionOnWatch(double ruckWeight, {bool isMetric = true}) async {
     debugPrint('[PAUSE_DEBUG] WatchService: startSessionOnWatch called with ruckWeight: $ruckWeight, isMetric: $isMetric. Setting _isSessionActive = true.');
+    AppLogger.info('[WATCH_SERVICE] startSessionOnWatch - sending isMetric: $isMetric to watch');
     _isSessionActive = true;
     _isPaused = false;
     _ruckWeight = ruckWeight;
@@ -220,11 +221,13 @@ class WatchService {
     try {
       // Store ruckWeight locally for calorie calculations, but don't send to watch
       // to prevent it from being displayed on the watch face
-      await _sendMessageToWatch({
+      final message = {
         'command': 'workoutStarted',
         'isMetric': isMetric, // Send user's unit preference to watch
         // ruckWeight intentionally omitted to prevent display on watch
-      });
+      };
+      AppLogger.info('[WATCH_SERVICE] Sending message to watch: $message');
+      await _sendMessageToWatch(message);
     } catch (e) {
       AppLogger.error('[ERROR] Failed to start session on Watch: $e');
     }
@@ -316,6 +319,7 @@ class WatchService {
   }) async {
     try {
       AppLogger.info('[WATCH] Sending updated metrics to watch');
+      AppLogger.info('[WATCH] Unit preference being sent: isMetric=$isMetric');
       // Convert km to miles if user prefers imperial units
       // distance is always stored in km in the app, but we send it in the user's preferred unit
       double displayDistance = isMetric ? distance : distance / 1.60934; // km to miles

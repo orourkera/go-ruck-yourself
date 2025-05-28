@@ -49,7 +49,7 @@ class RuckingApiHandler extends RuckingApi {
       // Auto-navigate to active session screen if context is available
       final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
       navigatorKey.currentState?.pushNamedAndRemoveUntil(
-        '/activeSession',
+        '/active_session',
         (route) => false,
         arguments: response, // Pass the session data if needed
       );
@@ -124,6 +124,7 @@ class RuckingApiHandler extends RuckingApi {
         final authState = authBloc.state;
         if (authState is Authenticated) {
           isMetric = authState.user.preferMetric;
+          AppLogger.info('[API_HANDLER] User preferMetric from AuthBloc: ${authState.user.preferMetric}');
         }
       } else {
         // If AuthBloc isn't registered yet, try to get metric preference directly from AuthService
@@ -131,11 +132,15 @@ class RuckingApiHandler extends RuckingApi {
         final user = await authService.getCurrentUser();
         if (user != null) {
           isMetric = user.preferMetric;
+          AppLogger.info('[API_HANDLER] User preferMetric from AuthService: ${user.preferMetric}');
         }
       }
     } catch (e) {
       AppLogger.warning('[API_HANDLER] Could not access user preferences, defaulting to metric: $e');
     }
+    
+    // DEBUG: Log what we're sending to the watch
+    AppLogger.info('[API_HANDLER] Sending to watch: distance=$distance, isMetric=$isMetric');
     
     return _watchService.updateSessionOnWatch(
       distance: distance,

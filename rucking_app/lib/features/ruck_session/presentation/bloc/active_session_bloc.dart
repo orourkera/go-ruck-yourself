@@ -15,6 +15,8 @@ import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
+import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:rucking_app/core/utils/met_calculator.dart';
@@ -178,7 +180,39 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       emit(initialSessionState);
       AppLogger.debug('ActiveSessionRunning emitted for $sessionId');
 
-      await _watchService.startSessionOnWatch(event.ruckWeightKg, isMetric: GetIt.I<AuthBloc>().state is Authenticated ? (GetIt.I<AuthBloc>().state as Authenticated).user.preferMetric ?? true : true);
+      // Get user's metric preference
+      bool preferMetric = false; // Default to imperial (standard) instead of metric
+      final authState = GetIt.I<AuthBloc>().state;
+      AppLogger.info('[ACTIVE_SESSION] AuthBloc state type: ${authState.runtimeType}');
+      AppLogger.info('[ACTIVE_SESSION] AuthBloc state: $authState');
+      
+      if (authState is Authenticated) {
+        preferMetric = authState.user.preferMetric;
+        AppLogger.info('[ACTIVE_SESSION] User from AuthBloc: ${authState.user.toJson()}');
+        AppLogger.info('[ACTIVE_SESSION] User preferMetric: ${authState.user.preferMetric}');
+      } else {
+        AppLogger.warning('[ACTIVE_SESSION] User not authenticated, checking storage for preference');
+        
+        // Fallback: Try to get user preference from storage
+        try {
+          final storageService = GetIt.I<StorageService>();
+          final storedUserData = await storageService.getObject(AppConfig.userProfileKey);
+          if (storedUserData != null && storedUserData.containsKey('preferMetric')) {
+            preferMetric = storedUserData['preferMetric'] as bool;
+            AppLogger.info('[ACTIVE_SESSION] Found stored user preference: $preferMetric');
+          } else {
+            AppLogger.warning('[ACTIVE_SESSION] No stored user preference found, defaulting to imperial (false)');
+          }
+        } catch (e) {
+          AppLogger.error('[ACTIVE_SESSION] Error reading stored user preference: $e');
+          AppLogger.warning('[ACTIVE_SESSION] Defaulting to imperial (false)');
+        }
+      }
+      
+      AppLogger.info('[ACTIVE_SESSION] Final preferMetric value: $preferMetric');
+      AppLogger.info('[ACTIVE_SESSION] Sending isMetric to watch: $preferMetric');
+      
+      await _watchService.startSessionOnWatch(event.ruckWeightKg, isMetric: preferMetric);
       await _watchService.sendSessionIdToWatch(sessionId);
 
       _validationService.reset();
@@ -362,7 +396,36 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Update metrics on watch
       try {
         // Get the user's metric preference
-        bool preferMetric = GetIt.I<AuthBloc>().state is Authenticated ? (GetIt.I<AuthBloc>().state as Authenticated).user.preferMetric ?? true : true;
+        bool preferMetric = false; // Default to imperial (standard) instead of metric
+        final authState = GetIt.I<AuthBloc>().state;
+        AppLogger.info('[ACTIVE_SESSION] AuthBloc state type: ${authState.runtimeType}');
+        AppLogger.info('[ACTIVE_SESSION] AuthBloc state: $authState');
+        
+        if (authState is Authenticated) {
+          preferMetric = authState.user.preferMetric;
+          AppLogger.info('[ACTIVE_SESSION] User from AuthBloc: ${authState.user.toJson()}');
+          AppLogger.info('[ACTIVE_SESSION] User preferMetric: ${authState.user.preferMetric}');
+        } else {
+          AppLogger.warning('[ACTIVE_SESSION] User not authenticated, checking storage for preference');
+          
+          // Fallback: Try to get user preference from storage
+          try {
+            final storageService = GetIt.I<StorageService>();
+            final storedUserData = await storageService.getObject(AppConfig.userProfileKey);
+            if (storedUserData != null && storedUserData.containsKey('preferMetric')) {
+              preferMetric = storedUserData['preferMetric'] as bool;
+              AppLogger.info('[ACTIVE_SESSION] Found stored user preference: $preferMetric');
+            } else {
+              AppLogger.warning('[ACTIVE_SESSION] No stored user preference found, defaulting to imperial (false)');
+            }
+          } catch (e) {
+            AppLogger.error('[ACTIVE_SESSION] Error reading stored user preference: $e');
+            AppLogger.warning('[ACTIVE_SESSION] Defaulting to imperial (false)');
+          }
+        }
+        
+        AppLogger.info('[ACTIVE_SESSION] Final preferMetric value: $preferMetric');
+        AppLogger.info('[ACTIVE_SESSION] Sending isMetric to watch: $preferMetric');
         
         await _watchService.updateMetricsOnWatch(
           distance: currentState.distanceKm,
@@ -440,7 +503,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _stopTickerAndWatchdog();
       _locationSubscription?.cancel(); _locationSubscription = null;
       _locationService.stopLocationTracking();
-      await _stopHeartRateMonitoring(); // Includes sending final buffer
+      await _stopHeartRateMonitoring();
 
       try {
         Duration finalTotalPausedDuration = currentState.totalPausedDuration;
@@ -488,6 +551,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           'max_heart_rate': _maxHeartRate,
           'session_photos': currentState.photos.map((p) => p.id).toList(),
           'splits': _splitTrackingService.getSplits(), // Already a List<Map<String, dynamic>>
+          'is_public': currentUser?.allowRuckSharing ?? false, // Share based on user preference
         };
         
         AppLogger.debug('Completing session ${currentState.sessionId} with payload...');

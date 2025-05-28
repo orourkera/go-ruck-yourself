@@ -304,12 +304,21 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 processSplitNotification(message)
                 
             case "startSession", "workoutStarted":
+                print("[SessionManager] Received workoutStarted command")
+                print("[SessionManager] Full message received: \(message)")
+                print("[SessionManager] isMetric from message: \(message["isMetric"] ?? "NOT_FOUND")")
+                
                 // Start the session if not already active
                 if !isSessionActive {
                     // Check for unit preference in the message
                     if let unitPref = message["isMetric"] as? Bool {
                         self.isMetric = unitPref
                         print("Setting unit preference to \(unitPref ? "metric" : "standard")")
+                        print("[SessionManager] Set isMetric to: \(self.isMetric)")
+                    } else {
+                        // Default to metric if not specified
+                        self.isMetric = true
+                        print("[SessionManager] Defaulted isMetric to: \(self.isMetric) (value not found or wrong type)")
                     }
                     
                     // Starting session from phone command
@@ -367,6 +376,25 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 }
                 if let unitPref = message["isMetric"] as? Bool {
                     DispatchQueue.main.async { self.isMetric = unitPref }
+                }
+                
+            case "updateMetrics":
+                print("[SessionManager] Processing updateMetrics command")
+                print("[SessionManager] updateMetrics message: \(message)")
+                
+                // Update current metrics from the phone
+                if let distance = message["distance"] as? Double {
+                    self.distanceValue = distance
+                }
+                
+                if let pace = message["pace"] as? Double {
+                    self.paceValue = pace
+                }
+                
+                if let isMetricValue = message["isMetric"] as? Bool {
+                    self.isMetric = isMetricValue
+                    print("[SessionManager] Updated user's metric preference to: \(self.isMetric)")
+                    print("[SessionManager] updateMetrics - Set isMetric to: \(self.isMetric)")
                 }
                 
             default:
@@ -471,7 +499,10 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         
         // Update metric/imperial preference when present
         if let isMetricValue = metrics["isMetric"] as? Bool {
+            print("[DEBUG] Setting isMetric from nested metrics: \(isMetricValue)")
             self.isMetric = isMetricValue
+        } else {
+            print("[DEBUG] No isMetric found in nested metrics")
         }
         
         // Update paused state when present
