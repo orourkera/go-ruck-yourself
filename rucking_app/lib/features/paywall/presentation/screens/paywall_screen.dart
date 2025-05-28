@@ -26,16 +26,49 @@ class _PaywallScreenState extends State<PaywallScreen> {
   // Define the content for each card
   final List<Map<String, String>> _cards = [
     {
-      'title': 'Go Ruck Yourself',
-      'screenshot': 'assets/images/go ruck yourself copy.png',
-      'valueProp': 'Track your ruck sessions, calorie burn, and sync with Apple Fitness.',
+      'title': 'Track Your Rucks',
+      'screenshot': 'assets/images/paywall/session tracking.PNG',
+      'valueProp': 'Log your rucks with detailed metrics including distance, pace, elevation gain, and the most accurate calories burned calculation based on ruck weight, pace and real time elevation change.',
+    },
+    {
+      'title': 'Apple Watch Ready',
+      'screenshot': 'assets/images/paywall/watch screenshot.png',
+      'valueProp': 'Full Apple Watch integration lets you track your rucks directly from your wrist with live metrics, split notifications and the ability to pause the ruck.',
+    },
+    {
+      'title': 'Ruck Buddies',
+      'screenshot': 'assets/images/paywall/ruck_buddies.png',
+      'valueProp': 'Connect with fellow ruckers, share routes and compete with your friends to stay motivated.',
+    },
+    {
+      'title': 'Health Integration',
+      'screenshot': 'assets/images/paywall/apple health.png',
+      'valueProp': 'All your workouts sync directly to Apple Health/Google Fit to keep your fitness data consolidated.',
     },
   ];
 
   @override
   void initState() {
     super.initState();
-    // No auto-scrolling timer needed since we have only one card
+    // Start auto-scrolling timer
+    _startAutoScroll();
+  }
+
+  void _startAutoScroll() {
+    // Auto-scroll every 5 seconds
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_currentPage < _cards.length - 1) {
+        _currentPage++;
+      } else {
+        _currentPage = 0;
+      }
+      
+      _pageController.animateToPage(
+        _currentPage,
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeInOut,
+      );
+    });  
   }
 
   @override
@@ -101,12 +134,46 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min, // No intrinsic height issues
                     children: [
-                      // Title section
-                      _buildCard(
-                        title: _cards[0]['title']!,
-                        screenshot: _cards[0]['screenshot']!,
-                        valueProp: _cards[0]['valueProp']!,
-                        isTablet: isTablet,
+                      // Carousel of cards
+                      Container(
+                        height: isTablet ? 380 : 320,
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: _cards.length,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentPage = index;
+                            });
+                          },
+                          itemBuilder: (context, index) {
+                            return _buildCard(
+                              title: _cards[index]['title']!,
+                              screenshot: _cards[index]['screenshot']!,
+                              valueProp: _cards[index]['valueProp']!,
+                              isTablet: isTablet,
+                            );
+                          },
+                        ),
+                      ),
+                      
+                      // Page indicators
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          _cards.length,
+                          (index) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _currentPage == index
+                                ? AppColors.primary
+                                : Colors.grey.shade300,
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 20),
                       
@@ -280,22 +347,41 @@ class _PaywallScreenState extends State<PaywallScreen> {
       children: [
         Text(
           title,
-          style: AppTextStyles.paywallHeadline.copyWith(
+          style: TextStyle(
+            fontFamily: 'Bangers', 
             fontSize: isTablet ? 42 : 32,
-          ), 
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
+            letterSpacing: 1.2,
+          ),
           textAlign: TextAlign.center,
         ),
         SizedBox(height: isTablet ? 20 : 12),
         // App Screenshot (adapts to tablet size)
-        SizedBox(
-          height: isTablet ? 160 : 95,
+        Container(
+          height: isTablet ? 160 : 120,
+          margin: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
             child: Image.asset(
               screenshot,
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
-                return const SizedBox.shrink();
+                return Container(
+                  color: Colors.grey.shade200,
+                  child: const Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+                );
               },
             ),
           ),
