@@ -538,8 +538,8 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     // }
                 }
                 
-                // Auto-dismiss after 5 seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                // Auto-dismiss after 10 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
                     self.showingSplitNotification = false
                 }
             }

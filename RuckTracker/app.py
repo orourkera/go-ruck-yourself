@@ -300,9 +300,13 @@ api.add_resource(RuckSessionResumeResource, '/api/rucks/<int:ruck_id>/resume')
 api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete')
 # Apply high rate limit to location data endpoint
 app.logger.info(f"Setting RuckSessionLocationResource rate limit to: 3600 per hour")
-# Directly patch the RuckSessionLocationResource methods with the limiter decorator
-RuckSessionLocationResource.post = limiter.limit("3600 per hour", override_defaults=True)(RuckSessionLocationResource.post)
-RuckSessionLocationResource.get = limiter.limit("3600 per hour", override_defaults=True)(RuckSessionLocationResource.get)
+# Directly patch the RuckSessionLocationResource methods with only the post method (no get method)
+try:
+    RuckSessionLocationResource.post = limiter.limit("3600 per hour", override_defaults=True)(RuckSessionLocationResource.post)
+    app.logger.info(f"Successfully applied rate limit to RuckSessionLocationResource.post")
+except AttributeError as e:
+    app.logger.error(f"Failed to apply rate limit to RuckSessionLocationResource: {e}")
+    # Fall back to a global rate limit approach for this resource
 
 # Now register the resource with modified methods
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')

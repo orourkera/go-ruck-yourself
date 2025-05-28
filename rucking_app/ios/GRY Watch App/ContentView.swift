@@ -50,63 +50,37 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             
-            // Overlay the split notification when active
+            // Overlay the split notification when active - full screen version
             if sessionManager.showingSplitNotification {
-                // Semi-transparent overlay for the split notification
-                VStack(spacing: 8) {
-                    Text("Split Complete!")
-                        .font(.headline)
-                        .foregroundColor(.white)
+                // Full-screen overlay that covers everything
+                ZStack {
+                    // Black background covering full screen
+                    Color.black.edgesIgnoringSafeArea(.all)
                     
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Distance:")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                            Spacer()
-                            Text(sessionManager.splitDistance)
-                                .font(.body)
-                                .foregroundColor(.green)
-                        }
+                    // Simplified content
+                    VStack(spacing: 16) {
+                        Spacer()
                         
-                        HStack {
-                            Text("Time:")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                            Spacer()
-                            Text(sessionManager.splitTime)
-                                .font(.body)
-                                .foregroundColor(.green)
-                        }
+                        Text("Split Complete!")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.bottom, 20)
                         
-                        Divider()
-                            .background(Color.gray.opacity(0.5))
+                        // Split time - prominent and centered
+                        Text(sessionManager.splitTime)
+                            .font(.system(size: 46, weight: .bold))
+                            .foregroundColor(.green)
                         
-                        HStack {
-                            Text("Total:")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                            Spacer()
-                            Text(sessionManager.totalDistance)
-                                .font(.body)
-                        }
+                        // Total distance below time
+                        Text(sessionManager.totalDistance)
+                            .font(.system(size: 32, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.top, 8)
                         
-                        HStack {
-                            Text("Total Time:")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                            Spacer()
-                            Text(sessionManager.totalTime)
-                                .font(.custom("Bangers-Regular", size: 28))
-                        }
+                        Spacer()
                     }
-                    .padding(.horizontal)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding(16)
-                .background(Color.black.opacity(0.85))
-                .cornerRadius(12)
-                .shadow(radius: 5)
-                .padding(12)
                 .transition(.opacity)
                 .animation(.easeInOut(duration: 0.3), value: sessionManager.showingSplitNotification)
             }
