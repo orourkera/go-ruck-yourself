@@ -103,6 +103,9 @@ class RuckSession extends Equatable {
   /// Tags for the session
   final List<String> tags;
   
+  /// Whether this session is publicly shared
+  final bool isPublic;
+  
   /// Creates a new ruck session
   const RuckSession({
     this.ruckId,
@@ -126,6 +129,7 @@ class RuckSession extends Equatable {
     this.waypoints,
     this.review,
     this.tags = const <String>[],
+    this.isPublic = false,
   });
   
   /// Formatted duration as HH:MM:SS
@@ -168,6 +172,7 @@ class RuckSession extends Equatable {
     List<LocationPoint>? waypoints,
     SessionReview? review,
     List<String>? tags,
+    bool? isPublic,
   }) {
     return RuckSession(
       ruckId: ruckId ?? this.ruckId,
@@ -191,6 +196,7 @@ class RuckSession extends Equatable {
       waypoints: waypoints ?? this.waypoints,
       review: review ?? this.review,
       tags: tags ?? this.tags,
+      isPublic: isPublic ?? this.isPublic,
     );
   }
   
@@ -248,6 +254,7 @@ class RuckSession extends Equatable {
       tags: json['tags'] != null && json['tags'] is List 
           ? (json['tags'] as List<dynamic>).map((e) => e.toString()).toList() 
           : const <String>[],
+      isPublic: json['is_public'] ?? false,
     );
   }
   
@@ -277,6 +284,7 @@ class RuckSession extends Equatable {
     if (waypoints != null) result['waypoints'] = waypoints!.map((e) => e.toJson()).toList();
     if (review != null) result['review'] = review!.toJson();
     if (tags.isNotEmpty) result['tags'] = tags;
+    if (isPublic != false) result['is_public'] = isPublic;
     
     return result;
   }
@@ -287,6 +295,6 @@ class RuckSession extends Equatable {
     notes, createdAt, startedAt, pausedAt, completedAt, 
     distanceKm, elevationGainMeters, elevationLossMeters, caloriesBurned, 
     durationSeconds, averagePaceMinKm, routeMapUrl,
-    waypoints, review, tags
+    waypoints, review, tags, isPublic
   ];
 } 
