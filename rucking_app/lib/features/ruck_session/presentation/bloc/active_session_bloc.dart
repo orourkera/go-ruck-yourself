@@ -178,7 +178,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       emit(initialSessionState);
       AppLogger.debug('ActiveSessionRunning emitted for $sessionId');
 
-      await _watchService.startSessionOnWatch(event.ruckWeightKg);
+      await _watchService.startSessionOnWatch(event.ruckWeightKg, isMetric: GetIt.I<AuthBloc>().state is Authenticated ? (GetIt.I<AuthBloc>().state as Authenticated).user.preferMetric ?? true : true);
       await _watchService.sendSessionIdToWatch(sessionId);
 
       _validationService.reset();

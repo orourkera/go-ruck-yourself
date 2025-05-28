@@ -95,19 +95,9 @@ struct ContentView: View {
     private var activeSessionView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                // Green left-aligned "GRY" title
-                Text("GRY")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.green)
-                    .fixedSize(horizontal: true, vertical: false) // Prevent text truncation
-                    .padding(.leading, 4) // Add some left padding
-                    .padding(.top, 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 2)
-                
                 // Full-width timer - simplified, statusText should be valid if session is active
                 Text(sessionManager.statusText)
-                    .font(.custom("Bangers-Regular", size: 30))
+                    .font(.custom("Bangers-Regular", size: 38))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
                     .lineLimit(1)

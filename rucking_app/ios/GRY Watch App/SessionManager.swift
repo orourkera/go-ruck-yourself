@@ -53,10 +53,9 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         // Convert to feet if using imperial units
         if !self.isMetric {
             let gainFeet = Int(elevationGain * 3.28084)
-            let lossFeet = Int(elevationLoss * 3.28084)
-            return "+\(gainFeet)/-\(lossFeet) ft"
+            return "+\(gainFeet) ft"
         } else {
-            return "+\(Int(elevationGain))/-\(Int(elevationLoss)) m"
+            return "+\(Int(elevationGain)) m"
         }
     }
     var distance: String {
@@ -307,6 +306,12 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             case "startSession", "workoutStarted":
                 // Start the session if not already active
                 if !isSessionActive {
+                    // Check for unit preference in the message
+                    if let unitPref = message["isMetric"] as? Bool {
+                        self.isMetric = unitPref
+                        print("Setting unit preference to \(unitPref ? "metric" : "standard")")
+                    }
+                    
                     // Starting session from phone command
                     DispatchQueue.main.async {
                         self.isSessionActive = true
