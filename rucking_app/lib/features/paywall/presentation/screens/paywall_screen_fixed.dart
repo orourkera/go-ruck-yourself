@@ -28,22 +28,22 @@ class _PaywallScreenState extends State<PaywallScreen> {
     {
       'title': 'Track Your Rucks',
       'screenshot': 'assets/images/paywall/session tracking.PNG',
-      'valueProp': 'Detailed metrics including distance, pace, elevation gain, and METs based calories burned.',
+      'valueProp': 'Log your rucks with detailed metrics including distance, pace, elevation gain, and the most accurate calories burned calculation based on ruck weight, pace and real time elevation change.',
     },
     {
       'title': 'Apple Watch Ready',
       'screenshot': 'assets/images/paywall/watch screenshot.png',
-      'valueProp': 'Apple Watch integration tracks real time heartrate, stats and splits.',
+      'valueProp': 'Full Apple Watch integration lets you track your rucks directly from your wrist with live metrics, split notifications and the ability to pause the ruck.',
     },
     {
       'title': 'Ruck Buddies',
       'screenshot': 'assets/images/paywall/ruck_buddies.png',
-      'valueProp': 'Like, comment, and connect with fellow ruckers around the world.',
+      'valueProp': 'Connect with fellow ruckers, share routes and compete with your friends to stay motivated.',
     },
     {
       'title': 'Health Integration',
       'screenshot': 'assets/images/paywall/apple health.png',
-      'valueProp': 'Sync with Apple Health/Google Fit to keep your fitness data consolidated.',
+      'valueProp': 'All your workouts sync directly to Apple Health/Google Fit to keep your fitness data consolidated.',
     },
   ];
 
@@ -110,7 +110,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
       children: [
         // Main PageView carousel
         Container(
-          height: isTablet ? 520 : 430, // Reduced height to eliminate extra space
+          height: isTablet ? 570 : 480,
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: PageView.builder(
             controller: _pageController,
@@ -380,11 +380,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 30), // More horizontal padding
-      // Use padding only at the top to eliminate space at the bottom
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start, // Move content up
         crossAxisAlignment: CrossAxisAlignment.start, // Left align content
-        mainAxisSize: MainAxisSize.min, // Minimize vertical space
         children: [
           // Reduced top padding to move content up
           SizedBox(height: isTablet ? 10 : 5),
@@ -413,31 +411,45 @@ class _PaywallScreenState extends State<PaywallScreen> {
           // Reduced spacing to move content up
           SizedBox(height: isTablet ? 20 : 15),
           
-          // App Screenshot with no background or container effects - larger size
-          Image.asset(
-            screenshot,
-            height: isTablet ? 300 : 220, // Increased image height
-            width: double.infinity,
-            fit: BoxFit.contain, // Keep contain to prevent cropping
-            errorBuilder: (context, error, stackTrace) {
-              return SizedBox(
-                height: isTablet ? 300 : 220, // Match increased height
-                child: Icon(Icons.image_not_supported, size: 40, color: Colors.white.withOpacity(0.8)),
-              );
-            },
+          // App Screenshot (adapts to tablet size)
+          Container(
+            height: isTablet ? 240 : 180, // Increased image height by 50%
+            width: double.infinity, // Full width within padding
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+              child: Image.asset(
+                screenshot,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey.shade200,
+                    child: const Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+                  );
+                },
+              ),
+            ),
           ),
           
-          // Increased spacing between image and text
-          SizedBox(height: isTablet ? 30 : 24),
+          // Reduced spacing to move content up
+          SizedBox(height: isTablet ? 25 : 20),
           
-          // Value Proposition Text - now left-aligned with tightened spacing
+          // Value Proposition Text - now left-aligned
           Text(
             valueProp,
             style: TextStyle(
               fontSize: isTablet ? 22 : 18,
               fontWeight: FontWeight.w500,
               color: Colors.white, // White text
-              height: 1.2, // Tighter line spacing
             ),
             textAlign: TextAlign.left, // Left aligned text
           ),

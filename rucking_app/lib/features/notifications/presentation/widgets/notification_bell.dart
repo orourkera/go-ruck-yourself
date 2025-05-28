@@ -7,7 +7,7 @@ import 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/features/notifications/presentation/pages/notifications_screen.dart';
 
-class NotificationBell extends StatelessWidget {
+class NotificationBell extends StatefulWidget {
   final bool useLadyMode;
   
   const NotificationBell({
@@ -15,6 +15,53 @@ class NotificationBell extends StatelessWidget {
     this.useLadyMode = false,
   }) : super(key: key);
 
+  @override
+  State<NotificationBell> createState() => _NotificationBellState();
+}
+
+class _NotificationBellState extends State<NotificationBell> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _rotationAnimation;
+  
+  @override
+  void initState() {
+    super.initState();
+    
+    // Create animation controller with faster duration for shake effect
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    
+    // Create a rotation animation that shakes back and forth
+    _rotationAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: 0.05)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.05, end: -0.05)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.05, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 25,
+      ),
+    ]).animate(_animationController);
+    
+    // Make the animation repeat indefinitely
+    _animationController.repeat();
+  }
+  
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+  
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<NotificationBloc, NotificationState>(
@@ -25,21 +72,40 @@ class NotificationBell extends StatelessWidget {
           unreadCount = state.unreadCount;
         }
         
+        // Stop animation if no unread notifications
+        if (unreadCount <= 0 && _animationController.isAnimating) {
+          _animationController.stop();
+          _animationController.reset();
+        } else if (unreadCount > 0 && !_animationController.isAnimating) {
+          _animationController.repeat();
+        }
+        
         return Stack(
           clipBehavior: Clip.none,
           children: [
             SizedBox(
               width: 96, // 50% larger container
               height: 96,
-              child: IconButton(
-                iconSize: 96, // 50% larger icon size
-                padding: EdgeInsets.zero, // Remove padding to maximize space
-                constraints: const BoxConstraints(), // Remove constraints to allow full size
-                icon: Image.asset(
-                  'assets/images/notifications.png',
-                  width: 96, // 50% larger (previously 64px)
-                  height: 96, // 50% larger (previously 64px)
-                ),
+              child: AnimatedBuilder(
+                animation: _rotationAnimation,
+                builder: (context, child) {
+                  // Only apply rotation animation if there are unread notifications
+                  final rotation = unreadCount > 0 ? _rotationAnimation.value : 0.0;
+                  
+                  return Transform.rotate(
+                    angle: rotation, // rotation in radians
+                    child: child,
+                  );
+                },
+                child: IconButton(
+                  iconSize: 96, // 50% larger icon size
+                  padding: EdgeInsets.zero, // Remove padding to maximize space
+                  constraints: const BoxConstraints(), // Remove constraints to allow full size
+                  icon: Image.asset(
+                    'assets/images/notifications.png',
+                    width: 96, // 50% larger (previously 64px)
+                    height: 96, // 50% larger (previously 64px)
+                  ),
                 onPressed: () async {
                   // Navigate to notifications screen
                   await Navigator.push(
@@ -54,7 +120,8 @@ class NotificationBell extends StatelessWidget {
                   if (context.mounted) {
                     context.read<NotificationBloc>().add(const NotificationsRequested());
                   }
-                },
+                  },
+                ),
               ),
             ),
             if (unreadCount > 0)

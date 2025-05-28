@@ -28,22 +28,21 @@ class _PaywallScreenState extends State<PaywallScreen> {
     {
       'title': 'Track Your Rucks',
       'screenshot': 'assets/images/paywall/session tracking.PNG',
-      'valueProp': 'Detailed metrics including distance, pace, elevation gain, and METs based calories burned.',
+      'valueProp': 'Log rucks with detailed metrics including distance, pace, elevation gain, and METs based calories burned.',
     },
     {
       'title': 'Apple Watch Ready',
       'screenshot': 'assets/images/paywall/watch screenshot.png',
-      'valueProp': 'Apple Watch integration tracks real time heartrate, stats and splits.',
+      'valueProp': 'Apple Watch integration with live heart rate, ruck metrics, and split notifications.',
     },
     {
       'title': 'Ruck Buddies',
       'screenshot': 'assets/images/paywall/ruck_buddies.png',
-      'valueProp': 'Like, comment, and connect with fellow ruckers around the world.',
-    },
+      'valueProp': 'Like, comment, and connect with fellow ruckers.'
     {
       'title': 'Health Integration',
       'screenshot': 'assets/images/paywall/apple health.png',
-      'valueProp': 'Sync with Apple Health/Google Fit to keep your fitness data consolidated.',
+      'valueProp': 'Sync directly to Apple Health/Google Fit.',
     },
   ];
 
@@ -110,7 +109,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
       children: [
         // Main PageView carousel
         Container(
-          height: isTablet ? 520 : 430, // Reduced height to eliminate extra space
+          height: isTablet ? 570 : 480,
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: PageView.builder(
             controller: _pageController,
@@ -367,90 +366,70 @@ class _PaywallScreenState extends State<PaywallScreen> {
         context: context,
         message: 'No subscription offerings available.',
         duration: const Duration(seconds: 3),
-      );
-    }
-  }
+          ),
+        );
+      }
 
-  // Build card with more horizontal padding and left-aligned text
-  Widget _buildCard({
-    required String title,
-    required String screenshot,
-    required String valueProp,
-    bool isTablet = false,
-  }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 30), // More horizontal padding
-      // Use padding only at the top to eliminate space at the bottom
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.start, // Move content up
-        crossAxisAlignment: CrossAxisAlignment.start, // Left align content
-        mainAxisSize: MainAxisSize.min, // Minimize vertical space
-        children: [
-          // Reduced top padding to move content up
-          SizedBox(height: isTablet ? 10 : 5),
-          
-          // Title still centered
-          Center(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontFamily: 'Bangers', 
-                fontSize: isTablet ? 42 : 32,
-                color: AppColors.secondary, // Orange color
-                letterSpacing: 1.2,
-                shadows: [
-                  // White outline effect
-                  Shadow(color: Colors.white, offset: Offset(-1, -1), blurRadius: 1),
-                  Shadow(color: Colors.white, offset: Offset(1, -1), blurRadius: 1),
-                  Shadow(color: Colors.white, offset: Offset(-1, 1), blurRadius: 1),
-                  Shadow(color: Colors.white, offset: Offset(1, 1), blurRadius: 1),
-                ],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          
-          // Reduced spacing to move content up
-          SizedBox(height: isTablet ? 20 : 15),
-          
-          // App Screenshot with no background or container effects - larger size
-          Image.asset(
-            screenshot,
-            height: isTablet ? 300 : 220, // Increased image height
-            width: double.infinity,
-            fit: BoxFit.contain, // Keep contain to prevent cropping
-            errorBuilder: (context, error, stackTrace) {
-              return SizedBox(
-                height: isTablet ? 300 : 220, // Match increased height
-                child: Icon(Icons.image_not_supported, size: 40, color: Colors.white.withOpacity(0.8)),
-              );
-            },
-          ),
-          
-          // Increased spacing between image and text
-          SizedBox(height: isTablet ? 30 : 24),
-          
-          // Value Proposition Text - now left-aligned with tightened spacing
-          Text(
-            valueProp,
-            style: TextStyle(
-              fontSize: isTablet ? 22 : 18,
-              fontWeight: FontWeight.w500,
-              color: Colors.white, // White text
-              height: 1.2, // Tighter line spacing
-            ),
-            textAlign: TextAlign.left, // Left aligned text
-          ),
-        ],
-      ),
-    );
-  }
+      Future<void> _handleGetRuckyPressed(BuildContext context) async {
+        final revenueCatService = GetIt.instance<RevenueCatService>();
+        final offerings = await revenueCatService.getOfferings();
+        if (offerings.isNotEmpty) {
+          final package = offerings.first.availablePackages.first;
+          final isPurchased = await revenueCatService.makePurchase(package);
+          if (isPurchased) {
+            // After successful purchase, go directly to Home Screen
+            Navigator.pushReplacementNamed(context, '/home');
+          } else {
+            // Handle purchase failure
+            StyledSnackBar.showError(
+              context: context,
+              message: 'Purchase failed. Please try again.',
+              duration: const Duration(seconds: 3),
+            );
+          }
+        } else {
+          StyledSnackBar.showError(
+            context: context,
+            message: 'No subscription offerings available.',
+            duration: const Duration(seconds: 3),
+          );
+        }
+      }
 
-  Widget _buildPlanCard(String planName, String price, bool isSelected) {
-    final isTablet = _isTablet(context);
-    
-    // Determine free trial period based on plan name
-    String trialPeriod = '';
+      Widget _buildCard({
+        required String title,
+        required String screenshot,
+        required String valueProp,
+        bool isTablet = false,
+      }) {
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 30), // Added more horizontal padding
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start, // Changed to start to move content up
+            crossAxisAlignment: CrossAxisAlignment.start, // Left align content
+            children: [
+              // Reduced top padding to move content up
+              SizedBox(height: isTablet ? 10 : 5),
+              
+              // Title centered but the container is left-aligned
+              Center(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Bangers', 
+                    fontSize: isTablet ? 42 : 32,
+                    color: AppColors.secondary, // Orange color
+                    letterSpacing: 1.2,
+                    shadows: [
+                      // White outline effect
+                      Shadow(color: Colors.white, offset: Offset(-1, -1), blurRadius: 1),
+                      Shadow(color: Colors.white, offset: Offset(1, -1), blurRadius: 1),
+                      Shadow(color: Colors.white, offset: Offset(-1, 1), blurRadius: 1),
+                      Shadow(color: Colors.white, offset: Offset(1, 1), blurRadius: 1),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
     if (planName == 'Weekly') {
       trialPeriod = '3 day free trial!';
     } else if (planName == 'Monthly') {
