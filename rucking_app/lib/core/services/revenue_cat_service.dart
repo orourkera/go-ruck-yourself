@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
@@ -19,10 +20,21 @@ class RevenueCatService {
       _isInitialized = true;
       return;
     }
-    final apiKey = dotenv.env['REVENUECAT_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
-      throw Exception('REVENUECAT_API_KEY is missing from .env file');
+    String? apiKey;
+    if (Platform.isIOS) {
+      apiKey = dotenv.env['REVENUECAT_API_KEY_IOS'];
+      debugPrint('RevenueCatService: Using iOS API key');
+    } else if (Platform.isAndroid) {
+      apiKey = dotenv.env['REVENUECAT_API_KEY_ANDROID'];
+      debugPrint('RevenueCatService: Using Android API key');
+    } else {
+      apiKey = dotenv.env['REVENUECAT_API_KEY']; // Fallback
     }
+    
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('RevenueCat API key is missing from .env file for this platform');
+    }
+    
     // Disable RevenueCat debug logs for production
     Purchases.setDebugLogsEnabled(false);
     await Purchases.configure(PurchasesConfiguration(apiKey));
