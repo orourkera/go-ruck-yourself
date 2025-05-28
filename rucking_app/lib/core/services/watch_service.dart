@@ -209,8 +209,8 @@ class WatchService {
   }
 
   /// Start a new rucking session on the watch
-  Future<void> startSessionOnWatch(double ruckWeight) async {
-    debugPrint('[PAUSE_DEBUG] WatchService: startSessionOnWatch called with ruckWeight: $ruckWeight. Setting _isSessionActive = true.');
+  Future<void> startSessionOnWatch(double ruckWeight, {bool isMetric = true}) async {
+    debugPrint('[PAUSE_DEBUG] WatchService: startSessionOnWatch called with ruckWeight: $ruckWeight, isMetric: $isMetric. Setting _isSessionActive = true.');
     _isSessionActive = true;
     _isPaused = false;
     _ruckWeight = ruckWeight;
@@ -222,6 +222,7 @@ class WatchService {
       // to prevent it from being displayed on the watch face
       await _sendMessageToWatch({
         'command': 'workoutStarted',
+        'isMetric': isMetric, // Send user's unit preference to watch
         // ruckWeight intentionally omitted to prevent display on watch
       });
     } catch (e) {
