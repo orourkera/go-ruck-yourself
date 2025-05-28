@@ -38,5 +38,9 @@ local.properties
 *.keystore
 *.jks
 
+# Firebase configuration files
+google-services.json
+GoogleService-Info.plist
+
 # Web (if applicable)
 .dart_tool/build/
