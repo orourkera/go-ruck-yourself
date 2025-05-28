@@ -114,7 +114,7 @@ struct ContentView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     // Distance - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
-                        Text(sessionManager.isMetric ? "DISTANCE (KM)" : "DISTANCE (MI)")
+                        Text(sessionManager.isMetric ? "DISTANCE" : "DISTANCE")
                             .font(.caption2)
                             .foregroundColor(.gray)
                             .padding(.top, 2)
@@ -168,7 +168,7 @@ struct ContentView: View {
                     
                     // Elevation - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
-                        Text(sessionManager.isMetric ? "ELEVATION (M)" : "ELEVATION (FT)")
+                        Text(sessionManager.isMetric ? "ELEVATION" : "ELEVATION")
                             .font(.caption2)
                             .foregroundColor(.gray)
                             .padding(.top, 2)

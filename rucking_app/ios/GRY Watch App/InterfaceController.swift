@@ -110,6 +110,11 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
     
     // Update UI with received metrics
     private func updateMetrics(_ metrics: [String: Any]) {
+        // Determine unit preference from incoming payload first, fallback to stored default
+        let preferMetric: Bool = (metrics["isMetric"] as? Bool) ?? UserDefaults.standard.bool(forKey: "preferMetric")
+        // Persist latest preference for future use
+        UserDefaults.standard.set(preferMetric, forKey: "preferMetric")
+        
         // Update the status label with the duration (timer) value if available
         if let duration = metrics["duration"] as? Int {
             let hours = duration / 3600
@@ -131,13 +136,16 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
             heartRateLabel.setText(String(format: "HR: %.0f bpm", heartRate))
         }
         if let distance = metrics["distance"] as? Double {
-            distanceLabel.setText(String(format: "Dist: %.2f km", distance))
+            if preferMetric {
+                distanceLabel.setText(String(format: "Dist: %.2f km", distance))
+            } else {
+                distanceLabel.setText(String(format: "Dist: %.2f mi", distance))
+            }
         }
         if let calories = metrics["calories"] as? Double {
             caloriesLabel.setText(String(format: "Cal: %.0f", calories))
         }
         if let pace = metrics["pace"] as? Double {
-            let preferMetric = UserDefaults.standard.bool(forKey: "preferMetric")
             if preferMetric {
                 paceLabel.setText(String(format: "Pace: %.2f min/km", pace))
             } else {
@@ -145,7 +153,6 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
                 paceLabel.setText(String(format: "Pace: %.2f min/mi", paceImperial))
             }
         }
-        let preferMetric = UserDefaults.standard.bool(forKey: "preferMetric")
         if let elevationGain = metrics["elevationGain"] as? Double, let elevationLoss = metrics["elevationLoss"] as? Double {
             if preferMetric {
                 elevationLabel.setText(String(format: "Elev: +%.0f/-%.0f m", elevationGain, elevationLoss))
