@@ -103,6 +103,7 @@ flutter:
   assets:
     - .env
     - assets/images/
+    - assets/images/paywall/
     - assets/screenshots/
     # - assets/icons/   # Commented out because directory does not exist
   

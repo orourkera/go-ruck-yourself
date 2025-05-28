@@ -176,10 +176,8 @@ class AuthServiceImpl implements AuthService {
     User? userToReturn;
     String? userId = await _storageService.getString(AppConfig.userIdKey);
     
-    // Ideally, fetch email stored securely during login if available
-    // For simplicity now, we'll assume ID is enough to link
+    // If we do not have a stored ID we cannot fetch a profile, just return null (don't log out)
     if (userId == null) {
-        await signOut(); // If no ID, sign out
         return null;
     }
 
@@ -194,13 +192,22 @@ class AuthServiceImpl implements AuthService {
       
     } catch (e) {
       if (e is UnauthorizedException) {
-        await signOut();
-        return null;
+        // Attempt a token refresh once before giving up
+        try {
+          await refreshToken();
+          final profileResponse = await _apiClient.get('/users/profile');
+          userToReturn = User.fromJson(profileResponse);
+          await _storageService.setObject(AppConfig.userProfileKey, userToReturn!.toJson());
+        } catch (_) {
+          // If still failing, fall back to stored data (do not force sign-out)
+        }
       }
-      // Fallback to stored user on network error
-      final storedUserData = await _storageService.getObject(AppConfig.userProfileKey);
-      if (storedUserData != null) {
-        userToReturn = User.fromJson(storedUserData);
+      // Fallback to stored user on network error or other issues
+      if (userToReturn == null) {
+        final storedUserData = await _storageService.getObject(AppConfig.userProfileKey);
+        if (storedUserData != null) {
+          userToReturn = User.fromJson(storedUserData);
+        }
       }
     }
     return userToReturn;
@@ -223,12 +230,16 @@ class AuthServiceImpl implements AuthService {
       return response != null;
     } catch (e) {
       if (e is UnauthorizedException) {
-        // Token is invalid or expired
-        await signOut();
-        return false;
+        // Token might be expired. Try to refresh it **once** before considering unauthenticated.
+        try {
+          final newToken = await refreshToken();
+          return newToken != null;
+        } catch (_) {
+          // Ignore and fall through to stored data check below
+        }
       }
       
-      // For network errors, check if we have a stored user
+      // For network errors or refresh failures, fall back to cached user data
       final userData = await _storageService.getObject(AppConfig.userProfileKey);
       return userData != null;
     }
@@ -293,11 +304,7 @@ class AuthServiceImpl implements AuthService {
       }
     } catch (e) {
       print('[AUTH] ERROR in refreshToken: $e');
-      // Force logout on refresh failure
-      await _storageService.removeSecure(AppConfig.tokenKey);
-      await _storageService.removeSecure(AppConfig.refreshTokenKey);
-      // Use empty string instead of null to clear the token
-      _apiClient.setAuthToken("");
+      // Do NOT log the user out automatically; propagate error so the caller can decide.
       rethrow;
     }
   }
