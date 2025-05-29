@@ -33,64 +33,83 @@ class ApiClient {
       ));
     }
     
-    // Add token refresh interceptor
+    // Add token refresh interceptor with enhanced retry mechanism
     _dio.interceptors.add(
       InterceptorsWrapper(
         onError: (error, handler) async {
+          // Handle unauthorized errors (401) that indicate token expiration
           if (error.response?.statusCode == 401) {
-            try {
-              debugPrint('[API] Token expired. Attempting to refresh...');
-              
-              // Skip the request if it's already a refresh token request
-              if (error.requestOptions.path.contains('/auth/refresh')) {
-                return handler.next(error);
-              }
-              
-              // Get refresh token from storage
+            // Skip token refresh for requests that are already token refresh attempts
+            if (error.requestOptions.path.contains('/auth/refresh')) {
+              debugPrint('[API] Skipping refresh for refresh token request');
+              return handler.next(error);
+            }
+            
+            debugPrint('[API] Authentication error (401). Attempting to refresh token...');
+            
+            try {              
+              // Get refresh token from storage (without failing if not found)
               final refreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
-              if (refreshToken == null) {
-                debugPrint('[API] No refresh token available');
+              if (refreshToken == null || refreshToken.isEmpty) {
+                debugPrint('[API] No refresh token available - continuing with error');
                 return handler.next(error);
               }
               
               // Create a new Dio instance for refresh request to avoid interceptor loop
               final refreshDio = Dio(_dio.options);
+              // Add specific timeout for refresh requests - longer for reliability during long sessions
+              refreshDio.options.connectTimeout = const Duration(seconds: 60);
+              refreshDio.options.receiveTimeout = const Duration(seconds: 60);
+              
+              debugPrint('[API] Attempting token refresh with backend...');
               final refreshResponse = await refreshDio.post(
                 '/auth/refresh',
                 data: {'refresh_token': refreshToken},
               );
               
-              if (refreshResponse.statusCode == 200) {
+              if (refreshResponse.statusCode == 200 && 
+                  refreshResponse.data != null && 
+                  refreshResponse.data['token'] != null) {
+                
+                // Extract and validate tokens
                 final newToken = refreshResponse.data['token'] as String;
                 final newRefreshToken = refreshResponse.data['refresh_token'] as String;
                 
-                // Save new tokens
-                await _storageService.setSecureString(AppConfig.tokenKey, newToken);
-                await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
-                
-                // Update token in the current Dio instance
-                setAuthToken(newToken);
-                
-                debugPrint('[API] Token refreshed successfully. Retrying original request...');
-                
-                // Retry the original request with the new token
-                final options = Options(
-                  method: error.requestOptions.method,
-                  headers: {...error.requestOptions.headers, 'Authorization': 'Bearer $newToken'},
-                );
-                
-                final retryResponse = await _dio.request<dynamic>(
-                  error.requestOptions.path,
-                  data: error.requestOptions.data,
-                  queryParameters: error.requestOptions.queryParameters,
-                  options: options,
-                );
-                
-                // Return the response from the retry
-                return handler.resolve(retryResponse);
+                if (newToken.isNotEmpty && newRefreshToken.isNotEmpty) {
+                  await _storageService.setSecureString(AppConfig.tokenKey, newToken);
+                  await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
+                  
+                  // Update token in the current Dio instance
+                  setAuthToken(newToken);
+                  
+                  debugPrint('[API] Token refreshed successfully. Retrying original request...');
+                  
+                  // Retry the original request with the new token
+                  final options = Options(
+                    method: error.requestOptions.method,
+                    headers: {...error.requestOptions.headers, 'Authorization': 'Bearer $newToken'},
+                  );
+                  
+                  final retryResponse = await _dio.request<dynamic>(
+                    error.requestOptions.path,
+                    data: error.requestOptions.data,
+                    queryParameters: error.requestOptions.queryParameters,
+                    options: options,
+                  );
+                  
+                  // Return the response from the retry
+                  return handler.resolve(retryResponse);
+                } else {
+                  debugPrint('[API] Received empty tokens from refresh response');
+                }
+              } else {
+                debugPrint('[API] Token refresh failed with status: ${refreshResponse.statusCode}');
               }
             } catch (e) {
-              debugPrint('[API] Token refresh failed: $e');
+              // Handle refresh errors gracefully without logging the user out
+              debugPrint('[API] Token refresh attempt failed: $e');
+              // Save the error for later analysis but don't interfere with user session
+              // We'll try again next time an API call fails
             }
           }
           
@@ -106,6 +125,91 @@ class ApiClient {
     _storageService = storageService;
   }
   
+  /// Gets the auth token, attempting to refresh if necessary
+  Future<String?> getToken() async {
+    // Get the token from storage, if not found or empty, try to refresh it
+    final token = await _storageService.getSecureString(AppConfig.tokenKey);
+    if (token == null || token.isEmpty) {
+      // Attempt token refresh as a recovery mechanism
+      debugPrint('[API] Token not found in storage, attempting refresh');
+      try {
+        return await refreshToken();
+      } catch (e) {
+        debugPrint('[API] Refresh attempt failed during getToken: $e');
+        return null;
+      }
+    }
+    return token;
+  }
+  
+  /// Refreshes the authentication token
+  Future<String?> refreshToken() async {
+    // Retry logic for long sessions - attempt refresh up to 3 times with exponential backoff
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        final refreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
+        if (refreshToken == null || refreshToken.isEmpty) {
+          debugPrint('[API] No refresh token available for refresh (attempt $attempt)');
+          return null;
+        }
+        
+        // Create a new Dio instance to avoid interceptor loops
+        final refreshDio = Dio(_dio.options);
+        // Add timeouts to avoid hanging on slow networks
+        refreshDio.options.connectTimeout = const Duration(seconds: 60);
+        refreshDio.options.receiveTimeout = const Duration(seconds: 60);
+        
+        debugPrint('[API] Attempting token refresh via dedicated method (attempt $attempt/3)');
+        final response = await refreshDio.post(
+          '/auth/refresh',
+          data: {'refresh_token': refreshToken},
+        );
+        
+        if (response.statusCode == 200 && response.data != null) {
+          final newToken = response.data['token'] as String;
+          final newRefreshToken = response.data['refresh_token'] as String;
+          
+          if (newToken.isNotEmpty && newRefreshToken.isNotEmpty) {
+            // Save the new tokens
+            await _storageService.setSecureString(AppConfig.tokenKey, newToken);
+            await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
+            
+            // Update the token in Dio
+            setAuthToken(newToken);
+            
+            debugPrint('[API] Token refreshed successfully via refreshToken method (attempt $attempt)');
+            return newToken;
+          } else {
+            debugPrint('[API] Received empty tokens from refresh response (attempt $attempt)');
+          }
+        } else {
+          debugPrint('[API] Token refresh failed with status: ${response.statusCode} (attempt $attempt)');
+        }
+        
+      } catch (e) {
+        debugPrint('[API] Error refreshing token (attempt $attempt/3): $e');
+        
+        // For network errors, wait before retrying (exponential backoff)
+        if (attempt < 3 && (e is DioException && 
+            (e.type == DioExceptionType.connectionError || 
+             e.type == DioExceptionType.connectionTimeout))) {
+          final waitTime = Duration(seconds: attempt * 2); // 2s, 4s for attempts 1,2
+          debugPrint('[API] Network error, waiting ${waitTime.inSeconds}s before retry...');
+          await Future.delayed(waitTime);
+          continue; // Retry
+        }
+      }
+      
+      // If we reach here on the last attempt, all retries failed
+      if (attempt == 3) {
+        debugPrint('[API] All token refresh attempts failed, but maintaining user session');
+      }
+    }
+    
+    // Return null instead of throwing - maintains user session
+    return null;
+  }
+  
   /// Sets the authentication token for subsequent requests
   void setAuthToken(String token) {
     _dio.options.headers['Authorization'] = 'Bearer $token';
@@ -119,20 +223,34 @@ class ApiClient {
   /// Ensures the auth token is present for authenticated requests
   /// Returns true if token was set successfully
   Future<bool> _ensureAuthToken() async {
-    // Check if we already have a token in headers
+    // Check if the token is already set in the Dio instance
     if (_dio.options.headers.containsKey('Authorization')) {
+      // Verify the token format to catch potential corruption
+      String authHeader = _dio.options.headers['Authorization'] as String;
+      if (authHeader.startsWith('Bearer ') && authHeader.length > 10) {
+        return true;
+      }
+      // Invalid header format, clear it and try again
+      debugPrint('[API] Invalid auth header format detected, clearing');
+      _dio.options.headers.remove('Authorization');
+    }
+    
+    // If not set or invalid, try to get it from storage
+    final token = await _storageService.getSecureString(AppConfig.tokenKey);
+    if (token != null && token.isNotEmpty) {
+      // Set the token in the Dio instance
+      setAuthToken(token);
       return true;
     }
     
-    // Try to get token from storage
-    final token = await _storageService.getAuthToken();
-    if (token == null) {
-      return false;
+    // No token in storage, try to refresh it as a last resort
+    final newToken = await refreshToken();
+    if (newToken != null && newToken.isNotEmpty) {
+      return true; // refreshToken already sets the auth header
     }
     
-    // Set token in headers
-    _dio.options.headers['Authorization'] = 'Bearer $token';
-    return true;
+    debugPrint('[API] No valid auth token available');
+    return false;
   }
   
   /// Makes a GET request to the API

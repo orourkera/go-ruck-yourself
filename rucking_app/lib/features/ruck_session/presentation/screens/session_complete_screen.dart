@@ -146,36 +146,53 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'elevation_loss_m': widget.elevationLoss,
       };
 
+      // Save session first - this is fast and immediate
       await _apiClient.patch('/rucks/${widget.ruckId}', completionData);
       
+      // Navigate immediately - don't wait for photo uploads
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      
+      // Upload photos in background if any are selected
       if (_selectedPhotos.isNotEmpty) {
-        setState(() => _isUploadingPhotos = true);
-        try {
-          final uploadedPhotos = await _sessionRepo.uploadSessionPhotos(
-            widget.ruckId,
-            _selectedPhotos.map((path) => File(path)).toList(),
-          );
-          
-          if (uploadedPhotos.isNotEmpty) {
-            await _apiClient.patch(
-              '/rucks/${widget.ruckId}',
-              {'has_photos': true},
-            );
-          }
-        } catch (e) {
-          AppLogger.error('Photo upload failed: $e');
-          Navigator.pushReplacementNamed(context, '/home', arguments: {'showPhotoUploadError': true});
-          return;
-        } finally {
-          setState(() => _isUploadingPhotos = false);
-        }
+        _uploadPhotosInBackground();
       }
       
-      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } catch (e) {
       StyledSnackBar.showError(context: context, message: 'Error saving session: $e');
     } finally {
       setState(() => _isSaving = false);
+    }
+  }
+  
+  /// Upload photos in the background after session is saved
+  void _uploadPhotosInBackground() async {
+    try {
+      // Show a background upload notification
+      if (mounted) {
+        StyledSnackBar.show(
+          context: context, 
+          message: 'Uploading ${_selectedPhotos.length} photos in background...',
+          duration: const Duration(seconds: 3),
+        );
+      }
+      
+      final uploadedPhotos = await _sessionRepo.uploadSessionPhotosOptimized(
+        widget.ruckId,
+        _selectedPhotos.map((path) => File(path)).toList(),
+      );
+      
+      if (uploadedPhotos.isNotEmpty) {
+        await _apiClient.patch(
+          '/rucks/${widget.ruckId}',
+          {'has_photos': true},
+        );
+      }
+      
+      AppLogger.info('Background photo upload completed successfully');
+    } catch (e) {
+      AppLogger.error('Background photo upload failed: $e');
+      // Don't show error to user since they've already moved on
+      // Could implement a retry mechanism or local storage for failed uploads
     }
   }
 
