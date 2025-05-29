@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:rucking_app/features/ruck_buddies/data/repositories/ruck_buddies_repository_impl.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/usecases/get_ruck_buddies.dart';
 import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
@@ -76,13 +77,15 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
         debugPrint('[BLOC] Error fetching ruck buddies: ${failure.message}');
         emit(RuckBuddiesError(message: failure.message));
       },
-      (ruckBuddies) {
+      (ruckBuddies) async {
         debugPrint('[BLOC] Loaded ${ruckBuddies.length} ruck buddies');
         if (ruckBuddies.isEmpty) {
           debugPrint('[BLOC] No ruck buddies found in API response');
         } else {
           debugPrint('[BLOC] First buddy: ${ruckBuddies.first.id}, user: ${ruckBuddies.first.user.username}, commentCount: ${ruckBuddies.first.commentCount}');
         }
+        
+        // Emit the loaded state immediately for fast UI response
         emit(
           RuckBuddiesLoaded(
             ruckBuddies: ruckBuddies,
@@ -92,6 +95,23 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
             longitude: lon,
           ),
         );
+        
+        // Preload social data in the background for better performance
+        if (ruckBuddies.isNotEmpty) {
+          final ruckIds = ruckBuddies
+              .map((buddy) => int.tryParse(buddy.id))
+              .where((id) => id != null)
+              .cast<int>()
+              .toList();
+          debugPrint('[BLOC] Preloading social data for ${ruckIds.length} rucks: $ruckIds');
+          try {
+            await socialRepository.preloadSocialDataForRucks(ruckIds);
+            debugPrint('[BLOC] Social data preloading completed');
+          } catch (e) {
+            debugPrint('[BLOC] Social data preloading failed: $e');
+            // Don't emit error state - this is background optimization
+          }
+        }
       },
     );
   }
@@ -130,14 +150,34 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       (failure) => emit(
         RuckBuddiesError(message: failure.message),
       ),
-      (newRuckBuddies) => emit(
-        RuckBuddiesLoaded(
-          ruckBuddies: [...currentState.ruckBuddies, ...newRuckBuddies],
-          hasReachedMax: newRuckBuddies.length < event.limit,
-          filter: currentState.filter,
-          isLoadingMore: false,
-        ),
-      ),
+      (newRuckBuddies) async {
+        // Emit the loaded state with new data immediately
+        emit(
+          RuckBuddiesLoaded(
+            ruckBuddies: [...currentState.ruckBuddies, ...newRuckBuddies],
+            hasReachedMax: newRuckBuddies.length < event.limit,
+            filter: currentState.filter,
+            isLoadingMore: false,
+          ),
+        );
+        
+        // Preload social data for the new rucks in the background
+        if (newRuckBuddies.isNotEmpty) {
+          final newRuckIds = newRuckBuddies
+              .map((buddy) => int.tryParse(buddy.id))
+              .where((id) => id != null)
+              .cast<int>()
+              .toList();
+          debugPrint('[BLOC] Preloading social data for ${newRuckIds.length} new rucks: $newRuckIds');
+          try {
+            await socialRepository.preloadSocialDataForRucks(newRuckIds);
+            debugPrint('[BLOC] Social data preloading completed for new rucks');
+          } catch (e) {
+            debugPrint('[BLOC] Social data preloading failed for new rucks: $e');
+            // Don't emit error state - this is background optimization
+          }
+        }
+      },
     );
   }
 
@@ -153,6 +193,10 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
     RefreshRuckBuddiesEvent event, 
     Emitter<RuckBuddiesState> emit
   ) async {
+    // Clear caches to force fresh data
+    debugPrint('[BLOC] Refresh triggered - clearing caches');
+    RuckBuddiesRepositoryImpl.clearRuckBuddiesCache();
+    
     // Get current filter and location
     String currentFilter = 'closest';
     double? currentLat;

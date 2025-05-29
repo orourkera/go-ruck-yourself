@@ -10,6 +10,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
+import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
@@ -50,32 +51,50 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   double _calculatedPace = 0.0;
   int? _ruckId;
   int? _commentCount;  // Track comment count locally
+  SocialRepository? _socialRepository;
 
   @override
   void initState() {
     super.initState();
-      // Remove the map key initialization from _RuckBuddyCardState
     
     _ruckId = int.tryParse(widget.ruckBuddy.id);
+    
+    // Get social repository instance
+    try {
+      _socialRepository = GetIt.instance<SocialRepository>();
+    } catch (e) {
+      developer.log('[SOCIAL_DEBUG] Could not get SocialRepository from GetIt: $e', name: 'RuckBuddyCard');
+    }
     
     // IMPORTANT: Immediately use the data from widget.ruckBuddy to prevent initial zero values
     _likeCount = widget.ruckBuddy.likeCount ?? 0;
     _commentCount = widget.ruckBuddy.commentCount ?? 0;
-    _isLiked = widget.ruckBuddy.isLikedByCurrentUser ?? false; // Initialize with RuckBuddy data
+    _isLiked = widget.ruckBuddy.isLikedByCurrentUser ?? false;
     
-    // Fetch fresh data from SocialBloc
+    // Try to get cached social data first for immediate display
+    if (_ruckId != null && _socialRepository != null) {
+      final cachedLikeStatus = _socialRepository!.getCachedLikeStatus(_ruckId!);
+      final cachedLikeCount = _socialRepository!.getCachedLikeCount(_ruckId!);
+      
+      if (cachedLikeStatus != null) {
+        _isLiked = cachedLikeStatus;
+        developer.log('[SOCIAL_DEBUG] Using cached like status for ruck $_ruckId: $_isLiked', name: 'RuckBuddyCard');
+      }
+      
+      if (cachedLikeCount != null) {
+        _likeCount = cachedLikeCount;
+        developer.log('[SOCIAL_DEBUG] Using cached like count for ruck $_ruckId: $_likeCount', name: 'RuckBuddyCard');
+      }
+    }
+    
+    // Fetch fresh data from SocialBloc (this will update if different from cache)
     if (_ruckId != null) {
       developer.log('[SOCIAL_DEBUG] RuckBuddyCard initState for ruckId: $_ruckId - dispatching CheckRuckLikeStatus and LoadRuckComments', name: 'RuckBuddyCard');
-      // Use context.read<SocialBloc>() if SocialBloc is provided via Provider higher up the tree
-      // If using GetIt for BLoC access directly (as hinted by previous code), ensure it's appropriate here.
-      // For standard BLoC usage with widget tree, context.read is preferred.
-      // Assuming SocialBloc is accessible via context here for typical Flutter BLoC pattern.
       try {
         context.read<SocialBloc>().add(CheckRuckLikeStatus(_ruckId!));
         context.read<SocialBloc>().add(LoadRuckComments(_ruckId!.toString()));
       } catch (e) {
         developer.log('[SOCIAL_DEBUG] Error dispatching events in RuckBuddyCard initState: $e. Ensure SocialBloc is provided.', name: 'RuckBuddyCard');
-        // Fallback or error handling if SocialBloc is not found in context
       }
     }
     
@@ -378,14 +397,21 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                             ],
                           ),
                         ),
-                        // Distance stat in header - matching detail page style
-                        Text(
-                          formattedDistance,
-                          style: TextStyle(
-                            fontFamily: 'Bangers',
-                            fontSize: 28,
-                            color: isDarkMode ? Colors.white : Colors.black,
-                            letterSpacing: 1.0,
+                        // Distance stat in header - with green background tile
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            formattedDistance,
+                            style: const TextStyle(
+                              fontFamily: 'Bangers',
+                              fontSize: 28,
+                              color: Colors.white,
+                              letterSpacing: 1.0,
+                            ),
                           ),
                         ),
                       ],
