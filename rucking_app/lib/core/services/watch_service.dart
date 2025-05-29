@@ -288,6 +288,9 @@ class WatchService {
       final String formattedSplitDistance = '${splitDistance.toStringAsFixed(1)} ${isMetric ? 'km' : 'mi'}';
       final String formattedTotalDistance = '${totalDistance.toStringAsFixed(1)} ${isMetric ? 'km' : 'mi'}';
 
+      AppLogger.debug('[WATCH] Formatted split distance for watch: $formattedSplitDistance');
+      AppLogger.debug('[WATCH] User isMetric preference: $isMetric');
+
       await _sendMessageToWatch({
         'command': 'splitNotification',
         'splitDistance': formattedSplitDistance,

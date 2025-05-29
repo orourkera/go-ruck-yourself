@@ -85,15 +85,20 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     if (widget.session.id != null) {
       AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState: Loading session ${widget.session.id}');
       
-      // 1. Load the full session data
-      GetIt.instance<ActiveSessionBloc>().add(LoadSessionForViewing(
-        sessionId: widget.session.id!, 
-        session: widget.session
-      ));
+      // 1. Load the full session data (only if heart rate data is missing)
+      if (widget.session.heartRateSamples == null || widget.session.heartRateSamples!.isEmpty) {
+        AppLogger.debug('[SESSION DETAIL] Loading full session data - heart rate missing');
+        GetIt.instance<ActiveSessionBloc>().add(LoadSessionForViewing(
+          sessionId: widget.session.id!, 
+          session: widget.session
+        ));
+      } else {
+        AppLogger.debug('[SESSION DETAIL] Using provided session data - heart rate already available');
+      }
       
-      // 2. Force a fresh load of photos
-      AppLogger.debug('[PHOTO_DEBUG] Force loading photos in initState for session: ${widget.session.id}');
-      _forceLoadPhotos();
+      // 2. Load photos - use standard loading instead of force loading to leverage cache
+      AppLogger.debug('[PHOTO_DEBUG] Loading photos in initState for session: ${widget.session.id}');
+      _loadPhotos();
       
       // 3. Load social data
       _loadSocialData(widget.session.id!);
@@ -129,17 +134,18 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     }
   }
 
-  List<Widget> _buildSessionDetailTabs(RuckSession session) {
-    final tabs = <Widget>[
-      const Tab(text: 'Overview'),
-    ];
-    // Only add the 'Live Map' tab if the session status indicates it might have a map.
-    // For instance, if it's in progress or completed and had tracking.
-    // Based on the RuckStatus enum, we use inProgress for active sessions
-    if (session.status == RuckStatus.inProgress) {
-      tabs.add(const Tab(text: 'Live Map'));
+  void _loadPhotos() {
+    if (widget.session.id != null) {
+      AppLogger.info('[PHOTO_DEBUG] 📸 Loading photos for session ${widget.session.id}');
+      if (!GetIt.I.isRegistered<ActiveSessionBloc>()) {
+        AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
+        return;
+      }
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
+    } else {
+      AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
     }
-    return tabs;
   }
 
   void _forceLoadPhotos() {
@@ -158,21 +164,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Attempting to add FetchSessionPhotosRequested for session ${widget.session.id}');
       activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
       AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Successfully added FetchSessionPhotosRequested for session ${widget.session.id}');
-    } else {
-      AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
-    }
-  }
-  
-  /// Standard photo loading - doesn't clear existing photos first
-  void _loadPhotos() {
-    if (widget.session.id != null) {
-      AppLogger.info('[PHOTO_DEBUG] 📸 Loading photos for session ${widget.session.id}');
-      if (!GetIt.I.isRegistered<ActiveSessionBloc>()) {
-        AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
-        return;
-      }
-      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-      activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
     } else {
       AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
     }

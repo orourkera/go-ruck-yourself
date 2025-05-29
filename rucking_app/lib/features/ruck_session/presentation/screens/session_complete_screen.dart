@@ -20,6 +20,7 @@ import 'package:rucking_app/features/ruck_session/data/repositories/session_repo
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
@@ -154,6 +155,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       
       // Clear session history cache so new session appears in history
       SessionRepository.clearSessionHistoryCache();
+      
+      // Reset active session state to return to home screen properly
+      context.read<ActiveSessionBloc>().add(const SessionReset());
       
       // Upload photos in background if any are selected - using repository
       if (_selectedPhotos.isNotEmpty) {

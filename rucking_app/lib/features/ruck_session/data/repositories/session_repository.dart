@@ -79,6 +79,11 @@ class SessionRepository {
   static DateTime? _sessionHistoryCacheTime;
   static const Duration _sessionHistoryCacheValidity = Duration(minutes: 5); // Cache for 5 minutes
 
+  // Cache for individual session details to avoid repeated API calls
+  static final Map<String, RuckSession> _sessionDetailCache = {};
+  static final Map<String, DateTime> _sessionDetailCacheTime = {};
+  static const Duration _sessionDetailCacheValidity = Duration(minutes: 10); // Cache for 10 minutes
+
   SessionRepository({required ApiClient apiClient})
       : _apiClient = apiClient,
         _supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '',
@@ -225,6 +230,22 @@ class SessionRepository {
   /// Fetch a ruck session by its ID, including all heart rate samples.
   Future<RuckSession?> fetchSessionById(String sessionId) async {
     try {
+      // Check if we have cached data for this session
+      if (_sessionDetailCache.containsKey(sessionId)) {
+        final cacheTime = _sessionDetailCacheTime[sessionId];
+        final now = DateTime.now();
+        
+        // Check if cache is still valid (less than 10 minutes old)
+        if (cacheTime != null && now.difference(cacheTime) < _sessionDetailCacheValidity) {
+          AppLogger.debug('[SESSION FETCH] Using cached data for session: $sessionId');
+          return _sessionDetailCache[sessionId];
+        } else {
+          AppLogger.debug('[SESSION FETCH] Cache expired for session: $sessionId');
+        }
+      } else {
+        AppLogger.debug('[SESSION FETCH] No cache found for session: $sessionId');
+      }
+
       AppLogger.info('DEBUGGING: Fetching session with ID: $sessionId');
       if (sessionId.isEmpty) {
         AppLogger.error('Session ID is empty');
@@ -263,6 +284,12 @@ class SessionRepository {
       // Return a session with samples attached
       final resultSession = session.copyWith(heartRateSamples: heartRateSamples);
       AppLogger.info('DEBUGGING: Returning session with ${resultSession.heartRateSamples?.length ?? 0} heart rate samples');
+      
+      // Cache the session details
+      _sessionDetailCache[sessionId] = resultSession;
+      _sessionDetailCacheTime[sessionId] = DateTime.now();
+      AppLogger.debug('[SESSION FETCH] Cached session details for $sessionId');
+      
       return resultSession;
     } catch (e) {
       AppLogger.error('Error fetching session: $e');
@@ -1112,5 +1139,43 @@ class SessionRepository {
     _sessionHistoryCache = null;
     _sessionHistoryCacheTime = null;
     AppLogger.debug('[SESSION_HISTORY] Cache cleared');
+  }
+
+  /// Clear cached data for specific operations
+  static void clearSessionDetailCache(String sessionId) {
+    _sessionDetailCache.remove(sessionId);
+    _sessionDetailCacheTime.remove(sessionId);
+    AppLogger.debug('[SESSION CACHE] Cleared cache for session: $sessionId');
+  }
+  
+  static void clearAllSessionCaches() {
+    _sessionDetailCache.clear();
+    _sessionDetailCacheTime.clear();
+    _sessionHistoryCache = null;
+    _sessionHistoryCacheTime = null;
+    AppLogger.debug('[SESSION CACHE] Cleared all session caches');
+  }
+  
+  static void clearPhotoCache(String sessionId) {
+    _photoCache.remove(sessionId);
+    _lastFetchTime.remove(sessionId);
+    _pendingRequests.remove(sessionId);
+    AppLogger.debug('[PHOTO CACHE] Cleared photo cache for session: $sessionId');
+  }
+
+  /// Update cached session after modification (e.g., editing notes, rating)
+  static void updateSessionCache(String sessionId, RuckSession updatedSession) {
+    _sessionDetailCache[sessionId] = updatedSession;
+    _sessionDetailCacheTime[sessionId] = DateTime.now();
+    
+    // Also update session history cache if it exists
+    if (_sessionHistoryCache != null) {
+      final index = _sessionHistoryCache!.indexWhere((s) => s.id == sessionId);
+      if (index != -1) {
+        _sessionHistoryCache![index] = updatedSession;
+      }
+    }
+    
+    AppLogger.debug('[SESSION CACHE] Updated cache for modified session: $sessionId');
   }
 }
