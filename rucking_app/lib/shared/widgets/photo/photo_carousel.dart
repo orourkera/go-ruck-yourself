@@ -192,9 +192,9 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         }
       },
       child: Container(
-        margin: const EdgeInsets.only(right: 10.0, top: 8.0, bottom: 8.0, left: 0),
+        margin: const EdgeInsets.only(right: 1.0, top: 0, bottom: 0, left: 0),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15.0),
+          borderRadius: BorderRadius.circular(0.0), // Square corners
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
@@ -207,7 +207,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
           children: [
             // Photo
             ClipRRect(
-              borderRadius: BorderRadius.circular(15.0),
+              borderRadius: BorderRadius.circular(0.0), // Square corners
               child: _buildImageWithFallback(context, index),
             ),
             
@@ -268,7 +268,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
     AppLogger.info('Loading image from URL: $imageUrl');
     
     return ClipRRect(
-      borderRadius: BorderRadius.circular(15.0),
+      borderRadius: BorderRadius.circular(0.0), // Square corners
       child: CachedNetworkImage(
         imageUrl: imageUrl,
         // Create a stable key based on URL to improve cache hits
@@ -312,7 +312,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   Widget _buildErrorContainer(BuildContext context, String errorMessage) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15.0),
+        borderRadius: BorderRadius.circular(0.0), // Square corners
         color: Colors.grey.shade200,
       ),
       child: Center(
