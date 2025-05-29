@@ -16,6 +16,7 @@ import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
@@ -47,12 +48,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final SessionValidationService _validationService;
   final SessionRepository _sessionRepository;
   final SplitTrackingService _splitTrackingService;
+  final ActiveSessionStorage _activeSessionStorage;
 
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
   StreamSubscription<List<HeartRateSample>>? _heartRateBufferSubscription;
   Timer? _ticker;
   Timer? _watchdogTimer;
+  Timer? _sessionPersistenceTimer;
   DateTime _lastTickTime = DateTime.now();
   LocationPoint? _lastValidLocation;
   int _validLocationCount = 0;
@@ -68,6 +71,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   
   /// Heart rate throttling - only save one sample every 30 seconds
   DateTime? _lastSavedHeartRateTime;
+  
+  /// Heart rate API throttling - only send to API every 30 seconds
+  DateTime? _lastApiHeartRateTime;
+
+  int? _authRetryCounter;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -77,6 +85,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required HeartRateService heartRateService,
     required SplitTrackingService splitTrackingService,
     required SessionRepository sessionRepository,
+    required ActiveSessionStorage activeSessionStorage,
     SessionValidationService? validationService,
   })  : _apiClient = apiClient,
         _locationService = locationService,
@@ -85,6 +94,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _heartRateService = heartRateService,
         _splitTrackingService = splitTrackingService,
         _sessionRepository = sessionRepository,
+        _activeSessionStorage = activeSessionStorage,
         _validationService = validationService ?? SessionValidationService(),
         super(ActiveSessionInitial()) {
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
@@ -101,6 +111,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<Tick>(_onTick);
     on<SessionErrorCleared>(_onSessionErrorCleared);
     on<TimerStarted>(_onTimerStarted);
+    on<SessionRecoveryRequested>(_onSessionRecoveryRequested);
     on<FetchSessionPhotosRequested>(_onFetchSessionPhotosRequested);
     on<UploadSessionPhotosRequested>(_onUploadSessionPhotosRequested);
     on<DeleteSessionPhotoRequested>(_onDeleteSessionPhotoRequested);
@@ -123,6 +134,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _maxHeartRate = null;
     _latestHeartRate = null;
     _lastSavedHeartRateTime = null; // Reset heart rate throttling
+    _lastApiHeartRateTime = null; // Reset API heart rate throttling
     _isHeartRateMonitoringStarted = false;
     _elapsedCounter = 0;
     _ticksSinceTruth = 0;
@@ -228,11 +240,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Start');
       AppLogger.error('Error starting session: $errorMessage\nError: $e\n$stackTrace');
       if (sessionId != null && sessionId.isNotEmpty) {
-         try {
-            await _apiClient.post('/rucks/$sessionId/fail', {'error_message': errorMessage});
-         } catch (failError) {
-            AppLogger.error('Additionally, failed to mark session $sessionId as failed: $failError');
-         }
+         // Removed the /fail endpoint call
       }
       emit(ActiveSessionFailure(errorMessage: errorMessage));
     }
@@ -260,7 +268,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final validationResult = _validationService.validateLocationPoint(newPoint, _lastValidLocation);
       if (!(validationResult['isValid'] as bool? ?? false)) { // Safely access 'isValid'
         final String message = validationResult['message'] as String? ?? 'Validation failed, no specific message';
-        AppLogger.debug('Invalid location discarded: $message. Acc ${newPoint.accuracy}');
         return;
       }
       _validLocationCount++;
@@ -289,7 +296,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       );
 
       _apiClient.post('/rucks/${currentState.sessionId}/location', newPoint.toJson())
-        .catchError((e) => AppLogger.warning('Failed to send location to backend: $e'));
+        .catchError((e) {
+          if (e.toString().contains('401') || e.toString().contains('Already Used')) {
+            AppLogger.warning('[SESSION_RECOVERY] Location sync failed due to auth issue, will retry: $e');
+            // Don't kill the session - continue tracking locally
+          } else {
+            AppLogger.warning('Failed to send location to backend: $e');
+          }
+        });
 
       emit(currentState.copyWith(
         locationPoints: newLocationPoints,
@@ -317,12 +331,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _lastLocationTimestamp = DateTime.now();
       }
     });
+
+    _sessionPersistenceTimer?.cancel();
+    _sessionPersistenceTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+      if (state is ActiveSessionRunning) {
+        final currentState = state as ActiveSessionRunning;
+        await _activeSessionStorage.saveActiveSession(currentState);
+      }
+    });
   }
 
   void _stopTickerAndWatchdog() {
     _ticker?.cancel(); _ticker = null;
     _watchdogTimer?.cancel(); _watchdogTimer = null;
-    AppLogger.debug('Master timer and watchdog stopped.');
+    _sessionPersistenceTimer?.cancel(); _sessionPersistenceTimer = null;
+    AppLogger.debug('Master timer, watchdog, and session persistence timer stopped.');
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
@@ -444,6 +467,24 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } catch (e) {
         AppLogger.error('Failed to update metrics on watch: $e');
       }
+      
+      // Retry authentication and location syncing if not currently active
+      // Check every minute (60 ticks) to see if we can restore API functionality
+      _authRetryCounter = (_authRetryCounter ?? 0) + 1;
+      if (_authRetryCounter! >= 60) {
+        _authRetryCounter = 0;
+        if (_locationSubscription == null) {
+          AppLogger.info('[SESSION_RECOVERY] Attempting to restore location syncing...');
+          try {
+            // Test if auth is working now
+            await _apiClient.get('/user/profile');
+            AppLogger.info('[SESSION_RECOVERY] Authentication restored, restarting location updates');
+            _startLocationUpdates(currentState.sessionId);
+          } catch (authError) {
+            AppLogger.debug('[SESSION_RECOVERY] Authentication still not ready: $authError');
+          }
+        }
+      }
     }
   }
 
@@ -505,7 +546,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
       _stopTickerAndWatchdog();
-      _locationSubscription?.cancel(); _locationSubscription = null;
       _locationService.stopLocationTracking();
       await _stopHeartRateMonitoring();
 
@@ -598,11 +638,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } catch (e, stackTrace) {
         String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Complete');
         AppLogger.error('Error completing session: $errorMessage\nError: $e\n$stackTrace');
-        try {
-            await _apiClient.post('/rucks/${currentState.sessionId}/fail', {'error_message': 'Completion API call failed: $errorMessage'});
-        } catch (failError) {
-            AppLogger.error('Additionally, failed to mark session ${currentState.sessionId} as failed: $failError');
-        }
+        // Removed the /fail endpoint call
         // Pass the current state directly instead of trying to convert it
         emit(ActiveSessionFailure(errorMessage: errorMessage, sessionDetails: currentState));
       }
@@ -617,7 +653,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     AppLogger.error('SessionFailed event: ${event.errorMessage}, Session ID: ${event.sessionId}');
     _stopTickerAndWatchdog();
-    _locationSubscription?.cancel(); _locationSubscription = null;
     _locationService.stopLocationTracking();
     await _stopHeartRateMonitoring();
 
@@ -627,10 +662,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
 
     try {
-      await _apiClient.post('/rucks/${event.sessionId}/fail', {'error_message': event.errorMessage});
-      AppLogger.debug('Marked session ${event.sessionId} as failed on backend.');
+      AppLogger.debug('Session ${event.sessionId} failed with error: ${event.errorMessage}');
     } catch (e) {
-      AppLogger.error('Failed to mark session ${event.sessionId} as failed on backend: $e');
+      AppLogger.error('Error handling session failure for session ${event.sessionId}: $e');
     }
     
     emit(ActiveSessionFailure(errorMessage: event.errorMessage, sessionDetails: sessionDetails));
@@ -710,8 +744,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      // _allHeartRateSamples.addAll(event.samples); // Samples are already added via _onHeartRateUpdated
-      await _sendHeartRateSamplesToApi(currentState.sessionId, event.samples);
+      
+      // Apply the same 30-second throttling to API uploads as we do for local storage
+      final now = DateTime.now();
+      final shouldSendToApi = _lastApiHeartRateTime == null || 
+          now.difference(_lastApiHeartRateTime!).inSeconds >= 30;
+      
+      if (shouldSendToApi) {
+        await _sendHeartRateSamplesToApi(currentState.sessionId, event.samples);
+        AppLogger.debug('[HR_API_THROTTLE] Sent ${event.samples.length} heart rate samples to API');
+        _lastApiHeartRateTime = now;
+      } else {
+        AppLogger.debug('[HR_API_THROTTLE] Skipped sending ${event.samples.length} heart rate samples to API (throttled)');
+      }
       // Optionally emit state if UI needs to reflect that a batch was sent, though usually not needed.
     }
   }
@@ -1083,10 +1128,149 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
   }
 
+  Future<void> _onSessionRecoveryRequested(
+    SessionRecoveryRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    try {
+      AppLogger.info('[SESSION_RECOVERY] Checking for recoverable session...');
+      
+      // Check if we should recover a session
+      final shouldRecover = await _activeSessionStorage.shouldRecoverSession();
+      if (!shouldRecover) {
+        AppLogger.info('[SESSION_RECOVERY] No recoverable session found or session too old');
+        return;
+      }
+
+      // Recover the session data
+      final recoveredData = await _activeSessionStorage.recoverSession();
+      if (recoveredData == null) {
+        AppLogger.warning('[SESSION_RECOVERY] Failed to recover session data');
+        return;
+      }
+
+      // Reconstruct the ActiveSessionRunning state
+      final sessionId = recoveredData['session_id'] as String;
+      final locationPoints = recoveredData['location_points'] as List<LocationPoint>;
+      final heartRateSamples = recoveredData['heart_rate_samples'] as List<HeartRateSample>;
+      
+      // Restore internal state
+      _allHeartRateSamples.clear();
+      _allHeartRateSamples.addAll(heartRateSamples);
+      _latestHeartRate = recoveredData['latest_heart_rate'] as int?;
+      _minHeartRate = recoveredData['min_heart_rate'] as int?;
+      _maxHeartRate = recoveredData['max_heart_rate'] as int?;
+      
+      // Reset heart rate throttling timers for fresh session
+      _lastSavedHeartRateTime = null;
+      _lastApiHeartRateTime = null;
+      
+      // Initialize elapsed counter with recovered time so timer continues from where it left off
+      _elapsedCounter = recoveredData['elapsed_seconds'] as int;
+      
+      if (locationPoints.isNotEmpty) {
+        _lastValidLocation = locationPoints.last;
+      }
+
+      // Create the recovered session state
+      final recoveredState = ActiveSessionRunning(
+        sessionId: sessionId,
+        elapsedSeconds: recoveredData['elapsed_seconds'] as int,
+        distanceKm: recoveredData['distance_km'] as double,
+        calories: recoveredData['calories'] as double,
+        elevationGain: recoveredData['elevation_gain'] as double,
+        elevationLoss: recoveredData['elevation_loss'] as double,
+        ruckWeightKg: recoveredData['ruck_weight_kg'] as double,
+        userWeightKg: recoveredData['user_weight_kg'] as double? ?? 70.0, // Default if not available
+        locationPoints: locationPoints,
+        originalSessionStartTimeUtc: recoveredData['session_start_time'] as DateTime,
+        totalPausedDuration: Duration.zero, // Reset pause duration on recovery
+        isPaused: false, // Resume as unpaused
+        pace: locationPoints.length >= 2 ? 
+          _calculateCurrentPace(locationPoints) : null,
+        heartRateSamples: heartRateSamples,
+        latestHeartRate: _latestHeartRate,
+        minHeartRate: _minHeartRate,
+        maxHeartRate: _maxHeartRate,
+        splits: [], // Will be recalculated if needed
+      );
+
+      emit(recoveredState);
+
+      // Verify authentication is working before starting API-dependent operations
+      AppLogger.info('[SESSION_RECOVERY] Verifying authentication before resuming API operations...');
+      
+      try {
+        // Make a simple API call to test if auth is working
+        // Use a lightweight endpoint that doesn't affect session state
+        await _apiClient.get('/user/profile');
+        AppLogger.info('[SESSION_RECOVERY] Authentication verified, resuming full operations...');
+        
+        // Auth is working, safe to start location updates and API calls
+        _startLocationUpdates(sessionId);
+        _startHeartRateMonitoring(sessionId);
+        add(TimerStarted());
+        
+      } catch (authError) {
+        AppLogger.warning('[SESSION_RECOVERY] Authentication failed during recovery: $authError');
+        
+        // Authentication failed - start monitoring without API calls
+        // This allows the user to continue their session locally until auth is resolved
+        _startHeartRateMonitoring(sessionId);
+        add(TimerStarted());
+        
+        // Don't start location updates yet - they trigger API calls
+        // We'll retry authentication periodically via the timer
+        AppLogger.info('[SESSION_RECOVERY] Session recovered in offline mode - will retry API sync when auth is restored');
+      }
+
+      AppLogger.info('[SESSION_RECOVERY] Successfully recovered session: $sessionId');
+      
+    } catch (e, stackTrace) {
+      AppLogger.error('[SESSION_RECOVERY] Failed to recover session: $e\n$stackTrace');
+      // Clear any corrupted session data
+      await _activeSessionStorage.clearSessionData();
+    }
+  }
+
+  double? _calculateCurrentPace(List<LocationPoint> points) {
+    if (points.length < 2) return null;
+    
+    try {
+      final lastPoint = points.last;
+      final secondLastPoint = points[points.length - 2];
+      
+      final distance = _calculateDistance(
+        secondLastPoint.latitude, secondLastPoint.longitude,
+        lastPoint.latitude, lastPoint.longitude,
+      );
+      
+      final timeDiff = lastPoint.timestamp.difference(secondLastPoint.timestamp).inSeconds;
+      if (timeDiff <= 0 || distance <= 0) return null;
+      
+      // Return pace in minutes per km
+      return (timeDiff / 60) / (distance / 1000);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371000; // Earth radius in meters
+    final double dLat = (lat2 - lat1) * (math.pi / 180);
+    final double dLon = (lon2 - lon1) * (math.pi / 180);
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * (math.pi / 180)) *
+            math.cos(lat2 * (math.pi / 180)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadius * c;
+  }
+
   @override
   Future<void> close() async {
     _stopTickerAndWatchdog();
-    // Remove reference to non-existent _sessionSubscription
     _locationSubscription?.cancel();
     _heartRateSubscription?.cancel();
     _heartRateBufferSubscription?.cancel();

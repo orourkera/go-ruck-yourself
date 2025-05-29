@@ -90,7 +90,10 @@ limiter.init_app(app)
 # Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
 from RuckTracker.api.ruck import HeartRateSampleUploadResource
 
-limiter.limit("3600 per hour", key_func=get_remote_address)(HeartRateSampleUploadResource) # Increased from 360 to 3600 per hour
+# Apply rate limit to specific HTTP methods
+app.logger.info("Setting HeartRateSampleUploadResource rate limit to: 3600 per hour")
+HeartRateSampleUploadResource.get = limiter.limit("3600 per hour", override_defaults=True)(HeartRateSampleUploadResource.get)
+HeartRateSampleUploadResource.post = limiter.limit("3600 per hour", override_defaults=True)(HeartRateSampleUploadResource.post)
 
 # Define custom rate limits for specific endpoints
 @app.route("/api/auth/register", methods=["POST"])

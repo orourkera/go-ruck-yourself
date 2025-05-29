@@ -26,6 +26,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/core/services/session_cache_service.dart';
+import 'package:rucking_app/core/services/app_startup_service.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -220,6 +221,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
       _checkForPhotoUploadError();
+      _checkForSessionRecovery();
       
       // Start polling for notifications
       final notificationBloc = GetIt.instance<NotificationBloc>();
@@ -250,6 +252,18 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       }
     } catch (e) {
       debugPrint('Error checking for photo upload error: $e');
+    }
+  }
+  
+  /// Checks for session recovery and navigates to active session if needed
+  Future<void> _checkForSessionRecovery() async {
+    if (!mounted) return;
+    
+    try {
+      final startupService = GetIt.instance<AppStartupService>();
+      await startupService.checkAndRecoverSession(context);
+    } catch (e) {
+      debugPrint('Error checking for session recovery: $e');
     }
   }
   

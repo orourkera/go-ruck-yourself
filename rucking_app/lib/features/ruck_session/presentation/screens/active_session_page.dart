@@ -14,6 +14,7 @@ import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
@@ -21,6 +22,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
@@ -97,6 +99,7 @@ class ActiveSessionPage extends StatelessWidget {
             heartRateService: locator<HeartRateService>(),
             splitTrackingService: locator<SplitTrackingService>(),
             sessionRepository: locator<SessionRepository>(),
+            activeSessionStorage: locator<ActiveSessionStorage>(),
           ),
         ),
         BlocProvider(
@@ -540,6 +543,101 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           child: Text(
                             'Session Completed — Distance: ${state.session.distance.toStringAsFixed(2)} km',
                             style: AppTextStyles.titleMedium,
+                          ),
+                        );
+                      }
+                      if (state is ActiveSessionFailure) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 64,
+                                  color: Colors.red,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Session Save Failed',
+                                  style: AppTextStyles.headlineMedium.copyWith(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  state.errorMessage,
+                                  style: AppTextStyles.bodyLarge,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 24),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    // Try to recreate the session summary from the failure state
+                                    if (state.sessionDetails != null) {
+                                      final sessionDetails = state.sessionDetails!;
+                                      
+                                      // Create a mock session from the current state data
+                                      final mockSession = RuckSession(
+                                        id: sessionDetails.sessionId,
+                                        duration: Duration(seconds: sessionDetails.elapsedSeconds),
+                                        distance: sessionDetails.distanceKm,
+                                        caloriesBurned: sessionDetails.calories.round(),
+                                        startTime: sessionDetails.originalSessionStartTimeUtc,
+                                        endTime: DateTime.now().toUtc(),
+                                        ruckWeightKg: sessionDetails.ruckWeightKg,
+                                        elevationGain: sessionDetails.elevationGain,
+                                        elevationLoss: sessionDetails.elevationLoss,
+                                        averagePace: sessionDetails.pace ?? (sessionDetails.distanceKm > 0 ? sessionDetails.elapsedSeconds / sessionDetails.distanceKm : 0.0),
+                                        status: RuckStatus.completed,
+                                        avgHeartRate: null, // Will be filled from samples if available
+                                        heartRateSamples: [],
+                                      );
+                                      
+                                      Navigator.of(context).pushReplacementNamed(
+                                        '/session_complete',
+                                        arguments: {
+                                          'completedAt': DateTime.now().toUtc(),
+                                          'ruckId': sessionDetails.sessionId ?? '',
+                                          'duration': Duration(seconds: sessionDetails.elapsedSeconds),
+                                          'distance': sessionDetails.distanceKm,
+                                          'caloriesBurned': sessionDetails.calories.round(),
+                                          'elevationGain': sessionDetails.elevationGain,
+                                          'elevationLoss': sessionDetails.elevationLoss,
+                                          'ruckWeightKg': sessionDetails.ruckWeightKg,
+                                          'notes': null,
+                                          'session': mockSession,
+                                        },
+                                      );
+                                    } else {
+                                      // If no session details available, go back to home
+                                      Navigator.of(context).pushNamedAndRemoveUntil(
+                                        '/home',
+                                        (route) => false,
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: Text('Continue to Summary'),
+                                ),
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pushNamedAndRemoveUntil(
+                                      '/home',
+                                      (route) => false,
+                                    );
+                                  },
+                                  child: Text('Return to Home'),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       }
