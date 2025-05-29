@@ -612,7 +612,7 @@ class SessionRepository {
 
   /// Upload a single photo with retry logic
   Future<RuckPhoto?> _uploadSinglePhotoOptimized(String ruckId, File photo, int photoIndex) async {
-    const maxRetries = 2;
+    const maxRetries = 3;
     
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -620,13 +620,16 @@ class SessionRepository {
         
         final fileName = 'ruck_${ruckId}_photo_${photoIndex}_${DateTime.now().millisecondsSinceEpoch}.jpg';
         
-        final request = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiBaseUrl}/rucks/$ruckId/photos'));
+        final request = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiBaseUrl}/ruck-photos'));
         
         // Add auth headers
         final token = await _apiClient.getToken();
         if (token != null && token.isNotEmpty) {
           request.headers['Authorization'] = 'Bearer $token';
         }
+        
+        // Add the ruck_id field - this is required by the backend
+        request.fields['ruck_id'] = ruckId;
         
         request.files.add(
           await http.MultipartFile.fromPath(
@@ -637,8 +640,8 @@ class SessionRepository {
           ),
         );
         
-        // Longer timeout for potentially large uploads
-        final streamedResponse = await request.send().timeout(const Duration(seconds: 60));
+        // Extended timeout for potentially slow server responses
+        final streamedResponse = await request.send().timeout(const Duration(seconds: 90));
         final response = await http.Response.fromStream(streamedResponse);
         
         if (response.statusCode == 200 || response.statusCode == 201) {
@@ -653,17 +656,29 @@ class SessionRepository {
           }
           return null;
         } else {
-          AppLogger.error('[PHOTO_DEBUG] Photo $photoIndex upload failed with status: ${response.statusCode}');
+          AppLogger.error('[PHOTO_DEBUG] Photo $photoIndex upload failed with status: ${response.statusCode}, body: ${response.body}');
+          
+          // Handle specific server errors
+          if (response.statusCode >= 500) {
+            AppLogger.warning('[PHOTO_DEBUG] Server error detected, increasing retry delay');
+          }
+          
           if (attempt < maxRetries) {
-            await Future.delayed(Duration(seconds: attempt * 2)); // Exponential backoff
+            // Exponential backoff
+            final delaySeconds = attempt * 3;
+            await Future.delayed(Duration(seconds: delaySeconds));
             continue;
           }
         }
         
       } catch (e) {
         AppLogger.error('[PHOTO_DEBUG] Photo $photoIndex upload error (attempt $attempt): $e');
+        
         if (attempt < maxRetries) {
-          await Future.delayed(Duration(seconds: attempt * 2));
+          // Exponential backoff
+          final delaySeconds = attempt * 3;
+          AppLogger.info('[PHOTO_DEBUG] Retrying photo $photoIndex in ${delaySeconds}s');
+          await Future.delayed(Duration(seconds: delaySeconds));
           continue;
         }
       }

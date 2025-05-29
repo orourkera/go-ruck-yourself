@@ -807,7 +807,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                         height: 270,
                                         width: double.infinity,
                                         child: Padding(
-                                          padding: EdgeInsets.zero,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
                                           child: AnimatedHeartRateChart(
                                             heartRateSamples: safeHeartRateSamples,
                                             avgHeartRate: avgHeartRate,
