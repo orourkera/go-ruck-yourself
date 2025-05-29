@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Import for HapticFeedback
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -508,11 +509,6 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         ? (authBloc.state as Authenticated).user.preferMetric
         : false;
 
-    // Debug print to check displayBuddy's state at build time
-    print('[BUILD_DEBUG] displayBuddy.user.username: ${displayBuddy.user.username}');
-    print('[BUILD_DEBUG] displayBuddy.ruckWeightKg: ${displayBuddy.ruckWeightKg}');
-    print('[BUILD_DEBUG] displayBuddy.distanceKm: ${displayBuddy.distanceKm}');
-
     return BlocListener<ActiveSessionBloc, ActiveSessionState>(
       bloc: GetIt.instance<ActiveSessionBloc>(),
       listenWhen: (previous, current) {
@@ -675,6 +671,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           child: displayBuddy.user?.photoUrl != null && displayBuddy.user!.photoUrl!.isNotEmpty
                             ? CachedNetworkImage(
                                 imageUrl: displayBuddy.user!.photoUrl!,
+                                cacheManager: ImageCacheManager.instance,
                                 fit: BoxFit.cover,
                                 placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                                 errorWidget: (context, url, error) => Image.asset(
@@ -816,6 +813,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                     ],
                   ),
                   const Divider(),
+                ] else ...[
+                  const SizedBox.shrink(),
                 ],
                 
                 // Ruck details
