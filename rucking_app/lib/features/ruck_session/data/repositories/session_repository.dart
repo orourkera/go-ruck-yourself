@@ -23,6 +23,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'dart:async' show unawaited;
 
 /// Simple semaphore for limiting concurrent operations
 class Semaphore {
@@ -68,16 +69,21 @@ class SessionRepository {
   // Rate limiting configuration: max 5 requests per minute per API's restriction
   static const Duration _minRequestInterval = Duration(seconds: 12); // ~5 per minute
 
-  SessionRepository({required ApiClient apiClient})
-      : _apiClient = apiClient,
-        _supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '',
-        _supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-
   // Cache for heart rate samples to avoid hitting rate limits
   static final Map<String, List<HeartRateSample>> _heartRateCache = {};
   static final Map<String, DateTime> _heartRateCacheTime = {};
   static const Duration _heartRateCacheValidity = Duration(hours: 1); // Cache for an hour
   
+  // Cache for session history to improve loading performance
+  static List<RuckSession>? _sessionHistoryCache;
+  static DateTime? _sessionHistoryCacheTime;
+  static const Duration _sessionHistoryCacheValidity = Duration(minutes: 5); // Cache for 5 minutes
+
+  SessionRepository({required ApiClient apiClient})
+      : _apiClient = apiClient,
+        _supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '',
+        _supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
   /// Fetch heart rate samples for a session by its ID.
   /// This method specifically requests heart rate data from the server.
   /// Uses caching to avoid hitting rate limits (50 per hour).
@@ -667,6 +673,34 @@ class SessionRepository {
     return null;
   }
 
+  /// Upload photos in the background without blocking the UI or being tied to widget lifecycle
+  void uploadSessionPhotosInBackground(String ruckId, List<File> photoFiles) {
+    // Fire and forget - this runs independently of any widget
+    unawaited(_performBackgroundUpload(ruckId, photoFiles));
+  }
+
+  /// Internal method to perform the actual background upload
+  Future<void> _performBackgroundUpload(String ruckId, List<File> photoFiles) async {
+    try {
+      AppLogger.info('[PHOTO_DEBUG] Starting independent background upload for ${photoFiles.length} photos');
+      
+      final uploadedPhotos = await uploadSessionPhotosOptimized(ruckId, photoFiles);
+      
+      if (uploadedPhotos.isNotEmpty) {
+        // Update the ruck to indicate it has photos
+        await _apiClient.patch('/rucks/$ruckId', {'has_photos': true});
+        AppLogger.info('[PHOTO_DEBUG] Background upload completed successfully for ${uploadedPhotos.length} photos');
+      } else {
+        AppLogger.warning('[PHOTO_DEBUG] Background upload completed but no photos were successfully uploaded');
+      }
+      
+    } catch (e) {
+      AppLogger.error('[PHOTO_DEBUG] Background photo upload failed: $e');
+      // Could implement retry logic or local storage for failed uploads here
+      // For now, we log the error but don't disrupt the user experience
+    }
+  }
+
   /// Upload a file to Supabase storage
   Future<Map<String, dynamic>?> _uploadToSupabase(File file, String storagePath) async {
     try {
@@ -957,5 +991,111 @@ class SessionRepository {
       AppLogger.error('Error deleting photo: $e');
       return false;
     }
+  }
+  
+  /// Fetch session history with caching for improved performance
+  /// 
+  /// Returns a list of completed ruck sessions, cached for 5 minutes to reduce API calls
+  /// Supports filtering by date ranges
+  Future<List<RuckSession>> fetchSessionHistory({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      // Check if we have cached data that's still valid
+      final now = DateTime.now();
+      if (_sessionHistoryCache != null && 
+          _sessionHistoryCacheTime != null &&
+          now.difference(_sessionHistoryCacheTime!) < _sessionHistoryCacheValidity &&
+          startDate == null && endDate == null) { // Only use cache for "all sessions" requests
+        AppLogger.debug('[SESSION_HISTORY] Using cached session history (${_sessionHistoryCache!.length} sessions)');
+        return _sessionHistoryCache!;
+      }
+      
+      // Build endpoint based on filter
+      String endpoint = '/rucks';
+      if (startDate != null || endDate != null) {
+        List<String> params = [];
+        if (startDate != null) {
+          params.add('start_date=${startDate.toIso8601String()}');
+        }
+        if (endDate != null) {
+          params.add('end_date=${endDate.toIso8601String()}');
+        }
+        if (params.isNotEmpty) {
+          endpoint = '/rucks?${params.join('&')}';
+        }
+      }
+      
+      AppLogger.info('[SESSION_HISTORY] Fetching sessions with endpoint: $endpoint');
+      final response = await _apiClient.get(endpoint);
+      
+      List<dynamic> sessionsList = [];
+      
+      // Handle different response formats from the API
+      if (response == null) {
+        sessionsList = [];
+      } else if (response is List) {
+        sessionsList = response;
+      } else if (response is Map) {
+        // Look for common API response patterns
+        if (response.containsKey('data')) {
+          sessionsList = response['data'] as List;
+        } else if (response.containsKey('sessions')) {
+          sessionsList = response['sessions'] as List;
+        } else if (response.containsKey('items')) {
+          sessionsList = response['items'] as List;
+        } else if (response.containsKey('results')) {
+          sessionsList = response['results'] as List;
+        } else {
+          // Try to find any List in the response
+          for (final key in response.keys) {
+            if (response[key] is List) {
+              sessionsList = response[key] as List;
+              break;
+            }
+          }
+          
+          if (sessionsList.isEmpty) {
+            AppLogger.warning('[SESSION_HISTORY] Unexpected response format from API');
+          }
+        }
+      } else {
+        AppLogger.warning('[SESSION_HISTORY] Unknown response type from API');
+      }
+      
+      // Convert to RuckSession objects
+      final sessions = sessionsList
+          .map((session) => RuckSession.fromJson(session))
+          .toList();
+          
+      // Filter for completed sessions ONLY
+      final completedSessions = sessions
+          .where((s) => s.status == RuckStatus.completed)
+          .toList();
+          
+      // Sort by date (newest first)
+      completedSessions.sort((a, b) => b.startTime.compareTo(a.startTime));
+      
+      // Cache the results only for "all sessions" requests (no date filters)
+      if (startDate == null && endDate == null) {
+        _sessionHistoryCache = completedSessions;
+        _sessionHistoryCacheTime = now;
+        AppLogger.debug('[SESSION_HISTORY] Cached ${completedSessions.length} sessions');
+      }
+      
+      AppLogger.info('[SESSION_HISTORY] Fetched ${completedSessions.length} completed sessions');
+      return completedSessions;
+    } catch (e) {
+      AppLogger.error('[SESSION_HISTORY] Error fetching sessions: $e');
+      rethrow;
+    }
+  }
+  
+  /// Clear session history cache (useful when new sessions are completed)
+  static void clearSessionHistoryCache() {
+    _sessionHistoryCache = null;
+    _sessionHistoryCacheTime = null;
+    AppLogger.debug('[SESSION_HISTORY] Cache cleared');
   }
 }

@@ -65,6 +65,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   int? _latestHeartRate;
   int? _minHeartRate;
   int? _maxHeartRate;
+  
+  /// Heart rate throttling - only save one sample every 30 seconds
+  DateTime? _lastSavedHeartRateTime;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -119,6 +122,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _minHeartRate = null;
     _maxHeartRate = null;
     _latestHeartRate = null;
+    _lastSavedHeartRateTime = null; // Reset heart rate throttling
     _isHeartRateMonitoringStarted = false;
     _elapsedCounter = 0;
     _ticksSinceTruth = 0;
@@ -680,7 +684,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       if (_minHeartRate == null || bpm < _minHeartRate!) _minHeartRate = bpm;
       if (_maxHeartRate == null || bpm > _maxHeartRate!) _maxHeartRate = bpm;
       
-      _allHeartRateSamples.add(event.sample);
+      // Throttle heart rate sample storage - only save every 30 seconds
+      final now = DateTime.now();
+      final shouldSaveSample = _lastSavedHeartRateTime == null || 
+          now.difference(_lastSavedHeartRateTime!).inSeconds >= 30;
+      
+      if (shouldSaveSample) {
+        _allHeartRateSamples.add(event.sample);
+        _lastSavedHeartRateTime = now;
+        AppLogger.debug('[HR_THROTTLE] Saved heart rate sample: ${bpm}bpm (${_allHeartRateSamples.length} total saved)');
+      } else {
+        AppLogger.debug('[HR_THROTTLE] Skipped heart rate sample: ${bpm}bpm (throttled)');
+      }
+      
       // The main _onTick handler will emit state with updated HR lists and values.
       // Emitting here might be too frequent if samples come rapidly.
       // However, if live HR display needs sub-second updates, emit here:

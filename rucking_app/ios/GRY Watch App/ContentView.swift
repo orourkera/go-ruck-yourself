@@ -100,6 +100,7 @@ struct ContentView: View {
                     .font(.custom("Bangers-Regular", size: 38))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
+                    .padding(.trailing, 16) // Increased from 8 to 16 for italic font clearance
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 
@@ -169,11 +170,11 @@ struct ContentView: View {
                     // Elevation - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
                         Text(sessionManager.isMetric ? "ELEVATION" : "ELEVATION")
-                            .font(.caption2)
+                            .font(.system(size: 8, weight: .medium))
                             .foregroundColor(.gray)
                             .padding(.top, 2)
                         Text(sessionManager.elevationText)
-                            .font(.system(size: 18, weight: .bold)) // Reduced font size from 24
+                            .font(.system(size: 24, weight: .bold)) // Match other metric values
                             .foregroundColor(Color(red: 0, green: 0.9, blue: 0.9)) // Custom cyan color for compatibility
                             .lineLimit(1)
                     }
