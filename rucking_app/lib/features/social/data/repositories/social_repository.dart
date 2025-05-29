@@ -20,8 +20,8 @@ class SocialRepository {
   final Map<int, DateTime> _likeCacheTimestamps = {};
   final Map<String, DateTime> _commentsCacheTimestamps = {};
   
-  // Cache expiration in seconds - very short to ensure fresh data while still providing immediate response
-  static const int _cacheExpirationSeconds = 10; // 10 seconds cache
+  // Cache expiration in seconds - increased to 5 minutes for better performance
+  static const int _cacheExpirationSeconds = 300; // 5 minutes cache
   
   // Getters for cached data - these provide immediate access to cached values without network calls
   bool? getCachedLikeStatus(int ruckId) => _likeStatusCache[ruckId];
@@ -537,6 +537,98 @@ class SocialRepository {
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
       throw ServerException(message: 'Failed to delete comment: $e');
+    }
+  }
+
+  /// Batch preload social data for multiple rucks to improve performance
+  /// This method loads likes and comments for multiple rucks in a single API call
+  Future<void> preloadSocialDataForRucks(List<int> ruckIds) async {
+    if (ruckIds.isEmpty) return;
+    
+    try {
+      final token = await _authToken;
+      if (token == null) {
+        debugPrint('[SOCIAL_BATCH] No auth token available for batch preload');
+        return;
+      }
+      
+      // Filter out rucks that already have fresh cache
+      final now = DateTime.now();
+      final rucksToFetch = ruckIds.where((ruckId) {
+        final timestamp = _likeCacheTimestamps[ruckId];
+        return timestamp == null || 
+               now.difference(timestamp).inSeconds > _cacheExpirationSeconds;
+      }).toList();
+      
+      if (rucksToFetch.isEmpty) {
+        debugPrint('[SOCIAL_BATCH] All requested rucks have fresh cache, skipping batch load');
+        return;
+      }
+      
+      debugPrint('[SOCIAL_BATCH] Preloading social data for ${rucksToFetch.length} rucks: $rucksToFetch');
+      
+      // Make batch API call for like statuses and counts
+      final ruckIdsParam = rucksToFetch.join(',');
+      final response = await _httpClient.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes/batch?ruck_ids=$ruckIdsParam'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final batchData = data['data'] as Map<String, dynamic>;
+          
+          // Update cache with batch results
+          for (final ruckId in rucksToFetch) {
+            final ruckIdStr = ruckId.toString();
+            if (batchData.containsKey(ruckIdStr)) {
+              final ruckData = batchData[ruckIdStr];
+              _likeStatusCache[ruckId] = ruckData['user_has_liked'] ?? false;
+              _likeCountCache[ruckId] = ruckData['like_count'] ?? 0;
+              _likeCacheTimestamps[ruckId] = now;
+            }
+          }
+          
+          debugPrint('[SOCIAL_BATCH] Successfully cached social data for ${rucksToFetch.length} rucks');
+        }
+      } else {
+        debugPrint('[SOCIAL_BATCH] Batch API failed with status ${response.statusCode}');
+        // Fall back to individual requests for critical data
+        _fallbackIndividualRequests(rucksToFetch.take(3).toList()); // Limit fallback
+      }
+    } catch (e) {
+      debugPrint('[SOCIAL_BATCH] Error in batch preload: $e');
+      // Fail silently - cached data will be used or individual requests will be made as needed
+    }
+  }
+  
+  /// Fallback method for individual social data requests when batch fails
+  Future<void> _fallbackIndividualRequests(List<int> ruckIds) async {
+    final token = await _authToken;
+    if (token == null) return;
+    
+    for (final ruckId in ruckIds) {
+      try {
+        // Quick check for like status without full error handling
+        final likeStatus = await _fallbackSingleRuckCheck(ruckId, token);
+        if (likeStatus != null) {
+          _likeStatusCache[ruckId] = likeStatus;
+          _likeCacheTimestamps[ruckId] = DateTime.now();
+        }
+        
+        // Quick check for like count
+        final likeCount = await _fallbackSingleRuckLikeCount(ruckId, token);
+        if (likeCount != null) {
+          _likeCountCache[ruckId] = likeCount;
+        }
+      } catch (e) {
+        // Ignore individual failures during fallback
+        debugPrint('[SOCIAL_FALLBACK] Failed to load data for ruck $ruckId: $e');
+      }
     }
   }
 }
