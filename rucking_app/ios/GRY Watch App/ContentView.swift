@@ -71,12 +71,6 @@ struct ContentView: View {
                             .font(.system(size: 46, weight: .bold))
                             .foregroundColor(.green)
                         
-                        // Total distance below time
-                        Text(sessionManager.totalDistance)
-                            .font(.system(size: 32, weight: .medium))
-                            .foregroundColor(.white)
-                            .padding(.top, 8)
-                        
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -95,15 +89,18 @@ struct ContentView: View {
     private var activeSessionView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                // Full-width timer - simplified, statusText should be valid if session is active
-                Text(sessionManager.statusText)
-                    .font(.custom("Bangers-Regular", size: 36)) // Reduced from 38 to 36
-                    .fixedSize(horizontal: true, vertical: false) // Prevent horizontal truncation
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 8) // Reduced padding since we're using fixedSize
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7) // More aggressive scaling if needed
+                // Full-width timer container - ensure it takes full width
+                HStack {
+                    Spacer()
+                    Text(sessionManager.statusText)
+                        .font(.custom("Bangers-Regular", size: 32))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity) // Ensure full width
+                .padding(.vertical, 4)
+                .padding(.horizontal, 4)
                 
                 // Pace display (below timer)
                 Text(sessionManager.pace)

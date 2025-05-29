@@ -122,6 +122,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<UpdateStateWithSessionPhotos>(_onUpdateStateWithSessionPhotos);
     on<HeartRateUpdated>(_onHeartRateUpdated);
     on<HeartRateBufferProcessed>(_onHeartRateBufferProcessed);
+    on<SessionReset>(_onSessionReset);
   }
 
   Future<void> _onSessionStarted(
@@ -599,7 +600,52 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         };
         
         AppLogger.debug('Completing session ${currentState.sessionId} with payload...');
+        AppLogger.debug('Session state - Duration: ${finalDurationSeconds}s, Distance: ${finalDistanceKm}km, Calories: ${finalCalories.round()}');
+        AppLogger.debug('Session start time: ${currentState.originalSessionStartTimeUtc}');
+        AppLogger.debug('Current time: ${DateTime.now().toUtc()}');
+        
+        // First, check if the session is still valid by trying to get its current status
+        try {
+          AppLogger.debug('Checking session ${currentState.sessionId} status before completion...');
+          final statusResponse = await _apiClient.get('/rucks/${currentState.sessionId}');
+          AppLogger.debug('Session status: $statusResponse');
+        } catch (e) {
+          AppLogger.warning('Could not check session status: $e');
+        }
+        
         final response = await _apiClient.post('/rucks/${currentState.sessionId}/complete', payload);
+        
+        // Check if the response contains an error message
+        if (response is Map<String, dynamic> && response.containsKey('message')) {
+          final errorMessage = response['message'] as String;
+          AppLogger.error('Session completion failed: $errorMessage');
+          
+          // If session is not in progress, it might already be completed
+          if (errorMessage.contains('not in progress')) {
+            // Try to fetch the completed session data
+            try {
+              AppLogger.debug('Attempting to fetch already completed session ${currentState.sessionId}...');
+              final completedResponse = await _apiClient.get('/rucks/${currentState.sessionId}');
+              final completedSession = RuckSession.fromJson(completedResponse);
+              
+              AppLogger.debug('Found completed session, proceeding with summary...');
+              final RuckSession enrichedSession = completedSession.copyWith(
+                heartRateSamples: completedSession.heartRateSamples ?? _allHeartRateSamples,
+                avgHeartRate: completedSession.avgHeartRate ?? avgHeartRate,
+                maxHeartRate: completedSession.maxHeartRate ?? _maxHeartRate,
+                minHeartRate: completedSession.minHeartRate ?? _minHeartRate
+              );
+              
+              emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
+              return;
+            } catch (fetchError) {
+              AppLogger.error('Could not fetch completed session: $fetchError');
+            }
+          }
+          
+          throw Exception('Session completion failed: $errorMessage');
+        }
+        
         final RuckSession completedSession = RuckSession.fromJson(response);
         
         AppLogger.debug('Session ${currentState.sessionId} completed successfully.');
@@ -632,7 +678,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             heartRate: completedSession.avgHeartRate?.toDouble(), // Convert int? to double?
             ruckWeightKg: completedSession.ruckWeightKg,
             elevationGainMeters: completedSession.elevationGain,
-            elevationLossMeters: completedSession.elevationLoss
+            elevationLossMeters: completedSession.elevationLoss,
         );
 
       } catch (e, stackTrace) {
@@ -1231,6 +1277,37 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Clear any corrupted session data
       await _activeSessionStorage.clearSessionData();
     }
+  }
+
+  Future<void> _onSessionReset(
+    SessionReset event, 
+    Emitter<ActiveSessionState> emit
+  ) async {
+    AppLogger.debug('Resetting session state to initial state');
+    
+    // Stop any active timers or services
+    _stopTickerAndWatchdog();
+    
+    // Clear heart rate data
+    _allHeartRateSamples.clear();
+    _maxHeartRate = null;
+    _minHeartRate = null;
+    
+    // Reset counters
+    _elapsedCounter = 0;
+    
+    // Clear split tracking
+    _splitTrackingService.reset();
+    
+    // Clear any stored active session
+    try {
+      await _activeSessionStorage.clearSessionData();
+    } catch (e) {
+      AppLogger.error('Error clearing active session storage: $e');
+    }
+    
+    // Return to initial state
+    emit(const ActiveSessionInitial());
   }
 
   double? _calculateCurrentPace(List<LocationPoint> points) {

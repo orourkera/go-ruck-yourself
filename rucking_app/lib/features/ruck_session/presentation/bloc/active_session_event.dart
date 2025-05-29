@@ -238,3 +238,11 @@ class LoadSessionForViewing extends ActiveSessionEvent {
   @override
   List<Object?> get props => [sessionId, session];
 }
+
+/// Event to reset the session state after saving, returning to initial state
+class SessionReset extends ActiveSessionEvent {
+  const SessionReset();
+
+  @override
+  List<Object?> get props => [];
+}

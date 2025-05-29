@@ -44,8 +44,12 @@ class SplitTrackingService {
       final bool preferMetric = authBloc.state is Authenticated ? 
           (authBloc.state as Authenticated).user.preferMetric : true;
       
+      AppLogger.debug('[SPLITS] User preferMetric preference: $preferMetric');
+      
       // Set the split distance based on user preference
       final double splitDistanceKm = preferMetric ? 1.0 : 1.609; // 1km or 1mi (in km)
+      
+      AppLogger.debug('[SPLITS] Split distance in km: $splitDistanceKm (${preferMetric ? "1km" : "1mi"})');
       
       // Calculate current milestone based on total distance
       final int currentMilestoneIndex = (currentDistanceKm / splitDistanceKm).floor();
@@ -65,11 +69,11 @@ class SplitTrackingService {
         // Record this split info
         final splitInfo = {
           'splitNumber': currentMilestoneIndex,
-          'splitDistance': preferMetric ? 1.0 : 1.0, // 1km or 1mi as displayed value
-          'splitDuration': splitDuration,
+          'splitDistance': 1.0, // Always 1.0 as it represents 1km or 1mi
+          'splitDurationSeconds': splitDuration.inSeconds, // Convert Duration to seconds
           'totalDistance': preferMetric ? currentDistanceKm : currentDistanceKm / 1.609, // Convert to mi if needed
-          'totalDuration': Duration(seconds: elapsedSeconds),
-          'timestamp': splitEndTime,
+          'totalDurationSeconds': elapsedSeconds, // Use seconds instead of Duration
+          'timestamp': splitEndTime.toIso8601String(), // Convert DateTime to string
         };
         _splits.add(splitInfo);
         
@@ -79,7 +83,7 @@ class SplitTrackingService {
         
         // Send notification to the watch
         await _watchService.sendSplitNotification(
-          splitDistance: preferMetric ? 1.0 : 1.0, // Always show as 1.0 (km or mi)
+          splitDistance: 1.0, // Always show as 1.0 (represents 1km or 1mi based on isMetric flag)
           splitDuration: splitDuration,
           totalDistance: preferMetric ? currentDistanceKm : currentDistanceKm / 1.609, // Convert to mi if needed
           totalDuration: Duration(seconds: elapsedSeconds),

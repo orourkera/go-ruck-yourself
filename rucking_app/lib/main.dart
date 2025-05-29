@@ -83,6 +83,12 @@ class AppBlocObserver extends BlocObserver {
   @override
   void onChange(BlocBase bloc, Change change) {
     super.onChange(bloc, change);
+    
+    // Skip logging for ActiveSessionBloc to avoid excessive location point logging
+    if (bloc.runtimeType.toString() == 'ActiveSessionBloc') {
+      return;
+    }
+    
     AppLogger.info('${bloc.runtimeType} $change');
   }
 

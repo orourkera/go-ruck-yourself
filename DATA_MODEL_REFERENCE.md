@@ -11,6 +11,7 @@ This document maps the data model for a rucking session across all layers:
 - [Example JSON Payload](#example-json-payload)
 - [Example SQL Table](#example-sql-table)
 - [Notes](#notes)
+- [Session Splits](#session-splits)
 
 ---
 
@@ -214,6 +215,40 @@ When navigating to the session completion screen, the following argument mapping
 +- Calories to nearest integer
 +- Elevation gains/losses to nearest integer
 +- Weights to one decimal place
+
+---
+
+## Detailed Database Schema: `session_splits`
+
+| Column Name            | Data Type                   | Nullable | Default                                      |
+|------------------------|-----------------------------|----------|----------------------------------------------|
+| id                     | integer                     | NO       | nextval('session_splits_id_seq'::regclass) |
+| session_id             | integer                     | NO       |                                              |
+| split_number           | integer                     | NO       |                                              |
+| split_distance_km      | numeric                     | NO       |                                              |
+| split_duration_seconds | integer                     | NO       |                                              |
+| total_distance_km      | numeric                     | NO       |                                              |
+| total_duration_seconds | integer                     | NO       |                                              |
+| split_timestamp        | timestamp with time zone    | NO       |                                              |
+| created_at             | timestamp with time zone    | NO       | now()                                        |
+| updated_at             | timestamp with time zone    | NO       | now()                                        |
+
+### Property/API/DB Mapping: Session Splits
+
+| Concept                | Dart/Flutter Property        | API Field                  | Database Column           |
+|------------------------|------------------------------|----------------------------|---------------------------|
+| Split ID               | `id`                         | `id`                       | `id`                      |
+| Session ID             | `sessionId`                  | `session_id`               | `session_id`              |
+| Split Number           | `splitNumber`                | `split_number`             | `split_number`            |
+| Split Distance (km)    | `splitDistanceKm`            | `split_distance_km`        | `split_distance_km`       |
+| Split Duration (s)     | `splitDurationSeconds`       | `split_duration_seconds`   | `split_duration_seconds`  |
+| Total Distance (km)    | `totalDistanceKm`            | `total_distance_km`        | `total_distance_km`       |
+| Total Duration (s)     | `totalDurationSeconds`       | `total_duration_seconds`   | `total_duration_seconds`  |
+| Split Timestamp        | `splitTimestamp`             | `split_timestamp`          | `split_timestamp`         |
+| Created At             | `createdAt`                  | `created_at`               | `created_at`              |
+| Updated At             | `updatedAt`                  | `updated_at`               | `updated_at`              |
+
+**Split Tracking**: Session splits represent 1km or 1mi milestones during a ruck session. Each split records the time taken to complete that segment, along with cumulative totals. Split distance is stored in kilometers regardless of user preference (1.0km for metric users, 1.609km for imperial users who complete 1 mile).
 
 ---
 

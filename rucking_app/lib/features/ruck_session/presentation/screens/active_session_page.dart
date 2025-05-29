@@ -408,11 +408,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         final route = state.locationPoints
                             .map((p) => latlong.LatLng(p.latitude, p.longitude))
                             .toList();
-                        // DEBUG: Print route length and points
-                        debugPrint('Route length:  [32m [1m [4m [7m${route.length} [0m');
-                        for (var i = 0; i <route.length; i++) {
-                          debugPrint('Route[$i]: Lat:  [36m${route[i].latitude} [0m, Lng:  [36m${route[i].longitude} [0m');
-                        }
 
                         return SingleChildScrollView(
                           child: Column(
