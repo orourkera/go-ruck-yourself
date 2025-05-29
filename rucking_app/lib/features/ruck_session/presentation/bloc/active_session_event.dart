@@ -246,3 +246,11 @@ class SessionReset extends ActiveSessionEvent {
   @override
   List<Object?> get props => [];
 }
+
+/// Event to clean up session resources (for app lifecycle management)
+class SessionCleanupRequested extends ActiveSessionEvent {
+  const SessionCleanupRequested();
+
+  @override
+  List<Object?> get props => [];
+}

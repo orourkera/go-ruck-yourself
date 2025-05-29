@@ -165,7 +165,7 @@ class RuckSessionResource(Resource):
             if not data:
                 return {'message': 'No data provided'}, 400
 
-            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned']
+            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned', 'is_public']
             update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
             if not update_data:

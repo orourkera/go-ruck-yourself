@@ -152,10 +152,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'elevation_loss_m': widget.elevationLoss,
       };
       
-      // Only include is_public if user explicitly set a preference for this session
-      if (_shareSession != null) {
-        completionData['is_public'] = _shareSession!;
-      }
+      // Include is_public field - either user's explicit choice or their default preference
+      final authState = BlocProvider.of<AuthBloc>(context).state;
+      final bool userAllowsSharing = authState is Authenticated ? 
+          authState.user.allowRuckSharing : false;
+      completionData['is_public'] = _shareSession ?? userAllowsSharing;
 
       // Save session first - this is fast and immediate
       await _apiClient.patch('/rucks/${widget.ruckId}', completionData);

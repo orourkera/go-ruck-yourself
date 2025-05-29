@@ -752,7 +752,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       if (snapshot.hasError) {
                         return const SizedBox.shrink();
                       }
-                      if (snapshot.hasData && snapshot.data!.isNotEmpty && snapshot.data! != 'Unknown location') {
+                      if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty && snapshot.data!.toLowerCase() != 'unknown location') {
                         return Text(
                           snapshot.data!,
                           style: TextStyle(

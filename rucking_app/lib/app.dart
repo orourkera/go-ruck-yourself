@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+
+import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
@@ -13,20 +16,48 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/session_c
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
-import 'package:rucking_app/shared/theme/app_theme.dart';
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
-import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 
 /// Main application widget
-class RuckingApp extends StatelessWidget {
+class RuckingApp extends StatefulWidget {
   const RuckingApp({Key? key}) : super(key: key);
+
+  @override
+  State<RuckingApp> createState() => _RuckingAppState();
+}
+
+class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
+  late AppLifecycleService _lifecycleService;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Initialize the lifecycle service
+    _lifecycleService = getIt<AppLifecycleService>();
+    _lifecycleService.initialize();
+    WidgetsBinding.instance?.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _lifecycleService.dispose();
+    WidgetsBinding.instance?.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // The AppLifecycleService automatically handles this via WidgetsBindingObserver
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +70,12 @@ class RuckingApp extends StatelessWidget {
           create: (context) => getIt<SessionHistoryBloc>(),
         ),
         BlocProvider<ActiveSessionBloc>(
-          create: (context) => getIt<ActiveSessionBloc>(),
+          create: (context) {
+            final bloc = getIt<ActiveSessionBloc>();
+            // Set bloc reference in lifecycle service
+            _lifecycleService.setBlocReferences(activeSessionBloc: bloc);
+            return bloc;
+          },
         ),
         BlocProvider<SessionBloc>(
           create: (context) => getIt<SessionBloc>(),
@@ -54,9 +90,14 @@ class RuckingApp extends StatelessWidget {
           create: (context) => getIt<SocialBloc>(),
         ),
         BlocProvider<NotificationBloc>(
-          create: (context) => getIt<NotificationBloc>()
-            ..add(const NotificationsRequested())
-            ..startPolling(),
+          create: (context) {
+            final bloc = getIt<NotificationBloc>()
+              ..add(const NotificationsRequested())
+              ..startPolling();
+            // Set bloc reference in lifecycle service
+            _lifecycleService.setBlocReferences(notificationBloc: bloc);
+            return bloc;
+          },
         ),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(

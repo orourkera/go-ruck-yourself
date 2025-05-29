@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vibration/vibration.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/notifications/domain/entities/app_notification.dart';
 import 'package:rucking_app/features/notifications/domain/repositories/notification_repository.dart';
@@ -9,6 +10,7 @@ import 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final NotificationRepository repository;
   Timer? _pollingTimer;
+  int _previousUnreadCount = 0;
 
   NotificationBloc({required this.repository}) : super(NotificationsInitial()) {
     on<NotificationsRequested>(_onNotificationsRequested);
@@ -24,6 +26,15 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     try {
       final notifications = await repository.getNotifications();
       final unreadCount = notifications.where((n) => !n.isRead).length;
+      
+      // Vibrate if there are new notifications (unread count increased)
+      if (unreadCount > _previousUnreadCount && _previousUnreadCount > 0) {
+        _vibrateForNewNotification();
+        AppLogger.info('New notification(s) received - vibrating phone');
+      }
+      
+      _previousUnreadCount = unreadCount;
+      
       emit(NotificationsLoaded(
         notifications: notifications,
         unreadCount: unreadCount,
@@ -51,6 +62,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
           }).toList();
           
           final newUnreadCount = updatedNotifications.where((n) => !n.isRead).length;
+          _previousUnreadCount = newUnreadCount; // Update tracked count
           
           emit(currentState.copyWith(
             notifications: updatedNotifications,
@@ -76,6 +88,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
           final updatedNotifications = currentState.notifications
               .map((notification) => notification.copyWith(isRead: true))
               .toList();
+          
+          _previousUnreadCount = 0; // Update tracked count
           
           emit(currentState.copyWith(
             notifications: updatedNotifications,
@@ -108,6 +122,25 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   void stopPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = null;
+  }
+
+  /// Pause polling (for app lifecycle management)
+  void pausePolling() {
+    AppLogger.info('Pausing notification polling');
+    stopPolling();
+  }
+
+  /// Resume polling (for app lifecycle management)
+  void resumePolling({Duration interval = const Duration(seconds: 90)}) {
+    AppLogger.info('Resuming notification polling');
+    startPolling(interval: interval);
+  }
+
+  void _vibrateForNewNotification() async {
+    if (await Vibration.hasVibrator()) {
+      // Fast, intense vibration pattern: 3 quick bursts
+      await Vibration.vibrate(pattern: [50, 50, 50, 50, 50]);
+    }
   }
 
   @override
