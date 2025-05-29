@@ -35,6 +35,13 @@ class SessionStarted extends ActiveSessionEvent {
   List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg];
 }
 
+class SessionRecoveryRequested extends ActiveSessionEvent {
+  const SessionRecoveryRequested();
+  
+  @override
+  List<Object?> get props => [];
+}
+
 class LocationUpdated extends ActiveSessionEvent {
   final LocationPoint locationPoint;
   

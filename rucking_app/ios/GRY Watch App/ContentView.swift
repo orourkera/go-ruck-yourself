@@ -97,12 +97,13 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Full-width timer - simplified, statusText should be valid if session is active
                 Text(sessionManager.statusText)
-                    .font(.custom("Bangers-Regular", size: 38))
+                    .font(.custom("Bangers-Regular", size: 36)) // Reduced from 38 to 36
+                    .fixedSize(horizontal: true, vertical: false) // Prevent horizontal truncation
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
-                    .padding(.trailing, 16) // Increased from 8 to 16 for italic font clearance
+                    .padding(.horizontal, 8) // Reduced padding since we're using fixedSize
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7) // More aggressive scaling if needed
                 
                 // Pace display (below timer)
                 Text(sessionManager.pace)
@@ -170,13 +171,14 @@ struct ContentView: View {
                     // Elevation - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
                         Text(sessionManager.isMetric ? "ELEVATION" : "ELEVATION")
-                            .font(.system(size: 8, weight: .medium))
+                            .font(.caption2)
                             .foregroundColor(.gray)
                             .padding(.top, 2)
                         Text(sessionManager.elevationText)
-                            .font(.system(size: 24, weight: .bold)) // Match other metric values
-                            .foregroundColor(Color(red: 0, green: 0.9, blue: 0.9)) // Custom cyan color for compatibility
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(Color(red: 0, green: 0.9, blue: 0.9))
                             .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     .frame(maxWidth: .infinity, minHeight: 70)
                     .background(Color.black.opacity(0.1))

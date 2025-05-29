@@ -5,6 +5,8 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:rucking_app/core/services/active_session_storage.dart';
+import 'package:rucking_app/core/services/app_startup_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/security/ssl_pinning.dart';
@@ -90,6 +92,16 @@ Future<void> setupServiceLocator() async {
     SessionRepository(apiClient: getIt<ApiClient>())
   );
   
+  // Session storage for offline persistence
+  getIt.registerSingleton<ActiveSessionStorage>(
+    ActiveSessionStorage(getIt<SharedPreferences>())
+  );
+  
+  // App startup service for session recovery
+  getIt.registerSingleton<AppStartupService>(
+    AppStartupService(getIt<ActiveSessionStorage>())
+  );
+  
   // Blocs
   getIt.registerFactory<AuthBloc>(() => AuthBloc(getIt<AuthRepository>()));
   getIt.registerFactory<SessionHistoryBloc>(() => SessionHistoryBloc(
@@ -103,6 +115,7 @@ Future<void> setupServiceLocator() async {
         heartRateService: getIt<HeartRateService>(),
         splitTrackingService: getIt<SplitTrackingService>(),
         sessionRepository: getIt<SessionRepository>(),
+        activeSessionStorage: getIt<ActiveSessionStorage>(),
       ));
       
   // Register session bloc for operations like delete
