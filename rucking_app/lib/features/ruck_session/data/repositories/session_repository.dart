@@ -1,7 +1,8 @@
-import 'dart:async'; // For Completer and Timer
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/painting.dart' show decodeImageFromList;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,7 +20,38 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:rucking_app/core/models/api_exception.dart'; // Corrected import for ApiException
+import 'package:image/image.dart' as img;
+import 'package:rucking_app/core/api/api_exceptions.dart';
+import 'package:rucking_app/core/config/app_config.dart';
+
+/// Simple semaphore for limiting concurrent operations
+class Semaphore {
+  final int maxCount;
+  int _currentCount;
+  final Queue<Completer<void>> _waitQueue = Queue<Completer<void>>();
+
+  Semaphore(this.maxCount) : _currentCount = maxCount;
+
+  Future<void> acquire() async {
+    if (_currentCount > 0) {
+      _currentCount--;
+      return;
+    } else {
+      final completer = Completer<void>();
+      _waitQueue.add(completer);
+      return completer.future;
+    }
+  }
+
+  void release() {
+    if (_waitQueue.isNotEmpty) {
+      final completer = _waitQueue.removeFirst();
+      completer.complete();
+    } else {
+      _currentCount++;
+    }
+  }
+}
 
 /// Repository class for session-related operations
 class SessionRepository {
@@ -308,7 +340,7 @@ class SessionRepository {
           
           if (authToken == null || authToken.isEmpty) {
             AppLogger.error('[PHOTO_DEBUG] Authentication token is null or empty!');
-            throw ApiException(message: 'Authentication token is missing');
+            throw ApiException('Authentication token is missing');
           }
           
           // Create a multipart request
@@ -377,7 +409,7 @@ class SessionRepository {
           if (response.statusCode == 429) {
             AppLogger.warning('[PHOTO_DEBUG] Rate limit hit (${response.body}). Waiting...');
             await Future.delayed(const Duration(seconds: 15)); // Wait longer to respect rate limit
-            throw ApiException(message: response.body); // Will be caught and retried
+            throw ApiException('Rate limit hit');
           }
           
           // Handle successful response
@@ -468,7 +500,173 @@ class SessionRepository {
       rethrow;
     }
   }
-  
+
+  /// Upload photos for a ruck session with optimization
+  /// 
+  /// This optimized version includes:
+  /// - Image compression to reduce upload time
+  /// - Parallel uploads for better performance  
+  /// - Better error handling and retry logic
+  Future<List<RuckPhoto>> uploadSessionPhotosOptimized(String ruckId, List<File> photos) async {
+    final List<RuckPhoto> allUploadedPhotos = [];
+    
+    try {
+      AppLogger.info('===== START OPTIMIZED PHOTO UPLOAD (${photos.length} photos for ruckId: $ruckId) =====');
+      
+      if (photos.isEmpty) {
+        AppLogger.info('No photos to upload');
+        return allUploadedPhotos;
+      }
+
+      // Compress photos in parallel first
+      final compressedPhotos = await _compressPhotosInParallel(photos);
+      AppLogger.info('Compressed ${compressedPhotos.length} photos for upload');
+
+      // Upload photos in parallel (limit to 3 concurrent uploads to avoid overwhelming server)
+      final uploadFutures = <Future<RuckPhoto?>>[];
+      final semaphore = Semaphore(3); // Limit to 3 concurrent uploads
+      
+      for (int i = 0; i < compressedPhotos.length; i++) {
+        final uploadFuture = semaphore.acquire().then((_) async {
+          try {
+            return await _uploadSinglePhotoOptimized(ruckId, compressedPhotos[i], i + 1);
+          } finally {
+            semaphore.release();
+          }
+        });
+        uploadFutures.add(uploadFuture);
+      }
+
+      // Wait for all uploads to complete
+      final results = await Future.wait(uploadFutures);
+      
+      // Collect successful uploads
+      for (final photo in results) {
+        if (photo != null) {
+          allUploadedPhotos.add(photo);
+        }
+      }
+
+      AppLogger.info('===== OPTIMIZED PHOTO UPLOAD COMPLETED: ${allUploadedPhotos.length}/${photos.length} successful =====');
+      return allUploadedPhotos;
+
+    } catch (e) {
+      AppLogger.error('Optimized photo upload failed: $e');
+      return allUploadedPhotos; // Return any photos that were successfully uploaded
+    }
+  }
+
+  /// Compress photos in parallel to reduce upload time
+  Future<List<File>> _compressPhotosInParallel(List<File> photos) async {
+    final compressionFutures = photos.map((photo) => _compressPhoto(photo)).toList();
+    return await Future.wait(compressionFutures);
+  }
+
+  /// Compress a single photo for faster upload
+  Future<File> _compressPhoto(File originalPhoto) async {
+    try {
+      final bytes = await originalPhoto.readAsBytes();
+      
+      // Compress using flutter's image package
+      final image = img.decodeImage(bytes);
+      if (image == null) return originalPhoto;
+      
+      // Resize if too large (max 1920px on longest side)
+      img.Image resized = image;
+      if (image.width > 1920 || image.height > 1920) {
+        if (image.width > image.height) {
+          resized = img.copyResize(image, width: 1920);
+        } else {
+          resized = img.copyResize(image, height: 1920);
+        }
+      }
+      
+      // Compress JPEG with 80% quality
+      final compressedBytes = img.encodeJpg(resized, quality: 80);
+      
+      // Save compressed version to temporary file
+      final tempDir = await getTemporaryDirectory();
+      final compressedFile = File(
+        '${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}_${path.basename(originalPhoto.path)}'
+      );
+      await compressedFile.writeAsBytes(compressedBytes);
+      
+      final originalSize = bytes.length;
+      final compressedSize = compressedBytes.length;
+      final compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toStringAsFixed(1);
+      
+      AppLogger.info('Compressed photo: ${originalSize} → ${compressedSize} bytes (${compressionRatio}% reduction)');
+      
+      return compressedFile;
+    } catch (e) {
+      AppLogger.error('Photo compression failed, using original: $e');
+      return originalPhoto;
+    }
+  }
+
+  /// Upload a single photo with retry logic
+  Future<RuckPhoto?> _uploadSinglePhotoOptimized(String ruckId, File photo, int photoIndex) async {
+    const maxRetries = 2;
+    
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        AppLogger.info('[PHOTO_DEBUG] Uploading photo $photoIndex (attempt $attempt/$maxRetries)');
+        
+        final fileName = 'ruck_${ruckId}_photo_${photoIndex}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        
+        final request = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiBaseUrl}/rucks/$ruckId/photos'));
+        
+        // Add auth headers
+        final token = await _apiClient.getToken();
+        if (token != null && token.isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
+        
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'photos',
+            photo.path,
+            filename: fileName,
+            contentType: MediaType.parse('image/jpeg'),
+          ),
+        );
+        
+        // Longer timeout for potentially large uploads
+        final streamedResponse = await request.send().timeout(const Duration(seconds: 60));
+        final response = await http.Response.fromStream(streamedResponse);
+        
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final responseData = jsonDecode(response.body);
+          AppLogger.info('[PHOTO_DEBUG] Photo $photoIndex uploaded successfully');
+          
+          if (responseData is Map<String, dynamic> && responseData.containsKey('photos')) {
+            final photosData = responseData['photos'] as List;
+            if (photosData.isNotEmpty) {
+              return RuckPhoto.fromJson(photosData.first);
+            }
+          }
+          return null;
+        } else {
+          AppLogger.error('[PHOTO_DEBUG] Photo $photoIndex upload failed with status: ${response.statusCode}');
+          if (attempt < maxRetries) {
+            await Future.delayed(Duration(seconds: attempt * 2)); // Exponential backoff
+            continue;
+          }
+        }
+        
+      } catch (e) {
+        AppLogger.error('[PHOTO_DEBUG] Photo $photoIndex upload error (attempt $attempt): $e');
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+          continue;
+        }
+      }
+    }
+    
+    AppLogger.error('[PHOTO_DEBUG] Photo $photoIndex upload failed after all retries');
+    return null;
+  }
+
   /// Upload a file to Supabase storage
   Future<Map<String, dynamic>?> _uploadToSupabase(File file, String storagePath) async {
     try {
@@ -562,7 +760,7 @@ class SessionRepository {
       // Ensure we're working with a valid ruckId
       if (ruckId.isEmpty) {
         AppLogger.error('[PHOTO_DEBUG] SessionRepository: Empty ruckId provided');
-        throw ApiException(message: 'Invalid ruckId: empty string');
+        throw ApiException('Invalid ruckId: empty string');
       }
       
       // The backend expects an integer ruckId
@@ -570,7 +768,7 @@ class SessionRepository {
       final parsedRuckId = int.tryParse(ruckId.trim());
       if (parsedRuckId == null) {
         AppLogger.error('[PHOTO_DEBUG] SessionRepository: Unable to parse ruckId: $ruckId as integer');
-        throw ApiException(message: 'Invalid ruckId format. Expected integer value, got: $ruckId');
+        throw ApiException('Invalid ruckId format. Expected integer value, got: $ruckId');
       }
       
       final endpointPath = '/ruck-photos'; 

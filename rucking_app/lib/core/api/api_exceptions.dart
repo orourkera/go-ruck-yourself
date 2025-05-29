@@ -78,4 +78,12 @@ class RequestCancelledException extends ApiException {
   
   @override
   String toString() => 'RequestCancelledException: $message';
+}
+
+/// Exception for expired sessions requiring re-authentication
+class SessionExpiredException extends UnauthorizedException {
+  SessionExpiredException(String message) : super(message);
+  
+  @override
+  String toString() => 'SessionExpiredException: $message';
 } 

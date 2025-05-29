@@ -265,19 +265,17 @@ class AuthServiceImpl implements AuthService {
         print('[AUTH] Refresh token (redacted): $redactedToken');
       }
       
-      if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
-        print('[AUTH] ERROR: Refresh token not found or empty');
-        throw UnauthorizedException('Refresh token not found or empty');
-      }
-      
-      // Try refreshing with our backend API first
       try {
-        final response = await _apiClient.post('/auth/refresh', {'refresh_token': storedRefreshToken});
-        print('[AUTH] Token refresh response: $response');
+        // Make the token refresh request
+        final response = await _apiClient.post(
+          '/auth/refresh',
+          {'refresh_token': storedRefreshToken},
+        );
         
-        if (response == null || !response.containsKey('token') || !response.containsKey('refresh_token')) {
-          print('[AUTH] ERROR: Invalid refresh response format - missing tokens');
-          throw UnauthorizedException('Invalid refresh response format');
+        if (response == null) {
+          print('[AUTH] ERROR: Null response from token refresh');
+          await _cleanupInvalidAuthState();
+          return null;
         }
         
         final newToken = response['token'] as String;
@@ -285,6 +283,7 @@ class AuthServiceImpl implements AuthService {
 
         if (newToken.isEmpty || newRefreshToken.isEmpty) {
           print('[AUTH] ERROR: Received empty tokens from refresh');
+          await _cleanupInvalidAuthState();
           throw UnauthorizedException('Received empty tokens from refresh');
         }
 
@@ -298,15 +297,50 @@ class AuthServiceImpl implements AuthService {
         print('[AUTH] Token refresh successful!');
         return newToken;
       } catch (e) {
-        print('[AUTH] Token refresh through API failed: $e. Will try direct login fallback.');
-        // Fallback to direct refresh if needed
-        throw e;
+        print('[AUTH] Token refresh through API failed: $e');
+        
+        // All token refresh errors are treated as temporary issues
+      // We'll never force a logout due to token problems
+      if (e is DioException) {
+        if (e.response?.statusCode == 400) {
+          // Bad request (expired token) - keep the user logged in
+          print('[AUTH] Refresh token issue detected, but maintaining user session');
+          await _cleanupInvalidAuthState();
+        } else if (e.type == DioExceptionType.connectionError || 
+                  e.type == DioExceptionType.connectionTimeout) {
+          // Network connectivity issues
+          print('[AUTH] Network connectivity issue during token refresh');
+        } else {
+          // Other API errors
+          print('[AUTH] Server error during token refresh: ${e.response?.statusCode}');
+        }
+      } else {
+        // Non-Dio exceptions
+        print('[AUTH] Unexpected error during token refresh: $e');
+      }
+      // Return null instead of throwing - this indicates token refresh failed
+      // but we're NOT logging the user out
+      return null;
       }
     } catch (e) {
+      // Never throw session expiration exceptions
       print('[AUTH] ERROR in refreshToken: $e');
-      // Do NOT log the user out automatically; propagate error so the caller can decide.
-      rethrow;
+      // Return null instead of throwing - caller should handle this gracefully
+      // without forcing user logout
+      return null;
     }
+  }
+
+  // Helper method to handle invalid tokens without logging out the user
+  Future<void> _cleanupInvalidAuthState() async {
+    print('[AUTH] Invalid or expired tokens detected, but maintaining user session');
+    // Only clear the API client's current token, but DO NOT remove stored tokens
+    // This allows auto-recovery when network conditions improve
+    _apiClient.clearAuthToken();
+    
+    // The user profile and other data remains intact
+    // Next API call will trigger a new token refresh attempt
+    print('[AUTH] User session maintained - will attempt to recover on next API call');
   }
   
   @override
