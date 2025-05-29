@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 /// A reusable carousel widget for displaying photos
@@ -271,14 +272,10 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       borderRadius: BorderRadius.circular(0.0), // Square corners
       child: CachedNetworkImage(
         imageUrl: imageUrl,
+        // Use the custom cache manager for longer cache duration
+        cacheManager: ImageCacheManager.instance,
         // Create a stable key based on URL to improve cache hits
         cacheKey: Uri.parse(imageUrl).pathSegments.last,
-        // Memory cache optimization for thumbnails
-        memCacheWidth: 300,
-        memCacheHeight: 300,
-        // Disk cache optimization
-        maxWidthDiskCache: 600,
-        maxHeightDiskCache: 600,
         // Visual settings
         fit: BoxFit.cover,
         width: double.infinity,

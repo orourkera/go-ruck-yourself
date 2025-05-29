@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 
 /// A fullscreen photo viewer with zoom and swipe navigation capabilities
 class PhotoViewer extends StatefulWidget {
@@ -116,6 +117,7 @@ class _PhotoViewerState extends State<PhotoViewer> {
                 child: Hero(
                   tag: 'photo_${widget.photoUrls[index]}',
                   child: CachedNetworkImage(
+                    cacheManager: ImageCacheManager.instance,
                     imageUrl: widget.photoUrls[index],
                     fit: BoxFit.contain,
                     placeholder: (context, url) => const Center(

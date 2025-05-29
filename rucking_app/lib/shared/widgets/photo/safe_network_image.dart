@@ -1,6 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 
 /// A safer version of network image loading that handles various error cases
 /// and helps prevent crashes during image loading and rendering
@@ -84,13 +85,12 @@ class SafeNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       httpHeaders: finalHeaders,
+      cacheManager: ImageCacheManager.instance, // Use ImageCacheManager instance
       placeholder: (context, url) => _buildPlaceholder(context),
       errorWidget: (context, url, error) => 
           errorWidget != null 
               ? errorWidget!(context, url, error)
               : _buildDefaultErrorWidget(context, error.toString()),
-      memCacheWidth: width?.toInt(), // Optimize memory usage
-      memCacheHeight: height?.toInt(),
       fadeInDuration: const Duration(milliseconds: 300),
     );
     

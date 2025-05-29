@@ -23,6 +23,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 
 import 'package:get_it/get_it.dart';
 import 'dart:developer' as developer;
@@ -464,7 +465,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                       );
                     }),
                     
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     
                     // Stats in a 2x2 grid layout
                     Column(
@@ -493,7 +494,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                           ],
                         ),
                         
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 5),
                         
                         // Second row: Pace and Calories
                         Row(
@@ -609,6 +610,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           width: avatarSize,
           height: avatarSize,
           fit: BoxFit.cover,
+          cacheManager: ImageCacheManager.instance, // Add custom cache manager
           placeholder: (context, url) => Container(
             width: avatarSize,
             height: avatarSize,
@@ -747,36 +749,27 @@ class MediaCarousel extends StatefulWidget {
   State<MediaCarousel> createState() => _MediaCarouselState();
 }
 
-class _MediaCarouselState extends State<MediaCarousel> {
-  PageController _pageController = PageController();
+class _MediaCarouselState extends State<MediaCarousel> with TickerProviderStateMixin {
+  late PageController _pageController;
   int _currentPage = 0;
+  bool _shouldPreloadRemaining = false;
 
   @override
   void initState() {
     super.initState();
-    _currentPage = widget.initialPage;
     _pageController = PageController(initialPage: widget.initialPage);
+    _currentPage = widget.initialPage;
     
-    // Preload all photos when carousel is created
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _preloadPhotos();
+    // Start background preloading after a short delay to prioritize first photo
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _shouldPreloadRemaining = true;
+        });
+      }
     });
   }
   
-  void _preloadPhotos() {
-    if (!mounted) return;
-    
-    for (final item in widget.mediaItems) {
-      if (item.type == MediaType.photo) {
-        // Preload the image into cache
-        precacheImage(
-          CachedNetworkImageProvider(item.photoUrl!),
-          context,
-        );
-      }
-    }
-  }
-
   @override
   void dispose() {
     _pageController.dispose();
@@ -786,33 +779,110 @@ class _MediaCarouselState extends State<MediaCarousel> {
   @override
   Widget build(BuildContext context) {
     if (widget.mediaItems.isEmpty) {
-      return const SizedBox.shrink();
+      return SizedBox(
+        height: widget.height,
+        child: Center(
+          child: Text(
+            'No media yet',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      );
     }
 
     return Column(
       children: [
-        // PageView for full-width media items
-        SizedBox(
-          height: widget.height,
-          width: double.infinity,
-          child: PageView.builder(
-            controller: _pageController,
-            onPageChanged: (int page) {
-              setState(() {
-                _currentPage = page;
-              });
-            },
-            itemCount: widget.mediaItems.length,
-            itemBuilder: (context, index) {
-              return _buildMediaItem(context, index);
-            },
-          ),
+        Stack(
+          children: [
+            // Main PageView
+            SizedBox(
+              height: widget.height,
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: widget.mediaItems.length,
+                onPageChanged: (int index) {
+                  if (mounted && index >= 0 && index < widget.mediaItems.length) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  }
+                },
+                itemBuilder: (context, index) {
+                  final item = widget.mediaItems[index];
+                  
+                  if (item.type == MediaType.map) {
+                    return _RouteMapPreview(locationPoints: item.locationPoints, ruckWeightKg: item.ruckWeightKg);
+                  } else {
+                    return GestureDetector(
+                      onTap: () {
+                        if (widget.onPhotoTap != null) {
+                          // Calculate photo index (skip map items)
+                          int photoIndex = 0;
+                          for (int i = 0; i < index; i++) {
+                            if (widget.mediaItems[i].type == MediaType.photo) {
+                              photoIndex++;
+                            }
+                          }
+                          widget.onPhotoTap!(photoIndex);
+                        }
+                      },
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                        ), // Rounded top corners to match Card
+                        child: CachedNetworkImage(
+                          imageUrl: item.photoUrl!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          cacheManager: ImageCacheManager.instance, // Add custom cache manager
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(child: CircularProgressIndicator()),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(child: Icon(Icons.error)),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+            // Invisible stack to preload all photos immediately
+            if (_shouldPreloadRemaining && widget.mediaItems.length > 1)
+              Positioned(
+                left: -1000, // Position off-screen
+                top: 0,
+                child: SizedBox(
+                  width: 1,
+                  height: 1,
+                  child: Stack(
+                    children: widget.mediaItems
+                        .where((item) => item.type == MediaType.photo)
+                        .skip(1) // Skip first photo (already visible), only preload remaining
+                        .map((item) => CachedNetworkImage(
+                              imageUrl: item.photoUrl!,
+                              width: 1,
+                              height: 1,
+                              fit: BoxFit.cover,
+                              cacheManager: ImageCacheManager.instance, // Add custom cache manager
+                              placeholder: (context, url) => const SizedBox.shrink(),
+                              errorWidget: (context, url, error) => const SizedBox.shrink(),
+                            ))
+                        .toList(),
+                  ),
+                ),
+              ),
+          ],
         ),
-        
         // Page indicator dots
         if (widget.mediaItems.length > 1)
           Padding(
-            padding: const EdgeInsets.only(top: 8.0),
+            padding: const EdgeInsets.only(top: 10.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -832,90 +902,6 @@ class _MediaCarouselState extends State<MediaCarousel> {
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildMediaItem(BuildContext context, int index) {
-    final mediaItem = widget.mediaItems[index];
-    
-    return GestureDetector(
-      onTap: () {
-        if (mediaItem.type == MediaType.photo && widget.onPhotoTap != null) {
-          // Calculate the photo index (excluding map items)
-          int photoIndex = 0;
-          for (int i = 0; i < index; i++) {
-            if (widget.mediaItems[i].type == MediaType.photo) {
-              photoIndex++;
-            }
-          }
-          widget.onPhotoTap!(photoIndex);
-        }
-        // Map items don't have tap functionality for now
-      },
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(0.0), // Square corners
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 5.0,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(0.0), // Square corners
-          child: mediaItem.type == MediaType.photo
-              ? _buildPhotoItem(mediaItem)
-              : _buildMapItem(mediaItem),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPhotoItem(MediaCarouselItem item) {
-    return SizedBox(
-      width: double.infinity,
-      height: widget.height,
-      child: CachedNetworkImage(
-        imageUrl: item.photoUrl!,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: Colors.grey.shade200,
-          child: const Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.grey.shade200,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.broken_image, color: Colors.red, size: 32),
-                const SizedBox(height: 8),
-                Text(
-                  'Failed to load image',
-                  style: TextStyle(color: Colors.red.shade800),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMapItem(MediaCarouselItem item) {
-    return SizedBox(
-      width: double.infinity,
-      height: widget.height,
-      child: _RouteMapPreview(
-        locationPoints: item.locationPoints,
-        ruckWeightKg: item.ruckWeightKg,
-      ),
     );
   }
 }
@@ -1029,11 +1015,14 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
 
     if (routePoints.isEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
         child: Stack(
           children: [
             Container(
-              height: 175,
+              height: 200, // Match the MediaCarousel height
               width: double.infinity,
               color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.grey[200],
               child: Center(
@@ -1104,11 +1093,14 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(12),
+        topRight: Radius.circular(12),
+      ),
       child: Stack(
         children: [
           SizedBox(
-            height: 175,
+            height: 200, // Match the MediaCarousel height
             width: double.infinity,
             child: _cachedMapWidget!,
           ),
