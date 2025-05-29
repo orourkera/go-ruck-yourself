@@ -381,6 +381,16 @@ class RuckSessionCompleteResource(Resource):
             started_at_str = session_check.data[0].get('started_at')
             if current_status not in ['in_progress', 'paused']:
                 return {'message': 'Session not in progress or paused'}, 400
+            
+            # Fetch user's allow_ruck_sharing preference to set default for is_public
+            user_resp = supabase.table('user') \
+                .select('allow_ruck_sharing') \
+                .eq('id', g.user.id) \
+                .single() \
+                .execute()
+        
+            user_allows_sharing = user_resp.data.get('allow_ruck_sharing', False) if user_resp.data else False
+        
             # Calculate duration
             if started_at_str:
                 try:
@@ -396,7 +406,7 @@ class RuckSessionCompleteResource(Resource):
             distance_km = None
             if 'distance_km' in data and data['distance_km']:
                 distance_km = data['distance_km']
-            
+        
             server_calculated_pace = None
             if distance_km and distance_km > 0 and duration_seconds > 0:
                 server_calculated_pace = duration_seconds / distance_km  # seconds per km
@@ -406,6 +416,15 @@ class RuckSessionCompleteResource(Resource):
                 'status': 'completed',
                 'duration_seconds': duration_seconds
             }
+        
+            # Set is_public based on user preference or explicit override from client
+            if 'is_public' in data:
+                # Client explicitly set sharing preference for this session
+                update_data['is_public'] = data['is_public']
+            else:
+                # Default based on user's global preference
+                update_data['is_public'] = user_allows_sharing
+            
             # Add all relevant fields if provided
             if 'distance_km' in data:
                 update_data['distance_km'] = data['distance_km']
@@ -444,6 +463,10 @@ class RuckSessionCompleteResource(Resource):
                 update_data['tags'] = data['tags']
             if 'planned_duration_minutes' in data:
                 update_data['planned_duration_minutes'] = data['planned_duration_minutes']
+            
+            # Log the sharing decision for debugging
+            logger.info(f"Session {ruck_id} completion: user_allows_sharing={user_allows_sharing}, is_public={update_data['is_public']}")
+        
             # Continue with update as before
             update_resp = supabase.table('ruck_session') \
                 .update(update_data) \

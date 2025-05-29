@@ -23,6 +23,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
@@ -289,6 +290,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         final ruckWeightKg = state.session.ruckWeightKg ?? 0.0;
                         final notes = state.session.notes;
                         final heartRateSamples = state.session.heartRateSamples;
+                        final splits = state.session.splits;
 
                         if (state.session.endTime == null) {
                           debugPrint('[SessionCompleteScreen] endTime was null, using DateTime.now()');
@@ -328,6 +330,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                             'ruckWeight': ruckWeightKg,
                             'initialNotes': notes,
                             'heartRateSamples': heartRateSamples,
+                            'splits': splits,
                           },
                         );
                       } else if (state is ActiveSessionRunning && !sessionRunning) {
@@ -590,6 +593,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                         status: RuckStatus.completed,
                                         avgHeartRate: null, // Will be filled from samples if available
                                         heartRateSamples: [],
+                                        splits: sessionDetails.splits.map((splitData) => SessionSplit.fromJson(splitData as Map<String, dynamic>)).toList(),
                                       );
                                       
                                       Navigator.of(context).pushReplacementNamed(
@@ -605,6 +609,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                           'ruckWeightKg': sessionDetails.ruckWeightKg,
                                           'notes': null,
                                           'session': mockSession,
+                                          'splits': sessionDetails.splits.map((splitData) => SessionSplit.fromJson(splitData as Map<String, dynamic>)).toList(),
                                         },
                                       );
                                     } else {
