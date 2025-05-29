@@ -963,7 +963,7 @@ class _RouteMapState extends State<_RouteMap> {
     
     // Determine which marker image to use based on gender
     final String markerImagePath = (userGender == 'female')
-        ? 'assets/images/lady_rucker.png' // Female version
+        ? 'assets/images/ladyruckerpin.png' // Female version
         : 'assets/images/map_marker.png'; // Default/male version
     
     debugPrint('Using map marker image path: $markerImagePath');

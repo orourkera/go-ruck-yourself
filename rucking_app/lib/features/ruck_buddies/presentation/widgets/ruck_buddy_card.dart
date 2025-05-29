@@ -419,44 +419,50 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                     
                     const SizedBox(height: 12),
                     
-                    // Map Preview
-                    _RouteMapPreview(
-                      locationPoints: widget.ruckBuddy.locationPoints,
-                      ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
-                    ),
-                    
-                    // Photos Carousel (directly after map with minimal spacing)
-                    if (_photos.isNotEmpty) 
-                      Builder(builder: (context) {
-                        // Force create a new carousel widget each time with unique cache busters
-                        final processedUrls = _getProcessedPhotoUrls(_photos, addCacheBuster: true);
-                        developer.log('[PHOTO_DEBUG] Building photo carousel with ${processedUrls.length} photos', name: 'RuckBuddyCard');
-                        
-                        return Container(
-                          key: ValueKey('photo_carousel_${DateTime.now().millisecondsSinceEpoch}'),
-                          // Remove horizontal padding, only keep vertical spacing
-                          margin: EdgeInsets.zero,
-                          padding: const EdgeInsets.only(top: 5.0),
-                          width: MediaQuery.of(context).size.width,
-                          alignment: Alignment.centerLeft,
-                          child: PhotoCarousel(
-                            photoUrls: processedUrls,
-                            height: 140,
-                            showDeleteButtons: false,
-                            onPhotoTap: (index) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => PhotoViewer(
-                                    photoUrls: processedUrls,
-                                    initialIndex: index,
-                                  ),
+                    // Unified Media Carousel (photos + map)
+                    Builder(builder: (context) {
+                      // Create list of media items (map first, then photos)
+                      List<MediaCarouselItem> mediaItems = [];
+                      
+                      // Add map as the first item
+                      mediaItems.add(MediaCarouselItem.map(
+                        locationPoints: widget.ruckBuddy.locationPoints,
+                        ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
+                      ));
+                      
+                      // Add photos after the map
+                      final processedUrls = _getProcessedPhotoUrls(_photos, addCacheBuster: true);
+                      for (String photoUrl in processedUrls) {
+                        mediaItems.add(MediaCarouselItem.photo(photoUrl));
+                      }
+                      
+                      developer.log('[MEDIA_DEBUG] Building media carousel with ${mediaItems.length} items (1 map + ${processedUrls.length} photos)', name: 'RuckBuddyCard');
+                      
+                      return MediaCarousel(
+                        mediaItems: mediaItems,
+                        height: 200, // Updated to 200px tall
+                        initialPage: processedUrls.isNotEmpty ? 1 : 0, // Start at first photo if photos exist
+                        onPhotoTap: (index) {
+                          // Only handle photo taps, skip map items
+                          final photoUrls = mediaItems
+                              .where((item) => item.type == MediaType.photo)
+                              .map((item) => item.photoUrl!)
+                              .toList();
+                          
+                          if (photoUrls.isNotEmpty) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PhotoViewer(
+                                  photoUrls: photoUrls,
+                                  initialIndex: index,
                                 ),
-                              );
-                            },
-                          ),
-                        );
-                      }),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    }),
                     
                     const SizedBox(height: 8),
                     
@@ -683,6 +689,233 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           overflow: TextOverflow.ellipsis,
         ),
       ],
+    );
+  }
+}
+
+// Enum for media types
+enum MediaType { photo, map }
+
+// Media carousel item class
+class MediaCarouselItem {
+  final MediaType type;
+  final String? photoUrl;
+  final List<dynamic>? locationPoints;
+  final double? ruckWeightKg;
+
+  MediaCarouselItem._({
+    required this.type,
+    this.photoUrl,
+    this.locationPoints,
+    this.ruckWeightKg,
+  });
+
+  // Factory constructor for photo items
+  factory MediaCarouselItem.photo(String photoUrl) {
+    return MediaCarouselItem._(type: MediaType.photo, photoUrl: photoUrl);
+  }
+
+  // Factory constructor for map items
+  factory MediaCarouselItem.map({
+    required List<dynamic>? locationPoints,
+    double? ruckWeightKg,
+  }) {
+    return MediaCarouselItem._(
+      type: MediaType.map,
+      locationPoints: locationPoints,
+      ruckWeightKg: ruckWeightKg,
+    );
+  }
+}
+
+// Media carousel widget that handles both photos and maps
+class MediaCarousel extends StatefulWidget {
+  final List<MediaCarouselItem> mediaItems;
+  final double height;
+  final int initialPage;
+  final Function(int index)? onPhotoTap;
+
+  const MediaCarousel({
+    Key? key,
+    required this.mediaItems,
+    this.height = 240.0,
+    this.initialPage = 0,
+    this.onPhotoTap,
+  }) : super(key: key);
+
+  @override
+  State<MediaCarousel> createState() => _MediaCarouselState();
+}
+
+class _MediaCarouselState extends State<MediaCarousel> {
+  PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.initialPage;
+    _pageController = PageController(initialPage: widget.initialPage);
+    
+    // Preload all photos when carousel is created
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preloadPhotos();
+    });
+  }
+  
+  void _preloadPhotos() {
+    if (!mounted) return;
+    
+    for (final item in widget.mediaItems) {
+      if (item.type == MediaType.photo) {
+        // Preload the image into cache
+        precacheImage(
+          CachedNetworkImageProvider(item.photoUrl!),
+          context,
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.mediaItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: [
+        // PageView for full-width media items
+        SizedBox(
+          height: widget.height,
+          width: double.infinity,
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: (int page) {
+              setState(() {
+                _currentPage = page;
+              });
+            },
+            itemCount: widget.mediaItems.length,
+            itemBuilder: (context, index) {
+              return _buildMediaItem(context, index);
+            },
+          ),
+        ),
+        
+        // Page indicator dots
+        if (widget.mediaItems.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                widget.mediaItems.length,
+                (index) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                  width: 8.0,
+                  height: 8.0,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _currentPage == index
+                        ? AppColors.secondary
+                        : Colors.grey.withOpacity(0.4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMediaItem(BuildContext context, int index) {
+    final mediaItem = widget.mediaItems[index];
+    
+    return GestureDetector(
+      onTap: () {
+        if (mediaItem.type == MediaType.photo && widget.onPhotoTap != null) {
+          // Calculate the photo index (excluding map items)
+          int photoIndex = 0;
+          for (int i = 0; i < index; i++) {
+            if (widget.mediaItems[i].type == MediaType.photo) {
+              photoIndex++;
+            }
+          }
+          widget.onPhotoTap!(photoIndex);
+        }
+        // Map items don't have tap functionality for now
+      },
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(0.0), // Square corners
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 5.0,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(0.0), // Square corners
+          child: mediaItem.type == MediaType.photo
+              ? _buildPhotoItem(mediaItem)
+              : _buildMapItem(mediaItem),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoItem(MediaCarouselItem item) {
+    return SizedBox(
+      width: double.infinity,
+      height: widget.height,
+      child: CachedNetworkImage(
+        imageUrl: item.photoUrl!,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          color: Colors.grey.shade200,
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+        errorWidget: (context, url, error) => Container(
+          color: Colors.grey.shade200,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.broken_image, color: Colors.red, size: 32),
+                const SizedBox(height: 8),
+                Text(
+                  'Failed to load image',
+                  style: TextStyle(color: Colors.red.shade800),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapItem(MediaCarouselItem item) {
+    return SizedBox(
+      width: double.infinity,
+      height: widget.height,
+      child: _RouteMapPreview(
+        locationPoints: item.locationPoints,
+        ruckWeightKg: item.ruckWeightKg,
+      ),
     );
   }
 }
