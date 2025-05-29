@@ -11,6 +11,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/app_theme.dart';
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
@@ -111,6 +112,7 @@ class RuckingApp extends StatelessWidget {
                           ruckWeight: args['ruckWeight'] as double,
                           initialNotes: args['initialNotes'] as String?,
                           heartRateSamples: args['heartRateSamples'] as List<HeartRateSample>?,
+                          splits: args['splits'] as List<SessionSplit>?,
                         ),
                       ),
                     );

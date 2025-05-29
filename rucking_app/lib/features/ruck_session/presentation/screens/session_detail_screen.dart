@@ -32,6 +32,7 @@ import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
 import 'package:rucking_app/core/services/service_locator.dart'; // For 'getIt' variable
 import 'package:rucking_app/shared/widgets/charts/animated_heart_rate_chart.dart'; // Added import for AnimatedHeartRateChart
+import 'package:rucking_app/features/ruck_session/presentation/widgets/splits_display.dart';
 import 'package:get_it/get_it.dart';
 
 /// Screen that displays detailed information about a completed session
@@ -691,6 +692,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           widget.session.notes!,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
+                      ),
+                    ],
+                    
+                    // Splits Display Section - show above heart rate
+                    if (widget.session.splits != null && widget.session.splits!.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      SplitsDisplay(
+                        splits: widget.session.splits!,
+                        isMetric: preferMetric,
                       ),
                     ],
                     

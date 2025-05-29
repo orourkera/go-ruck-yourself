@@ -19,10 +19,12 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/splits_display.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
@@ -44,6 +46,7 @@ class SessionCompleteScreen extends StatefulWidget {
   final double ruckWeight;
   final String? initialNotes;
   final List<HeartRateSample>? heartRateSamples;
+  final List<SessionSplit>? splits;
 
   const SessionCompleteScreen({
     super.key,
@@ -57,6 +60,7 @@ class SessionCompleteScreen extends StatefulWidget {
     required this.ruckWeight,
     this.initialNotes,
     this.heartRateSamples,
+    this.splits,
   });
 
   @override
@@ -75,6 +79,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   List<String> _selectedPhotos = [];
   bool _isSaving = false;
   bool _isUploadingPhotos = false;
+  bool? _shareSession; // null means use user's default preference
 
   // Heart rate data
   List<HeartRateSample>? _heartRateSamples;
@@ -146,6 +151,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'elevation_gain_m': widget.elevationGain,
         'elevation_loss_m': widget.elevationLoss,
       };
+      
+      // Only include is_public if user explicitly set a preference for this session
+      if (_shareSession != null) {
+        completionData['is_public'] = _shareSession!;
+      }
 
       // Save session first - this is fast and immediate
       await _apiClient.patch('/rucks/${widget.ruckId}', completionData);
@@ -246,6 +256,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 _buildHeader(),
                 const SizedBox(height: 24),
                 _buildStatsGrid(preferMetric),
+                if (widget.splits != null && widget.splits!.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildSplitsSection(preferMetric),
+                ],
                 if (_heartRateSamples?.isNotEmpty ?? false) ...[
                   const SizedBox(height: 24),
                   _buildHeartRateSection(),
@@ -258,6 +272,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 _buildExertionSection(),
                 const SizedBox(height: 24),
                 _buildNotesSection(),
+                const SizedBox(height: 24),
+                _buildSharingSection(),
                 const SizedBox(height: 32),
                 _buildActionButtons(),
               ],
@@ -310,6 +326,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           StatCard(title: 'Max HR', value: _maxHeartRate?.toString() ?? '--', icon: Icons.favorite_border, color: AppColors.error, centerContent: true, valueFontSize: 36),
       ],
     );
+  }
+
+  Widget _buildSplitsSection(bool preferMetric) {
+    return SplitsDisplay(splits: widget.splits!, isMetric: preferMetric);
   }
 
   Widget _buildHeartRateSection() {
@@ -481,6 +501,69 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           keyboardType: TextInputType.multiline,
         ),
       ],
+    );
+  }
+
+  Widget _buildSharingSection() {
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, authState) {
+        final bool userAllowsSharing = authState is Authenticated 
+            ? authState.user.allowRuckSharing 
+            : false;
+        
+        final bool effectiveShareSetting = _shareSession ?? userAllowsSharing;
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Session Sharing', style: AppTextStyles.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              'Default: ${userAllowsSharing ? 'Public' : 'Private'} (based on your preferences)',
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  effectiveShareSetting ? Icons.public : Icons.lock,
+                  size: 20,
+                  color: effectiveShareSetting ? Colors.green : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    effectiveShareSetting 
+                        ? 'This session will be visible to other users'
+                        : 'This session will be private',
+                    style: AppTextStyles.bodyMedium,
+                  ),
+                ),
+                Switch(
+                  value: effectiveShareSetting,
+                  onChanged: (value) {
+                    setState(() {
+                      // If the new value matches user's default, clear override
+                      _shareSession = (value == userAllowsSharing) ? null : value;
+                    });
+                  },
+                ),
+              ],
+            ),
+            if (_shareSession != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Override: ${_shareSession! ? 'Public' : 'Private'} for this session',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: _shareSession! ? Colors.green : Colors.orange,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

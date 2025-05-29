@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 
 /// Enum representing the status of a ruck session
 enum RuckStatus {
@@ -39,6 +40,7 @@ class RuckSession {
     double? weightKg,
     int? plannedDurationMinutes,
     int? pausedDurationSeconds,
+    List<SessionSplit>? splits,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -66,6 +68,7 @@ class RuckSession {
       weightKg: weightKg ?? this.weightKg,
       plannedDurationMinutes: plannedDurationMinutes ?? this.plannedDurationMinutes,
       pausedDurationSeconds: pausedDurationSeconds ?? this.pausedDurationSeconds,
+      splits: splits ?? this.splits,
     );
   }
 
@@ -95,6 +98,7 @@ class RuckSession {
   final int? avgHeartRate;
   final int? maxHeartRate;
   final int? minHeartRate;
+  final List<SessionSplit>? splits;
 
   RuckSession({
     this.id,
@@ -122,6 +126,7 @@ class RuckSession {
     this.weightKg,
     this.plannedDurationMinutes,
     this.pausedDurationSeconds,
+    this.splits,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -259,6 +264,11 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         weightKg: json['weight_kg'] != null ? parseDistance(json['weight_kg']) : null,
         plannedDurationMinutes: json['planned_duration_minutes'] != null ? (json['planned_duration_minutes'] as num).toInt() : null,
         pausedDurationSeconds: json['paused_duration_seconds'] != null ? (json['paused_duration_seconds'] as num).toInt() : null,
+        splits: json['splits'] != null
+            ? (json['splits'] as List<dynamic>)
+                .map((e) => SessionSplit.fromJson(e as Map<String, dynamic>))
+                .toList()
+            : null,
       );
     } catch (e) {
       AppLogger.error("Error parsing RuckSession from JSON: $e");
@@ -312,6 +322,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       'weight_kg': weightKg,
       'planned_duration_minutes': plannedDurationMinutes,
       'paused_duration_seconds': pausedDurationSeconds,
+      'splits': splits?.map((e) => e.toJson()).toList(),
     };
   }
 }
