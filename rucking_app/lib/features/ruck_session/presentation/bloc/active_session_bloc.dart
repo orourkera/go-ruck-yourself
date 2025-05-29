@@ -123,6 +123,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<HeartRateUpdated>(_onHeartRateUpdated);
     on<HeartRateBufferProcessed>(_onHeartRateBufferProcessed);
     on<SessionReset>(_onSessionReset);
+    on<SessionCleanupRequested>(_onSessionCleanupRequested);
   }
 
   Future<void> _onSessionStarted(
@@ -478,7 +479,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           AppLogger.info('[SESSION_RECOVERY] Attempting to restore location syncing...');
           try {
             // Test if auth is working now
-            await _apiClient.get('/user/profile');
+            await _apiClient.get('/users/profile');
             AppLogger.info('[SESSION_RECOVERY] Authentication restored, restarting location updates');
             _startLocationUpdates(currentState.sessionId);
           } catch (authError) {
@@ -1249,7 +1250,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       try {
         // Make a simple API call to test if auth is working
         // Use a lightweight endpoint that doesn't affect session state
-        await _apiClient.get('/user/profile');
+        await _apiClient.get('/users/profile');
         AppLogger.info('[SESSION_RECOVERY] Authentication verified, resuming full operations...');
         
         // Auth is working, safe to start location updates and API calls
@@ -1355,6 +1356,40 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     await _stopHeartRateMonitoring(); 
     _log('ActiveSessionBloc closed, all resources released.');
     super.close();
+  }
+
+  /// Handle session cleanup for app lifecycle management
+  Future<void> _onSessionCleanupRequested(
+    SessionCleanupRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('Session cleanup requested for app lifecycle');
+    
+    try {
+      final currentState = state;
+      
+      // If there's an active session, ensure data is persisted
+      if (currentState is ActiveSessionRunning) {
+        AppLogger.info('Saving active session data during cleanup');
+        
+        // Force save any pending heart rate data
+        if (_allHeartRateSamples.isNotEmpty) {
+          await _sendHeartRateSamplesToApi(currentState.sessionId, _allHeartRateSamples);
+        }
+        
+        // Persist current session state
+        await _activeSessionStorage.saveActiveSession(currentState);
+        
+        AppLogger.info('Active session data saved during cleanup');
+      }
+      
+      // Clean up resources but don't fully stop the session
+      // (session might need to continue in background)
+      AppLogger.info('Session cleanup completed');
+      
+    } catch (e) {
+      AppLogger.error('Error during session cleanup: $e');
+    }
   }
 
   // Helper method to work around analyzer issue with AppLogger

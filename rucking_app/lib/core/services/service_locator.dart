@@ -7,6 +7,7 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
+import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/security/ssl_pinning.dart';
@@ -59,6 +60,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<LocationService>(LocationServiceImpl());
   getIt.registerSingleton<HealthService>(HealthService());
   getIt.registerSingleton<RevenueCatService>(RevenueCatService());
+  getIt.registerSingleton<AppLifecycleService>(AppLifecycleService.instance);
   
   // Watch service depends on location, health, auth
   getIt.registerSingleton<WatchService>(
