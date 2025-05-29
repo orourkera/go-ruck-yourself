@@ -93,7 +93,7 @@ Future<void> setupServiceLocator() async {
   // Blocs
   getIt.registerFactory<AuthBloc>(() => AuthBloc(getIt<AuthRepository>()));
   getIt.registerFactory<SessionHistoryBloc>(() => SessionHistoryBloc(
-    apiClient: getIt<ApiClient>(),
+    sessionRepository: getIt<SessionRepository>(),
   ));
   getIt.registerFactory<ActiveSessionBloc>(() => ActiveSessionBloc(
         apiClient: getIt<ApiClient>(),

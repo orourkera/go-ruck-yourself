@@ -1,17 +1,17 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
 part 'session_history_event.dart';
 part 'session_history_state.dart';
 
 class SessionHistoryBloc extends Bloc<SessionHistoryEvent, SessionHistoryState> {
-  final ApiClient _apiClient;
+  final SessionRepository _sessionRepository;
   
-  SessionHistoryBloc({required ApiClient apiClient}) 
-      : _apiClient = apiClient,
+  SessionHistoryBloc({required SessionRepository sessionRepository}) 
+      : _sessionRepository = sessionRepository,
         super(SessionHistoryInitial()) {
     on<LoadSessionHistory>(_onLoadSessionHistory);
     on<FilterSessionHistory>(_onFilterSessionHistory);
@@ -24,91 +24,44 @@ class SessionHistoryBloc extends Bloc<SessionHistoryEvent, SessionHistoryState> 
     emit(SessionHistoryLoading());
     
     try {
-      // Build endpoint based on filter
-      String endpoint = '/rucks';
+      // Determine date filters based on the filter type
+      DateTime? startDate;
+      DateTime? endDate;
       
       if (event.filter != null) {
         switch (event.filter) {
           case SessionFilter.thisWeek:
             final now = DateTime.now();
             final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-            final startDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-            endpoint = '/rucks?start_date=${startDate.toIso8601String()}';
+            startDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
             break;
           case SessionFilter.thisMonth:
             final now = DateTime.now();
-            final startOfMonth = DateTime(now.year, now.month, 1);
-            endpoint = '/rucks?start_date=${startOfMonth.toIso8601String()}';
+            startDate = DateTime(now.year, now.month, 1);
             break;
           case SessionFilter.lastMonth:
             final now = DateTime.now();
-            final startOfLastMonth = DateTime(now.year, now.month - 1, 1);
-            final endOfLastMonth = DateTime(now.year, now.month, 0);
-            endpoint = '/rucks?start_date=${startOfLastMonth.toIso8601String()}&end_date=${endOfLastMonth.toIso8601String()}';
+            startDate = DateTime(now.year, now.month - 1, 1);
+            endDate = DateTime(now.year, now.month, 0);
             break;
           case SessionFilter.custom:
-            if (event.customStartDate != null && event.customEndDate != null) {
-              endpoint = '/rucks?start_date=${event.customStartDate!.toIso8601String()}&end_date=${event.customEndDate!.toIso8601String()}';
-            }
+            startDate = event.customStartDate;
+            endDate = event.customEndDate;
             break;
           case SessionFilter.all:
           default:
-            // Default endpoint is all sessions
+            // No date filters for "all" sessions
             break;
         }
       }
       
-      AppLogger.info('Fetching sessions with endpoint: $endpoint');
-      final response = await _apiClient.get(endpoint);
+      // Use the cached repository method
+      final sessions = await _sessionRepository.fetchSessionHistory(
+        startDate: startDate,
+        endDate: endDate,
+      );
       
-      List<dynamic> sessionsList = [];
-      
-      // Handle different response formats from the API
-      if (response == null) {
-        sessionsList = [];
-      } else if (response is List) {
-        sessionsList = response;
-      } else if (response is Map) {
-        // Look for common API response patterns
-        if (response.containsKey('data')) {
-          sessionsList = response['data'] as List;
-        } else if (response.containsKey('sessions')) {
-          sessionsList = response['sessions'] as List;
-        } else if (response.containsKey('items')) {
-          sessionsList = response['items'] as List;
-        } else if (response.containsKey('results')) {
-          sessionsList = response['results'] as List;
-        } else {
-          // Try to find any List in the response
-          for (final key in response.keys) {
-            if (response[key] is List) {
-              sessionsList = response[key] as List;
-              break;
-            }
-          }
-          
-          if (sessionsList.isEmpty) {
-            AppLogger.warning('Unexpected response format from API');
-          }
-        }
-      } else {
-        AppLogger.warning('Unknown response type from API');
-      }
-      
-      // Convert to RuckSession objects
-      final sessions = sessionsList
-          .map((session) => RuckSession.fromJson(session))
-          .toList();
-          
-      // Filter for completed sessions ONLY
-      final completedSessions = sessions
-          .where((s) => s.status == RuckStatus.completed)
-          .toList();
-          
-      // Sort by date (newest first)
-      completedSessions.sort((a, b) => b.startTime.compareTo(a.startTime));
-      
-      emit(SessionHistoryLoaded(sessions: completedSessions)); // Emit filtered list
+      emit(SessionHistoryLoaded(sessions: sessions));
     } catch (e) {
       AppLogger.error('Error fetching sessions: $e');
       emit(SessionHistoryError(message: e.toString()));
