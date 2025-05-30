@@ -32,7 +32,7 @@ class MeasurementUtils {
 
   /// Converts seconds-per-km to seconds-per-unit depending on preference.
   static double paceSeconds(double secPerKm, {required bool metric}) =>
-      metric ? secPerKm : secPerKm * 1 / _kmToMi;
+      metric ? secPerKm : secPerKm / _kmToMi;
 
   // ===== Formatting helpers (strings for UI) =============================
 
@@ -58,7 +58,7 @@ class MeasurementUtils {
     
     // Convert from seconds/km to seconds/mile if not metric
     // For conversion: seconds/mile = seconds/km * 0.621371 (km to mile factor)
-    final pace = metric ? paceSeconds : paceSeconds * 0.621371;
+    final pace = metric ? paceSeconds : paceSeconds / 0.621371;
     
     // Cap extremely slow paces (>60min/km or mile) to avoid UI glitches
     // Also handles if conversion resulted in non-finite or if original pace was too high

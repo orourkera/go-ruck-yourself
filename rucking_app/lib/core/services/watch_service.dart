@@ -323,9 +323,9 @@ class WatchService {
     try {
       AppLogger.info('[WATCH] Sending updated metrics to watch');
       AppLogger.info('[WATCH] Unit preference being sent: isMetric=$isMetric');
-      // Convert km to miles if user prefers imperial units
-      // distance is always stored in km in the app, but we send it in the user's preferred unit
-      double displayDistance = isMetric ? distance : distance / 1.60934; // km to miles
+      // Send distance in km - watch handles unit conversion based on isMetric flag
+      // No need to pre-convert since watch will convert km to user's preferred display unit
+      double displayDistance = distance; // Always send in km
       await _sendMessageToWatch({
         'command': 'updateMetrics',
         'isMetric': isMetric, // Add unit preference at top-level for quick access

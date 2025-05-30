@@ -385,8 +385,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       double userWeightKg = currentState.userWeightKg;
 
       // Convert pace (seconds per km) to speed (km/h), then to mph for MetCalculator
-      // Speed (km/h) = 3600 / pace (seconds per km)
-      double speedKmh = newPace != null && newPace > 0 ? (3600 / newPace) : 0;
+      // Speed (km/h) = 60 / pace (seconds per km)
+      double speedKmh = newPace != null && newPace > 0 ? (60 / newPace) : 0;
       double speedMph = MetCalculator.kmhToMph(speedKmh);
       // Convert kg to lbs for rucksack weight
       double ruckWeightLbs = currentState.ruckWeightKg * 2.20462;
@@ -589,7 +589,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           'calories_burned': finalCalories.round(),
           'elevation_gain_m': currentState.elevationGain, // Changed key
           'elevation_loss_m': currentState.elevationLoss, // Changed key
-          'average_pace_min_km': currentState.pace, 
+          'average_pace_min_km': currentState.pace, // Changed key
           'route': currentState.locationPoints.map((p) => p.toJson()).toList(),
           'heart_rate_samples': _allHeartRateSamples.map((s) => s.toJson()).toList(), // Send all collected samples
           'average_heart_rate': avgHeartRate,

@@ -193,7 +193,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
 
         // Extract user information
         final userId = data['user_id']?.toString() ?? '';
-        final username = data['user_name']?.toString() ?? data['username']?.toString() ?? ''; // Default to empty string
+        final username = data['user']?['username']?.toString() ?? ''; // Use documented API structure
         final userGender = data['user_gender']?.toString() ?? 'male';
         print('RuckBuddyDetailScreen _loadRuckDetails: Parsed User: id=$userId, name=$username, gender=$userGender');
 
@@ -835,7 +835,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                               label: 'Pace',
                               value: MeasurementUtils.formatPace(
                                 displayBuddy.distanceKm > 0 
-                                  ? (displayBuddy.durationSeconds / 60) / displayBuddy.distanceKm 
+                                  ? displayBuddy.durationSeconds / displayBuddy.distanceKm 
                                   : 0,
                                 metric: preferMetric,
                               ),
