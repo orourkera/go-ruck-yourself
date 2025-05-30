@@ -60,8 +60,8 @@ class TokenRefreshInterceptor extends Interceptor {
         }
       } catch (e) {
         debugPrint('[AUTH] Token refresh failed: $e');
-        // If refresh fails, clear auth and proceed with error
-        await _authService.logout();
+        // If refresh fails, log the error but don't logout - let user continue
+        debugPrint('[AUTH] Token refresh failed but keeping user authenticated');
       } finally {
         _isRefreshing = false;
       }
