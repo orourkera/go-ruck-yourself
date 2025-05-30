@@ -36,25 +36,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           if (user != null) {
             emit(Authenticated(user));
           } else {
-            // If we can't get a user despite being "authenticated", force logout
-            await _authRepository.logout();
-            emit(Unauthenticated());
+            // If we can't get a user despite being "authenticated", stay authenticated
+            // but log the issue - don't force logout
+            AppLogger.warning('[AuthBloc] Could not get user data but staying authenticated');
+            emit(AuthLoading()); // Keep in loading state rather than logout
           }
         } catch (e) {
           // If we get an error while trying to get the current user,
-          // force a logout and re-authentication
-          AppLogger.error('[AuthBloc] Error getting current user: $e');
-          await _authRepository.logout();
-          emit(Unauthenticated());
+          // stay authenticated but log the issue - don't force logout
+          AppLogger.warning('[AuthBloc] Error getting current user but staying authenticated: $e');
+          emit(AuthLoading()); // Keep in loading state rather than logout
         }
       } else {
         emit(Unauthenticated());
       }
     } catch (e) {
       AppLogger.error('[AuthBloc] Auth check error: $e');
-      // Force logout if there's any authentication-related error
-      await _authRepository.logout();
-      emit(Unauthenticated());
+      // Stay authenticated on auth check errors - don't force logout
+      AppLogger.warning('[AuthBloc] Auth check failed but staying authenticated');
+      emit(AuthLoading()); // Keep in loading state rather than logout
     }
   }
 
