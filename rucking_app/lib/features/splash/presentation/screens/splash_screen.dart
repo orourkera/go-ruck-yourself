@@ -209,7 +209,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     ),
                     const SizedBox(height: 70),
                     Text(
-                      'But seriously, you\'ll never ruck alone.',
+                      'You\'ll never ruck alone.',
                       style: AppTextStyles.titleMedium.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w500,

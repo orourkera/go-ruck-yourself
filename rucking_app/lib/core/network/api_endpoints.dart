@@ -1,4 +1,4 @@
-/// API Endpoints for the RuckingApp
+/// API Endpoints for Ruck!
 /// This file contains all the endpoint constants used throughout the application
 
 class ApiEndpoints {

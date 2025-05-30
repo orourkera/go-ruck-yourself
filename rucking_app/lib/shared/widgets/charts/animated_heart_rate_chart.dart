@@ -80,9 +80,20 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
         ? widget.totalDuration!.inMinutes.toDouble()
         : spots.isNotEmpty ? spots.last.x + 5 : 10.0;
         
-    // Always use the total duration as the max X, not just the last data point
-    // This ensures the graph extends to the full session duration even if heart rate data ends earlier
-    final double safeMaxX = totalMinutes;
+    // Ensure the chart shows all data points while maintaining good visualization
+    final double actualDataMaxX = spots.isNotEmpty ? spots.last.x : 0.0;
+    
+    // If session duration is much longer than heart rate data, prioritize data visibility
+    // If they're similar, use session duration for context
+    final double safeMaxX;
+    if (totalMinutes > actualDataMaxX * 2 && actualDataMaxX > 0) {
+      // Session much longer than HR data - show data range with reasonable buffer
+      safeMaxX = actualDataMaxX + math.max(3.0, actualDataMaxX * 0.3);
+    } else {
+      // Use session duration as it provides good context
+      safeMaxX = math.max(totalMinutes, actualDataMaxX + 2.0);
+    }
+        
     // Ensure min and max Y values are proper doubles
     final double safeMinY = ((widget.minHeartRate != null) ? widget.minHeartRate!.toDouble() : 60.0) - 10.0;
     final double safeMaxY = ((widget.maxHeartRate != null) ? widget.maxHeartRate!.toDouble() : 180.0) + 10.0;

@@ -278,7 +278,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           // Legal text and links
                           SizedBox(height: isTablet ? 20 : 15),
                           Text(
-                            'Go Ruck Yourself Premium\nAuto-renewing subscription',
+                            'Ruck! Premium\nAuto-renewing subscription',
                             style: AppTextStyles.bodySmall.copyWith(
                               fontWeight: FontWeight.bold,
                               fontSize: isTablet ? 14 : null,

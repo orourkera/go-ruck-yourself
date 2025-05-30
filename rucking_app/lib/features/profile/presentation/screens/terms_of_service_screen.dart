@@ -38,12 +38,12 @@ class TermsOfServiceScreen extends StatelessWidget {
           children: [
             _buildSection(
               'Effective Date: April 10, 2025',
-              'App Name: Go Ruck Yourself\nDeveloper: Get Rucky, Inc\nContact: rory@getrucky.com',
+              'App Name: Ruck!\nDeveloper: Get Rucky, Inc\nContact: rory@getrucky.com',
               context,
             ),
             _buildSection(
               '1. Acceptance of Terms',
-              'By creating an account or using the Go Ruck Yourself app (the "App"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree, do not use the App.',
+              'By creating an account or using the Ruck! app (the "App"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree, do not use the App.',
               context,
             ),
             _buildSection(
