@@ -98,16 +98,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && GetIt.I.isRegistered<ActiveSessionBloc>()) {
           final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Fetching photos for ${displayBuddy.id} from ActiveSessionBloc.');
-          // Request photos from the bloc
-          try {
-            final ruckId = displayBuddy.id;
-            print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Dispatching FetchSessionPhotosRequested event with ruckId: $ruckId');
-            // Force the bloc to fetch fresh photos
-            activeSessionBloc.add(FetchSessionPhotosRequested(ruckId));
-          } catch (e) {
-            print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Error requesting photos for ID ${displayBuddy.id}: $e');
-          }
+          final ruckId = displayBuddy.id;
+          activeSessionBloc.add(FetchSessionPhotosRequested(ruckId));
         } else {
           print('[PHOTO_DEBUG] RuckBuddyDetailScreen: ActiveSessionBloc not registered or widget not mounted');
         }
@@ -512,8 +504,6 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
     return BlocListener<ActiveSessionBloc, ActiveSessionState>(
       bloc: GetIt.instance<ActiveSessionBloc>(),
       listenWhen: (previous, current) {
-        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: previous=${previous.runtimeType}, current=${current.runtimeType}');
-        
         // Helper function to get photos from any state type that might contain them
         List<dynamic> getPhotosFromState(ActiveSessionState state) {
           if (state is SessionSummaryGenerated) return state.photos;
@@ -526,43 +516,29 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         final prevPhotos = getPhotosFromState(previous);
         final currPhotos = getPhotosFromState(current);
         
-        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: previousPhotos=${prevPhotos.length}, currentPhotos=${currPhotos.length}');
-        
         // Only trigger listener when photos change
         final bool photosChanged = prevPhotos != currPhotos;
         
-        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listenWhen: ${photosChanged ? "PHOTOS CHANGED" : "no change"}');
         return photosChanged;
       },
       listener: (context, state) {
-        print('[PHOTO_DEBUG] RuckBuddyDetailScreen listener: Received state ${state.runtimeType}');
-        
         List<dynamic> statePhotos = [];
         if (state is SessionSummaryGenerated) {
           statePhotos = state.photos;
-          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in SessionSummaryGenerated state');
         } else if (state is ActiveSessionInitial) {
           statePhotos = state.photos;
-          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in ActiveSessionInitial state');
         } else if (state is ActiveSessionRunning) {
           statePhotos = state.photos;
-          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in ActiveSessionRunning state');
         } else if (state is SessionPhotosLoadedForId && state.sessionId.toString() == displayBuddy.id.toString()) {
           // Handle the SessionPhotosLoadedForId state which is emitted by our updated ActiveSessionBloc
           statePhotos = state.photos;
-          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Found ${statePhotos.length} photos in SessionPhotosLoadedForId state');
         }
         
         // Extract photo URLs and log them for debugging
         final photoUrls = _extractPhotoUrls(statePhotos);
-        print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Extracted ${photoUrls.length} valid photo URLs from ${statePhotos.length} photos');
-        if (photoUrls.isNotEmpty) {
-          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: First URL: ${photoUrls.first}');
-        }
         
         // Check if new photos are available and update
         if (statePhotos.isNotEmpty && mounted) {
-          print('[PHOTO_DEBUG] RuckBuddyDetailScreen: Updating UI with ${statePhotos.length} photos');
           setState(() {
             // Properly convert each dynamic object to RuckPhoto to match the expected type
             _photos = statePhotos.map((photo) {
@@ -610,7 +586,6 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                 _likeCount = state.likeCount;
                 _isProcessingLike = false;
               });
-              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: LikeStatusChecked for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
             }
           } else if (state is LikeActionCompleted) {
             if (state.ruckId == ruckId) {
@@ -619,18 +594,15 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                 _likeCount = state.likeCount;
                 _isProcessingLike = false;
               });
-              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: LikeActionCompleted for ruckId: ${state.ruckId}, isLiked: ${state.isLiked}, likeCount: ${state.likeCount}');
             }
           } else if (state is CommentActionCompleted) {
             // Refresh comments when a comment is added, updated, or deleted
-            print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: CommentActionCompleted with actionType: ${state.actionType}');
             context.read<SocialBloc>().add(LoadRuckComments(ruckId.toString()));
           } else if (state is CommentCountUpdated) {
             if (state.ruckId == ruckId) {
               setState(() {
                 _commentCount = state.count;
               });
-              print('[SOCIAL_DEBUG] RuckBuddyDetailScreen: CommentCountUpdated for ruckId: ${state.ruckId}, new commentCount: ${state.count}');
             }
           }
         },  

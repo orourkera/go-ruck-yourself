@@ -73,9 +73,7 @@ class _CommentsSectionState extends State<CommentsSection> {
     super.initState();
     
     // Load comments on init
-    debugPrint('[COMMENT_DEBUG] CommentsSection initState for ruckId: ${widget.ruckId}');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      debugPrint('[COMMENT_DEBUG] CommentsSection loading comments for ruckId: ${widget.ruckId}');
       context.read<SocialBloc>().add(LoadRuckComments(widget.ruckId));
     });
   }
@@ -170,7 +168,6 @@ class _CommentsSectionState extends State<CommentsSection> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[COMMENT_DEBUG] CommentsSection build called for ruckId: ${widget.ruckId}');
     
     // Check authentication state
     bool isAuthenticated = false;
@@ -179,16 +176,15 @@ class _CommentsSectionState extends State<CommentsSection> {
       isAuthenticated = authState is Authenticated;
       
       if (!isAuthenticated) {
-        debugPrint('[COMMENT_DEBUG] User is not authenticated, disabling comment features');
+        debugPrint('User is not authenticated, disabling comment features');
       }
     } catch (e) {
-      debugPrint('[COMMENT_DEBUG] Error checking auth state: $e');
+      debugPrint('Error checking auth state: $e');
     }
     
     // Manually trigger load if no comments are loaded yet and user is authenticated
     if (!_commentsLoaded && isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        debugPrint('[COMMENT_DEBUG] CommentsSection forcing load of comments for ruckId: ${widget.ruckId}');
         context.read<SocialBloc>().add(LoadRuckComments(widget.ruckId));
         _commentsLoaded = true;
       });
@@ -209,12 +205,9 @@ class _CommentsSectionState extends State<CommentsSection> {
           isForThisRuck = current.comment!.ruckId == widget.ruckId;
         }
         
-        debugPrint('[COMMENT_DEBUG] CommentsSection listenWhen: previous=${previous.runtimeType}, current=${current.runtimeType}, relevantState=$relevantState, isForThisRuck=$isForThisRuck');
-        
         return relevantState && (current is CommentActionError || isForThisRuck);
       },
       listener: (context, state) {
-        debugPrint('[COMMENT_DEBUG] CommentsSection listener fired with state: ${state.runtimeType}');
         
         if (state is CommentActionCompleted) {
           setState(() {
@@ -224,7 +217,6 @@ class _CommentsSectionState extends State<CommentsSection> {
           });
           
           // Automatically refresh comments list after an action
-          debugPrint('[COMMENT_DEBUG] CommentActionCompleted, refreshing comments for ruckId: ${widget.ruckId}');
           context.read<SocialBloc>().add(LoadRuckComments(widget.ruckId));
           
           if (state.actionType == 'add') {
@@ -257,7 +249,6 @@ class _CommentsSectionState extends State<CommentsSection> {
             type: SnackBarType.error,
           );
         } else if (state is CommentsLoaded) {
-          debugPrint('[COMMENT_DEBUG] CommentsLoaded state with ${state.comments.length} comments for ruckId: ${state.ruckId}');
           // Store comments in local state when they're loaded
           if (state.ruckId == widget.ruckId) {
             setState(() {
@@ -267,13 +258,10 @@ class _CommentsSectionState extends State<CommentsSection> {
         }
       },
       builder: (context, state) {
-        debugPrint('[COMMENT_DEBUG] CommentsSection builder with state: ${state.runtimeType}');
         
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section title removed per user request
-            
             // Comments list
             if (state is CommentsLoading && _currentComments.isEmpty)
               const Center(
@@ -307,7 +295,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                   final authState = context.read<AuthBloc>().state;
                   isAuthenticated = authState is Authenticated;
                 } catch (e) {
-                  debugPrint('[COMMENT_DEBUG] Error checking auth state in comment input: $e');
+                  debugPrint('Error checking auth state in comment input: $e');
                 }
                 
                 // If not authenticated, show login prompt instead of comment field
@@ -449,7 +437,7 @@ class _CommentsSectionState extends State<CommentsSection> {
     try {
       currentUserId = _getCurrentUserId(context);
     } catch (e) {
-      debugPrint('[COMMENT_DEBUG] Error getting current user ID: $e');
+      debugPrint('Error getting current user ID: $e');
       currentUserId = null;
     }
     
@@ -461,7 +449,7 @@ class _CommentsSectionState extends State<CommentsSection> {
     try {
       formattedDate = DateFormat('MMM d, yyyy • h:mm a').format(comment.createdAt);
     } catch (e) {
-      debugPrint('[COMMENT_DEBUG] Error formatting date: $e');
+      debugPrint('Error formatting date: $e');
       formattedDate = 'Date unavailable';
     }
     
@@ -479,7 +467,7 @@ class _CommentsSectionState extends State<CommentsSection> {
           }
         });
       } catch (e) {
-        debugPrint('[COMMENT_DEBUG] Error setting comment text: $e');
+        debugPrint('Error setting comment text: $e');
       }
     }
     

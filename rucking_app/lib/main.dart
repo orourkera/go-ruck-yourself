@@ -7,6 +7,9 @@ import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/tracking_transparency_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/location_service.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -15,6 +18,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  FlutterError.onError = (details) {
+    // AppLogger.error('Flutter Error: ${details.exception}');
+    // AppLogger.error('Stack trace: ${details.stack}');
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    // AppLogger.error('Platform Error: $error');
+    // AppLogger.error('Stack trace: $stack');
+    return true;
+  };
+
   // Attach Bloc observer for detailed logging of state changes & errors
   Bloc.observer = AppBlocObserver();
   
@@ -57,14 +71,6 @@ void main() async {
   // Initialize Firebase
   await Firebase.initializeApp();
   
-  // Default error handler
-  PlatformDispatcher.instance.onError = (error, stack) {
-    AppLogger.error('Uncaught error: $error', exception: error, stackTrace: stack);
-    return true;
-  };
-  
-  // Crashlytics temporarily removed to fix build issues
-  
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -72,8 +78,27 @@ void main() async {
   ]);
   
   runApp(
-    ProviderScope(
-      child: const RuckingApp(),
+    MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthBloc>(
+          create: (context) {
+            final authBloc = getIt<AuthBloc>();
+            authBloc.add(AuthCheckRequested());
+            return authBloc;
+          },
+        ),
+        BlocProvider<SessionBloc>(
+          create: (context) {
+            return getIt<SessionBloc>();
+          },
+        ),
+        BlocProvider<SocialBloc>(
+          create: (context) {
+            return getIt<SocialBloc>();
+          },
+        ),
+      ],
+      child: RuckingApp(),
     ),
   );
 }
