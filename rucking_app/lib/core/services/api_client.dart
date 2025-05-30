@@ -307,8 +307,8 @@ class ApiClient {
       
       // Debug logging for /auth/refresh request
       if (endpoint == '/auth/refresh') {
-        print('[API] Sending refresh token request to $endpoint');
-        print('[API] Request body: $body');
+        // print('[API] Sending refresh token request to $endpoint');
+        // print('[API] Request body: $body');
       }
       
       // Set timeout to prevent hanging requests
@@ -333,8 +333,8 @@ class ApiClient {
       
       // Debug logging for /auth/refresh response
       if (endpoint == '/auth/refresh') {
-        print('[API] Refresh token response status: ${response.statusCode}');
-        print('[API] Refresh token response body: ${response.data}');
+        // print('[API] Refresh token response status: ${response.statusCode}');
+        // print('[API] Refresh token response body: ${response.data}');
       }
       
       return response.data;

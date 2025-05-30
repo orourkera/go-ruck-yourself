@@ -53,7 +53,6 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   void initState() {
     super.initState();
     _instanceId = ++_instanceCounter;
-    print('[DEBUG] PhotoCarousel instance $_instanceId initializing with ${widget.photoUrls.length} photos');
     
     // Simple initialization - back to basics
     _pageController = PageController(initialPage: 0, viewportFraction: 0.5);
@@ -79,7 +78,6 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   
   @override
   void dispose() {
-    print('[DEBUG] PhotoCarousel instance $_instanceId disposing');
     if (_pageController.hasClients) {
       _pageController.dispose();
     }
@@ -109,12 +107,6 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
           ),
         ),
       );
-    }
-    
-    // Debug log all URLs to help diagnose issues
-    AppLogger.info('PhotoCarousel rendering ${widget.photoUrls.length} photos');
-    for (int i = 0; i < widget.photoUrls.length; i++) {
-      AppLogger.info('Photo URL[$i]: ${widget.photoUrls[i]}');
     }
     
     return Column(
@@ -265,8 +257,6 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   // Helper method to build image with fallback options and better error handling
   Widget _buildImageWithFallback(BuildContext context, int index) {
     final String imageUrl = widget.photoUrls[index];
-    // Log the attempt to load the image
-    AppLogger.info('Loading image from URL: $imageUrl');
     
     return ClipRRect(
       borderRadius: BorderRadius.circular(0.0), // Square corners
@@ -285,7 +275,6 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         fadeInDuration: const Duration(milliseconds: 300),
         // Error handling with detailed logging
         errorWidget: (context, url, error) {
-          AppLogger.error('Error loading image: $imageUrl, error: $error');
           return _buildErrorContainer(context, 'Image failed to load');
         },
         // Improved placeholder with fade transition

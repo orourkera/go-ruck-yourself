@@ -70,6 +70,8 @@ class AuthServiceImpl implements AuthService {
   @override
   Future<User> signIn(String email, String password) async {
     try {
+      AppLogger.info('Attempting login for email: $email');
+      
       final response = await _apiClient.post(
         '/auth/login',
         {
@@ -83,22 +85,19 @@ class AuthServiceImpl implements AuthService {
       final userData = response['user'] as Map<String, dynamic>;
       final user = User.fromJson(userData);
       
-      // Debug logging to confirm token receipt
-      print('[AUTH] Login successful. Access token received: ${token.isNotEmpty}');
-      print('[AUTH] Refresh token received: ${refreshToken.isNotEmpty}');
       // Store token and user data
       await _storageService.setSecureString(AppConfig.tokenKey, token);
       await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
       await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
       await _storageService.setString(AppConfig.userIdKey, user.userId);
-      // Confirm storage
-      print('[AUTH] Tokens and user data stored in secure storage.');
       
       // Set token in API client
       _apiClient.setAuthToken(token);
       
+      AppLogger.info('Login successful for user: ${user.userId}');
       return user;
     } catch (e) {
+      AppLogger.error('Login failed', exception: e);
       throw _handleAuthError(e);
     }
   }
@@ -151,8 +150,10 @@ class AuthServiceImpl implements AuthService {
       // Set token in API client
       _apiClient.setAuthToken(token);
       
+      AppLogger.info('Registration successful for user: ${user.userId}');
       return user;
     } catch (e) {
+      AppLogger.error('Registration failed', exception: e);
       throw _handleAuthError(e);
     }
   }
@@ -165,8 +166,6 @@ class AuthServiceImpl implements AuthService {
     await _storageService.remove(AppConfig.userProfileKey);
     await _storageService.remove(AppConfig.userIdKey);
     
-    // Confirm token clearing
-    print('[AUTH] Tokens and user data cleared from storage during sign out.');
     // Clear token in API client
     _apiClient.clearAuthToken();
   }
@@ -254,16 +253,6 @@ class AuthServiceImpl implements AuthService {
   Future<String?> refreshToken() async {
     try {
       final storedRefreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
-      // Debug logging to check if refresh token exists
-      print('[AUTH] Attempting token refresh. Refresh token available: ${storedRefreshToken != null}');
-      
-      // Log a redacted version of the token for debugging (first few and last few characters only)
-      if (storedRefreshToken != null) {
-        String redactedToken = storedRefreshToken.length > 10 
-            ? '${storedRefreshToken.substring(0, 5)}...${storedRefreshToken.substring(storedRefreshToken.length - 5)}' 
-            : '[SHORT TOKEN]';
-        print('[AUTH] Refresh token (redacted): $redactedToken');
-      }
       
       try {
         // Make the token refresh request
@@ -273,7 +262,7 @@ class AuthServiceImpl implements AuthService {
         );
         
         if (response == null) {
-          print('[AUTH] ERROR: Null response from token refresh');
+          AppLogger.error('Token refresh failed: Null response from server');
           await _cleanupInvalidAuthState();
           return null;
         }
@@ -282,7 +271,7 @@ class AuthServiceImpl implements AuthService {
         final newRefreshToken = response['refresh_token'] as String;
 
         if (newToken.isEmpty || newRefreshToken.isEmpty) {
-          print('[AUTH] ERROR: Received empty tokens from refresh');
+          AppLogger.error('Token refresh failed: Received empty tokens from server');
           await _cleanupInvalidAuthState();
           throw UnauthorizedException('Received empty tokens from refresh');
         }
@@ -294,29 +283,29 @@ class AuthServiceImpl implements AuthService {
         // Set new token in API client
         _apiClient.setAuthToken(newToken);
         
-        print('[AUTH] Token refresh successful!');
+        AppLogger.info('Token refresh successful');
         return newToken;
       } catch (e) {
-        print('[AUTH] Token refresh through API failed: $e');
+        AppLogger.error('Token refresh failed', exception: e);
         
         // All token refresh errors are treated as temporary issues
       // We'll never force a logout due to token problems
       if (e is DioException) {
         if (e.response?.statusCode == 400) {
           // Bad request (expired token) - keep the user logged in
-          print('[AUTH] Refresh token issue detected, but maintaining user session');
+          AppLogger.warning('Refresh token issue detected, but maintaining user session');
           await _cleanupInvalidAuthState();
         } else if (e.type == DioExceptionType.connectionError || 
                   e.type == DioExceptionType.connectionTimeout) {
           // Network connectivity issues
-          print('[AUTH] Network connectivity issue during token refresh');
+          AppLogger.warning('Network connectivity issue during token refresh');
         } else {
           // Other API errors
-          print('[AUTH] Server error during token refresh: ${e.response?.statusCode}');
+          AppLogger.error('Server error during token refresh: ${e.response?.statusCode}');
         }
       } else {
         // Non-Dio exceptions
-        print('[AUTH] Unexpected error during token refresh: $e');
+        AppLogger.error('Unexpected error during token refresh: $e');
       }
       // Return null instead of throwing - this indicates token refresh failed
       // but we're NOT logging the user out
@@ -324,7 +313,7 @@ class AuthServiceImpl implements AuthService {
       }
     } catch (e) {
       // Never throw session expiration exceptions
-      print('[AUTH] ERROR in refreshToken: $e');
+      AppLogger.error('Error in refreshToken', exception: e);
       // Return null instead of throwing - caller should handle this gracefully
       // without forcing user logout
       return null;
@@ -333,14 +322,14 @@ class AuthServiceImpl implements AuthService {
 
   // Helper method to handle invalid tokens without logging out the user
   Future<void> _cleanupInvalidAuthState() async {
-    print('[AUTH] Invalid or expired tokens detected, but maintaining user session');
+    AppLogger.warning('Invalid or expired tokens detected, but maintaining user session');
     // Only clear the API client's current token, but DO NOT remove stored tokens
     // This allows auto-recovery when network conditions improve
     _apiClient.clearAuthToken();
     
     // The user profile and other data remains intact
     // Next API call will trigger a new token refresh attempt
-    print('[AUTH] User session maintained - will attempt to recover on next API call');
+    AppLogger.info('User session maintained - will attempt to recover on next API call');
   }
   
   @override
@@ -386,6 +375,7 @@ class AuthServiceImpl implements AuthService {
       
       return user;
     } catch (e) {
+      AppLogger.error('Profile update failed', exception: e);
       throw _handleAuthError(e);
     }
   }

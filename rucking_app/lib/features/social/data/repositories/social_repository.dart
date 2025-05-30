@@ -42,7 +42,6 @@ class SocialRepository {
       // Use the AuthService to get the token
       return await _authService.getToken();
     } catch (e) {
-      debugPrint('Error getting auth token: $e');
       return null;
     }
   }
@@ -55,9 +54,6 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
       
-      debugPrint('[SOCIAL_DEBUG] Getting likes for ruck $ruckId');
-
-      // Don't include /api in the path as it's already in the base URL
       final response = await _httpClient.get(
         Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId'),
         headers: {
@@ -90,20 +86,13 @@ class SocialRepository {
   /// Add a like to a ruck session
   /// Updates the cache with the new like status
   Future<RuckLike> addRuckLike(int ruckId) async {
-    debugPrint('🔍 SocialRepository.addRuckLike called for ruckId: $ruckId');
     try {
-      debugPrint('🔍 Getting auth token...');
       final token = await _authToken;
-      debugPrint('🔍 Auth token retrieved: ${token != null ? 'YES' : 'NO'}');
-      
       if (token == null) {
-        debugPrint('⚠ No auth token available');
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      debugPrint('🔍 Making API request to add like');
       final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes';
-      debugPrint('🔍 Endpoint: $endpoint');
       final response = await _httpClient.post(
         Uri.parse(endpoint),
         headers: {
@@ -114,29 +103,21 @@ class SocialRepository {
           'ruck_id': ruckId,
         }),
       );
-      debugPrint('🔍 Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
-          debugPrint('🔍 Successfully added like');
-          
           // Update cache to set liked=true and increment like count
           _likeStatusCache[ruckId] = true;
           _likeCountCache[ruckId] = (_likeCountCache[ruckId] ?? 0) + 1;
           _likeCacheTimestamps[ruckId] = DateTime.now();
-          debugPrint('🔍 Updated cache for ruckId: $ruckId, liked=true, count=${_likeCountCache[ruckId]}');
-          
           return RuckLike.fromJson(data['data']);
         } else {
-          debugPrint('⚠ API success but invalid response: ${response.body}');
           throw ServerException(message: 'Invalid response: ${response.body}');
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
-        debugPrint('⚠ Unauthorized request: ${response.statusCode}');
         throw UnauthorizedException(message: 'Unauthorized request');
       } else {
-        debugPrint('⚠ Server error: ${response.statusCode} - ${response.body}');
         throw ServerException(
             message: 'Failed to add like: ${response.statusCode} - ${response.body}');
       }
@@ -149,16 +130,13 @@ class SocialRepository {
   /// Remove a like from a ruck session
   /// Updates the cache with the new unlike status
   Future<bool> removeRuckLike(int ruckId) async {
-    debugPrint('[SOCIAL_DEBUG] removeRuckLike called for ruckId: $ruckId');
     try {
       final token = await _authToken;
       if (token == null) {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      // For DELETE requests, use query parameters instead of request body
       final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId';
-      debugPrint('[SOCIAL_DEBUG] Endpoint: $endpoint');
       final response = await _httpClient.delete(
         Uri.parse(endpoint),
         headers: {
@@ -177,7 +155,6 @@ class SocialRepository {
           _likeCountCache[ruckId] = (_likeCountCache[ruckId] ?? 1) - 1;
           if (_likeCountCache[ruckId]! < 0) _likeCountCache[ruckId] = 0; // Ensure count doesn't go below 0
           _likeCacheTimestamps[ruckId] = DateTime.now();
-          debugPrint('[SOCIAL_DEBUG] Updated cache for ruckId: $ruckId, liked=false, count=${_likeCountCache[ruckId]}');
         }
         
         return success;
@@ -198,18 +175,13 @@ class SocialRepository {
   /// fresh data for both the user's like status and the total like count for the ruck,
   /// updating the respective caches.
   Future<bool> hasUserLikedRuck(int ruckId) async {
-    debugPrint('[SOCIAL_DEBUG] hasUserLikedRuck called for ruckId: $ruckId');
-
     // Check cache first if it's valid
     if (_isValidCache(ruckId)) {
-      debugPrint('[SOCIAL_DEBUG] Using cached like status for ruckId: $ruckId. Status: ${_likeStatusCache[ruckId]}, Count: ${_likeCountCache[ruckId]}');
       return _likeStatusCache[ruckId] ?? false;
     }
 
-    debugPrint('[SOCIAL_DEBUG] Cache invalid for ruckId: $ruckId. Fetching fresh like status and count.');
     final token = await _authToken;
     if (token == null) {
-      debugPrint('[SOCIAL_DEBUG] No auth token in hasUserLikedRuck for ruckId: $ruckId. Assuming not liked, count 0.');
       _likeStatusCache[ruckId] = false; // Update status cache
       _likeCountCache[ruckId] = 0;      // Update count cache
       _likeCacheTimestamps[ruckId] = DateTime.now(); // Update timestamp
@@ -226,8 +198,6 @@ class SocialRepository {
     _likeCountCache[ruckId] = freshLikeCount ?? 0; // Default to 0 if count fetch fails
     _likeCacheTimestamps[ruckId] = DateTime.now();
 
-    debugPrint('[SOCIAL_DEBUG] Updated cache for ruckId: $ruckId. Status: ${freshHasLiked ?? false}, Count: ${freshLikeCount ?? 0}');
-
     return freshHasLiked ?? false; // If fallback returns null (error), treat as not liked
   }
   
@@ -241,7 +211,6 @@ class SocialRepository {
   /// Returns true/false if user has liked the ruck, or null on error
   Future<bool?> _fallbackSingleRuckCheck(int ruckId, String token) async {
     try {
-      debugPrint('[SOCIAL_DEBUG] Individual check for like status of ruck $ruckId');
       final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes/check?ruck_id=$ruckId';
       final response = await _httpClient.get(
         Uri.parse(endpoint),
@@ -251,8 +220,6 @@ class SocialRepository {
         },
       ).timeout(const Duration(seconds: 5));
       
-      debugPrint('[SOCIAL_DEBUG] API response status code: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true) {
@@ -263,21 +230,18 @@ class SocialRepository {
           } else {
             hasLiked = data['data'] == true || data['data'] == 'true' || data['data'] == 1;
           }
-          debugPrint('[SOCIAL_DEBUG] User has liked ruck $ruckId: $hasLiked');
           return hasLiked;
         }
         return false;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 429) {
-        debugPrint('[SOCIAL_DEBUG] Rate limit hit for ruck $ruckId: ${response.statusCode}');
         return null; // Return null on rate limit to allow retry later
       } else {
         throw ServerException(
             message: 'Failed to check like status: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('[SOCIAL_DEBUG] Error in _fallbackSingleRuckCheck: $e');
       return null; // Return null on error
     }
   }
@@ -287,7 +251,6 @@ class SocialRepository {
   Future<int?> _fallbackSingleRuckLikeCount(int ruckId, String token) async {
     try {
       final url = '${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId';
-      debugPrint('[SOCIAL_DEBUG] Individual check for like count of ruck $ruckId, URL: $url');
       
       final response = await _httpClient.get(
         Uri.parse(url),
@@ -297,36 +260,24 @@ class SocialRepository {
         },
       ).timeout(const Duration(seconds: 5));
 
-      debugPrint('[SOCIAL_DEBUG] Like count API response for ruck $ruckId: ${response.statusCode}');
-      
       if (response.statusCode == 200) {
-        // Log the full response for debugging
-        debugPrint('[SOCIAL_DEBUG] Like count response body: ${response.body}');
-        
         final Map<String, dynamic> data = json.decode(response.body);
-        debugPrint('[SOCIAL_DEBUG] Like count data format check - success: ${data['success']}, data type: ${data['data']?.runtimeType}');
         
         if (data['success'] == true && data['data'] is List) {
           final count = (data['data'] as List).length;
-          debugPrint('[SOCIAL_DEBUG] Like count for ruck $ruckId: $count');
           return count;
         } else {
-          debugPrint('[SOCIAL_DEBUG] Invalid data format in like count response for ruck $ruckId');
+          return 0;
         }
-        return 0;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
-        debugPrint('[SOCIAL_DEBUG] Unauthorized request for like count of ruck $ruckId');
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 429) {
-        debugPrint('[SOCIAL_DEBUG] Rate limit hit for like count of ruck $ruckId: ${response.statusCode}');
         return null; // Return null on rate limit
       } else {
-        debugPrint('[SOCIAL_DEBUG] Server error for like count of ruck $ruckId: ${response.statusCode} - ${response.body}');
         throw ServerException(
             message: 'Failed to get like count: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('[SOCIAL_DEBUG] Error in _fallbackSingleRuckLikeCount for ruck $ruckId: $e');
       return null; // Return null on error
     }
   }
@@ -339,10 +290,7 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      // Update to the new endpoint structure /rucks/{id}/comments
       final endpoint = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments';
-      debugPrint('[SOCIAL_DEBUG] Getting comments for ruckId $ruckId, endpoint: $endpoint');
-
       final response = await _httpClient.get(
         Uri.parse(endpoint),
         headers: {
@@ -351,11 +299,6 @@ class SocialRepository {
         },
       );
       
-      debugPrint('[SOCIAL_DEBUG] Comments API response: ${response.statusCode}');
-      if (response.statusCode != 200) {
-        debugPrint('[SOCIAL_DEBUG] Failed response body: ${response.body}');
-      }
-
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
@@ -385,25 +328,11 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      debugPrint('[SOCIAL_DEBUG] Adding comment to ruck $ruckId with content: $content');
-      
-      // Parse the ruck ID to an integer if possible
-      int? ruckIdInt;
-      try {
-        ruckIdInt = int.parse(ruckId);
-      } catch (e) {
-        debugPrint('[SOCIAL_DEBUG] Could not parse ruckId to int: $e');
-      }
-      
-      // Use the correct endpoint format according to API documentation
       final endpoint = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments';
-      debugPrint('[SOCIAL_DEBUG] Comment endpoint: $endpoint');
       
-      // The ruck_id is now in the URL path, so we only need to include content in the payload
       final payload = {
         'content': content,
       };
-      debugPrint('[SOCIAL_DEBUG] Comment payload: ${json.encode(payload)}');
       
       final response = await _httpClient.post(
         Uri.parse(endpoint),
@@ -414,8 +343,6 @@ class SocialRepository {
         body: json.encode(payload),
       );
       
-      debugPrint('[SOCIAL_DEBUG] Comment API response: ${response.statusCode} - ${response.body}');
-
       if (response.statusCode == 201) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
@@ -443,25 +370,8 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      debugPrint('[SOCIAL_DEBUG] Updating comment $commentId with content: $content');
-      
-      // To update a comment, we need to know which ruck it belongs to
-      // We'll need to extract the ruck ID from the comment ID format (if possible)
-      // For now, let's use the PUT method on the specific comment endpoint
-      
-      // Try to parse the comment ID as an integer if possible
-      int? commentIdInt;
-      try {
-        commentIdInt = int.parse(commentId);
-      } catch (e) {
-        debugPrint('[SOCIAL_DEBUG] Could not parse commentId to int: $e');
-      }
-      
-      // Since the correct endpoint would be /rucks/{ruck_id}/comments/{comment_id}
-      // but we don't have the ruck_id here, we'll use the API's ability to 
-      // identify comments directly by ID
       final response = await _httpClient.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/comments/${commentIdInt ?? commentId}'),
+        Uri.parse('${AppConfig.apiBaseUrl}/comments/${commentId}'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -471,8 +381,6 @@ class SocialRepository {
         }),
       );
       
-      debugPrint('[SOCIAL_DEBUG] Update comment API response: ${response.statusCode} - ${response.body}');
-
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
@@ -500,31 +408,14 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      debugPrint('[SOCIAL_DEBUG] Deleting comment $commentId');
-      
-      // Try to parse the comment ID as an integer if possible
-      int? commentIdInt;
-      try {
-        commentIdInt = int.parse(commentId);
-      } catch (e) {
-        debugPrint('[SOCIAL_DEBUG] Could not parse commentId to int: $e');
-      }
-      
-      // The correct endpoint format is /comments/{id} for direct comment management
-      // without knowing the ruck_id
-      final commentParam = commentIdInt != null ? commentIdInt.toString() : commentId;
-      
-      // Use the DELETE method on the specific comment endpoint
       final response = await _httpClient.delete(
-        Uri.parse('${AppConfig.apiBaseUrl}/comments/$commentParam'),
+        Uri.parse('${AppConfig.apiBaseUrl}/comments/$commentId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
       
-      debugPrint('[SOCIAL_DEBUG] Delete comment API response: ${response.statusCode} - ${response.body}');
-
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         return data['success'] == true;
@@ -547,10 +438,7 @@ class SocialRepository {
     
     try {
       final token = await _authToken;
-      if (token == null) {
-        debugPrint('[SOCIAL_BATCH] No auth token available for batch preload');
-        return;
-      }
+      if (token == null) return;
       
       // Filter out rucks that already have fresh cache
       final now = DateTime.now();
@@ -560,14 +448,8 @@ class SocialRepository {
                now.difference(timestamp).inSeconds > _cacheExpirationSeconds;
       }).toList();
       
-      if (rucksToFetch.isEmpty) {
-        debugPrint('[SOCIAL_BATCH] All requested rucks have fresh cache, skipping batch load');
-        return;
-      }
+      if (rucksToFetch.isEmpty) return;
       
-      debugPrint('[SOCIAL_BATCH] Preloading social data for ${rucksToFetch.length} rucks: $rucksToFetch');
-      
-      // Make batch API call for like statuses and counts
       final ruckIdsParam = rucksToFetch.join(',');
       final response = await _httpClient.get(
         Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes/batch?ruck_ids=$ruckIdsParam'),
@@ -592,16 +474,12 @@ class SocialRepository {
               _likeCacheTimestamps[ruckId] = now;
             }
           }
-          
-          debugPrint('[SOCIAL_BATCH] Successfully cached social data for ${rucksToFetch.length} rucks');
         }
       } else {
-        debugPrint('[SOCIAL_BATCH] Batch API failed with status ${response.statusCode}');
         // Fall back to individual requests for critical data
         _fallbackIndividualRequests(rucksToFetch.take(3).toList()); // Limit fallback
       }
     } catch (e) {
-      debugPrint('[SOCIAL_BATCH] Error in batch preload: $e');
       // Fail silently - cached data will be used or individual requests will be made as needed
     }
   }
@@ -627,7 +505,6 @@ class SocialRepository {
         }
       } catch (e) {
         // Ignore individual failures during fallback
-        debugPrint('[SOCIAL_FALLBACK] Failed to load data for ruck $ruckId: $e');
       }
     }
   }

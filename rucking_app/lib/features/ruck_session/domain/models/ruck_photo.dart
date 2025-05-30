@@ -28,107 +28,90 @@ class RuckPhoto extends Equatable {
 
   /// Create a RuckPhoto from JSON
   factory RuckPhoto.fromJson(Map<String, dynamic> json) {
-    // Add debug logging for every photo parsing
-    print('[PHOTO_DEBUG] Parsing RuckPhoto from JSON keys: ${json.keys.join(', ')}');
-    
     try {
-      // Check all available keys for id
-      final id = json['id']?.toString() ?? 
-                 json['photo_id']?.toString() ?? 
-                 json['_id']?.toString() ?? 
-                 '';
+      // Extract the primary data fields
+      final String id = json['id']?.toString() ?? '';
+      final String url = json['photo_url']?.toString() ?? json['url']?.toString() ?? '';
+      final String ruckSessionId = json['ruck_session_id']?.toString() ?? '';
       
-      // Check all common variations of ruckId
-      final ruckId = json['ruck_id']?.toString() ?? 
-                     json['ruckId']?.toString() ?? 
-                     json['session_id']?.toString() ?? 
-                     '';
+      // Handle the timestamp parsing with enhanced fallback options
+      DateTime parsedAt;
+      try {
+        final dynamic timestamp = json['taken_at'] ?? json['created_at'] ?? json['timestamp'];
+        
+        if (timestamp is String) {
+          // Handle ISO format timestamps like "2023-XX-XXTXX:XX:XX.XXXXXXZ"
+          final cleanedTimestamp = timestamp.replaceAll('T', ' ').replaceAll('Z', '');
+          parsedAt = DateTime.parse(cleanedTimestamp);
+        } else if (timestamp is int) {
+          // Handle Unix timestamps (seconds)
+          parsedAt = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+        } else if (timestamp is double) {
+          // Handle Unix timestamps (milliseconds as double)
+          parsedAt = DateTime.fromMillisecondsSinceEpoch(timestamp.toInt());
+        } else {
+          // If all else fails, use current time
+          parsedAt = DateTime.now();
+        }
+      } catch (e) {
+        parsedAt = DateTime.now();
+      }
       
-      // Check all common variations of userId
-      final userId = json['user_id']?.toString() ?? 
-                     json['userId']?.toString() ?? 
-                     '';
+      // Extract optional metadata with safe parsing
+      final Map<String, dynamic> metadata = {};
+      if (json.containsKey('metadata') && json['metadata'] is Map) {
+        metadata.addAll(Map<String, dynamic>.from(json['metadata']));
+      }
       
-      // Get filename or extract from URL if available
-      String filename = json['filename'] ?? '';
-      final url = json['url'] ?? json['photo_url'] ?? json['image_url'] ?? '';
-      
-      // If no filename but URL exists, extract filename from URL
-      if (filename.isEmpty && url.isNotEmpty) {
-        final uriObj = Uri.tryParse(url);
-        if (uriObj != null) {
-          final pathSegments = uriObj.pathSegments;
-          if (pathSegments.isNotEmpty) {
-            filename = pathSegments.last;
-          }
+      // Add location info to metadata if present in the root JSON object
+      if (json.containsKey('latitude') && json.containsKey('longitude')) {
+        final dynamic lat = json['latitude'];
+        final dynamic lng = json['longitude'];
+        
+        if (lat != null && lng != null) {
+          metadata['latitude'] = lat is String ? double.tryParse(lat) ?? 0.0 : lat.toDouble();
+          metadata['longitude'] = lng is String ? double.tryParse(lng) ?? 0.0 : lng.toDouble();
         }
       }
       
-      // Try multiple date formats for created_at
-      DateTime createdAt;
-      final createdAtStr = json['created_at'] ?? json['createdAt'] ?? json['timestamp'];
-      if (createdAtStr != null) {
-        try {
-          createdAt = DateTime.parse(createdAtStr.toString());
-        } catch (e) {
-          print('[PHOTO_DEBUG] Error parsing date: $e, using current time instead');
-          createdAt = DateTime.now();
-        }
-      } else {
-        createdAt = DateTime.now();
-      }
-      
-      // Look for thumbnail URL with various key names
-      final thumbnailUrl = json['thumbnail_url'] ?? 
-                           json['thumbnailUrl'] ?? 
-                           json['thumb'] ?? 
-                           json['thumbnail'] ?? 
-                           url; // Fallback to main URL
-      
-      // Create the photo object
+      // Create and return the RuckPhoto object
       final photo = RuckPhoto(
         id: id,
-        ruckId: ruckId,
-        userId: userId,
-        filename: filename,
-        originalFilename: json['original_filename'] ?? json['originalFilename'],
-        contentType: json['content_type'] ?? json['contentType'] ?? json['mime_type'],
-        size: json['size'] is int 
-              ? json['size'] 
-              : json['size'] is String 
-                ? int.tryParse(json['size']) 
-                : null,
-        createdAt: createdAt,
+        ruckId: ruckSessionId,
+        userId: '',
+        filename: '',
+        createdAt: parsedAt,
         url: url,
-        thumbnailUrl: thumbnailUrl,
+        thumbnailUrl: '',
       );
       
-      print('[PHOTO_DEBUG] Successfully parsed photo: $photo');
       return photo;
-    } catch (e, stack) {
-      print('[PHOTO_DEBUG] Error parsing RuckPhoto: $e');
-      print('[PHOTO_DEBUG] Stack trace: $stack');
-      print('[PHOTO_DEBUG] JSON that caused the error: $json');
       
-      // Return a fallback/default model instead of crashing
+    } catch (e, stack) {
+      
+      // Attempt to create a minimal RuckPhoto with fallback values
       try {
-        return RuckPhoto(
-          id: json['id']?.toString() ?? 'error-${DateTime.now().millisecondsSinceEpoch}',
-          ruckId: json['ruck_id']?.toString() ?? '',
-          userId: json['user_id']?.toString() ?? '',
-          filename: json['filename'] ?? 'error.jpg',
+        final fallbackPhoto = RuckPhoto(
+          id: json['id']?.toString() ?? '',
+          ruckId: json['ruck_session_id']?.toString() ?? '',
+          userId: '',
+          filename: '',
           createdAt: DateTime.now(),
-          url: json['url'] ?? '',
+          url: json['photo_url']?.toString() ?? json['url']?.toString() ?? '',
+          thumbnailUrl: '',
         );
+        return fallbackPhoto;
       } catch (fallbackError) {
-        print('[PHOTO_DEBUG] Even fallback creation failed: $fallbackError');
-        // Absolute last resort fallback
+        
+        // Return an empty photo object as the absolute last resort
         return RuckPhoto(
-          id: 'error-${DateTime.now().millisecondsSinceEpoch}',
+          id: '',
           ruckId: '',
           userId: '',
-          filename: 'error.jpg',
+          filename: '',
           createdAt: DateTime.now(),
+          url: '',
+          thumbnailUrl: '',
         );
       }
     }
