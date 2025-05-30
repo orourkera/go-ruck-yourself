@@ -120,7 +120,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
         // Calculate pace from distance and duration
         if (widget.ruckBuddy.distanceKm > 0 && widget.ruckBuddy.durationSeconds > 0) {
           setState(() {
-            _calculatedPace = (widget.ruckBuddy.durationSeconds / 60) / widget.ruckBuddy.distanceKm;
+            _calculatedPace = widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm;
           });
         }
       }
@@ -230,7 +230,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   Widget build(BuildContext context) {
     // Calculate pace if not already done
     if (_calculatedPace == 0.0 && widget.ruckBuddy.distanceKm > 0 && widget.ruckBuddy.durationSeconds > 0) {
-      _calculatedPace = (widget.ruckBuddy.durationSeconds / 60) / widget.ruckBuddy.distanceKm;
+      _calculatedPace = widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm;
     }
 
     // Determine if metric system is preferred from AuthBloc state
