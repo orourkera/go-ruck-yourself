@@ -240,7 +240,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     final String formattedPace = MeasurementUtils.formatPace(_calculatedPace, metric: preferMetric);
     final String formattedDistance = MeasurementUtils.formatDistance(widget.ruckBuddy.distanceKm, metric: preferMetric);
     final String formattedDuration = MeasurementUtils.formatDuration(Duration(seconds: widget.ruckBuddy.durationSeconds.round()));
-    final String formattedElevation = MeasurementUtils.formatElevation(widget.ruckBuddy.elevationGainM, 0, metric: preferMetric);
+    final String formattedElevation = MeasurementUtils.formatElevation(widget.ruckBuddy.elevationGainM, widget.ruckBuddy.elevationLossM, metric: preferMetric);
     final String formattedCalories = '${widget.ruckBuddy.caloriesBurned.round()} kcal';
     final String formattedWeight = MeasurementUtils.formatWeight(widget.ruckBuddy.ruckWeightKg, metric: preferMetric);
 

@@ -284,10 +284,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final prevPoint = newLocationPoints[newLocationPoints.length - 2];
         newDistanceKm += _locationService.calculateDistance(prevPoint, newPoint);
 
-        // Elevation is non-nullable in LocationPoint, direct access is safe if prevPoint and newPoint are valid.
-        double elevationChange = newPoint.elevation - prevPoint.elevation;
-        if (elevationChange > 0) newElevationGain += elevationChange;
-        else newElevationLoss += elevationChange.abs();
+        // Elevation calculation with noise filtering
+        final elevationResult = _validationService.validateElevationChange(
+          prevPoint, 
+          newPoint,
+          minChangeMeters: 2.0, // Filter out GPS noise smaller than 2m
+        );
+        newElevationGain += elevationResult['gain']!;
+        newElevationLoss += elevationResult['loss']!;
       }
       
       _splitTrackingService.checkForMilestone(
