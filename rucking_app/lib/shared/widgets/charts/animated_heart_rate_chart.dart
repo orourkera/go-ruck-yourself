@@ -172,8 +172,8 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
               dashArray: [5, 5],
               label: HorizontalLineLabel(
                 show: true,
-                alignment: Alignment.topRight,
-                padding: const EdgeInsets.only(right: 5, bottom: 5),
+                alignment: Alignment.topLeft,
+                padding: const EdgeInsets.only(left: 10, bottom: 5),
                 style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
                 labelResolver: (_) => 'Max: ${widget.maxHeartRate} bpm',
               ),

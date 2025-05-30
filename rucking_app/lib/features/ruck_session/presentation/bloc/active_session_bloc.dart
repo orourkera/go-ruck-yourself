@@ -457,7 +457,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.info('[ACTIVE_SESSION] Sending isMetric to watch: $preferMetric');
         
         await _watchService.updateMetricsOnWatch(
-          distance: currentState.distanceKm,
+          distance: currentState.distanceKm, // Always send in km - watch handles unit conversion internally
           duration: Duration(seconds: newElapsed),
           pace: newPace ?? 0.0,
           isPaused: currentState.isPaused,
@@ -621,6 +621,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           final errorMessage = response['message'] as String;
           AppLogger.error('Session completion failed: $errorMessage');
           
+          // Handle session not found (404) - clear local cache and go to homepage
+          if (errorMessage.contains('Session not found') || errorMessage.contains('not found')) {
+            AppLogger.warning('Session ${currentState.sessionId} not found on server, clearing local storage and returning to homepage');
+            await _activeSessionStorage.clearSessionData();
+            emit(ActiveSessionInitial());
+            return;
+          }
+          
           // If session is not in progress, it might already be completed
           if (errorMessage.contains('not in progress')) {
             // Try to fetch the completed session data
@@ -638,9 +646,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
               );
               
               emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
+              await _activeSessionStorage.clearSessionData();
               return;
             } catch (fetchError) {
               AppLogger.error('Could not fetch completed session: $fetchError');
+              // If fetch also fails with 404, clear local storage and go to homepage
+              if (fetchError.toString().contains('404') || fetchError.toString().contains('not found')) {
+                AppLogger.warning('Session ${currentState.sessionId} definitely not found, clearing local storage and returning to homepage');
+                await _activeSessionStorage.clearSessionData();
+                emit(ActiveSessionInitial());
+                return;
+              }
             }
           }
           
@@ -660,6 +676,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       );
       
       emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
+      await _activeSessionStorage.clearSessionData();
+      AppLogger.debug('Session data cleared from local storage (newly completed)');
       
       // Log heart rate data for debugging
       AppLogger.debug('Heart rate samples count: ${_allHeartRateSamples.length}');
@@ -1129,6 +1147,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           isPhotosLoading: false, 
           photosError: photosError
         ));
+        await _activeSessionStorage.clearSessionData();
         
       } catch (e) {
         AppLogger.error('Error loading session for viewing: $e');

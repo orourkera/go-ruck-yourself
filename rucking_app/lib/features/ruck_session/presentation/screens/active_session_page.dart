@@ -271,7 +271,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                     listenWhen: (prev, curr) => 
                       (prev is ActiveSessionFailure != curr is ActiveSessionFailure) || 
                       (curr is SessionSummaryGenerated) ||
-                      (curr is ActiveSessionRunning && !sessionRunning),
+                      (curr is ActiveSessionRunning && !sessionRunning) ||
+                      (prev is! ActiveSessionInitial && curr is ActiveSessionInitial), // Handle transition back to initial (404 case)
                     listener: (context, state) {
                       if (state is ActiveSessionFailure) {
                         StyledSnackBar.showError(
@@ -279,6 +280,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           message: state.errorMessage,
                           duration: const Duration(seconds: 3),
                         );
+                      } else if (state is ActiveSessionInitial && uiInitialized) {
+                        // If we transition back to Initial after UI was initialized, 
+                        // it means we need to navigate away (e.g., 404 error case)
+                        AppLogger.info('Session returned to Initial state, navigating to homepage');
+                        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
                       } else if (state is SessionSummaryGenerated) {
                         final endTime = state.session.endTime ?? DateTime.now();
                         final ruckId = state.session.id ?? '';
