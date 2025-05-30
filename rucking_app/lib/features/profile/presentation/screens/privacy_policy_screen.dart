@@ -38,17 +38,17 @@ class PrivacyPolicyScreen extends StatelessWidget {
           children: [
             _buildSection(
               'Effective Date: April 10, 2025',
-              'App Name: Go Ruck Yourself\nDeveloper: Get Rucky, Inc\nContact: rory@getrucky.com',
+              'App Name: Ruck!\nDeveloper: Get Rucky, Inc\nContact: rory@getrucky.com',
               context,
             ),
             _buildSection(
               '1. Introduction',
-              'Welcome to Go Ruck Yourself! We respect your privacy and are committed to protecting your personal information. This Privacy Policy explains how we collect, use, store, and protect your data when you use our app to track rucking sessions, calculate calories burned, and review your ruck history.\n\nBy using our app, you agree to the practices described in this policy.',
+              'Welcome to Ruck!! We respect your privacy and are committed to protecting your personal information. This Privacy Policy explains how we collect, use, store, and protect your data when you use our app to track rucking sessions, calculate calories burned, and review your ruck history.\n\nBy using our app, you agree to the practices described in this policy.',
               context,
             ),
             _buildSection(
               '2. Information We Collect',
-              'To provide and improve the Go Ruck Yourself experience, we may collect:\n\na. Account Information\nName or username\nEmail address\nPassword (encrypted and never stored in plain text)\n\nb. Activity, Fitness & Health Data\nHeight, weight, age, gender (used for calorie calculations)\nRuck details: distance, duration, pace, ruck weight\nHistorical session data tied to your account\nHeart rate data (if you enable Health integration):\n- Used for real-time feedback, calorie estimation, and post-session analytics (average, max, min heart rate)\n- Stored locally on your device using secure app storage\n- Never sold or used for advertising\n- Not shared with third parties unless you enable cloud sync or backup\n\nc. Location Data\nGPS data (used only with your permission to track sessions)\n\nd. Device and Technical Data\nDevice model and OS version\nApp usage and interaction data\nCrash logs and diagnostics (for performance improvements)',
+              'To provide and improve the Ruck! experience, we may collect:\n\na. Account Information\nName or username\nEmail address\nPassword (encrypted and never stored in plain text)\n\nb. Activity, Fitness & Health Data\nHeight, weight, age, gender (used for calorie calculations)\nRuck details: distance, duration, pace, ruck weight\nHistorical session data tied to your account\nHeart rate data (if you enable Health integration):\n- Used for real-time feedback, calorie estimation, and post-session analytics (average, max, min heart rate)\n- Stored locally on your device using secure app storage\n- Never sold or used for advertising\n- Not shared with third parties unless you enable cloud sync or backup\n\nc. Location Data\nGPS data (used only with your permission to track sessions)\n\nd. Device and Technical Data\nDevice model and OS version\nApp usage and interaction data\nCrash logs and diagnostics (for performance improvements)',
               context,
             ),
              _buildSection(
@@ -78,7 +78,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
              _buildSection(
               '8. Children\'s Privacy',
-              'Go Ruck Yourself is not intended for children under 13. We do not knowingly collect data from anyone under this age. If we discover such data has been collected, it will be deleted immediately.',
+              'Ruck! is not intended for children under 13. We do not knowingly collect data from anyone under this age. If we discover such data has been collected, it will be deleted immediately.',
               context,
             ),
              _buildSection(

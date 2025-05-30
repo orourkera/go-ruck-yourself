@@ -33,8 +33,8 @@ class SplashHelper {
   /// Determines which splash image to use based on gender status
   static String getSplashImagePath(bool isLadyMode) {
     return isLadyMode
-        ? 'assets/images/lady_rucker.png' // Female version
-        : 'assets/images/go ruck yourself.png'; // Default/male version
+        ? 'assets/images/ladyruckerpin.png' // Female version
+        : 'assets/images/go ruck yourself copy.png'; // Default/male version
   }
   
   /// Gets the appropriate background color based on gender

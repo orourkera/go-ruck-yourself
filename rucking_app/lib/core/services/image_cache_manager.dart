@@ -2,7 +2,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// Custom cache manager for images with longer cache duration
 class ImageCacheManager {
-  static const String _key = 'RuckingAppImageCache';
+  static const String _key = 'RuckImageCache';
   
   /// Cache manager with extended duration for better user experience
   static CacheManager get instance => CacheManager(

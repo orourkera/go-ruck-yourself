@@ -49,7 +49,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Go Ruck Yourself',
+                      'Ruck!',
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 4),
@@ -64,7 +64,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Go Ruck Yourself is a rucking tracker designed for the toughest athletes. Track your distance, pace, elevation, calories, and more. Integrates with Apple Health and your Apple Watch for seamless workout logging. Built for privacy, performance, and fun.',
+                'Ruck! is a rucking tracker designed for the toughest athletes. Track your distance, pace, elevation, calories, and more. Integrates with Apple Health and your Apple Watch for seamless workout logging. Built for privacy, performance, and fun.',
                 style: TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 24),
@@ -80,7 +80,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
               const SizedBox(height: 12),
-              const Text('All rights reserved. © 2025 Go Ruck Yourself.'),
+              const Text('All rights reserved. 2025 Ruck!.'),
             ],
           ),
         ),

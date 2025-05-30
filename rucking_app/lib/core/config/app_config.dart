@@ -5,7 +5,7 @@ class AppConfig {
   static const int apiTimeout = 30; // seconds
   
   // App information
-  static const String appName = 'Go Ruck Yourself';
+  static const String appName = 'Ruck!';
   static const String appVersion = '1.0.0';
   
   // Weight Conversion and Options
