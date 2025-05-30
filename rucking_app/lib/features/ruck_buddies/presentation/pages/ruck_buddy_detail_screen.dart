@@ -815,7 +815,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                               label: 'Elevation',
                               value: MeasurementUtils.formatElevation(
                                 displayBuddy.elevationGainM,
-                                0,
+                                displayBuddy.elevationLossM,
                                 metric: preferMetric,
                               ),
                             ),
