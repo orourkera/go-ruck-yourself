@@ -9,6 +9,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 class ActiveSessionStorage {
   static const String _activeSessionKey = 'active_session_data';
   static const String _lastSaveKey = 'active_session_last_save';
+  static const String _offlineSessionsKey = 'offline_completed_sessions';
   final SharedPreferences _prefs;
 
   ActiveSessionStorage(this._prefs);
@@ -183,6 +184,118 @@ class ActiveSessionStorage {
       return DateTime.fromMillisecondsSinceEpoch(timestamp);
     } catch (e) {
       return null;
+    }
+  }
+
+  /// Save a completed offline session for later sync
+  Future<void> saveCompletedOfflineSession(dynamic activeSessionState, Map<String, dynamic> completionPayload) async {
+    try {
+      final offlineSessionData = {
+        'offlineSessionId': activeSessionState.sessionId,
+        'completedAt': DateTime.now().toIso8601String(),
+        'ruckWeightKg': activeSessionState.ruckWeightKg,
+        'notes': activeSessionState.notes ?? '',
+        'originalSessionStartTimeUtc': activeSessionState.originalSessionStartTimeUtc.toIso8601String(),
+        'completionPayload': completionPayload,
+        'synced': false,
+      };
+
+      // Get existing offline sessions
+      final existingSessionsJson = _prefs.getString(_offlineSessionsKey);
+      List<Map<String, dynamic>> offlineSessions = [];
+      
+      if (existingSessionsJson != null) {
+        final decoded = jsonDecode(existingSessionsJson) as List<dynamic>;
+        offlineSessions = decoded.cast<Map<String, dynamic>>();
+      }
+
+      // Add the new session
+      offlineSessions.add(offlineSessionData);
+
+      // Save back to storage
+      await _prefs.setString(_offlineSessionsKey, jsonEncode(offlineSessions));
+      
+      AppLogger.info('[OFFLINE_STORAGE] Saved offline session: ${activeSessionState.sessionId}');
+    } catch (e) {
+      AppLogger.error('[OFFLINE_STORAGE] Failed to save offline session', exception: e);
+    }
+  }
+
+  /// Get all completed offline sessions that need to be synced
+  Future<List<Map<String, dynamic>>> getCompletedOfflineSessions() async {
+    try {
+      final existingSessionsJson = _prefs.getString(_offlineSessionsKey);
+      if (existingSessionsJson == null) return [];
+
+      final decoded = jsonDecode(existingSessionsJson) as List<dynamic>;
+      final offlineSessions = decoded.cast<Map<String, dynamic>>();
+
+      // Return only unsynced sessions
+      return offlineSessions.where((session) => session['synced'] != true).toList();
+    } catch (e) {
+      AppLogger.error('[OFFLINE_STORAGE] Failed to get offline sessions', exception: e);
+      return [];
+    }
+  }
+
+  /// Mark an offline session as synced
+  Future<void> markOfflineSessionSynced(String offlineSessionId) async {
+    try {
+      final existingSessionsJson = _prefs.getString(_offlineSessionsKey);
+      if (existingSessionsJson == null) return;
+
+      final decoded = jsonDecode(existingSessionsJson) as List<dynamic>;
+      final offlineSessions = decoded.cast<Map<String, dynamic>>();
+
+      // Find and mark the session as synced
+      for (final session in offlineSessions) {
+        if (session['offlineSessionId'] == offlineSessionId) {
+          session['synced'] = true;
+          session['syncedAt'] = DateTime.now().toIso8601String();
+          break;
+        }
+      }
+
+      // Save back to storage
+      await _prefs.setString(_offlineSessionsKey, jsonEncode(offlineSessions));
+      
+      AppLogger.info('[OFFLINE_STORAGE] Marked session as synced: $offlineSessionId');
+    } catch (e) {
+      AppLogger.error('[OFFLINE_STORAGE] Failed to mark session as synced', exception: e);
+    }
+  }
+
+  /// Clean up synced offline sessions (remove old ones)
+  Future<void> cleanupSyncedOfflineSessions() async {
+    try {
+      final existingSessionsJson = _prefs.getString(_offlineSessionsKey);
+      if (existingSessionsJson == null) return;
+
+      final decoded = jsonDecode(existingSessionsJson) as List<dynamic>;
+      final offlineSessions = decoded.cast<Map<String, dynamic>>();
+
+      // Keep only unsynced sessions and recently synced ones (last 7 days)
+      final now = DateTime.now();
+      final keepSessions = offlineSessions.where((session) {
+        if (session['synced'] != true) return true; // Keep unsynced
+        
+        final syncedAtStr = session['syncedAt'] as String?;
+        if (syncedAtStr == null) return false;
+        
+        final syncedAt = DateTime.parse(syncedAtStr);
+        final daysSinceSync = now.difference(syncedAt).inDays;
+        return daysSinceSync < 7; // Keep recently synced sessions for 7 days
+      }).toList();
+
+      // Save cleaned up list
+      await _prefs.setString(_offlineSessionsKey, jsonEncode(keepSessions));
+      
+      final removedCount = offlineSessions.length - keepSessions.length;
+      if (removedCount > 0) {
+        AppLogger.info('[OFFLINE_STORAGE] Cleaned up $removedCount old synced sessions');
+      }
+    } catch (e) {
+      AppLogger.error('[OFFLINE_STORAGE] Failed to cleanup synced sessions', exception: e);
     }
   }
 }

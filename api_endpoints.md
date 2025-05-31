@@ -83,6 +83,18 @@ This document provides a comprehensive list of all API endpoints used in the Ruc
 
 > **NOTE**: The notifications table in the database uses `recipient_id` (not `user_id`) to store the user ID.
 
+## Achievements System
+
+| Endpoint | HTTP Method | Description |
+|----------|------------|-------------|
+| `/achievements` | GET | Get all available achievements |
+| `/achievements/categories` | GET | Get achievement categories |
+| `/users/{user_id}/achievements` | GET | Get user's earned achievements |
+| `/users/{user_id}/achievements/progress` | GET | Get progress toward unearned achievements |
+| `/achievements/check/{session_id}` | POST | Check and award achievements for a session |
+| `/achievements/stats/{user_id}` | GET | Get achievement statistics for user |
+| `/achievements/recent` | GET | Get recently earned achievements across platform |
+
 ---
 
 ## Request/Response Formats

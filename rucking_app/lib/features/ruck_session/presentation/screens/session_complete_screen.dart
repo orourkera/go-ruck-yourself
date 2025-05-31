@@ -9,11 +9,19 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:get_it/get_it.dart';
 
-// Project-specific imports
+// Core imports
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+
+// Achievement imports
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_event.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
+import 'package:rucking_app/features/achievements/presentation/widgets/session_achievement_notification.dart';
+
+// Project-specific imports
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
@@ -161,12 +169,15 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       // Save session first - this is fast and immediate
       await _apiClient.patch('/rucks/${widget.ruckId}', completionData);
       
+      // Check for new achievements after saving the session
+      context.read<AchievementBloc>().add(CheckSessionAchievements(int.parse(widget.ruckId)));
+      
       // Session saved successfully, navigate immediately - don't wait for photo uploads
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       
       // Clear session history cache so new session appears in history
       SessionRepository.clearSessionHistoryCache();
-      
+
       // Reset active session state to return to home screen properly
       context.read<ActiveSessionBloc>().add(const SessionReset());
       
@@ -237,6 +248,28 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
               state.success
                   ? StyledSnackBar.showSuccess(context: context, message: message)
                   : StyledSnackBar.showError(context: context, message: message);
+            }
+          },
+        ),
+        BlocListener<AchievementBloc, AchievementState>(
+          listener: (context, state) {
+            if (state is AchievementsLoaded && state.newlyEarned.isNotEmpty) {
+              // Show achievement unlock celebration
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => AlertDialog(
+                    content: SessionAchievementNotification(
+                      newAchievements: state.newlyEarned,
+                      onDismiss: () => Navigator.of(context).pop(),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                  ),
+                );
+              });
             }
           },
         ),

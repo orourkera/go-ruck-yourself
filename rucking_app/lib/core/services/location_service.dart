@@ -1,5 +1,6 @@
-import 'dart:async';
 import 'dart:math' show cos, sqrt, asin, pi, sin, atan2;
+import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:geolocator/geolocator.dart';
@@ -47,14 +48,39 @@ class LocationServiceImpl implements LocationService {
   
   @override
   Future<bool> requestLocationPermission() async {
-    // First try the permission_handler for a more user-friendly dialog
-    final status = await Permission.locationWhenInUse.request();
-    if (status.isGranted) return true;
-    
-    // Fall back to Geolocator's permission request if needed
-    final permission = await Geolocator.requestPermission();
-    return permission == LocationPermission.always || 
-           permission == LocationPermission.whileInUse;
+    try {
+      AppLogger.info('Requesting location permissions...');
+      
+      // First request basic location permission
+      final whenInUseStatus = await Permission.locationWhenInUse.request();
+      AppLogger.info('When-in-use permission: $whenInUseStatus');
+      
+      if (whenInUseStatus.isGranted) {
+        // For long workout sessions, also request always permission for background tracking
+        if (Platform.isIOS) {
+          AppLogger.info('Requesting background location permission for iOS...');
+          final alwaysStatus = await Permission.locationAlways.request();
+          AppLogger.info('Always permission: $alwaysStatus');
+          
+          // iOS background location requires always permission
+          return alwaysStatus.isGranted;
+        } else {
+          // Android can work with when-in-use + foreground service
+          return true;
+        }
+      }
+      
+      // Fall back to Geolocator's permission request if needed
+      AppLogger.info('Falling back to Geolocator permission request...');
+      final permission = await Geolocator.requestPermission();
+      AppLogger.info('Geolocator permission result: $permission');
+      
+      return permission == LocationPermission.always || 
+             permission == LocationPermission.whileInUse;
+    } catch (e) {
+      AppLogger.error('Error requesting location permissions', exception: e);
+      return false;
+    }
   }
   
   @override
@@ -87,18 +113,40 @@ class LocationServiceImpl implements LocationService {
       _sendBatchUpdate();
     });
     
-    // Raw position stream with distance filter
-    final positionStream = Geolocator.getPositionStream(
-      locationSettings: AndroidSettings(
-        accuracy: LocationAccuracy.best, // Changed from high to best for maximum accuracy
+    // Configure location settings for both platforms
+    late LocationSettings locationSettings;
+    
+    if (Platform.isAndroid) {
+      locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.best,
         distanceFilter: _minDistanceFilter.toInt(),
-        intervalDuration: const Duration(seconds: 1), // Update every second for better tracking
+        intervalDuration: const Duration(seconds: 1),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Rucking in Progress',
           notificationText: 'Tracking your ruck session',
           enableWakeLock: true,
         ),
-      ),
+      );
+    } else if (Platform.isIOS) {
+      locationSettings = AppleSettings(
+        accuracy: LocationAccuracy.best,
+        distanceFilter: _minDistanceFilter,
+        pauseLocationUpdatesAutomatically: false, // Critical: Keep GPS active in background
+        activityType: ActivityType.fitness, // Optimize for fitness tracking
+        showBackgroundLocationIndicator: true, // Required for background location
+        allowBackgroundLocationUpdates: true, // Enable background updates
+      );
+    } else {
+      // Fallback for other platforms
+      locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.best,
+        distanceFilter: _minDistanceFilter,
+      );
+    }
+    
+    // Raw position stream with platform-specific settings
+    final positionStream = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
     );
     
     // Subscribe to raw positions and convert to LocationPoint objects

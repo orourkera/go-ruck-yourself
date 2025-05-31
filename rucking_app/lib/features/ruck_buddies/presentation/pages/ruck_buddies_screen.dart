@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/features/achievements/presentation/widgets/achievement_summary.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
@@ -120,6 +121,12 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Achievements summary
+            const AchievementSummary(
+              showTitle: false,
+              maxRecentItems: 2,
+            ),
+            
             // Added padding between header and filter chips
             const SizedBox(height: 12),
             
