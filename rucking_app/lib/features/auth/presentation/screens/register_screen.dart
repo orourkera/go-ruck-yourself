@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -111,20 +112,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // Force app-wide theme rebuild with the new user settings
           // This ensures gender-based theme is applied immediately after registration
           Future.delayed(Duration.zero, () {
-            // Navigate to Apple Health integration screen after successful registration
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => BlocProvider(
-                  create: (context) => HealthBloc(
-                    healthService: HealthService(),
-                    userId: state.user.userId, // Pass the user ID from authenticated state
-                  ),
-                  child: HealthIntegrationIntroScreen(
-                    userId: state.user.userId, // Pass the user ID to the intro screen
+            // Navigate based on platform - only iOS has Apple Health integration
+            if (Platform.isIOS) {
+              // Navigate to Apple Health integration screen on iOS
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => BlocProvider(
+                    create: (context) => HealthBloc(
+                      healthService: HealthService(),
+                      userId: state.user.userId, // Pass the user ID from authenticated state
+                    ),
+                    child: HealthIntegrationIntroScreen(
+                      userId: state.user.userId, // Pass the user ID to the intro screen
+                    ),
                   ),
                 ),
-              ),
-            );
+              );
+            } else {
+              // Navigate directly to HomeScreen on Android and other platforms
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+              );
+            }
           });
         } else if (state is AuthUserAlreadyExists) {
           // Using a custom widget with clickable login button
