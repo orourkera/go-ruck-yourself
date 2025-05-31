@@ -148,7 +148,7 @@ app.register_blueprint(ruck_buddies_bp)
 
 # Import and register achievements blueprint
 from RuckTracker.api.achievements import achievements_bp
-app.register_blueprint(achievements_bp)
+app.register_blueprint(achievements_bp, url_prefix='/api')
 
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (
