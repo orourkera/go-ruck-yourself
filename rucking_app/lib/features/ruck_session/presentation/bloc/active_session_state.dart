@@ -282,6 +282,64 @@ class ActiveSessionComplete extends ActiveSessionState {
   List<Object?> get props => [session];
 }
 
+class ActiveSessionCompleted extends ActiveSessionState {
+  final String sessionId;
+  final double finalDistanceKm;
+  final int finalDurationSeconds;
+  final int finalCalories;
+  final double elevationGain;
+  final double elevationLoss;
+  final double? averagePace;
+  final List<LocationPoint> route;
+  final List<HeartRateSample> heartRateSamples;
+  final int? averageHeartRate;
+  final int? minHeartRate;
+  final int? maxHeartRate;
+  final List<dynamic> sessionPhotos;
+  final List<dynamic> splits;
+  final DateTime completedAt;
+  final bool isOffline;
+  
+  const ActiveSessionCompleted({
+    required this.sessionId,
+    required this.finalDistanceKm,
+    required this.finalDurationSeconds,
+    required this.finalCalories,
+    required this.elevationGain,
+    required this.elevationLoss,
+    this.averagePace,
+    required this.route,
+    required this.heartRateSamples,
+    this.averageHeartRate,
+    this.minHeartRate,
+    this.maxHeartRate,
+    required this.sessionPhotos,
+    required this.splits,
+    required this.completedAt,
+    this.isOffline = false,
+  });
+  
+  @override
+  List<Object?> get props => [
+    sessionId,
+    finalDistanceKm,
+    finalDurationSeconds,
+    finalCalories,
+    elevationGain,
+    elevationLoss,
+    averagePace,
+    route,
+    heartRateSamples,
+    averageHeartRate,
+    minHeartRate,
+    maxHeartRate,
+    sessionPhotos,
+    splits,
+    completedAt,
+    isOffline,
+  ];
+}
+
 class SessionSummaryGenerated extends ActiveSessionState {
   final RuckSession session;
   final List<RuckPhoto> photos;

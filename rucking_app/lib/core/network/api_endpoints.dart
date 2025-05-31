@@ -26,6 +26,15 @@ class ApiEndpoints {
   static const String notificationRead = '$baseApi/notifications/{id}/read'; // Replace {id} with notification ID
   static const String readAllNotifications = '$baseApi/notifications/read-all';
   
+  // Achievements
+  static const String achievements = '$baseApi/achievements';
+  static const String achievementCategories = '$baseApi/achievements/categories';
+  static const String userAchievements = '$baseApi/users/{user_id}/achievements'; // Replace {user_id} with actual user ID
+  static const String userAchievementsProgress = '$baseApi/users/{user_id}/achievements/progress'; // Replace {user_id} with actual user ID
+  static const String checkSessionAchievements = '$baseApi/achievements/check/{session_id}'; // Replace {session_id} with actual session ID
+  static const String achievementStats = '$baseApi/achievements/stats/{user_id}'; // Replace {user_id} with actual user ID
+  static const String recentAchievements = '$baseApi/achievements/recent';
+
   // Helper methods for path parameters
   static String getRuckEndpoint(String ruckId) => '$ruckById/$ruckId';
   static String getLikesEndpoint(String ruckId) => likes.replaceAll('{id}', ruckId);
@@ -34,4 +43,12 @@ class ApiEndpoints {
       deleteComment.replaceAll('{id}', ruckId).replaceAll('{comment_id}', commentId);
   static String getNotificationReadEndpoint(String notificationId) => 
       notificationRead.replaceAll('{id}', notificationId);
+  static String getUserAchievementsEndpoint(String userId) => 
+      userAchievements.replaceAll('{user_id}', userId);
+  static String getUserAchievementsProgressEndpoint(String userId) => 
+      userAchievementsProgress.replaceAll('{user_id}', userId);
+  static String getCheckSessionAchievementsEndpoint(String sessionId) => 
+      checkSessionAchievements.replaceAll('{session_id}', sessionId);
+  static String getAchievementStatsEndpoint(String userId) => 
+      achievementStats.replaceAll('{user_id}', userId);
 }

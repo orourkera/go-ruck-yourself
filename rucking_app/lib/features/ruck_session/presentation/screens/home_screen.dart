@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
+import 'package:rucking_app/features/achievements/presentation/widgets/achievement_summary.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
@@ -613,6 +615,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  
+                  // Achievements summary
+                  const AchievementSummary(),
                   
                   // Recent sessions section
                   Text(

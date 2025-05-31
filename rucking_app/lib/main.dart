@@ -10,6 +10,7 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -95,6 +96,11 @@ void main() async {
         BlocProvider<SocialBloc>(
           create: (context) {
             return getIt<SocialBloc>();
+          },
+        ),
+        BlocProvider<AchievementBloc>(
+          create: (context) {
+            return getIt<AchievementBloc>();
           },
         ),
       ],

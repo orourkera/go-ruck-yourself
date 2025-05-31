@@ -157,18 +157,26 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         return;
       }
 
-      final createResponse = await _apiClient.post('/rucks', {
-        'ruck_weight_kg': event.ruckWeightKg,
-        'notes': event.notes,
-      });
-      sessionId = createResponse['id']?.toString();
-      if (sessionId == null || sessionId.isEmpty) throw Exception('Failed to create session: No ID.');
-      AppLogger.debug('Created new session with ID: $sessionId');
+      // Try to create session on backend, but allow offline mode if it fails
+      try {
+        final createResponse = await _apiClient.post('/rucks', {
+          'ruck_weight_kg': event.ruckWeightKg,
+          'notes': event.notes,
+        });
+        sessionId = createResponse['id']?.toString();
+        if (sessionId == null || sessionId.isEmpty) throw Exception('Failed to create session: No ID.');
+        AppLogger.debug('Created new session with ID: $sessionId');
 
-      // Use path with explicit ruck_id as URL parameter to match server expectation
-      await _apiClient.post('/rucks/$sessionId/start', {});
-      AppLogger.debug('Backend notified of session start for $sessionId');
-
+        // Use path with explicit ruck_id as URL parameter to match server expectation
+        await _apiClient.post('/rucks/$sessionId/start', {});
+        AppLogger.debug('Backend notified of session start for $sessionId');
+      } catch (apiError) {
+        // If API calls fail, create offline session with local ID
+        sessionId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
+        AppLogger.warning('Failed to create session on backend, starting offline session: $sessionId');
+        AppLogger.warning('API Error: $apiError');
+        // Session will sync to backend when connectivity is restored
+      }
       final initialSessionState = ActiveSessionRunning(
         sessionId: sessionId,
         locationPoints: const [],
@@ -609,100 +617,139 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.debug('Session start time: ${currentState.originalSessionStartTimeUtc}');
         AppLogger.debug('Current time: ${DateTime.now().toUtc()}');
         
-        // First, check if the session is still valid by trying to get its current status
-        try {
-          AppLogger.debug('Checking session ${currentState.sessionId} status before completion...');
-          final statusResponse = await _apiClient.get('/rucks/${currentState.sessionId}');
-          AppLogger.debug('Session status: $statusResponse');
-        } catch (e) {
-          AppLogger.warning('Could not check session status: $e');
+        // Check if this is an offline session
+        final bool isOfflineSession = currentState.sessionId.startsWith('offline_');
+        
+        if (isOfflineSession) {
+          AppLogger.info('Completing offline session ${currentState.sessionId}');
+          // Store completed session data locally for later sync
+          await _activeSessionStorage.saveCompletedOfflineSession(currentState, payload);
+          AppLogger.info('Offline session saved locally, will sync when connectivity returns');
+          
+          // Emit completed state immediately for offline sessions
+          emit(ActiveSessionCompleted(
+            sessionId: currentState.sessionId,
+            finalDistanceKm: finalDistanceKm,
+            finalDurationSeconds: finalDurationSeconds,
+            finalCalories: finalCalories.round(),
+            elevationGain: currentState.elevationGain,
+            elevationLoss: currentState.elevationLoss,
+            averagePace: currentState.pace,
+            route: currentState.locationPoints,
+            heartRateSamples: _allHeartRateSamples,
+            averageHeartRate: avgHeartRate,
+            minHeartRate: _minHeartRate,
+            maxHeartRate: _maxHeartRate,
+            sessionPhotos: currentState.photos,
+            splits: _splitTrackingService.getSplits(),
+            completedAt: DateTime.now().toUtc(),
+            isOffline: true, // Flag to indicate this was completed offline
+          ));
+          
+          // Clear active session data
+          await _activeSessionStorage.clearSessionData();
+          
+          // Try to sync offline sessions in background
+          _syncOfflineSessionsInBackground();
+          return;
         }
         
-        final response = await _apiClient.post('/rucks/${currentState.sessionId}/complete', payload);
-        
-        // Check if the response contains an error message
-        if (response is Map<String, dynamic> && response.containsKey('message')) {
-          final errorMessage = response['message'] as String;
-          AppLogger.error('Session completion failed: $errorMessage');
-          
-          // Handle session not found (404) - clear local cache and go to homepage
-          if (errorMessage.contains('Session not found') || errorMessage.contains('not found')) {
-            AppLogger.warning('Session ${currentState.sessionId} not found on server, clearing local storage and returning to homepage');
-            await _activeSessionStorage.clearSessionData();
-            emit(ActiveSessionInitial());
-            return;
+        // For online sessions, proceed with API calls
+        try {
+          // First, check if the session is still valid by trying to get its current status
+          try {
+            AppLogger.debug('Checking session ${currentState.sessionId} status before completion...');
+            final statusResponse = await _apiClient.get('/rucks/${currentState.sessionId}');
+            AppLogger.debug('Session status: $statusResponse');
+          } catch (e) {
+            AppLogger.warning('Could not check session status: $e');
           }
           
-          // If session is not in progress, it might already be completed
-          if (errorMessage.contains('not in progress')) {
-            // Try to fetch the completed session data
-            try {
-              AppLogger.debug('Attempting to fetch already completed session ${currentState.sessionId}...');
-              final completedResponse = await _apiClient.get('/rucks/${currentState.sessionId}');
-              final completedSession = RuckSession.fromJson(completedResponse);
-              
-              AppLogger.debug('Found completed session, proceeding with summary...');
-              final RuckSession enrichedSession = completedSession.copyWith(
-                heartRateSamples: completedSession.heartRateSamples ?? _allHeartRateSamples,
-                avgHeartRate: completedSession.avgHeartRate ?? avgHeartRate,
-                maxHeartRate: completedSession.maxHeartRate ?? _maxHeartRate,
-                minHeartRate: completedSession.minHeartRate ?? _minHeartRate
-              );
-              
-              emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
+          final response = await _apiClient.post('/rucks/${currentState.sessionId}/complete', payload);
+          
+          // Handle response and check for errors...
+          if (response is Map<String, dynamic> && response.containsKey('message')) {
+            final errorMessage = response['message'] as String;
+            AppLogger.error('Session completion failed: $errorMessage');
+            
+            // Handle session not found (404) - clear local cache and go to homepage
+            if (errorMessage.contains('Session not found') || errorMessage.contains('not found')) {
+              AppLogger.warning('Session ${currentState.sessionId} not found on server, clearing local storage and returning to homepage');
               await _activeSessionStorage.clearSessionData();
+              emit(ActiveSessionInitial());
               return;
-            } catch (fetchError) {
-              AppLogger.error('Could not fetch completed session: $fetchError');
-              // If fetch also fails with 404, clear local storage and go to homepage
-              if (fetchError.toString().contains('404') || fetchError.toString().contains('not found')) {
-                AppLogger.warning('Session ${currentState.sessionId} definitely not found, clearing local storage and returning to homepage');
+            }
+            
+            // If session is not in progress, it might already be completed
+            if (errorMessage.contains('not in progress')) {
+              // Try to fetch the completed session data
+              try {
+                AppLogger.debug('Attempting to fetch already completed session ${currentState.sessionId}...');
+                final completedResponse = await _apiClient.get('/rucks/${currentState.sessionId}');
+                final completedSession = RuckSession.fromJson(completedResponse);
+                
+                AppLogger.debug('Found completed session, proceeding with summary...');
+                final RuckSession enrichedSession = completedSession.copyWith(
+                  heartRateSamples: completedSession.heartRateSamples ?? _allHeartRateSamples,
+                  avgHeartRate: completedSession.avgHeartRate ?? avgHeartRate,
+                  maxHeartRate: completedSession.maxHeartRate ?? _maxHeartRate,
+                  minHeartRate: completedSession.minHeartRate ?? _minHeartRate
+                );
+                
+                emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
                 await _activeSessionStorage.clearSessionData();
-                emit(ActiveSessionInitial());
                 return;
+              } catch (fetchError) {
+                AppLogger.error('Could not fetch completed session: $fetchError');
+                // If fetch also fails with 404, clear local storage and go to homepage
+                if (fetchError.toString().contains('404') || fetchError.toString().contains('not found')) {
+                  AppLogger.warning('Session ${currentState.sessionId} definitely not found, clearing local storage and returning to homepage');
+                  await _activeSessionStorage.clearSessionData();
+                  emit(ActiveSessionInitial());
+                  return;
+                }
               }
             }
+            
+            throw Exception('Session completion failed: $errorMessage');
           }
           
-          throw Exception('Session completion failed: $errorMessage');
-        }
+          final RuckSession completedSession = RuckSession.fromJson(response);
+          
+          AppLogger.debug('Session ${currentState.sessionId} completed successfully.');
         
-        final RuckSession completedSession = RuckSession.fromJson(response);
-        
-        AppLogger.debug('Session ${currentState.sessionId} completed successfully.');
-      
-      // Create a modified session that includes heart rate data if not present in the API response
-      final RuckSession enrichedSession = completedSession.copyWith(
-        heartRateSamples: completedSession.heartRateSamples ?? _allHeartRateSamples,
-        avgHeartRate: completedSession.avgHeartRate ?? avgHeartRate,
-        maxHeartRate: completedSession.maxHeartRate ?? _maxHeartRate,
-        minHeartRate: completedSession.minHeartRate ?? _minHeartRate
-      );
-      
-      emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
-      await _activeSessionStorage.clearSessionData();
-      AppLogger.debug('Session data cleared from local storage (newly completed)');
-      
-      // Log heart rate data for debugging
-      AppLogger.debug('Heart rate samples count: ${_allHeartRateSamples.length}');
-      AppLogger.debug('Avg HR: $avgHeartRate, Min HR: $_minHeartRate, Max HR: $_maxHeartRate');
-      
-      _watchService.endSessionOnWatch().catchError((e) {
-        // Just log the error but don't block UI progression
-        AppLogger.error('Error ending session on watch (non-blocking): $e');
-      });
-      
-      // Health service integration should continue regardless of watch status
-      await _healthService.saveWorkout(
-            startDate: completedSession.startTime ?? currentState.originalSessionStartTimeUtc.subtract(finalTotalPausedDuration),
-            endDate: completedSession.endTime ?? DateTime.now().toUtc(),
-            distanceKm: completedSession.distance,
-            caloriesBurned: completedSession.caloriesBurned,
-            heartRate: completedSession.avgHeartRate?.toDouble(), // Convert int? to double?
-            ruckWeightKg: completedSession.ruckWeightKg,
-            elevationGainMeters: completedSession.elevationGain,
-            elevationLossMeters: completedSession.elevationLoss,
+        // Create a modified session that includes heart rate data if not present in the API response
+        final RuckSession enrichedSession = completedSession.copyWith(
+          heartRateSamples: completedSession.heartRateSamples ?? _allHeartRateSamples,
+          avgHeartRate: completedSession.avgHeartRate ?? avgHeartRate,
+          maxHeartRate: completedSession.maxHeartRate ?? _maxHeartRate,
+          minHeartRate: completedSession.minHeartRate ?? _minHeartRate
         );
+        
+        emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
+        await _activeSessionStorage.clearSessionData();
+        AppLogger.debug('Session data cleared from local storage (newly completed)');
+        
+        // Log heart rate data for debugging
+        AppLogger.debug('Heart rate samples count: ${_allHeartRateSamples.length}');
+        AppLogger.debug('Avg HR: $avgHeartRate, Min HR: $_minHeartRate, Max HR: $_maxHeartRate');
+        
+        _watchService.endSessionOnWatch().catchError((e) {
+          // Just log the error but don't block UI progression
+          AppLogger.error('Error ending session on watch (non-blocking): $e');
+        });
+        
+        // Health service integration should continue regardless of watch status
+        await _healthService.saveWorkout(
+              startDate: completedSession.startTime ?? currentState.originalSessionStartTimeUtc.subtract(finalTotalPausedDuration),
+              endDate: completedSession.endTime ?? DateTime.now().toUtc(),
+              distanceKm: completedSession.distance,
+              caloriesBurned: completedSession.caloriesBurned,
+              heartRate: completedSession.avgHeartRate?.toDouble(), // Convert int? to double?
+              ruckWeightKg: completedSession.ruckWeightKg,
+              elevationGainMeters: completedSession.elevationGain,
+              elevationLossMeters: completedSession.elevationLoss,
+          );
 
       } catch (e, stackTrace) {
         String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Complete');
@@ -1412,6 +1459,71 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
     } catch (e) {
       AppLogger.error('Error during session cleanup: $e');
+    }
+  }
+
+  /// Sync offline sessions to backend when connectivity is restored
+  void _syncOfflineSessionsInBackground() {
+    // Run sync in background without blocking UI
+    Timer(const Duration(seconds: 2), () async {
+      try {
+        await _syncOfflineSessions();
+      } catch (e) {
+        AppLogger.warning('Background offline session sync failed: $e');
+        // Schedule retry in 30 seconds
+        Timer(const Duration(seconds: 30), () => _syncOfflineSessionsInBackground());
+      }
+    });
+  }
+
+  /// Sync stored offline sessions to backend
+  Future<void> _syncOfflineSessions() async {
+    try {
+      final offlineSessions = await _activeSessionStorage.getCompletedOfflineSessions();
+      if (offlineSessions.isEmpty) {
+        AppLogger.info('No offline sessions to sync');
+        return;
+      }
+
+      AppLogger.info('Found ${offlineSessions.length} offline sessions to sync');
+
+      for (final sessionData in offlineSessions) {
+        try {
+          // Create session on backend
+          final createResponse = await _apiClient.post('/rucks', {
+            'ruck_weight_kg': sessionData['ruckWeightKg'],
+            'notes': sessionData['notes'] ?? '',
+            'created_at': sessionData['originalSessionStartTimeUtc'],
+          });
+
+          final backendSessionId = createResponse['id']?.toString();
+          if (backendSessionId == null) continue;
+
+          // Start session
+          await _apiClient.post('/rucks/$backendSessionId/start', {
+            'started_at': sessionData['originalSessionStartTimeUtc'],
+          });
+
+          // Complete session with all data
+          await _apiClient.post('/rucks/$backendSessionId/complete', sessionData['completionPayload']);
+
+          // Mark this offline session as synced
+          await _activeSessionStorage.markOfflineSessionSynced(sessionData['offlineSessionId']);
+          
+          AppLogger.info('Successfully synced offline session ${sessionData['offlineSessionId']} to backend as $backendSessionId');
+
+        } catch (syncError) {
+          AppLogger.warning('Failed to sync offline session ${sessionData['offlineSessionId']}: $syncError');
+          // Continue with next session
+        }
+      }
+
+      // Clean up successfully synced sessions
+      await _activeSessionStorage.cleanupSyncedOfflineSessions();
+      
+    } catch (e) {
+      AppLogger.error('Error during offline session sync', exception: e);
+      rethrow;
     }
   }
 
