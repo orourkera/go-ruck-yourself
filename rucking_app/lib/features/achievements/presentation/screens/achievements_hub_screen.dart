@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_event.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
+import 'package:rucking_app/features/achievements/data/models/achievement_model.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Achievements Hub Screen - Main screen for viewing and tracking achievements
 class AchievementsHubScreen extends StatefulWidget {
@@ -19,6 +24,14 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    
+    // Get user ID from auth
+    final authState = context.read<AuthBloc>().state;
+    final userId = authState is Authenticated ? authState.user.userId : '';
+    
+    // Load achievement data
+    context.read<AchievementBloc>().add(const LoadAchievements());
+    context.read<AchievementBloc>().add(LoadAchievementStats(userId));
   }
 
   @override
@@ -53,18 +66,53 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildOverviewTab(),
-          _buildProgressTab(),
-          _buildCollectionTab(),
-        ],
+      body: BlocBuilder<AchievementBloc, AchievementState>(
+        builder: (context, state) {
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildOverviewTab(state),
+              _buildProgressTab(state),
+              _buildCollectionTab(state),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildOverviewTab() {
+  Widget _buildOverviewTab(AchievementState state) {
+    // Handle different states
+    if (state is AchievementsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (state is AchievementsError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading achievements',
+              style: AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.message,
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Default to empty state for initial or other states
+    final stats = state is AchievementsLoaded ? state.stats : null;
+    final recentAchievements = state is AchievementsLoaded ? state.recentAchievements : <UserAchievement>[];
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -100,9 +148,21 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildStatColumn('12', 'Earned', Icons.emoji_events),
-                      _buildStatColumn('8', 'In Progress', Icons.trending_up),
-                      _buildStatColumn('25%', 'Complete', Icons.pie_chart),
+                      _buildStatColumn(
+                        stats?.totalEarned.toString() ?? '0', 
+                        'Earned', 
+                        Icons.emoji_events
+                      ),
+                      _buildStatColumn(
+                        ((stats?.totalAvailable ?? 0) - (stats?.totalEarned ?? 0)).toString(),
+                        'In Progress', 
+                        Icons.trending_up
+                      ),
+                      _buildStatColumn(
+                        '${stats?.completionPercentage.toStringAsFixed(0) ?? '0'}%', 
+                        'Complete', 
+                        Icons.pie_chart
+                      ),
                     ],
                   ),
                 ],
@@ -121,8 +181,26 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           ),
           const SizedBox(height: 16),
           
-          // Placeholder for recent achievements
-          _buildPlaceholderCard('No recent achievements yet'),
+          // Show recent achievements or placeholder
+          if (recentAchievements.isNotEmpty)
+            ...recentAchievements.map((achievement) => Card(
+              elevation: 2,
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: Icon(
+                  Icons.emoji_events,
+                  color: AppColors.primary,
+                ),
+                title: Text(achievement.achievement?.name ?? 'Achievement'),
+                subtitle: Text(achievement.achievement?.description ?? ''),
+                trailing: Text(
+                  '${achievement.earnedAt.day}/${achievement.earnedAt.month}',
+                  style: AppTextStyles.bodySmall,
+                ),
+              ),
+            )).toList()
+          else
+            _buildPlaceholderCard('No recent achievements yet'),
           
           const SizedBox(height: 24),
           
@@ -135,13 +213,13 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           ),
           const SizedBox(height: 16),
           
-          _buildCategoryGrid(),
+          _buildCategoryGrid(state),
         ],
       ),
     );
   }
 
-  Widget _buildProgressTab() {
+  Widget _buildProgressTab(AchievementState state) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -161,7 +239,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     );
   }
 
-  Widget _buildCollectionTab() {
+  Widget _buildCollectionTab(AchievementState state) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -208,7 +286,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     );
   }
 
-  Widget _buildCategoryGrid() {
+  Widget _buildCategoryGrid(AchievementState state) {
     final categories = [
       {'name': 'Distance', 'icon': Icons.directions_run, 'color': Colors.blue},
       {'name': 'Weight', 'icon': Icons.fitness_center, 'color': Colors.red},
@@ -218,6 +296,10 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
       {'name': 'Special', 'icon': Icons.star, 'color': Colors.pink},
     ];
 
+    // Get category stats from state
+    final stats = state is AchievementsLoaded ? state.stats : null;
+    final categoryStats = stats?.byCategory ?? <String, int>{};
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -225,18 +307,22 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.5,
+        childAspectRatio: 1.0, // Changed from 1.2 to 1.0 for more height
       ),
       itemCount: categories.length,
       itemBuilder: (context, index) {
         final category = categories[index];
+        final categoryName = category['name'] as String;
+        final earned = categoryStats[categoryName.toLowerCase()] ?? 0;
+        final total = 12; // Default total per category, you can make this dynamic
+        
         return Card(
           elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12), // Reduced from 16 to 12
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: (category['color'] as Color).withOpacity(0.1),
@@ -246,22 +332,31 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
               children: [
                 Icon(
                   category['icon'] as IconData,
-                  size: 32,
+                  size: 28, // Reduced from 32 to 28
                   color: category['color'] as Color,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  category['name'] as String,
-                  style: AppTextStyles.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: category['color'] as Color,
+                const SizedBox(height: 6), // Reduced from 8 to 6
+                Flexible( // Wrap text in Flexible to prevent overflow
+                  child: Text(
+                    categoryName,
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: category['color'] as Color,
+                      fontSize: 14, // Slightly smaller font
+                    ),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '0/12',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: Colors.grey[600],
+                const SizedBox(height: 2), // Reduced from 4 to 2
+                Flexible( // Wrap progress text in Flexible
+                  child: Text(
+                    '$earned/$total',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

@@ -25,6 +25,7 @@ import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -130,7 +131,12 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                 case '/ruck_buddies':
                   return MaterialPageRoute(builder: (_) => const RuckBuddiesScreen());
                 case '/achievements':
-                  return MaterialPageRoute(builder: (_) => const AchievementsHubScreen());
+                  return MaterialPageRoute(
+                    builder: (_) => BlocProvider<AchievementBloc>(
+                      create: (context) => getIt<AchievementBloc>(),
+                      child: const AchievementsHubScreen(),
+                    ),
+                  );
                 case '/session_complete':
                   final args = settings.arguments as Map<String, dynamic>?;
                   if (args != null) {
