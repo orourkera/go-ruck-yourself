@@ -24,6 +24,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
+import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -131,6 +132,8 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   return MaterialPageRoute(builder: (_) => const PaywallScreen());
                 case '/ruck_buddies':
                   return MaterialPageRoute(builder: (_) => const RuckBuddiesScreen());
+                case '/achievements':
+                  return MaterialPageRoute(builder: (_) => const AchievementsHubScreen());
                 case '/session_complete':
                   final args = settings.arguments as Map<String, dynamic>?;
                   if (args != null) {

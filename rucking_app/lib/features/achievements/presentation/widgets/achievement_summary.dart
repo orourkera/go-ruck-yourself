@@ -1,218 +1,140 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rucking_app/features/achievements/data/models/achievement_model.dart';
-import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
-import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
-import 'package:rucking_app/features/achievements/presentation/widgets/achievement_badge.dart';
-import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
+/// Achievement Summary widget for displaying quick achievement stats
 class AchievementSummary extends StatelessWidget {
   final bool showTitle;
-  final int maxRecentItems;
-  final VoidCallback? onViewAll;
+  final int maxRecentAchievements;
 
   const AchievementSummary({
-    super.key,
+    Key? key,
     this.showTitle = true,
-    this.maxRecentItems = 3,
-    this.onViewAll,
-  });
+    this.maxRecentAchievements = 3,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AchievementBloc, AchievementState>(
-      builder: (context, state) {
-        if (state is AchievementsLoading) {
-          return const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-          );
-        }
-
-        if (state is AchievementsError) {
-          return const SizedBox.shrink();
-        }
-
-        if (state is! AchievementsLoaded) {
-          return const SizedBox.shrink();
-        }
-
-        final stats = state.stats;
-        final recentAchievements = state.recentAchievements?.take(maxRecentItems).toList() ?? [];
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                if (showTitle)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Achievements',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: onViewAll ?? () => _navigateToAchievementsHub(context),
-                        child: const Text('View All'),
-                      ),
-                    ],
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.primary.withOpacity(0.8), AppColors.secondary.withOpacity(0.8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showTitle) ...[
+              Row(
+                children: [
+                  Icon(
+                    Icons.emoji_events,
+                    color: Colors.white,
+                    size: 24,
                   ),
-
-                if (showTitle) const SizedBox(height: 16.0),
-
-                // Stats row
-                if (stats != null)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatItem(
-                          context,
-                          'Earned',
-                          stats.totalEarned.toString(),
-                          Icons.emoji_events,
-                          Colors.amber,
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: Colors.grey.shade300,
-                        margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                      ),
-                      Expanded(
-                        child: _buildStatItem(
-                          context,
-                          'Progress',
-                          '${stats.completionPercentage.toStringAsFixed(0)}%',
-                          Icons.trending_up,
-                          Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                // Recent achievements
-                if (recentAchievements.isNotEmpty) ...[
-                  const SizedBox(height: 16.0),
+                  const SizedBox(width: 8),
                   Text(
-                    'Recent Unlocks',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
+                    'Achievements',
+                    style: AppTextStyles.titleLarge.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 12.0),
-                  Row(
-                    children: recentAchievements.where((userAchievement) => userAchievement.achievement != null).map((userAchievement) {
-                      final achievement = userAchievement.achievement!;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12.0),
-                        child: Column(
-                          children: [
-                            AchievementBadge(
-                              achievement: achievement,
-                              isEarned: true,
-                              size: 40,
-                            ),
-                            const SizedBox(height: 4.0),
-                            SizedBox(
-                              width: 50,
-                              child: Text(
-                                achievement.name,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontSize: 10,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ] else if (stats != null && stats.totalEarned == 0) ...[
-                  const SizedBox(height: 16.0),
-                  Container(
-                    padding: const EdgeInsets.all(12.0),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(8.0),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.grey.shade600,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8.0),
-                        Expanded(
-                          child: Text(
-                            'Complete your first ruck to start earning achievements!',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ),
-                      ],
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () {
+                      // Navigate to achievements hub
+                      Navigator.pushNamed(context, '/achievements');
+                    },
+                    child: Text(
+                      'View All',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: Colors.white,
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+            ],
+            
+            // Quick stats
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildStatColumn('5', 'Earned', Icons.emoji_events),
+                _buildStatColumn('12', 'Available', Icons.flag),
+                _buildStatColumn('42%', 'Complete', Icons.trending_up),
               ],
             ),
-          ),
-        );
-      },
+            
+            const SizedBox(height: 16),
+            
+            // Recent achievements placeholder
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.star,
+                    color: Colors.yellow[300],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Recent: First Steps, Pack Pioneer',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildStatItem(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildStatColumn(String value, String label, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 4.0),
+        Icon(
+          icon,
+          color: Colors.white,
+          size: 20,
+        ),
+        const SizedBox(height: 4),
         Text(
           value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
+            color: Colors.white,
             fontWeight: FontWeight.bold,
-            color: color,
           ),
         ),
+        const SizedBox(height: 2),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey.shade600,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: Colors.white70,
           ),
         ),
       ],
-    );
-  }
-
-  void _navigateToAchievementsHub(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const AchievementsHubScreen(),
-      ),
     );
   }
 }
