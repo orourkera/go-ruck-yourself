@@ -130,7 +130,7 @@ class LocationServiceImpl implements LocationService {
     } else if (Platform.isIOS) {
       locationSettings = AppleSettings(
         accuracy: LocationAccuracy.best,
-        distanceFilter: _minDistanceFilter,
+        distanceFilter: _minDistanceFilter.toInt(), // Fix type error by converting double _minDistanceFilter to int
         pauseLocationUpdatesAutomatically: false, // Critical: Keep GPS active in background
         activityType: ActivityType.fitness, // Optimize for fitness tracking
         showBackgroundLocationIndicator: true, // Required for background location
@@ -138,9 +138,9 @@ class LocationServiceImpl implements LocationService {
       );
     } else {
       // Fallback for other platforms
-      locationSettings = const LocationSettings(
+      locationSettings = LocationSettings(
         accuracy: LocationAccuracy.best,
-        distanceFilter: _minDistanceFilter,
+        distanceFilter: 1, // Convert from _minDistanceFilter (1.0) to int
       );
     }
     

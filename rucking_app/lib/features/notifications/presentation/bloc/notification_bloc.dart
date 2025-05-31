@@ -7,6 +7,9 @@ import 'package:rucking_app/features/notifications/domain/repositories/notificat
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_state.dart';
 
+export 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
+export 'package:rucking_app/features/notifications/presentation/bloc/notification_state.dart';
+
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final NotificationRepository repository;
   Timer? _pollingTimer;

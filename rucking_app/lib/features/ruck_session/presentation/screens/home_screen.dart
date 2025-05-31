@@ -27,6 +27,7 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/core/services/session_cache_service.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
+import 'package:rucking_app/core/services/api_client.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)

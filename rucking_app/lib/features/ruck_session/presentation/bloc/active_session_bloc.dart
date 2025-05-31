@@ -749,7 +749,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
               ruckWeightKg: completedSession.ruckWeightKg,
               elevationGainMeters: completedSession.elevationGain,
               elevationLossMeters: completedSession.elevationLoss,
-          );
+        );
 
       } catch (e, stackTrace) {
         String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Complete');
@@ -758,6 +758,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Pass the current state directly instead of trying to convert it
         emit(ActiveSessionFailure(errorMessage: errorMessage, sessionDetails: currentState));
       }
+      } catch (e, stackTrace) { // CATCH FOR OUTER TRY (started on line 566)
+        AppLogger.error(
+          'Unhandled error in _onSessionCompleted main processing: $e',
+          exception: e,
+          stackTrace: stackTrace,
+        );
+        // currentState is defined at the start of the 'if (state is ActiveSessionRunning)' block
+        emit(ActiveSessionFailure(
+          errorMessage: 'An unexpected error occurred while completing the session.',
+          sessionDetails: currentState, 
+        ));
+      } 
     } else {
       emit(ActiveSessionInitial());
     }
@@ -1366,9 +1378,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     
     // Reset counters
     _elapsedCounter = 0;
-    
-    // Clear split tracking
-    _splitTrackingService.reset();
     
     // Clear any stored active session
     try {
