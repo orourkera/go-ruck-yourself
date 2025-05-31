@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/widgets/achievement_summary.dart';
+import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
@@ -10,17 +11,14 @@ import 'package:rucking_app/features/profile/presentation/screens/profile_screen
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_history_screen.dart';
-import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
 import 'package:rucking_app/features/notifications/presentation/widgets/notification_bell.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
-import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
-import 'package:rucking_app/core/services/api_client.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -77,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const _HomeTab(),
     const SessionHistoryScreen(),
     const RuckBuddiesScreen(),
-    const StatisticsScreen(),
+    const AchievementsHubScreen(),
     const ProfileScreen(),
   ];
   
@@ -151,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 48,
               height: 48,
             ),
-            label: 'Stats',
+            label: 'Achievements',
           ),
           BottomNavigationBarItem(
             icon: _buildProfileIcon(false),
