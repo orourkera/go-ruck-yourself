@@ -77,15 +77,14 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
   
+  // Trigger authentication check on the singleton AuthBloc instance
+  getIt<AuthBloc>().add(AuthCheckRequested());
+  
   runApp(
     MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>(
-          create: (context) {
-            final authBloc = getIt<AuthBloc>();
-            authBloc.add(AuthCheckRequested());
-            return authBloc;
-          },
+          create: (context) => getIt<AuthBloc>(),
         ),
         BlocProvider<SessionBloc>(
           create: (context) {
