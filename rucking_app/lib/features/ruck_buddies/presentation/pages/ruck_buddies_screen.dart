@@ -124,7 +124,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
             // Achievements summary
             const AchievementSummary(
               showTitle: false,
-              maxRecentItems: 2,
+              maxRecentAchievements: 2,
             ),
             
             // Added padding between header and filter chips
