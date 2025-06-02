@@ -3,7 +3,7 @@ import 'package:rucking_app/features/achievements/data/models/achievement_model.
 /// Interface for achievements repository
 abstract class AchievementRepository {
   /// Get all available achievements
-  Future<List<Achievement>> getAchievements();
+  Future<List<Achievement>> getAllAchievements();
   
   /// Get achievement categories
   Future<List<String>> getAchievementCategories();

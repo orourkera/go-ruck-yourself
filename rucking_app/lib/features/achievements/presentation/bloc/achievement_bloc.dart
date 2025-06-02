@@ -31,7 +31,7 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     try {
       emit(AchievementsLoading());
       
-      final achievements = await _achievementRepository.getAchievements();
+      final achievements = await _achievementRepository.getAllAchievements();
       
       // If we already have some state, preserve it and just update achievements
       if (state is AchievementsLoaded) {
@@ -226,7 +226,7 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       
       // Load all data in parallel for better performance
       final results = await Future.wait([
-        _achievementRepository.getAchievements(),
+        _achievementRepository.getAllAchievements(),
         _achievementRepository.getAchievementCategories(),
         _achievementRepository.getUserAchievements(event.userId),
         _achievementRepository.getUserAchievementProgress(event.userId),
