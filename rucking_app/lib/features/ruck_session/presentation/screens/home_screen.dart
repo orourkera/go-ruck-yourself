@@ -618,6 +618,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                   // Achievements summary
                   const AchievementSummary(),
                   
+                  const SizedBox(height: 24),
+                  
                   // Recent sessions section
                   Text(
                     'Recent Sessions',
