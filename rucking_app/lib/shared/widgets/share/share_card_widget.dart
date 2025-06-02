@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/core/models/location_point.dart';
@@ -8,6 +6,7 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart'; // For ShareBackgroundOption
+import 'package:rucking_app/shared/widgets/share/route_map_painter.dart';
 
 /// A beautiful share card widget that displays session stats and achievements
 class ShareCardWidget extends StatelessWidget {
@@ -79,68 +78,36 @@ class ShareCardWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   child: Builder(
                     builder: (context) {
-                      // Calculate route points
-                      final routePoints = session.locationPoints!
+                      // Calculate route points for the painter
+                      final locationPoints = session.locationPoints!
                           .where((point) => (point['lat'] != null || point['latitude'] != null) && 
                                   (point['lng'] != null || point['longitude'] != null))
-                          .map((point) => LatLng(
-                            (point['lat'] ?? point['latitude'] as num).toDouble(),
-                            (point['lng'] ?? point['longitude'] as num).toDouble(),
+                          .map((point) => LocationPoint(
+                            latitude: (point['lat'] ?? point['latitude'] as num).toDouble(),
+                            longitude: (point['lng'] ?? point['longitude'] as num).toDouble(),
+                            elevation: 0.0,
+                            timestamp: DateTime.now(),
+                            accuracy: 0.0,
                           ))
                           .toList();
                       
-                      if (routePoints.isEmpty) {
+                      if (locationPoints.isEmpty) {
                         return Container(
                           color: Colors.grey[300],
                           child: const Center(child: Text('No route data')),
                         );
                       }
                       
-                      // Calculate center point
-                      final center = LatLng(
-                        routePoints.map((p) => p.latitude).reduce((a, b) => a + b) / routePoints.length,
-                        routePoints.map((p) => p.longitude).reduce((a, b) => a + b) / routePoints.length,
-                      );
-                      
-                      // Calculate appropriate zoom level
-                      double minLat = routePoints.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-                      double maxLat = routePoints.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-                      double minLng = routePoints.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
-                      double maxLng = routePoints.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
-                      double latDiff = (maxLat - minLat).abs();
-                      double lngDiff = (maxLng - minLng).abs();
-                      double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
-                      maxDiff *= 1.2; // Add padding
-                      
-                      double zoom;
-                      if (maxDiff < 0.001) zoom = 17.0;
-                      else if (maxDiff < 0.01) zoom = 15.0;
-                      else if (maxDiff < 0.1) zoom = 13.0;
-                      else if (maxDiff < 1.0) zoom = 10.0;
-                      else zoom = 8.0;
-                      
-                      return FlutterMap(
-                        options: MapOptions(
-                          initialCenter: center,
-                          initialZoom: zoom,
-                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                      return CustomPaint(
+                        painter: RouteMapPainter(
+                          locationPoints: locationPoints,
+                          routeColor: AppColors.secondary,
+                          strokeWidth: 3.0,
                         ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-                            userAgentPackageName: 'com.getrucky.gfy',
-                            retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-                          ),
-                          PolylineLayer(
-                            polylines: [
-                              Polyline(
-                                points: routePoints,
-                                color: AppColors.secondary,
-                                strokeWidth: 3.0,
-                              ),
-                            ],
-                          ),
-                        ],
+                        child: Container(
+                          width: 400,
+                          height: 600,
+                        ),
                       );
                     },
                   ),
