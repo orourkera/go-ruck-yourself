@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
@@ -346,26 +351,74 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _handleGetRuckyPressed(BuildContext context) async {
-    final revenueCatService = GetIt.instance<RevenueCatService>();
-    final offerings = await revenueCatService.getOfferings();
-    if (offerings.isNotEmpty) {
-      final package = offerings.first.availablePackages.first;
-      final isPurchased = await revenueCatService.makePurchase(package);
-      if (isPurchased) {
-        // After successful purchase, go directly to Home Screen
-        Navigator.pushReplacementNamed(context, '/home');
+    print('[Paywall] Get Rucky button pressed');
+    try {
+      final revenueCatService = GetIt.instance<RevenueCatService>();
+      print('[Paywall] RevenueCatService obtained');
+      
+      final offerings = await revenueCatService.getOfferings();
+      print('[Paywall] Offerings received: ${offerings.length} offerings');
+      
+      if (offerings.isNotEmpty) {
+        final package = offerings.first.availablePackages.first;
+        print('[Paywall] Making purchase for package: ${package.identifier}');
+        
+        final isPurchased = await revenueCatService.makePurchase(package);
+        print('[Paywall] Purchase result: $isPurchased');
+        
+        if (isPurchased) {
+          // After successful purchase, navigate based on platform
+          final authBloc = BlocProvider.of<AuthBloc>(context);
+          final authState = authBloc.state;
+          
+          if (authState is Authenticated) {
+            if (Platform.isIOS) {
+              // Navigate to Apple Health integration screen on iOS
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => BlocProvider(
+                    create: (context) => HealthBloc(
+                      healthService: HealthService(),
+                      userId: authState.user.userId,
+                    ),
+                    child: HealthIntegrationIntroScreen(
+                      userId: authState.user.userId,
+                    ),
+                  ),
+                ),
+              );
+            } else {
+              // Navigate directly to HomeScreen on Android and other platforms
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+              );
+            }
+          } else {
+            // Fallback if user is not authenticated (shouldn't happen)
+            Navigator.pushReplacementNamed(context, '/home');
+          }
+        } else {
+          // Handle purchase failure
+          print('[Paywall] Purchase failed');
+          StyledSnackBar.showError(
+            context: context,
+            message: 'Purchase failed. Please try again.',
+            duration: const Duration(seconds: 3),
+          );
+        }
       } else {
-        // Handle purchase failure
+        print('[Paywall] No offerings available');
         StyledSnackBar.showError(
           context: context,
-          message: 'Purchase failed. Please try again.',
+          message: 'No subscription offerings available.',
           duration: const Duration(seconds: 3),
         );
       }
-    } else {
+    } catch (e) {
+      print('[Paywall] Error in _handleGetRuckyPressed: $e');
       StyledSnackBar.showError(
         context: context,
-        message: 'No subscription offerings available.',
+        message: 'Error occurred: $e',
         duration: const Duration(seconds: 3),
       );
     }
