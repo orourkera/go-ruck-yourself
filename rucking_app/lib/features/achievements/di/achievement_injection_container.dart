@@ -8,7 +8,7 @@ import 'package:rucking_app/features/achievements/presentation/bloc/achievement_
 void initAchievementFeature(GetIt sl) {
   // Repository
   sl.registerLazySingleton<AchievementRepository>(
-    () => AchievementRepositoryImpl(sl<ApiClient>()),
+    () => AchievementRepositoryImpl(apiClient: sl<ApiClient>()),
   );
 
   // Bloc
