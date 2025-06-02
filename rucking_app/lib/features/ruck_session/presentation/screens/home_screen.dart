@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/widgets/achievement_summary.dart';
-import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
@@ -28,6 +27,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dar
 import 'package:rucking_app/core/services/session_cache_service.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -76,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const _HomeTab(),
     const SessionHistoryScreen(),
     const RuckBuddiesScreen(),
-    const AchievementsHubScreen(),
+    const StatisticsScreen(),
     const ProfileScreen(),
   ];
   
@@ -150,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 48,
               height: 48,
             ),
-            label: 'Achievements',
+            label: 'Stats',
           ),
           BottomNavigationBarItem(
             icon: _buildProfileIcon(false),

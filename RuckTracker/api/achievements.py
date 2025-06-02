@@ -294,8 +294,9 @@ class AchievementStatsResource(Resource):
                 if tier:
                     tier_counts[tier] = tier_counts.get(tier, 0) + 1
             
-            # Get total available achievements
-            total_response = supabase.table('achievements').select('id').eq('is_active', True).execute()
+            # Get total available achievements using admin client for RLS bypass
+            supabase_admin = get_supabase_admin_client()
+            total_response = supabase_admin.table('achievements').select('id').eq('is_active', True).execute()
             total_available = len(total_response.data or [])
             
             # Calculate total power points from all user's completed sessions
