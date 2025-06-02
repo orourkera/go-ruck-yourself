@@ -14,6 +14,11 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<User> login({required String email, required String password}) async {
     return await _authService.signIn(email, password);
   }
+
+  @override
+  Future<User> googleLogin() async {
+    return await _authService.googleSignIn();
+  }
   
   @override
   Future<User> register({

@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/utils/location_utils.dart';
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -509,6 +510,34 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: _SessionRouteMap(session: widget.session),
               ),
+
+              // Location Display
+              if (widget.session.locationPoints != null && widget.session.locationPoints!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Center(
+                    child: FutureBuilder<String>(
+                      future: LocationUtils.getLocationName(widget.session.locationPoints),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          return Text(
+                            snapshot.data!,
+                            style: TextStyle(
+                              fontFamily: 'Bangers',
+                              fontSize: 24,
+                              color: AppColors.primary,
+                              letterSpacing: 1.2,
+                            ),
+                            textAlign: TextAlign.center,
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 16),
 
               // Photo Gallery Section - only shown when there are photos
               BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
