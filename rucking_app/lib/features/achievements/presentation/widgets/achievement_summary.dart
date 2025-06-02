@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_event.dart';
+import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
+import 'package:rucking_app/features/achievements/data/models/achievement_model.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Achievement Summary widget for displaying quick achievement stats
-class AchievementSummary extends StatelessWidget {
+class AchievementSummary extends StatefulWidget {
   final bool showTitle;
   final int maxRecentAchievements;
 
@@ -14,99 +20,188 @@ class AchievementSummary extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<AchievementSummary> createState() => _AchievementSummaryState();
+}
+
+class _AchievementSummaryState extends State<AchievementSummary> {
+  @override
+  void initState() {
+    super.initState();
+    _loadAchievementData();
+  }
+
+  void _loadAchievementData() {
+    final authBloc = BlocProvider.of<AuthBloc>(context);
+    final achievementBloc = BlocProvider.of<AchievementBloc>(context);
+    
+    if (authBloc.state is Authenticated) {
+      final userId = (authBloc.state as Authenticated).user.userId;
+      
+      // Load achievements data
+      achievementBloc.add(const LoadAchievements());
+      achievementBloc.add(LoadAchievementStats(userId));
+      achievementBloc.add(const LoadRecentAchievements());
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.primary.withOpacity(0.8), AppColors.secondary.withOpacity(0.8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return BlocBuilder<AchievementBloc, AchievementState>(
+      builder: (context, state) {
+        return Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showTitle) ...[
-              Row(
-                children: [
-                  Icon(
-                    Icons.emoji_events,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Achievements',
-                    style: AppTextStyles.titleLarge.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () {
-                      // Navigate to achievements hub
-                      Navigator.pushNamed(context, '/achievements');
-                    },
-                    child: Text(
-                      'View All',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: Colors.white,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ],
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary.withOpacity(0.8), AppColors.secondary.withOpacity(0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(height: 16),
-            ],
-            
-            // Quick stats
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStatColumn('5', 'Earned', Icons.emoji_events),
-                _buildStatColumn('12', 'Available', Icons.flag),
-                _buildStatColumn('42%', 'Complete', Icons.trending_up),
+                if (widget.showTitle) ...[
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.emoji_events,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Achievements',
+                        style: AppTextStyles.titleLarge.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          // Navigate to achievements hub
+                          Navigator.pushNamed(context, '/achievements');
+                        },
+                        child: Text(
+                          'View All',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: Colors.white,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                
+                // Quick stats
+                _buildStatsRow(state),
+                
+                const SizedBox(height: 16),
+                
+                // Recent achievements
+                _buildRecentAchievements(state),
               ],
             ),
-            
-            const SizedBox(height: 16),
-            
-            // Recent achievements placeholder
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatsRow(AchievementState state) {
+    if (state is AchievementsLoading || (state is AchievementsLoaded && state.stats == null)) {
+      return const Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+        ],
+      );
+    }
+
+    final stats = (state is AchievementsLoaded) ? state.stats : null;
+    final totalEarned = stats?.totalEarned.toString() ?? '0';
+    final totalAvailable = stats?.totalAvailable.toString() ?? '0';
+    final completionPercentage = stats?.completionPercentage.toStringAsFixed(0) ?? '0';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildStatColumn(totalEarned, 'Earned', Icons.emoji_events),
+        _buildStatColumn(totalAvailable, 'Available', Icons.flag),
+        _buildStatColumn('$completionPercentage%', 'Complete', Icons.trending_up),
+      ],
+    );
+  }
+
+  Widget _buildRecentAchievements(AchievementState state) {
+    if (state is AchievementsLoading || (state is AchievementsLoaded && state.recentAchievements.isEmpty)) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.star,
-                    color: Colors.yellow[300],
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Recent: First Steps, Pack Pioneer',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+            ),
+            const SizedBox(width: 8),
+            Text(
+              state is AchievementsLoading ? 'Loading recent achievements...' : 'No recent achievements',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.white,
               ),
             ),
           ],
         ),
+      );
+    }
+
+    final recentAchievements = (state is AchievementsLoaded) ? state.recentAchievements : <UserAchievement>[];
+    final recentNames = recentAchievements
+        .take(3)
+        .map((achievement) => achievement.achievement?.name ?? 'Unknown Achievement')
+        .join(', ');
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.star,
+            color: Colors.yellow[300],
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Recent: $recentNames',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }
