@@ -30,11 +30,11 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
-      debugPrint('🏆 [AchievementBloc] LoadAchievements event received');
+      debugPrint('🏆 [AchievementBloc] LoadAchievements event received with unitPreference: ${event.unitPreference}');
       emit(AchievementsLoading());
       
       debugPrint('🏆 [AchievementBloc] Fetching all achievements...');
-      final achievements = await _achievementRepository.getAllAchievements();
+      final achievements = await _achievementRepository.getAllAchievements(unitPreference: event.unitPreference);
       debugPrint('🏆 [AchievementBloc] Fetched ${achievements.length} achievements');
       
       // If we already have some state, preserve it and just update achievements
@@ -186,7 +186,7 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
-      final stats = await _achievementRepository.getAchievementStats(event.userId);
+      final stats = await _achievementRepository.getAchievementStats(event.userId, unitPreference: event.unitPreference);
       
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
@@ -241,11 +241,11 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       
       // Load all data in parallel for better performance
       final results = await Future.wait([
-        _achievementRepository.getAllAchievements(),
+        _achievementRepository.getAllAchievements(unitPreference: event.unitPreference),
         _achievementRepository.getAchievementCategories(),
         _achievementRepository.getUserAchievements(event.userId),
         _achievementRepository.getUserAchievementProgress(event.userId),
-        _achievementRepository.getAchievementStats(event.userId),
+        _achievementRepository.getAchievementStats(event.userId, unitPreference: event.unitPreference),
         _achievementRepository.getRecentAchievements(),
       ]);
 

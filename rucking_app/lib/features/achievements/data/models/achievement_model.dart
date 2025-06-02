@@ -8,6 +8,7 @@ class Achievement {
   final Map<String, dynamic> criteria;
   final String iconName;
   final bool isActive;
+  final String? unitPreference; // null = universal, 'metric' or 'standard'
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -21,6 +22,7 @@ class Achievement {
     required this.criteria,
     required this.iconName,
     required this.isActive,
+    this.unitPreference,
     this.createdAt,
     this.updatedAt,
   });
@@ -36,6 +38,7 @@ class Achievement {
       criteria: json['criteria'] as Map<String, dynamic>? ?? {},
       iconName: json['icon_name'] ?? '',
       isActive: json['is_active'] ?? true,
+      unitPreference: json['unit_preference'],
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
     );
@@ -52,6 +55,7 @@ class Achievement {
       'criteria': criteria,
       'icon_name': iconName,
       'is_active': isActive,
+      'unit_preference': unitPreference,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -67,6 +71,7 @@ class Achievement {
     Map<String, dynamic>? criteria,
     String? iconName,
     bool? isActive,
+    String? unitPreference,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -80,6 +85,7 @@ class Achievement {
       criteria: criteria ?? this.criteria,
       iconName: iconName ?? this.iconName,
       isActive: isActive ?? this.isActive,
+      unitPreference: unitPreference ?? this.unitPreference,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -96,7 +102,8 @@ class Achievement {
         other.category == category &&
         other.tier == tier &&
         other.iconName == iconName &&
-        other.isActive == isActive;
+        other.isActive == isActive &&
+        other.unitPreference == unitPreference;
   }
 
   @override
@@ -108,7 +115,8 @@ class Achievement {
         category.hashCode ^
         tier.hashCode ^
         iconName.hashCode ^
-        isActive.hashCode;
+        isActive.hashCode ^
+        unitPreference.hashCode;
   }
 
   @override

@@ -2,8 +2,8 @@ import 'package:rucking_app/features/achievements/data/models/achievement_model.
 
 /// Interface for achievements repository
 abstract class AchievementRepository {
-  /// Get all available achievements
-  Future<List<Achievement>> getAllAchievements();
+  /// Get all available achievements filtered by unit preference
+  Future<List<Achievement>> getAllAchievements({String? unitPreference});
   
   /// Get achievement categories
   Future<List<String>> getAchievementCategories();
@@ -17,8 +17,8 @@ abstract class AchievementRepository {
   /// Check and award achievements for a completed session
   Future<List<Achievement>> checkSessionAchievements(int sessionId);
   
-  /// Get achievement statistics for a user
-  Future<AchievementStats> getAchievementStats(String userId);
+  /// Get achievement statistics for a user filtered by unit preference
+  Future<AchievementStats> getAchievementStats(String userId, {String? unitPreference});
   
   /// Get recently earned achievements across the platform
   Future<List<UserAchievement>> getRecentAchievements();

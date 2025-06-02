@@ -13,12 +13,19 @@ class AchievementRepositoryImpl implements AchievementRepository {
   }) : _apiClient = apiClient;
 
   @override
-  Future<List<Achievement>> getAllAchievements() async {
+  Future<List<Achievement>> getAllAchievements({String? unitPreference}) async {
     try {
-      debugPrint('🏆 [AchievementRepository] getAllAchievements called');
-      debugPrint('🏆 [AchievementRepository] API endpoint: ${ApiEndpoints.achievements}');
+      debugPrint('🏆 [AchievementRepository] getAllAchievements called with unitPreference: $unitPreference');
       
-      final response = await _apiClient.get(ApiEndpoints.achievements);
+      // Build endpoint with unit preference query parameter
+      String endpoint = ApiEndpoints.achievements;
+      if (unitPreference != null) {
+        endpoint += '?unit_preference=$unitPreference';
+      }
+      
+      debugPrint('🏆 [AchievementRepository] API endpoint: $endpoint');
+      
+      final response = await _apiClient.get(endpoint);
       debugPrint('🏆 [AchievementRepository] API response received: ${response.toString().substring(0, 200)}...');
       
       // The API returns: {'status': 'success', 'achievements': [...]}
@@ -121,9 +128,14 @@ class AchievementRepositoryImpl implements AchievementRepository {
   }
 
   @override
-  Future<AchievementStats> getAchievementStats(String userId) async {
+  Future<AchievementStats> getAchievementStats(String userId, {String? unitPreference}) async {
     try {
-      final endpoint = ApiEndpoints.getAchievementStatsEndpoint(userId);
+      // Build endpoint with unit preference query parameter
+      String endpoint = ApiEndpoints.getAchievementStatsEndpoint(userId);
+      if (unitPreference != null) {
+        endpoint += '?unit_preference=$unitPreference';
+      }
+      
       print('[DEBUG] AchievementRepository: Fetching stats from: $endpoint');
       final response = await _apiClient.get(endpoint);
       
