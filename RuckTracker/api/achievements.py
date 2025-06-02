@@ -5,7 +5,7 @@ Handles achievement management, progress tracking, and award calculations
 import logging
 from flask import Blueprint, request, jsonify, g
 from flask_restful import Resource, Api
-from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 
@@ -16,7 +16,8 @@ class AchievementsResource(Resource):
     
     def get(self):
         try:
-            supabase = get_supabase_client()
+            # Use admin client since achievements are public data
+            supabase = get_supabase_admin_client()
             
             # Get all active achievements
             response = supabase.table('achievements').select('*').eq('is_active', True).execute()

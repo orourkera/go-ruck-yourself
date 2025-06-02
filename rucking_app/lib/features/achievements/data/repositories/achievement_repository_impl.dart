@@ -14,18 +14,25 @@ class AchievementRepositoryImpl implements AchievementRepository {
   @override
   Future<List<Achievement>> getAllAchievements() async {
     try {
+      debugPrint('🏆 [AchievementRepository] getAllAchievements called');
+      debugPrint('🏆 [AchievementRepository] API endpoint: ${ApiEndpoints.achievements}');
+      
       final response = await _apiClient.get(ApiEndpoints.achievements);
+      debugPrint('🏆 [AchievementRepository] API response received: ${response.toString().substring(0, 200)}...');
       
       // The API returns: {'status': 'success', 'achievements': [...]}
       if (response['status'] == 'success' && response['achievements'] != null) {
         final achievementsData = response['achievements'] as List;
+        debugPrint('🏆 [AchievementRepository] Found ${achievementsData.length} achievements in response');
         return achievementsData
             .map((json) => Achievement.fromJson(json))
             .toList();
       }
       
+      debugPrint('🏆 [AchievementRepository] No achievements found in response');
       return [];
     } catch (e) {
+      debugPrint('🏆 [AchievementRepository] Error fetching achievements: $e');
       AppLogger.error('Error fetching achievements', exception: e);
       throw Exception('Failed to fetch achievements: $e');
     }
