@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart'; 
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
@@ -58,12 +59,16 @@ abstract class AuthService {
   /// Delete the current user's account
   /// Requires the user's ID to target the correct backend endpoint.
   Future<void> deleteAccount({required String userId});
+
+  /// Sign in with Google
+  Future<User> googleSignIn();
 }
 
 /// Implementation of AuthService using ApiClient and StorageService
 class AuthServiceImpl implements AuthService {
   final ApiClient _apiClient;
   final StorageService _storageService;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
   
   AuthServiceImpl(this._apiClient, this._storageService);
   
@@ -98,6 +103,56 @@ class AuthServiceImpl implements AuthService {
       return user;
     } catch (e) {
       AppLogger.error('Login failed', exception: e);
+      throw _handleAuthError(e);
+    }
+  }
+
+  @override
+  Future<User> googleSignIn() async {
+    try {
+      AppLogger.info('Attempting Google Sign-In');
+      
+      // Trigger Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw Exception('Google Sign-In was cancelled by user');
+      }
+
+      // Get authentication details
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      if (googleAuth.idToken == null) {
+        throw Exception('Failed to get Google ID token');
+      }
+
+      AppLogger.info('Google Sign-In successful, sending to backend');
+
+      // Send the Google ID token to your backend
+      final response = await _apiClient.post(
+        '/auth/google',
+        {
+          'id_token': googleAuth.idToken,
+        },
+      );
+
+      final token = response['token'] as String;
+      final refreshToken = response['refresh_token'] as String;
+      final userData = response['user'] as Map<String, dynamic>;
+      final user = User.fromJson(userData);
+
+      // Store token and user data
+      await _storageService.setSecureString(AppConfig.tokenKey, token);
+      await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
+      await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
+      await _storageService.setString(AppConfig.userIdKey, user.userId);
+
+      // Set token in API client
+      _apiClient.setAuthToken(token);
+
+      AppLogger.info('Google login successful for user: ${user.userId}');
+      return user;
+    } catch (e) {
+      AppLogger.error('Google login failed', exception: e);
       throw _handleAuthError(e);
     }
   }

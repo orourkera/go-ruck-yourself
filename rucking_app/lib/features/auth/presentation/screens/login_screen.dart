@@ -49,6 +49,14 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _handleGoogleLogin() {
+    context.read<AuthBloc>().add(AuthGoogleLoginRequested());
+  }
+
+  bool _isFormValid() {
+    return _formKey.currentState!.validate();
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
@@ -223,7 +231,30 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+
+                  // Google Sign-In Button
+                  OutlinedButton.icon(
+                    onPressed: _handleGoogleLogin, 
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                    icon: const Icon(
+                      Icons.g_translate, // You can replace with Google icon
+                      color: AppColors.primary,
+                    ),
+                    label: Text(
+                      'Continue with Google',
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
                   
                   // Register link
                   Row(

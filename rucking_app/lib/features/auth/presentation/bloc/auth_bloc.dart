@@ -14,6 +14,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc(this._authRepository) : super(AuthInitial()) {
     on<AuthCheckRequested>(_onAuthCheckRequested);
     on<AuthLoginRequested>(_onAuthLoginRequested);
+    on<AuthGoogleLoginRequested>(_onAuthGoogleLoginRequested);
     on<AuthRegisterRequested>(_onAuthRegisterRequested);
     on<AuthLogoutRequested>(_onAuthLogoutRequested);
     on<AuthUpdateProfileRequested>(_onAuthUpdateProfileRequested);
@@ -88,6 +89,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     } catch (e) {
       emit(AuthError('Login failed: $e'));
+    }
+  }
+
+  /// Handle Google login request
+  Future<void> _onAuthGoogleLoginRequested(
+    AuthGoogleLoginRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    
+    try {
+      final user = await _authRepository.googleLogin();
+      emit(Authenticated(user));
+    } catch (e) {
+      emit(AuthError('Google login failed: $e'));
     }
   }
 
