@@ -94,6 +94,49 @@ body {
   margin-top: 8px;
   font-size: 0.95rem;
 }
+
+/* Content page styles */
+.content-container {
+  background: rgba(0, 0, 0, 0.75);
+  color: #F7F3E8;
+  padding: 2rem;
+  border-radius: 12px;
+  max-width: 700px;
+  margin: 3rem auto 6rem auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(247, 243, 232, 0.1);
+}
+
+.content-container h1 {
+  color: #CC6A2A;
+  font-family: 'Bangers', 'Arial Black', cursive, sans-serif;
+  font-size: 2.5em;
+  margin-bottom: 1rem;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.content-container h2 {
+  color: #CC6A2A;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.content-container p, .content-container li {
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.content-container a {
+  color: #CC6A2A;
+  text-decoration: underline;
+}
+
+.content-container a:hover {
+  color: #F7F3E8;
+}
+
 @media (max-width: 700px) {
   .headline {
     font-size: 3.3em;
