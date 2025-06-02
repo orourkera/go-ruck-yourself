@@ -29,14 +29,18 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
-      emit(AchievementsLoading());
+      debugPrint('🏆 [AchievementBloc] LoadAchievements event received');
+      emit(const AchievementsLoading());
       
+      debugPrint('🏆 [AchievementBloc] Fetching all achievements...');
       final achievements = await _achievementRepository.getAllAchievements();
+      debugPrint('🏆 [AchievementBloc] Fetched ${achievements.length} achievements');
       
       // If we already have some state, preserve it and just update achievements
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
         emit(currentState.copyWith(allAchievements: achievements));
+        debugPrint('🏆 [AchievementBloc] Emitted AchievementsLoaded state');
       } else {
         emit(AchievementsLoaded(
           allAchievements: achievements,
@@ -45,8 +49,10 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
           userProgress: [],
           recentAchievements: [],
         ));
+        debugPrint('🏆 [AchievementBloc] Emitted basic AchievementsLoaded state');
       }
     } catch (e) {
+      debugPrint('🏆 [AchievementBloc] Error loading achievements: $e');
       AppLogger.error('Failed to load achievements', exception: e);
       emit(AchievementsError(message: 'Failed to load achievements: ${e.toString()}'));
     }

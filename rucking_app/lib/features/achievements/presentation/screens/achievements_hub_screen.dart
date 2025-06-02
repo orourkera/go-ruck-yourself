@@ -240,20 +240,175 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
   }
 
   Widget _buildCollectionTab(AchievementState state) {
+    // Handle different states
+    if (state is AchievementsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (state is AchievementsError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading achievements',
+              style: AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.message,
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final achievements = state is AchievementsLoaded ? state.allAchievements : <Achievement>[];
+    final userAchievements = state is AchievementsLoaded ? state.userAchievements : <UserAchievement>[];
+    
+    // Create a map of earned achievement IDs for quick lookup
+    final earnedAchievementIds = userAchievements.map((ua) => ua.achievementId).toSet();
+
+    if (achievements.isEmpty) {
+      return Center(
+        child: _buildPlaceholderCard('No achievements available'),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'All Achievements',
+            'All Achievements (${achievements.length})',
             style: AppTextStyles.titleLarge.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
           
-          _buildPlaceholderCard('Achievement collection will be shown here'),
+          // Achievement list
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: achievements.length,
+            itemBuilder: (context, index) {
+              final achievement = achievements[index];
+              final isEarned = earnedAchievementIds.contains(achievement.id);
+              
+              return Card(
+                elevation: 2,
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      // Achievement icon/badge
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isEarned 
+                            ? _getCategoryColor(achievement.category).withOpacity(0.2)
+                            : Colors.grey[200],
+                        ),
+                        child: Icon(
+                          _getCategoryIcon(achievement.category),
+                          size: 28,
+                          color: isEarned 
+                            ? _getCategoryColor(achievement.category)
+                            : Colors.grey[400],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      
+                      // Achievement details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    achievement.name,
+                                    style: AppTextStyles.titleMedium.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: isEarned ? Colors.black : Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                                if (isEarned)
+                                  Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 20,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              achievement.description,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: isEarned ? Colors.grey[700] : Colors.grey[500],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                // Category badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _getCategoryColor(achievement.category).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    achievement.category.toUpperCase(),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: _getCategoryColor(achievement.category),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // Tier badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _getTierColor(achievement.tier).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    achievement.tier.toUpperCase(),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: _getTierColor(achievement.tier),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -395,5 +550,59 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         ),
       ),
     );
+  }
+
+  // Helper methods for category and tier styling
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'distance':
+        return Colors.blue;
+      case 'weight':
+        return Colors.red;
+      case 'power':
+        return Colors.orange;
+      case 'pace':
+        return Colors.green;
+      case 'time':
+        return Colors.purple;
+      case 'special':
+        return Colors.pink;
+      default:
+        return Colors.grey;
+    }
+  }
+  
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'distance':
+        return Icons.directions_run;
+      case 'weight':
+        return Icons.fitness_center;
+      case 'power':
+        return Icons.flash_on;
+      case 'pace':
+        return Icons.speed;
+      case 'time':
+        return Icons.access_time;
+      case 'special':
+        return Icons.star;
+      default:
+        return Icons.emoji_events;
+    }
+  }
+  
+  Color _getTierColor(String tier) {
+    switch (tier.toLowerCase()) {
+      case 'bronze':
+        return const Color(0xFFCD7F32);
+      case 'silver':
+        return const Color(0xFFC0C0C0);
+      case 'gold':
+        return const Color(0xFFFFD700);
+      case 'platinum':
+        return const Color(0xFFE5E4E2);
+      default:
+        return Colors.grey;
+    }
   }
 }

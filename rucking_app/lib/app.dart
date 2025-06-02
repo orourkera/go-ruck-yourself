@@ -98,6 +98,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
             return bloc;
           },
         ),
+        BlocProvider<AchievementBloc>(
+          create: (context) => getIt<AchievementBloc>(),
+        ),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, authState) {
@@ -132,10 +135,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   return MaterialPageRoute(builder: (_) => const RuckBuddiesScreen());
                 case '/achievements':
                   return MaterialPageRoute(
-                    builder: (_) => BlocProvider<AchievementBloc>(
-                      create: (context) => getIt<AchievementBloc>(),
-                      child: const AchievementsHubScreen(),
-                    ),
+                    builder: (_) => const AchievementsHubScreen(),
                   );
                 case '/session_complete':
                   final args = settings.arguments as Map<String, dynamic>?;
