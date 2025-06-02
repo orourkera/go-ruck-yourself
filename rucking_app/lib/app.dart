@@ -128,7 +128,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                 case '/home':
                   return MaterialPageRoute(builder: (_) => const HomeScreen());
                 case '/login':
-                  return MaterialPageRoute(builder: (_) => const LoginScreen());
+                  return MaterialPageRoute(builder: (_) => LoginScreen());
                 case '/paywall':
                   return MaterialPageRoute(builder: (_) => const PaywallScreen());
                 case '/ruck_buddies':

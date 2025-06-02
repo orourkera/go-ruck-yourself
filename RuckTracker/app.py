@@ -12,7 +12,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate # Import Migrate
-from RuckTracker.supabase_client import get_supabase_client # Correct import path for get_supabase_client
+from supabase_client import get_supabase_client # Correct import path for get_supabase_client
 from flask_limiter.util import get_remote_address
 
 # Load environment variables from .env file
@@ -168,7 +168,7 @@ from .api.auth import (
     SignOutResource,
     RefreshTokenResource,
     ForgotPasswordResource,
-    UserProfileResource
+    UserProfileResource,
 )
     
 from .api.stats import ( # Import new stats resources
@@ -291,10 +291,11 @@ def enforce_https():
 # Auth endpoints (prefixed with /api)
 api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
 api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin')
-api.add_resource(SignOutResource, '/api/auth/signout')
+api.add_resource(SignOutResource, '/api/auth/signout', '/api/auth/logout')
 api.add_resource(RefreshTokenResource, '/api/auth/refresh')
 api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
-api.add_resource(UserProfileResource, '/api/users/profile') # Handles GET/PUT
+api.add_resource(UserProfileResource, '/api/auth/profile')
+
 from .api.resources import UserResource # Import UserResource
 api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
 

@@ -5,8 +5,16 @@ from datetime import datetime, timedelta
 import sys
 import logging
 from functools import wraps
+from google.auth.transport import requests
+from google.oauth2 import id_token
 
-from ..supabase_client import get_supabase_client, get_supabase_admin_client
+import sys
+import os
+
+# Add the parent directory to the path to allow importing from the root directory
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from supabase_client import get_supabase_client, get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
 

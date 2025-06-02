@@ -34,7 +34,8 @@ import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upl
 import 'package:rucking_app/core/services/service_locator.dart'; // For 'getIt' variable
 import 'package:rucking_app/shared/widgets/charts/animated_heart_rate_chart.dart'; // Added import for AnimatedHeartRateChart
 import 'package:rucking_app/features/ruck_session/presentation/widgets/splits_display.dart';
-import 'package:get_it/get_it.dart';
+import 'package:rucking_app/core/services/share_service.dart';
+import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -345,6 +346,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           backgroundColor: _getLadyModeColor(context),
           elevation: 0,
           actions: [
+            // Share session button
+            IconButton(
+              icon: const Icon(Icons.share),
+              tooltip: 'Share session',
+              onPressed: () => _shareSession(context),
+            ),
             // Delete session button
             IconButton(
               icon: const Icon(Icons.delete_outline),
@@ -940,8 +947,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         Text(
           value,
           style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
@@ -1043,35 +1050,132 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     );
   }
   
-  void _shareSession(BuildContext context) {
+  void _shareSession(BuildContext context) async {
     AppLogger.info('Sharing session ${widget.session.id}');
     
-    // Get user preferences for metric/imperial
-    final authState = context.read<AuthBloc>().state;
-    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    
-    // Format date using MeasurementUtils for timezone conversion
-    final formattedDate = MeasurementUtils.formatDate(widget.session.startTime);
-    
-    // Create message with emoji for style points
-    final shareText = '''🏋️ Go Rucky Yourself - Session Completed!
-📅 $formattedDate
-🔄 ${widget.session.formattedDuration}
-📏 ${MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric)}
-🔥 ${widget.session.caloriesBurned} calories
-⚖️ ${widget.session.ruckWeightKg == 0.0 ? 'Hike' : MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric)}
-
-Download Go Rucky Yourself from the App Store!
-''';
-
-    // This would use a share plugin in a real implementation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sharing not implemented in this version'),
-      ),
-    );
+    try {
+      // Get user preferences for metric/imperial and lady mode
+      final authState = context.read<AuthBloc>().state;
+      final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+      final bool isLadyMode = authState is Authenticated ? authState.user.gender == 'female' : false;
+      
+      // Get session photos for potential background and photo selection
+      String? backgroundImageUrl;
+      List<String> sessionPhotos = [];
+      final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
+      
+      // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
+      List<RuckPhoto> availablePhotos = [];
+      if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.photos.isNotEmpty) {
+        availablePhotos = activeSessionState.photos;
+      } else if (activeSessionState is SessionSummaryGenerated && activeSessionState.photos.isNotEmpty) {
+        availablePhotos = activeSessionState.photos;
+      }
+      
+      if (availablePhotos.isNotEmpty) {
+        // Use the first photo as default background
+        backgroundImageUrl = availablePhotos.first.url;
+        // Extract all photo URLs for background selection, filtering out null values
+        sessionPhotos = availablePhotos
+            .map((photo) => photo.url)
+            .where((url) => url != null)
+            .cast<String>()
+            .toList();
+      }
+      
+      // TODO: Get achievements from session data when achievement system is implemented
+      final List<String> achievements = [];
+      
+      // Navigate to share preview screen with photo options
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => SharePreviewScreen(
+            session: widget.session,
+            preferMetric: preferMetric,
+            backgroundImageUrl: backgroundImageUrl,
+            achievements: achievements,
+            isLadyMode: isLadyMode,
+            sessionPhotos: sessionPhotos, // Pass session photos for background selection
+          ),
+        ),
+      );
+    } catch (e) {
+      AppLogger.error('Failed to open share preview: $e', exception: e);
+      await _shareDirectly(context);
+    }
   }
-  
+
+  /// Fallback method to share directly without preview
+  Future<void> _shareDirectly(BuildContext context) async {
+    try {
+      // Get user preferences for metric/imperial and lady mode
+      final authState = context.read<AuthBloc>().state;
+      final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+      final bool isLadyMode = authState is Authenticated ? authState.user.gender == 'female' : false;
+      
+      // Get session photos for potential background
+      String? backgroundImageUrl;
+      final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
+      
+      // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
+      List<RuckPhoto> availablePhotos = [];
+      if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.photos.isNotEmpty) {
+        availablePhotos = activeSessionState.photos;
+      } else if (activeSessionState is SessionSummaryGenerated && activeSessionState.photos.isNotEmpty) {
+        availablePhotos = activeSessionState.photos;
+      }
+      
+      if (availablePhotos.isNotEmpty) {
+        // Use the first photo as background
+        backgroundImageUrl = availablePhotos.first.url;
+      }
+      
+      // TODO: Get achievements from session data when achievement system is implemented
+      final List<String> achievements = [];
+      
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 16),
+              Text('Creating share card...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // Use ShareService to create and share the session
+      await ShareService.shareSession(
+        context: context,
+        session: widget.session,
+        preferMetric: preferMetric,
+        backgroundImageUrl: backgroundImageUrl,
+        achievements: achievements,
+        isLadyMode: isLadyMode,
+      );
+      
+    } catch (e) {
+      AppLogger.error('Failed to share session: $e', exception: e);
+      
+      // Show error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share session: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   /// Shows a confirmation dialog before deleting a session
   void _showDeleteConfirmationDialog(BuildContext context) {
     showDialog(

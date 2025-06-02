@@ -69,5 +69,18 @@
 	<string>Go Rucky Yourself needs access to your photo library to select photos of your ruck sessions to share with the community.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Go Rucky Yourself needs permission to save photos to your photo library.</string>
+	<key>GIDClientID</key>
+	<string>514839968860-gbmear4okr5baujshsjk87r9c76tug8q.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.goruckyourself.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.514839968860-gbmear4okr5baujshsjk87r9c76tug8q</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

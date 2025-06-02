@@ -51,7 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         } else if (state is Unauthenticated) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            MaterialPageRoute(builder: (_) => LoginScreen()),
           );
         }
       },
@@ -216,7 +216,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   width: 48,
                                   height: 48,
                                 ),
-                                applicationLegalese: '© 2025 Get Rucky',
+                                applicationLegalese: ' 2025 Get Rucky',
                                 children: [
                                   const SizedBox(height: 16),
                                   const Text(
