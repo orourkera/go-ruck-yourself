@@ -51,4 +51,6 @@ class ApiEndpoints {
       checkSessionAchievements.replaceAll('{session_id}', sessionId);
   static String getAchievementStatsEndpoint(String userId) => 
       achievementStats.replaceAll('{user_id}', userId);
+  static String getAchievementCategoriesEndpoint() => achievementCategories;
+  static String getRecentAchievementsEndpoint() => recentAchievements;
 }
