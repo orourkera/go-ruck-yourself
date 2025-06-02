@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/animated_counter.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_event.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
@@ -159,9 +160,17 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
                         Icons.trending_up
                       ),
                       _buildStatColumn(
-                        '${stats?.completionPercentage.toStringAsFixed(0) ?? '0'}%', 
-                        'Complete', 
-                        Icons.pie_chart
+                        '', // Empty string since we'll use valueWidget
+                        'Power Points', 
+                        Icons.bolt,
+                        valueWidget: AnimatedCounter(
+                          targetValue: stats?.powerPoints ?? 0,
+                          textStyle: AppTextStyles.titleMedium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Bangers',
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -414,26 +423,27 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     );
   }
 
-  Widget _buildStatColumn(String value, String label, IconData icon) {
+  Widget _buildStatColumn(String value, String label, IconData icon, {Widget? valueWidget}) {
     return Column(
       children: [
         Icon(
           icon,
           color: Colors.white,
-          size: 32,
+          size: 24,
         ),
         const SizedBox(height: 8),
-        Text(
+        valueWidget ?? Text(
           value,
-          style: AppTextStyles.headlineMedium.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
+            fontFamily: 'Bangers',
           ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: AppTextStyles.bodyMedium.copyWith(
+          style: AppTextStyles.bodySmall.copyWith(
             color: Colors.white70,
           ),
         ),

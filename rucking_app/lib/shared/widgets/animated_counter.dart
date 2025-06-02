@@ -22,9 +22,11 @@ class AnimatedCounter extends StatefulWidget {
 }
 
 class _AnimatedCounterState extends State<AnimatedCounter>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
+  late AnimationController _scaleController;
   late Animation<double> _animation;
+  late Animation<double> _scaleAnimation;
   int _currentValue = 0;
 
   @override
@@ -36,6 +38,11 @@ class _AnimatedCounterState extends State<AnimatedCounter>
       vsync: this,
     );
 
+    _scaleController = AnimationController(
+      duration: Duration(milliseconds: widget.duration.inMilliseconds + 300),
+      vsync: this,
+    );
+
     _animation = Tween<double>(
       begin: 0.0,
       end: widget.targetValue.toDouble(),
@@ -43,6 +50,20 @@ class _AnimatedCounterState extends State<AnimatedCounter>
       parent: _controller,
       curve: Curves.easeOutCubic,
     ));
+
+    // Scale animation - grows to 1.3x, then back to 1.0
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 1.3)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 60.0,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.3, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 40.0,
+      ),
+    ]).animate(_scaleController);
 
     _animation.addListener(() {
       setState(() {
@@ -55,6 +76,7 @@ class _AnimatedCounterState extends State<AnimatedCounter>
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           _controller.forward();
+          _scaleController.forward();
         }
       });
     }
@@ -74,8 +96,10 @@ class _AnimatedCounterState extends State<AnimatedCounter>
       ));
       
       _controller.reset();
+      _scaleController.reset();
       if (widget.autoStart) {
         _controller.forward();
+        _scaleController.forward();
       }
     }
   }
@@ -83,24 +107,30 @@ class _AnimatedCounterState extends State<AnimatedCounter>
   @override
   void dispose() {
     _controller.dispose();
+    _scaleController.dispose();
     super.dispose();
   }
 
   void startAnimation() {
     if (!_controller.isAnimating) {
       _controller.reset();
+      _scaleController.reset();
       _controller.forward();
+      _scaleController.forward();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _animation,
+      animation: Listenable.merge([_animation, _scaleAnimation]),
       builder: (context, child) {
-        return Text(
-          '$_currentValue${widget.suffix}',
-          style: widget.textStyle,
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Text(
+            '$_currentValue${widget.suffix}',
+            style: widget.textStyle,
+          ),
         );
       },
     );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/network/api_endpoints.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';

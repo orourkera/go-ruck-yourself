@@ -248,6 +248,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
           textStyle: AppTextStyles.titleMedium.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
+            fontFamily: 'Bangers',
           ),
         ),
         const SizedBox(height: 2),

@@ -1,4 +1,5 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/achievements/data/models/achievement_model.dart';
 import 'package:rucking_app/features/achievements/domain/repositories/achievement_repository.dart';
@@ -30,7 +31,7 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
   ) async {
     try {
       debugPrint('🏆 [AchievementBloc] LoadAchievements event received');
-      emit(const AchievementsLoading());
+      emit(AchievementsLoading());
       
       debugPrint('🏆 [AchievementBloc] Fetching all achievements...');
       final achievements = await _achievementRepository.getAllAchievements();
