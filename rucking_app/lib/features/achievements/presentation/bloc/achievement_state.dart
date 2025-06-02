@@ -41,6 +41,7 @@ class AchievementsLoaded extends AchievementState {
       totalEarned: 0,
       totalAvailable: 0,
       completionPercentage: 0.0,
+      powerPoints: 0,
       byCategory: {},
       byTier: {},
     ),

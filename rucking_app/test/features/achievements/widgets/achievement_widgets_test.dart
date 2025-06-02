@@ -42,10 +42,16 @@ void main() {
         totalEarned: 5,
         totalAvailable: 60,
         completionPercentage: 8.3,
-        earnedByCategory: {
+        powerPoints: 150,
+        byCategory: {
           'distance': 2,
           'weight': 1,
           'consistency': 2,
+        },
+        byTier: {
+          'bronze': 3,
+          'silver': 2,
+          'gold': 0,
         },
       );
     });

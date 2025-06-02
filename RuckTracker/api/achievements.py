@@ -297,12 +297,30 @@ class AchievementStatsResource(Resource):
             total_response = supabase.table('achievements').select('id').eq('is_active', True).execute()
             total_available = len(total_response.data or [])
             
+            # Calculate total power points from all user's completed sessions
+            power_points_response = supabase.table('ruck_session').select(
+                'power_points'
+            ).eq('user_id', user_id).eq('status', 'completed').execute()
+            
+            total_power_points = 0
+            if power_points_response.data:
+                for session in power_points_response.data:
+                    power_points = session.get('power_points')
+                    if power_points is not None:
+                        try:
+                            # Convert to float and add to total
+                            total_power_points += float(power_points)
+                        except (ValueError, TypeError):
+                            # Skip invalid power_points values
+                            continue
+            
             return {
                 'status': 'success',
                 'stats': {
                     'total_earned': total_earned,
                     'total_available': total_available,
                     'completion_percentage': round((total_earned / total_available * 100) if total_available > 0 else 0, 1),
+                    'power_points': int(round(total_power_points)),  # Round to nearest integer for display
                     'by_category': category_counts,
                     'by_tier': tier_counts
                 }

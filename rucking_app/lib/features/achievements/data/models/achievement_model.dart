@@ -316,6 +316,7 @@ class AchievementStats {
   final int totalEarned;
   final int totalAvailable;
   final double completionPercentage;
+  final int powerPoints;
   final Map<String, int> byCategory;
   final Map<String, int> byTier;
 
@@ -323,6 +324,7 @@ class AchievementStats {
     required this.totalEarned,
     required this.totalAvailable,
     required this.completionPercentage,
+    required this.powerPoints,
     required this.byCategory,
     required this.byTier,
   });
@@ -334,6 +336,7 @@ class AchievementStats {
       totalEarned: stats['total_earned'] ?? 0,
       totalAvailable: stats['total_available'] ?? 0,
       completionPercentage: (stats['completion_percentage'] ?? 0.0).toDouble(),
+      powerPoints: stats['power_points'] ?? 0,
       byCategory: Map<String, int>.from(stats['by_category'] ?? {}),
       byTier: Map<String, int>.from(stats['by_tier'] ?? {}),
     );
@@ -344,6 +347,7 @@ class AchievementStats {
       'total_earned': totalEarned,
       'total_available': totalAvailable,
       'completion_percentage': completionPercentage,
+      'power_points': powerPoints,
       'by_category': byCategory,
       'by_tier': byTier,
     };
@@ -353,6 +357,7 @@ class AchievementStats {
     int? totalEarned,
     int? totalAvailable,
     double? completionPercentage,
+    int? powerPoints,
     Map<String, int>? byCategory,
     Map<String, int>? byTier,
   }) {
@@ -360,6 +365,7 @@ class AchievementStats {
       totalEarned: totalEarned ?? this.totalEarned,
       totalAvailable: totalAvailable ?? this.totalAvailable,
       completionPercentage: completionPercentage ?? this.completionPercentage,
+      powerPoints: powerPoints ?? this.powerPoints,
       byCategory: byCategory ?? this.byCategory,
       byTier: byTier ?? this.byTier,
     );
@@ -367,6 +373,6 @@ class AchievementStats {
 
   @override
   String toString() {
-    return 'AchievementStats(earned: $totalEarned/$totalAvailable, completion: ${completionPercentage.toStringAsFixed(1)}%)';
+    return 'AchievementStats(earned: $totalEarned/$totalAvailable, completion: ${completionPercentage.toStringAsFixed(1)}%, powerPoints: $powerPoints)';
   }
 }

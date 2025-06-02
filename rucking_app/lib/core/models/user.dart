@@ -162,6 +162,9 @@ class UserStats extends Equatable {
   /// Total calories burned
   final int totalCalories;
   
+  /// Total power points earned
+  final int totalPowerPoints;
+  
   /// Statistics for the current month
   final MonthlyStats? thisMonth;
   
@@ -170,6 +173,7 @@ class UserStats extends Equatable {
     required this.totalRucks,
     required this.totalDistanceKm,
     required this.totalCalories,
+    required this.totalPowerPoints,
     this.thisMonth,
   });
   
@@ -179,6 +183,7 @@ class UserStats extends Equatable {
       totalRucks: json['total_rucks'] != null ? (json['total_rucks'] as num).toInt() : 0,
       totalDistanceKm: json['total_distance_km'] != null ? (json['total_distance_km'] as num).toDouble() : 0.0,
       totalCalories: json['total_calories'] != null ? (json['total_calories'] as num).toInt() : 0,
+      totalPowerPoints: json['total_power_points'] != null ? (json['total_power_points'] as num).toInt() : 0,
       thisMonth: json['this_month'] != null 
           ? MonthlyStats.fromJson(json['this_month'] as Map<String, dynamic>) 
           : null,
@@ -191,6 +196,7 @@ class UserStats extends Equatable {
       'total_rucks': totalRucks,
       'total_distance_km': totalDistanceKm,
       'total_calories': totalCalories,
+      'total_power_points': totalPowerPoints,
     };
     
     if (thisMonth != null) result['this_month'] = thisMonth!.toJson();
@@ -199,7 +205,7 @@ class UserStats extends Equatable {
   }
   
   @override
-  List<Object?> get props => [totalRucks, totalDistanceKm, totalCalories, thisMonth];
+  List<Object?> get props => [totalRucks, totalDistanceKm, totalCalories, totalPowerPoints, thisMonth];
 }
 
 /// Monthly statistics model

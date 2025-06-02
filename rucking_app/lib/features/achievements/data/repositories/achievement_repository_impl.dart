@@ -91,17 +91,22 @@ class AchievementRepositoryImpl implements AchievementRepository {
   Future<List<Achievement>> checkSessionAchievements(int sessionId) async {
     try {
       final endpoint = ApiEndpoints.getCheckSessionAchievementsEndpoint(sessionId.toString());
+      print('[DEBUG] AchievementRepo: Calling endpoint: $endpoint');
       final response = await _apiClient.post(endpoint, {});
+      print('[DEBUG] AchievementRepo: Response: $response');
       
       if (response['status'] == 'success' && response['new_achievements'] != null) {
         final newAchievementsData = response['new_achievements'] as List;
+        print('[DEBUG] AchievementRepo: Found ${newAchievementsData.length} new achievements in response');
         return newAchievementsData
             .map((json) => Achievement.fromJson(json))
             .toList();
       }
       
+      print('[DEBUG] AchievementRepo: No new achievements or status not success');
       return [];
     } catch (e) {
+      print('[DEBUG] AchievementRepo: Error: $e');
       AppLogger.error('Error checking session achievements', exception: e);
       throw Exception('Failed to check session achievements: $e');
     }
@@ -111,21 +116,28 @@ class AchievementRepositoryImpl implements AchievementRepository {
   Future<AchievementStats> getAchievementStats(String userId) async {
     try {
       final endpoint = ApiEndpoints.getAchievementStatsEndpoint(userId);
+      print('[DEBUG] AchievementRepository: Fetching stats from: $endpoint');
       final response = await _apiClient.get(endpoint);
       
+      print('[DEBUG] AchievementRepository: Stats API response: $response');
+      
       if (response['status'] == 'success' && response['stats'] != null) {
+        print('[DEBUG] AchievementRepository: Parsing stats: ${response['stats']}');
         return AchievementStats.fromJson(response['stats']);
       }
       
+      print('[DEBUG] AchievementRepository: No stats found, returning empty stats');
       // Return empty stats if no data
       return const AchievementStats(
         totalEarned: 0,
         totalAvailable: 0,
         completionPercentage: 0.0,
+        powerPoints: 0,
         byCategory: {},
         byTier: {},
       );
     } catch (e) {
+      print('[DEBUG] AchievementRepository: Error fetching stats: $e');
       AppLogger.error('Error fetching achievement stats', exception: e);
       throw Exception('Failed to fetch achievement stats: $e');
     }
