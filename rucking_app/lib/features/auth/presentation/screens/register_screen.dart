@@ -16,7 +16,7 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 /// Screen for registering new users
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({Key? key}) : super(key: key);
+  RegisterScreen({Key? key}) : super(key: key);
 
   @override
   _RegisterScreenState createState() => _RegisterScreenState();

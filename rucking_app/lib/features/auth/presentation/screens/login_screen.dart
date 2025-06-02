@@ -13,7 +13,7 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 /// Login screen for user authentication
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  LoginScreen({Key? key}) : super(key: key);
 
   @override
   _LoginScreenState createState() => _LoginScreenState();
@@ -64,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (state is Authenticated) {
           // Revert to direct navigation to HomeScreen after login
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            MaterialPageRoute(builder: (_) => HomeScreen()),
           );
         } else if (state is AuthError) {
           // Show error message if login fails using the styled snackbar
@@ -241,9 +241,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      side: const BorderSide(color: AppColors.primary),
+                      side: BorderSide(color: AppColors.primary),
                     ),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.g_translate, // You can replace with Google icon
                       color: AppColors.primary,
                     ),
@@ -268,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const RegisterScreen(),
+                              builder: (_) => RegisterScreen(),
                             ),
                           );
                         },

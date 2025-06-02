@@ -444,7 +444,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       listener: (context, state) {
         if (state is Unauthenticated) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            MaterialPageRoute(builder: (_) => LoginScreen()),
           );
         }
       },
@@ -600,7 +600,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const CreateSessionScreen()),
+                          MaterialPageRoute(builder: (_) => CreateSessionScreen()),
                         );
                       },
                       style: ElevatedButton.styleFrom(

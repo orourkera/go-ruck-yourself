@@ -15,6 +15,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -71,6 +72,21 @@ void main() async {
   
   // Initialize Firebase
   await Firebase.initializeApp();
+  
+  // Initialize Supabase
+  final supabaseUrl = dotenv.env['SUPABASE_URL'];
+  final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
+  
+  if (supabaseUrl == null || supabaseKey == null || supabaseUrl.isEmpty || supabaseKey.isEmpty) {
+    AppLogger.error('Supabase configuration missing from .env file');
+    throw Exception('SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env file');
+  }
+  
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseKey,
+    debug: true,
+  );
   
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([

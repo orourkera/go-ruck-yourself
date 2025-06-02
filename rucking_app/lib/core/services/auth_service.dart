@@ -10,6 +10,7 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, OAuthProvider, AuthResponse;
 
 /// Interface for authentication operations
 abstract class AuthService {
@@ -125,32 +126,72 @@ class AuthServiceImpl implements AuthService {
         throw Exception('Failed to get Google ID token');
       }
 
-      AppLogger.info('Google Sign-In successful, sending to backend');
+      AppLogger.info('Google Sign-In successful, authenticating with Supabase');
 
-      // Send the Google ID token to your backend
-      final response = await _apiClient.post(
-        '/auth/google',
-        {
-          'id_token': googleAuth.idToken,
-        },
+      // Use Supabase's ID token authentication
+      final AuthResponse response = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: googleAuth.idToken!,
+        accessToken: googleAuth.accessToken,
       );
-
-      final token = response['token'] as String;
-      final refreshToken = response['refresh_token'] as String;
-      final userData = response['user'] as Map<String, dynamic>;
-      final user = User.fromJson(userData);
-
-      // Store token and user data
-      await _storageService.setSecureString(AppConfig.tokenKey, token);
-      await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
-      await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
-      await _storageService.setString(AppConfig.userIdKey, user.userId);
-
-      // Set token in API client
-      _apiClient.setAuthToken(token);
-
-      AppLogger.info('Google login successful for user: ${user.userId}');
-      return user;
+      
+      if (response.user == null || response.session == null) {
+        throw Exception('Supabase authentication failed');
+      }
+      
+      final supabaseUser = response.user!;
+      final session = response.session!;
+      
+      AppLogger.info('Supabase authentication successful');
+      
+      // Create user profile record if it doesn't exist
+      try {
+        // Set the token first so API calls work
+        _apiClient.setAuthToken(session.accessToken);
+        
+        // Check if user profile exists in our user table
+        final profileResponse = await _apiClient.get('/users/profile');
+        
+        // If we get here, profile exists, convert to our User model
+        final user = User.fromJson(profileResponse);
+        
+        // Store tokens and user data
+        await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
+        await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken ?? '');
+        await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
+        await _storageService.setString(AppConfig.userIdKey, user.userId);
+        
+        AppLogger.info('Google login successful for existing user: ${user.userId}');
+        return user;
+        
+      } catch (e) {
+        // Profile doesn't exist, create it
+        AppLogger.info('Creating user profile for new Google user');
+        
+        final email = supabaseUser.email ?? '';
+        final username = supabaseUser.userMetadata?['full_name']?.toString() ?? 
+                        supabaseUser.userMetadata?['name']?.toString() ?? 
+                        email.split('@')[0];
+        
+        // Create user profile via our API
+        final createResponse = await _apiClient.post('/users/register', {
+          'username': username,
+          'email': email,
+          'id': supabaseUser.id, // Use Supabase user ID
+        });
+        
+        final user = User.fromJson(createResponse['user']);
+        
+        // Store tokens and user data
+        await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
+        await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken ?? '');
+        await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
+        await _storageService.setString(AppConfig.userIdKey, user.userId);
+        
+        AppLogger.info('Google login successful for new user: ${user.userId}');
+        return user;
+      }
+      
     } catch (e) {
       AppLogger.error('Google login failed', exception: e);
       throw _handleAuthError(e);
