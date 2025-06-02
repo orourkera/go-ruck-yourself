@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/animated_counter.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_event.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
@@ -130,14 +131,14 @@ class _AchievementSummaryState extends State<AchievementSummary> {
     final stats = (state is AchievementsLoaded) ? state.stats : null;
     final totalEarned = stats?.totalEarned.toString() ?? '0';
     final totalAvailable = stats?.totalAvailable.toString() ?? '0';
-    final completionPercentage = stats?.completionPercentage.toStringAsFixed(0) ?? '0';
+    final powerPoints = stats?.powerPoints ?? 0;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         _buildStatColumn(totalEarned, 'Earned', Icons.emoji_events),
         _buildStatColumn(totalAvailable, 'Available', Icons.flag),
-        _buildStatColumn('$completionPercentage%', 'Complete', Icons.trending_up),
+        _buildPowerPointsColumn(powerPoints),
       ],
     );
   }
@@ -225,6 +226,33 @@ class _AchievementSummaryState extends State<AchievementSummary> {
         const SizedBox(height: 2),
         Text(
           label,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: Colors.white70,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPowerPointsColumn(int powerPoints) {
+    return Column(
+      children: [
+        Icon(
+          Icons.bolt,
+          color: Colors.white,
+          size: 20,
+        ),
+        const SizedBox(height: 4),
+        AnimatedCounter(
+          targetValue: powerPoints,
+          textStyle: AppTextStyles.titleMedium.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Power Points',
           style: AppTextStyles.bodySmall.copyWith(
             color: Colors.white70,
           ),

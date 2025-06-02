@@ -85,6 +85,9 @@ class RuckSession extends Equatable {
   /// Estimated calories burned
   final double? caloriesBurned;
   
+  /// Power points calculated from weight × distance × elevation gain
+  final double? powerPoints;
+  
   /// Duration in seconds
   final int? durationSeconds;
   
@@ -123,6 +126,7 @@ class RuckSession extends Equatable {
     this.elevationGainMeters,
     this.elevationLossMeters,
     this.caloriesBurned,
+    this.powerPoints,
     this.durationSeconds,
     this.averagePaceMinKm,
     this.routeMapUrl,
@@ -166,6 +170,7 @@ class RuckSession extends Equatable {
     double? elevationGainMeters,
     double? elevationLossMeters,
     double? caloriesBurned,
+    double? powerPoints,
     int? durationSeconds,
     double? averagePaceMinKm,
     String? routeMapUrl,
@@ -190,6 +195,7 @@ class RuckSession extends Equatable {
       elevationGainMeters: elevationGainMeters ?? this.elevationGainMeters,
       elevationLossMeters: elevationLossMeters ?? this.elevationLossMeters,
       caloriesBurned: caloriesBurned ?? this.caloriesBurned,
+      powerPoints: powerPoints ?? this.powerPoints,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       averagePaceMinKm: averagePaceMinKm ?? this.averagePaceMinKm,
       routeMapUrl: routeMapUrl ?? this.routeMapUrl,
@@ -240,6 +246,7 @@ class RuckSession extends Equatable {
       elevationGainMeters: safeParseNum(json['elevation_gain_meters'])?.toDouble(),
       elevationLossMeters: safeParseNum(json['elevation_loss_meters'])?.toDouble(),
       caloriesBurned: safeParseNum(json['calories_burned'])?.toDouble(),
+      powerPoints: safeParseNum(json['power_points'])?.toDouble(),
       durationSeconds: safeParseNum(json['duration_seconds'])?.toInt(),
       averagePaceMinKm: safeParseNum(json['average_pace_min_km'])?.toDouble(),
       routeMapUrl: json['route_map_url'] as String?,
@@ -278,6 +285,7 @@ class RuckSession extends Equatable {
     if (elevationGainMeters != null) result['elevation_gain_meters'] = elevationGainMeters;
     if (elevationLossMeters != null) result['elevation_loss_meters'] = elevationLossMeters;
     if (caloriesBurned != null) result['calories_burned'] = caloriesBurned;
+    if (powerPoints != null) result['power_points'] = powerPoints;
     if (durationSeconds != null) result['duration_seconds'] = durationSeconds;
     if (averagePaceMinKm != null) result['average_pace_min_km'] = averagePaceMinKm;
     if (routeMapUrl != null) result['route_map_url'] = routeMapUrl;
@@ -293,7 +301,7 @@ class RuckSession extends Equatable {
   List<Object?> get props => [
     ruckId, userId, status, ruckWeightKg, userWeightKg, plannedDurationMinutes,
     notes, createdAt, startedAt, pausedAt, completedAt, 
-    distanceKm, elevationGainMeters, elevationLossMeters, caloriesBurned, 
+    distanceKm, elevationGainMeters, elevationLossMeters, caloriesBurned, powerPoints, 
     durationSeconds, averagePaceMinKm, routeMapUrl,
     waypoints, review, tags, isPublic
   ];

@@ -160,6 +160,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'elevation_loss_m': widget.elevationLoss,
       };
       
+      // Include splits if available to preserve them during completion
+      if (widget.splits != null && widget.splits!.isNotEmpty) {
+        completionData['splits'] = widget.splits!.map((split) => split.toJson()).toList();
+      }
+      
       // Include is_public field - either user's explicit choice or their default preference
       final authState = BlocProvider.of<AuthBloc>(context).state;
       final bool userAllowsSharing = authState is Authenticated ? 
@@ -171,6 +176,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       
       // Check for new achievements after saving the session
       context.read<AchievementBloc>().add(CheckSessionAchievements(int.parse(widget.ruckId)));
+      print('[DEBUG] SessionComplete: Dispatched CheckSessionAchievements for session ${widget.ruckId}');
       
       // Session saved successfully, navigate immediately - don't wait for photo uploads
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
@@ -253,23 +259,28 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         ),
         BlocListener<AchievementBloc, AchievementState>(
           listener: (context, state) {
-            if (state is AchievementsLoaded && state.newlyEarned.isNotEmpty) {
-              // Show achievement unlock celebration
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => AlertDialog(
-                    content: SessionAchievementNotification(
-                      newAchievements: state.newlyEarned,
-                      onDismiss: () => Navigator.of(context).pop(),
+            print('[DEBUG] SessionComplete: Achievement state changed to ${state.runtimeType}');
+            if (state is AchievementsSessionChecked) {
+              print('[DEBUG] SessionComplete: AchievementsSessionChecked with ${state.newAchievements.length} new achievements');
+              if (state.newAchievements.isNotEmpty) {
+                print('[DEBUG] SessionComplete: Showing achievement notification dialog');
+                // Show achievement unlock celebration
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => AlertDialog(
+                      content: SessionAchievementNotification(
+                        newAchievements: state.newAchievements,
+                        onDismiss: () => Navigator.of(context).pop(),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
                     ),
-                    contentPadding: EdgeInsets.zero,
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                  ),
-                );
-              });
+                  );
+                });
+              }
             }
           },
         ),

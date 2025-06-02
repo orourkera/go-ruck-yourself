@@ -132,21 +132,28 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
+      print('[DEBUG] AchievementBloc: Checking achievements for session ${event.sessionId}');
       final newAchievements = await _achievementRepository.checkSessionAchievements(event.sessionId);
+      print('[DEBUG] AchievementBloc: Found ${newAchievements.length} new achievements');
       
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
         
         if (newAchievements.isNotEmpty) {
+          print('[DEBUG] AchievementBloc: Emitting AchievementsSessionChecked with new achievements');
           // Update the newly earned list and emit session checked state
           emit(AchievementsSessionChecked(
             newAchievements: newAchievements,
             previousState: currentState.copyWith(newlyEarned: newAchievements),
           ));
+        } else {
+          print('[DEBUG] AchievementBloc: No new achievements found');
         }
       } else {
+        print('[DEBUG] AchievementBloc: Current state is not AchievementsLoaded: ${state.runtimeType}');
         // If no current state, just emit the new achievements
         if (newAchievements.isNotEmpty) {
+          print('[DEBUG] AchievementBloc: Emitting AchievementsSessionChecked (no previous state)');
           emit(AchievementsSessionChecked(
             newAchievements: newAchievements,
             previousState: AchievementsLoaded(
@@ -161,6 +168,7 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
         }
       }
     } catch (e) {
+      print('[DEBUG] AchievementBloc: Error checking session achievements: $e');
       AppLogger.error('Failed to check session achievements', exception: e);
       emit(AchievementsError(message: 'Failed to check session achievements: ${e.toString()}'));
     }
