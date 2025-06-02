@@ -19,8 +19,20 @@ class AchievementsResource(Resource):
             # Use admin client since achievements are public data
             supabase = get_supabase_admin_client()
             
-            # Get all active achievements
-            response = supabase.table('achievements').select('*').eq('is_active', True).execute()
+            # Get unit preference from query parameters
+            unit_preference = request.args.get('unit_preference', 'metric')  # default to metric
+            
+            # Base query for active achievements
+            query = supabase.table('achievements').select('*').eq('is_active', True)
+            
+            # Filter by unit preference: include universal (null) achievements and user's preferred unit
+            if unit_preference in ['metric', 'standard']:
+                # Get achievements that are either universal (unit_preference is null) 
+                # or match the user's preference
+                response = query.or_(f'unit_preference.is.null,unit_preference.eq.{unit_preference}').execute()
+            else:
+                # If no valid preference provided, get all achievements
+                response = query.execute()
             
             if response.data:
                 return {
@@ -296,7 +308,21 @@ class AchievementStatsResource(Resource):
             
             # Get total available achievements using admin client for RLS bypass
             supabase_admin = get_supabase_admin_client()
-            total_response = supabase_admin.table('achievements').select('id').eq('is_active', True).execute()
+            
+            # Get unit preference from query parameters
+            unit_preference = request.args.get('unit_preference', 'metric')  # default to metric
+            
+            # Filter total available achievements by unit preference
+            total_query = supabase_admin.table('achievements').select('id').eq('is_active', True)
+            
+            if unit_preference in ['metric', 'standard']:
+                # Get achievements that are either universal (unit_preference is null) 
+                # or match the user's preference
+                total_response = total_query.or_(f'unit_preference.is.null,unit_preference.eq.{unit_preference}').execute()
+            else:
+                # If no valid preference provided, get all achievements
+                total_response = total_query.execute()
+                
             total_available = len(total_response.data or [])
             
             # Calculate total power points from all user's completed sessions

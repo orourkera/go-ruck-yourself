@@ -4,12 +4,17 @@ abstract class AchievementEvent extends Equatable {
   const AchievementEvent();
 
   @override
-  List<Object> get props => [];
+  List<Object?> get props => [];
 }
 
 /// Event to load all achievements
 class LoadAchievements extends AchievementEvent {
-  const LoadAchievements();
+  final String? unitPreference;
+  
+  const LoadAchievements({this.unitPreference});
+  
+  @override
+  List<Object?> get props => [unitPreference];
 }
 
 /// Event to load achievement categories
@@ -50,11 +55,12 @@ class CheckSessionAchievements extends AchievementEvent {
 /// Event to load achievement statistics
 class LoadAchievementStats extends AchievementEvent {
   final String userId;
+  final String? unitPreference;
 
-  const LoadAchievementStats(this.userId);
+  const LoadAchievementStats(this.userId, {this.unitPreference});
 
   @override
-  List<Object> get props => [userId];
+  List<Object?> get props => [userId, unitPreference];
 }
 
 /// Event to load recent achievements across platform
@@ -65,9 +71,10 @@ class LoadRecentAchievements extends AchievementEvent {
 /// Event to refresh all achievement data for a user
 class RefreshAchievementData extends AchievementEvent {
   final String userId;
+  final String? unitPreference;
 
-  const RefreshAchievementData(this.userId);
+  const RefreshAchievementData(this.userId, {this.unitPreference});
 
   @override
-  List<Object> get props => [userId];
+  List<Object?> get props => [userId, unitPreference];
 }

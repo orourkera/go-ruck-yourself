@@ -51,15 +51,15 @@ class _AnimatedCounterState extends State<AnimatedCounter>
       curve: Curves.easeOutCubic,
     ));
 
-    // Scale animation - grows to 1.3x, then back to 1.0
+    // Scale animation - grows to 2.0x, then back to 1.0
     _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.3)
+        tween: Tween<double>(begin: 1.0, end: 2.0)
             .chain(CurveTween(curve: Curves.easeOut)),
         weight: 60.0,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.3, end: 1.0)
+        tween: Tween<double>(begin: 2.0, end: 1.0)
             .chain(CurveTween(curve: Curves.elasticOut)),
         weight: 40.0,
       ),

@@ -144,7 +144,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
   }
 
   Widget _buildRecentAchievements(AchievementState state) {
-    if (state is AchievementsLoading || (state is AchievementsLoaded && state.recentAchievements.isEmpty)) {
+    if (state is AchievementsLoading) {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -163,7 +163,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
             ),
             const SizedBox(width: 8),
             Text(
-              state is AchievementsLoading ? 'Loading recent achievements...' : 'No recent achievements',
+              'Loading recent achievements...',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: Colors.white,
               ),
@@ -174,6 +174,45 @@ class _AchievementSummaryState extends State<AchievementSummary> {
     }
 
     final recentAchievements = (state is AchievementsLoaded) ? state.recentAchievements : <UserAchievement>[];
+    
+    // If no recent achievements, show recommendation
+    if (recentAchievements.isEmpty) {
+      // Get stats to check if user has any rucks
+      final stats = (state is AchievementsLoaded) ? state.stats : null;
+      final hasNoRucks = stats?.totalEarned == 0;
+      
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.lightbulb_outline,
+              color: Colors.yellow[300],
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                hasNoRucks 
+                  ? 'Next up: First Steps - Complete your first ruck!' 
+                  : 'Keep going! More achievements await!',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Show recent achievements
     final recentNames = recentAchievements
         .take(3)
         .map((achievement) => achievement.achievement?.name ?? 'Unknown Achievement')
