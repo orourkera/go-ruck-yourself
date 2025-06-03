@@ -174,7 +174,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       );
     }
 
-    final recentAchievements = (state is AchievementsLoaded) ? state.recentAchievements : <UserAchievement>[];
+    final recentAchievements = (state is AchievementsLoaded) ? state.userAchievements : <UserAchievement>[];
     
     // If no recent achievements, show recommendation
     if (recentAchievements.isEmpty) {
@@ -214,8 +214,11 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       );
     }
     
-    // Show recent achievements
-    final recentNames = recentAchievements
+    // Show user's earned achievements (most recent first)
+    final sortedAchievements = List<UserAchievement>.from(recentAchievements)
+      ..sort((a, b) => (b.earnedAt ?? DateTime.now()).compareTo(a.earnedAt ?? DateTime.now()));
+    
+    final recentNames = sortedAchievements
         .take(3)
         .map((achievement) => achievement.achievement?.name ?? 'Unknown Achievement')
         .join(', ');
