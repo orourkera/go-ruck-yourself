@@ -15,6 +15,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
@@ -26,6 +27,7 @@ import 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
+import 'package:rucking_app/features/premium/presentation/screens/post_session_upsell_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -136,6 +138,19 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                 case '/achievements':
                   return MaterialPageRoute(
                     builder: (_) => const AchievementsHubScreen(),
+                  );
+                case '/post_session_upsell':
+                  final args = settings.arguments;
+                  if (args is RuckSession) {
+                    return MaterialPageRoute(
+                      builder: (_) => PostSessionUpsellScreen(session: args),
+                    );
+                  }
+                  return MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('Error')),
+                      body: const Center(child: Text('Missing session data for upsell.')),
+                    ),
                   );
                 case '/session_complete':
                   final args = settings.arguments as Map<String, dynamic>?;

@@ -44,6 +44,8 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/core/services/share_service.dart';
 import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
+import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
+import 'package:rucking_app/features/premium/presentation/bloc/premium_state.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -182,8 +184,46 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       context.read<AchievementBloc>().add(CheckSessionAchievements(int.parse(widget.ruckId)));
       print('[DEBUG] SessionComplete: Dispatched CheckSessionAchievements for session ${widget.ruckId}');
       
-      // Session saved successfully, navigate immediately - don't wait for photo uploads
-      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      // Check premium status and navigate accordingly
+      final premiumState = context.read<PremiumBloc>().state;
+      bool isPremium = false;
+      if (premiumState is PremiumLoaded) {
+        isPremium = premiumState.isPremium;
+      }
+      
+      if (!isPremium) {
+        // Free user - navigate to post-session upsell screen
+        double avgPace = 0.0;
+        if (widget.distance > 0) {
+          avgPace = (widget.duration.inSeconds / 60) / widget.distance;
+        }
+        
+        final sessionData = RuckSession(
+          id: widget.ruckId,
+          startTime: DateTime.now().subtract(widget.duration),
+          endTime: DateTime.now(),
+          duration: widget.duration,
+          distance: widget.distance,
+          elevationGain: widget.elevationGain,
+          elevationLoss: widget.elevationLoss,
+          caloriesBurned: widget.caloriesBurned,
+          ruckWeightKg: widget.ruckWeight,
+          status: RuckStatus.completed,
+          notes: _notesController.text.trim(),
+          rating: _rating,
+          averagePace: avgPace,
+        );
+        
+        Navigator.pushNamedAndRemoveUntil(
+          context, 
+          '/post_session_upsell', 
+          (route) => false,
+          arguments: sessionData,
+        );
+      } else {
+        // Premium user - navigate directly to home
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      }
       
       // Clear session history cache so new session appears in history
       SessionRepository.clearSessionHistoryCache();
