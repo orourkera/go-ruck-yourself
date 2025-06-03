@@ -12,6 +12,7 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/home_scre
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
+import 'package:rucking_app/core/services/first_launch_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Paywall screen with auto-scrolling cards to encourage subscription
@@ -280,6 +281,31 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             ),
                           ),
                           
+                          // Start for free link
+                          SizedBox(height: isTablet ? 15 : 12),
+                          GestureDetector(
+                            onTap: () async {
+                              // Mark paywall as seen so user doesn't see it again
+                              await FirstLaunchService.markPaywallSeen();
+                              // Navigate to home screen in free mode
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                '/home',
+                                (route) => false,
+                              );
+                            },
+                            child: Text(
+                              'Start for free',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.primary,
+                                fontSize: isTablet ? 16 : 14,
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.underline,
+                                decorationColor: AppColors.primary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          
                           // Legal text and links
                           SizedBox(height: isTablet ? 20 : 15),
                           Text(
@@ -390,7 +416,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
         print('[Paywall] Purchase result: $isPurchased');
         
         if (isPurchased) {
-          // After successful purchase, navigate based on platform
+          // Mark paywall as seen since user successfully purchased
+          await FirstLaunchService.markPaywallSeen();
+          
+          print('[Paywall] Purchase successful, navigating to next screen');
           final authBloc = BlocProvider.of<AuthBloc>(context);
           final authState = authBloc.state;
           
