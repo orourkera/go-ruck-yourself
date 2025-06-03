@@ -127,17 +127,17 @@ class _PostSessionUpsellScreenState extends State<PostSessionUpsellScreen> {
                       children: [
                         _buildStatRow(
                           'Distance',
-                          MeasurementUtils.formatDistance(widget.session.distanceKm),
+                          MeasurementUtils.formatDistance(widget.session.distance, metric: true),
                         ),
                         const SizedBox(height: 8),
                         _buildStatRow(
                           'Duration',
-                          MeasurementUtils.formatDuration(widget.session.durationMinutes),
+                          MeasurementUtils.formatDuration(widget.session.duration),
                         ),
                         const SizedBox(height: 8),
                         _buildStatRow(
                           'Weight',
-                          MeasurementUtils.formatWeight(widget.session.weightKg),
+                          MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: true),
                         ),
                       ],
                     ),

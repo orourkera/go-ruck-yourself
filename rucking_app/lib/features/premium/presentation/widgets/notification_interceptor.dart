@@ -163,6 +163,17 @@ class NotificationInterceptor extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
 
+            const SizedBox(height: 16),
+
+            Text(
+              "But that's just the beginning...",
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: AppColors.textLightSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
             const SizedBox(height: 32),
 
             // Upgrade button
@@ -173,8 +184,8 @@ class NotificationInterceptor extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) => PremiumPaywallScreen(
-                        featureTitle: 'Community Engagement',
-                        featureDescription: 'See who\'s cheering you on and join the conversation with fellow ruckers.',
+                        feature: 'Community Engagement',
+                        description: 'See who\'s cheering you on and join the conversation with fellow ruckers.',
                       ),
                     ),
                   );

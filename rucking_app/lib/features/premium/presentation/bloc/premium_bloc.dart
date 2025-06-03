@@ -1,7 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rucking_app/features/premium/presentation/bloc/premium_event.dart';
-import 'package:rucking_app/features/premium/presentation/bloc/premium_state.dart';
-import 'package:rucking_app/features/premium/domain/services/premium_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:rucking_app/features/premium/services/premium_service.dart';
+import 'premium_event.dart';
+import 'premium_state.dart';
 
 class PremiumBloc extends Bloc<PremiumEvent, PremiumState> {
   final PremiumService _premiumService;
