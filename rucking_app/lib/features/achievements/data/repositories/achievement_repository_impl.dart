@@ -65,16 +65,22 @@ class AchievementRepositoryImpl implements AchievementRepository {
   @override
   Future<List<UserAchievement>> getUserAchievements(String userId) async {
     try {
+      debugPrint('🏆 [AchievementRepository] getUserAchievements called for userId: $userId');
       final endpoint = ApiEndpoints.getUserAchievementsEndpoint(userId);
+      debugPrint('🏆 [AchievementRepository] API endpoint: $endpoint');
+      
       final response = await _apiClient.get(endpoint);
+      debugPrint('🏆 [AchievementRepository] User achievements response: $response');
       
       if (response['status'] == 'success' && response['user_achievements'] != null) {
         final userAchievementsData = response['user_achievements'] as List;
+        debugPrint('🏆 [AchievementRepository] Found ${userAchievementsData.length} user achievements');
         return userAchievementsData
             .map((json) => UserAchievement.fromJson(json))
             .toList();
       }
       
+      debugPrint('🏆 [AchievementRepository] No user achievements found or invalid response');
       return [];
     } catch (e) {
       AppLogger.error('Error fetching user achievements', exception: e);

@@ -113,7 +113,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
 
     // Default to empty state for initial or other states
     final stats = state is AchievementsLoaded ? state.stats : null;
-    final recentAchievements = state is AchievementsLoaded ? state.recentAchievements : <UserAchievement>[];
+    final recentAchievements = state is AchievementsLoaded ? state.userAchievements : <UserAchievement>[];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),

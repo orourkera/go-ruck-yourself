@@ -55,7 +55,8 @@ class AchievementCategoriesResource(Resource):
     
     def get(self):
         try:
-            supabase = get_supabase_client()
+            # Get the user's JWT token from the request context
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get distinct categories
             response = supabase.table('achievements').select('category').eq('is_active', True).execute()
@@ -82,12 +83,17 @@ class UserAchievementsResource(Resource):
     
     def get(self, user_id):
         try:
-            supabase = get_supabase_client()
+            logger.info(f"Fetching achievements for user_id: {user_id}")
+            # Get the user's JWT token from the request context
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get user's earned achievements with achievement details
             response = supabase.table('user_achievements').select(
                 '*, achievements(*)'
             ).eq('user_id', user_id).order('earned_at', desc=True).execute()
+            
+            logger.info(f"Supabase response for user {user_id}: {response.data}")
+            logger.info(f"Number of achievements found: {len(response.data) if response.data else 0}")
             
             if response.data:
                 return {
@@ -110,7 +116,8 @@ class UserAchievementsProgressResource(Resource):
     
     def get(self, user_id):
         try:
-            supabase = get_supabase_client()
+            # Get the user's JWT token from the request context
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get user's progress with achievement details
             response = supabase.table('achievement_progress').select(
@@ -138,7 +145,8 @@ class CheckSessionAchievementsResource(Resource):
     
     def post(self, session_id):
         try:
-            supabase = get_supabase_client()
+            # Get the user's JWT token from the request context
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get session details
             session_response = supabase.table('ruck_session').select('*').eq('id', session_id).single().execute()
@@ -282,7 +290,8 @@ class AchievementStatsResource(Resource):
     
     def get(self, user_id):
         try:
-            supabase = get_supabase_client()
+            # Get the user's JWT token from the request context
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get user's earned achievements count by category and tier
             earned_response = supabase.table('user_achievements').select(
@@ -364,7 +373,8 @@ class RecentAchievementsResource(Resource):
     
     def get(self):
         try:
-            supabase = get_supabase_client()
+            # Get the user's JWT token from the request context
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get recent achievements from the last 7 days
             since_date = (datetime.utcnow() - timedelta(days=7)).isoformat()
