@@ -4,6 +4,9 @@ import 'package:rucking_app/features/achievements/presentation/bloc/achievement_
 import 'package:rucking_app/features/achievements/presentation/widgets/achievement_summary.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:rucking_app/features/premium/presentation/widgets/premium_tab_interceptor.dart';
+import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
+import 'package:rucking_app/features/premium/presentation/bloc/premium_event.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
@@ -71,12 +74,27 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   
+  @override
+  void initState() {
+    super.initState();
+    // Initialize premium status when home screen loads
+    context.read<PremiumBloc>().add(InitializePremiumStatus());
+  }
+  
   // List of screens for the bottom navigation bar
   final List<Widget> _screens = [
     const _HomeTab(),
     const SessionHistoryScreen(),
-    const RuckBuddiesScreen(),
-    const StatisticsScreen(),
+    const PremiumTabInterceptor(
+      tabIndex: 2,
+      featureName: 'Ruck Buddies',
+      child: RuckBuddiesScreen(),
+    ),
+    const PremiumTabInterceptor(
+      tabIndex: 3,
+      featureName: 'Statistics',
+      child: StatisticsScreen(),
+    ),
     const ProfileScreen(),
   ];
   
