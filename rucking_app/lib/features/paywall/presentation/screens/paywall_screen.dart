@@ -335,6 +335,26 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               ),
                             ],
                           ),
+                          
+                          // Continue for Free link
+                          GestureDetector(
+                            onTap: () {
+                              // Dismiss the paywall and continue with free tier
+                              Navigator.of(context).pop();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16.0),
+                              child: Text(
+                                'Continue for Free',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textSecondary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          
                           // Extra bottom padding for safety
                           SizedBox(height: isTablet ? 60 : 45),
                         ],
