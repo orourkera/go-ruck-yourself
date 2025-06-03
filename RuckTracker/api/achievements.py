@@ -82,12 +82,15 @@ class UserAchievementsResource(Resource):
     
     def get(self, user_id):
         try:
-            supabase = get_supabase_client()
+            logger.info(f"Fetching achievements for user_id: {user_id}")
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
-            # Get user's earned achievements with achievement details
             response = supabase.table('user_achievements').select(
                 '*, achievements(*)'
             ).eq('user_id', user_id).order('earned_at', desc=True).execute()
+            
+            logger.info(f"Supabase response for user {user_id}: {response.data}")
+            logger.info(f"Number of achievements found: {len(response.data) if response.data else 0}")
             
             if response.data:
                 return {
@@ -99,7 +102,7 @@ class UserAchievementsResource(Resource):
                     'status': 'success',
                     'user_achievements': []
                 }, 200
-                
+        
         except Exception as e:
             logger.error(f"Error fetching user achievements: {str(e)}")
             return {'error': 'Failed to fetch user achievements'}, 500
@@ -110,7 +113,7 @@ class UserAchievementsProgressResource(Resource):
     
     def get(self, user_id):
         try:
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get user's progress with achievement details
             response = supabase.table('achievement_progress').select(
@@ -282,7 +285,7 @@ class AchievementStatsResource(Resource):
     
     def get(self, user_id):
         try:
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get user's earned achievements count by category and tier
             earned_response = supabase.table('user_achievements').select(
