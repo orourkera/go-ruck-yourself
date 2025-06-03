@@ -29,6 +29,7 @@ import 'package:rucking_app/features/social/di/social_injection_container.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/notifications/di/notification_injection_container.dart';
 import 'package:rucking_app/features/achievements/di/achievement_injection_container.dart';
+import 'package:rucking_app/features/premium/di/premium_injection_container.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -139,6 +140,9 @@ Future<void> setupServiceLocator() async {
   
   // Initialize Achievement feature
   initAchievementFeature(getIt);
+  
+  // Initialize Premium feature
+  initPremiumFeature(getIt);
 }
 
 /// Configures Dio with base options and interceptors
