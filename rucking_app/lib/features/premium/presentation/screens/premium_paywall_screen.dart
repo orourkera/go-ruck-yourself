@@ -82,7 +82,11 @@ class PremiumPaywallScreen extends StatelessWidget {
               // Cancel button
               TextButton(
                 onPressed: () {
-                  Navigator.of(context).pop();
+                  // Navigate to home route, clearing the stack
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/home',
+                    (route) => false,
+                  );
                 },
                 child: Text(
                   'Maybe Later',
