@@ -339,15 +339,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           // Continue for Free link
                           GestureDetector(
                             onTap: () {
-                              // Dismiss the paywall and continue with free tier
-                              Navigator.of(context).pop();
+                              // Navigate to home screen with free tier
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                '/home',
+                                (route) => false,
+                              );
                             },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 16.0),
                               child: Text(
                                 'Continue for Free',
                                 style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.textSecondary,
+                                  color: AppColors.textDarkSecondary,
                                   decoration: TextDecoration.underline,
                                 ),
                                 textAlign: TextAlign.center,
