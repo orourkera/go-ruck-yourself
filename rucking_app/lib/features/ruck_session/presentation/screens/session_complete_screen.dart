@@ -25,6 +25,7 @@ import 'package:rucking_app/features/achievements/presentation/widgets/session_a
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/features/ruck_session/data/models/location_point.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
@@ -231,15 +232,27 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
       final bool isLadyMode = authState is Authenticated ? authState.user.gender == 'female' : false;
       
-      // Try to load the full session data from the repository to get location points
+      // Try to get location points from active session state first
       List<Map<String, dynamic>>? locationPoints;
-      try {
-        final sessionRepository = GetIt.instance<SessionRepository>();
-        final fullSession = await sessionRepository.fetchSessionById(widget.ruckId);
-        locationPoints = fullSession?.locationPoints;
-      } catch (e) {
-        AppLogger.warning('Could not load location points for sharing: $e');
-        locationPoints = null;
+      final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
+      
+      if (activeSessionState is ActiveSessionRunning && activeSessionState.locationPoints.isNotEmpty) {
+        // Convert LocationPoint objects to Map<String, dynamic>
+        locationPoints = activeSessionState.locationPoints
+            .map((point) => point.toJson())
+            .toList();
+        AppLogger.info('Using ${locationPoints.length} location points from active session');
+      } else {
+        // Fallback: try to load from repository
+        try {
+          final sessionRepository = GetIt.instance<SessionRepository>();
+          final fullSession = await sessionRepository.fetchSessionById(widget.ruckId);
+          locationPoints = fullSession?.locationPoints;
+          AppLogger.info('Loaded ${locationPoints?.length ?? 0} location points from repository');
+        } catch (e) {
+          AppLogger.warning('Could not load location points from repository: $e');
+          locationPoints = null;
+        }
       }
       
       // Create a RuckSession from the complete screen data
@@ -264,29 +277,74 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         locationPoints: locationPoints,
       );
       
-      // Get session photos for potential background and photo selection
+      // Get session photos - handle both file paths and URLs
       String? backgroundImageUrl;
       List<String> sessionPhotos = [];
-      final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
       
-      // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
-      List<RuckPhoto> availablePhotos = [];
-      if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.photos.isNotEmpty) {
-        availablePhotos = activeSessionState.photos;
-      } else if (activeSessionState is SessionSummaryGenerated && activeSessionState.photos.isNotEmpty) {
-        availablePhotos = activeSessionState.photos;
+      // First, check if we have selected photos as file paths
+      if (_selectedPhotos.isNotEmpty) {
+        AppLogger.info('Found ${_selectedPhotos.length} selected photos as file paths');
+        
+        // Check if these are already URLs or file paths
+        if (_selectedPhotos.first.startsWith('http')) {
+          // These are already URLs
+          sessionPhotos = _selectedPhotos;
+          backgroundImageUrl = _selectedPhotos.first;
+          AppLogger.info('Using photos as URLs directly');
+        } else {
+          // These are file paths - we need URLs from the uploaded photos
+          // Check if photos have been uploaded and are available in the active session state
+          if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.photos.isNotEmpty) {
+            final availablePhotos = activeSessionState.photos;
+            sessionPhotos = availablePhotos
+                .map((photo) => photo.url)
+                .where((url) => url != null)
+                .cast<String>()
+                .toList();
+            backgroundImageUrl = sessionPhotos.isNotEmpty ? sessionPhotos.first : null;
+            AppLogger.info('Found ${sessionPhotos.length} uploaded photo URLs from SessionPhotosLoadedForId');
+          } else if (activeSessionState is SessionSummaryGenerated && activeSessionState.photos.isNotEmpty) {
+            final availablePhotos = activeSessionState.photos;
+            sessionPhotos = availablePhotos
+                .map((photo) => photo.url)
+                .where((url) => url != null)
+                .cast<String>()
+                .toList();
+            backgroundImageUrl = sessionPhotos.isNotEmpty ? sessionPhotos.first : null;
+            AppLogger.info('Found ${sessionPhotos.length} uploaded photo URLs from SessionSummaryGenerated');
+          } else {
+            // Photos not uploaded yet - we can only share without photos
+            AppLogger.warning('Photos selected but not uploaded yet, sharing without photos');
+          }
+        }
+      } else {
+        // No photos selected in this screen, check active session state
+        AppLogger.info('No photos selected, checking active session state');
+        
+        if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.photos.isNotEmpty) {
+          final availablePhotos = activeSessionState.photos;
+          sessionPhotos = availablePhotos
+              .map((photo) => photo.url)
+              .where((url) => url != null)
+              .cast<String>()
+              .toList();
+          backgroundImageUrl = sessionPhotos.isNotEmpty ? sessionPhotos.first : null;
+          AppLogger.info('Found ${sessionPhotos.length} photo URLs from SessionPhotosLoadedForId');
+        } else if (activeSessionState is SessionSummaryGenerated && activeSessionState.photos.isNotEmpty) {
+          final availablePhotos = activeSessionState.photos;
+          sessionPhotos = availablePhotos
+              .map((photo) => photo.url)
+              .where((url) => url != null)
+              .cast<String>()
+              .toList();
+          backgroundImageUrl = sessionPhotos.isNotEmpty ? sessionPhotos.first : null;
+          AppLogger.info('Found ${sessionPhotos.length} photo URLs from SessionSummaryGenerated');
+        } else {
+          AppLogger.warning('No photos found in active session state');
+        }
       }
       
-      if (availablePhotos.isNotEmpty) {
-        // Use the first photo as default background
-        backgroundImageUrl = availablePhotos.first.url;
-        // Extract all photo URLs for background selection, filtering out null values
-        sessionPhotos = availablePhotos
-            .map((photo) => photo.url)
-            .where((url) => url != null)
-            .cast<String>()
-            .toList();
-      }
+      AppLogger.info('Navigating to share preview with ${locationPoints?.length ?? 0} location points and ${sessionPhotos.length} photos');
       
       // Navigate to share preview screen
       await Navigator.of(context).push(
