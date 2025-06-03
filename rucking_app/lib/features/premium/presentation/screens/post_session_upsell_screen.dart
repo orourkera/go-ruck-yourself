@@ -65,7 +65,12 @@ class _PostSessionUpsellScreenState extends State<PostSessionUpsellScreen> {
                 alignment: Alignment.topRight,
                 child: _canSkip
                     ? TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/home',
+                            (route) => false,
+                          );
+                        },
                         child: Text(
                           'Skip',
                           style: AppTextStyles.bodyMedium.copyWith(

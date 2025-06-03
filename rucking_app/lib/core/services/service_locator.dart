@@ -142,7 +142,7 @@ Future<void> setupServiceLocator() async {
   initAchievementFeature(getIt);
   
   // Initialize Premium feature
-  initPremiumFeature(getIt);
+  setupPremiumDependencies();
 }
 
 /// Configures Dio with base options and interceptors
