@@ -198,6 +198,29 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           avgPace = (widget.duration.inSeconds / 60) / widget.distance;
         }
         
+        // Try to get location points from active session state first or the repository
+        List<Map<String, dynamic>>? locationPoints;
+        final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
+        
+        if (activeSessionState is ActiveSessionRunning && activeSessionState.locationPoints.isNotEmpty) {
+          // Convert LocationPoint objects to Map<String, dynamic>
+          locationPoints = activeSessionState.locationPoints
+              .map((point) => point.toJson())
+              .toList();
+          AppLogger.info('Using ${locationPoints.length} location points from active session');
+        } else {
+          // Fallback: try to load from repository
+          try {
+            final sessionRepository = GetIt.instance<SessionRepository>();
+            final fullSession = await sessionRepository.fetchSessionById(widget.ruckId);
+            locationPoints = fullSession?.locationPoints;
+            AppLogger.info('Loaded ${locationPoints?.length ?? 0} location points from repository');
+          } catch (e) {
+            AppLogger.warning('Could not load location points from repository: $e');
+            locationPoints = null;
+          }
+        }
+        
         final sessionData = RuckSession(
           id: widget.ruckId,
           startTime: DateTime.now().subtract(widget.duration),
@@ -212,6 +235,12 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           notes: _notesController.text.trim(),
           rating: _rating,
           averagePace: avgPace,
+          heartRateSamples: _heartRateSamples,
+          avgHeartRate: _avgHeartRate,
+          maxHeartRate: _maxHeartRate,
+          minHeartRate: _minHeartRate,
+          locationPoints: locationPoints,
+          splits: widget.splits,
         );
         
         Navigator.pushNamedAndRemoveUntil(

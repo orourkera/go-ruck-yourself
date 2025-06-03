@@ -8,6 +8,7 @@ import 'package:rucking_app/features/achievements/presentation/bloc/achievement_
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
 import 'package:rucking_app/features/achievements/data/models/achievement_model.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
 
 /// Achievement Summary widget for displaying quick achievement stats
 class AchievementSummary extends StatefulWidget {
@@ -164,7 +165,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
             ),
             const SizedBox(width: 8),
             Text(
-              'Loading recent achievements...',
+              'Loading next challenge...',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: Colors.white,
               ),
@@ -174,14 +175,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       );
     }
 
-    final recentAchievements = (state is AchievementsLoaded) ? state.userAchievements : <UserAchievement>[];
-    
-    // If no recent achievements, show recommendation
-    if (recentAchievements.isEmpty) {
-      // Get stats to check if user has any rucks
-      final stats = (state is AchievementsLoaded) ? state.stats : null;
-      final hasNoRucks = stats?.totalEarned == 0;
-      
+    if (state is! AchievementsLoaded) {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -198,9 +192,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                hasNoRucks 
-                  ? 'Next up: First Steps - Complete your first ruck!' 
-                  : 'Keep going! More achievements await!',
+                'Complete challenges to earn achievements!',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
@@ -214,39 +206,151 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       );
     }
     
-    // Show user's earned achievements (most recent first)
-    final sortedAchievements = List<UserAchievement>.from(recentAchievements)
-      ..sort((a, b) => (b.earnedAt ?? DateTime.now()).compareTo(a.earnedAt ?? DateTime.now()));
+    // Get locked achievements
+    final lockedAchievements = state.getLockedAchievements();
     
-    final recentNames = sortedAchievements
-        .take(3)
-        .map((achievement) => achievement.achievement?.name ?? 'Unknown Achievement')
-        .join(', ');
-    
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.star,
-            color: Colors.yellow[300],
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Recent: $recentNames',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: Colors.white,
+    // If no locked achievements, show a message
+    if (lockedAchievements.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.emoji_events,
+              color: Colors.yellow[300],
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'You\'ve earned all achievements! Wow!',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.visible,
               ),
-              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Get achievements with progress
+    final achievementsWithProgress = lockedAchievements
+        .where((a) => state.userProgress.any((p) => p.achievementId == a.id && p.currentValue > 0))
+        .toList();
+    
+    // Find a good next achievement to show
+    Achievement? nextChallenge;
+    String progressText = '';
+    String achievementId = '';
+    
+    // First try to find an achievement with progress
+    if (achievementsWithProgress.isNotEmpty) {
+      // Sort by closest to completion
+      final sortedByProgress = achievementsWithProgress.map((achievement) {
+        final progress = state.getProgressForAchievement(achievement.id);
+        final percent = progress != null 
+            ? (progress.currentValue / progress.targetValue) 
+            : 0.0;
+        return {'achievement': achievement, 'percent': percent};
+      }).toList();
+      
+      // Sort by highest completion percentage
+      sortedByProgress.sort((a, b) => (b['percent'] as double).compareTo(a['percent'] as double));
+      
+      if (sortedByProgress.isNotEmpty) {
+        nextChallenge = sortedByProgress.first['achievement'] as Achievement;
+        achievementId = nextChallenge.id;
+        final percent = sortedByProgress.first['percent'] as double;
+        final progress = state.getProgressForAchievement(nextChallenge.id);
+        
+        if (progress != null) {
+          progressText = ' (${(percent * 100).toInt()}% complete)';
+        }
+      }
+    }
+    
+    // If no achievement with progress, pick a random beginner one
+    if (nextChallenge == null) {
+      final beginnerAchievements = lockedAchievements
+          .where((a) => a.tier.toLowerCase() == 'beginner' || a.tier.toLowerCase() == 'easy')
+          .toList();
+      
+      if (beginnerAchievements.isNotEmpty) {
+        // Get a random beginner achievement
+        nextChallenge = beginnerAchievements[DateTime.now().millisecondsSinceEpoch % beginnerAchievements.length];
+        achievementId = nextChallenge.id;
+      } else {
+        // Just get any locked achievement
+        nextChallenge = lockedAchievements[0];
+        achievementId = nextChallenge.id;
+      }
+    }
+    
+    return GestureDetector(
+      onTap: () {
+        // Navigate to achievement detail page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AchievementsHubScreen(
+              initialAchievementId: achievementId,
             ),
           ),
-        ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.flag,
+              color: Colors.yellow[300],
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Next challenge: ${nextChallenge.name}$progressText',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.visible,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tap to view details',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Colors.white.withOpacity(0.6),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.white70,
+              size: 18,
+            ),
+          ],
+        ),
       ),
     );
   }
