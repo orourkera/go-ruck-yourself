@@ -32,6 +32,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     
     // Load achievement data
     context.read<AchievementBloc>().add(const LoadAchievements());
+    context.read<AchievementBloc>().add(LoadUserAchievements(userId)); // Load user's earned achievements
     context.read<AchievementBloc>().add(LoadAchievementStats(userId));
   }
 

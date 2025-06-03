@@ -40,6 +40,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       
       // Load achievements data
       achievementBloc.add(const LoadAchievements());
+      achievementBloc.add(LoadUserAchievements(userId)); // Load user's earned achievements
       achievementBloc.add(LoadAchievementStats(userId));
       achievementBloc.add(const LoadRecentAchievements());
     }

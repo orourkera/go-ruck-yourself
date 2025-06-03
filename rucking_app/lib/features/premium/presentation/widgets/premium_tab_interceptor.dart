@@ -29,18 +29,9 @@ class PremiumTabInterceptor extends StatelessWidget {
 
         // Block access to premium tabs (index 2 = Ruck Buddies, index 3 = Stats)
         if (tabIndex == 2 || tabIndex == 3) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(context).pushNamed('/paywall');
-          });
-          
-          // Return a loading widget while navigation happens
-          return Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(
-              child: CircularProgressIndicator(
-                color: Colors.blue,
-              ),
-            ),
+          return PremiumPaywallScreen(
+            feature: featureName,
+            description: _getFeatureDescription(tabIndex),
           );
         }
 

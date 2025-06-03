@@ -71,7 +71,7 @@ class PremiumPaywallScreen extends StatelessWidget {
               CustomButton(
                 text: 'Upgrade to Premium',
                 onPressed: () {
-                  context.read<PremiumBloc>().add(PurchasePremium());
+                  Navigator.of(context).pushNamed('/paywall');
                 },
                 color: AppColors.primary,
                 textColor: AppColors.white,
