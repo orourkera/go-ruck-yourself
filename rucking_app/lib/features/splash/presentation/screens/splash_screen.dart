@@ -2,10 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
-import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/shared/theme/app_text_styles.dart';
-import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
+import 'package:rucking_app/core/services/first_launch_service.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/splash/service/splash_helper.dart';
 
 /// Splash screen shown on app launch
@@ -124,15 +125,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       final bool isSubscribed = await revenueCatService.checkSubscriptionStatus(); 
       if (!mounted) return; // Check mounted after await
 
+      // Check if user has seen the paywall before
+      final bool hasSeenPaywall = await FirstLaunchService.hasSeenPaywall();
+
       if (isSubscribed) {
         debugPrint('[Splash] User is subscribed. Navigating to HomeScreen.');
         Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        debugPrint('[Splash] User is not subscribed. Navigating to PaywallScreen.');
+      } else if (!hasSeenPaywall) {
+        // First time user sees paywall - show it and mark as seen
+        debugPrint('[Splash] First launch - showing PaywallScreen.');
+        await FirstLaunchService.markPaywallSeen();
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const PaywallScreen()),
         );
+      } else {
+        // User has seen paywall before - go straight to home
+        debugPrint('[Splash] User has seen paywall before. Navigating to HomeScreen.');
+        Navigator.pushReplacementNamed(context, '/home');
       }
     } else if (authStateToNavigate is Unauthenticated || authStateToNavigate is AuthError) {
       debugPrint('[Splash] AuthState is ${authStateToNavigate.runtimeType}. Navigating to /login.');
