@@ -294,7 +294,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               );
                             },
                             child: Text(
-                              'Start for free',
+                              'Continue for Free',
                               style: AppTextStyles.bodyMedium.copyWith(
                                 color: AppColors.primary,
                                 fontSize: isTablet ? 16 : 14,
@@ -360,28 +360,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 ),
                               ),
                             ],
-                          ),
-                          
-                          // Continue for Free link
-                          GestureDetector(
-                            onTap: () {
-                              // Navigate to home screen with free tier
-                              Navigator.of(context).pushNamedAndRemoveUntil(
-                                '/home',
-                                (route) => false,
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16.0),
-                              child: Text(
-                                'Continue for Free',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.textDarkSecondary,
-                                  decoration: TextDecoration.underline,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
                           ),
                           
                           // Extra bottom padding for safety
