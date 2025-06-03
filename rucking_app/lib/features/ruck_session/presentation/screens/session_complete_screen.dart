@@ -27,6 +27,7 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
@@ -40,6 +41,8 @@ import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
+import 'package:rucking_app/core/services/share_service.dart';
+import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -216,6 +219,100 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       return;
     }
     context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.ruckId));
+  }
+
+  /// Share the completed session immediately without saving first
+  void _shareSessionExternal(BuildContext context) async {
+    AppLogger.info('Sharing completed session ${widget.ruckId}');
+    
+    try {
+      // Get user preferences for metric/imperial and lady mode
+      final authState = context.read<AuthBloc>().state;
+      final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+      final bool isLadyMode = authState is Authenticated ? authState.user.gender == 'female' : false;
+      
+      // Try to load the full session data from the repository to get location points
+      List<Map<String, dynamic>>? locationPoints;
+      try {
+        final sessionRepository = GetIt.instance<SessionRepository>();
+        final fullSession = await sessionRepository.fetchSessionById(widget.ruckId);
+        locationPoints = fullSession?.locationPoints;
+      } catch (e) {
+        AppLogger.warning('Could not load location points for sharing: $e');
+        locationPoints = null;
+      }
+      
+      // Create a RuckSession from the complete screen data
+      final sessionForSharing = RuckSession(
+        id: widget.ruckId,
+        startTime: widget.completedAt.subtract(widget.duration),
+        endTime: widget.completedAt,
+        duration: widget.duration,
+        distance: widget.distance,
+        caloriesBurned: widget.caloriesBurned,
+        elevationGain: widget.elevationGain,
+        elevationLoss: widget.elevationLoss,
+        averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 
+            ? (widget.duration.inMinutes / widget.distance) : 0.0,
+        ruckWeightKg: widget.ruckWeight ?? 0.0,
+        status: RuckStatus.completed,
+        heartRateSamples: _heartRateSamples,
+        avgHeartRate: _avgHeartRate,
+        maxHeartRate: _maxHeartRate,
+        minHeartRate: _minHeartRate,
+        splits: widget.splits,
+        locationPoints: locationPoints,
+      );
+      
+      // Get session photos for potential background and photo selection
+      String? backgroundImageUrl;
+      List<String> sessionPhotos = [];
+      final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
+      
+      // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
+      List<RuckPhoto> availablePhotos = [];
+      if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.photos.isNotEmpty) {
+        availablePhotos = activeSessionState.photos;
+      } else if (activeSessionState is SessionSummaryGenerated && activeSessionState.photos.isNotEmpty) {
+        availablePhotos = activeSessionState.photos;
+      }
+      
+      if (availablePhotos.isNotEmpty) {
+        // Use the first photo as default background
+        backgroundImageUrl = availablePhotos.first.url;
+        // Extract all photo URLs for background selection, filtering out null values
+        sessionPhotos = availablePhotos
+            .map((photo) => photo.url)
+            .where((url) => url != null)
+            .cast<String>()
+            .toList();
+      }
+      
+      // Navigate to share preview screen
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => SharePreviewScreen(
+            session: sessionForSharing,
+            preferMetric: preferMetric,
+            backgroundImageUrl: backgroundImageUrl,
+            achievements: [], // Could populate with achievement strings if available
+            isLadyMode: isLadyMode,
+            sessionPhotos: sessionPhotos,
+          ),
+        ),
+      );
+    } catch (e) {
+      AppLogger.error('Failed to open share preview: $e', exception: e);
+      
+      // Show error message
+      if (context.mounted) {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Failed to open share preview: ${e.toString()}',
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
   }
 
   // UI helpers
@@ -622,6 +719,16 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             icon: Icons.save,
             color: _getLadyModeColor(context),
             isLoading: _isSaving,
+            width: 250,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: CustomButton(
+            onPressed: () => _shareSessionExternal(context),
+            text: 'Share Session',
+            icon: Icons.share,
+            color: AppColors.success,
             width: 250,
           ),
         ),
