@@ -11,7 +11,12 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Achievements Hub Screen - Main screen for viewing and tracking achievements
 class AchievementsHubScreen extends StatefulWidget {
-  const AchievementsHubScreen({Key? key}) : super(key: key);
+  final String? initialAchievementId;
+  
+  const AchievementsHubScreen({
+    Key? key,
+    this.initialAchievementId,
+  }) : super(key: key);
 
   @override
   State<AchievementsHubScreen> createState() => _AchievementsHubScreenState();
@@ -20,11 +25,19 @@ class AchievementsHubScreen extends StatefulWidget {
 class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final GlobalKey _achievementsListKey = GlobalKey();
+  String? _targetAchievementId;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _targetAchievementId = widget.initialAchievementId;
+    
+    // If an initial achievement ID is provided, select the Collection tab
+    if (_targetAchievementId != null) {
+      _tabController.animateTo(2); // Collection tab index
+    }
     
     // Get user ID from auth
     final authState = context.read<AuthBloc>().state;
@@ -304,10 +317,22 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           
           // Achievement list
           ListView.builder(
+            key: _achievementsListKey,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: achievements.length,
             itemBuilder: (context, index) {
+              // If this is the target achievement, scroll to it after build
+              if (_targetAchievementId != null && achievements[index].id == _targetAchievementId) {
+                // Use a post frame callback to scroll to this item after rendering
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _scrollToAchievement(index);
+                  // Clear the target ID after scrolling to prevent repeat scrolling
+                  setState(() {
+                    _targetAchievementId = null;
+                  });
+                });
+              }
               final achievement = achievements[index];
               final isEarned = earnedAchievementIds.contains(achievement.id);
               
@@ -614,6 +639,29 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         return const Color(0xFFE5E4E2);
       default:
         return Colors.grey;
+    }
+  }
+  
+  // Helper method to scroll to a specific achievement in the list
+  void _scrollToAchievement(int index) {
+    // Find the render object for the list
+    final RenderObject? renderObject = _achievementsListKey.currentContext?.findRenderObject();
+    if (renderObject != null) {
+      // Calculate position of item and scroll to it
+      final RenderBox box = renderObject as RenderBox;
+      final position = box.localToGlobal(Offset.zero);
+      final scrollPosition = position.dy;
+      
+      // Determine amount to scroll
+      final double itemHeight = 150; // Approximate height of each card
+      final double offset = index * itemHeight;
+      
+      // Scroll to the position
+      Scrollable.ensureVisible(
+        _achievementsListKey.currentContext!,
+        alignment: 0.0,
+        duration: const Duration(milliseconds: 400),
+      );
     }
   }
 }
