@@ -23,6 +23,10 @@ class AppColors {
   static final Color accentLight = Color(0xFFD67D6D);
   static final Color accentDark = Color(0xFF9A311E);
   
+  // Premium color - Gold
+  static final Color premium = Color(0xFFFFD700); // Gold for premium features
+  static final Color premiumDark = Color(0xFFB8860B); // Dark gold
+  
   // Neutral colors
   static final Color white = Color(0xFFFFFFFF);
   static final Color black = Color(0xFF000000);
