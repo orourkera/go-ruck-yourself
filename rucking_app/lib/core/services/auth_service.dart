@@ -134,32 +134,108 @@ class AuthServiceImpl implements AuthService {
       AppLogger.info('Attempting Google Sign-In');
       
       // Trigger Google Sign-In flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        throw Exception('Google Sign-In was cancelled by user');
+      GoogleSignInAccount? googleUser;
+      try {
+        googleUser = await _googleSignIn.signIn();
+        if (googleUser == null) {
+          throw AuthException('Google Sign-In was cancelled by user', 'GOOGLE_SIGN_IN_CANCELLED');
+        }
+      } catch (signInError) {
+        AppLogger.error('Error during Google signIn()', exception: signInError);
+        
+        // Handle PlatformException for sign-in failures which is a common issue for new users
+        // Instead of showing technical error, we'll create a better UX by moving them to registration
+        if (signInError.toString().toLowerCase().contains('platformexception') || 
+            signInError.toString().toLowerCase().contains('sign_in_failed')) {
+          
+          // This is likely a new Google user, so let's get their info from the GoogleSignIn object
+          // and direct them to the registration flow
+          GoogleSignInAccount? account;
+          try {
+            account = _googleSignIn.currentUser;
+            
+            if (account != null) {
+              final auth = await account.authentication;
+              final email = account.email;
+              final displayName = account.displayName ?? email.split('@')[0];
+              
+              throw GoogleUserNeedsRegistrationException(
+                'New Google user - redirecting to registration',
+                email: email,
+                displayName: displayName,
+                googleIdToken: auth.idToken,
+                googleAccessToken: auth.accessToken,
+              );
+            }
+          } catch (secondaryError) {
+            AppLogger.error('Failed to get Google user info after sign-in error', exception: secondaryError);
+          }
+          
+          // If we can't get user info, show a more friendly error
+          throw AuthException(
+            'We encountered an issue with Google Sign-In. Please try registering with email instead.',
+            'GOOGLE_SIGN_IN_FAILED'
+          );
+        }
+        rethrow;
       }
 
       // Get authentication details
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      if (googleAuth.idToken == null) {
-        throw Exception('Failed to get Google ID token');
+      GoogleSignInAuthentication googleAuth;
+      try {
+        googleAuth = await googleUser.authentication;
+        if (googleAuth.idToken == null) {
+          throw AuthException('Failed to get Google ID token', 'GOOGLE_TOKEN_FAILED');
+        }
+      } catch (authError) {
+        AppLogger.error('Error getting Google authentication', exception: authError);
+        
+        // Check if this might be a new user
+        final email = googleUser.email;
+        final displayName = googleUser.displayName ?? email.split('@')[0];
+        
+        // Route new users to registration even on auth errors
+        throw GoogleUserNeedsRegistrationException(
+          'New Google user (auth error) - redirecting to registration',
+          email: email,
+          displayName: displayName,
+          googleIdToken: null,
+          googleAccessToken: null,
+        );
       }
 
       AppLogger.info('Google Sign-In successful, authenticating with Supabase');
 
-      // Use Supabase's ID token authentication
-      final AuthResponse response = await Supabase.instance.client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: googleAuth.idToken!,
-        accessToken: googleAuth.accessToken,
-      );
-      
-      if (response.user == null || response.session == null) {
-        throw Exception('Supabase authentication failed');
+      // Try to use Supabase authentication
+      AuthResponse? response;
+      try {
+        response = await Supabase.instance.client.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: googleAuth.idToken!,
+          accessToken: googleAuth.accessToken,
+        );
+        
+        if (response.user == null || response.session == null) {
+          throw AuthException('Supabase authentication failed', 'SUPABASE_AUTH_FAILED');
+        }
+      } catch (supabaseError) {
+        AppLogger.error('Supabase Google auth error', exception: supabaseError);
+        
+        // This could be a new user who hasn't been registered yet
+        // Let's route them to registration
+        final email = googleUser.email;
+        final displayName = googleUser.displayName ?? email.split('@')[0];
+        
+        throw GoogleUserNeedsRegistrationException(
+          'Google user needs registration (Supabase auth failed)',
+          email: email,
+          displayName: displayName,
+          googleIdToken: googleAuth.idToken,
+          googleAccessToken: googleAuth.accessToken,
+        );
       }
       
-      final supabaseUser = response.user!;
+      final supabaseUser = response!.user!;
       final session = response.session!;
       
       AppLogger.info('Supabase authentication successful');
@@ -188,9 +264,11 @@ class AuthServiceImpl implements AuthService {
         // Profile doesn't exist - throw exception to route user to registration
         AppLogger.info('Google user profile not found, needs registration');
         
-        final email = supabaseUser.email ?? '';
+        final email = supabaseUser.email ?? googleUser.email;
         final displayName = supabaseUser.userMetadata?['full_name']?.toString() ?? 
-                          supabaseUser.userMetadata?['name']?.toString();
+                          supabaseUser.userMetadata?['name']?.toString() ?? 
+                          googleUser.displayName ?? 
+                          email.split('@').first; // Fallback to part of email if name is not available
         
         throw GoogleUserNeedsRegistrationException(
           'Google user needs to complete registration',

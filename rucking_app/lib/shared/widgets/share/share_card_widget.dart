@@ -1,9 +1,13 @@
 import 'dart:math' as math;
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart'; // For ShareBackgroundOption
@@ -45,73 +49,196 @@ class ShareCardWidget extends StatelessWidget {
   }
   
   Widget _buildShareCardWithMap() {
-    final mapUrl = _generateMapUrl();
-    if (mapUrl == null) {
-      return _buildStandardShareCard();
-    }
-    
-    // Simple direct approach
     return Container(
       width: 800,
       height: 800,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Stack(
-        children: [
-          // Map background
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.network(
-              mapUrl,
+      child: FutureBuilder<Uint8List?>(
+        future: _fetchMapImage(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            // Show loading state with gradient background
+            return Container(
               width: 800,
               height: 800,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                print('❌ Failed to load map image: $error');
-                return Container(
-                  width: 800,
-                  height: 800,
-                  decoration: BoxDecoration(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: _buildBackgroundGradient(),
+              ),
+              child: const Center(child: CircularProgressIndicator()),
+            );
+          } else if (snapshot.hasError) {
+            // Log the error
+            print('❌ Error loading map image: ${snapshot.error}');
+            
+            // Try fallback to URL-based approach
+            final mapUrl = _generateMapUrl();
+            if (mapUrl != null) {
+              return Stack(
+                children: [
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    gradient: _buildBackgroundGradient(),
-                  ),
-                );
-              },
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) {
-                  return ColorFiltered(
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.3),
-                      BlendMode.darken,
-                    ),
-                    child: child,
-                  );
-                }
-                return Container(
-                  width: 800,
-                  height: 800,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: _buildBackgroundGradient(),
-                  ),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
+                    child: Image.network(
+                      mapUrl,
+                      width: 800,
+                      height: 800,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        print('❌ Fallback map image failed: $error');
+                        return Container(
+                          width: 800,
+                          height: 800,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: _buildBackgroundGradient(),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          // Content on top
-          _buildShareCardContent(),
-        ],
+                  // Content overlay
+                  _buildShareCardContent(),
+                ],
+              );
+            } else {
+              // Fallback with gradient if no map available
+              return _buildStandardShareCard();
+            }
+          } else if (snapshot.hasData && snapshot.data != null) {
+            // We have image bytes - render using Image.memory
+            return Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.memory(
+                    snapshot.data!,
+                    width: 800,
+                    height: 800,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      print('❌ Memory image failed: $error');
+                      return Container(
+                        width: 800,
+                        height: 800,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: _buildBackgroundGradient(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                // Content overlay
+                _buildShareCardContent(),
+              ],
+            );
+          } else {
+            // No data but no error - fallback
+            return _buildStandardShareCard();
+          }
+        },
       ),
     );
+  }
+  
+  /// Fetch map image using Stadia Maps POST API
+  Future<Uint8List?> _fetchMapImage() async {
+    try {
+      // Get API key
+      String apiKey = dotenv.env['STADIA_MAPS_API_KEY'] ?? '';
+      if (apiKey.isEmpty) {
+        try {
+          dotenv.load();
+          apiKey = dotenv.env['STADIA_MAPS_API_KEY'] ?? '';
+        } catch (_) {}
+      }
+      
+      if (apiKey.isEmpty) {
+        AppLogger.error('STADIA_MAPS_API_KEY is not set. Map generation will fail.', exception: null);
+        return null;
+      }
+      
+      // Get location points
+      final points = session.locationPoints ?? [];
+      if (points.isEmpty) return null;
+      
+      // Convert to lat/lng pairs and simplify the route
+      final coordinates = <Map<String, double>>[];
+      for (final point in points) {
+        final lat = (point['lat'] ?? point['latitude'] as num?)?.toDouble();
+        final lng = (point['lng'] ?? point['longitude'] as num?)?.toDouble();
+        
+        if (lat != null && lng != null) {
+          coordinates.add({'lat': lat, 'lng': lng});
+        }
+      }
+      
+      if (coordinates.isEmpty) return null;
+      
+      // Simplify the route by sampling points (max 50 points for better performance)
+      final simplifiedCoordinates = _simplifyRoute(coordinates, 50);
+      
+      // Calculate center point
+      double centerLat = simplifiedCoordinates.map((p) => p['lat']!).reduce((a, b) => a + b) / simplifiedCoordinates.length;
+      double centerLng = simplifiedCoordinates.map((p) => p['lng']!).reduce((a, b) => a + b) / simplifiedCoordinates.length;
+      
+      // Build request body using coordinate array format instead of polyline
+      final requestBody = {
+        'center': '$centerLat,$centerLng',
+        'size': '800x800',
+        'zoom': 13,
+        'lines': [
+          {
+            'coordinates': simplifiedCoordinates.map((coord) => [coord['lng']!, coord['lat']!]).toList(),
+            'color': 'FF9500',
+            'width': 4,
+          }
+        ],
+      };
+      
+      // Send POST request to the cacheable endpoint
+      final response = await http.post(
+        Uri.parse('https://tiles.stadiamaps.com/static_cacheable/alidade_smooth?api_key=$apiKey'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+      
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      } else {
+        AppLogger.error('Stadia Maps API error: ${response.statusCode} ${response.body}', exception: null);
+        return null;
+      }
+    } catch (e) {
+      AppLogger.error('Error in _fetchMapImage', exception: e);
+      return null;
+    }
+  }
+
+  List<Map<String, double>> _simplifyRoute(List<Map<String, double>> coordinates, int maxPoints) {
+    if (coordinates.length <= maxPoints) return coordinates;
+    
+    final simplified = <Map<String, double>>[];
+    final step = coordinates.length / maxPoints;
+    
+    for (int i = 0; i < coordinates.length; i += step.floor()) {
+      simplified.add(coordinates[i]);
+    }
+    
+    return simplified;
+  }
+  
+  String _encodePolyline(List<Map<String, double>> coordinates) {
+    // For simplicity, let's use a basic encoding
+    // In a real app, you'd use the Google polyline algorithm
+    final buffer = StringBuffer();
+    for (int i = 0; i < coordinates.length; i++) {
+      if (i > 0) buffer.write('|');
+      buffer.write('${coordinates[i]['lat']},${coordinates[i]['lng']}');
+    }
+    return buffer.toString();
   }
   
   String? _generateMapUrl() {
@@ -239,15 +366,24 @@ class ShareCardWidget extends StatelessWidget {
   Widget _buildShareCardContent() {
     return Stack(
       children: [
+        // Debug background type and points to help troubleshoot
+        Builder(
+          builder: (context) {
+            AppLogger.debug('ShareCardWidget build - Background type: ${backgroundOption?.type}');
+            AppLogger.debug('ShareCardWidget build - Location points count: ${session.locationPoints?.length}');
+            return const SizedBox.shrink();
+          },
+        ),
+        
         // Only draw route map overlay when we have a map background
         if (backgroundOption?.type == ShareBackgroundType.map && session.locationPoints?.isNotEmpty == true) ...[  
           // Debug: Print location points info
           Builder(
             builder: (context) {
-              print('🗺️ Map background selected - Location points: ${session.locationPoints?.length}');
+              AppLogger.debug('Map background rendering with ${session.locationPoints?.length} points');
               if (session.locationPoints?.isNotEmpty == true) {
-                print('🗺️ First point: ${session.locationPoints!.first}');
-                print('🗺️ Last point: ${session.locationPoints!.last}');
+                AppLogger.debug('First point: ${session.locationPoints!.first}');
+                AppLogger.debug('Last point: ${session.locationPoints!.last}');
                 
                 // Test conversion
                 final converted = session.locationPoints!
@@ -261,9 +397,9 @@ class ShareCardWidget extends StatelessWidget {
                       accuracy: 0.0,
                     ))
                     .toList();
-                print('🗺️ Converted points: ${converted.length}');
+                AppLogger.debug('Converted points: ${converted.length}');
                 if (converted.isNotEmpty) {
-                  print('🗺️ First converted: lat=${converted.first.latitude}, lng=${converted.first.longitude}');
+                  AppLogger.debug('First converted: lat=${converted.first.latitude}, lng=${converted.first.longitude}');
                 }
               }
               return const SizedBox.shrink();
@@ -306,6 +442,9 @@ class ShareCardWidget extends StatelessWidget {
                       locationPoints: locationPoints,
                       routeColor: AppColors.secondary,
                       strokeWidth: 3.0,
+                      simplifyRoute: true,
+                      // Use aggressive simplification to prevent URL length issues
+                      epsilon: locationPoints.length > 100 ? 0.0002 : 0.00005,
                     ),
                     child: Container(
                       width: 800,
@@ -317,20 +456,25 @@ class ShareCardWidget extends StatelessWidget {
             ),
           ),
         ] else ... [
-          // Debug: Why map is not showing
-          Builder(
-            builder: (context) {
-              print('🗺️ Map background selected but no location points');
-              print('🗺️ Background type: ${backgroundOption?.type}');
-              print('🗺️ Location points null: ${session.locationPoints == null}');
-              print('🗺️ Location points empty: ${session.locationPoints?.isEmpty}');
-              return const SizedBox.shrink();
-            },
-          ),
+        // Debug: More accurate background info
+        Builder(
+          builder: (context) {
+            if (backgroundOption?.type == ShareBackgroundType.map) {
+              AppLogger.debug('Map background selected but missing data to display');
+              AppLogger.debug('Location points null: ${session.locationPoints == null}');
+              AppLogger.debug('Location points empty: ${session.locationPoints?.isEmpty}');
+            } else {
+              AppLogger.debug('Non-map background type: ${backgroundOption?.type}');
+            }
+            return const SizedBox.shrink();
+          },
+        ),
         ],
         
         // Overlay for text readability
         Container(
+          width: double.infinity,
+          height: double.infinity,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(
@@ -343,35 +487,41 @@ class ShareCardWidget extends StatelessWidget {
               ],
             ),
           ),
-        ),
-        
-        // Content on top of the background
-        Column(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 18.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top section with header
+                _buildHeader(),
+                
+                // Small spacing instead of Spacer
+                const SizedBox(height: 12),
+                
+                // Middle section with main stats
+                _buildMainStats(),
+                
+                // Small spacing instead of Spacer
+                const SizedBox(height: 16),
+                
+                // Bottom section with achievements and footer
+                Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildHeader(),
-                    const SizedBox(height: 11),
-                    _buildMainStats(),
-                    const SizedBox(height: 10),
-                    // Only show achievements if there's space
-                    if (achievements.isNotEmpty && achievements.length <= 3) ...[  
+                    // Only show achievements if there are any
+                    if (achievements.isNotEmpty) 
                       _buildAchievements(),
-                      const SizedBox(height: 6), 
-                    ],
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Footer
+                    _buildFooter(),
                   ],
                 ),
-              ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildFooter(),
-            ),
-          ],
+          ),
         ),
       ],
     );
@@ -398,9 +548,10 @@ class ShareCardWidget extends StatelessWidget {
     final preferMetric = this.preferMetric;
     
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 6), // Reduced vertical padding
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min, // More compact layout
         children: [
           // Time in a large display
           Text(
@@ -408,28 +559,28 @@ class ShareCardWidget extends StatelessWidget {
             style: AppTextStyles.labelSmall.copyWith(
               color: Colors.white.withAlpha(204),
               letterSpacing: 1.2,
-              fontSize: 14,
+              fontSize: 12, // Smaller font size
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1), // Reduced spacing
           Text(
             _formatDurationDisplay(session.duration),
             style: AppTextStyles.displayLarge.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.bold,
-              fontSize: 48, // Slightly smaller for better fit
+              fontSize: 40, // Smaller for better fit in Instagram post
             ),
           ),
           
           // Elevation gain (if significant) - more compact
           if (session.elevationGain > 0) ...[  
-            const SizedBox(height: 4),
+            const SizedBox(height: 2), // Reduced spacing
             Text(
               'ELEVATION GAIN',
               style: AppTextStyles.labelSmall.copyWith(
                 color: Colors.white.withAlpha(204),
                 letterSpacing: 1.2,
-                fontSize: 12,
+                fontSize: 10, // Smaller font
               ),
             ),
             Text(
@@ -437,12 +588,12 @@ class ShareCardWidget extends StatelessWidget {
               style: AppTextStyles.titleMedium.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
-                fontSize: 18,
+                fontSize: 16, // Slightly smaller
               ),
             ),
           ],
           
-          const SizedBox(height: 12),
+          const SizedBox(height: 8), // Reduced spacing
           
           // Distance and Weight in a row - more compact
           Row(
@@ -475,24 +626,25 @@ class ShareCardWidget extends StatelessWidget {
 
   Widget _buildStatItem(String label, String value) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,
           style: AppTextStyles.labelSmall.copyWith(
             color: Colors.white.withAlpha(204),
-            letterSpacing: 1.2,
-            fontSize: 14,
+            letterSpacing: 1.0,
+            fontSize: 12, // Smaller font
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 1), // Reduced spacing
         Text(
           value,
-          style: AppTextStyles.titleLarge.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            fontSize: 18, // Smaller font
           ),
-          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -539,35 +691,36 @@ class ShareCardWidget extends StatelessWidget {
 
   Widget _buildAchievements() {
     final achievementList = achievements.take(2).toList(); // Only show first 2 achievements to save space
-    
+  
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           'ACHIEVEMENTS',
           style: AppTextStyles.labelSmall.copyWith(
             color: Colors.white.withAlpha(204),
-            letterSpacing: 1.2,
-            fontSize: 12,
+            letterSpacing: 1.0,
+            fontSize: 10, // Smaller font
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4), // Reduced spacing
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: achievementList.map((achievement) => 
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // Smaller padding
+              margin: const EdgeInsets.only(right: 6), // Smaller margin
               decoration: BoxDecoration(
                 color: Colors.white.withAlpha(51),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16), // Smaller radius
               ),
               child: Text(
                 achievement,
                 style: AppTextStyles.labelSmall.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
-                  fontSize: 12,
+                  fontSize: 10, // Smaller font
                 ),
               ),
             ),
@@ -706,34 +859,29 @@ class ShareCardWidget extends StatelessWidget {
   DecorationImage? _buildBackgroundImage() {
     // Don't build background image if we're already handling map in _buildShareCardWithMap
     if (backgroundOption?.type == ShareBackgroundType.map) {
+      if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
+        try {
+          // We'll handle map rendering through the FutureBuilder in the build method
+          // because static maps now use POST requests, not GET with URL params
+          return null;
+        } catch (e) {
+          AppLogger.error('Error preparing map background: $e', exception: e);
+          return null;
+        }
+      }
       return null;
+    } else if (backgroundOption?.type == ShareBackgroundType.photo) {
+      return backgroundOption?.imageUrl != null
+          ? DecorationImage(
+              image: NetworkImage(backgroundOption!.imageUrl!),
+              fit: BoxFit.cover,
+              colorFilter: const ColorFilter.mode(
+                Colors.black26,
+                BlendMode.darken,
+              ),
+            )
+          : null;
     }
-    
-    // Handle photo backgrounds
-    if (backgroundOption?.type == ShareBackgroundType.photo && 
-        backgroundOption?.imageUrl != null) {
-      return DecorationImage(
-        image: NetworkImage(backgroundOption!.imageUrl!),
-        fit: BoxFit.cover,
-        colorFilter: ColorFilter.mode(
-          Colors.black.withAlpha(102),
-          BlendMode.darken,
-        ),
-      );
-    }
-    
-    // Legacy background image handling
-    if (backgroundImageUrl != null) {
-      return DecorationImage(
-        image: NetworkImage(backgroundImageUrl!),
-        fit: BoxFit.cover,
-        colorFilter: ColorFilter.mode(
-          Colors.black.withAlpha(76),
-          BlendMode.darken,
-        ),
-      );
-    }
-    
     return null;
   }
 }

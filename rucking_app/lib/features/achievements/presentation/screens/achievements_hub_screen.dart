@@ -7,6 +7,7 @@ import 'package:rucking_app/features/achievements/presentation/bloc/achievement_
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_event.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
 import 'package:rucking_app/features/achievements/data/models/achievement_model.dart';
+import 'package:rucking_app/features/achievements/presentation/widgets/achievement_progress_card.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Achievements Hub Screen - Main screen for viewing and tracking achievements
@@ -166,12 +167,12 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
                       _buildStatColumn(
                         stats?.totalEarned.toString() ?? '0', 
                         'Earned', 
-                        Icons.emoji_events
+                        Icons.emoji_events,
                       ),
                       _buildStatColumn(
                         ((stats?.totalAvailable ?? 0) - (stats?.totalEarned ?? 0)).toString(),
                         'In Progress', 
-                        Icons.trending_up
+                        Icons.trending_up,
                       ),
                       _buildStatColumn(
                         '', // Empty string since we'll use valueWidget
@@ -242,28 +243,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     );
   }
 
-  Widget _buildProgressTab(AchievementState state) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Active Progress',
-            style: AppTextStyles.titleLarge.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          _buildPlaceholderCard('Achievement progress will be shown here'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCollectionTab(AchievementState state) {
-    // Handle different states
+  Widget _buildCategoryGrid(AchievementState state) {
     if (state is AchievementsLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -290,194 +270,6 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
       );
     }
 
-    final achievements = state is AchievementsLoaded ? state.allAchievements : <Achievement>[];
-    final userAchievements = state is AchievementsLoaded ? state.userAchievements : <UserAchievement>[];
-    
-    // Create a map of earned achievement IDs for quick lookup
-    final earnedAchievementIds = userAchievements.map((ua) => ua.achievementId).toSet();
-
-    if (achievements.isEmpty) {
-      return Center(
-        child: _buildPlaceholderCard('No achievements available'),
-      );
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'All Achievements (${achievements.length})',
-            style: AppTextStyles.titleLarge.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Achievement list
-          ListView.builder(
-            key: _achievementsListKey,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: achievements.length,
-            itemBuilder: (context, index) {
-              // If this is the target achievement, scroll to it after build
-              if (_targetAchievementId != null && achievements[index].id == _targetAchievementId) {
-                // Use a post frame callback to scroll to this item after rendering
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _scrollToAchievement(index);
-                  // Clear the target ID after scrolling to prevent repeat scrolling
-                  setState(() {
-                    _targetAchievementId = null;
-                  });
-                });
-              }
-              final achievement = achievements[index];
-              final isEarned = earnedAchievementIds.contains(achievement.id);
-              
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      // Achievement icon/badge
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isEarned 
-                            ? _getCategoryColor(achievement.category).withOpacity(0.2)
-                            : Colors.grey[200],
-                        ),
-                        child: Icon(
-                          _getCategoryIcon(achievement.category),
-                          size: 28,
-                          color: isEarned 
-                            ? _getCategoryColor(achievement.category)
-                            : Colors.grey[400],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      
-                      // Achievement details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    achievement.name,
-                                    style: AppTextStyles.titleMedium.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: isEarned ? Colors.black : Colors.grey[600],
-                                    ),
-                                  ),
-                                ),
-                                if (isEarned)
-                                  Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
-                                    size: 20,
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              achievement.description,
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: isEarned ? Colors.grey[700] : Colors.grey[500],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                // Category badge
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: _getCategoryColor(achievement.category).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    achievement.category.toUpperCase(),
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: _getCategoryColor(achievement.category),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                // Tier badge
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: _getTierColor(achievement.tier).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    achievement.tier.toUpperCase(),
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: _getTierColor(achievement.tier),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatColumn(String value, String label, IconData icon, {Widget? valueWidget}) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          color: Colors.white,
-          size: 24,
-        ),
-        const SizedBox(height: 8),
-        valueWidget ?? Text(
-          value,
-          style: AppTextStyles.titleMedium.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Bangers',
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: Colors.white70,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCategoryGrid(AchievementState state) {
     final categories = [
       {'name': 'Distance', 'icon': Icons.directions_run, 'color': Colors.blue},
       {'name': 'Weight', 'icon': Icons.fitness_center, 'color': Colors.red},
@@ -555,6 +347,309 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStatColumn(String value, String label, IconData icon, {Widget? valueWidget}) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: Colors.white,
+          size: 24,
+        ),
+        const SizedBox(height: 8),
+        valueWidget ?? Text(
+          value,
+          style: AppTextStyles.titleMedium.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Bangers',
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: Colors.white70,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressTab(AchievementState state) {
+    // Handle different states
+    if (state is AchievementsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (state is AchievementsError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading achievements',
+              style: AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.message,
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (state is AchievementsLoaded) {
+      final progressItems = <Widget>[];
+      
+      // Filter achievements with progress (currentValue > 0 but not completed)
+      final inProgressAchievements = <Map<String, dynamic>>[];
+      
+      for (var progress in state.userProgress) {
+        if (progress.currentValue > 0 && progress.progressPercentage < 100) {
+          // Find the corresponding achievement details
+          Achievement? achievement;
+          try {
+            achievement = state.allAchievements.firstWhere(
+              (a) => a.id == progress.achievementId,
+            );
+          } catch (e) {
+            // Achievement not found
+            achievement = null;
+          }
+          
+          if (achievement != null) {
+            inProgressAchievements.add({
+              'achievement': achievement,
+              'progress': progress,
+              'percentage': progress.progressPercentage
+            });
+          }
+        }
+      }
+      
+      // Sort by completion percentage (highest first)
+      inProgressAchievements.sort((a, b) {
+        return (b['percentage'] as double).compareTo(a['percentage'] as double);
+      });
+      
+      if (inProgressAchievements.isEmpty) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Active Progress',
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildPlaceholderCard('No achievements in progress yet. Keep rucking to make progress on new challenges!')
+            ],
+          ),
+        );
+      }
+      
+      // Build cards for each in-progress achievement
+      for (final item in inProgressAchievements) {
+        final achievement = item['achievement'] as Achievement;
+        final progress = item['progress'] as AchievementProgress;
+        
+        progressItems.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: AchievementProgressCard(
+              achievement: achievement,
+              progress: progress,
+              isEarned: false,
+              onTap: () {
+                // Navigate to collection tab and try to show this achievement
+                _tabController.animateTo(2); // Index of Collection tab
+              },
+            ),
+          ),
+        );
+      }
+      
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Active Progress',
+              style: AppTextStyles.titleLarge.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...progressItems,
+          ],
+        ),
+      );
+    }
+    
+    // Default case if state isn't loaded or error
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Active Progress',
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildPlaceholderCard('Achievement progress will be shown here'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollectionTab(AchievementState state) {
+    // Handle different states
+    if (state is AchievementsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (state is AchievementsError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading achievements',
+              style: AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.message,
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final achievements = state is AchievementsLoaded ? state.allAchievements : <Achievement>[];
+    final userAchievements = state is AchievementsLoaded ? state.userAchievements : <UserAchievement>[];
+    
+    // Create a map of earned achievement IDs for quick lookup
+    final earnedAchievementIds = userAchievements.map((ua) => ua.achievementId).toSet();
+    
+    if (achievements.isEmpty) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Achievement Collection',
+              style: AppTextStyles.titleLarge.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildPlaceholderCard('No achievements available'),
+          ],
+        ),
+      );
+    }
+    
+    // Group achievements by category
+    Map<String, List<Achievement>> achievementsByCategory = {};
+    for (var achievement in achievements) {
+      if (!achievementsByCategory.containsKey(achievement.category)) {
+        achievementsByCategory[achievement.category] = [];
+      }
+      achievementsByCategory[achievement.category]!.add(achievement);
+    }
+    
+    List<Widget> categoryWidgets = [];
+    
+    // Build UI for each category
+    achievementsByCategory.forEach((category, categoryAchievements) {
+      // Sort achievements by tier (bronze, silver, gold, platinum)
+      categoryAchievements.sort((a, b) {
+        final tierOrder = {'bronze': 0, 'silver': 1, 'gold': 2, 'platinum': 3};
+        return (tierOrder[a.tier.toLowerCase()] ?? 0)
+            .compareTo(tierOrder[b.tier.toLowerCase()] ?? 0);
+      });
+      
+      // Add category header
+      categoryWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+          child: Row(
+            children: [
+              Icon(_getCategoryIcon(category), color: _getCategoryColor(category)),
+              const SizedBox(width: 8),
+              Text(
+                category,
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: _getCategoryColor(category),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      
+      // Add achievements for this category
+      for (var achievement in categoryAchievements) {
+        final isEarned = earnedAchievementIds.contains(achievement.id);
+        var progress;
+        if (state is AchievementsLoaded && !isEarned) {
+          progress = state.getProgressForAchievement(achievement.id);
+        }
+        
+        categoryWidgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: AchievementProgressCard(
+              achievement: achievement,
+              isEarned: isEarned,
+              progress: progress,
+              onTap: () {
+                // Handle tap on achievement
+                // Could navigate to a detail page
+              },
+            ),
+          ),
+        );
+      }
+    });
+    
+    return SingleChildScrollView(
+      key: _achievementsListKey,
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Achievement Collection',
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          ...categoryWidgets,
+        ],
+      ),
     );
   }
 

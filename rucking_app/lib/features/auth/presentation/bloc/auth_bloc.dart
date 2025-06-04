@@ -109,14 +109,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       // Check if user needs to complete registration
       if (e is GoogleUserNeedsRegistrationException) {
+        // Handle null tokens for Google registration flow
+        // Even with null tokens, we can still direct users to manual registration with email prefilled
+        AppLogger.info('Routing Google user to registration: ${e.email}');
+        
         emit(GoogleUserNeedsRegistration(
           email: e.email,
           displayName: e.displayName,
           googleIdToken: e.googleIdToken,
           googleAccessToken: e.googleAccessToken,
         ));
+      } else if (e is AuthException) {
+        // Handle specific auth exceptions
+        emit(AuthError(e.message));
       } else {
-        emit(AuthError('Google login failed: $e'));
+        // Generic error handling
+        final errorMessage = e.toString().contains('PLATFORMEXCEPTION') 
+            ? 'There was an issue with Google Sign-In. Please try again or use email registration.' 
+            : 'Google login failed: $e';
+        emit(AuthError(errorMessage));
       }
     }
   }
