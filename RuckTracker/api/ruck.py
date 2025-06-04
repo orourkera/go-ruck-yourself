@@ -63,6 +63,32 @@ class RuckSessionListResource(Resource):
                 else:
                     session['route'] = []
                     session['location_points'] = []
+                
+                # Fetch splits data for each session
+                splits_resp = supabase.table('session_splits') \
+                    .select('split_number,split_distance_km,split_duration_seconds') \
+                    .eq('session_id', session['id']) \
+                    .order('split_number') \
+                    .execute()
+                
+                if splits_resp.data:
+                    # Convert splits to the format expected by frontend
+                    session['splits'] = []
+                    for split in splits_resp.data:
+                        distance_km = split['split_distance_km']
+                        duration_seconds = split['split_duration_seconds']
+                        
+                        # Calculate pace (seconds per km)
+                        pace_seconds_per_km = duration_seconds / distance_km if distance_km > 0 else 0
+                        
+                        session['splits'].append({
+                            'splitNumber': split['split_number'],
+                            'distance': distance_km * 1000, # Convert km to meters
+                            'duration': duration_seconds,
+                            'paceSecondsPerKm': pace_seconds_per_km
+                        })
+                else:
+                    session['splits'] = []
             
             # Log the sessions data before returning to client
             logger.info(f"Session data being returned to client (sample of up to 3 sessions):")
@@ -151,6 +177,33 @@ class RuckSessionResource(Resource):
             else:
                 session['route'] = []
                 session['location_points'] = []
+            
+            # Fetch splits data
+            splits_resp = supabase.table('session_splits') \
+                .select('split_number,split_distance_km,split_duration_seconds') \
+                .eq('session_id', ruck_id) \
+                .order('split_number') \
+                .execute()
+            
+            if splits_resp.data:
+                # Convert splits to the format expected by frontend
+                session['splits'] = []
+                for split in splits_resp.data:
+                    distance_km = split['split_distance_km']
+                    duration_seconds = split['split_duration_seconds']
+                    
+                    # Calculate pace (seconds per km)
+                    pace_seconds_per_km = duration_seconds / distance_km if distance_km > 0 else 0
+                    
+                    session['splits'].append({
+                        'splitNumber': split['split_number'],
+                        'distance': distance_km * 1000, # Convert km to meters
+                        'duration': duration_seconds,
+                        'paceSecondsPerKm': pace_seconds_per_km
+                    })
+            else:
+                session['splits'] = []
+            
             return session, 200
         except Exception as e:
             logger.error(f"Error fetching ruck session {ruck_id}: {e}")
@@ -165,13 +218,18 @@ class RuckSessionResource(Resource):
             if not data:
                 return {'message': 'No data provided'}, 400
 
-            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned', 'is_public']
+            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned', 'is_public', 'splits']
             update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
             if not update_data:
                 return {'message': 'No valid fields to update'}, 400
 
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Handle splits separately since they need to be inserted into session_splits table
+            splits_data = update_data.pop('splits', None)
+            
+            # Update the main session data
             update_resp = supabase.table('ruck_session') \
                 .update(update_data) \
                 .eq('id', ruck_id) \
@@ -180,6 +238,37 @@ class RuckSessionResource(Resource):
 
             if not update_resp.data or len(update_resp.data) == 0:
                 return {'message': 'Failed to update session'}, 500
+
+            # Handle splits data if provided
+            if splits_data is not None:
+                # First, delete existing splits for this session
+                delete_resp = supabase.table('session_splits') \
+                    .delete() \
+                    .eq('session_id', ruck_id) \
+                    .execute()
+                
+                # Insert new splits
+                if splits_data and len(splits_data) > 0:
+                    splits_to_insert = []
+                    for split in splits_data:
+                        split_record = {
+                            'session_id': int(ruck_id),
+                            'split_number': split.get('splitNumber'),
+                            'split_distance_km': split.get('distance', 0) / 1000.0 if split.get('distance') else 0,  # Convert meters to km
+                            'split_duration_seconds': split.get('duration', {}).get('inSeconds') if isinstance(split.get('duration'), dict) else split.get('duration'),
+                            'total_distance_km': 0,  # Will be calculated by database trigger or set separately
+                            'total_duration_seconds': 0,  # Will be calculated by database trigger or set separately
+                            'split_timestamp': datetime.now(tz.tzutc()).isoformat()
+                        }
+                        splits_to_insert.append(split_record)
+                    
+                    if splits_to_insert:
+                        insert_resp = supabase.table('session_splits') \
+                            .insert(splits_to_insert) \
+                            .execute()
+                        
+                        if not insert_resp.data:
+                            logger.warning(f"Failed to insert splits for session {ruck_id}")
 
             return update_resp.data[0], 200
         except Exception as e:
@@ -209,65 +298,6 @@ class RuckSessionResource(Resource):
         except Exception as e:
             logger.error(f"Error deleting ruck session {ruck_id}: {e}")
             return {'message': f"Error deleting ruck session: {str(e)}"}, 500
-
-        """Allow updating notes, rating, perceived_exertion, and tags on any session."""
-        try:
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            data = request.get_json()
-            if not data:
-                return {'message': 'No data provided'}, 400
-
-            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned']
-            update_data = {k: v for k, v in data.items() if k in allowed_fields}
-
-            if not update_data:
-                return {'message': 'No valid fields to update'}, 400
-
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            update_resp = supabase.table('ruck_session') \
-                .update(update_data) \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-
-            if not update_resp.data or len(update_resp.data) == 0:
-                return {'message': 'Failed to update session'}, 500
-
-            return update_resp.data[0], 200
-        except Exception as e:
-            logger.error(f"Error updating ruck session {ruck_id}: {e}")
-            return {'message': f"Error updating ruck session: {str(e)}"}, 500
-
-        try:
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            response = supabase.table('ruck_session') \
-                .select('*') \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            if not response.data or len(response.data) == 0:
-                return {'message': 'Session not found'}, 404
-            session = response.data[0]
-            locations_resp = supabase.table('location_point') \
-                .select('latitude,longitude') \
-                .eq('session_id', ruck_id) \
-                .order('timestamp', desc=True) \
-                .execute()
-            logger.info(f"Location response data for session {ruck_id}: {locations_resp.data}")
-            if locations_resp.data:
-                # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
-                session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
-                session['location_points'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
-            else:
-                session['route'] = []
-                session['location_points'] = []
-            return session, 200
-        except Exception as e:
-            logger.error(f"Error fetching ruck session {ruck_id}: {e}")
-            return {'message': f"Error fetching ruck session: {str(e)}"}, 500
 
 class RuckSessionStartResource(Resource):
     def post(self, ruck_id):
