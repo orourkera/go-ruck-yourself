@@ -490,20 +490,20 @@ class ShareCardWidget extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 18.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Top section with header
                 _buildHeader(),
                 
-                // Small spacing instead of Spacer
-                const SizedBox(height: 12),
+                // Spacing between header and main content
+                const SizedBox(height: 24),
                 
                 // Middle section with main stats
                 _buildMainStats(),
                 
-                // Small spacing instead of Spacer
-                const SizedBox(height: 16),
+                // Spacing between main stats and bottom
+                const SizedBox(height: 24),
                 
                 // Bottom section with achievements and footer
                 Column(
@@ -513,7 +513,7 @@ class ShareCardWidget extends StatelessWidget {
                     if (achievements.isNotEmpty) 
                       _buildAchievements(),
                     
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     
                     // Footer
                     _buildFooter(),
