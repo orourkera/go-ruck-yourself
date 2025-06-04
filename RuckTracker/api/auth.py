@@ -82,7 +82,7 @@ class SignUpResource(Resource):
                 'height_cm': data.get('height_cm'),
                 'date_of_birth': data.get('date_of_birth'),
                 'gender': data.get('gender'),
-                'prefer_metric': data.get('preferMetric') # Read camelCase from request
+                'prefer_metric': data.get('prefer_metric'), # Read snake_case from request
             }
             user_data_clean = {k: v for k, v in user_data.items() if v is not None}
             
