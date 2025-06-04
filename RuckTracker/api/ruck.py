@@ -5,7 +5,7 @@ import uuid
 import logging
 from dateutil import tz
 
-from supabase_client import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
