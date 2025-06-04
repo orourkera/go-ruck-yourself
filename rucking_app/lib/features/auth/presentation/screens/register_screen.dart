@@ -349,9 +349,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (value.length < 3) {
                           return 'Display name must be at least 3 characters';
                         }
-                        // Basic alphanumeric check (allow underscore)
-                        if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
-                          return 'Display name can only contain letters, numbers, and underscores';
+                        // Allow letters, numbers, underscores, spaces, and apostrophes
+                        if (!RegExp(r"^[a-zA-Z0-9_\s']+$").hasMatch(value)) {
+                          return 'Display name can only contain letters, numbers, spaces, underscores, and apostrophes';
                         }
                         return null;
                       },

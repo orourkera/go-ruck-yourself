@@ -83,7 +83,7 @@ abstract class AuthService {
 class AuthServiceImpl implements AuthService {
   final ApiClient _apiClient;
   final StorageService _storageService;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email']);
   
   AuthServiceImpl(this._apiClient, this._storageService);
   
@@ -133,119 +133,41 @@ class AuthServiceImpl implements AuthService {
     try {
       AppLogger.info('Attempting Google Sign-In');
       
-      // Trigger Google Sign-In flow
-      GoogleSignInAccount? googleUser;
-      try {
-        googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) {
-          throw AuthException('Google Sign-In was cancelled by user', 'GOOGLE_SIGN_IN_CANCELLED');
-        }
-      } catch (signInError) {
-        AppLogger.error('Error during Google signIn()', exception: signInError);
-        
-        // Handle PlatformException for sign-in failures which is a common issue for new users
-        // Instead of showing technical error, we'll create a better UX by moving them to registration
-        if (signInError.toString().toLowerCase().contains('platformexception') || 
-            signInError.toString().toLowerCase().contains('sign_in_failed')) {
-          
-          // This is likely a new Google user, so let's get their info from the GoogleSignIn object
-          // and direct them to the registration flow
-          GoogleSignInAccount? account;
-          try {
-            account = _googleSignIn.currentUser;
-            
-            if (account != null) {
-              final auth = await account.authentication;
-              final email = account.email;
-              final displayName = account.displayName ?? email.split('@')[0];
-              
-              throw GoogleUserNeedsRegistrationException(
-                'New Google user - redirecting to registration',
-                email: email,
-                displayName: displayName,
-                googleIdToken: auth.idToken,
-                googleAccessToken: auth.accessToken,
-              );
-            }
-          } catch (secondaryError) {
-            AppLogger.error('Failed to get Google user info after sign-in error', exception: secondaryError);
-          }
-          
-          // If we can't get user info, show a more friendly error
-          throw AuthException(
-            'We encountered an issue with Google Sign-In. Please try registering with email instead.',
-            'GOOGLE_SIGN_IN_FAILED'
-          );
-        }
-        rethrow;
-      }
-
-      // Get authentication details
-      GoogleSignInAuthentication googleAuth;
-      try {
-        googleAuth = await googleUser.authentication;
-        if (googleAuth.idToken == null) {
-          throw AuthException('Failed to get Google ID token', 'GOOGLE_TOKEN_FAILED');
-        }
-      } catch (authError) {
-        AppLogger.error('Error getting Google authentication', exception: authError);
-        
-        // Check if this might be a new user
-        final email = googleUser.email;
-        final displayName = googleUser.displayName ?? email.split('@')[0];
-        
-        // Route new users to registration even on auth errors
-        throw GoogleUserNeedsRegistrationException(
-          'New Google user (auth error) - redirecting to registration',
-          email: email,
-          displayName: displayName,
-          googleIdToken: null,
-          googleAccessToken: null,
-        );
-      }
-
-      AppLogger.info('Google Sign-In successful, authenticating with Supabase');
-
-      // Try to use Supabase authentication
-      AuthResponse? response;
-      try {
-        response = await Supabase.instance.client.auth.signInWithIdToken(
-          provider: OAuthProvider.google,
-          idToken: googleAuth.idToken!,
-          accessToken: googleAuth.accessToken,
-        );
-        
-        if (response.user == null || response.session == null) {
-          throw AuthException('Supabase authentication failed', 'SUPABASE_AUTH_FAILED');
-        }
-      } catch (supabaseError) {
-        AppLogger.error('Supabase Google auth error', exception: supabaseError);
-        
-        // This could be a new user who hasn't been registered yet
-        // Let's route them to registration
-        final email = googleUser.email;
-        final displayName = googleUser.displayName ?? email.split('@')[0];
-        
-        throw GoogleUserNeedsRegistrationException(
-          'Google user needs registration (Supabase auth failed)',
-          email: email,
-          displayName: displayName,
-          googleIdToken: googleAuth.idToken,
-          googleAccessToken: googleAuth.accessToken,
-        );
+      // Use Google Sign-In SDK to get the user's ID token
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw AuthException('Google Sign-In failed', 'GOOGLE_SIGN_IN_FAILED');
       }
       
-      final supabaseUser = response!.user!;
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+      
+      if (idToken == null) {
+        throw AuthException('No ID Token found', 'GOOGLE_TOKEN_FAILED');
+      }
+      
+      // Use Supabase's built-in Google OAuth flow
+      final response = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+      
+      if (response.user == null || response.session == null) {
+        throw AuthException('Google OAuth flow failed to launch', 'GOOGLE_OAUTH_FAILED');
+      }
+      
+      final supabaseUser = response.user!;
       final session = response.session!;
       
-      AppLogger.info('Supabase authentication successful');
+      AppLogger.info('Supabase Google authentication successful');
       
-      // Create user profile record if it doesn't exist
+      // Set the token first so API calls work
+      _apiClient.setAuthToken(session.accessToken);
+      
+      // Check if user profile exists in our user table
       try {
-        // Set the token first so API calls work
-        _apiClient.setAuthToken(session.accessToken);
-        
-        // Check if user profile exists in our user table
         final profileResponse = await _apiClient.get('/users/profile');
         
         // If we get here, profile exists, convert to our User model
@@ -257,31 +179,38 @@ class AuthServiceImpl implements AuthService {
         await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
         await _storageService.setString(AppConfig.userIdKey, user.userId);
         
-        AppLogger.info('Google login successful for existing user: ${user.userId}');
+        AppLogger.info('Existing Google user signed in successfully');
         return user;
         
-      } catch (e) {
-        // Profile doesn't exist - throw exception to route user to registration
-        AppLogger.info('Google user profile not found, needs registration');
+      } catch (profileError) {
+        // Profile doesn't exist, user needs registration
+        AppLogger.info('Google user needs to complete registration');
         
-        final email = supabaseUser.email ?? googleUser.email;
-        final displayName = supabaseUser.userMetadata?['full_name']?.toString() ?? 
-                          supabaseUser.userMetadata?['name']?.toString() ?? 
-                          googleUser.displayName ?? 
-                          email.split('@').first; // Fallback to part of email if name is not available
+        // Extract user info from Supabase auth
+        final email = supabaseUser.email ?? '';
+        final displayName = supabaseUser.userMetadata?['full_name'] as String? ?? 
+                           supabaseUser.userMetadata?['name'] as String? ?? 
+                           email.split('@')[0];
         
         throw GoogleUserNeedsRegistrationException(
           'Google user needs to complete registration',
           email: email,
           displayName: displayName,
-          googleIdToken: googleAuth.idToken,
-          googleAccessToken: googleAuth.accessToken,
+          googleIdToken: idToken,
+          googleAccessToken: accessToken,
         );
       }
       
     } catch (e) {
-      AppLogger.error('Google login failed', exception: e);
-      throw _handleAuthError(e);
+      AppLogger.error('Google sign-in failed', exception: e);
+      
+      // Re-throw specific exceptions
+      if (e is GoogleUserNeedsRegistrationException || e is AuthException) {
+        rethrow;
+      }
+      
+      // Generic error handling
+      throw AuthException('Google sign-in failed: $e', 'GOOGLE_SIGN_IN_FAILED');
     }
   }
   
@@ -320,12 +249,14 @@ class AuthServiceImpl implements AuthService {
       final createResponse = await _apiClient.post('/users/register', {
         'username': username,
         'email': email,
+        'password': null, // Google OAuth users don't have passwords
         'id': supabaseUser.id, // Use Supabase user ID
         'prefer_metric': preferMetric,
         'weight_kg': weightKg,
         'height_cm': heightCm,
         'date_of_birth': dateOfBirth,
         'gender': gender,
+        'is_google_oauth': true, // Flag to indicate this is a Google OAuth user
       });
       
       final user = User.fromJson(createResponse['user']);
