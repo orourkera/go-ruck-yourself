@@ -32,12 +32,12 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _targetAchievementId = widget.initialAchievementId;
     
     // If an initial achievement ID is provided, select the Collection tab
     if (_targetAchievementId != null) {
-      _tabController.animateTo(2); // Collection tab index
+      _tabController.animateTo(1); // Collection tab index (now index 1)
     }
     
     // Get user ID from auth
@@ -77,7 +77,6 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           indicatorColor: Colors.white,
           tabs: const [
             Tab(text: 'Overview'),
-            Tab(text: 'Progress'),
             Tab(text: 'Collection'),
           ],
         ),
@@ -88,7 +87,6 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
             controller: _tabController,
             children: [
               _buildOverviewTab(state),
-              _buildProgressTab(state),
               _buildCollectionTab(state),
             ],
           );
@@ -375,145 +373,6 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildProgressTab(AchievementState state) {
-    // Handle different states
-    if (state is AchievementsLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (state is AchievementsError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Error loading achievements',
-              style: AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              state.message,
-              style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[500]),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (state is AchievementsLoaded) {
-      final progressItems = <Widget>[];
-      
-      // Filter achievements with progress (currentValue > 0 but not completed)
-      final inProgressAchievements = <Map<String, dynamic>>[];
-      
-      for (var progress in state.userProgress) {
-        if (progress.currentValue > 0 && progress.progressPercentage < 100) {
-          // Find the corresponding achievement details
-          Achievement? achievement;
-          try {
-            achievement = state.allAchievements.firstWhere(
-              (a) => a.id == progress.achievementId,
-            );
-          } catch (e) {
-            // Achievement not found
-            achievement = null;
-          }
-          
-          if (achievement != null) {
-            inProgressAchievements.add({
-              'achievement': achievement,
-              'progress': progress,
-              'percentage': progress.progressPercentage
-            });
-          }
-        }
-      }
-      
-      // Sort by completion percentage (highest first)
-      inProgressAchievements.sort((a, b) {
-        return (b['percentage'] as double).compareTo(a['percentage'] as double);
-      });
-      
-      if (inProgressAchievements.isEmpty) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Active Progress',
-                style: AppTextStyles.titleLarge.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildPlaceholderCard('No achievements in progress yet. Keep rucking to make progress on new challenges!')
-            ],
-          ),
-        );
-      }
-      
-      // Build cards for each in-progress achievement
-      for (final item in inProgressAchievements) {
-        final achievement = item['achievement'] as Achievement;
-        final progress = item['progress'] as AchievementProgress;
-        
-        progressItems.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12.0),
-            child: AchievementProgressCard(
-              achievement: achievement,
-              progress: progress,
-              isEarned: false,
-              onTap: () {
-                // Navigate to collection tab and try to show this achievement
-                _tabController.animateTo(2); // Index of Collection tab
-              },
-            ),
-          ),
-        );
-      }
-      
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Active Progress',
-              style: AppTextStyles.titleLarge.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...progressItems,
-          ],
-        ),
-      );
-    }
-    
-    // Default case if state isn't loaded or error
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Active Progress',
-            style: AppTextStyles.titleLarge.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildPlaceholderCard('Achievement progress will be shown here'),
-        ],
-      ),
     );
   }
 
