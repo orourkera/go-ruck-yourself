@@ -17,3 +17,4 @@ Flask-Migrate==4.1.0
 flask-jwt-extended==4.6.0
 fastapi
 uvicorn[standard]
+google-auth==2.29.0
