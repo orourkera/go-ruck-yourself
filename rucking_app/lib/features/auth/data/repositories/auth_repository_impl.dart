@@ -21,6 +21,33 @@ class AuthRepositoryImpl implements AuthRepository {
   }
   
   @override
+  Future<User> googleRegister({
+    required String email,
+    required String displayName,
+    required String googleIdToken,
+    required String googleAccessToken,
+    required String username,
+    required bool preferMetric,
+    double? weightKg,
+    double? heightCm,
+    String? dateOfBirth,
+    String? gender,
+  }) async {
+    return await _authService.googleRegister(
+      email: email,
+      displayName: displayName,
+      googleIdToken: googleIdToken,
+      googleAccessToken: googleAccessToken,
+      username: username,
+      preferMetric: preferMetric,
+      weightKg: weightKg,
+      heightCm: heightCm,
+      dateOfBirth: dateOfBirth,
+      gender: gender,
+    );
+  }
+  
+  @override
   Future<User> register({
     required String username, // This is the display name
     required String email,

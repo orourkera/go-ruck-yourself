@@ -30,6 +30,7 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/notifications/di/notification_injection_container.dart';
 import 'package:rucking_app/features/achievements/di/achievement_injection_container.dart';
 import 'package:rucking_app/features/premium/di/premium_injection_container.dart';
+import 'package:rucking_app/core/services/battery_optimization_service.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -39,7 +40,19 @@ Future<void> setupServiceLocator() async {
   // External services
   final sharedPrefs = await SharedPreferences.getInstance();
   getIt.registerSingleton<SharedPreferences>(sharedPrefs);
-  getIt.registerSingleton<FlutterSecureStorage>(const FlutterSecureStorage());
+  
+  // Configure FlutterSecureStorage with Android-specific options for better reliability
+  const secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      // Use AES encryption and ensure data persists across app kills
+      preferencesKeyPrefix: 'ruck_secure_',
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  );
+  getIt.registerSingleton<FlutterSecureStorage>(secureStorage);
   
   // Core services - order matters!
   getIt.registerSingleton<Dio>(_configureDio());

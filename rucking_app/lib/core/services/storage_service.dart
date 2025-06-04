@@ -124,12 +124,31 @@ class StorageServiceImpl implements StorageService {
   
   @override
   Future<void> setSecureString(String key, String value) async {
-    await _secureStorage.write(key: key, value: value);
+    try {
+      await _secureStorage.write(key: key, value: value);
+      // Verify write on Android
+      final verified = await _secureStorage.read(key: key);
+      if (verified != value) {
+        print('[STORAGE ERROR] Secure storage write verification failed for key: $key');
+      } else {
+        print('[STORAGE] Secure storage write successful for key: $key');
+      }
+    } catch (e) {
+      print('[STORAGE ERROR] Failed to write secure string for key: $key, error: $e');
+      rethrow;
+    }
   }
   
   @override
   Future<String?> getSecureString(String key) async {
-    return await _secureStorage.read(key: key);
+    try {
+      final value = await _secureStorage.read(key: key);
+      print('[STORAGE] Secure storage read for key: $key, found: ${value != null}');
+      return value;
+    } catch (e) {
+      print('[STORAGE ERROR] Failed to read secure string for key: $key, error: $e');
+      return null;
+    }
   }
   
   @override

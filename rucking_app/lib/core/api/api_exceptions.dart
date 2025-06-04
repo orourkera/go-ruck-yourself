@@ -86,4 +86,23 @@ class SessionExpiredException extends UnauthorizedException {
   
   @override
   String toString() => 'SessionExpiredException: $message';
-} 
+}
+
+/// Exception thrown when Google user needs to complete registration
+class GoogleUserNeedsRegistrationException extends ApiException {
+  final String email;
+  final String? displayName;
+  final String? googleIdToken;
+  final String? googleAccessToken;
+  
+  GoogleUserNeedsRegistrationException(
+    String message, {
+    required this.email,
+    this.displayName,
+    this.googleIdToken,
+    this.googleAccessToken,
+  }) : super(message);
+  
+  @override
+  String toString() => 'GoogleUserNeedsRegistrationException: $message';
+}

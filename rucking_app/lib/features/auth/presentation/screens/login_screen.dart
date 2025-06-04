@@ -66,6 +66,18 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => HomeScreen()),
           );
+        } else if (state is GoogleUserNeedsRegistration) {
+          // Navigate to registration screen with Google user data pre-filled
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => RegisterScreen(
+                prefilledEmail: state.email,
+                prefilledDisplayName: state.displayName,
+                googleIdToken: state.googleIdToken,
+                googleAccessToken: state.googleAccessToken,
+              ),
+            ),
+          );
         } else if (state is AuthError) {
           // Show error message if login fails using the styled snackbar
           StyledSnackBar.showError(

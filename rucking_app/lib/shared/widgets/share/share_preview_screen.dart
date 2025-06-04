@@ -60,28 +60,67 @@ class SharePreviewScreen extends StatefulWidget {
 class _SharePreviewScreenState extends State<SharePreviewScreen> {
   bool _isSharing = false;
   late PageController _pageController;
+  late PageController _thumbnailController;
   int _currentBackgroundIndex = 0;
   late List<ShareBackgroundOption> _backgroundOptions;
+  
+  // Color overlay options for swiping
+  final List<Map<String, dynamic>> _colorOverlays = [
+    {
+      'name': 'None',
+      'overlay': Colors.transparent,
+      'opacity': 0.0,
+    },
+    {
+      'name': 'Light Dark',
+      'overlay': Colors.black,
+      'opacity': 0.2,
+    },
+    {
+      'name': 'Dark',
+      'overlay': Colors.black,
+      'opacity': 0.4,
+    },
+    {
+      'name': 'Blue Tint',
+      'overlay': Colors.blue.shade900,
+      'opacity': 0.3,
+    },
+    {
+      'name': 'Warm',
+      'overlay': Colors.amber.shade900,
+      'opacity': 0.2,
+    },
+    {
+      'name': 'Vintage',
+      'overlay': Colors.brown.shade800,
+      'opacity': 0.3,
+    },
+  ];
+  
+  int _currentOverlayIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _thumbnailController = PageController(viewportFraction: 0.25);
     _initializeBackgroundOptions();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _thumbnailController.dispose();
     super.dispose();
   }
 
   void _initializeBackgroundOptions() {
     _backgroundOptions = [
-      // Default gradient
+      // None option (default gradient with transparency)
       const ShareBackgroundOption(
         type: ShareBackgroundType.defaultGradient,
-        displayName: 'Default',
+        displayName: 'None',
       ),
     ];
 
@@ -204,10 +243,17 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
           // Share card preview with swipeable backgrounds
           Expanded(
             child: PageView.builder(
+              pageSnapping: true,
               controller: _pageController,
               onPageChanged: (index) {
                 setState(() {
                   _currentBackgroundIndex = index;
+                  // Sync the thumbnail carousel
+                  _thumbnailController.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
                 });
               },
               itemCount: _backgroundOptions.length,
@@ -222,25 +268,113 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
             ),
           ),
           
-          // Background indicator dots
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _backgroundOptions.length,
-                (index) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: index == _currentBackgroundIndex
-                        ? (widget.isLadyMode ? AppColors.ladyPrimary : AppColors.primary)
-                        : Colors.white.withAlpha(76),
+          // Background selection carousel
+          Container(
+            height: 100,
+            margin: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, bottom: 8),
+                  child: Text(
+                    'Background:',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
+                Expanded(
+                  child: PageView.builder(
+                    controller: _thumbnailController,
+                    itemCount: _backgroundOptions.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentBackgroundIndex = index;
+                        _pageController.animateToPage(
+                          index,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final option = _backgroundOptions[index];
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _currentBackgroundIndex = index;
+                            _pageController.animateToPage(
+                              index,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: index == _currentBackgroundIndex
+                                  ? (widget.isLadyMode ? AppColors.ladyPrimary : AppColors.primary)
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: _buildBackgroundThumbnail(option),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Color overlay selection
+          Container(
+            height: 60,
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, bottom: 8),
+                  child: Text(
+                    'Color Effect (swipe card to change):',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    _colorOverlays.length,
+                    (index) => Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _colorOverlays[index]['overlay'].withOpacity(_colorOverlays[index]['opacity']),
+                        border: Border.all(
+                          color: index == _currentOverlayIndex
+                              ? (widget.isLadyMode ? AppColors.ladyPrimary : AppColors.primary)
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           
@@ -268,7 +402,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                         ),
                       )
                     : Text(
-                        'Share Your Achievement',
+                        'Share Your Ruck',
                         style: AppTextStyles.labelLarge.copyWith(
                           color: Colors.white,
                           fontSize: 16,
@@ -283,25 +417,116 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
   }
 
   Widget _buildShareCardWithBackground(ShareBackgroundOption backgroundOption) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(76),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ShareCardWidget(
-        session: widget.session,
-        preferMetric: widget.preferMetric,
-        achievements: widget.achievements,
-        isLadyMode: widget.isLadyMode,
-        backgroundOption: backgroundOption,
+    return GestureDetector(
+      // Swipe to change color overlay
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity! > 0) {
+          // Swipe right - previous overlay
+          setState(() {
+            _currentOverlayIndex = (_currentOverlayIndex - 1) % _colorOverlays.length;
+            if (_currentOverlayIndex < 0) _currentOverlayIndex = _colorOverlays.length - 1;
+          });
+        } else if (details.primaryVelocity! < 0) {
+          // Swipe left - next overlay
+          setState(() {
+            _currentOverlayIndex = (_currentOverlayIndex + 1) % _colorOverlays.length;
+          });
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(76),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // The share card
+            ShareCardWidget(
+              session: widget.session,
+              preferMetric: widget.preferMetric,
+              achievements: widget.achievements,
+              isLadyMode: widget.isLadyMode,
+              backgroundOption: backgroundOption,
+            ),
+            // The color overlay
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 1080, // Match share card dimensions
+                height: 1080,
+                color: _colorOverlays[_currentOverlayIndex]['overlay']
+                    .withOpacity(_colorOverlays[_currentOverlayIndex]['opacity']),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+  
+  Widget _buildBackgroundThumbnail(ShareBackgroundOption option) {
+    switch (option.type) {
+      case ShareBackgroundType.map:
+        return Container(
+          color: const Color(0xFF1E3A8A), // Dark blue background for map
+          child: const Center(
+            child: Icon(
+              Icons.map_outlined, 
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        );
+        
+      case ShareBackgroundType.photo:
+        if (option.imageUrl != null) {
+          return Image.network(
+            option.imageUrl!,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => const Center(
+              child: Icon(Icons.broken_image, color: Colors.white),
+            ),
+          );
+        }
+        return const Center(
+          child: Icon(Icons.image, color: Colors.white),
+        );
+        
+      case ShareBackgroundType.colorVariation:
+        if (option.primaryColor != null && option.secondaryColor != null) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  option.primaryColor!,
+                  option.secondaryColor!,
+                ],
+              ),
+            ),
+          );
+        }
+        return Container(color: option.primaryColor ?? Colors.grey);
+        
+      case ShareBackgroundType.defaultGradient:
+      default:
+        return Container(
+          color: Colors.grey.shade300,
+          child: const Center(
+            child: Text(
+              'None',
+              style: TextStyle(color: Colors.black54),
+            ),
+          ),
+        );
+    }
   }
 
   Future<void> _shareSession() async {

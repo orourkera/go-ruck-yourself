@@ -63,6 +63,20 @@ abstract class AuthService {
 
   /// Sign in with Google
   Future<User> googleSignIn();
+  
+  /// Complete Google user registration with profile creation
+  Future<User> googleRegister({
+    required String email,
+    required String displayName,
+    required String googleIdToken,
+    required String googleAccessToken,
+    required String username,
+    required bool preferMetric,
+    double? weightKg,
+    double? heightCm,
+    String? dateOfBirth,
+    String? gender,
+  });
 }
 
 /// Implementation of AuthService using ApiClient and StorageService
@@ -92,10 +106,16 @@ class AuthServiceImpl implements AuthService {
       final user = User.fromJson(userData);
       
       // Store token and user data
+      AppLogger.info('[AUTH] Storing authentication tokens and user data');
       await _storageService.setSecureString(AppConfig.tokenKey, token);
       await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
       await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
       await _storageService.setString(AppConfig.userIdKey, user.userId);
+      
+      // Verify storage worked (Android debugging)
+      final storedToken = await _storageService.getSecureString(AppConfig.tokenKey);
+      final storedUser = await _storageService.getObject(AppConfig.userProfileKey);
+      AppLogger.info('[AUTH] Storage verification - token stored: ${storedToken != null}, user stored: ${storedUser != null}');
       
       // Set token in API client
       _apiClient.setAuthToken(token);
@@ -165,35 +185,84 @@ class AuthServiceImpl implements AuthService {
         return user;
         
       } catch (e) {
-        // Profile doesn't exist, create it
-        AppLogger.info('Creating user profile for new Google user');
+        // Profile doesn't exist - throw exception to route user to registration
+        AppLogger.info('Google user profile not found, needs registration');
         
         final email = supabaseUser.email ?? '';
-        final username = supabaseUser.userMetadata?['full_name']?.toString() ?? 
-                        supabaseUser.userMetadata?['name']?.toString() ?? 
-                        email.split('@')[0];
+        final displayName = supabaseUser.userMetadata?['full_name']?.toString() ?? 
+                          supabaseUser.userMetadata?['name']?.toString();
         
-        // Create user profile via our API
-        final createResponse = await _apiClient.post('/users/register', {
-          'username': username,
-          'email': email,
-          'id': supabaseUser.id, // Use Supabase user ID
-        });
-        
-        final user = User.fromJson(createResponse['user']);
-        
-        // Store tokens and user data
-        await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
-        await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken ?? '');
-        await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
-        await _storageService.setString(AppConfig.userIdKey, user.userId);
-        
-        AppLogger.info('Google login successful for new user: ${user.userId}');
-        return user;
+        throw GoogleUserNeedsRegistrationException(
+          'Google user needs to complete registration',
+          email: email,
+          displayName: displayName,
+          googleIdToken: googleAuth.idToken,
+          googleAccessToken: googleAuth.accessToken,
+        );
       }
       
     } catch (e) {
       AppLogger.error('Google login failed', exception: e);
+      throw _handleAuthError(e);
+    }
+  }
+  
+  @override
+  Future<User> googleRegister({
+    required String email,
+    required String displayName,
+    required String googleIdToken,
+    required String googleAccessToken,
+    required String username,
+    required bool preferMetric,
+    double? weightKg,
+    double? heightCm,
+    String? dateOfBirth,
+    String? gender,
+  }) async {
+    try {
+      // Re-authenticate with Supabase using provided Google tokens
+      final response = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: googleIdToken,
+        accessToken: googleAccessToken,
+      );
+      
+      if (response.user == null || response.session == null) {
+        throw Exception('Failed to re-authenticate with Google');
+      }
+      
+      final supabaseUser = response.user!;
+      final session = response.session!;
+      
+      // Set the auth token for API calls
+      _apiClient.setAuthToken(session.accessToken);
+      
+      // Create user profile via our API
+      final createResponse = await _apiClient.post('/users/register', {
+        'username': username,
+        'email': email,
+        'id': supabaseUser.id, // Use Supabase user ID
+        'prefer_metric': preferMetric,
+        'weight_kg': weightKg,
+        'height_cm': heightCm,
+        'date_of_birth': dateOfBirth,
+        'gender': gender,
+      });
+      
+      final user = User.fromJson(createResponse['user']);
+      
+      // Store tokens and user data
+      await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
+      await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken ?? '');
+      await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
+      await _storageService.setString(AppConfig.userIdKey, user.userId);
+      
+      AppLogger.info('Google registration successful for user: ${user.userId}');
+      return user;
+      
+    } catch (e) {
+      AppLogger.error('Google registration failed', exception: e);
       throw _handleAuthError(e);
     }
   }
@@ -312,31 +381,43 @@ class AuthServiceImpl implements AuthService {
   Future<bool> isAuthenticated() async {
     // First check if we have a token stored
     final token = await _storageService.getSecureString(AppConfig.tokenKey);
+    AppLogger.info('[AUTH] Checking authentication - token exists: ${token != null}');
     if (token == null) {
+      AppLogger.warning('[AUTH] No token found in secure storage');
       return false; // No token means not authenticated
     }
     
     // Set the token for API requests
     _apiClient.setAuthToken(token);
+    AppLogger.info('[AUTH] Token set in API client, attempting profile fetch');
     
     try {
       // Try to get the user profile
       final response = await _apiClient.get('/users/profile');
+      AppLogger.info('[AUTH] Profile fetch successful - user is authenticated');
       return response != null;
     } catch (e) {
+      AppLogger.warning('[AUTH] Profile fetch failed: $e');
       if (e is UnauthorizedException) {
         // Token might be expired. Try to refresh it **once** before considering unauthenticated.
+        AppLogger.info('[AUTH] Token unauthorized, attempting refresh');
         try {
           final newToken = await refreshToken();
-          return newToken != null;
-        } catch (_) {
+          final refreshSuccessful = newToken != null;
+          AppLogger.info('[AUTH] Token refresh result: ${refreshSuccessful ? 'success' : 'failed'}');
+          return refreshSuccessful;
+        } catch (refreshError) {
+          AppLogger.warning('[AUTH] Token refresh failed: $refreshError');
           // Ignore and fall through to stored data check below
         }
       }
       
       // For network errors or refresh failures, fall back to cached user data
+      AppLogger.info('[AUTH] Falling back to cached user data check');
       final userData = await _storageService.getObject(AppConfig.userProfileKey);
-      return userData != null;
+      final hasCachedData = userData != null;
+      AppLogger.info('[AUTH] Cached user data exists: $hasCachedData');
+      return hasCachedData;
     }
   }
   

@@ -46,3 +46,21 @@ class AuthUserAlreadyExists extends AuthState {
   @override
   List<Object> get props => [message];
 }
+
+/// State when Google user needs to complete registration
+class GoogleUserNeedsRegistration extends AuthState {
+  final String email;
+  final String? displayName;
+  final String? googleIdToken;
+  final String? googleAccessToken;
+  
+  const GoogleUserNeedsRegistration({
+    required this.email,
+    this.displayName,
+    this.googleIdToken,
+    this.googleAccessToken,
+  });
+  
+  @override
+  List<Object?> get props => [email, displayName, googleIdToken, googleAccessToken];
+}

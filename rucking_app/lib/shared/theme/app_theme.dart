@@ -138,6 +138,11 @@ class AppTheme {
           color: AppColors.textDarkSecondary,
         ),
       ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: AppColors.primary,
+        selectionColor: AppColors.primary.withOpacity(0.3),
+        selectionHandleColor: AppColors.primary,
+      ),
     );
   }
 
@@ -172,6 +177,11 @@ class AppTheme {
         contentTextStyle: _getTextTheme(AppColors.textLight).bodySmall,
         backgroundColor: AppColors.greyLight, // Lighter background for dark theme snackbar
         actionTextColor: AppColors.primaryDark, // Example, adjust as needed
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: AppColors.secondary,
+        selectionColor: AppColors.secondary.withOpacity(0.3),
+        selectionHandleColor: AppColors.secondary,
       ),
     );
   }
@@ -309,6 +319,11 @@ class AppTheme {
         unselectedLabelStyle: AppTextStyles.tabLabel.copyWith(
           color: AppColors.textLightSecondary,
         ),
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: AppColors.primary,
+        selectionColor: AppColors.primary.withOpacity(0.3),
+        selectionHandleColor: AppColors.primary,
       ),
     );
   }

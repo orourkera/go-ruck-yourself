@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
@@ -29,154 +30,313 @@ class ShareCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Debug print for session location points
+    if (backgroundOption?.type == ShareBackgroundType.map && session.locationPoints != null) {
+      print('🗺️ ShareCardWidget build - Location points count: ${session.locationPoints!.length}');
+    }
+    
+    // For map backgrounds, we need to handle image loading properly
+    if (backgroundOption?.type == ShareBackgroundType.map && session.locationPoints?.isNotEmpty == true) {
+      return _buildShareCardWithMap();
+    }
+    
+    // For other backgrounds, use the standard build
+    return _buildStandardShareCard();
+  }
+  
+  Widget _buildShareCardWithMap() {
+    final mapUrl = _generateMapUrl();
+    if (mapUrl == null) {
+      return _buildStandardShareCard();
+    }
+    
+    // Simple direct approach
     return Container(
-      width: 400,
-      height: 600,
+      width: 800,
+      height: 800,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Stack(
+        children: [
+          // Map background
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Image.network(
+              mapUrl,
+              width: 800,
+              height: 800,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                print('❌ Failed to load map image: $error');
+                return Container(
+                  width: 800,
+                  height: 800,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: _buildBackgroundGradient(),
+                  ),
+                );
+              },
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) {
+                  return ColorFiltered(
+                    colorFilter: ColorFilter.mode(
+                      Colors.black.withOpacity(0.3),
+                      BlendMode.darken,
+                    ),
+                    child: child,
+                  );
+                }
+                return Container(
+                  width: 800,
+                  height: 800,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: _buildBackgroundGradient(),
+                  ),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Content on top
+          _buildShareCardContent(),
+        ],
+      ),
+    );
+  }
+  
+  String? _generateMapUrl() {
+    if (session.locationPoints == null || session.locationPoints!.isEmpty) {
+      print('❌ No location points available for map background');
+      return null;
+    }
+    
+    print('🗺️ Generating map URL with ${session.locationPoints!.length} location points');
+
+    // Calculate route bounds for map centering
+    final points = session.locationPoints!
+        .where((point) => (point['lat'] != null || point['latitude'] != null) && 
+                        (point['lng'] != null || point['longitude'] != null))
+        .map((point) => {
+              'lat': (point['lat'] ?? point['latitude'] as num).toDouble(),
+              'lng': (point['lng'] ?? point['longitude'] as num).toDouble(),
+            })
+        .toList();
+
+    if (points.isEmpty) {
+      print('❌ No valid lat/lng points found');
+      return null;
+    }
+
+    // Calculate bounding box
+    double minLat = points.first['lat']!;
+    double maxLat = points.first['lat']!;
+    double minLng = points.first['lng']!;
+    double maxLng = points.first['lng']!;
+
+    for (final point in points) {
+      minLat = minLat < point['lat']! ? minLat : point['lat']!;
+      maxLat = maxLat > point['lat']! ? maxLat : point['lat']!;
+      minLng = minLng < point['lng']! ? minLng : point['lng']!;
+      maxLng = maxLng > point['lng']! ? maxLng : point['lng']!;
+    }
+    
+    // Add padding to bounding box
+    final latPadding = (maxLat - minLat) * 0.1;
+    final lngPadding = (maxLng - minLng) * 0.1;
+    minLat -= latPadding;
+    maxLat += latPadding;
+    minLng -= lngPadding;
+    maxLng += lngPadding;
+    
+    // Calculate center
+    final centerLat = (minLat + maxLat) / 2;
+    final centerLng = (minLng + maxLng) / 2;
+    
+    // Build Stadia Maps static map URL (correct format)
+    // Docs: https://docs.stadiamaps.com/static-maps/
+    String apiKey = dotenv.env['STADIA_MAPS_API_KEY'] ?? '';
+    if (apiKey.isEmpty) {
+      try {
+        dotenv.load();
+        apiKey = dotenv.env['STADIA_MAPS_API_KEY'] ?? '';
+      } catch (_) {}
+    }
+    if (apiKey.isEmpty) {
+      // Fallback dev key (remove in production)
+      apiKey = '5e17b67d-2b4c-4337-ba79-91a0e72d8d0c';
+    }
+
+    const style = 'alidade_smooth';
+    const format = 'png';
+    const zoom = 13; // reasonable default; API can auto-fit, but explicit zoom is fine
+    const size = '800x800'; // reduce to stay within free-tier limits and avoid @2x 2160px
+
+    final stadiaMapsUrl = 'https://tiles.stadiamaps.com/static/$style.$format?' +
+        'center=$centerLat,$centerLng&' +
+        'zoom=$zoom&' +
+        'size=$size'; // omit api_key for now to bypass 403
+    print('🗺️ Stadia static map URL → $stadiaMapsUrl');
+    return stadiaMapsUrl;
+  }
+  
+  Widget _buildStandardShareCard() {
+    return Container(
+      width: 800,
+      height: 800,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: _buildBackgroundGradient(),
         image: _buildBackgroundImage(),
       ),
-      child: Stack(
-        children: [
-          // Route map overlay (only for map backgrounds)
-          if (backgroundOption?.type == ShareBackgroundType.map) ...[
-            if (session.locationPoints?.isNotEmpty == true) ...[
-              // Debug: Print location points info
-              Builder(
-                builder: (context) {
-                  print('🗺️ Map background selected - Location points: ${session.locationPoints?.length}');
-                  if (session.locationPoints?.isNotEmpty == true) {
-                    print('🗺️ First point: ${session.locationPoints!.first}');
-                    print('🗺️ Last point: ${session.locationPoints!.last}');
-                    
-                    // Test conversion
-                    final converted = session.locationPoints!
-                        .where((point) => (point['lat'] != null || point['latitude'] != null) && 
-                                        (point['lng'] != null || point['longitude'] != null))
-                        .map((point) => LocationPoint(
-                          latitude: (point['lat'] ?? point['latitude'] as num).toDouble(),
-                          longitude: (point['lng'] ?? point['longitude'] as num).toDouble(),
-                          elevation: 0.0,
-                          timestamp: DateTime.now(),
-                          accuracy: 0.0,
-                        ))
-                        .toList();
-                    print('🗺️ Converted points: ${converted.length}');
-                    if (converted.isNotEmpty) {
-                      print('🗺️ First converted: lat=${converted.first.latitude}, lng=${converted.first.longitude}');
-                    }
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Builder(
-                    builder: (context) {
-                      // Calculate route points for the painter
-                      final locationPoints = session.locationPoints!
-                          .where((point) => (point['lat'] != null || point['latitude'] != null) && 
-                                  (point['lng'] != null || point['longitude'] != null))
-                          .map((point) => LocationPoint(
-                            latitude: (point['lat'] ?? point['latitude'] as num).toDouble(),
-                            longitude: (point['lng'] ?? point['longitude'] as num).toDouble(),
-                            elevation: 0.0,
-                            timestamp: DateTime.now(),
-                            accuracy: 0.0,
-                          ))
-                          .toList();
-                      
-                      if (locationPoints.isEmpty) {
-                        return Container(
-                          color: Colors.grey[300],
-                          child: const Center(child: Text('No route data')),
-                        );
-                      }
-                      
-                      return CustomPaint(
-                        painter: RouteMapPainter(
-                          locationPoints: locationPoints,
-                          routeColor: AppColors.secondary,
-                          strokeWidth: 3.0,
-                        ),
-                        child: Container(
-                          width: 400,
-                          height: 600,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ] else ...[
-              // Debug: Why map is not showing
-              Builder(
-                builder: (context) {
-                  print('🗺️ Map background selected but no location points');
-                  print('🗺️ Background type: ${backgroundOption?.type}');
-                  print('🗺️ Location points null: ${session.locationPoints == null}');
-                  print('🗺️ Location points empty: ${session.locationPoints?.isEmpty}');
-                  return const SizedBox.shrink();
-                },
-              ),
-            ],
-          ],
-          
-          // Overlay for text readability
+      child: _buildShareCardContent(),
+    );
+  }
+  
+  Widget _buildShareCardContent() {
+    return Stack(
+      children: [
+        // Only draw route map overlay when we have a map background
+        if (backgroundOption?.type == ShareBackgroundType.map && session.locationPoints?.isNotEmpty == true) ...[  
+          // Debug: Print location points info
+          Builder(
+            builder: (context) {
+              print('🗺️ Map background selected - Location points: ${session.locationPoints?.length}');
+              if (session.locationPoints?.isNotEmpty == true) {
+                print('🗺️ First point: ${session.locationPoints!.first}');
+                print('🗺️ Last point: ${session.locationPoints!.last}');
+                
+                // Test conversion
+                final converted = session.locationPoints!
+                    .where((point) => (point['lat'] != null || point['latitude'] != null) && 
+                                    (point['lng'] != null || point['longitude'] != null))
+                    .map((point) => LocationPoint(
+                      latitude: (point['lat'] ?? point['latitude'] as num).toDouble(),
+                      longitude: (point['lng'] ?? point['longitude'] as num).toDouble(),
+                      elevation: 0.0,
+                      timestamp: DateTime.now(),
+                      accuracy: 0.0,
+                    ))
+                    .toList();
+                print('🗺️ Converted points: ${converted.length}');
+                if (converted.isNotEmpty) {
+                  print('🗺️ First converted: lat=${converted.first.latitude}, lng=${converted.first.longitude}');
+                }
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withAlpha(25),
-                  Colors.black.withAlpha(100),
-                  Colors.black.withAlpha(175),
-                ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Builder(
+                builder: (context) {
+                  // Calculate route points for the painter
+                  final locationPoints = session.locationPoints!
+                      .where((point) => (point['lat'] != null || point['latitude'] != null) && 
+                              (point['lng'] != null || point['longitude'] != null))
+                      .map((point) => LocationPoint(
+                        latitude: (point['lat'] ?? point['latitude'] as num).toDouble(),
+                        longitude: (point['lng'] ?? point['longitude'] as num).toDouble(),
+                        elevation: 0.0,
+                        timestamp: DateTime.now(),
+                        accuracy: 0.0,
+                      ))
+                      .toList();
+                  
+                  if (locationPoints.isEmpty) {
+                    return Container(
+                      width: 800,
+                      height: 800,
+                      color: Colors.grey[300],
+                      child: const Center(child: Text('No route data')),
+                    );
+                  }
+                  
+                  print('🎨 RouteMapPainter.paint called - Size: Size(800.0, 800.0), Points: ${locationPoints.length}');
+                  return CustomPaint(
+                    size: Size(800, 800),
+                    painter: RouteMapPainter(
+                      locationPoints: locationPoints,
+                      routeColor: AppColors.secondary,
+                      strokeWidth: 3.0,
+                    ),
+                    child: Container(
+                      width: 800,
+                      height: 800,
+                    ),
+                  );
+                },
               ),
             ),
           ),
-          
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with app branding
-                _buildHeader(),
-                
-                const Spacer(),
-                
-                // Main stats section
-                _buildMainStats(),
-                
-                const SizedBox(height: 20),
-                
-                // Additional stats
-                _buildSecondaryStats(),
-                
-                const SizedBox(height: 20),
-                
-                // Achievements (if any)
-                if (achievements.isNotEmpty) ...[
-                  _buildAchievements(),
-                  const SizedBox(height: 20),
-                ],
-                
-                // Footer with call to action
-                _buildFooter(),
+        ] else ... [
+          // Debug: Why map is not showing
+          Builder(
+            builder: (context) {
+              print('🗺️ Map background selected but no location points');
+              print('🗺️ Background type: ${backgroundOption?.type}');
+              print('🗺️ Location points null: ${session.locationPoints == null}');
+              print('🗺️ Location points empty: ${session.locationPoints?.isEmpty}');
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
+        
+        // Overlay for text readability
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withAlpha(25),
+                Colors.black.withAlpha(100),
+                Colors.black.withAlpha(175),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        
+        // Content on top of the background
+        Column(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 12),
+                    _buildMainStats(),
+                    const SizedBox(height: 10),
+                    // Only show achievements if there's space
+                    if (achievements.isNotEmpty && achievements.length <= 3) ...[  
+                      _buildAchievements(),
+                      const SizedBox(height: 8), 
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            _buildFooter(),
+          ],
+        ),
+      ],
     );
   }
 
@@ -196,59 +356,57 @@ class ShareCardWidget extends StatelessWidget {
   }
 
   Widget _buildMainStats() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(38),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withAlpha(51),
-          width: 1,
-        ),
-      ),
+    // Determine if it's metric or imperial
+    final preferMetric = this.preferMetric;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Duration - Main highlight
-          Column(
-            children: [
-              Text(
-                'TIME',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: Colors.white.withAlpha(204),
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                session.formattedDuration,
-                style: AppTextStyles.headlineLarge.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 36,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'ELEVATION GAIN',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: Colors.white.withAlpha(204),
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                MeasurementUtils.formatSingleElevation(session.elevationGain, metric: preferMetric),
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          // Time in a large display
+          Text(
+            'TIME',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: Colors.white.withAlpha(204),
+              letterSpacing: 1.2,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${session.duration.inHours}:${(session.duration.inMinutes % 60).toString().padLeft(2, '0')}',
+            style: AppTextStyles.displayLarge.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 42, // Slightly smaller for better fit
+            ),
           ),
           
-          const SizedBox(height: 20),
+          // Elevation gain (if significant) - more compact
+          if (session.elevationGain > 0) ...[  
+            const SizedBox(height: 4),
+            Text(
+              'ELEVATION GAIN',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: Colors.white.withAlpha(204),
+                letterSpacing: 1.2,
+                fontSize: 10,
+              ),
+            ),
+            Text(
+              MeasurementUtils.formatSingleElevation(session.elevationGain, metric: preferMetric),
+              style: AppTextStyles.titleMedium.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+          ],
           
-          // Distance and Weight in a row
+          const SizedBox(height: 12),
+          
+          // Distance and Weight in a row - more compact
           Row(
             children: [
               Expanded(
@@ -259,12 +417,12 @@ class ShareCardWidget extends StatelessWidget {
               ),
               Container(
                 width: 1,
-                height: 40,
+                height: 30,
                 color: Colors.white.withAlpha(76),
               ),
               Expanded(
                 child: _buildStatItem(
-                  'WEIGHT',
+                  'RUCK WEIGHT',
                   session.ruckWeightKg == 0.0 
                     ? 'Hike' 
                     : MeasurementUtils.formatWeight(session.ruckWeightKg, metric: preferMetric),
@@ -338,34 +496,40 @@ class ShareCardWidget extends StatelessWidget {
   }
 
   Widget _buildAchievements() {
+    final achievementList = achievements.take(2).toList(); // Only show first 2 achievements to save space
+    
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           'ACHIEVEMENTS',
-          style: AppTextStyles.labelMedium.copyWith(
-            color: Colors.white.withAlpha(230),
+          style: AppTextStyles.labelSmall.copyWith(
+            color: Colors.white.withAlpha(204),
             letterSpacing: 1.2,
+            fontSize: 10,
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: achievements.map((achievement) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary).withAlpha(204),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              achievement,
-              style: AppTextStyles.labelSmall.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: achievementList.map((achievement) => 
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(51),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                achievement,
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 10,
+                ),
               ),
             ),
-          )).toList(),
+          ).toList(),
         ),
       ],
     );
@@ -476,6 +640,11 @@ class ShareCardWidget extends StatelessWidget {
   }
 
   DecorationImage? _buildBackgroundImage() {
+    // Don't build background image if we're already handling map in _buildShareCardWithMap
+    if (backgroundOption?.type == ShareBackgroundType.map) {
+      return null;
+    }
+    
     // Handle photo backgrounds
     if (backgroundOption?.type == ShareBackgroundType.photo && 
         backgroundOption?.imageUrl != null) {
@@ -487,13 +656,6 @@ class ShareCardWidget extends StatelessWidget {
           BlendMode.darken,
         ),
       );
-    }
-    
-    // Handle map backgrounds - create a simple route visualization
-    if (backgroundOption?.type == ShareBackgroundType.map) {
-      // For now, return null and use a special map gradient background
-      // In the future, you could generate an actual map image from session.locationPoints
-      return null; // This will use the map gradient from _buildBackgroundGradient
     }
     
     // Legacy background image handling

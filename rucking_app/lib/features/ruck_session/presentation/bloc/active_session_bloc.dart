@@ -17,6 +17,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
+import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
@@ -155,6 +156,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       if (!hasPermission) {
         emit(const ActiveSessionFailure(errorMessage: 'Location permission is required.'));
         return;
+      }
+
+      // Android: Ensure battery optimization permissions for background tracking
+      AppLogger.info('[SESSION_START] Checking battery optimization permissions...');
+      await BatteryOptimizationService.logPowerManagementState();
+      
+      final backgroundPermissions = await BatteryOptimizationService.checkBackgroundLocationPermissions();
+      if (!backgroundPermissions['all_granted']!) {
+        AppLogger.warning('[SESSION_START] Some background permissions missing, requesting...');
+        final granted = await BatteryOptimizationService.requestAllBackgroundPermissions();
+        if (!granted) {
+          AppLogger.warning('[SESSION_START] Background permissions not fully granted - session may be interrupted');
+          // Continue anyway but warn user in the future
+        }
+      } else {
+        AppLogger.info('[SESSION_START] All background permissions granted');
       }
 
       // Try to create session on backend, but allow offline mode if it fails
