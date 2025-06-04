@@ -1457,15 +1457,25 @@ class _SessionRouteMap extends StatelessWidget {
                 double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
                 double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
                 double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+                
                 double latDiff = (maxLat - minLat).abs();
                 double lngDiff = (maxLng - minLng).abs();
                 double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
-                maxDiff *= 1.05;
-                if (maxDiff < 0.001) return 17.5;
-                if (maxDiff < 0.01) return 16.0;
-                if (maxDiff < 0.1) return 14.0;
-                if (maxDiff < 1.0) return 11.0;
-                return 8.0;
+                
+                // Add 40% padding to ensure route fits comfortably
+                maxDiff *= 1.4;
+                
+                // More granular zoom levels for better fitting
+                if (maxDiff < 0.0005) return 18.0;  // Very small route
+                if (maxDiff < 0.001) return 17.0;   // Small route
+                if (maxDiff < 0.003) return 16.0;   // Small-medium route
+                if (maxDiff < 0.008) return 15.0;   // Medium route
+                if (maxDiff < 0.02) return 14.0;    // Medium-large route
+                if (maxDiff < 0.05) return 13.0;    // Large route
+                if (maxDiff < 0.1) return 12.0;     // Very large route
+                if (maxDiff < 0.2) return 11.0;     // Extra large route
+                if (maxDiff < 0.5) return 10.0;     // Huge route
+                return 9.0;                         // Massive route
               })()
           );
 
@@ -1490,7 +1500,11 @@ class _SessionRouteMap extends StatelessWidget {
           options: MapOptions(
             initialCenter: center,
             initialZoom: zoom,
-            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all,
+            ),
+            minZoom: 5.0,
+            maxZoom: 18.0,
           ),
           children: [
             TileLayer(
