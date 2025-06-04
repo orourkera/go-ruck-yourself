@@ -87,7 +87,6 @@ class UserAchievementsResource(Resource):
             # Get the user's JWT token from the request context
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
-            # Get user's earned achievements with achievement details
             response = supabase.table('user_achievements').select(
                 '*, achievements(*)'
             ).eq('user_id', user_id).order('earned_at', desc=True).execute()
@@ -105,7 +104,7 @@ class UserAchievementsResource(Resource):
                     'status': 'success',
                     'user_achievements': []
                 }, 200
-                
+        
         except Exception as e:
             logger.error(f"Error fetching user achievements: {str(e)}")
             return {'error': 'Failed to fetch user achievements'}, 500
