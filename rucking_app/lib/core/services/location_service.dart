@@ -121,10 +121,14 @@ class LocationServiceImpl implements LocationService {
         accuracy: LocationAccuracy.best,
         distanceFilter: _minDistanceFilter.toInt(),
         intervalDuration: const Duration(seconds: 1),
+        // Critical: Configure foreground service for background tracking
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Rucking in Progress',
-          notificationText: 'Tracking your ruck session',
-          enableWakeLock: true,
+          notificationText: 'Tracking your ruck session - tap to return to app',
+          enableWakeLock: true, // Prevent CPU sleep
+          notificationChannelName: 'Ruck Session Tracking',
+          notificationIcon: AndroidResource(name: 'ic_launcher'),
+          setOngoing: true, // Prevents dismissal during active sessions
         ),
       );
     } else if (Platform.isIOS) {

@@ -11,6 +11,20 @@ abstract class AuthRepository {
   /// Login with Google
   Future<User> googleLogin();
   
+  /// Complete Google user registration 
+  Future<User> googleRegister({
+    required String email,
+    required String displayName,
+    required String googleIdToken,
+    required String googleAccessToken,
+    required String username,
+    required bool preferMetric,
+    double? weightKg,
+    double? heightCm,
+    String? dateOfBirth,
+    String? gender,
+  });
+  
   /// Register a new user
   Future<User> register({
     required String username, // This is the display name

@@ -16,7 +16,18 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 /// Screen for registering new users
 class RegisterScreen extends StatefulWidget {
-  RegisterScreen({Key? key}) : super(key: key);
+  final String? prefilledEmail;
+  final String? prefilledDisplayName;
+  final String? googleIdToken;
+  final String? googleAccessToken;
+  
+  const RegisterScreen({
+    Key? key,
+    this.prefilledEmail,
+    this.prefilledDisplayName,
+    this.googleIdToken,
+    this.googleAccessToken,
+  }) : super(key: key);
 
   @override
   _RegisterScreenState createState() => _RegisterScreenState();
@@ -42,6 +53,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   
   // Dynamically get primary color based on selected gender
   Color get _primaryColor => _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
+  
+  // Check if this is Google registration
+  bool get _isGoogleRegistration => widget.googleIdToken != null;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Pre-fill controllers with Google data if available
+    if (widget.prefilledEmail != null) {
+      _emailController.text = widget.prefilledEmail!;
+    }
+    if (widget.prefilledDisplayName != null) {
+      _displayNameController.text = widget.prefilledDisplayName!;
+    }
+  }
 
   @override
   void dispose() {
@@ -78,18 +105,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
         weight = weight * 0.453592;
       }
 
-      context.read<AuthBloc>().add(
-        AuthRegisterRequested(
-          username: _displayNameController.text.trim(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-          weightKg: weight,
-          preferMetric: _preferMetric,
-          heightCm: null,
-          dateOfBirth: null,
-          gender: _selectedGender,
-        ),
-      );
+      if (_isGoogleRegistration) {
+        // Google registration flow
+        context.read<AuthBloc>().add(
+          AuthGoogleRegisterRequested(
+            username: _displayNameController.text.trim(),
+            email: _emailController.text.trim(),
+            displayName: widget.prefilledDisplayName,
+            googleIdToken: widget.googleIdToken!,
+            googleAccessToken: widget.googleAccessToken!,
+            weightKg: weight,
+            preferMetric: _preferMetric,
+            heightCm: null,
+            dateOfBirth: null,
+            gender: _selectedGender,
+          ),
+        );
+      } else {
+        // Regular registration flow
+        context.read<AuthBloc>().add(
+          AuthRegisterRequested(
+            username: _displayNameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+            weightKg: weight,
+            preferMetric: _preferMetric,
+            heightCm: null,
+            dateOfBirth: null,
+            gender: _selectedGender,
+          ),
+        );
+      }
     }
   }
 
@@ -291,68 +337,96 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    // Password field
-                    CustomTextField(
-                      controller: _passwordController,
-                      label: 'Password',
-                      hint: 'Password',
-                      prefixIcon: Icons.lock_outline,
-                      obscureText: !_isPasswordVisible,
-                      textInputAction: TextInputAction.next,
-                      suffixIcon: IconButton(
-                        icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () {
-                          setState(() {
-                            _isPasswordVisible = !_isPasswordVisible;
-                          });
+                    // Password field - only show for regular registration
+                    if (!_isGoogleRegistration) ...[
+                      CustomTextField(
+                        controller: _passwordController,
+                        label: 'Password',
+                        hint: 'Password',
+                        prefixIcon: Icons.lock_outline,
+                        obscureText: !_isPasswordVisible,
+                        textInputAction: TextInputAction.next,
+                        suffixIcon: IconButton(
+                          icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () {
+                            setState(() {
+                              _isPasswordVisible = !_isPasswordVisible;
+                            });
+                          },
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a password';
+                          }
+                          if (value.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                        focusNode: _passwordFocusNode,
+                        onFieldSubmitted: (_) {
+                          FocusScope.of(context).requestFocus(_confirmPasswordFocusNode);
                         },
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                      focusNode: _passwordFocusNode,
-                      onFieldSubmitted: (_) {
-                        FocusScope.of(context).requestFocus(_confirmPasswordFocusNode);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    // Confirm Password field
-                    CustomTextField(
-                      controller: _confirmPasswordController,
-                      label: 'Confirm Password',
-                      hint: 'Confirm Password',
-                      prefixIcon: Icons.lock_outline,
-                      obscureText: !_isConfirmPasswordVisible,
-                      textInputAction: TextInputAction.next,
-                      focusNode: _confirmPasswordFocusNode,
-                      suffixIcon: IconButton(
-                        icon: Icon(_isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () {
-                          setState(() {
-                            _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
-                          });
+                      const SizedBox(height: 16),
+                      // Confirm Password field
+                      CustomTextField(
+                        controller: _confirmPasswordController,
+                        label: 'Confirm Password',
+                        hint: 'Confirm Password',
+                        prefixIcon: Icons.lock_outline,
+                        obscureText: !_isConfirmPasswordVisible,
+                        textInputAction: TextInputAction.next,
+                        focusNode: _confirmPasswordFocusNode,
+                        suffixIcon: IconButton(
+                          icon: Icon(_isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () {
+                            setState(() {
+                              _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                            });
+                          },
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please confirm your password';
+                          }
+                          if (value != _passwordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                        onFieldSubmitted: (_) {
+                          FocusScope.of(context).requestFocus(_weightFocusNode);
                         },
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please confirm your password';
-                        }
-                        if (value != _passwordController.text) {
-                          return 'Passwords do not match';
-                        }
-                        return null;
-                      },
-                      onFieldSubmitted: (_) {
-                        FocusScope.of(context).requestFocus(_weightFocusNode);
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+                    ],
+                    // Google registration info
+                    if (_isGoogleRegistration) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _primaryColor.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: _primaryColor, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'You\'ll sign in with Google - no password needed!',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: _primaryColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     // Weight unit preference
                     Text('Preferred Units', style: AppTextStyles.titleMedium),
                     Row(

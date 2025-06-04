@@ -83,17 +83,24 @@ class RouteMapPainter extends CustomPainter {
         ..color = Colors.red
         ..style = PaintingStyle.fill;
 
+      final borderPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+
       // Start point
       final startPoint = locationPoints.first;
       final startX = ((startPoint.longitude - minLng) / (maxLng - minLng)) * size.width;
       final startY = size.height - (((startPoint.latitude - minLat) / (maxLat - minLat)) * size.height);
-      canvas.drawCircle(Offset(startX, startY), 6, startPaint);
+      canvas.drawCircle(Offset(startX, startY), 8, startPaint);
+      canvas.drawCircle(Offset(startX, startY), 9, borderPaint);
 
       // End point
       final endPoint = locationPoints.last;
       final endX = ((endPoint.longitude - minLng) / (maxLng - minLng)) * size.width;
       final endY = size.height - (((endPoint.latitude - minLat) / (maxLat - minLat)) * size.height);
-      canvas.drawCircle(Offset(endX, endY), 6, endPaint);
+      canvas.drawCircle(Offset(endX, endY), 8, endPaint);
+      canvas.drawCircle(Offset(endX, endY), 9, borderPaint);
     }
   }
 

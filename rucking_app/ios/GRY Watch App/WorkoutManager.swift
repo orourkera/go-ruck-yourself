@@ -1,6 +1,7 @@
 #if os(watchOS)
 import Foundation
 import HealthKit
+import WatchKit
 
 public protocol WorkoutManagerDelegate: AnyObject {
     func workoutDidEnd()
@@ -80,16 +81,26 @@ public class WorkoutManager: NSObject {
             return
         }
         
+        // Explicitly end the session first
         session.end()
+        
+        // End data collection with current date
         builder.endCollection(withEnd: Date()) { (success, error) in
             if let error = error {
+                print("[ERROR] Failed to end collection: \(error.localizedDescription)")
                 completion(error)
                 return
             }
             
+            // Finish the workout and save to HealthKit
             builder.finishWorkout { (workout, error) in
+                // Clean up references immediately
                 self.workoutSession = nil
                 self.workoutBuilder = nil
+                
+                // Log completion for debugging
+                print("[WORKOUT] Workout session completely terminated")
+                
                 completion(error)
             }
         }

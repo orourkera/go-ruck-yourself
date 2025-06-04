@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/api/api_exceptions.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -16,6 +17,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLoginRequested>(_onAuthLoginRequested);
     on<AuthGoogleLoginRequested>(_onAuthGoogleLoginRequested);
     on<AuthRegisterRequested>(_onAuthRegisterRequested);
+    on<AuthGoogleRegisterRequested>(_onAuthGoogleRegisterRequested);
     on<AuthLogoutRequested>(_onAuthLogoutRequested);
     on<AuthUpdateProfileRequested>(_onAuthUpdateProfileRequested);
     on<AuthDeleteAccountRequested>(_onAuthDeleteAccountRequested);
@@ -103,7 +105,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final user = await _authRepository.googleLogin();
       emit(Authenticated(user));
     } catch (e) {
-      emit(AuthError('Google login failed: $e'));
+      AppLogger.error('Google login failed', exception: e);
+      
+      // Check if user needs to complete registration
+      if (e is GoogleUserNeedsRegistrationException) {
+        emit(GoogleUserNeedsRegistration(
+          email: e.email,
+          displayName: e.displayName,
+          googleIdToken: e.googleIdToken,
+          googleAccessToken: e.googleAccessToken,
+        ));
+      } else {
+        emit(AuthError('Google login failed: $e'));
+      }
     }
   }
 
@@ -133,6 +147,33 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       } else {
         emit(AuthError('Registration failed: $e'));
       }
+    }
+  }
+
+  /// Handle Google registration request
+  Future<void> _onAuthGoogleRegisterRequested(
+    AuthGoogleRegisterRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    
+    try {
+      final user = await _authRepository.googleRegister(
+        email: event.email,
+        displayName: event.displayName ?? event.username,
+        googleIdToken: event.googleIdToken,
+        googleAccessToken: event.googleAccessToken,
+        username: event.username,
+        preferMetric: event.preferMetric,
+        weightKg: event.weightKg,
+        heightCm: event.heightCm,
+        dateOfBirth: event.dateOfBirth,
+        gender: event.gender,
+      );
+      
+      emit(Authenticated(user));
+    } catch (e) {
+      emit(AuthError('Google registration failed: $e'));
     }
   }
 

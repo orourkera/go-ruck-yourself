@@ -335,7 +335,24 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     // Stopping session from phone command
                     DispatchQueue.main.async {
                         self.isSessionActive = false
+                        self.isPaused = false
+                        
+                        // Clear the timer status to prevent lock screen persistence
+                        self.status = "--"
+                        
+                        // Reset all session data
+                        self.heartRate = 0
+                        self.calories = 0
+                        self.distanceValue = 0.0
+                        self.paceValue = 0.0
+                        self.elevationGain = 0.0
+                        self.elevationLoss = 0.0
+                        
+                        // Stop the workout manager
                         self.workoutManager.stopWorkout()
+                        
+                        // Force UI refresh to clear any background state
+                        WKInterfaceDevice.current().play(.stop)
                     }
                 }
                 
@@ -516,14 +533,44 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         if let activeBool = metrics["isSessionActive"] as? Bool {
             self.isSessionActive = activeBool
             if !activeBool {
+                // Session ended - comprehensive cleanup
+                self.isPaused = false
+                self.status = "--"
+                
+                // Reset all session metrics
+                self.heartRate = 0
+                self.calories = 0
+                self.distanceValue = 0.0
+                self.paceValue = 0.0
+                self.elevationGain = 0.0
+                self.elevationLoss = 0.0
+                
                 // Ensure workout is stopped and UI reset
                 self.workoutManager.stopWorkout()
+                
+                // Clear any background state
+                WKInterfaceDevice.current().play(.stop)
             }
         } else if let activeInt = metrics["isSessionActive"] as? Int {
             let active = activeInt == 1
             self.isSessionActive = active
             if !active {
+                // Session ended - comprehensive cleanup
+                self.isPaused = false
+                self.status = "--"
+                
+                // Reset all session metrics
+                self.heartRate = 0
+                self.calories = 0
+                self.distanceValue = 0.0
+                self.paceValue = 0.0
+                self.elevationGain = 0.0
+                self.elevationLoss = 0.0
+                
                 self.workoutManager.stopWorkout()
+                
+                // Clear any background state
+                WKInterfaceDevice.current().play(.stop)
             }
         }
         
@@ -601,6 +648,12 @@ extension SessionManager {
             self.splitTime = ""
             self.totalDistance = ""
             self.totalTime = ""
+            
+            // Clear any background activities and force app state refresh
+            WKInterfaceDevice.current().play(.stop)
+            
+            // Log workout end for debugging
+            print("[WORKOUT] Workout ended via delegate - all state cleared")
         }
     }
 }

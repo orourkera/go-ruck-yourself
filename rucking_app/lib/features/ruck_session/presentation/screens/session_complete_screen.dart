@@ -1,6 +1,7 @@
 // Standard library imports
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:async';
 
 // Flutter and third-party imports
 import 'package:fl_chart/fl_chart.dart';
@@ -100,6 +101,12 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   int? _avgHeartRate;
   int? _maxHeartRate;
   int? _minHeartRate;
+
+  // New variables to track achievement dialog and upsell navigation
+  bool _isLoading = false;
+  bool _isAchievementDialogShowing = false;
+  bool _pendingUpsellNavigation = false;
+  RuckSession? _pendingSessionData;
 
   @override
   void initState() {
@@ -243,12 +250,22 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           splits: widget.splits,
         );
         
-        Navigator.pushNamedAndRemoveUntil(
-          context, 
-          '/post_session_upsell', 
-          (route) => false,
-          arguments: sessionData,
-        );
+        // Check if we're currently showing achievements
+        if (_isAchievementDialogShowing) {
+          // Wait for achievements to be dismissed before navigating
+          setState(() {
+            _pendingUpsellNavigation = true;
+            _pendingSessionData = sessionData;
+          });
+        } else {
+          // No achievements showing, navigate immediately
+          Navigator.pushNamedAndRemoveUntil(
+            context, 
+            '/post_session_upsell', 
+            (route) => false,
+            arguments: sessionData,
+          );
+        }
       } else {
         // Premium user - navigate directly to home
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
@@ -450,6 +467,24 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         : AppColors.primary;
   }
 
+  void _handleAchievementDismissed() {
+    setState(() {
+      _isAchievementDialogShowing = false;
+    });
+    if (_pendingUpsellNavigation) {
+      setState(() {
+        _pendingUpsellNavigation = false;
+      });
+      Navigator.pushNamedAndRemoveUntil(
+        context, 
+        '/post_session_upsell', 
+        (route) => false,
+        arguments: _pendingSessionData,
+      );
+      _pendingSessionData = null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
@@ -488,6 +523,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
               print('[DEBUG] SessionComplete: AchievementsSessionChecked with ${state.newAchievements.length} new achievements');
               if (state.newAchievements.isNotEmpty) {
                 print('[DEBUG] SessionComplete: Showing achievement notification dialog');
+                setState(() {
+                  _isAchievementDialogShowing = true;
+                });
+                
                 // Show achievement unlock celebration
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   showDialog(
@@ -496,13 +535,24 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                     builder: (context) => AlertDialog(
                       content: SessionAchievementNotification(
                         newAchievements: state.newAchievements,
-                        onDismiss: () => Navigator.of(context).pop(),
+                        onDismiss: () {
+                          Navigator.of(context).pop();
+                          _handleAchievementDismissed();
+                        },
                       ),
                       contentPadding: EdgeInsets.zero,
                       backgroundColor: Colors.transparent,
                       elevation: 0,
                     ),
                   );
+                  
+                  // Auto-dismiss after 4 seconds to give users time to see it
+                  Timer(const Duration(seconds: 4), () {
+                    if (_isAchievementDialogShowing && mounted) {
+                      Navigator.of(context).pop();
+                      _handleAchievementDismissed();
+                    }
+                  });
                 });
               }
             }
