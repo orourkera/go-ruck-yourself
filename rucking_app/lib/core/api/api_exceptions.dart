@@ -88,16 +88,6 @@ class SessionExpiredException extends UnauthorizedException {
   String toString() => 'SessionExpiredException: $message';
 }
 
-/// Exception for authentication specific errors
-class AuthException extends ApiException {
-  final String? code;
-  
-  AuthException(String message, [this.code]) : super(message);
-  
-  @override
-  String toString() => 'AuthException: $message${code != null ? ' (Code: $code)' : ''}';
-}
-
 /// Exception thrown when Google user needs to complete registration
 class GoogleUserNeedsRegistrationException extends ApiException {
   final String email;
@@ -115,4 +105,14 @@ class GoogleUserNeedsRegistrationException extends ApiException {
   
   @override
   String toString() => 'GoogleUserNeedsRegistrationException: $message';
+}
+
+/// Exception for authentication-related errors
+class AuthException extends ApiException {
+  final String code;
+  
+  AuthException(String message, this.code) : super(message);
+  
+  @override
+  String toString() => 'AuthException: $message (Code: $code)';
 }

@@ -41,96 +41,79 @@ class SignUpResource(Resource):
             email = data.get('email')
             password = data.get('password')
             username = data.get('username') # This contains the display name from Flutter
-            is_google_oauth = data.get('is_google_oauth', False)
-            user_id = data.get('id')  # For OAuth users, this comes from Supabase
             
-            # For Google OAuth users, we don't need password and they're already authenticated
-            if is_google_oauth:
-                if not email or not username or not user_id:
-                    return {'message': 'Email, username (display name), and user ID are required for Google OAuth users'}, 400
-            else:
-                if not email or not password or not username: 
-                    return {'message': 'Email, password, and username (display name) are required'}, 400
-            
-            # For non-OAuth users, create user in Supabase Auth
-            if not is_google_oauth:
-                supabase = get_supabase_client()
-                auth_response = supabase.auth.sign_up({
-                    "email": email,
-                    "password": password,
-                })
+            if not email or not password or not username: 
+                return {'message': 'Email, password, and username (display name) are required'}, 400
                 
-                if auth_response.user:
-                    user_id = auth_response.user.id
-                else:
-                    error_message = "Failed to register user"
-                    auth_error = getattr(auth_response, 'error', None) or getattr(auth_response, 'message', None)
-                    if auth_error:
-                         error_message += f": {str(auth_error)}"
-                         
-                    logger.warning(f"{error_message} for email: {email}")
-                    status_code = 409 if "user already exists" in error_message.lower() else 400
-                    return {'message': error_message}, status_code
+            # Create user in Supabase Auth
+            supabase = get_supabase_client()
+            auth_response = supabase.auth.sign_up({
+                "email": email,
+                "password": password,
+            })
             
-            # Prepare data for the public.user table
-            # Only include columns defined in the User model, EXCLUDING email
-            user_data = {
-                'id': str(user_id), 
-                'username': username, # Save username (display name) as username
-                'email': email, # User table needs the email column
-                'weight_kg': data.get('weight_kg'),
-                'height_cm': data.get('height_cm'),
-                'date_of_birth': data.get('date_of_birth'),
-                'gender': data.get('gender'),
-                'prefer_metric': data.get('prefer_metric'), # Read snake_case from request
-            }
-            user_data_clean = {k: v for k, v in user_data.items() if v is not None}
-            
-            logger.debug(f"Inserting into user table for user {user_id}: {user_data_clean}") 
-            try:
-                admin_supabase = get_supabase_admin_client()
-                user_insert_response = admin_supabase.table('user').insert(user_data_clean).execute()
-            except Exception as user_insert_err:
-                db_error_message = str(user_insert_err)
-                logger.error(f"Error inserting user record using admin client for user {user_id}: {db_error_message}", exc_info=True)
-                if not is_google_oauth:
+            if auth_response.user:
+                user_id = auth_response.user.id
+                
+                # Prepare data for the public.user table
+                # Only include columns defined in the User model, EXCLUDING email
+                user_data = {
+                    'id': str(user_id), 
+                    'username': username, # Save username (display name) as username
+                    'email': email, # User table needs the email column
+                    'weight_kg': data.get('weight_kg'),
+                    'height_cm': data.get('height_cm'),
+                    'date_of_birth': data.get('date_of_birth'),
+                    'gender': data.get('gender'),
+                    'prefer_metric': data.get('preferMetric') # Read camelCase from request
+                }
+                user_data_clean = {k: v for k, v in user_data.items() if v is not None}
+                
+                logger.debug(f"Inserting into user table for user {user_id}: {user_data_clean}") 
+                try:
+                    admin_supabase = get_supabase_admin_client()
+                    user_insert_response = admin_supabase.table('user').insert(user_data_clean).execute()
+                except Exception as user_insert_err:
+                    db_error_message = str(user_insert_err)
+                    logger.error(f"Error inserting user record using admin client for user {user_id}: {db_error_message}", exc_info=True)
                     try:
                         logger.warning(f"Attempting to delete auth user {user_id} due to user record creation failure.")
                         admin_supabase.auth.admin.delete_user(user_id)
                     except Exception as delete_err:
                         logger.error(f"Failed to delete auth user {user_id} after insert failure: {delete_err}", exc_info=True)
-                return {'message': f'User created in auth, but failed to create user record: {db_error_message}'}, 500 
-            
-            logger.info(f"Successfully created user record for user {user_id}")
-            
-            # For OAuth users, we need to get the user data from Supabase since we didn't create it
-            if is_google_oauth:
-                user_response_data = {
-                    'id': user_id,
-                    'email': email,
-                    'username': username
-                }
-            else:
-                user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else {}
-            
-            # Merge data from the user table insert into the response
-            if user_insert_response.data:
-                user_details = user_insert_response.data[0]
-                user_response_data['username'] = user_details.get('username', username)
-                user_response_data['weight_kg'] = user_details.get('weight_kg')
-                user_response_data['prefer_metric'] = user_details.get('prefer_metric')
-            else:
-                user_response_data['username'] = username
+                    return {'message': f'User created in auth, but failed to create user record: {db_error_message}'}, 500 
                 
-            # Add the email from the auth response to the final user object sent to client
-            user_response_data['email'] = email
-            
-            return {
-                'message': 'User registered successfully',
-                'token': None if is_google_oauth else (auth_response.session.access_token if auth_response.session else None),
-                'user': user_response_data 
-            }, 201
-            
+                logger.info(f"Successfully created user record for user {user_id}")
+                
+                user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else {}
+                
+                # Merge data from the user table insert into the response
+                if user_insert_response.data:
+                    user_details = user_insert_response.data[0]
+                    user_response_data['username'] = user_details.get('username', username)
+                    user_response_data['weight_kg'] = user_details.get('weight_kg')
+                    user_response_data['prefer_metric'] = user_details.get('prefer_metric')
+                else:
+                    user_response_data['username'] = username
+                    
+                # Add the email from the auth response to the final user object sent to client
+                user_response_data['email'] = email
+                
+                return {
+                    'message': 'User registered successfully',
+                    'token': auth_response.session.access_token if auth_response.session else None,
+                    'user': user_response_data 
+                }, 201
+            else:
+                error_message = "Failed to register user"
+                auth_error = getattr(auth_response, 'error', None) or getattr(auth_response, 'message', None)
+                if auth_error:
+                     error_message += f": {str(auth_error)}"
+                     
+                logger.warning(f"{error_message} for email: {email}")
+                status_code = 409 if "user already exists" in error_message.lower() else 400
+                return {'message': error_message}, status_code
+                
         except Exception as e:
             logger.error(f"Error during signup: {str(e)}", exc_info=True)
             return {'message': f'Error during signup: {str(e)}'}, 500
