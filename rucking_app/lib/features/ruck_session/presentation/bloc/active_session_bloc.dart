@@ -643,6 +643,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           await _activeSessionStorage.saveCompletedOfflineSession(currentState, payload);
           AppLogger.info('Offline session saved locally, will sync when connectivity returns');
           
+          // End the session on the watch to prevent battery drain
+          _watchService.endSessionOnWatch().catchError((e) {
+            AppLogger.error('Error ending session on watch for offline session (non-blocking): $e');
+          });
+          
           // Emit completed state immediately for offline sessions
           emit(ActiveSessionCompleted(
             sessionId: currentState.sessionId,

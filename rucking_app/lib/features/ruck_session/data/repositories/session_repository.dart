@@ -3,14 +3,14 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:collection';
-import 'package:flutter/painting.dart' show decodeImageFromList;
+
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:get_it/get_it.dart';
-import 'package:rucking_app/core/network/api_endpoints.dart';
+
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
@@ -18,12 +18,13 @@ import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sampl
 import 'package:path/path.dart' as path;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:uuid/uuid.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/config/app_config.dart';
-import 'dart:async' show unawaited;
+import 'package:flutter/foundation.dart' show compute;
+// import 'dart:async' show unawaited; // Covered by dart:async
 
 /// Simple semaphore for limiting concurrent operations
 class Semaphore {
@@ -55,11 +56,52 @@ class Semaphore {
 }
 
 /// Repository class for session-related operations
+
+// Top-level function for image compression to be run in a separate isolate.
+Future<String> _compressPhotoIsolateWork(String originalPhotoPath) async {
+  try {
+    final File originalPhoto = File(originalPhotoPath);
+    final bytes = await originalPhoto.readAsBytes();
+
+    final image = img.decodeImage(bytes);
+    if (image == null) return originalPhotoPath; // Return original path if decoding fails
+
+    img.Image resized = image;
+    if (image.width > 1920 || image.height > 1920) {
+      if (image.width > image.height) {
+        resized = img.copyResize(image, width: 1920);
+      } else {
+        resized = img.copyResize(image, height: 1920);
+      }
+    }
+
+    final compressedBytes = img.encodeJpg(resized, quality: 80);
+
+    final tempDir = await getTemporaryDirectory();
+    final String compressedFilePath = 
+      '${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}_${path.basename(originalPhotoPath)}';
+    final File compressedFile = File(compressedFilePath);
+    await compressedFile.writeAsBytes(compressedBytes);
+
+    final originalSize = bytes.length;
+    final compressedSize = compressedBytes.length;
+    final compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toStringAsFixed(1);
+
+    // Using print as AppLogger might not be available/configured in a separate isolate.
+    print('Compressed photo (isolate): ${originalSize} → ${compressedSize} bytes (${compressionRatio}% reduction)');
+
+    return compressedFilePath;
+  } catch (e) {
+    print('Photo compression failed in isolate, using original path: $e');
+    return originalPhotoPath; // Return original path on error
+  }
+}
+
 class SessionRepository {
   final ApiClient _apiClient;
-  final String _supabaseUrl;
-  final String _supabaseAnonKey;
-  final String _photoBucketName = 'ruck-photos';
+  // final String _supabaseUrl; // Unused Supabase field
+  // final String _supabaseAnonKey; // Unused Supabase field
+  // final String _photoBucketName = 'ruck-photos'; // Unused Supabase field
   
   // Photo caching mechanism to prevent excessive API calls
   static final Map<String, List<RuckPhoto>> _photoCache = {};
@@ -67,7 +109,7 @@ class SessionRepository {
   static final Map<String, Completer<List<RuckPhoto>>> _pendingRequests = {};
   
   // Rate limiting configuration: max 5 requests per minute per API's restriction
-  static const Duration _minRequestInterval = Duration(seconds: 12); // ~5 per minute
+  // static const Duration _minRequestInterval = Duration(seconds: 12); // ~5 per minute // Unused
 
   // Cache for heart rate samples to avoid hitting rate limits
   static final Map<String, List<HeartRateSample>> _heartRateCache = {};
@@ -85,9 +127,7 @@ class SessionRepository {
   static const Duration _sessionDetailCacheValidity = Duration(minutes: 10); // Cache for 10 minutes
 
   SessionRepository({required ApiClient apiClient})
-      : _apiClient = apiClient,
-        _supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '',
-        _supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+      : _apiClient = apiClient;
 
   /// Fetch heart rate samples for a session by its ID.
   /// This method specifically requests heart rate data from the server.
@@ -595,44 +635,24 @@ class SessionRepository {
     return await Future.wait(compressionFutures);
   }
 
-  /// Compress a single photo for faster upload
+  /// Compress a single photo for faster upload using a separate isolate.
   Future<File> _compressPhoto(File originalPhoto) async {
     try {
-      final bytes = await originalPhoto.readAsBytes();
+      AppLogger.info('Starting compression for ${originalPhoto.path}');
+      // Run the compression logic in a separate isolate.
+      // Pass the file path as a String, as File objects may not be ideal for isolates.
+      final String compressedPath = await compute(_compressPhotoIsolateWork, originalPhoto.path);
       
-      // Compress using flutter's image package
-      final image = img.decodeImage(bytes);
-      if (image == null) return originalPhoto;
-      
-      // Resize if too large (max 1920px on longest side)
-      img.Image resized = image;
-      if (image.width > 1920 || image.height > 1920) {
-        if (image.width > image.height) {
-          resized = img.copyResize(image, width: 1920);
-        } else {
-          resized = img.copyResize(image, height: 1920);
-        }
+      // If compression failed in the isolate, it returns the original path.
+      if (compressedPath == originalPhoto.path) {
+        AppLogger.warning('Photo compression returned original path for ${originalPhoto.path}, possibly due to an error in isolate.');
+        return originalPhoto;
       }
       
-      // Compress JPEG with 80% quality
-      final compressedBytes = img.encodeJpg(resized, quality: 80);
-      
-      // Save compressed version to temporary file
-      final tempDir = await getTemporaryDirectory();
-      final compressedFile = File(
-        '${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}_${path.basename(originalPhoto.path)}'
-      );
-      await compressedFile.writeAsBytes(compressedBytes);
-      
-      final originalSize = bytes.length;
-      final compressedSize = compressedBytes.length;
-      final compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toStringAsFixed(1);
-      
-      AppLogger.info('Compressed photo: ${originalSize} → ${compressedSize} bytes (${compressionRatio}% reduction)');
-      
-      return compressedFile;
+      AppLogger.info('Finished compression for ${originalPhoto.path}, compressed file at $compressedPath');
+      return File(compressedPath);
     } catch (e) {
-      AppLogger.error('Photo compression failed, using original: $e');
+      AppLogger.error('Error calling compute for photo compression, using original for ${originalPhoto.path}: $e');
       return originalPhoto;
     }
   }
@@ -663,7 +683,7 @@ class SessionRepository {
             'photos',
             photo.path,
             filename: fileName,
-            contentType: MediaType.parse('image/jpeg'),
+            contentType: MediaType.parse(_getContentType(photo.path)),
           ),
         );
         
@@ -743,73 +763,7 @@ class SessionRepository {
     }
   }
 
-  /// Upload a file to Supabase storage
-  Future<Map<String, dynamic>?> _uploadToSupabase(File file, String storagePath) async {
-    try {
-      final fileBytes = await file.readAsBytes();
-      final contentType = _getContentType(file.path);
-      
-      // Prepare the storage upload URL
-      final url = '$_supabaseUrl/storage/v1/object/$_photoBucketName/$storagePath';
-      
-      // Upload file to Supabase storage
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': contentType,
-          'apikey': _supabaseAnonKey,
-          'Authorization': 'Bearer $_supabaseAnonKey',
-        },
-        body: fileBytes,
-      );
-      
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        return responseData;
-      } else {
-        AppLogger.error('Error uploading to Supabase: ${response.statusCode}, ${response.body}');
-        return null;
-      }
-    } catch (e) {
-      AppLogger.error('Error uploading to Supabase: $e');
-      return null;
-    }
-  }
-  
-  /// Create metadata entry for a photo in the database
-  Future<RuckPhoto?> _createPhotoMetadata({
-    required String photoId,
-    required String ruckId,
-    required String userId,
-    required String filename,
-    required String originalFilename,
-    required String contentType,
-    required int size,
-    required String url,
-    required String thumbnailUrl,
-  }) async {
-    try {
-      final data = {
-        'photo_id': photoId,
-        'ruck_id': ruckId,
-        'user_id': userId,
-        'filename': filename,
-        'original_filename': originalFilename,
-        'content_type': contentType,
-        'size': size,
-        'url': url,
-        'thumbnail_url': thumbnailUrl,
-      };
-      
-      final response = await _apiClient.post('/ruck-photos', data);
-      
-      return RuckPhoto.fromJson(response);
-    } catch (e) {
-      AppLogger.error('Error creating photo metadata: $e');
-      return null;
-    }
-  }
-  
+  /// Get photos for a ruck session
   /// Get the content type based on file extension
   String _getContentType(String filePath) {
     final ext = path.extension(filePath).toLowerCase();
@@ -822,13 +776,12 @@ class SessionRepository {
       case '.gif':
         return 'image/gif';
       case '.heic':
-        return 'image/heic';
+        return 'image/heic'; // Common on iOS
       default:
-        return 'application/octet-stream';
+        return 'application/octet-stream'; // Fallback
     }
   }
-  
-  /// Get photos for a ruck session
+
   Future<List<RuckPhoto>> getSessionPhotos(String ruckId) async {
     AppLogger.debug('[PHOTO_DEBUG] SessionRepository: Attempting to fetch photos for ruckId: $ruckId');
     AppLogger.info('===== BEGIN FETCH PHOTOS DETAIL (ruckId: $ruckId) =====');

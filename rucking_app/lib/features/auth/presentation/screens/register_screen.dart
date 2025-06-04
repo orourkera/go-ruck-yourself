@@ -13,6 +13,7 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Screen for registering new users
 class RegisterScreen extends StatefulWidget {
@@ -55,7 +56,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Color get _primaryColor => _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
   
   // Check if this is Google registration
-  bool get _isGoogleRegistration => widget.googleIdToken != null;
+  // A user might be coming from Google registration flow even if tokens are null
+  // We should consider it a Google registration if any Google data is provided
+  bool get _isGoogleRegistration => 
+      widget.prefilledEmail != null || 
+      widget.prefilledDisplayName != null || 
+      widget.googleIdToken != null || 
+      widget.googleAccessToken != null;
 
   @override
   void initState() {
@@ -106,21 +113,62 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
 
       if (_isGoogleRegistration) {
-        // Google registration flow
-        context.read<AuthBloc>().add(
-          AuthGoogleRegisterRequested(
-            username: _displayNameController.text.trim(),
-            email: _emailController.text.trim(),
-            displayName: widget.prefilledDisplayName,
-            googleIdToken: widget.googleIdToken!,
-            googleAccessToken: widget.googleAccessToken!,
-            weightKg: weight,
-            preferMetric: _preferMetric,
-            heightCm: null,
-            dateOfBirth: null,
-            gender: _selectedGender,
-          ),
-        );
+        // Google registration flow - handle cases where tokens may be null
+        // If tokens are null, we'll still try to use the Google info we have
+        final googleIdToken = widget.googleIdToken;
+        final googleAccessToken = widget.googleAccessToken;
+        
+        // Check if we have valid tokens to use Google registration
+        if (googleIdToken != null && googleAccessToken != null) {
+          AppLogger.info('Proceeding with Google registration');
+          context.read<AuthBloc>().add(
+            AuthGoogleRegisterRequested(
+              username: _displayNameController.text.trim(),
+              email: _emailController.text.trim(),
+              displayName: widget.prefilledDisplayName ?? _displayNameController.text.trim(),
+              googleIdToken: googleIdToken,
+              googleAccessToken: googleAccessToken,
+              weightKg: weight,
+              preferMetric: _preferMetric,
+              heightCm: null,
+              dateOfBirth: null,
+              gender: _selectedGender,
+            ),
+          );
+        } else {
+          // Fall back to standard registration if tokens are null
+          AppLogger.warning('Missing Google tokens, falling back to standard registration');
+          StyledSnackBar.show(
+            context: context,
+            message: 'Could not complete Google registration. Proceeding with standard registration.',
+            animationStyle: SnackBarAnimationStyle.slideUpBounce,
+          );
+          
+          // Ensure password is provided in this case
+          if (_passwordController.text.isEmpty) {
+            StyledSnackBar.showError(
+              context: context,
+              message: 'Please set a password to complete your registration',
+              animationStyle: SnackBarAnimationStyle.slideUpBounce,
+            );
+            FocusScope.of(context).requestFocus(_passwordFocusNode);
+            return;
+          }
+          
+          // Fall back to regular registration
+          context.read<AuthBloc>().add(
+            AuthRegisterRequested(
+              username: _displayNameController.text.trim(),
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+              weightKg: weight,
+              preferMetric: _preferMetric,
+              heightCm: null,
+              dateOfBirth: null,
+              gender: _selectedGender,
+            ),
+          );
+        }
       } else {
         // Regular registration flow
         context.read<AuthBloc>().add(
