@@ -222,7 +222,7 @@ When navigating to the session completion screen, the following argument mapping
 
 | Column Name            | Data Type                   | Nullable | Default                                      |
 |------------------------|-----------------------------|----------|----------------------------------------------|
-| id                     | integer                     | NO       | nextval('session_splits_id_seq'::regclass) |
+| id                     | integer                     | NO       | nextval('session_splits_id_seq'::regclass)  |
 | session_id             | integer                     | NO       |                                              |
 | split_number           | integer                     | NO       |                                              |
 | split_distance_km      | numeric                     | NO       |                                              |
@@ -240,15 +240,27 @@ When navigating to the session completion screen, the following argument mapping
 | Split ID               | `id`                         | `id`                       | `id`                      |
 | Session ID             | `sessionId`                  | `session_id`               | `session_id`              |
 | Split Number           | `splitNumber`                | `split_number`             | `split_number`            |
-| Split Distance (km)    | `splitDistanceKm`            | `split_distance_km`        | `split_distance_km`       |
-| Split Duration (s)     | `splitDurationSeconds`       | `split_duration_seconds`   | `split_duration_seconds`  |
-| Total Distance (km)    | `totalDistanceKm`            | `total_distance_km`        | `total_distance_km`       |
-| Total Duration (s)     | `totalDurationSeconds`       | `total_duration_seconds`   | `total_duration_seconds`  |
-| Split Timestamp        | `splitTimestamp`             | `split_timestamp`          | `split_timestamp`         |
-| Created At             | `createdAt`                  | `created_at`               | `created_at`              |
-| Updated At             | `updatedAt`                  | `updated_at`               | `updated_at`              |
+| Split Distance (km)    | `distance` (converted)       | `split_distance_km`        | `split_distance_km`       |
+| Split Duration (s)     | `duration`                   | `split_duration_seconds`   | `split_duration_seconds`  |
+| Total Distance (km)    | N/A (calculated)             | `total_distance_km`        | `total_distance_km`       |
+| Total Duration (s)     | N/A (calculated)             | `total_duration_seconds`   | `total_duration_seconds`  |
+| Split Timestamp        | N/A (server-generated)       | `split_timestamp`          | `split_timestamp`         |
+| Pace (s/km)            | `paceSecondsPerKm`           | calculated from distance/duration | calculated from distance/duration |
+| Created At             | N/A                          | `created_at`               | `created_at`              |
+| Updated At             | N/A                          | `updated_at`               | `updated_at`              |
 
-**Split Tracking**: Session splits represent 1km or 1mi milestones during a ruck session. Each split records the time taken to complete that segment, along with cumulative totals. Split distance is stored in kilometers regardless of user preference (1.0km for metric users, 1.609km for imperial users who complete 1 mile).
+**Split Tracking**: Session splits represent 1km milestones during a ruck session. Each split records:
+- **Split Distance**: Always stored in kilometers (1.0km for metric users)
+- **Split Duration**: Time in seconds to complete that specific split segment
+- **Total Distance**: Cumulative distance up to this split point
+- **Total Duration**: Cumulative time up to this split point
+- **Pace**: Calculated as `split_duration_seconds / split_distance_km` (not stored, computed)
+
+**Frontend-Backend Mapping**:
+- Frontend sends `distance` in meters → Backend converts and stores as `split_distance_km`
+- Frontend sends `duration` in seconds → Backend stores as `split_duration_seconds`
+- Backend calculates and returns `paceSecondsPerKm` for frontend display
+- `total_distance_km` and `total_duration_seconds` track cumulative progress through the session
 
 ---
 

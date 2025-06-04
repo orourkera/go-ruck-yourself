@@ -184,7 +184,8 @@ class ShareCardWidget extends StatelessWidget {
     final stadiaMapsUrl = 'https://tiles.stadiamaps.com/static/$style.$format?' +
         'center=$centerLat,$centerLng&' +
         'zoom=$zoom&' +
-        'size=$size'; // omit api_key for now to bypass 403
+        'size=$size&' +
+        'api_key=$apiKey';
     print('🗺️ Stadia static map URL → $stadiaMapsUrl');
     return stadiaMapsUrl;
   }
