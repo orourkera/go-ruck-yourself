@@ -638,7 +638,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           centerContent: true,
           valueFontSize: 28
         ),
-        StatCard(title: 'Ruck Weight', value: MeasurementUtils.formatWeight(widget.ruckWeight, metric: preferMetric), icon: Icons.fitness_center, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
+        StatCard(title: 'Ruck Weight', value: widget.ruckWeight == 0.0 ? 'HIKE' : MeasurementUtils.formatWeight(widget.ruckWeight, metric: preferMetric), icon: Icons.fitness_center, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
         if (_heartRateSamples?.isNotEmpty ?? false)
           StatCard(title: 'Avg HR', value: _avgHeartRate?.toString() ?? '--', icon: Icons.favorite, color: AppColors.error, centerContent: true, valueFontSize: 36),
         if (_heartRateSamples?.isNotEmpty ?? false)
