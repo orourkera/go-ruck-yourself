@@ -150,19 +150,28 @@ class ShareCardWidget extends StatelessWidget {
       maxLng = maxLng > point['lng']! ? maxLng : point['lng']!;
     }
     
-    // Add padding to bounding box
-    final latPadding = (maxLat - minLat) * 0.1;
-    final lngPadding = (maxLng - minLng) * 0.1;
+    // Add padding to bounding box (increased padding for better visibility)
+    final latPadding = (maxLat - minLat) * 0.15;
+    final lngPadding = (maxLng - minLng) * 0.15;
     minLat -= latPadding;
     maxLat += latPadding;
     minLng -= lngPadding;
     maxLng += lngPadding;
     
-    // Calculate center
-    final centerLat = (minLat + maxLat) / 2;
-    final centerLng = (minLng + maxLng) / 2;
+    // Calculate zoom level dynamically based on the bounding box
+    double zoom = _calculateZoomLevel(minLat, maxLat, minLng, maxLng, 800, 800);
+    print('🔎 Calculated zoom level: $zoom for lat diff: ${maxLat - minLat}, lng diff: ${maxLng - minLng}');
     
-    // Build Stadia Maps static map URL (correct format)
+    // Build the path parameter for route drawing
+    final pathPoints = <String>[];
+    // Only include up to 100 points to keep URL length reasonable
+    final step = points.length > 100 ? (points.length / 100).ceil() : 1;
+    for (int i = 0; i < points.length; i += step) {
+      final point = points[i];
+      pathPoints.add('${point['lat']},${point['lng']}');
+    }
+
+    // Build Stadia Maps static map URL with path
     // Docs: https://docs.stadiamaps.com/static-maps/
     String apiKey = dotenv.env['STADIA_MAPS_API_KEY'] ?? '';
     if (apiKey.isEmpty) {
@@ -172,22 +181,46 @@ class ShareCardWidget extends StatelessWidget {
       } catch (_) {}
     }
     if (apiKey.isEmpty) {
-      // Fallback dev key (remove in production)
-      apiKey = '5e17b67d-2b4c-4337-ba79-91a0e72d8d0c';
+      // If no API key is found, the map request might fail or use a default.
+      // Consider logging this or handling it gracefully.
+      print('⚠️ STADIA_MAPS_API_KEY is not set. Map generation may fail.');
     }
 
     const style = 'alidade_smooth';
     const format = 'png';
-    const zoom = 13; // reasonable default; API can auto-fit, but explicit zoom is fine
     const size = '800x800'; // reduce to stay within free-tier limits and avoid @2x 2160px
 
+    // Path style: color, opacity, weight, fillcolor, fillopacity
+    const pathStyle = 'color:FF9500,weight:4';
+
     final stadiaMapsUrl = 'https://tiles.stadiamaps.com/static/$style.$format?' +
-        'center=$centerLat,$centerLng&' +
-        'zoom=$zoom&' +
+        'bbox=$minLng,$minLat,$maxLng,$maxLat&' +
         'size=$size&' +
+        'path=$pathStyle|${pathPoints.join('|')}&' +
         'api_key=$apiKey';
-    print('🗺️ Stadia static map URL → $stadiaMapsUrl');
+    print('🗺️ Stadia static map URL → length: ${stadiaMapsUrl.length}');
     return stadiaMapsUrl;
+  }
+  
+  // Calculate appropriate zoom level based on geographic bounds
+  double _calculateZoomLevel(double minLat, double maxLat, double minLng, double maxLng, double mapWidth, double mapHeight) {
+    const GLOBE_WIDTH = 256; // a constant in Google's map projection
+    double latDiff = maxLat - minLat;
+    double lngDiff = maxLng - minLng;
+    
+    // Calculate zoom based on the larger of the two differences
+    double latZoom = math.log(mapHeight / GLOBE_WIDTH / latDiff * 360) / math.ln2;
+    double lngZoom = math.log(mapWidth / GLOBE_WIDTH / lngDiff * 360) / math.ln2;
+    
+    // Use the smaller zoom level to ensure everything fits
+    double zoom = math.min(latZoom, lngZoom);
+    
+    // Ensure reasonable bounds
+    if (zoom > 18) zoom = 18;
+    if (zoom < 1) zoom = 1;
+    
+    // Round to nearest 0.5 for better consistency
+    return (zoom * 2).round() / 2;
   }
   
   Widget _buildStandardShareCard() {
@@ -380,7 +413,7 @@ class ShareCardWidget extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            '${session.duration.inHours}:${(session.duration.inMinutes % 60).toString().padLeft(2, '0')}',
+            _formatDurationDisplay(session.duration),
             style: AppTextStyles.displayLarge.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -586,6 +619,26 @@ class ShareCardWidget extends StatelessWidget {
     
     final unit = preferMetric ? '/km' : '/mi';
     return '${minutes}:${seconds.toString().padLeft(2, '0')}$unit';
+  }
+  
+  /// Formats a duration to display as h:mm:ss or mm:ss if hours = 0
+  /// No leading zeros for hours, but minutes and seconds have leading zeros
+  String _formatDurationDisplay(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = (duration.inMinutes % 60);
+    final seconds = (duration.inSeconds % 60);
+    
+    // Format with zero-padded minutes and seconds for consistency
+    final formattedMinutes = minutes.toString().padLeft(2, '0');
+    final formattedSeconds = seconds.toString().padLeft(2, '0');
+    
+    if (hours > 0) {
+      // Show hours:minutes:seconds when there are hours
+      return '$hours:$formattedMinutes:$formattedSeconds';
+    } else {
+      // Show only minutes:seconds when no hours
+      return '$minutes:$formattedSeconds';
+    }
   }
 
   LinearGradient _buildBackgroundGradient() {

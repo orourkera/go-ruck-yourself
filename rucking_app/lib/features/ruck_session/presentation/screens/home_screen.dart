@@ -41,26 +41,52 @@ LatLng _getRouteCenter(List<LatLng> points) {
 
 // Improved zoom calculation to fit all points with padding
 double _getFitZoom(List<LatLng> points) {
-  if (points.isEmpty) return 16.0; // Default zoom closer
-  if (points.length == 1) return 17.5; // Even closer for single point
+  if (points.isEmpty) return 16.0;
+  if (points.length == 1) return 17.0;
 
   double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
   double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
   double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
   double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
 
-  double latDiff = (maxLat - minLat).abs();
-  double lngDiff = (maxLng - minLng).abs();
-  double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+  // Add some padding (20% on each side)
+  double latPadding = (maxLat - minLat) * 0.2;
+  double lngPadding = (maxLng - minLng) * 0.2;
+  
+  minLat -= latPadding;
+  maxLat += latPadding;
+  minLng -= lngPadding;
+  maxLng += lngPadding;
 
-  // Smaller buffer for a tighter fit
-  maxDiff *= 1.05;
+  // Calculate zoom levels based on the bounding box
+  // These calculations are based on a map container that's approximately 220px tall
+  double latDiff = maxLat - minLat;
+  double lngDiff = maxLng - minLng;
 
-  if (maxDiff < 0.001) return 17.5;
-  if (maxDiff < 0.01) return 16.0;
-  if (maxDiff < 0.1) return 14.0;
-  if (maxDiff < 1.0) return 11.0;
-  return 8.0;
+  // Approximate zoom calculation based on degrees of lat/lng difference
+  // These values are tuned for a small map preview
+  double zoom;
+  if (latDiff < 0.0005 && lngDiff < 0.0005) {
+    zoom = 17.0; // Very close zoom for tiny routes
+  } else if (latDiff < 0.001 && lngDiff < 0.001) {
+    zoom = 16.5;
+  } else if (latDiff < 0.005 && lngDiff < 0.005) {
+    zoom = 15.5;
+  } else if (latDiff < 0.01 && lngDiff < 0.01) {
+    zoom = 14.5;
+  } else if (latDiff < 0.05 && lngDiff < 0.05) {
+    zoom = 13.0;
+  } else if (latDiff < 0.1 && lngDiff < 0.1) {
+    zoom = 12.0;
+  } else if (latDiff < 0.5 && lngDiff < 0.5) {
+    zoom = 10.5;
+  } else if (latDiff < 1.0 && lngDiff < 1.0) {
+    zoom = 9.5;
+  } else {
+    zoom = 8.0;
+  }
+
+  return zoom;
 }
 
 /// Main home screen that serves as the central hub of the app
@@ -831,7 +857,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                       child: FlutterMap(
                                         options: MapOptions(
                                           initialCenter: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
-                                          initialZoom: routePoints.length > 1 ? _getFitZoom(routePoints) : 15.5,
+                                          initialZoom: routePoints.isNotEmpty ? _getFitZoom(routePoints) : 15.0,
+                                          minZoom: 3.0,
+                                          maxZoom: 18.0,
                                           interactionOptions: const InteractionOptions(
                                             flags: InteractiveFlag.none, // Disable interactions for preview
                                           ),
