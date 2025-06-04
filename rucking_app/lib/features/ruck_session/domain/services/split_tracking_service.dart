@@ -68,11 +68,11 @@ class SplitTrackingService {
         
         // Record this split info
         final splitInfo = {
-          'split_number': currentMilestoneIndex,
-          'split_distance': 1.0, // Always 1.0 as it represents 1km or 1mi
-          'split_duration_seconds': splitDuration.inSeconds, // Convert Duration to seconds
-          'total_distance': preferMetric ? currentDistanceKm : currentDistanceKm / 1.609, // Convert to mi if needed
-          'total_duration_seconds': elapsedSeconds, // Use seconds instead of Duration
+          'splitNumber': currentMilestoneIndex,
+          'splitDistance': 1.0, // Always 1.0 as it represents 1km or 1mi
+          'splitDurationSeconds': splitDuration.inSeconds, // Convert Duration to seconds
+          'totalDistance': preferMetric ? currentDistanceKm : currentDistanceKm / 1.609, // Convert to mi if needed
+          'totalDurationSeconds': elapsedSeconds, // Use seconds instead of Duration
           'timestamp': splitEndTime.toIso8601String(), // Convert DateTime to string
         };
         _splits.add(splitInfo);

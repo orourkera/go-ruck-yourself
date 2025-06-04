@@ -180,27 +180,64 @@ class ShareCardWidget extends StatelessWidget {
       // Simplify the route by sampling points (max 50 points for better performance)
       final simplifiedCoordinates = _simplifyRoute(coordinates, 50);
       
-      // Calculate center point
-      double centerLat = simplifiedCoordinates.map((p) => p['lat']!).reduce((a, b) => a + b) / simplifiedCoordinates.length;
-      double centerLng = simplifiedCoordinates.map((p) => p['lng']!).reduce((a, b) => a + b) / simplifiedCoordinates.length;
+      // Calculate bounds for better zoom
+      final lats = simplifiedCoordinates.map((p) => p['lat']!);
+      final lngs = simplifiedCoordinates.map((p) => p['lng']!);
+      final minLat = lats.reduce((a, b) => a < b ? a : b);
+      final maxLat = lats.reduce((a, b) => a > b ? a : b);
+      final minLng = lngs.reduce((a, b) => a < b ? a : b);
+      final maxLng = lngs.reduce((a, b) => a > b ? a : b);
       
-      // Build request body using coordinate array format instead of polyline
+      final latSpan = maxLat - minLat;
+      final lngSpan = maxLng - minLng;
+      
+      print('🗺️ [DEBUG] Bounds: lat($minLat, $maxLat), lng($minLng, $maxLng)');
+      print('🗺️ [DEBUG] Spans: lat=$latSpan, lng=$lngSpan');
+      
+      // Calculate center point
+      final centerLat = (minLat + maxLat) / 2;
+      final centerLng = (minLng + maxLng) / 2;
+      
+      // Calculate zoom level based on span (smaller span = higher zoom)
+      final maxSpan = latSpan > lngSpan ? latSpan : lngSpan;
+      int zoom;
+      if (maxSpan > 0.1) {
+        zoom = 10; // Very large area
+      } else if (maxSpan > 0.05) {
+        zoom = 12; // Large area  
+      } else if (maxSpan > 0.02) {
+        zoom = 14; // Medium area
+      } else if (maxSpan > 0.01) {
+        zoom = 15; // Small area
+      } else {
+        zoom = 16; // Very small area
+      }
+      
+      print('🗺️ [DEBUG] Center: $centerLat,$centerLng, Zoom: $zoom, MaxSpan: $maxSpan');
+      
+      // Build request body using center/zoom approach
+      final encodedPolyline = _encodePolyline(simplifiedCoordinates);
+      print('🗺️ [DEBUG] Encoded polyline length: ${encodedPolyline.length}');
+      
       final requestBody = {
         'center': '$centerLat,$centerLng',
+        'zoom': zoom,
         'size': '800x800',
-        'zoom': 13,
+        'style': 'stamen_terrain',
         'lines': [
           {
-            'coordinates': simplifiedCoordinates.map((coord) => [coord['lng']!, coord['lat']!]).toList(),
+            'shape': encodedPolyline,
             'color': 'FF9500',
-            'width': 4,
+            'width': 5,
+            'cap': 'round',
+            'join': 'round'
           }
         ],
       };
       
       // Send POST request to the cacheable endpoint
       final response = await http.post(
-        Uri.parse('https://tiles.stadiamaps.com/static_cacheable/alidade_smooth?api_key=$apiKey'),
+        Uri.parse('https://tiles.stadiamaps.com/static_cacheable/stamen_terrain?api_key=$apiKey'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
       );
@@ -231,14 +268,45 @@ class ShareCardWidget extends StatelessWidget {
   }
   
   String _encodePolyline(List<Map<String, double>> coordinates) {
-    // For simplicity, let's use a basic encoding
-    // In a real app, you'd use the Google polyline algorithm
-    final buffer = StringBuffer();
-    for (int i = 0; i < coordinates.length; i++) {
-      if (i > 0) buffer.write('|');
-      buffer.write('${coordinates[i]['lat']},${coordinates[i]['lng']}');
+    if (coordinates.isEmpty) return '';
+    
+    // Implement Google polyline encoding algorithm
+    int lat = 0;
+    int lng = 0;
+    final result = StringBuffer();
+    
+    for (final coord in coordinates) {
+      final newLat = (coord['lat']! * 1e5).round();
+      final newLng = (coord['lng']! * 1e5).round();
+      
+      final deltaLat = newLat - lat;
+      final deltaLng = newLng - lng;
+      
+      lat = newLat;
+      lng = newLng;
+      
+      result.write(_encodeNumber(deltaLat));
+      result.write(_encodeNumber(deltaLng));
     }
-    return buffer.toString();
+    
+    return result.toString();
+  }
+  
+  String _encodeNumber(int num) {
+    // Left-shift the binary value one bit and apply bitwise XOR
+    int sgn_num = num << 1;
+    if (num < 0) {
+      sgn_num = ~sgn_num;
+    }
+    
+    final result = StringBuffer();
+    while (sgn_num >= 0x20) {
+      result.writeCharCode((0x20 | (sgn_num & 0x1f)) + 63);
+      sgn_num >>= 5;
+    }
+    result.writeCharCode(sgn_num + 63);
+    
+    return result.toString();
   }
   
   String? _generateMapUrl() {
@@ -313,7 +381,7 @@ class ShareCardWidget extends StatelessWidget {
       print('⚠️ STADIA_MAPS_API_KEY is not set. Map generation may fail.');
     }
 
-    const style = 'alidade_smooth';
+    const style = 'stamen_terrain';
     const format = 'png';
     const size = '800x800'; // reduce to stay within free-tier limits and avoid @2x 2160px
 
@@ -566,7 +634,7 @@ class ShareCardWidget extends StatelessWidget {
           Text(
             _formatDurationDisplay(session.duration),
             style: AppTextStyles.displayLarge.copyWith(
-              color: Colors.white,
+              color: Colors.white, // Changed back to white
               fontWeight: FontWeight.bold,
               fontSize: 40, // Smaller for better fit in Instagram post
             ),
@@ -738,20 +806,22 @@ class ShareCardWidget extends StatelessWidget {
           'Session completed! 💪',
           style: AppTextStyles.titleMedium.copyWith(
             color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            fontSize: 22, // Increased from 18
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16), // Increased from 10
         Text(
           'Shared from Ruck, the world\'s #1 Rucking App.',
           style: AppTextStyles.bodySmall.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w500,
-            fontSize: 14,
+            fontSize: 12, // Reduced from 14 to fit on one line
           ),
           textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
