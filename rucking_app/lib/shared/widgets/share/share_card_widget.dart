@@ -317,24 +317,27 @@ class ShareCardWidget extends StatelessWidget {
           children: [
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     _buildHeader(),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 11),
                     _buildMainStats(),
                     const SizedBox(height: 10),
                     // Only show achievements if there's space
                     if (achievements.isNotEmpty && achievements.length <= 3) ...[  
                       _buildAchievements(),
-                      const SizedBox(height: 8), 
+                      const SizedBox(height: 6), 
                     ],
                   ],
                 ),
               ),
             ),
-            _buildFooter(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildFooter(),
+            ),
           ],
         ),
       ],
@@ -350,6 +353,7 @@ class ShareCardWidget extends StatelessWidget {
           MeasurementUtils.formatDate(session.startTime),
           style: AppTextStyles.bodyMedium.copyWith(
             color: Colors.white.withAlpha(230),
+            fontSize: 18,
           ),
         ),
       ],
@@ -361,7 +365,7 @@ class ShareCardWidget extends StatelessWidget {
     final preferMetric = this.preferMetric;
     
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -371,7 +375,7 @@ class ShareCardWidget extends StatelessWidget {
             style: AppTextStyles.labelSmall.copyWith(
               color: Colors.white.withAlpha(204),
               letterSpacing: 1.2,
-              fontSize: 12,
+              fontSize: 14,
             ),
           ),
           const SizedBox(height: 2),
@@ -380,7 +384,7 @@ class ShareCardWidget extends StatelessWidget {
             style: AppTextStyles.displayLarge.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.bold,
-              fontSize: 42, // Slightly smaller for better fit
+              fontSize: 48, // Slightly smaller for better fit
             ),
           ),
           
@@ -392,7 +396,7 @@ class ShareCardWidget extends StatelessWidget {
               style: AppTextStyles.labelSmall.copyWith(
                 color: Colors.white.withAlpha(204),
                 letterSpacing: 1.2,
-                fontSize: 10,
+                fontSize: 12,
               ),
             ),
             Text(
@@ -400,7 +404,7 @@ class ShareCardWidget extends StatelessWidget {
               style: AppTextStyles.titleMedium.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
-                fontSize: 16,
+                fontSize: 18,
               ),
             ),
           ],
@@ -418,7 +422,7 @@ class ShareCardWidget extends StatelessWidget {
               ),
               Container(
                 width: 1,
-                height: 30,
+                height: 36,
                 color: Colors.white.withAlpha(76),
               ),
               Expanded(
@@ -444,14 +448,16 @@ class ShareCardWidget extends StatelessWidget {
           style: AppTextStyles.labelSmall.copyWith(
             color: Colors.white.withAlpha(204),
             letterSpacing: 1.2,
+            fontSize: 14,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
           value,
           style: AppTextStyles.titleLarge.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
           textAlign: TextAlign.center,
         ),
@@ -476,20 +482,22 @@ class ShareCardWidget extends StatelessWidget {
       children: [
         Text(
           emoji,
-          style: const TextStyle(fontSize: 20),
+          style: const TextStyle(fontSize: 24),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
           value,
           style: AppTextStyles.titleMedium.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
         ),
         Text(
           label,
           style: AppTextStyles.labelSmall.copyWith(
             color: Colors.white.withAlpha(204),
+            fontSize: 12,
           ),
         ),
       ],
@@ -507,16 +515,16 @@ class ShareCardWidget extends StatelessWidget {
           style: AppTextStyles.labelSmall.copyWith(
             color: Colors.white.withAlpha(204),
             letterSpacing: 1.2,
-            fontSize: 10,
+            fontSize: 12,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: achievementList.map((achievement) => 
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin: const EdgeInsets.only(right: 8),
               decoration: BoxDecoration(
                 color: Colors.white.withAlpha(51),
                 borderRadius: BorderRadius.circular(20),
@@ -526,7 +534,7 @@ class ShareCardWidget extends StatelessWidget {
                 style: AppTextStyles.labelSmall.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
-                  fontSize: 10,
+                  fontSize: 12,
                 ),
               ),
             ),
@@ -545,15 +553,17 @@ class ShareCardWidget extends StatelessWidget {
           style: AppTextStyles.titleMedium.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w600,
+            fontSize: 18,
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
           'Shared from Ruck, the world\'s #1 Rucking App.',
           style: AppTextStyles.bodySmall.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w500,
+            fontSize: 14,
           ),
           textAlign: TextAlign.center,
         ),
