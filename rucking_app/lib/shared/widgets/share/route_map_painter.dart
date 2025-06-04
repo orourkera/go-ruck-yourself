@@ -73,35 +73,7 @@ class RouteMapPainter extends CustomPainter {
     // Draw the route
     canvas.drawPath(path, paint);
 
-    // Draw start and end markers
-    if (locationPoints.isNotEmpty) {
-      final startPaint = Paint()
-        ..color = Colors.green
-        ..style = PaintingStyle.fill;
-      
-      final endPaint = Paint()
-        ..color = Colors.red
-        ..style = PaintingStyle.fill;
-
-      final borderPaint = Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-
-      // Start point
-      final startPoint = locationPoints.first;
-      final startX = ((startPoint.longitude - minLng) / (maxLng - minLng)) * size.width;
-      final startY = size.height - (((startPoint.latitude - minLat) / (maxLat - minLat)) * size.height);
-      canvas.drawCircle(Offset(startX, startY), 8, startPaint);
-      canvas.drawCircle(Offset(startX, startY), 9, borderPaint);
-
-      // End point
-      final endPoint = locationPoints.last;
-      final endX = ((endPoint.longitude - minLng) / (maxLng - minLng)) * size.width;
-      final endY = size.height - (((endPoint.latitude - minLat) / (maxLat - minLat)) * size.height);
-      canvas.drawCircle(Offset(endX, endY), 8, endPaint);
-      canvas.drawCircle(Offset(endX, endY), 9, borderPaint);
-    }
+    // Start and end markers removed for cleaner share card appearance
   }
 
   @override
