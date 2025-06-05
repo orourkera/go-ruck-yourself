@@ -9,17 +9,6 @@ from RuckTracker.services.push_notification_service import PushNotificationServi
 
 logger = logging.getLogger(__name__)
 
-# Utility function for API responses
-def build_api_response(data=None, success=True, error=None, status_code=200):
-    response_body = {"success": success}
-    if data is not None:
-        response_body["data"] = data
-    if error is not None:
-        response_body["error"] = error
-    # For Flask-RESTful compatibility, just return the dict and status code
-    # This lets Flask-RESTful handle the JSON conversion
-    return response_body, status_code
-
 class RuckLikesResource(Resource):
     def get(self):
         """
