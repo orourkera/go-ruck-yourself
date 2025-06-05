@@ -39,7 +39,7 @@ class DuelListResource(Resource):
     def get(self):
         """Get list of duels with filtering"""
         try:
-            user_id = g.current_user['id']
+            user_id = g.user['id']
             
             # Query parameters
             status = request.args.get('status', 'active')
@@ -123,7 +123,7 @@ class DuelListResource(Resource):
         try:
             schema = DuelCreateSchema()
             data = schema.load(request.get_json())
-            user_id = g.current_user['id']
+            user_id = g.user['id']
             
             # Get user's city and state for duel location
             cursor = db.connection.cursor()
@@ -238,7 +238,7 @@ class DuelResource(Resource):
         try:
             schema = DuelUpdateSchema()
             data = schema.load(request.get_json())
-            user_id = g.current_user['id']
+            user_id = g.user['id']
             
             cursor = db.connection.cursor()
             
@@ -276,7 +276,7 @@ class DuelJoinResource(Resource):
     def post(self, duel_id):
         """Join a public duel"""
         try:
-            user_id = g.current_user['id']
+            user_id = g.user['id']
             cursor = db.connection.cursor()
             
             # Check duel exists and is public
@@ -373,7 +373,7 @@ class DuelParticipantResource(Resource):
         try:
             schema = DuelParticipantSchema()
             data = schema.load(request.get_json())
-            user_id = g.current_user['id']
+            user_id = g.user['id']
             
             cursor = db.connection.cursor()
             
