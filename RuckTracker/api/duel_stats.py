@@ -134,7 +134,7 @@ class DuelStatsLeaderboardResource(Resource):
                        END as completion_rate,
                        ROW_NUMBER() OVER (ORDER BY {order_by}) as rank
                 FROM user_duel_stats uds
-                JOIN users u ON uds.user_id = u.id
+                JOIN "user" u ON uds.user_id = u.id
                 WHERE (uds.duels_created + uds.duels_joined) > 0
                 ORDER BY {order_by}
                 LIMIT %s
@@ -154,7 +154,7 @@ class DuelStatsLeaderboardResource(Resource):
                         SELECT user_id, 
                                ROW_NUMBER() OVER (ORDER BY {order_by}) as rank
                         FROM user_duel_stats uds
-                        JOIN users u ON uds.user_id = u.id
+                        JOIN "user" u ON uds.user_id = u.id
                         WHERE (uds.duels_created + uds.duels_joined) > 0
                     ) ranked
                     WHERE user_id = %s
@@ -223,8 +223,8 @@ class DuelAnalyticsResource(Resource):
                        COUNT(CASE WHEN d.winner_id = u.id THEN 1 END) as losses_against
                 FROM duel_participants dp1
                 JOIN duel_participants dp2 ON dp1.duel_id = dp2.duel_id AND dp1.user_id != dp2.user_id
-                JOIN users u ON dp2.user_id = u.id
                 JOIN duels d ON dp1.duel_id = d.id
+                JOIN "user" u ON dp2.user_id = u.id
                 WHERE dp1.user_id = %s AND dp1.status = 'accepted' 
                       AND dp2.status = 'accepted' AND d.status = 'completed'
                       AND d.created_at >= %s

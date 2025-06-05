@@ -174,7 +174,7 @@ class DuelParticipantProgressResource(Resource):
             cursor.execute('''
                 SELECT dp.*, u.username, d.challenge_type, d.target_value, d.status as duel_status
                 FROM duel_participants dp
-                JOIN users u ON dp.user_id = u.id
+                JOIN "user" u ON dp.user_id = u.id
                 JOIN duels d ON dp.duel_id = d.id
                 WHERE dp.id = %s AND dp.duel_id = %s
             ''', [participant_id, duel_id])
@@ -233,7 +233,7 @@ class DuelLeaderboardResource(Resource):
                            ELSE false 
                        END as target_reached
                 FROM duel_participants dp
-                JOIN users u ON dp.user_id = u.id
+                JOIN "user" u ON dp.user_id = u.id
                 WHERE dp.duel_id = %s AND dp.status = 'accepted'
                 ORDER BY dp.current_value DESC, dp.updated_at ASC
             ''', [duel['target_value'], duel_id])
@@ -246,7 +246,7 @@ class DuelLeaderboardResource(Resource):
                        rs.distance, rs.duration, rs.elevation_gain, rs.power_points
                 FROM duel_sessions ds
                 JOIN duel_participants dp ON ds.participant_id = dp.id
-                JOIN users u ON dp.user_id = u.id
+                JOIN "user" u ON dp.user_id = u.id
                 JOIN ruck_sessions rs ON ds.session_id = rs.id
                 WHERE ds.duel_id = %s
                 ORDER BY ds.created_at DESC
