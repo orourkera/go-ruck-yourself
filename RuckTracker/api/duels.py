@@ -76,7 +76,7 @@ class DuelListResource(Resource):
             result = []
             for duel in duels_response.data:
                 # Get creator username
-                creator_query = supabase.table('users').select('username').eq('id', duel['creator_id'])
+                creator_query = supabase.table('user').select('username').eq('id', duel['creator_id'])
                 creator_response = creator_query.execute()
                 creator_username = creator_response.data[0]['username'] if creator_response.data else 'Unknown'
                 
@@ -87,7 +87,7 @@ class DuelListResource(Resource):
                 # Get user info for each participant
                 enriched_participants = []
                 for participant in participants_response.data:
-                    user_query = supabase.table('users').select('username, email').eq('id', participant['user_id'])
+                    user_query = supabase.table('user').select('username, email').eq('id', participant['user_id'])
                     user_response = user_query.execute()
                     if user_response.data:
                         participant_data = dict(participant)
