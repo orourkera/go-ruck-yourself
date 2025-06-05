@@ -28,6 +28,11 @@ import 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/screens/post_session_upsell_screen.dart';
+import 'package:rucking_app/features/duels/presentation/screens/duels_list_screen.dart';
+import 'package:rucking_app/features/duels/presentation/screens/duel_detail_screen.dart';
+import 'package:rucking_app/features/duels/presentation/screens/create_duel_screen.dart';
+import 'package:rucking_app/features/duels/presentation/screens/duel_invitations_screen.dart';
+import 'package:rucking_app/features/duels/presentation/screens/duel_stats_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -207,6 +212,38 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                       body: const Center(child: Text('Invalid arguments for active session')),
                     ),
                   );
+                
+                // Duels feature routes
+                case '/duels':
+                  return MaterialPageRoute(
+                    builder: (_) => const DuelsListScreen(),
+                  );
+                case '/duels/create':
+                  return MaterialPageRoute(
+                    builder: (_) => const CreateDuelScreen(),
+                  );
+                case '/duel_detail':
+                  final args = settings.arguments;
+                  if (args is String) {
+                    return MaterialPageRoute(
+                      builder: (_) => DuelDetailScreen(duelId: args),
+                    );
+                  }
+                  return MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('Error')),
+                      body: const Center(child: Text('Missing duel ID')),
+                    ),
+                  );
+                case '/duel_invitations':
+                  return MaterialPageRoute(
+                    builder: (_) => const DuelInvitationsScreen(),
+                  );
+                case '/duel_stats':
+                  return MaterialPageRoute(
+                    builder: (_) => const DuelStatsScreen(),
+                  );
+                
                 default:
                   // Optionally handle unknown routes
                   return MaterialPageRoute(

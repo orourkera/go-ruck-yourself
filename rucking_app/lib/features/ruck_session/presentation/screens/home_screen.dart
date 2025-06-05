@@ -31,6 +31,7 @@ import 'package:rucking_app/core/services/session_cache_service.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
+import 'package:rucking_app/features/duels/presentation/screens/duels_list_screen.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -116,11 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
       featureName: 'Ruck Buddies',
       child: RuckBuddiesScreen(),
     ),
-    const PremiumTabInterceptor(
-      tabIndex: 3,
-      featureName: 'Statistics',
-      child: StatisticsScreen(),
-    ),
+    const DuelsListScreen(),
     const ProfileScreen(),
   ];
   
@@ -185,16 +182,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           BottomNavigationBarItem(
             icon: Image.asset(
-              'assets/images/stats.png',
+              'assets/images/duels icon.png',
               width: 48,
               height: 48,
             ),
             activeIcon: Image.asset(
-              'assets/images/stats_active.png',
+              'assets/images/duels active.png',
               width: 48,
               height: 48,
             ),
-            label: 'Stats',
+            label: 'Duels',
           ),
           BottomNavigationBarItem(
             icon: _buildProfileIcon(false),

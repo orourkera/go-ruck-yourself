@@ -30,6 +30,7 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/notifications/di/notification_injection_container.dart';
 import 'package:rucking_app/features/achievements/di/achievement_injection_container.dart';
 import 'package:rucking_app/features/premium/di/premium_injection_container.dart';
+import 'package:rucking_app/features/duels/di/duels_injection_container.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 
 // Global service locator instance
@@ -153,6 +154,9 @@ Future<void> setupServiceLocator() async {
   
   // Initialize Achievement feature
   initAchievementFeature(getIt);
+  
+  // Initialize Duels feature
+  initDuelsFeature(getIt);
   
   // Initialize Premium feature
   setupPremiumDependencies();

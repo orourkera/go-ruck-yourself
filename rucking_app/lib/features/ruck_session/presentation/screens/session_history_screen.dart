@@ -13,7 +13,10 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/create_se
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_card.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
+import 'package:rucking_app/features/premium/presentation/widgets/premium_tab_interceptor.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
 
 class SessionHistoryScreen extends StatefulWidget {
   const SessionHistoryScreen({Key? key}) : super(key: key);
@@ -22,13 +25,21 @@ class SessionHistoryScreen extends StatefulWidget {
   State<SessionHistoryScreen> createState() => _SessionHistoryScreenState();
 }
 
-class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
+class _SessionHistoryScreenState extends State<SessionHistoryScreen> with SingleTickerProviderStateMixin {
   final _refreshKey = GlobalKey<RefreshIndicatorState>();
+  late TabController _tabController;
   
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadSessions();
+  }
+  
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
   
   Future<void> _loadSessions() async {
@@ -39,49 +50,79 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
   
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('History & Stats'),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: AppColors.primary,
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.history),
+              text: 'History',
+            ),
+            Tab(
+              icon: Icon(Icons.analytics),
+              text: 'Stats',
+            ),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildHistoryTab(),
+          const PremiumTabInterceptor(
+            tabIndex: 3,
+            featureName: 'Statistics',
+            child: StatisticsScreen(),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildHistoryTab() {
     // Get user preferences for metric/imperial
     final authState = context.read<AuthBloc>().state;
     final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
     
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Session History'),
-      ),
-      body: RefreshIndicator(
-        key: _refreshKey,
-        onRefresh: _loadSessions,
-        child: BlocBuilder<SessionHistoryBloc, SessionHistoryState>(
-          builder: (context, state) {
-            if (state is SessionHistoryLoading) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (state is SessionHistoryLoaded) {
-              final sessions = state.sessions;
-              
-              if (sessions.isEmpty) {
-                return _buildEmptyState();
-              }
-              
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: sessions.length,
-                itemBuilder: (context, index) {
-                  final session = sessions[index];
-                  return SessionCard(
-                    session: session,
-                    preferMetric: preferMetric,
-                    onTap: () => _navigateToSessionDetail(session),
-                  );
-                },
-              );
-            } else if (state is SessionHistoryError) {
-              return _buildErrorState(state.message);
-            } else {
-              return const Center(
-                child: Text('No session data available. Pull down to refresh.'),
-              );
+    return RefreshIndicator(
+      key: _refreshKey,
+      onRefresh: _loadSessions,
+      child: BlocBuilder<SessionHistoryBloc, SessionHistoryState>(
+        builder: (context, state) {
+          if (state is SessionHistoryLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is SessionHistoryLoaded) {
+            final sessions = state.sessions;
+            
+            if (sessions.isEmpty) {
+              return _buildEmptyState();
             }
-          },
-        ),
+            
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: sessions.length,
+              itemBuilder: (context, index) {
+                final session = sessions[index];
+                return SessionCard(
+                  session: session,
+                  preferMetric: preferMetric,
+                  onTap: () => _navigateToSessionDetail(session),
+                );
+              },
+            );
+          } else if (state is SessionHistoryError) {
+            return _buildErrorState(state.message);
+          } else {
+            return const Center(
+              child: Text('No session data available. Pull down to refresh.'),
+            );
+          }
+        },
       ),
     );
   }

@@ -13,6 +13,11 @@ import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_event.dart';
+import 'package:rucking_app/features/duels/presentation/bloc/duel_list/duel_list_bloc.dart';
+import 'package:rucking_app/features/duels/presentation/bloc/duel_detail/duel_detail_bloc.dart';
+import 'package:rucking_app/features/duels/presentation/bloc/create_duel/create_duel_bloc.dart';
+import 'package:rucking_app/features/duels/presentation/bloc/duel_stats/duel_stats_bloc.dart';
+import 'package:rucking_app/features/duels/presentation/bloc/duel_invitations/duel_invitations_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -124,6 +129,22 @@ void main() async {
           create: (context) {
             return getIt<PremiumBloc>();
           },
+        ),
+        // Duels feature BLoCs
+        BlocProvider<DuelListBloc>(
+          create: (context) => getIt<DuelListBloc>(),
+        ),
+        BlocProvider<DuelDetailBloc>(
+          create: (context) => getIt<DuelDetailBloc>(),
+        ),
+        BlocProvider<CreateDuelBloc>(
+          create: (context) => getIt<CreateDuelBloc>(),
+        ),
+        BlocProvider<DuelStatsBloc>(
+          create: (context) => getIt<DuelStatsBloc>(),
+        ),
+        BlocProvider<DuelInvitationsBloc>(
+          create: (context) => getIt<DuelInvitationsBloc>(),
         ),
       ],
       child: RuckingApp(),

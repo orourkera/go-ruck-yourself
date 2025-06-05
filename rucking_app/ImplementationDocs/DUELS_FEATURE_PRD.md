@@ -322,59 +322,260 @@ Duels Tab
 - Premium features
 - Analytics and insights
 
-## 9. Risk Analysis
+## 8. Implementation File Structure
 
-### 9.1 Technical Risks
-- **Real-time Performance**: WebSocket scaling challenges
-- **Data Consistency**: Race conditions in progress updates
-- **Migration Complexity**: Moving Stats tab content to History
+### 8.1 New Files to Create
 
-**Mitigation**: Implement caching layers, use database transactions, phased rollout
+#### 8.1.1 Data Models
+```
+lib/features/duels/data/models/
+├── duel_model.dart                    # Duel entity with challenge type, target, participants
+├── duel_participant_model.dart        # Participant with current progress and status
+├── duel_session_model.dart           # Links sessions to duels with contribution values
+├── duel_invitation_model.dart        # Email invitations for private duels
+└── user_duel_stats_model.dart        # User's duel statistics and records
+```
 
-### 9.2 Product Risks
-- **Low Adoption**: Users may not engage with competitive features
-- **Cheating**: Potential for GPS/session manipulation
-- **Toxicity**: Negative competitive behavior
+#### 8.1.2 Data Layer
+```
+lib/features/duels/data/
+├── repositories/
+│   └── duel_repository_impl.dart     # Implements duel CRUD operations
+├── datasources/
+│   ├── duel_remote_datasource.dart   # API calls for duel management
+│   └── duel_local_datasource.dart    # Local caching (optional)
+└── services/
+    └── duel_service_impl.dart        # Business logic for duel operations
+```
 
-**Mitigation**: Soft launch with beta users, implement anti-cheat measures, strong community guidelines
+#### 8.1.3 Domain Layer
+```
+lib/features/duels/domain/
+├── entities/
+│   ├── duel.dart                     # Core duel business entity
+│   ├── duel_participant.dart         # Participant entity
+│   └── user_duel_stats.dart          # User statistics entity
+├── repositories/
+│   └── duel_repository.dart          # Abstract repository interface
+├── services/
+│   └── duel_service.dart             # Abstract service interface
+└── usecases/
+    ├── create_duel_usecase.dart      # Create new duel challenge
+    ├── join_duel_usecase.dart        # Join existing duel
+    ├── get_duels_usecase.dart        # Browse and filter duels
+    ├── get_duel_progress_usecase.dart # Get real-time duel progress
+    └── update_duel_progress_usecase.dart # Update progress from session
+```
 
-### 9.3 Business Risks
-- **Development Timeline**: Complex feature may delay other priorities
-- **User Confusion**: Navigation changes may disorient existing users
-- **Support Overhead**: New feature may increase support requests
+#### 8.1.4 Presentation Layer - BLoC
+```
+lib/features/duels/presentation/bloc/
+├── duel_list/
+│   ├── duel_list_bloc.dart           # Manages browsing and filtering duels
+│   ├── duel_list_event.dart          # Events: load, filter, refresh
+│   └── duel_list_state.dart          # States: loading, loaded, error
+├── duel_detail/
+│   ├── duel_detail_bloc.dart         # Manages single duel state
+│   ├── duel_detail_event.dart        # Events: load, join, update progress
+│   └── duel_detail_state.dart        # States: loading, loaded, joining
+├── create_duel/
+│   ├── create_duel_bloc.dart         # Handles duel creation flow
+│   ├── create_duel_event.dart        # Events: create, validate, submit
+│   └── create_duel_state.dart        # States: initial, creating, created
+└── duel_stats/
+    ├── duel_stats_bloc.dart          # User duel statistics
+    ├── duel_stats_event.dart         # Events: load stats, refresh
+    └── duel_stats_state.dart         # States: loading, loaded, error
+```
 
-**Mitigation**: Clear communication about changes, comprehensive help documentation, staged rollout
+#### 8.1.5 Presentation Layer - Screens
+```
+lib/features/duels/presentation/screens/
+├── duels_screen.dart                 # Main duels tab (replaces Stats tab)
+├── create_duel_screen.dart           # Duel creation form
+├── duel_detail_screen.dart           # Individual duel view with leaderboard
+├── duel_history_screen.dart          # User's past duels
+└── browse_duels_screen.dart          # Public duels discovery
+```
 
-## 10. Success Metrics & KPIs
+#### 8.1.6 Presentation Layer - Widgets
+```
+lib/features/duels/presentation/widgets/
+├── duel_card.dart                    # Compact duel display for lists
+├── duel_leaderboard.dart             # Progress and rankings display
+├── duel_progress_indicator.dart      # Visual progress bar
+├── challenge_type_selector.dart      # UI for selecting challenge type
+├── duel_participant_tile.dart        # Individual participant display
+├── duel_stats_summary.dart           # User's duel record summary
+├── create_duel_form.dart             # Duel creation form components
+└── duel_filter_sheet.dart            # Bottom sheet for filtering duels
+```
 
-### 10.1 Engagement Metrics
-- **Duel Participation Rate**: % of users who join at least one duel
-- **Active Duels per User**: Average number of concurrent duels
-- **Completion Rate**: % of accepted duels that reach completion
-- **Session Attribution**: % of sessions linked to active duels
+#### 8.1.7 Backend API Resources
+```
+RuckTracker/api/
+├── duels.py                          # DuelResource, DuelListResource
+├── duel_participants.py              # DuelParticipantResource
+├── duel_stats.py                     # UserDuelStatsResource
+└── duel_invitations.py               # DuelInvitationResource
+```
 
-### 10.2 Retention Metrics
-- **Duel User Retention**: D7, D30 retention for users who participate in duels
-- **Session Frequency**: Change in session frequency for duel participants
-- **Feature Stickiness**: % of users who return to duels after first experience
+#### 8.1.8 Database Migrations
+```
+RuckTracker/migrations/
+├── 20250605_001_create_duels_table.sql
+├── 20250605_002_create_duel_participants_table.sql
+├── 20250605_003_create_duel_sessions_table.sql
+├── 20250605_004_create_duel_invitations_table.sql
+└── 20250605_005_create_user_duel_stats_table.sql
+```
 
-### 10.3 Social Metrics
-- **Invitation Rate**: Average invitations sent per user
-- **Friend Challenges**: % of duels between connected users
-- **Viral Coefficient**: New users acquired through duel invitations
+### 8.2 Existing Files to Modify
 
-## 11. Future Enhancements
+#### 8.2.1 Navigation and App Structure
+```
+lib/core/navigation/
+├── app_router.dart                   # Add duel routes
+└── route_names.dart                  # Add duel route constants
 
-### 11.1 Advanced Features
-- **Team Duels**: Multi-person team competitions
-- **Tournament Mode**: Bracket-style elimination tournaments
-- **Seasonal Challenges**: App-wide competitive events
-- **Achievement System**: Badges for duel milestones
+lib/features/main/presentation/
+├── main_screen.dart                  # Update bottom navigation tabs
+└── widgets/main_nav_bar.dart         # Replace Stats with Duels tab
+```
 
-### 11.2 Integration Opportunities
-- **Social Media**: Share duel victories on Instagram/Twitter
-- **Wearable Devices**: Real-time progress from fitness trackers
-- **Location-based**: Duels specific to geographic regions
-- **Corporate Challenges**: Team-building features for companies
+#### 8.2.2 Session Integration
+```
+lib/features/ruck_session/presentation/bloc/
+└── active_session_bloc.dart          # Add duel progress update on session completion
 
-This comprehensive PRD provides the foundation for implementing a competitive social layer that will transform the Rucking app from a solo fitness tracker into an engaging community platform.
+lib/features/ruck_session/data/repositories/
+└── session_repository_impl.dart     # Hook duel updates into completion flow
+```
+
+#### 8.2.3 Notification System Integration
+```
+lib/core/services/
+├── notification_service.dart         # Add duel notification types
+└── push_notification_service.dart    # Handle duel-specific notifications
+
+lib/features/notifications/
+└── presentation/widgets/notification_tile.dart  # Add duel notification rendering
+```
+
+#### 8.2.4 History Tab Updates
+```
+lib/features/history/presentation/
+├── history_screen.dart               # Add tab bar: History | Stats | Duels
+└── widgets/history_tab_bar.dart      # Navigation between history sub-tabs
+```
+
+#### 8.2.5 Backend API Registration
+```
+RuckTracker/
+├── app.py                           # Register new duel API resources
+└── config.py                        # Add duel-related configuration
+```
+
+#### 8.2.6 Dependencies
+```
+rucking_app/
+└── pubspec.yaml                     # Add any new dependencies (likely none needed)
+```
+
+### 8.3 File Creation Priority Order
+
+**Phase 1: Foundation (Week 1)**
+1. Database migrations
+2. Data models
+3. Repository interfaces and implementations
+4. Backend API resources
+
+**Phase 2: Business Logic (Week 2)**
+5. Domain entities and use cases
+6. Service implementations
+7. BLoC events, states, and logic
+
+**Phase 3: UI Implementation (Week 3-4)**
+8. Core screens (DuelsScreen, CreateDuelScreen)
+9. Essential widgets (DuelCard, DuelLeaderboard)
+10. Navigation updates
+
+**Phase 4: Integration (Week 4-5)**
+11. Session completion hooks
+12. Notification integration
+13. History tab updates
+
+This structure follows the existing RuckingApp architecture patterns and ensures clean separation of concerns while integrating seamlessly with current systems.
+
+## 8.4 Implementation Progress Checklist
+
+### Phase 1: Foundation 
+#### Backend API Resources
+- ✅ `duels.py` - DuelResource, DuelListResource
+- ✅ `duel_participants.py` - DuelParticipantResource, progress tracking
+- ✅ `duel_stats.py` - UserDuelStatsResource, analytics
+- ✅ `duel_invitations.py` - DuelInvitationResource
+- ✅ `app.py` - Registered all duel API resources
+- ✅ `api_endpoints.md` - Updated API documentation
+
+#### Flutter Domain Layer
+- ✅ `duels_repository.dart` - Abstract repository interface
+- ✅ `duel.dart` - Core duel entity with enums and utilities
+- ✅ `duel_participant.dart` - Participant entity with status tracking
+- ✅ `duel_stats.dart` - User statistics entity
+- ✅ `duel_invitation.dart` - Invitation entity with status management
+
+#### Flutter Use Cases
+- ✅ `get_duels.dart` - Browse and filter duels
+- ✅ `create_duel.dart` - Create new duel with validation
+- ✅ `join_duel.dart` - Join public duels with business logic
+- ✅ `get_duel_details.dart` - Fetch specific duel information
+- ✅ `get_duel_leaderboard.dart` - Retrieve participant rankings
+- ✅ `update_duel_progress.dart` - Update progress from sessions
+- ✅ `respond_to_invitation.dart` - Accept/decline invitations
+- ✅ `get_user_duel_stats.dart` - Fetch user statistics
+- ✅ `get_duel_invitations.dart` - List received invitations
+- ✅ `get_duel_stats_leaderboard.dart` - Global leaderboards
+
+#### Flutter Data Layer
+- ✅ `duels_remote_datasource.dart` - HTTP API implementation
+- ✅ `duels_repository_impl.dart` - Repository implementation with error handling
+
+### Phase 2: State Management 
+#### BLoC Implementation
+- ✅ `duel_list_bloc.dart` - Manages browsing and filtering duels
+- ✅ `duel_detail_bloc.dart` - Manages single duel state
+- ✅ `create_duel_bloc.dart` - Handles duel creation flow
+- ✅ `duel_stats_bloc.dart` - User duel statistics management
+- ✅ `duel_invitations_bloc.dart` - Manages invitation responses
+
+### Phase 3: Core UI Screens 
+#### Screen Implementation
+- ✅ `duels_screen.dart` - Main duels tab
+- ✅ `create_duel_screen.dart` - Duel creation form
+- ✅ `duel_detail_screen.dart` - Individual duel view
+- ✅ `browse_duels_screen.dart` - Public duels discovery
+- ✅ `duel_history_screen.dart` - User's past duels
+
+#### Essential Widgets
+- ✅ `duel_card.dart` - Compact duel display
+- ✅ `duel_leaderboard.dart` - Progress and rankings
+- ✅ `duel_progress_indicator.dart` - Visual progress bar
+- ✅ `challenge_type_selector.dart` - Challenge type UI
+
+### Phase 4: Integration 
+#### Navigation Updates
+- ✅ Update `app_router.dart` - Add duel routes
+- ✅ Update `main_screen.dart` - Replace Stats tab with Duels
+
+#### Session Integration
+- ✅ Update `active_session_bloc.dart` - Add duel progress updates
+- ✅ Update `session_repository_impl.dart` - Hook duel completion flow
+
+#### Database & Backend
+- ✅ Database migrations for all duel tables
+- ✅ Database indexes for performance optimization
+
+**Current Status**: Completed backend API layer and Flutter domain/data layers. Ready to proceed with remaining UI components and integration work.
+
+{{ ... }}

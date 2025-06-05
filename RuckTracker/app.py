@@ -181,6 +181,11 @@ from .api.ruck_photos_resource import RuckPhotosResource # Added import for Ruck
 from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesResource
 from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
 from .api.notifications_resource import NotificationsResource, NotificationReadResource, ReadAllNotificationsResource # Import for Notification resources
+from .api.resources import UserResource # Import UserResource
+from .api.duels import DuelsListResource, DuelResource, DuelJoinResource, DuelParticipantStatusResource
+from .api.duel_participants import DuelParticipantProgressResource, DuelLeaderboardResource
+from .api.duel_stats import UserDuelStatsResource, DuelStatsLeaderboardResource, DuelAnalyticsResource
+from .api.duel_invitations import DuelInvitationListResource, DuelInvitationResource, SentInvitationsResource
 
 # Apply rate limiting to SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
@@ -296,7 +301,6 @@ api.add_resource(RefreshTokenResource, '/api/auth/refresh')
 api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
 api.add_resource(UserProfileResource, '/api/auth/profile', '/api/users/profile')
 
-from .api.resources import UserResource # Import UserResource
 api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
 
 # Ruck session endpoints (prefixed with /api)
@@ -364,6 +368,26 @@ NotificationsResource.get = limiter.limit("4000 per hour", override_defaults=Tru
 api.add_resource(NotificationsResource, '/api/notifications')
 api.add_resource(NotificationReadResource, '/api/notifications/<string:notification_id>/read')
 api.add_resource(ReadAllNotificationsResource, '/api/notifications/read-all')
+
+# Duel endpoints
+api.add_resource(DuelsListResource, '/api/duels')
+api.add_resource(DuelResource, '/api/duels/<string:duel_id>')
+api.add_resource(DuelJoinResource, '/api/duels/<string:duel_id>/join')
+api.add_resource(DuelParticipantStatusResource, '/api/duels/<string:duel_id>/participants/<string:participant_id>/status')
+
+# Duel participants endpoints
+api.add_resource(DuelParticipantProgressResource, '/api/duels/<string:duel_id>/participants/<string:participant_id>/progress')
+api.add_resource(DuelLeaderboardResource, '/api/duels/<string:duel_id>/leaderboard')
+
+# Duel stats endpoints
+api.add_resource(UserDuelStatsResource, '/api/duel-stats', '/api/duel-stats/<string:user_id>')
+api.add_resource(DuelStatsLeaderboardResource, '/api/duel-stats/leaderboard')
+api.add_resource(DuelAnalyticsResource, '/api/duel-stats/analytics')
+
+# Duel invitations endpoints
+api.add_resource(DuelInvitationListResource, '/api/duel-invitations')
+api.add_resource(DuelInvitationResource, '/api/duel-invitations/<string:invitation_id>')
+api.add_resource(SentInvitationsResource, '/api/duel-invitations/sent')
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
