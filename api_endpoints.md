@@ -95,6 +95,37 @@ This document provides a comprehensive list of all API endpoints used in the Ruc
 | `/achievements/stats/{user_id}` | GET | Get achievement statistics for user |
 | `/achievements/recent` | GET | Get recently earned achievements across platform |
 
+## Duels
+
+### Duels
+
+- **GET** `/api/duels` - List duels (with filtering by status, type, location)
+- **POST** `/api/duels` - Create a new duel challenge
+- **GET** `/api/duels/{duel_id}` - Get duel details and participants
+- **PUT** `/api/duels/{duel_id}` - Update duel (creator only, limited fields)
+- **POST** `/api/duels/{duel_id}/join` - Join a public duel
+- **PUT** `/api/duels/{duel_id}/participants/{participant_id}/status` - Update participant status (accept/decline invitation)
+
+### Duel Participants
+
+- **POST** `/api/duels/{duel_id}/participants/{participant_id}/progress` - Update participant progress from completed session
+- **GET** `/api/duels/{duel_id}/participants/{participant_id}/progress` - Get participant's detailed progress and contributing sessions
+- **GET** `/api/duels/{duel_id}/leaderboard` - Get real-time duel leaderboard and recent activity
+
+### Duel Statistics
+
+- **GET** `/api/duel-stats` - Get current user's duel statistics and recent history
+- **GET** `/api/duel-stats/{user_id}` - Get specific user's duel statistics
+- **GET** `/api/duel-stats/leaderboard` - Get global duel leaderboards (by wins, completion rate, total duels)
+- **GET** `/api/duel-stats/analytics` - Get user's duel analytics and insights over time
+
+### Duel Invitations
+
+- **GET** `/api/duel-invitations` - Get user's received duel invitations
+- **PUT** `/api/duel-invitations/{invitation_id}` - Respond to duel invitation (accept/decline)
+- **DELETE** `/api/duel-invitations/{invitation_id}` - Cancel sent invitation (inviter only)
+- **GET** `/api/duel-invitations/sent` - Get invitations sent by current user
+
 ---
 
 ## Request/Response Formats
