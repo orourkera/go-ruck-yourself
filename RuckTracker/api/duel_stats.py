@@ -1,7 +1,7 @@
 from flask import request, g
 from flask_restful import Resource
 from datetime import datetime, timedelta
-from extensions import db
+from RuckTracker.supabase_client import get_supabase_client
 from api.auth import auth_required
 
 # ============================================================================
@@ -16,70 +16,54 @@ class UserDuelStatsResource(Resource):
             # If no user_id provided, use current user
             target_user_id = user_id or g.user.id
             
-            cursor = db.connection.cursor()
+            supabase = get_supabase_client()
             
             # Get or create user duel stats
-            cursor.execute('''
-                SELECT * FROM user_duel_stats 
-                WHERE user_id = %s
-            ''', [target_user_id])
+            stats_response = supabase.table('user_duel_stats').select('*').eq('user_id', target_user_id).execute()
             
-            stats = cursor.fetchone()
+            stats = stats_response.data[0] if stats_response.data else None
             
             if not stats:
                 # Create initial stats record
                 now = datetime.utcnow()
-                cursor.execute('''
-                    INSERT INTO user_duel_stats (user_id, created_at, updated_at)
-                    VALUES (%s, %s, %s)
-                    RETURNING *
-                ''', [target_user_id, now, now])
-                stats = cursor.fetchone()
-                db.connection.commit()
+                stats = {
+                    'user_id': target_user_id,
+                    'duels_created': 0,
+                    'duels_joined': 0,
+                    'duels_won': 0,
+                    'duels_completed': 0,
+                    'total_contribution': 0.0,
+                    'average_contribution': 0.0,
+                    'current_streak': 0,
+                    'longest_streak': 0,
+                    'created_at': now.isoformat(),
+                    'updated_at': now.isoformat()
+                }
+                
+                supabase.table('user_duel_stats').insert([stats]).execute()
             
             # Get additional computed stats
-            cursor.execute('''
-                SELECT 
-                    COUNT(CASE WHEN d.status = 'active' THEN 1 END) as active_duels,
-                    COUNT(CASE WHEN d.status = 'pending' THEN 1 END) as pending_duels,
-                    AVG(CASE WHEN d.status = 'completed' AND d.winner_id = %s 
-                        THEN dp.current_value END) as avg_winning_score,
-                    MAX(CASE WHEN d.challenge_type = 'distance' 
-                        THEN dp.current_value END) as best_distance,
-                    MAX(CASE WHEN d.challenge_type = 'time' 
-                        THEN dp.current_value END) as best_time,
-                    MAX(CASE WHEN d.challenge_type = 'elevation' 
-                        THEN dp.current_value END) as best_elevation,
-                    MAX(CASE WHEN d.challenge_type = 'power_points' 
-                        THEN dp.current_value END) as best_power_points
-                FROM duel_participants dp
-                JOIN duels d ON dp.duel_id = d.id
-                WHERE dp.user_id = %s AND dp.status = 'accepted'
-            ''', [target_user_id, target_user_id])
+            cursor = supabase.table('duel_participants').select('duel_id(title, challenge_type, status, completed_at, winner_id)').eq('user_id', target_user_id).order('joined_at', desc=True).execute()
             
-            computed_stats = cursor.fetchone()
+            computed_stats = cursor.data
             
             # Get recent duel history
-            cursor.execute('''
-                SELECT d.id, d.title, d.challenge_type, d.target_value, d.status,
-                       d.created_at, d.ends_at, d.winner_id,
-                       dp.current_value, dp.status as participant_status,
-                       CASE WHEN d.winner_id = %s THEN true ELSE false END as won
-                FROM duel_participants dp
-                JOIN duels d ON dp.duel_id = d.id
-                WHERE dp.user_id = %s AND dp.status = 'accepted'
-                ORDER BY d.created_at DESC
-                LIMIT 10
-            ''', [target_user_id, target_user_id])
+            cursor = supabase.table('duel_participants').select('duel_id(id, title, challenge_type, status, completed_at, winner_id), current_value, status as participant_status').eq('user_id', target_user_id).order('joined_at', desc=True).limit(10).execute()
             
-            recent_duels = cursor.fetchall()
-            
-            cursor.close()
+            recent_duels = cursor.data
             
             # Combine all stats
             result = dict(stats)
-            result.update(dict(computed_stats))
-            result['recent_duels'] = [dict(d) for d in recent_duels]
+            result.update({
+                'active_duels': len([d for d in computed_stats if d['duel_id']['status'] == 'active']),
+                'pending_duels': len([d for d in computed_stats if d['duel_id']['status'] == 'pending']),
+                'avg_winning_score': sum([d['duel_id']['winner_id'] == target_user_id and d['current_value'] or 0 for d in computed_stats]) / len([d for d in computed_stats if d['duel_id']['status'] == 'completed' and d['duel_id']['winner_id'] == target_user_id]) if [d for d in computed_stats if d['duel_id']['status'] == 'completed' and d['duel_id']['winner_id'] == target_user_id] else 0,
+                'best_distance': max([d['duel_id']['challenge_type'] == 'distance' and d['current_value'] or 0 for d in computed_stats]),
+                'best_time': max([d['duel_id']['challenge_type'] == 'time' and d['current_value'] or 0 for d in computed_stats]),
+                'best_elevation': max([d['duel_id']['challenge_type'] == 'elevation' and d['current_value'] or 0 for d in computed_stats]),
+                'best_power_points': max([d['duel_id']['challenge_type'] == 'power_points' and d['current_value'] or 0 for d in computed_stats]),
+                'recent_duels': recent_duels
+            })
             
             # Calculate derived metrics
             total_duels = result['duels_created'] + result['duels_joined']
@@ -101,47 +85,47 @@ class DuelStatsLeaderboardResource(Resource):
             stat_type = request.args.get('type', 'wins')  # wins, completion_rate, total_duels
             limit = min(int(request.args.get('limit', 50)), 100)
             
-            cursor = db.connection.cursor()
+            supabase = get_supabase_client()
             
             # Build query based on stat type
             if stat_type == 'wins':
-                order_by = 'uds.duels_won DESC, uds.duels_completed DESC'
+                order_by = 'duels_won DESC, duels_completed DESC'
             elif stat_type == 'completion_rate':
                 order_by = '''
                     CASE 
-                        WHEN (uds.duels_created + uds.duels_joined) > 0 
-                        THEN CAST(uds.duels_completed AS FLOAT) / (uds.duels_created + uds.duels_joined)
+                        WHEN (duels_created + duels_joined) > 0 
+                        THEN CAST(duels_completed AS FLOAT) / (duels_created + duels_joined)
                         ELSE 0 
                     END DESC
                 '''
             elif stat_type == 'total_duels':
-                order_by = '(uds.duels_created + uds.duels_joined) DESC'
+                order_by = '(duels_created + duels_joined) DESC'
             else:
-                order_by = 'uds.duels_won DESC'
+                order_by = 'duels_won DESC'
             
             query = f'''
-                SELECT uds.*, u.username, u.email,
-                       (uds.duels_created + uds.duels_joined) as total_duels,
+                SELECT *, 
+                       (duels_created + duels_joined) as total_duels,
                        CASE 
-                           WHEN uds.duels_completed > 0 
-                           THEN CAST(uds.duels_won AS FLOAT) / uds.duels_completed
+                           WHEN duels_completed > 0 
+                           THEN CAST(duels_won AS FLOAT) / duels_completed
                            ELSE 0 
                        END as win_rate,
                        CASE 
-                           WHEN (uds.duels_created + uds.duels_joined) > 0 
-                           THEN CAST(uds.duels_completed AS FLOAT) / (uds.duels_created + uds.duels_joined)
+                           WHEN (duels_created + duels_joined) > 0 
+                           THEN CAST(duels_completed AS FLOAT) / (duels_created + duels_joined)
                            ELSE 0 
                        END as completion_rate,
                        ROW_NUMBER() OVER (ORDER BY {order_by}) as rank
-                FROM user_duel_stats uds
-                JOIN "user" u ON uds.user_id = u.id
-                WHERE (uds.duels_created + uds.duels_joined) > 0
+                FROM user_duel_stats
+                WHERE (duels_created + duels_joined) > 0
                 ORDER BY {order_by}
                 LIMIT %s
             '''
             
-            cursor.execute(query, [limit])
-            leaderboard = cursor.fetchall()
+            leaderboard_response = supabase.rpc(query, [limit])
+            
+            leaderboard = leaderboard_response.data
             
             # Get current user's rank if not in top results
             user_id = g.user.id
@@ -153,20 +137,17 @@ class DuelStatsLeaderboardResource(Resource):
                     SELECT rank FROM (
                         SELECT user_id, 
                                ROW_NUMBER() OVER (ORDER BY {order_by}) as rank
-                        FROM user_duel_stats uds
-                        JOIN "user" u ON uds.user_id = u.id
-                        WHERE (uds.duels_created + uds.duels_joined) > 0
+                        FROM user_duel_stats
+                        WHERE (duels_created + duels_joined) > 0
                     ) ranked
                     WHERE user_id = %s
                 '''
-                cursor.execute(user_rank_query, [user_id])
-                rank_result = cursor.fetchone()
+                user_rank_response = supabase.rpc(user_rank_query, [user_id])
+                rank_result = user_rank_response.data[0] if user_rank_response.data else None
                 user_rank = rank_result['rank'] if rank_result else None
             
-            cursor.close()
-            
             return {
-                'leaderboard': [dict(row) for row in leaderboard],
+                'leaderboard': leaderboard,
                 'stat_type': stat_type,
                 'user_rank': user_rank
             }
@@ -184,65 +165,28 @@ class DuelAnalyticsResource(Resource):
             days = int(request.args.get('days', 30))
             start_date = datetime.utcnow() - timedelta(days=days)
             
-            cursor = db.connection.cursor()
+            supabase = get_supabase_client()
             
             # Activity over time
-            cursor.execute('''
-                SELECT DATE(d.created_at) as date,
-                       COUNT(*) as duels_created,
-                       COUNT(CASE WHEN d.status = 'completed' THEN 1 END) as duels_completed
-                FROM duels d
-                WHERE d.creator_id = %s AND d.created_at >= %s
-                GROUP BY DATE(d.created_at)
-                ORDER BY date DESC
-            ''', [user_id, start_date])
+            cursor = supabase.table('duels').select('created_at').gte('created_at', start_date.isoformat()).execute()
             
-            activity_timeline = cursor.fetchall()
+            activity_timeline = cursor.data
             
             # Performance by challenge type
-            cursor.execute('''
-                SELECT d.challenge_type,
-                       COUNT(*) as total_duels,
-                       COUNT(CASE WHEN d.winner_id = %s THEN 1 END) as wins,
-                       AVG(dp.current_value) as avg_performance,
-                       MAX(dp.current_value) as best_performance
-                FROM duel_participants dp
-                JOIN duels d ON dp.duel_id = d.id
-                WHERE dp.user_id = %s AND dp.status = 'accepted' 
-                      AND d.created_at >= %s
-                GROUP BY d.challenge_type
-            ''', [user_id, user_id, start_date])
+            cursor = supabase.table('duel_participants').select('duel_id(challenge_type)').eq('user_id', user_id).execute()
             
-            performance_by_type = cursor.fetchall()
+            performance_by_type = cursor.data
             
             # Opponent analysis
-            cursor.execute('''
-                SELECT u.username, u.id as opponent_id,
-                       COUNT(*) as duels_against,
-                       COUNT(CASE WHEN d.winner_id = %s THEN 1 END) as wins_against,
-                       COUNT(CASE WHEN d.winner_id = u.id THEN 1 END) as losses_against
-                FROM duel_participants dp1
-                JOIN duel_participants dp2 ON dp1.duel_id = dp2.duel_id AND dp1.user_id != dp2.user_id
-                JOIN duels d ON dp1.duel_id = d.id
-                JOIN "user" u ON dp2.user_id = u.id
-                WHERE dp1.user_id = %s AND dp1.status = 'accepted' 
-                      AND dp2.status = 'accepted' AND d.status = 'completed'
-                      AND d.created_at >= %s
-                GROUP BY u.id, u.username
-                HAVING COUNT(*) > 1
-                ORDER BY COUNT(*) DESC
-                LIMIT 10
-            ''', [user_id, user_id, start_date])
+            cursor = supabase.table('duel_participants').select('duel_id(id, winner_id)').eq('user_id', user_id).execute()
             
-            frequent_opponents = cursor.fetchall()
-            
-            cursor.close()
+            frequent_opponents = cursor.data
             
             return {
                 'period_days': days,
-                'activity_timeline': [dict(row) for row in activity_timeline],
-                'performance_by_type': [dict(row) for row in performance_by_type],
-                'frequent_opponents': [dict(row) for row in frequent_opponents]
+                'activity_timeline': activity_timeline,
+                'performance_by_type': performance_by_type,
+                'frequent_opponents': frequent_opponents
             }
             
         except Exception as e:
