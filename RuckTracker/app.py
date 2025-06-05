@@ -182,7 +182,7 @@ from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesRes
 from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
 from .api.notifications_resource import NotificationsResource, NotificationReadResource, ReadAllNotificationsResource # Import for Notification resources
 from .api.resources import UserResource # Import UserResource
-from .api.duels import DuelsListResource, DuelResource, DuelJoinResource, DuelParticipantStatusResource
+from .api.duels import DuelListResource, DuelResource, DuelJoinResource, DuelParticipantResource
 from .api.duel_participants import DuelParticipantProgressResource, DuelLeaderboardResource
 from .api.duel_stats import UserDuelStatsResource, DuelStatsLeaderboardResource, DuelAnalyticsResource
 from .api.duel_invitations import DuelInvitationListResource, DuelInvitationResource, SentInvitationsResource
@@ -370,10 +370,10 @@ api.add_resource(NotificationReadResource, '/api/notifications/<string:notificat
 api.add_resource(ReadAllNotificationsResource, '/api/notifications/read-all')
 
 # Duel endpoints
-api.add_resource(DuelsListResource, '/api/duels')
+api.add_resource(DuelListResource, '/api/duels')
 api.add_resource(DuelResource, '/api/duels/<string:duel_id>')
 api.add_resource(DuelJoinResource, '/api/duels/<string:duel_id>/join')
-api.add_resource(DuelParticipantStatusResource, '/api/duels/<string:duel_id>/participants/<string:participant_id>/status')
+api.add_resource(DuelParticipantResource, '/api/duels/<string:duel_id>/participants/<string:participant_id>/status')
 
 # Duel participants endpoints
 api.add_resource(DuelParticipantProgressResource, '/api/duels/<string:duel_id>/participants/<string:participant_id>/progress')

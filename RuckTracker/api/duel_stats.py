@@ -14,7 +14,7 @@ class UserDuelStatsResource(Resource):
         """Get user's duel statistics"""
         try:
             # If no user_id provided, use current user
-            target_user_id = user_id or g.current_user['id']
+            target_user_id = user_id or g.user['id']
             
             cursor = db.connection.cursor()
             
@@ -144,7 +144,7 @@ class DuelStatsLeaderboardResource(Resource):
             leaderboard = cursor.fetchall()
             
             # Get current user's rank if not in top results
-            user_id = g.current_user['id']
+            user_id = g.user['id']
             user_in_results = any(row['user_id'] == user_id for row in leaderboard)
             user_rank = None
             
@@ -180,7 +180,7 @@ class DuelAnalyticsResource(Resource):
     def get(self):
         """Get duel analytics and insights"""
         try:
-            user_id = g.current_user['id']
+            user_id = g.user['id']
             days = int(request.args.get('days', 30))
             start_date = datetime.utcnow() - timedelta(days=days)
             
