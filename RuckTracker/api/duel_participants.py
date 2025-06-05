@@ -2,7 +2,7 @@ from flask import request, g
 from flask_restful import Resource
 from marshmallow import Schema, fields, ValidationError
 from datetime import datetime
-from extensions import db
+from RuckTracker.supabase_client import get_supabase_client
 from api.auth import auth_required
 
 # ============================================================================
@@ -26,141 +26,119 @@ class DuelParticipantProgressResource(Resource):
             data = schema.load(request.get_json())
             user_id = g.user.id
             
-            cursor = db.connection.cursor()
+            supabase = get_supabase_client()
             
             # Verify participant belongs to user and duel is active
-            cursor.execute('''
-                SELECT dp.id, dp.user_id, dp.current_value, d.status, d.challenge_type,
-                       d.ends_at, d.target_value
-                FROM duel_participants dp
-                JOIN duels d ON dp.duel_id = d.id
-                WHERE dp.id = %s AND dp.duel_id = %s AND dp.user_id = %s
-            ''', [participant_id, duel_id, user_id])
+            participant_response = supabase.table('duel_participants').select('id, user_id, current_value, duel_id(status, challenge_type, ends_at, target_value)').eq('id', participant_id).eq('duel_id', duel_id).eq('user_id', user_id).execute()
             
-            participant = cursor.fetchone()
+            participant = participant_response.data[0] if participant_response.data else None
             if not participant:
                 return {'error': 'Participant not found or unauthorized'}, 404
             
-            if participant['status'] != 'active':
+            duel = participant['duel_id']
+            if duel['status'] != 'active':
                 return {'error': 'Duel is not active'}, 400
             
-            if participant['ends_at'] and datetime.utcnow() > participant['ends_at']:
+            if duel['ends_at'] and datetime.utcnow() > datetime.fromisoformat(duel['ends_at']):
                 return {'error': 'Duel has ended'}, 400
             
             # Verify session exists and belongs to user
-            cursor.execute('''
-                SELECT id FROM ruck_sessions 
-                WHERE id = %s AND user_id = %s AND end_time IS NOT NULL
-            ''', [data['session_id'], user_id])
+            session_response = supabase.table('ruck_sessions').select('id, user_id, status, distance_km, duration_minutes, completed_at').eq('id', data['session_id']).eq('user_id', user_id).execute()
             
-            session = cursor.fetchone()
+            session = session_response.data[0] if session_response.data else None
             if not session:
-                return {'error': 'Session not found or not completed'}, 400
+                return {'error': 'Session not found or unauthorized'}, 404
             
-            # Check if session already contributed to this duel
-            cursor.execute('''
-                SELECT id FROM duel_sessions 
-                WHERE duel_id = %s AND session_id = %s
-            ''', [duel_id, data['session_id']])
+            if session['status'] != 'completed':
+                return {'error': 'Session is not completed'}, 400
             
-            if cursor.fetchone():
-                return {'error': 'Session already contributed to this duel'}, 400
+            # Check if session was already counted for this duel
+            duel_session_response = supabase.table('duel_sessions').select('id').eq('duel_id', duel_id).eq('participant_id', participant_id).eq('session_id', data['session_id']).execute()
             
-            # Record the duel session contribution
-            duel_session_id = str(uuid.uuid4())
+            if duel_session_response.data:
+                return {'error': 'Session already counted for this duel'}, 400
+            
+            # Calculate contribution based on challenge type
+            contribution = 0
+            if duel['challenge_type'] == 'distance':
+                contribution = session['distance_km']
+            elif duel['challenge_type'] == 'duration':
+                contribution = session['duration_minutes']
+            else:
+                contribution = data['contribution_value']  # For custom challenges
+            
+            # Update participant progress
+            new_value = participant['current_value'] + contribution
             now = datetime.utcnow()
             
-            cursor.execute('''
-                INSERT INTO duel_sessions (
-                    id, duel_id, participant_id, session_id, 
-                    contribution_value, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ''', [
-                duel_session_id, duel_id, participant_id, 
-                data['session_id'], data['contribution_value'], now, now
-            ])
+            supabase.table('duel_participants').update({
+                'current_value': new_value,
+                'updated_at': now.isoformat()
+            }).eq('id', participant_id).execute()
             
-            # Update participant's current value
-            new_current_value = participant['current_value'] + data['contribution_value']
-            cursor.execute('''
-                UPDATE duel_participants 
-                SET current_value = %s, last_session_id = %s, updated_at = %s
-                WHERE id = %s
-            ''', [new_current_value, data['session_id'], now, participant_id])
+            # Record the session contribution
+            supabase.table('duel_sessions').insert([{
+                'duel_id': duel_id,
+                'participant_id': participant_id,
+                'session_id': data['session_id'],
+                'contribution_value': contribution,
+                'created_at': now.isoformat()
+            }]).execute()
             
-            # Check if participant reached target and potentially won
-            target_reached = new_current_value >= participant['target_value']
-            duel_completed = False
-            winner_id = None
+            # Check if participant reached target
+            achievement = None
+            if new_value >= duel['target_value']:
+                achievement = 'target_reached'
+                supabase.table('duel_participants').update({
+                    'target_reached_at': now.isoformat()
+                }).eq('id', participant_id).execute()
             
-            if target_reached:
-                # Check if this is the first to reach target
-                cursor.execute('''
-                    SELECT dp.user_id, dp.current_value 
-                    FROM duel_participants dp
-                    WHERE dp.duel_id = %s AND dp.current_value >= %s
-                    ORDER BY dp.updated_at ASC
-                    LIMIT 1
-                ''', [duel_id, participant['target_value']])
+            # Check if duel should be completed (all active participants reached target or time expired)
+            participants_response = supabase.table('duel_participants').select('id, current_value, target_reached_at').eq('duel_id', duel_id).eq('status', 'accepted').execute()
+            
+            all_completed = all(p['target_reached_at'] for p in participants_response.data)
+            
+            if all_completed or (duel['ends_at'] and datetime.utcnow() > datetime.fromisoformat(duel['ends_at'])):
+                # Complete the duel and determine winner
+                max_value = max((p['current_value'] for p in participants_response.data), default=0)
+                winners = [p for p in participants_response.data if p['current_value'] == max_value]
                 
-                first_to_target = cursor.fetchone()
-                if first_to_target and first_to_target['user_id'] == user_id:
-                    # This user won!
-                    winner_id = user_id
-                    duel_completed = True
+                if len(winners) == 1:
+                    winner_participant = winners[0]
+                    winner_response = supabase.table('duel_participants').select('user_id').eq('id', winner_participant['id']).execute()
+                    winner_id = winner_response.data[0]['user_id']
                     
-                    # Update duel status
-                    cursor.execute('''
-                        UPDATE duels 
-                        SET status = 'completed', winner_id = %s, updated_at = %s
-                        WHERE id = %s
-                    ''', [winner_id, now, duel_id])
+                    supabase.table('duels').update({
+                        'status': 'completed',
+                        'winner_id': winner_id,
+                        'completed_at': now.isoformat(),
+                        'updated_at': now.isoformat()
+                    }).eq('id', duel_id).execute()
                     
-                    # Update all participants' stats
-                    cursor.execute('''
-                        SELECT user_id FROM duel_participants 
-                        WHERE duel_id = %s AND status = 'accepted'
-                    ''', [duel_id])
-                    all_participants = cursor.fetchall()
-                    
-                    for p in all_participants:
-                        is_winner = p['user_id'] == winner_id
-                        cursor.execute('''
-                            INSERT INTO user_duel_stats (
-                                user_id, duels_completed, duels_won, duels_lost, 
-                                created_at, updated_at
-                            ) VALUES (%s, 1, %s, %s, %s, %s)
-                            ON CONFLICT (user_id) 
-                            DO UPDATE SET 
-                                duels_completed = user_duel_stats.duels_completed + 1,
-                                duels_won = user_duel_stats.duels_won + %s,
-                                duels_lost = user_duel_stats.duels_lost + %s,
-                                updated_at = %s
-                        ''', [
-                            p['user_id'], 1 if is_winner else 0, 0 if is_winner else 1,
-                            now, now, 1 if is_winner else 0, 0 if is_winner else 1, now
-                        ])
+                    # Update winner stats
+                    supabase.table('user_duel_stats').upsert([{
+                        'user_id': winner_id,
+                        'duels_won': 1,
+                        'updated_at': now.isoformat()
+                    }], on_conflict='user_id').execute()
+                else:
+                    # Tie
+                    supabase.table('duels').update({
+                        'status': 'completed',
+                        'completed_at': now.isoformat(),
+                        'updated_at': now.isoformat()
+                    }).eq('id', duel_id).execute()
             
-            db.connection.commit()
-            cursor.close()
-            
-            result = {
+            return {
                 'message': 'Progress updated successfully',
-                'current_value': new_current_value,
-                'target_reached': target_reached
+                'new_value': new_value,
+                'contribution': contribution,
+                'achievement': achievement
             }
             
-            if duel_completed:
-                result['duel_completed'] = True
-                result['winner_id'] = winner_id
-                result['is_winner'] = winner_id == user_id
-            
-            return result
-            
         except ValidationError as e:
-            return {'error': 'Validation error'}, 400
+            return {'error': str(e)}, 400
         except Exception as e:
-            db.connection.rollback()
             return {'error': str(e)}, 500
 
     @auth_required
@@ -168,37 +146,32 @@ class DuelParticipantProgressResource(Resource):
         """Get participant's detailed progress including sessions"""
         try:
             user_id = g.user.id
-            cursor = db.connection.cursor()
+            supabase = get_supabase_client()
             
             # Get participant info
-            cursor.execute('''
-                SELECT dp.*, u.username, d.challenge_type, d.target_value, d.status as duel_status
-                FROM duel_participants dp
-                JOIN "user" u ON dp.user_id = u.id
-                JOIN duels d ON dp.duel_id = d.id
-                WHERE dp.id = %s AND dp.duel_id = %s
-            ''', [participant_id, duel_id])
+            participant_response = supabase.table('duel_participants').select('id, user_id, current_value, duel_id(challenge_type, target_value, status as duel_status)').eq('id', participant_id).eq('duel_id', duel_id).execute()
             
-            participant = cursor.fetchone()
+            participant = participant_response.data[0] if participant_response.data else None
             if not participant:
                 return {'error': 'Participant not found'}, 404
             
             # Get contributing sessions
-            cursor.execute('''
-                SELECT ds.*, rs.start_time, rs.end_time, rs.distance, 
-                       rs.duration, rs.elevation_gain, rs.power_points
-                FROM duel_sessions ds
-                JOIN ruck_sessions rs ON ds.session_id = rs.id
-                WHERE ds.duel_id = %s AND ds.participant_id = %s
-                ORDER BY ds.created_at DESC
-            ''', [duel_id, participant_id])
+            sessions_response = supabase.table('duel_sessions').select('id, session_id, contribution_value, created_at').eq('duel_id', duel_id).eq('participant_id', participant_id).order('created_at', desc=True).execute()
             
-            sessions = cursor.fetchall()
-            cursor.close()
+            sessions = sessions_response.data
+            
+            # Get session details
+            session_ids = [s['session_id'] for s in sessions]
+            session_response = supabase.table('ruck_sessions').select('id, start_time, end_time, distance, duration, elevation_gain, power_points').in_('id', session_ids).execute()
+            
+            session_details = {s['id']: s for s in session_response.data}
+            
+            # Combine session details with contributions
+            sessions = [{'id': s['id'], 'session_id': s['session_id'], 'contribution_value': s['contribution_value'], 'created_at': s['created_at'], **session_details[s['session_id']]} for s in sessions]
             
             result = dict(participant)
-            result['contributing_sessions'] = [dict(s) for s in sessions]
-            result['progress_percentage'] = min((participant['current_value'] / participant['target_value']) * 100, 100)
+            result['contributing_sessions'] = sessions
+            result['progress_percentage'] = min((participant['current_value'] / participant['duel_id']['target_value']) * 100, 100)
             
             return result
             
@@ -211,58 +184,48 @@ class DuelLeaderboardResource(Resource):
     def get(self, duel_id):
         """Get real-time leaderboard for a duel"""
         try:
-            cursor = db.connection.cursor()
+            supabase = get_supabase_client()
             
             # Verify duel exists
-            cursor.execute('''
-                SELECT id, status, challenge_type, target_value, ends_at
-                FROM duels WHERE id = %s
-            ''', [duel_id])
-            duel = cursor.fetchone()
+            duel_response = supabase.table('duels').select('id, status, challenge_type, target_value, ends_at').eq('id', duel_id).execute()
             
+            duel = duel_response.data[0] if duel_response.data else None
             if not duel:
                 return {'error': 'Duel not found'}, 404
             
             # Get leaderboard
-            cursor.execute('''
-                SELECT dp.id, dp.user_id, dp.current_value, dp.status, dp.last_session_id,
-                       u.username, u.email,
-                       RANK() OVER (ORDER BY dp.current_value DESC, dp.updated_at ASC) as rank,
-                       CASE 
-                           WHEN dp.current_value >= %s THEN true 
-                           ELSE false 
-                       END as target_reached
-                FROM duel_participants dp
-                JOIN "user" u ON dp.user_id = u.id
-                WHERE dp.duel_id = %s AND dp.status = 'accepted'
-                ORDER BY dp.current_value DESC, dp.updated_at ASC
-            ''', [duel['target_value'], duel_id])
+            leaderboard_response = supabase.table('duel_participants').select('id, user_id, current_value, status, last_session_id, duel_id(challenge_type, target_value)').eq('duel_id', duel_id).eq('status', 'accepted').order('current_value', desc=True).execute()
             
-            participants = cursor.fetchall()
+            participants = leaderboard_response.data
+            
+            # Get user details
+            user_ids = [p['user_id'] for p in participants]
+            user_response = supabase.table('users').select('id, username, email').in_('id', user_ids).execute()
+            
+            user_details = {u['id']: u for u in user_response.data}
+            
+            # Combine participant details with user details
+            participants = [{'id': p['id'], 'user_id': p['user_id'], 'current_value': p['current_value'], 'status': p['status'], 'last_session_id': p['last_session_id'], 'duel_id': p['duel_id'], **user_details[p['user_id']]} for p in participants]
             
             # Get recent activity
-            cursor.execute('''
-                SELECT ds.contribution_value, ds.created_at, u.username,
-                       rs.distance, rs.duration, rs.elevation_gain, rs.power_points
-                FROM duel_sessions ds
-                JOIN duel_participants dp ON ds.participant_id = dp.id
-                JOIN "user" u ON dp.user_id = u.id
-                JOIN ruck_sessions rs ON ds.session_id = rs.id
-                WHERE ds.duel_id = %s
-                ORDER BY ds.created_at DESC
-                LIMIT 10
-            ''', [duel_id])
+            recent_activity_response = supabase.table('duel_sessions').select('id, duel_id, participant_id, session_id, contribution_value, created_at').eq('duel_id', duel_id).order('created_at', desc=True).limit(10).execute()
             
-            recent_activity = cursor.fetchall()
-            cursor.close()
+            recent_activity = recent_activity_response.data
+            
+            # Get session details
+            session_ids = [a['session_id'] for a in recent_activity]
+            session_response = supabase.table('ruck_sessions').select('id, start_time, end_time, distance, duration, elevation_gain, power_points').in_('id', session_ids).execute()
+            
+            session_details = {s['id']: s for s in session_response.data}
+            
+            # Combine recent activity with session details
+            recent_activity = [{'id': a['id'], 'duel_id': a['duel_id'], 'participant_id': a['participant_id'], 'session_id': a['session_id'], 'contribution_value': a['contribution_value'], 'created_at': a['created_at'], **session_details[a['session_id']]} for a in recent_activity]
             
             return {
                 'duel': dict(duel),
-                'leaderboard': [dict(p) for p in participants],
-                'recent_activity': [dict(a) for a in recent_activity]
+                'leaderboard': participants,
+                'recent_activity': recent_activity
             }
             
         except Exception as e:
             return {'error': str(e)}, 500
-
-import uuid
