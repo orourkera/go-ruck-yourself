@@ -4,8 +4,7 @@ from marshmallow import Schema, fields, ValidationError, validates_schema
 from datetime import datetime, timedelta
 import uuid
 from extensions import db
-from utils.auth import auth_required
-from utils.error_handling import handle_validation_error, handle_not_found_error
+from api.auth import auth_required
 
 # ============================================================================
 # SCHEMAS
@@ -188,7 +187,7 @@ class DuelListResource(Resource):
             return {'message': 'Duel created successfully', 'duel_id': duel_id}, 201
             
         except ValidationError as e:
-            return handle_validation_error(e)
+            return {'error': str(e)}, 400
         except Exception as e:
             db.connection.rollback()
             return {'error': str(e)}, 500
@@ -211,7 +210,7 @@ class DuelResource(Resource):
             duel = cursor.fetchone()
             
             if not duel:
-                return handle_not_found_error('Duel not found')
+                return {'error': 'Duel not found'}, 404
             
             # Get participants with user info and progress
             cursor.execute('''
@@ -248,7 +247,7 @@ class DuelResource(Resource):
             duel = cursor.fetchone()
             
             if not duel:
-                return handle_not_found_error('Duel not found')
+                return {'error': 'Duel not found'}, 404
             
             if duel['creator_id'] != user_id:
                 return {'error': 'Only duel creator can update duel'}, 403
@@ -266,7 +265,7 @@ class DuelResource(Resource):
             return {'message': 'Duel updated successfully'}
             
         except ValidationError as e:
-            return handle_validation_error(e)
+            return {'error': str(e)}, 400
         except Exception as e:
             db.connection.rollback()
             return {'error': str(e)}, 500
@@ -288,7 +287,7 @@ class DuelJoinResource(Resource):
             duel = cursor.fetchone()
             
             if not duel:
-                return handle_not_found_error('Duel not found')
+                return {'error': 'Duel not found'}, 404
             
             if not duel['is_public']:
                 return {'error': 'Cannot join private duel without invitation'}, 403
@@ -386,7 +385,7 @@ class DuelParticipantResource(Resource):
             participant = cursor.fetchone()
             
             if not participant:
-                return handle_not_found_error('Participant not found')
+                return {'error': 'Participant not found'}, 404
             
             if participant['user_id'] != user_id:
                 return {'error': 'Can only update your own participation'}, 403
@@ -404,7 +403,7 @@ class DuelParticipantResource(Resource):
             return {'message': 'Participation status updated'}
             
         except ValidationError as e:
-            return handle_validation_error(e)
+            return {'error': str(e)}, 400
         except Exception as e:
             db.connection.rollback()
             return {'error': str(e)}, 500
