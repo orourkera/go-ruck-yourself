@@ -8,7 +8,7 @@ from supabase import Client
 
 # Import Supabase client
 from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
-from RuckTracker.auth.decorators import token_required
+from RuckTracker.api.auth import auth_required
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,7 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
         # Don't fail the comment creation if notification fails
 
 class DuelCommentsResource(Resource):
+    @auth_required
     def get(self, duel_id):
         """
         Get comments for a specific duel.
@@ -144,6 +145,7 @@ class DuelCommentsResource(Resource):
             logger.error(f"DuelCommentsResource: Error fetching duel comments: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while fetching comments.", status_code=500)
     
+    @auth_required
     def post(self, duel_id):
         """
         Add a comment to a duel.
@@ -249,6 +251,7 @@ class DuelCommentsResource(Resource):
             logger.error(f"DuelCommentsResource: Error adding comment: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while adding comment.", status_code=500)
     
+    @auth_required
     def put(self, duel_id):
         """
         Update an existing comment.
@@ -361,6 +364,7 @@ class DuelCommentsResource(Resource):
             logger.error(f"DuelCommentsResource: Error updating comment: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while updating comment.", status_code=500)
 
+    @auth_required
     def delete(self, duel_id):
         """
         Delete a comment.
