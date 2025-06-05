@@ -131,6 +131,8 @@ class DuelListResource(Resource):
                 'challenge_type': data['challenge_type'],
                 'target_value': data['target_value'],
                 'timeframe_hours': data['timeframe_hours'],
+                'creator_city': 'Unknown',  # Default value since user table doesn't have city
+                'creator_state': 'Unknown',  # Default value since user table doesn't have state
                 'is_public': data['is_public'],
                 'status': 'pending',
                 'max_participants': data['max_participants'],
