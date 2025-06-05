@@ -22,7 +22,7 @@ class DuelInvitationListResource(Resource):
     def get(self):
         """Get user's duel invitations"""
         try:
-            user_email = g.user['email']
+            user_email = g.user.email
             status = request.args.get('status', 'pending')
             
             cursor = db.connection.cursor()
@@ -57,8 +57,8 @@ class DuelInvitationResource(Resource):
         try:
             schema = InvitationResponseSchema()
             data = schema.load(request.get_json())
-            user_id = g.user['id']
-            user_email = g.user['email']
+            user_id = g.user.id
+            user_email = g.user.email
             
             cursor = db.connection.cursor()
             
@@ -173,7 +173,7 @@ class DuelInvitationResource(Resource):
     def delete(self, invitation_id):
         """Cancel a sent invitation (inviter only)"""
         try:
-            user_id = g.user['id']
+            user_id = g.user.id
             cursor = db.connection.cursor()
             
             # Check if user sent this invitation
@@ -214,7 +214,7 @@ class SentInvitationsResource(Resource):
     def get(self):
         """Get invitations sent by current user"""
         try:
-            user_id = g.user['id']
+            user_id = g.user.id
             cursor = db.connection.cursor()
             
             cursor.execute('''
