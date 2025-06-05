@@ -3,8 +3,7 @@ from flask_restful import Resource
 from marshmallow import Schema, fields, ValidationError
 from datetime import datetime
 from extensions import db
-from utils.auth import auth_required
-from utils.error_handling import handle_validation_error, handle_not_found_error
+from api.auth import auth_required
 
 # ============================================================================
 # SCHEMAS
@@ -40,7 +39,7 @@ class DuelParticipantProgressResource(Resource):
             
             participant = cursor.fetchone()
             if not participant:
-                return handle_not_found_error('Participant not found or unauthorized')
+                return {'error': 'Participant not found or unauthorized'}, 404
             
             if participant['status'] != 'active':
                 return {'error': 'Duel is not active'}, 400
@@ -159,7 +158,7 @@ class DuelParticipantProgressResource(Resource):
             return result
             
         except ValidationError as e:
-            return handle_validation_error(e)
+            return {'error': 'Validation error'}, 400
         except Exception as e:
             db.connection.rollback()
             return {'error': str(e)}, 500
@@ -182,7 +181,7 @@ class DuelParticipantProgressResource(Resource):
             
             participant = cursor.fetchone()
             if not participant:
-                return handle_not_found_error('Participant not found')
+                return {'error': 'Participant not found'}, 404
             
             # Get contributing sessions
             cursor.execute('''
@@ -222,7 +221,7 @@ class DuelLeaderboardResource(Resource):
             duel = cursor.fetchone()
             
             if not duel:
-                return handle_not_found_error('Duel not found')
+                return {'error': 'Duel not found'}, 404
             
             # Get leaderboard
             cursor.execute('''

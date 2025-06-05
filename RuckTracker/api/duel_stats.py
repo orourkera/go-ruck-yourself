@@ -2,7 +2,7 @@ from flask import request, g
 from flask_restful import Resource
 from datetime import datetime, timedelta
 from extensions import db
-from utils.auth import auth_required
+from api.auth import auth_required
 
 # ============================================================================
 # RESOURCES
