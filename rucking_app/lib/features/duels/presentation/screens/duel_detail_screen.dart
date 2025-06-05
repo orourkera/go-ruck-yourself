@@ -7,6 +7,7 @@ import '../widgets/duel_info_card.dart';
 import '../widgets/duel_progress_chart.dart';
 import '../widgets/duel_leaderboard_widget.dart';
 import '../widgets/duel_participants_list.dart';
+import '../widgets/duel_comments_section.dart';
 import '../../../../shared/theme/app_colors.dart';
 
 class DuelDetailScreen extends StatefulWidget {
@@ -165,27 +166,34 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
         
         // Tab Content
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
+          child: Column(
             children: [
-              // Progress Tab
-              DuelProgressChart(
-                duel: duel,
-                participants: participants,
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Progress Tab
+                    DuelProgressChart(
+                      duel: duel,
+                      participants: participants,
+                    ),
+                    
+                    // Leaderboard Tab
+                    DuelLeaderboardWidget(
+                      duel: duel,
+                      participants: participants,
+                      showAllParticipants: true,
+                    ),
+                    
+                    // Participants Tab
+                    DuelParticipantsList(
+                      duel: duel,
+                      participants: participants,
+                    ),
+                  ],
+                ),
               ),
-              
-              // Leaderboard Tab
-              DuelLeaderboardWidget(
-                duel: duel,
-                participants: participants,
-                showAllParticipants: true,
-              ),
-              
-              // Participants Tab
-              DuelParticipantsList(
-                duel: duel,
-                participants: participants,
-              ),
+              DuelCommentsSection(duel: duel),
             ],
           ),
         ),

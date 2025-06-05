@@ -5,8 +5,10 @@ import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
 import '../../domain/entities/duel_stats.dart';
 import '../../domain/entities/duel_invitation.dart';
+import '../../domain/entities/duel_comment.dart';
 import '../../domain/repositories/duels_repository.dart';
 import '../datasources/duels_remote_datasource.dart';
+import '../models/duel_comment_model.dart';
 
 class DuelsRepositoryImpl implements DuelsRepository {
   final DuelsRemoteDataSource remoteDataSource;
@@ -276,6 +278,64 @@ class DuelsRepositoryImpl implements DuelsRepository {
       return Left(ServerFailure(message: e.message));
     } catch (e) {
       return Left(ServerFailure(message: 'Failed to fetch sent invitations'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<DuelComment>>> getDuelComments(String duelId) async {
+    try {
+      final commentModels = await remoteDataSource.getDuelComments(duelId);
+      return Right(commentModels);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to fetch comments'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, DuelComment>> createDuelComment({
+    required String duelId,
+    required String text,
+  }) async {
+    try {
+      final commentModel = await remoteDataSource.createDuelComment(duelId, text);
+      return Right(commentModel);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to create comment'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteDuelComment({
+    required String duelId,
+    required String commentId,
+  }) async {
+    try {
+      await remoteDataSource.deleteDuelComment(duelId, commentId);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to delete comment'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateDuelComment({
+    required String duelId,
+    required String commentId,
+    required String text,
+  }) async {
+    try {
+      await remoteDataSource.updateDuelComment(duelId, commentId, text);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to update comment'));
     }
   }
 }

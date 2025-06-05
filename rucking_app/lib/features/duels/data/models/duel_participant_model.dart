@@ -18,25 +18,33 @@ class DuelParticipantModel extends DuelParticipant {
   });
 
   factory DuelParticipantModel.fromJson(Map<String, dynamic> json) {
-    return DuelParticipantModel(
-      id: json['id'] as String,
-      duelId: json['duel_id'] as String,
-      userId: json['user_id'] as String,
-      username: json['username'] as String,
-      email: json['email'] as String?,
-      status: DuelParticipantStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-      ),
-      currentValue: (json['current_value'] as num).toDouble(),
-      lastSessionId: json['last_session_id'] as String?,
-      joinedAt: json['joined_at'] != null 
-          ? DateTime.parse(json['joined_at'] as String) 
-          : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      rank: json['rank'] as int?,
-      targetReached: json['target_reached'] as bool?,
-    );
+    try {
+      return DuelParticipantModel(
+        id: json['id'] as String,
+        duelId: json['duel_id'] as String,
+        userId: json['user_id'] as String,
+        username: json['username']?.toString() ?? 'Unknown User',
+        email: json['email']?.toString(),
+        status: DuelParticipantStatus.values.firstWhere(
+          (e) => e.name == json['status'],
+          orElse: () => DuelParticipantStatus.invited,
+        ),
+        currentValue: (json['current_value'] as num).toDouble(),
+        lastSessionId: json['_session_id'] as String?,
+        joinedAt: json['joined_at'] != null 
+            ? DateTime.parse(json['joined_at'] as String) 
+            : null,
+        createdAt: DateTime.parse(json['created_at'] as String),
+        updatedAt: DateTime.parse(json['updated_at'] as String),
+        rank: json['rank'] as int?,
+        targetReached: json['target_reached'] as bool?,
+      );
+    } catch (e, stackTrace) {
+      print('[ERROR] DuelParticipantModel.fromJson failed: $e');
+      print('[ERROR] JSON data: $json');
+      print('[ERROR] Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -48,7 +56,7 @@ class DuelParticipantModel extends DuelParticipant {
       'email': email,
       'status': status.name,
       'current_value': currentValue,
-      'last_session_id': lastSessionId,
+      '_session_id': lastSessionId,
       'joined_at': joinedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),

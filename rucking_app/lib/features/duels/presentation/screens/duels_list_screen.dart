@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/service_locator.dart';
 import '../bloc/duel_list/duel_list_bloc.dart';
 import '../bloc/duel_list/duel_list_event.dart';
 import '../bloc/duel_list/duel_list_state.dart';
@@ -19,10 +21,23 @@ class DuelsListScreen extends StatefulWidget {
 }
 
 class _DuelsListScreenState extends State<DuelsListScreen> {
+  final AuthService _authService = getIt<AuthService>();
+  String? _currentUserId;
+
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     context.read<DuelListBloc>().add(const LoadDuels());
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = await _authService.getCurrentUser();
+    if (mounted) {
+      setState(() {
+        _currentUserId = user?.userId;
+      });
+    }
   }
 
   @override
@@ -227,21 +242,23 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
       itemCount: state.duels.length,
       itemBuilder: (context, index) {
         final duel = state.duels[index];
+        final isCurrentUserCreator = _currentUserId != null && duel.creatorId == _currentUserId;
+        
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: DuelCard(
             duel: duel,
             participants: [], // TODO: Get actual participants for this duel
-            showJoinButton: true,
+            showJoinButton: !isCurrentUserCreator,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => DuelDetailScreen(duelId: duel.id),
               ),
             ),
-            onJoin: () => context.read<DuelListBloc>().add(
+            onJoin: !isCurrentUserCreator ? () => context.read<DuelListBloc>().add(
               JoinDuel(duelId: duel.id),
-            ),
+            ) : null,
           ),
         );
       },

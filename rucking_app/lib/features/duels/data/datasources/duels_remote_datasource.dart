@@ -5,6 +5,7 @@ import '../models/duel_model.dart';
 import '../models/duel_participant_model.dart';
 import '../models/user_duel_stats_model.dart';
 import '../models/duel_invitation_model.dart';
+import '../models/duel_comment_model.dart';
 
 abstract class DuelsRemoteDataSource {
   // Duel management
@@ -45,6 +46,12 @@ abstract class DuelsRemoteDataSource {
   Future<void> respondToInvitation(String invitationId, String action);
   Future<void> cancelInvitation(String invitationId);
   Future<List<DuelInvitationModel>> getSentInvitations();
+
+  // Comments
+  Future<List<DuelCommentModel>> getDuelComments(String duelId);
+  Future<DuelCommentModel> createDuelComment(String duelId, String content);
+  Future<void> updateDuelComment(String duelId, String commentId, String content);
+  Future<void> deleteDuelComment(String duelId, String commentId);
 }
 
 class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
@@ -285,6 +292,49 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
       return invitationsData.map((invitationJson) => DuelInvitationModel.fromJson(invitationJson)).toList();
     } else {
       throw ServerException(message: 'Failed to fetch sent invitations');
+    }
+  }
+
+  @override
+  Future<List<DuelCommentModel>> getDuelComments(String duelId) async {
+    try {
+      final responseData = await apiClient.get('/duels/$duelId/comments', queryParams: {});
+      final List<dynamic> commentsData = responseData['comments'] ?? [];
+      return commentsData.map((commentJson) => DuelCommentModel.fromJson(commentJson)).toList();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<DuelCommentModel> createDuelComment(String duelId, String content) async {
+    try {
+      final body = {'content': content};
+      final response = await apiClient.post('/duels/$duelId/comments', body);
+      return DuelCommentModel.fromJson(response['comment']);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> updateDuelComment(String duelId, String commentId, String content) async {
+    try {
+      final body = {'content': content};
+      await apiClient.put('/duels/$duelId/comments/$commentId', body);
+      return;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> deleteDuelComment(String duelId, String commentId) async {
+    final response = await apiClient.delete('/duels/$duelId/comments/$commentId');
+    
+    if (response.statusCode != 200) {
+      final errorData = json.decode(response.body);
+      throw ServerException(message: errorData['error'] ?? 'Failed to delete comment');
     }
   }
 }

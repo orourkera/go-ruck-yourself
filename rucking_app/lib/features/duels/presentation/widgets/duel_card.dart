@@ -132,7 +132,7 @@ class DuelCard extends StatelessWidget {
             ),
           ],
         ),
-        if (duel.creatorCity != null || duel.creatorState != null) ...[
+        if (_shouldShowLocation()) ...[
           const SizedBox(height: 4),
           Row(
             children: [
@@ -256,46 +256,40 @@ class DuelCard extends StatelessWidget {
 
   Color _getStatusColor() {
     switch (duel.status) {
-      case 'pending':
+      case DuelStatus.pending:
         return Colors.orange;
-      case 'active':
+      case DuelStatus.active:
         return Colors.blue;
-      case 'completed':
+      case DuelStatus.completed:
         return Colors.green;
-      case 'cancelled':
+      case DuelStatus.cancelled:
         return Colors.red;
-      default:
-        return Colors.grey;
     }
   }
 
   String _getStatusText() {
     switch (duel.status) {
-      case 'pending':
+      case DuelStatus.pending:
         return 'Pending';
-      case 'active':
+      case DuelStatus.active:
         return 'Active';
-      case 'completed':
+      case DuelStatus.completed:
         return 'Completed';
-      case 'cancelled':
+      case DuelStatus.cancelled:
         return 'Cancelled';
-      default:
-        return 'Unknown';
     }
   }
 
   IconData _getChallengeIcon() {
     switch (duel.challengeType) {
-      case 'distance':
+      case DuelChallengeType.distance:
         return Icons.straighten;
-      case 'time':
+      case DuelChallengeType.time:
         return Icons.timer;
-      case 'elevation':
+      case DuelChallengeType.elevation:
         return Icons.terrain;
-      case 'power_points':
+      case DuelChallengeType.powerPoints:
         return Icons.bolt;
-      default:
-        return Icons.sports;
     }
   }
 
@@ -307,23 +301,21 @@ class DuelCard extends StatelessWidget {
 
   String _getUnit() {
     switch (duel.challengeType) {
-      case 'distance':
+      case DuelChallengeType.distance:
         return 'km';
-      case 'time':
+      case DuelChallengeType.time:
         return 'minutes';
-      case 'elevation':
+      case DuelChallengeType.elevation:
         return 'm';
-      case 'power_points':
-        return 'points';
-      default:
-        return '';
+      case DuelChallengeType.powerPoints:
+        return 'power points';
     }
   }
 
   String _getLocationText() {
     final parts = <String>[];
-    if (duel.creatorCity != null) parts.add(duel.creatorCity!);
-    if (duel.creatorState != null) parts.add(duel.creatorState!);
+    if (duel.creatorCity != null && duel.creatorCity != 'Unknown') parts.add(duel.creatorCity!);
+    if (duel.creatorState != null && duel.creatorState != 'Unknown') parts.add(duel.creatorState!);
     return parts.join(', ');
   }
 
@@ -363,7 +355,11 @@ class DuelCard extends StatelessWidget {
 
   bool _shouldShowJoinButton() {
     return onJoin != null && 
-           (duel.status == 'pending' || duel.status == 'active') &&
+           (duel.status == DuelStatus.pending || duel.status == DuelStatus.active) &&
            participants.length < duel.maxParticipants;
+  }
+
+  bool _shouldShowLocation() {
+    return (duel.creatorCity != null && duel.creatorCity != 'Unknown') || (duel.creatorState != null && duel.creatorState != 'Unknown');
   }
 }
