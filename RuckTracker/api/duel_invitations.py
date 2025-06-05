@@ -4,8 +4,7 @@ from marshmallow import Schema, fields, ValidationError
 from datetime import datetime
 import uuid
 from extensions import db
-from utils.auth import auth_required
-from utils.error_handling import handle_validation_error, handle_not_found_error
+from api.auth import auth_required
 
 # ============================================================================
 # SCHEMAS
@@ -74,7 +73,7 @@ class DuelInvitationResource(Resource):
             
             invitation = cursor.fetchone()
             if not invitation:
-                return handle_not_found_error('Invitation not found or already responded')
+                return {'error': 'Invitation not found or already responded'}, 404
             
             # Check if invitation has expired
             if invitation['expires_at'] and datetime.utcnow() > invitation['expires_at']:
@@ -165,7 +164,7 @@ class DuelInvitationResource(Resource):
             return {'message': f'Invitation {action_past} successfully'}
             
         except ValidationError as e:
-            return handle_validation_error(e)
+            return {'error': str(e)}, 400
         except Exception as e:
             db.connection.rollback()
             return {'error': str(e)}, 500
@@ -185,7 +184,7 @@ class DuelInvitationResource(Resource):
             
             invitation = cursor.fetchone()
             if not invitation:
-                return handle_not_found_error('Invitation not found')
+                return {'error': 'Invitation not found'}, 404
             
             if invitation['inviter_id'] != user_id:
                 return {'error': 'Can only cancel invitations you sent'}, 403
