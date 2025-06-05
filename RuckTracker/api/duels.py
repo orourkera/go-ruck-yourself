@@ -50,6 +50,8 @@ class DuelListResource(Resource):
             page = int(request.args.get('page', 1))
             per_page = min(int(request.args.get('per_page', 20)), 100)
             
+            logging.info(f"DuelList.get filters: status={status}, is_public={is_public}, challenge_type={challenge_type}, user_id={user_id}")
+            
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Base query for public duels or user's duels
@@ -58,19 +60,24 @@ class DuelListResource(Resource):
             # Add filters
             if is_public:
                 query = query.eq('is_public', True)
+                logging.info("Applied is_public=True filter")
             else:
                 # For private duels, show duels where user is creator or participant
                 query = query.or_(f'creator_id.eq.{user_id}')
+                logging.info(f"Applied creator_id filter for user {user_id}")
             
             if status:
                 query = query.eq('status', status)
+                logging.info(f"Applied status filter: {status}")
             
             if challenge_type:
                 query = query.eq('challenge_type', challenge_type)
+                logging.info(f"Applied challenge_type filter: {challenge_type}")
             
             query = query.range((page - 1) * per_page, page * per_page - 1).order('created_at', desc=True)
             
             duels_response = query.execute()
+            logging.info(f"Found {len(duels_response.data)} duels after filtering")
             
             # Get participants for each duel and enrich with creator info
             result = []
@@ -91,8 +98,8 @@ class DuelListResource(Resource):
                     user_response = user_query.execute()
                     if user_response.data:
                         participant_data = dict(participant)
-                        participant_data['user_username'] = user_response.data[0]['username']
-                        participant_data['user_email'] = user_response.data[0]['email']
+                        participant_data['username'] = user_response.data[0]['username']
+                        participant_data['email'] = user_response.data[0]['email']
                         enriched_participants.append(participant_data)
                 
                 duel_data = dict(duel)
