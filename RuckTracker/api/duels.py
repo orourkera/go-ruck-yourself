@@ -50,7 +50,7 @@ class DuelListResource(Resource):
             page = int(request.args.get('page', 1))
             per_page = min(int(request.args.get('per_page', 20)), 100)
             
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Base query for public duels or user's duels
             query = supabase.table('duels').select('*')
@@ -122,7 +122,7 @@ class DuelListResource(Resource):
             # Create duel
             duel_id = str(uuid.uuid4())
             now = datetime.utcnow()
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             supabase.table('duels').insert({
                 'id': duel_id,
@@ -188,7 +188,7 @@ class DuelResource(Resource):
     def get(self, duel_id):
         """Get duel details"""
         try:
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get duel with creator info
             duel_response = supabase.table('duels').select('*').eq('id', duel_id).execute()
@@ -218,7 +218,7 @@ class DuelResource(Resource):
             data = schema.load(request.get_json())
             user_id = g.user.id
             
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Check if user is creator
             duel_response = supabase.table('duels').select('creator_id').eq('id', duel_id).execute()
@@ -250,7 +250,7 @@ class DuelJoinResource(Resource):
         """Join a public duel"""
         try:
             user_id = g.user.id
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Check duel exists and is public
             duel_response = supabase.table('duels').select('id, is_public, status, max_participants, creator_id').eq('id', duel_id).execute()
@@ -334,7 +334,7 @@ class DuelParticipantResource(Resource):
             data = schema.load(request.get_json())
             user_id = g.user.id
             
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Check if user owns this participant record
             participant_response = supabase.table('duel_participants').select('user_id').eq('id', participant_id).eq('duel_id', duel_id).execute()
