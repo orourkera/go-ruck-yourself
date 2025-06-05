@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
-import '../../domain/entities/duel_status.dart';
 import '../../../../shared/theme/app_colors.dart';
 
 class DuelInfoCard extends StatelessWidget {

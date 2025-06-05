@@ -193,7 +193,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
                   ],
                 ),
               ),
-              DuelCommentsSection(duel: duel),
+              DuelCommentsSection(duelId: duel.id),
             ],
           ),
         ),
