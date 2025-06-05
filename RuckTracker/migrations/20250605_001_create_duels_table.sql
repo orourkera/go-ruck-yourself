@@ -1,7 +1,7 @@
 -- Create duels table for challenge management
 CREATE TABLE duels (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  creator_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  creator_id UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   title VARCHAR(50) NOT NULL,
   challenge_type VARCHAR(20) NOT NULL CHECK (challenge_type IN ('distance', 'time', 'elevation', 'power_points')),
   target_value DECIMAL(10,2) NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE duels (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   starts_at TIMESTAMP WITH TIME ZONE,
   ends_at TIMESTAMP WITH TIME ZONE,
-  winner_id UUID REFERENCES users(id),
+  winner_id UUID REFERENCES "user"(id),
   max_participants INTEGER DEFAULT 2
 );
 

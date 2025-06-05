@@ -3,7 +3,7 @@ CREATE TABLE duel_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   duel_id UUID NOT NULL REFERENCES duels(id) ON DELETE CASCADE,
   participant_id UUID NOT NULL REFERENCES duel_participants(id) ON DELETE CASCADE,
-  session_id UUID NOT NULL REFERENCES ruck_sessions(id) ON DELETE CASCADE,
+  session_id INTEGER NOT NULL REFERENCES ruck_session(id) ON DELETE CASCADE,
   contribution_value DECIMAL(10,2) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

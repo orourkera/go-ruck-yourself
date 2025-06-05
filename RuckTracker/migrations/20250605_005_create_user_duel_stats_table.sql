@@ -1,7 +1,7 @@
 -- Create user_duel_stats table for tracking user duel statistics
 CREATE TABLE user_duel_stats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   duels_created INTEGER DEFAULT 0,
   duels_joined INTEGER DEFAULT 0,
   duels_completed INTEGER DEFAULT 0,
@@ -39,6 +39,6 @@ $$ LANGUAGE plpgsql;
 
 -- Trigger to auto-create duel stats for new users
 CREATE TRIGGER auto_create_user_duel_stats
-    AFTER INSERT ON users
+    AFTER INSERT ON "user"
     FOR EACH ROW
     EXECUTE FUNCTION initialize_user_duel_stats();

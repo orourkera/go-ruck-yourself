@@ -2,7 +2,7 @@
 CREATE TABLE duel_invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   duel_id UUID NOT NULL REFERENCES duels(id) ON DELETE CASCADE,
-  inviter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  inviter_id UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   invitee_email VARCHAR(255) NOT NULL,
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined', 'expired')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
