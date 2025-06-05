@@ -20,8 +20,12 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
   }
 
   void _onLoadDuels(LoadDuels event, Emitter<DuelListState> emit) async {
+    print('[DEBUG] DuelListBloc._onLoadDuels() - Starting with status=${event.status}, challengeType=${event.challengeType}, location=${event.location}, limit=${event.limit}');
+    
     emit(DuelListLoading());
 
+    print('[DEBUG] DuelListBloc._onLoadDuels() - Calling getDuels usecase');
+    
     final result = await getDuels(GetDuelsParams(
       status: event.status,
       challengeType: event.challengeType,
@@ -29,19 +33,27 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
       limit: event.limit,
     ));
 
+    print('[DEBUG] DuelListBloc._onLoadDuels() - Got result from usecase');
+
     result.fold(
-      (failure) => emit(DuelListError(message: failure.message)),
-      (duels) => emit(DuelListLoaded(
-        duels: duels,
-        activeStatus: event.status,
-        activeChallengeType: event.challengeType,
-        activeLocation: event.location,
-        hasFilters: _hasActiveFilters(
-          event.status,
-          event.challengeType,
-          event.location,
-        ),
-      )),
+      (failure) {
+        print('[ERROR] DuelListBloc._onLoadDuels() - Failure: ${failure.message}');
+        emit(DuelListError(message: failure.message));
+      },
+      (duels) {
+        print('[DEBUG] DuelListBloc._onLoadDuels() - Success: got ${duels.length} duels');
+        emit(DuelListLoaded(
+          duels: duels,
+          activeStatus: event.status,
+          activeChallengeType: event.challengeType,
+          activeLocation: event.location,
+          hasFilters: _hasActiveFilters(
+            event.status,
+            event.challengeType,
+            event.location,
+          ),
+        ));
+      },
     );
   }
 
