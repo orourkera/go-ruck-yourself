@@ -3,7 +3,7 @@ from flask_restful import Resource
 from marshmallow import Schema, fields, ValidationError, validates_schema
 from datetime import datetime, timedelta
 import uuid
-from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
 from api.auth import auth_required
 import logging
 
@@ -168,13 +168,18 @@ class DuelListResource(Resource):
                         'updated_at': now.isoformat()
                     }).execute()
             
-            # Update user stats
-            supabase.table('user_duel_stats').upsert({
-                'user_id': user_id,
-                'duels_created': 1,
-                'created_at': now.isoformat(),
-                'updated_at': now.isoformat()
-            }).execute()
+            # Update user stats (optional - don't fail duel creation if this fails)
+            try:
+                supabase_admin = get_supabase_admin_client()
+                supabase_admin.table('user_duel_stats').upsert({
+                    'user_id': user_id,
+                    'duels_created': 1,
+                    'created_at': now.isoformat(),
+                    'updated_at': now.isoformat()
+                }).execute()
+            except Exception as e:
+                # Log the error but don't fail duel creation
+                logging.warning(f"Failed to update user duel stats: {e}")
             
             return {'message': 'Duel created successfully', 'duel_id': duel_id}, 201
             
@@ -294,13 +299,18 @@ class DuelJoinResource(Resource):
                 'updated_at': now.isoformat()
             }).execute()
             
-            # Update user stats
-            supabase.table('user_duel_stats').upsert({
-                'user_id': user_id,
-                'duels_joined': 1,
-                'created_at': now.isoformat(),
-                'updated_at': now.isoformat()
-            }).execute()
+            # Update user stats (optional - don't fail duel join if this fails)
+            try:
+                supabase_admin = get_supabase_admin_client()
+                supabase_admin.table('user_duel_stats').upsert({
+                    'user_id': user_id,
+                    'duels_joined': 1,
+                    'created_at': now.isoformat(),
+                    'updated_at': now.isoformat()
+                }).execute()
+            except Exception as e:
+                # Log the error but don't fail duel join
+                logging.warning(f"Failed to update user duel join stats: {e}")
             
             # Check if duel should become active
             participant_count_response = supabase.table('duel_participants').select('id', count='exact').eq('duel_id', duel_id).eq('status', 'accepted').execute()
