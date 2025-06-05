@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import uuid
 from extensions import db
 from api.auth import auth_required
+import logging
 
 # ============================================================================
 # SCHEMAS
@@ -115,6 +116,7 @@ class DuelListResource(Resource):
             }
             
         except Exception as e:
+            logging.error(f"Error in DuelList.get: {str(e)}", exc_info=True)
             return {'error': str(e)}, 500
 
     @auth_required
@@ -189,6 +191,7 @@ class DuelListResource(Resource):
         except ValidationError as e:
             return {'error': str(e)}, 400
         except Exception as e:
+            logging.error(f"Error in DuelList.post: {str(e)}", exc_info=True)
             db.connection.rollback()
             return {'error': str(e)}, 500
 
@@ -230,6 +233,7 @@ class DuelResource(Resource):
             return result
             
         except Exception as e:
+            logging.error(f"Error in DuelResource.get: {str(e)}", exc_info=True)
             return {'error': str(e)}, 500
 
     @auth_required
@@ -267,6 +271,7 @@ class DuelResource(Resource):
         except ValidationError as e:
             return {'error': str(e)}, 400
         except Exception as e:
+            logging.error(f"Error in DuelResource.put: {str(e)}", exc_info=True)
             db.connection.rollback()
             return {'error': str(e)}, 500
 
@@ -362,6 +367,7 @@ class DuelJoinResource(Resource):
             return {'message': 'Successfully joined duel'}
             
         except Exception as e:
+            logging.error(f"Error in DuelJoinResource.post: {str(e)}", exc_info=True)
             db.connection.rollback()
             return {'error': str(e)}, 500
 
@@ -405,5 +411,6 @@ class DuelParticipantResource(Resource):
         except ValidationError as e:
             return {'error': str(e)}, 400
         except Exception as e:
+            logging.error(f"Error in DuelParticipantResource.put: {str(e)}", exc_info=True)
             db.connection.rollback()
             return {'error': str(e)}, 500
