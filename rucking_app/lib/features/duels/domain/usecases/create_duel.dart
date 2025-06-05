@@ -50,9 +50,6 @@ class CreateDuel implements UseCase<Duel, CreateDuelParams> {
       timeframeHours: params.timeframeHours,
       maxParticipants: params.maxParticipants,
       isPublic: params.isPublic,
-      description: params.description?.trim(),
-      creatorCity: params.creatorCity?.trim(),
-      creatorState: params.creatorState?.trim(),
       inviteeEmails: params.inviteeEmails,
     );
   }
@@ -69,9 +66,6 @@ class CreateDuelParams {
   final int timeframeHours;
   final int maxParticipants;
   final bool isPublic;
-  final String? description;
-  final String? creatorCity;
-  final String? creatorState;
   final List<String>? inviteeEmails;
 
   const CreateDuelParams({
@@ -81,9 +75,6 @@ class CreateDuelParams {
     required this.timeframeHours,
     required this.maxParticipants,
     required this.isPublic,
-    this.description,
-    this.creatorCity,
-    this.creatorState,
     this.inviteeEmails,
   });
 }

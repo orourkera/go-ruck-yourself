@@ -14,9 +14,9 @@ class CreateDuelSubmitted extends CreateDuelEvent {
   final int timeframeHours;
   final int maxParticipants;
   final bool isPublic;
-  final String? description;
-  final String? creatorCity;
-  final String? creatorState;
+  // final String? description; // Removed - not supported by backend yet
+  // final String? creatorCity; // Removed - backend uses user profile location
+  // final String? creatorState; // Removed - backend uses user profile location
   final List<String>? inviteeEmails;
 
   const CreateDuelSubmitted({
@@ -26,9 +26,9 @@ class CreateDuelSubmitted extends CreateDuelEvent {
     required this.timeframeHours,
     required this.maxParticipants,
     required this.isPublic,
-    this.description,
-    this.creatorCity,
-    this.creatorState,
+    // this.description, // Removed - not supported by backend yet
+    // this.creatorCity, // Removed - backend uses user profile location
+    // this.creatorState, // Removed - backend uses user profile location
     this.inviteeEmails,
   });
 
@@ -40,9 +40,9 @@ class CreateDuelSubmitted extends CreateDuelEvent {
         timeframeHours,
         maxParticipants,
         isPublic,
-        description,
-        creatorCity,
-        creatorState,
+        // description, // Removed - not supported by backend yet
+        // creatorCity, // Removed - backend uses user profile location
+        // creatorState, // Removed - backend uses user profile location
         inviteeEmails,
       ];
 }

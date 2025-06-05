@@ -53,11 +53,14 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
     return Scaffold(
       appBar: AppBar(
         title: const Text('History & Stats'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: AppColors.primary,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: AppColors.accent,
           tabs: const [
             Tab(
               icon: Icon(Icons.history),

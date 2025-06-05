@@ -160,7 +160,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
                 context.read<CreateDuelBloc>().add(
                       CreateDuelSubmitted(
                         title: _titleController.text,
-                        description: _descriptionController.text,
+                        // description: _descriptionController.text, // Removed - not supported by backend yet
                         challengeType: _duelType,
                         targetValue: _targetValue,
                         timeframeHours: (_endDate.difference(DateTime.now()).inHours),

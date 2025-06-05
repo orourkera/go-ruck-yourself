@@ -24,9 +24,9 @@ class CreateDuelBloc extends Bloc<CreateDuelEvent, CreateDuelState> {
       timeframeHours: event.timeframeHours,
       maxParticipants: event.maxParticipants,
       isPublic: event.isPublic,
-      description: event.description,
-      creatorCity: event.creatorCity,
-      creatorState: event.creatorState,
+      // description: event.description, // Removed - not supported by backend yet
+      // creatorCity: event.creatorCity, // Removed - backend uses user profile location
+      // creatorState: event.creatorState, // Removed - backend uses user profile location
       inviteeEmails: event.inviteeEmails,
     ));
 

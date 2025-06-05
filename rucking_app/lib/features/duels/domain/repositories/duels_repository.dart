@@ -21,9 +21,9 @@ abstract class DuelsRepository {
     required int timeframeHours,
     required int maxParticipants,
     required bool isPublic,
-    String? description,
-    String? creatorCity,
-    String? creatorState,
+    // String? description, // Removed - not supported by backend yet
+    // String? creatorCity, // Removed - backend uses user profile location
+    // String? creatorState, // Removed - backend uses user profile location
     List<String>? inviteeEmails,
   });
 

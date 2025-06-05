@@ -22,9 +22,6 @@ abstract class DuelsRemoteDataSource {
     required int timeframeHours,
     required int maxParticipants,
     required bool isPublic,
-    String? description,
-    String? creatorCity,
-    String? creatorState,
     List<String>? inviteeEmails,
   });
 
@@ -103,9 +100,6 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     required int timeframeHours,
     required int maxParticipants,
     required bool isPublic,
-    String? description,
-    String? creatorCity,
-    String? creatorState,
     List<String>? inviteeEmails,
   }) async {
     final body = {
@@ -115,9 +109,6 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
       'timeframe_hours': timeframeHours,
       'max_participants': maxParticipants,
       'is_public': isPublic,
-      if (description != null) 'description': description,
-      if (creatorCity != null) 'creator_city': creatorCity,
-      if (creatorState != null) 'creator_state': creatorState,
       if (inviteeEmails != null) 'invitee_emails': inviteeEmails,
     };
 
