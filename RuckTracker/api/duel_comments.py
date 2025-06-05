@@ -10,6 +10,7 @@ from supabase import Client
 from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
 from RuckTracker.api.auth import auth_required
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
+from RuckTracker.utils.api_response import build_api_response
 
 logger = logging.getLogger(__name__)
 
