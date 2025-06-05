@@ -20,8 +20,6 @@ class DuelCreateSchema(Schema):
     max_participants = fields.Int(missing=2, validate=lambda x: 2 <= x <= 20)
     invitee_emails = fields.List(fields.Email(), missing=[])
     description = fields.Str(missing=None, allow_none=True)
-    creator_city = fields.Str(missing=None, allow_none=True)
-    creator_state = fields.Str(missing=None, allow_none=True)
 
     @validates_schema
     def validate_schema(self, data, **kwargs):
@@ -121,17 +119,10 @@ class DuelListResource(Resource):
             data = schema.load(request.get_json())
             user_id = g.user.id
             
-            # Get user's city and state for duel location
-            supabase = get_supabase_client()
-            user_response = supabase.table('user').select('city, state').eq('id', user_id).execute()
-            user_info = user_response.data[0] if user_response.data else None
-            
-            if not user_info or not user_info['city'] or not user_info['state']:
-                return {'error': 'User must have city and state set to create duels'}, 400
-            
             # Create duel
             duel_id = str(uuid.uuid4())
             now = datetime.utcnow()
+            supabase = get_supabase_client()
             
             supabase.table('duels').insert({
                 'id': duel_id,
@@ -140,8 +131,6 @@ class DuelListResource(Resource):
                 'challenge_type': data['challenge_type'],
                 'target_value': data['target_value'],
                 'timeframe_hours': data['timeframe_hours'],
-                'creator_city': user_info['city'],
-                'creator_state': user_info['state'],
                 'is_public': data['is_public'],
                 'status': 'pending',
                 'max_participants': data['max_participants'],
