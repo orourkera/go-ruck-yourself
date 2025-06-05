@@ -55,7 +55,7 @@ class DuelListResource(Resource):
                        COUNT(dp.id) as participant_count,
                        CASE WHEN dp_user.user_id IS NOT NULL THEN true ELSE false END as user_participating
                 FROM duels d
-                LEFT JOIN users u ON d.creator_id = u.id
+                LEFT JOIN "user" u ON d.creator_id = u.id
                 LEFT JOIN duel_participants dp ON d.id = dp.duel_id AND dp.status = 'accepted'
                 LEFT JOIN duel_participants dp_user ON d.id = dp_user.duel_id AND dp_user.user_id = %s
                 WHERE 1=1
@@ -95,7 +95,7 @@ class DuelListResource(Resource):
                 cursor.execute('''
                     SELECT dp.*, u.username, u.email
                     FROM duel_participants dp
-                    LEFT JOIN users u ON dp.user_id = u.id
+                    LEFT JOIN "user" u ON dp.user_id = u.id
                     WHERE dp.duel_id = %s
                     ORDER BY dp.current_value DESC
                 ''', [duel['id']])
@@ -127,7 +127,7 @@ class DuelListResource(Resource):
             
             # Get user's city and state for duel location
             cursor = db.connection.cursor()
-            cursor.execute('SELECT city, state FROM users WHERE id = %s', [user_id])
+            cursor.execute('SELECT city, state FROM "user" WHERE id = %s', [user_id])
             user_info = cursor.fetchone()
             
             if not user_info or not user_info['city'] or not user_info['state']:
@@ -204,7 +204,7 @@ class DuelResource(Resource):
             cursor.execute('''
                 SELECT d.*, u.username as creator_username
                 FROM duels d
-                LEFT JOIN users u ON d.creator_id = u.id
+                LEFT JOIN "user" u ON d.creator_id = u.id
                 WHERE d.id = %s
             ''', [duel_id])
             duel = cursor.fetchone()
@@ -216,7 +216,7 @@ class DuelResource(Resource):
             cursor.execute('''
                 SELECT dp.*, u.username, u.email
                 FROM duel_participants dp
-                LEFT JOIN users u ON dp.user_id = u.id
+                LEFT JOIN "user" u ON dp.user_id = u.id
                 WHERE dp.duel_id = %s
                 ORDER BY dp.current_value DESC, dp.joined_at ASC
             ''', [duel_id])

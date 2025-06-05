@@ -34,7 +34,7 @@ class DuelInvitationListResource(Resource):
                        u.username as inviter_username
                 FROM duel_invitations di
                 JOIN duels d ON di.duel_id = d.id
-                JOIN users u ON di.inviter_id = u.id
+                JOIN "user" u ON di.inviter_id = u.id
                 WHERE di.invitee_email = %s AND di.status = %s
                 ORDER BY di.created_at DESC
             ''', [user_email, status])
