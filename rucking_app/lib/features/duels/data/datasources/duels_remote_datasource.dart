@@ -299,7 +299,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   Future<List<DuelCommentModel>> getDuelComments(String duelId) async {
     try {
       final responseData = await apiClient.get('/duels/$duelId/comments', queryParams: {});
-      final List<dynamic> commentsData = responseData['comments'] ?? [];
+      final List<dynamic> commentsData = responseData['data'] ?? [];
       return commentsData.map((commentJson) => DuelCommentModel.fromJson(commentJson)).toList();
     } catch (e) {
       rethrow;
