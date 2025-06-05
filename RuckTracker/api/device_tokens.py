@@ -6,7 +6,7 @@ from flask import request, g
 from flask_restful import Resource
 
 from RuckTracker.supabase_client import get_supabase_client
-from RuckTracker.auth.decorators import token_required
+from RuckTracker.api.auth import auth_required
 from RuckTracker.utils.api_response import build_api_response
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class DeviceTokenResource(Resource):
     """Resource for managing user device tokens"""
     
-    @token_required
+    @auth_required
     def post(self):
         """Register or update a device token for push notifications"""
         try:
@@ -80,7 +80,7 @@ class DeviceTokenResource(Resource):
                 status_code=500
             )
     
-    @token_required
+    @auth_required
     def delete(self):
         """Deactivate device tokens for the current user"""
         try:

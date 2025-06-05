@@ -4,12 +4,13 @@ from flask_restful import Resource
 import logging
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.utils.api_response import build_api_response
-from RuckTracker.auth.decorators import token_required
+from RuckTracker.api.auth import auth_required
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
 
 logger = logging.getLogger(__name__)
 
 class RuckCommentsResource(Resource):
+    @auth_required
     def get(self, ruck_id):
         """
         Get comments for a specific ruck session.
@@ -17,17 +18,10 @@ class RuckCommentsResource(Resource):
         Expects 'ruck_id' from the URL path.
         The user must be authenticated.
         """
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            logger.warning("RuckCommentsResource: Missing or invalid Authorization header.")
-            return build_api_response(success=False, error="Unauthorized", status_code=401)
-        
-        token = auth_header.split("Bearer ")[1]
-
         # Initialize Supabase client with the user's token to respect RLS
         try:
-            supabase = get_supabase_client(user_jwt=token)
-            user_response = supabase.auth.get_user(token)
+            supabase = get_supabase_client(user_jwt=g.user_token)
+            user_response = supabase.auth.get_user(g.user_token)
             if not user_response.user:
                 logger.warning("RuckCommentsResource: Invalid token or user not found.")
                 return build_api_response(success=False, error="Invalid token or user not found.", status_code=401)
@@ -56,6 +50,7 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Error fetching ruck comments: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while fetching comments.", status_code=500)
     
+    @auth_required
     def post(self, ruck_id):
         """
         Add a comment to a ruck session.
@@ -63,17 +58,10 @@ class RuckCommentsResource(Resource):
         Expects 'ruck_id' from the URL path and JSON body with 'content'.
         The user must be authenticated.
         """
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            logger.warning("RuckCommentsResource: Missing or invalid Authorization header.")
-            return build_api_response(success=False, error="Unauthorized", status_code=401)
-        
-        token = auth_header.split("Bearer ")[1]
-
         # Initialize Supabase client with the user's token to respect RLS
         try:
-            supabase = get_supabase_client(user_jwt=token)
-            user_response = supabase.auth.get_user(token)
+            supabase = get_supabase_client(user_jwt=g.user_token)
+            user_response = supabase.auth.get_user(g.user_token)
             if not user_response.user:
                 logger.warning("RuckCommentsResource: Invalid token or user not found.")
                 return build_api_response(success=False, error="Invalid token or user not found.", status_code=401)
@@ -180,6 +168,7 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Error creating comment: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while creating the comment.", status_code=500)
     
+    @auth_required
     def put(self, ruck_id):
         """
         Update an existing comment.
@@ -187,17 +176,10 @@ class RuckCommentsResource(Resource):
         Expects 'ruck_id' from URL path and JSON body with 'comment_id' and 'content'.
         The user must be authenticated and must be the author of the comment.
         """
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            logger.warning("RuckCommentsResource: Missing or invalid Authorization header.")
-            return build_api_response(success=False, error="Unauthorized", status_code=401)
-        
-        token = auth_header.split("Bearer ")[1]
-
         # Initialize Supabase client with the user's token to respect RLS
         try:
-            supabase = get_supabase_client(user_jwt=token)
-            user_response = supabase.auth.get_user(token)
+            supabase = get_supabase_client(user_jwt=g.user_token)
+            user_response = supabase.auth.get_user(g.user_token)
             if not user_response.user:
                 logger.warning("RuckCommentsResource: Invalid token or user not found.")
                 return build_api_response(success=False, error="Invalid token or user not found.", status_code=401)
@@ -286,6 +268,7 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Error updating comment: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while updating the comment.", status_code=500)
     
+    @auth_required
     def delete(self, ruck_id):
         """
         Delete a comment.
@@ -293,17 +276,10 @@ class RuckCommentsResource(Resource):
         Expects 'ruck_id' from URL path and 'comment_id' as a query parameter.
         The user must be authenticated and must be the author of the comment.
         """
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            logger.warning("RuckCommentsResource: Missing or invalid Authorization header.")
-            return build_api_response(success=False, error="Unauthorized", status_code=401)
-        
-        token = auth_header.split("Bearer ")[1]
-
         # Initialize Supabase client with the user's token to respect RLS
         try:
-            supabase = get_supabase_client(user_jwt=token)
-            user_response = supabase.auth.get_user(token)
+            supabase = get_supabase_client(user_jwt=g.user_token)
+            user_response = supabase.auth.get_user(g.user_token)
             if not user_response.user:
                 logger.warning("RuckCommentsResource: Invalid token or user not found.")
                 return build_api_response(success=False, error="Invalid token or user not found.", status_code=401)
