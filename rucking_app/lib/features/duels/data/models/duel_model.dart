@@ -1,29 +1,32 @@
-import 'package:equatable/equatable.dart';
 import '../../domain/entities/duel.dart';
 import 'duel_participant_model.dart';
 
 class DuelModel extends Duel {
+  final int? currentParticipants;
+  final int? minParticipants;
+  final List<DuelParticipantModel> participants;
+
   const DuelModel({
     required super.id,
-    required super.creatorId,
     required super.title,
+    super.description,
     required super.challengeType,
     required super.targetValue,
     required super.timeframeHours,
-    required super.creatorCity,
-    required super.creatorState,
+    required super.maxParticipants,
     required super.isPublic,
     required super.status,
-    required super.createdAt,
-    required super.updatedAt,
+    required super.creatorId,
+    super.winnerId,
+    super.creatorCity,
+    super.creatorState,
     super.startsAt,
     super.endsAt,
-    super.winnerId,
-    super.description,
-    super.maxParticipants,
-    super.currentParticipants,
-    super.minParticipants,
-    super.participants = const [],
+    required super.createdAt,
+    required super.updatedAt,
+    this.currentParticipants,
+    this.minParticipants,
+    this.participants = const [],
   });
 
   factory DuelModel.fromJson(Map<String, dynamic> json) {
@@ -86,6 +89,7 @@ class DuelModel extends Duel {
     };
   }
 
+  @override
   DuelModel copyWith({
     String? id,
     String? creatorId,
@@ -132,19 +136,6 @@ class DuelModel extends Duel {
     );
   }
 
-  String get challengeTypeDisplayName {
-    switch (challengeType) {
-      case DuelChallengeType.distance:
-        return 'Distance';
-      case DuelChallengeType.time:
-        return 'Time';
-      case DuelChallengeType.elevation:
-        return 'Elevation';
-      case DuelChallengeType.powerPoints:
-        return 'Power Points';
-    }
-  }
-
   String get targetValueWithUnit {
     switch (challengeType) {
       case DuelChallengeType.distance:
@@ -157,11 +148,6 @@ class DuelModel extends Duel {
         return '${targetValue.toStringAsFixed(0)} pts';
     }
   }
-
-  bool get isActive => status == DuelStatus.active;
-  bool get isPending => status == DuelStatus.pending;
-  bool get isCompleted => status == DuelStatus.completed;
-  bool get isCancelled => status == DuelStatus.cancelled;
 
   @override
   List<Object?> get props => [

@@ -1,4 +1,3 @@
-import 'package:equatable/equatable.dart';
 import '../../domain/entities/duel_stats.dart';
 
 class UserDuelStatsModel extends DuelStats {
@@ -75,6 +74,7 @@ class UserDuelStatsModel extends DuelStats {
     };
   }
 
+  @override
   UserDuelStatsModel copyWith({
     String? id,
     String? userId,
@@ -83,13 +83,23 @@ class UserDuelStatsModel extends DuelStats {
     int? duelsCompleted,
     int? duelsWon,
     int? duelsLost,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    int? activeDuels,
+    int? pendingDuels,
+    double? avgWinningScore,
+    double? bestDistance,
+    double? bestTime,
+    double? bestElevation,
+    double? bestPowerPoints,
+    String? username,
+    String? email,
+    int? rank,
     int? duelsAbandoned,
     double? totalDistanceChallenged,
     int? totalTimeChallenged,
     double? totalElevationChallenged,
     int? totalPowerPointsChallenged,
-    DateTime? createdAt,
-    DateTime? updatedAt,
   }) {
     return UserDuelStatsModel(
       id: id ?? this.id,
@@ -99,28 +109,25 @@ class UserDuelStatsModel extends DuelStats {
       duelsCompleted: duelsCompleted ?? this.duelsCompleted,
       duelsWon: duelsWon ?? this.duelsWon,
       duelsLost: duelsLost ?? this.duelsLost,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      activeDuels: activeDuels ?? this.activeDuels,
+      pendingDuels: pendingDuels ?? this.pendingDuels,
+      avgWinningScore: avgWinningScore ?? this.avgWinningScore,
+      bestDistance: bestDistance ?? this.bestDistance,
+      bestTime: bestTime ?? this.bestTime,
+      bestElevation: bestElevation ?? this.bestElevation,
+      bestPowerPoints: bestPowerPoints ?? this.bestPowerPoints,
+      username: username ?? this.username,
+      email: email ?? this.email,
+      rank: rank ?? this.rank,
       duelsAbandoned: duelsAbandoned ?? this.duelsAbandoned,
       totalDistanceChallenged: totalDistanceChallenged ?? this.totalDistanceChallenged,
       totalTimeChallenged: totalTimeChallenged ?? this.totalTimeChallenged,
       totalElevationChallenged: totalElevationChallenged ?? this.totalElevationChallenged,
       totalPowerPointsChallenged: totalPowerPointsChallenged ?? this.totalPowerPointsChallenged,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
-
-  double get winRate {
-    if (duelsCompleted == 0) return 0.0;
-    return duelsWon / duelsCompleted;
-  }
-
-  double get completionRate {
-    final totalDuels = duelsJoined + duelsCreated;
-    if (totalDuels == 0) return 0.0;
-    return duelsCompleted / totalDuels;
-  }
-
-  int get totalDuels => duelsJoined + duelsCreated;
 
   @override
   List<Object?> get props => [

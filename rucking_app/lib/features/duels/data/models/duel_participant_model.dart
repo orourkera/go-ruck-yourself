@@ -1,4 +1,3 @@
-import 'package:equatable/equatable.dart';
 import '../../domain/entities/duel_participant.dart';
 
 class DuelParticipantModel extends DuelParticipant {
@@ -6,14 +5,16 @@ class DuelParticipantModel extends DuelParticipant {
     required super.id,
     required super.duelId,
     required super.userId,
+    required super.username,
+    super.email,
     required super.status,
     required super.currentValue,
-    required super.joinedAt,
+    super.lastSessionId,
+    super.joinedAt,
     required super.createdAt,
     required super.updatedAt,
-    super.lastSessionId,
-    super.username,
-    super.userEmail,
+    super.rank,
+    super.targetReached,
   });
 
   factory DuelParticipantModel.fromJson(Map<String, dynamic> json) {
@@ -21,16 +22,20 @@ class DuelParticipantModel extends DuelParticipant {
       id: json['id'] as String,
       duelId: json['duel_id'] as String,
       userId: json['user_id'] as String,
+      username: json['username'] as String,
+      email: json['email'] as String?,
       status: DuelParticipantStatus.values.firstWhere(
         (e) => e.name == json['status'],
       ),
       currentValue: (json['current_value'] as num).toDouble(),
       lastSessionId: json['last_session_id'] as String?,
-      joinedAt: DateTime.parse(json['joined_at'] as String),
+      joinedAt: json['joined_at'] != null 
+          ? DateTime.parse(json['joined_at'] as String) 
+          : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      username: json['username'] as String?,
-      userEmail: json['user_email'] as String?,
+      rank: json['rank'] as int?,
+      targetReached: json['target_reached'] as bool?,
     );
   }
 
@@ -39,63 +44,68 @@ class DuelParticipantModel extends DuelParticipant {
       'id': id,
       'duel_id': duelId,
       'user_id': userId,
+      'username': username,
+      'email': email,
       'status': status.name,
       'current_value': currentValue,
       'last_session_id': lastSessionId,
-      'joined_at': joinedAt.toIso8601String(),
+      'joined_at': joinedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
-      'username': username,
-      'user_email': userEmail,
+      'rank': rank,
+      'target_reached': targetReached,
     };
   }
 
+  @override
   DuelParticipantModel copyWith({
     String? id,
     String? duelId,
     String? userId,
+    String? username,
+    String? email,
     DuelParticipantStatus? status,
     double? currentValue,
     String? lastSessionId,
     DateTime? joinedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
-    String? username,
-    String? userEmail,
+    int? rank,
+    bool? targetReached,
   }) {
     return DuelParticipantModel(
       id: id ?? this.id,
       duelId: duelId ?? this.duelId,
       userId: userId ?? this.userId,
+      username: username ?? this.username,
+      email: email ?? this.email,
       status: status ?? this.status,
       currentValue: currentValue ?? this.currentValue,
       lastSessionId: lastSessionId ?? this.lastSessionId,
       joinedAt: joinedAt ?? this.joinedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      username: username ?? this.username,
-      userEmail: userEmail ?? this.userEmail,
+      rank: rank ?? this.rank,
+      targetReached: targetReached ?? this.targetReached,
     );
   }
 
-  bool get isPending => status == DuelParticipantStatus.pending;
-  bool get isAccepted => status == DuelParticipantStatus.accepted;
-  bool get isDeclined => status == DuelParticipantStatus.declined;
-
-  String get displayName => username ?? userEmail ?? 'Unknown User';
+  String get displayName => username;
 
   @override
   List<Object?> get props => [
         id,
         duelId,
         userId,
+        username,
+        email,
         status,
         currentValue,
         lastSessionId,
         joinedAt,
         createdAt,
         updatedAt,
-        username,
-        userEmail,
+        rank,
+        targetReached,
       ];
 }

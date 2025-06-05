@@ -1,4 +1,3 @@
-import 'package:equatable/equatable.dart';
 import '../../domain/entities/duel_invitation.dart';
 
 class DuelInvitationModel extends DuelInvitation {
@@ -12,6 +11,11 @@ class DuelInvitationModel extends DuelInvitation {
     required super.updatedAt,
     super.expiresAt,
     super.duelTitle,
+    super.challengeType,
+    super.targetValue,
+    super.timeframeHours,
+    super.creatorCity,
+    super.creatorState,
     super.inviterUsername,
   });
 
@@ -30,6 +34,13 @@ class DuelInvitationModel extends DuelInvitation {
           ? DateTime.parse(json['expires_at'] as String) 
           : null,
       duelTitle: json['duel_title'] as String?,
+      challengeType: json['challenge_type'] as String?,
+      targetValue: json['target_value'] != null 
+          ? (json['target_value'] as num).toDouble() 
+          : null,
+      timeframeHours: json['timeframe_hours'] as int?,
+      creatorCity: json['creator_city'] as String?,
+      creatorState: json['creator_state'] as String?,
       inviterUsername: json['inviter_username'] as String?,
     );
   }
@@ -45,10 +56,16 @@ class DuelInvitationModel extends DuelInvitation {
       'updated_at': updatedAt.toIso8601String(),
       'expires_at': expiresAt?.toIso8601String(),
       'duel_title': duelTitle,
+      'challenge_type': challengeType,
+      'target_value': targetValue,
+      'timeframe_hours': timeframeHours,
+      'creator_city': creatorCity,
+      'creator_state': creatorState,
       'inviter_username': inviterUsername,
     };
   }
 
+  @override
   DuelInvitationModel copyWith({
     String? id,
     String? duelId,
@@ -59,6 +76,11 @@ class DuelInvitationModel extends DuelInvitation {
     DateTime? updatedAt,
     DateTime? expiresAt,
     String? duelTitle,
+    String? challengeType,
+    double? targetValue,
+    int? timeframeHours,
+    String? creatorCity,
+    String? creatorState,
     String? inviterUsername,
   }) {
     return DuelInvitationModel(
@@ -71,31 +93,12 @@ class DuelInvitationModel extends DuelInvitation {
       updatedAt: updatedAt ?? this.updatedAt,
       expiresAt: expiresAt ?? this.expiresAt,
       duelTitle: duelTitle ?? this.duelTitle,
+      challengeType: challengeType ?? this.challengeType,
+      targetValue: targetValue ?? this.targetValue,
+      timeframeHours: timeframeHours ?? this.timeframeHours,
+      creatorCity: creatorCity ?? this.creatorCity,
+      creatorState: creatorState ?? this.creatorState,
       inviterUsername: inviterUsername ?? this.inviterUsername,
     );
   }
-
-  bool get isPending => status == DuelInvitationStatus.pending;
-  bool get isAccepted => status == DuelInvitationStatus.accepted;
-  bool get isDeclined => status == DuelInvitationStatus.declined;
-  bool get isExpired => status == DuelInvitationStatus.expired;
-
-  bool get hasExpired {
-    if (expiresAt == null) return false;
-    return DateTime.now().isAfter(expiresAt!);
-  }
-
-  @override
-  List<Object?> get props => [
-        id,
-        duelId,
-        inviterId,
-        inviteeEmail,
-        status,
-        createdAt,
-        updatedAt,
-        expiresAt,
-        duelTitle,
-        inviterUsername,
-      ];
 }
