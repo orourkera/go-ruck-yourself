@@ -86,7 +86,7 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   
   // Initialize Firebase Messaging Service
-  await FirebaseMessagingService.initialize();
+  await FirebaseMessagingService().initialize();
   
   // Initialize Supabase
   final supabaseUrl = dotenv.env['SUPABASE_URL'];

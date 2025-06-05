@@ -4,9 +4,9 @@ import '../../../domain/usecases/get_duel_leaderboard.dart';
 import '../../../domain/usecases/join_duel.dart' as join_duel_usecase;
 import '../../../domain/usecases/update_duel_progress.dart' as update_progress_usecase;
 import '../../../domain/usecases/get_duel_comments.dart';
-import '../../../domain/usecases/add_duel_comment.dart';
-import '../../../domain/usecases/update_duel_comment.dart';
-import '../../../domain/usecases/delete_duel_comment.dart';
+import '../../../domain/usecases/add_duel_comment.dart' as add_comment_usecase;
+import '../../../domain/usecases/update_duel_comment.dart' as update_comment_usecase;
+import '../../../domain/usecases/delete_duel_comment.dart' as delete_comment_usecase;
 import 'duel_detail_event.dart';
 import 'duel_detail_state.dart';
 
@@ -16,9 +16,9 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
   final join_duel_usecase.JoinDuel joinDuel;
   final update_progress_usecase.UpdateDuelProgress updateDuelProgress;
   final GetDuelComments getDuelComments;
-  final AddDuelComment addDuelComment;
-  final UpdateDuelComment updateDuelComment;
-  final DeleteDuelComment deleteDuelComment;
+  final add_comment_usecase.AddDuelComment addDuelComment;
+  final update_comment_usecase.UpdateDuelComment updateDuelComment;
+  final delete_comment_usecase.DeleteDuelComment deleteDuelComment;
 
   DuelDetailBloc({
     required this.getDuelDetails,
@@ -156,7 +156,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
     if (state is DuelDetailLoaded) {
       final currentState = state as DuelDetailLoaded;
 
-      final result = await addDuelComment(AddDuelCommentParams(
+      final result = await addDuelComment(add_comment_usecase.AddDuelCommentParams(
         duelId: event.duelId,
         content: event.content,
       ));
@@ -173,7 +173,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
 
   void _onUpdateDuelComment(UpdateDuelComment event, Emitter<DuelDetailState> emit) async {
     if (state is DuelDetailLoaded) {
-      final result = await updateDuelComment(UpdateDuelCommentParams(
+      final result = await updateDuelComment(update_comment_usecase.UpdateDuelCommentParams(
         commentId: event.commentId,
         content: event.content,
       ));
@@ -191,7 +191,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
 
   void _onDeleteDuelComment(DeleteDuelComment event, Emitter<DuelDetailState> emit) async {
     if (state is DuelDetailLoaded) {
-      final result = await deleteDuelComment(DeleteDuelCommentParams(
+      final result = await deleteDuelComment(delete_comment_usecase.DeleteDuelCommentParams(
         commentId: event.commentId,
       ));
 

@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import '../../domain/entities/duel_comment.dart';
-import '../bloc/duel_details_bloc.dart';
-import '../bloc/duel_details_event.dart';
-import '../bloc/duel_details_state.dart';
+import '../bloc/duel_detail/duel_detail_bloc.dart';
+import '../bloc/duel_detail/duel_detail_event.dart';
+import '../bloc/duel_detail/duel_detail_state.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/widgets/styled_snackbar.dart';
 
@@ -74,7 +74,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
     
     // Load comments on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DuelDetailsBloc>().add(LoadDuelComments(widget.duelId));
+      context.read<DuelDetailBloc>().add(LoadDuelComments(duelId: widget.duelId));
     });
   }
 
@@ -96,7 +96,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
     
     if (_editingCommentId != null) {
       // Update existing comment
-      context.read<DuelDetailsBloc>().add(
+      context.read<DuelDetailBloc>().add(
         UpdateDuelComment(
           commentId: _editingCommentId!,
           content: _commentController.text.trim(),
@@ -104,7 +104,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
       );
     } else {
       // Add new comment
-      context.read<DuelDetailsBloc>().add(
+      context.read<DuelDetailBloc>().add(
         AddDuelComment(
           duelId: widget.duelId,
           content: _commentController.text.trim(),
@@ -143,7 +143,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              context.read<DuelDetailsBloc>().add(DeleteDuelComment(commentId: comment.id));
+              context.read<DuelDetailBloc>().add(DeleteDuelComment(commentId: comment.id));
             },
             style: TextButton.styleFrom(
               foregroundColor: Colors.red,
@@ -165,9 +165,9 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<DuelDetailsBloc, DuelDetailsState>(
+    return BlocListener<DuelDetailBloc, DuelDetailState>(
       listener: (context, state) {
-        if (state is DuelDetailsLoaded) {
+        if (state is DuelDetailLoaded) {
           // Update local comments state
           setState(() {
             _currentComments = state.comments;
@@ -179,19 +179,22 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
           if (_editingCommentId != null) {
             _cancelEditing();
           }
-        } else if (state is DuelDetailsError && state.message.contains('comment')) {
+        } else if (state is DuelDetailError && state.message.contains('comment')) {
           // Show error for comment operations
-          StyledSnackBar.showError(context, state.message);
+          StyledSnackBar.showError(
+            context: context,
+            message: state.message,
+          );
           setState(() {
             _isAddingComment = false;
           });
         }
       },
-      child: BlocBuilder<DuelDetailsBloc, DuelDetailsState>(
+      child: BlocBuilder<DuelDetailBloc, DuelDetailState>(
         builder: (context, state) {
           List<DuelComment> comments = _currentComments;
           
-          if (state is DuelDetailsLoaded) {
+          if (state is DuelDetailLoaded) {
             comments = state.comments;
           }
 
@@ -293,7 +296,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
               ],
               
               // Comments list
-              if (state is DuelDetailsLoading && !_commentsLoaded)
+              if (state is DuelDetailLoading && !_commentsLoaded)
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32),
@@ -455,7 +458,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                         TextButton(
                           onPressed: () {
                             // Update the comment
-                            context.read<DuelDetailsBloc>().add(
+                            context.read<DuelDetailBloc>().add(
                               UpdateDuelComment(
                                 commentId: comment.id,
                                 content: _commentController.text.trim(),

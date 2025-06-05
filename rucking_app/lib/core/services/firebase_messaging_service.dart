@@ -4,9 +4,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:get_it/get_it.dart';
 import '../../features/notifications/util/notification_navigation.dart';
 import '../../features/notifications/domain/entities/app_notification.dart';
-import '../../shared/network/api_client.dart';
+import '../services/api_client.dart';
 
 /// Service for handling Firebase Cloud Messaging (FCM) push notifications
 class FirebaseMessagingService {
@@ -131,9 +132,9 @@ class FirebaseMessagingService {
   /// Register device token with backend
   Future<void> _registerDeviceToken(String token) async {
     try {
-      final apiClient = ApiClient();
+      final apiClient = GetIt.I<ApiClient>();
       
-      await apiClient.post('/device-token', data: {
+      await apiClient.post('/device-token', {
         'fcm_token': token,
         'device_type': Platform.isIOS ? 'ios' : 'android',
         'device_id': await _getDeviceId(),
@@ -220,6 +221,7 @@ class FirebaseMessagingService {
     final notification = AppNotification(
       id: data['notification_id'] ?? '',
       type: data['type'] ?? '',
+      message: data['message'] ?? data['body'] ?? '',
       data: data,
       createdAt: DateTime.now(),
       isRead: false,
@@ -259,12 +261,10 @@ class FirebaseMessagingService {
   /// Unregister device token
   Future<void> unregisterToken() async {
     try {
-      final apiClient = ApiClient();
+      final apiClient = GetIt.I<ApiClient>();
       
       if (_deviceToken != null) {
-        await apiClient.delete('/device-token', data: {
-          'fcm_token': _deviceToken,
-        });
+        await apiClient.delete('/device-token?fcm_token=$_deviceToken');
       }
       
       await _firebaseMessaging.deleteToken();
@@ -274,11 +274,6 @@ class FirebaseMessagingService {
     } catch (e) {
       print('Error unregistering device token: $e');
     }
-  }
-
-  /// Static method to initialize the service
-  static Future<void> initialize() async {
-    await FirebaseMessagingService().initialize();
   }
 
   /// Handle background messages (called from main.dart)

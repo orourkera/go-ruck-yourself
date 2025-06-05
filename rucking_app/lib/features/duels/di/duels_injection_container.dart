@@ -19,6 +19,10 @@ import '../domain/usecases/respond_to_invitation.dart';
 import '../domain/usecases/get_user_duel_stats.dart';
 import '../domain/usecases/get_duel_stats_leaderboard.dart';
 import '../domain/usecases/get_duel_leaderboard.dart';
+import '../domain/usecases/get_duel_comments.dart';
+import '../domain/usecases/add_duel_comment.dart';
+import '../domain/usecases/update_duel_comment.dart';
+import '../domain/usecases/delete_duel_comment.dart';
 
 // BLoCs
 import '../presentation/bloc/duel_list/duel_list_bloc.dart';
@@ -50,6 +54,10 @@ void initDuelsFeature(GetIt sl) {
   sl.registerLazySingleton(() => GetUserDuelStats(sl()));
   sl.registerLazySingleton(() => GetDuelStatsLeaderboard(sl()));
   sl.registerLazySingleton(() => GetDuelLeaderboard(sl()));
+  sl.registerLazySingleton(() => GetDuelComments(sl()));
+  sl.registerLazySingleton(() => AddDuelComment(sl()));
+  sl.registerLazySingleton(() => UpdateDuelComment(sl()));
+  sl.registerLazySingleton(() => DeleteDuelComment(sl()));
 
   // BLoCs
   sl.registerFactory(() => DuelListBloc(
@@ -62,6 +70,10 @@ void initDuelsFeature(GetIt sl) {
     getDuelLeaderboard: sl(),
     joinDuel: sl(),
     updateDuelProgress: sl(),
+    getDuelComments: sl(),
+    addDuelComment: sl(),
+    updateDuelComment: sl(),
+    deleteDuelComment: sl(),
   ));
 
   sl.registerFactory(() => CreateDuelBloc(
