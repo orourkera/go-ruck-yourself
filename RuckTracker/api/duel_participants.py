@@ -24,7 +24,7 @@ class DuelParticipantProgressResource(Resource):
         try:
             schema = DuelProgressUpdateSchema()
             data = schema.load(request.get_json())
-            user_id = g.user['id']
+            user_id = g.user.id
             
             cursor = db.connection.cursor()
             
@@ -167,7 +167,7 @@ class DuelParticipantProgressResource(Resource):
     def get(self, duel_id, participant_id):
         """Get participant's detailed progress including sessions"""
         try:
-            user_id = g.user['id']
+            user_id = g.user.id
             cursor = db.connection.cursor()
             
             # Get participant info
