@@ -171,12 +171,26 @@ class DuelListResource(Resource):
             # Update user stats (optional - don't fail duel creation if this fails)
             try:
                 supabase_admin = get_supabase_admin_client()
-                # Use SQL function to increment or set initial value
-                supabase_admin.rpc('increment_user_duel_stats', {
-                    'user_uuid': user_id,
-                    'created_increment': 1,
-                    'joined_increment': 0
-                }).execute()
+                now = datetime.utcnow()
+                # First try to get existing stats
+                existing_stats = supabase_admin.table('user_duel_stats').select('duels_created').eq('user_id', user_id).execute()
+                
+                if existing_stats.data:
+                    # Update existing record
+                    current_created = existing_stats.data[0].get('duels_created', 0)
+                    supabase_admin.table('user_duel_stats').update({
+                        'duels_created': current_created + 1,
+                        'updated_at': now.isoformat()
+                    }).eq('user_id', user_id).execute()
+                else:
+                    # Insert new record
+                    supabase_admin.table('user_duel_stats').insert({
+                        'user_id': user_id,
+                        'duels_created': 1,
+                        'duels_joined': 0,
+                        'created_at': now.isoformat(),
+                        'updated_at': now.isoformat()
+                    }).execute()
             except Exception as e:
                 # Log the error but don't fail duel creation
                 logging.warning(f"Failed to update user duel stats: {e}")
@@ -305,12 +319,26 @@ class DuelJoinResource(Resource):
             # Update user stats (optional - don't fail duel join if this fails)
             try:
                 supabase_admin = get_supabase_admin_client()
-                # Use SQL function to increment or set initial value
-                supabase_admin.rpc('increment_user_duel_stats', {
-                    'user_uuid': user_id,
-                    'created_increment': 0,
-                    'joined_increment': 1
-                }).execute()
+                now = datetime.utcnow()
+                # First try to get existing stats
+                existing_stats = supabase_admin.table('user_duel_stats').select('duels_joined').eq('user_id', user_id).execute()
+                
+                if existing_stats.data:
+                    # Update existing record
+                    current_joined = existing_stats.data[0].get('duels_joined', 0)
+                    supabase_admin.table('user_duel_stats').update({
+                        'duels_joined': current_joined + 1,
+                        'updated_at': now.isoformat()
+                    }).eq('user_id', user_id).execute()
+                else:
+                    # Insert new record
+                    supabase_admin.table('user_duel_stats').insert({
+                        'user_id': user_id,
+                        'duels_created': 0,
+                        'duels_joined': 1,
+                        'created_at': now.isoformat(),
+                        'updated_at': now.isoformat()
+                    }).execute()
             except Exception as e:
                 # Log the error but don't fail duel join
                 logging.warning(f"Failed to update user duel join stats: {e}")
