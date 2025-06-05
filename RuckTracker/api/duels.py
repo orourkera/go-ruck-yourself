@@ -171,17 +171,20 @@ class DuelListResource(Resource):
             # Update user stats (optional - don't fail duel creation if this fails)
             try:
                 supabase_admin = get_supabase_admin_client()
-                supabase_admin.table('user_duel_stats').upsert({
-                    'user_id': user_id,
-                    'duels_created': 1,
-                    'created_at': now.isoformat(),
-                    'updated_at': now.isoformat()
+                # Use SQL function to increment or set initial value
+                supabase_admin.rpc('increment_user_duel_stats', {
+                    'user_uuid': user_id,
+                    'created_increment': 1,
+                    'joined_increment': 0
                 }).execute()
             except Exception as e:
                 # Log the error but don't fail duel creation
                 logging.warning(f"Failed to update user duel stats: {e}")
             
-            return {'message': 'Duel created successfully', 'duel_id': duel_id}, 201
+            # Get the created duel to return complete data
+            created_duel = supabase.table('duels').select('*').eq('id', duel_id).execute()
+            
+            return {'message': 'Duel created successfully', 'duel': created_duel.data[0]}, 201
             
         except ValidationError as e:
             return {'error': str(e)}, 400
@@ -302,11 +305,11 @@ class DuelJoinResource(Resource):
             # Update user stats (optional - don't fail duel join if this fails)
             try:
                 supabase_admin = get_supabase_admin_client()
-                supabase_admin.table('user_duel_stats').upsert({
-                    'user_id': user_id,
-                    'duels_joined': 1,
-                    'created_at': now.isoformat(),
-                    'updated_at': now.isoformat()
+                # Use SQL function to increment or set initial value
+                supabase_admin.rpc('increment_user_duel_stats', {
+                    'user_uuid': user_id,
+                    'created_increment': 0,
+                    'joined_increment': 1
                 }).execute()
             except Exception as e:
                 # Log the error but don't fail duel join
