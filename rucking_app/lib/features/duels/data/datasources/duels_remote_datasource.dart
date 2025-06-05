@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../../../../core/services/api_client.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/duel_model.dart';
@@ -121,7 +120,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   @override
   Future<DuelModel> getDuel(String duelId) async {
     try {
-      final responseData = await apiClient.get('/duels/$duelId');
+      final responseData = await apiClient.get('/duels/$duelId', queryParams: {});
       return DuelModel.fromJson(responseData);
     } catch (e) {
       rethrow;
@@ -178,7 +177,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   @override
   Future<DuelParticipantModel> getParticipantProgress(String duelId, String participantId) async {
     try {
-      final responseData = await apiClient.get('/duels/$duelId/participants/$participantId/progress');
+      final responseData = await apiClient.get('/duels/$duelId/participants/$participantId/progress', queryParams: {});
       return DuelParticipantModel.fromJson(responseData);
     } catch (e) {
       rethrow;
@@ -188,7 +187,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   @override
   Future<List<DuelParticipantModel>> getDuelLeaderboard(String duelId) async {
     try {
-      final responseData = await apiClient.get('/duels/$duelId/leaderboard');
+      final responseData = await apiClient.get('/duels/$duelId/leaderboard', queryParams: {});
       final List<dynamic> leaderboardData = responseData['leaderboard'] ?? [];
       return leaderboardData
           .map((data) => DuelParticipantModel.fromJson(data))
@@ -202,7 +201,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   Future<UserDuelStatsModel> getUserDuelStats([String? userId]) async {
     try {
       final endpoint = userId != null ? '/duel-stats/$userId' : '/duel-stats';
-      final responseData = await apiClient.get(endpoint);
+      final responseData = await apiClient.get(endpoint, queryParams: {});
       return UserDuelStatsModel.fromJson(responseData);
     } catch (e) {
       rethrow;
@@ -216,7 +215,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
         'type': statType,
         'limit': limit.toString(),
       };
-      final responseData = await apiClient.get('/duel-stats/leaderboard', queryParams);
+      final responseData = await apiClient.get('/duel-stats/leaderboard', queryParams: queryParams);
       final List<dynamic> leaderboardData = responseData['leaderboard'] ?? [];
       return leaderboardData.map((statsJson) => UserDuelStatsModel.fromJson(statsJson)).toList();
     } catch (e) {
@@ -229,7 +228,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     try {
       final queryParams = {'days': days.toString()};
       // ApiClient.get returns the response data directly
-      return await apiClient.get('/duel-stats/analytics', queryParams);
+      return await apiClient.get('/duel-stats/analytics', queryParams: queryParams);
     } catch (e) {
       rethrow;
     }
@@ -239,7 +238,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   Future<List<DuelInvitationModel>> getDuelInvitations(String status) async {
     try {
       final queryParams = {'status': status};
-      final responseData = await apiClient.get('/duel-invitations', queryParams);
+      final responseData = await apiClient.get('/duel-invitations', queryParams: queryParams);
       final List<dynamic> invitationsData = responseData['invitations'] ?? [];
       return invitationsData.map((invitationJson) => DuelInvitationModel.fromJson(invitationJson)).toList();
     } catch (e) {
@@ -249,12 +248,13 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
 
   @override
   Future<void> respondToInvitation(String invitationId, String action) async {
-    final body = {'action': action};
-    final response = await apiClient.put('/duel-invitations/$invitationId', body: body);
-    
-    if (response.statusCode != 200) {
-      final errorData = json.decode(response.body);
-      throw ServerException(message: errorData['error'] ?? 'Failed to respond to invitation');
+    try {
+      final body = {'action': action};
+      await apiClient.put('/duel-invitations/$invitationId', body);
+      // Successfully responded if no exception is thrown
+      return;
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -270,7 +270,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
 
   @override
   Future<List<DuelInvitationModel>> getSentInvitations() async {
-    final response = await apiClient.get('/duel-invitations/sent');
+    final response = await apiClient.get('/duel-invitations/sent', queryParams: {});
     
     if (response.statusCode == 200) {
       final jsonData = json.decode(response.body);
