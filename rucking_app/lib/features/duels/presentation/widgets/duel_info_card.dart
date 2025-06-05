@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
+import '../../domain/entities/duel_status.dart';
 import '../../../../shared/theme/app_colors.dart';
 
 class DuelInfoCard extends StatelessWidget {
@@ -37,8 +38,8 @@ class DuelInfoCard extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppColors.primary,
-                AppColors.primary.withOpacity(0.8),
+                AppColors.accent,
+                AppColors.accent.withOpacity(0.8),
               ],
             ),
           ),
@@ -70,7 +71,7 @@ class DuelInfoCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
+            color: Colors.orange.withOpacity(0.9),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
@@ -161,7 +162,7 @@ class DuelInfoCard extends StatelessWidget {
               ),
             ],
           ),
-          if (duel.creatorCity != null || duel.creatorState != null) ...[
+          if (_shouldShowLocation()) ...[
             const SizedBox(height: 8),
             Row(
               children: [
@@ -289,16 +290,18 @@ class DuelInfoCard extends StatelessWidget {
 
   String _getStatusText() {
     switch (duel.status) {
-      case 'pending':
+      case DuelStatus.pending:
         return 'Starting Soon';
-      case 'active':
+      case DuelStatus.active:
         return 'In Progress';
-      case 'completed':
+      case DuelStatus.completed:
         return 'Completed';
-      case 'cancelled':
+      case DuelStatus.cancelled:
         return 'Cancelled';
       default:
-        return 'Unknown';
+        // Debug log to understand what status value we're getting
+        print('DEBUG: Unknown duel status: ${duel.status}');
+        return 'Pending';
     }
   }
 
@@ -331,7 +334,7 @@ class DuelInfoCard extends StatelessWidget {
       case 'elevation':
         return 'meters';
       case 'power_points':
-        return 'points';
+        return 'power points';
       default:
         return '';
     }
@@ -353,9 +356,13 @@ class DuelInfoCard extends StatelessWidget {
 
   String _getLocationText() {
     final parts = <String>[];
-    if (duel.creatorCity != null) parts.add(duel.creatorCity!);
-    if (duel.creatorState != null) parts.add(duel.creatorState!);
+    if (duel.creatorCity != null && duel.creatorCity != 'Unknown') parts.add(duel.creatorCity!);
+    if (duel.creatorState != null && duel.creatorState != 'Unknown') parts.add(duel.creatorState!);
     return parts.join(', ');
+  }
+
+  bool _shouldShowLocation() {
+    return (duel.creatorCity != null && duel.creatorCity != 'Unknown') || (duel.creatorState != null && duel.creatorState != 'Unknown');
   }
 
   double _calculateTopProgress() {

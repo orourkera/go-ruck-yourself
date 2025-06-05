@@ -1,10 +1,11 @@
 # /Users/rory/RuckingApp/RuckTracker/api/ruck_likes_resource.py
-from flask import request, jsonify, g
+from flask import request, g
 from flask_restful import Resource
 import logging
-
-# Import Supabase client
 from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.utils.api_response import build_api_response
+from RuckTracker.auth.decorators import token_required
+from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,40 @@ class RuckLikesResource(Resource):
             if hasattr(insert_response, 'error') and insert_response.error:
                 logger.error(f"RuckLikesResource: Error adding like: {insert_response.error}")
                 return build_api_response(success=False, error="Failed to add like", status_code=500)
+            
+            # Send push notification to ruck owner
+            try:
+                # Get ruck owner info
+                ruck_response = supabase.table('ruck_sessions') \
+                    .select('user_id') \
+                    .eq('id', ruck_id) \
+                    .execute()
+                
+                if ruck_response.data and ruck_response.data[0]['user_id'] != user_id:
+                    ruck_owner_id = ruck_response.data[0]['user_id']
+                    
+                    # Get liker display name
+                    user_response = supabase.table('users') \
+                        .select('display_name') \
+                        .eq('id', user_id) \
+                        .execute()
+                    
+                    liker_name = user_response.data[0]['display_name'] if user_response.data else 'Someone'
+                    
+                    # Send push notification
+                    push_notification_service = PushNotificationService()
+                    device_tokens = get_user_device_tokens([ruck_owner_id])
+                    
+                    if device_tokens:
+                        push_notification_service.send_ruck_like_notification(
+                            device_tokens=device_tokens,
+                            liker_name=liker_name,
+                            ruck_id=ruck_id
+                        )
+                        
+            except Exception as e:
+                logger.error(f"Failed to send like notification: {e}")
+                # Don't fail the like if notification fails
             
             # Return the created like
             return build_api_response(data=insert_response.data[0], status_code=201)

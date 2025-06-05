@@ -30,38 +30,66 @@ class DuelModel extends Duel {
   });
 
   factory DuelModel.fromJson(Map<String, dynamic> json) {
-    return DuelModel(
-      id: json['id'] as String,
-      creatorId: json['creator_id'] as String,
-      title: json['title'] as String,
-      challengeType: DuelChallengeType.values.firstWhere(
-        (e) => e.name == json['challenge_type'],
-      ),
-      targetValue: (json['target_value'] as num).toDouble(),
-      timeframeHours: json['timeframe_hours'] as int,
-      creatorCity: json['creator_city'] as String?,
-      creatorState: json['creator_state'] as String?,
-      isPublic: json['is_public'] as bool,
-      status: DuelStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-      ),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      startsAt: json['starts_at'] != null 
-          ? DateTime.parse(json['starts_at'] as String) 
-          : null,
-      endsAt: json['ends_at'] != null 
-          ? DateTime.parse(json['ends_at'] as String) 
-          : null,
-      winnerId: json['winner_id'] as String?,
-      description: json['description'] as String?,
-      maxParticipants: json['max_participants'] as int,
-      currentParticipants: json['current_participants'] as int?,
-      minParticipants: json['min_participants'] as int?,
-      participants: (json['participants'] as List<dynamic>?)
-          ?.map((p) => DuelParticipantModel.fromJson(p as Map<String, dynamic>))
-          .toList() ?? [],
-    );
+    try {
+      return DuelModel(
+        id: json['id']?.toString() ?? '',
+        creatorId: json['creator_id']?.toString() ?? '',
+        title: json['title']?.toString() ?? 'Unknown Title',
+        challengeType: _parseChallengeType(json['challenge_type']?.toString() ?? 'distance'),
+        targetValue: (json['target_value'] as num?)?.toDouble() ?? 0.0,
+        timeframeHours: json['timeframe_hours'] as int? ?? 24,
+        creatorCity: json['creator_city']?.toString(),
+        creatorState: json['creator_state']?.toString(),
+        isPublic: json['is_public'] as bool? ?? true,
+        status: _parseStatus(json['status']?.toString() ?? 'pending'),
+        createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
+        updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : DateTime.now(),
+        startsAt: json['starts_at'] != null 
+            ? DateTime.parse(json['starts_at'] as String) 
+            : null,
+        endsAt: json['ends_at'] != null 
+            ? DateTime.parse(json['ends_at'] as String) 
+            : null,
+        winnerId: json['winner_id']?.toString(),
+        description: json['description']?.toString(),
+        maxParticipants: json['max_participants'] as int? ?? 2,
+        currentParticipants: json['current_participants'] as int?,
+        minParticipants: json['min_participants'] as int?,
+        participants: (json['participants'] as List<dynamic>?)
+            ?.map((p) => DuelParticipantModel.fromJson(p as Map<String, dynamic>))
+            .toList() ?? [],
+      );
+    } catch (e, stackTrace) {
+      print('[ERROR] DuelModel.fromJson failed: $e');
+      print('[ERROR] JSON data: $json');
+      print('[ERROR] Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  static DuelChallengeType _parseChallengeType(String challengeType) {
+    // Handle both backend format (power_points) and frontend format (powerPoints)
+    switch (challengeType) {
+      case 'distance':
+        return DuelChallengeType.distance;
+      case 'time':
+        return DuelChallengeType.time;
+      case 'elevation':
+        return DuelChallengeType.elevation;
+      case 'power_points':
+      case 'powerPoints':
+        return DuelChallengeType.powerPoints;
+      default:
+        throw ArgumentError('Unknown challenge type: $challengeType');
+    }
+  }
+
+  static DuelStatus _parseStatus(String status) {
+    try {
+      return DuelStatus.values.firstWhere((e) => e.name == status);
+    } catch (e) {
+      throw ArgumentError('Unknown duel status: $status');
+    }
   }
 
   Map<String, dynamic> toJson() {

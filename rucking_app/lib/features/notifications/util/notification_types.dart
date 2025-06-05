@@ -11,4 +11,16 @@ class NotificationType {
   
   /// System notification
   static const String system = 'system';
+  
+  /// Duel comment notification
+  static const String duelComment = 'duel_comment';
+  
+  /// Duel invitation notification
+  static const String duelInvitation = 'duel_invitation';
+  
+  /// Duel joined notification
+  static const String duelJoined = 'duel_joined';
+  
+  /// Duel completed notification
+  static const String duelCompleted = 'duel_completed';
 }

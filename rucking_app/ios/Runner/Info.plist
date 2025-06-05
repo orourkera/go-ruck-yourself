@@ -42,6 +42,10 @@
 	<string>Go Rucky Yourself needs your location to track your routes, calculate distance, pace and elevation during ruck sessions. Your location data is only used while the app is in use.</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Your data will be used to provide you with a better and personalized rucking experience and to help improve our features.</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>This app uses notifications to keep you updated on ruck activities, comments, likes, and duel updates.</string>
+	<key>NSUserNotificationCriticalAlertsUsageDescription</key>
+	<string>This app may send critical notifications for time-sensitive duel updates.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

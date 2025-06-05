@@ -18,4 +18,5 @@ flask-jwt-extended==4.6.0
 fastapi
 uvicorn[standard]
 google-auth==2.29.0
+google-auth-oauthlib==1.1.0
 requests==2.31.0

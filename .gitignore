@@ -42,5 +42,9 @@ local.properties
 google-services.json
 GoogleService-Info.plist
 
+# Firebase service account (contains secrets)
+go-ruck-yourself-c8eff3e1bdf9.json
+*.json
+
 # Web (if applicable)
 .dart_tool/build/

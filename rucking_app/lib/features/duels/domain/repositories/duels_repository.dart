@@ -4,6 +4,7 @@ import '../entities/duel.dart';
 import '../entities/duel_participant.dart';
 import '../entities/duel_stats.dart';
 import '../entities/duel_invitation.dart';
+import '../entities/duel_comment.dart';
 
 abstract class DuelsRepository {
   // Duel management
@@ -84,4 +85,13 @@ abstract class DuelsRepository {
   Future<Either<Failure, void>> cancelInvitation(String invitationId);
 
   Future<Either<Failure, List<DuelInvitation>>> getSentInvitations();
+
+  // Comments
+  Future<Either<Failure, List<DuelComment>>> getDuelComments(String duelId);
+
+  Future<Either<Failure, DuelComment>> addDuelComment(String duelId, String content);
+
+  Future<Either<Failure, DuelComment>> updateDuelComment(String commentId, String content);
+
+  Future<Either<Failure, void>> deleteDuelComment(String commentId);
 }

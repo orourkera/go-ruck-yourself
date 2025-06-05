@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import '../../../domain/entities/duel.dart';
 import '../../../domain/entities/duel_participant.dart';
+import '../../../domain/entities/duel_comment.dart';
 
 abstract class DuelDetailState extends Equatable {
   const DuelDetailState();
@@ -17,27 +18,31 @@ class DuelDetailLoaded extends DuelDetailState {
   final Duel duel;
   final List<DuelParticipant> leaderboard;
   final bool isLeaderboardLoading;
+  final List<DuelComment> comments;
 
   const DuelDetailLoaded({
     required this.duel,
     this.leaderboard = const [],
     this.isLeaderboardLoading = false,
+    this.comments = const [],
   });
 
   DuelDetailLoaded copyWith({
     Duel? duel,
     List<DuelParticipant>? leaderboard,
     bool? isLeaderboardLoading,
+    List<DuelComment>? comments,
   }) {
     return DuelDetailLoaded(
       duel: duel ?? this.duel,
       leaderboard: leaderboard ?? this.leaderboard,
       isLeaderboardLoading: isLeaderboardLoading ?? this.isLeaderboardLoading,
+      comments: comments ?? this.comments,
     );
   }
 
   @override
-  List<Object?> get props => [duel, leaderboard, isLeaderboardLoading];
+  List<Object?> get props => [duel, leaderboard, isLeaderboardLoading, comments];
 }
 
 class DuelDetailError extends DuelDetailState {

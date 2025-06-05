@@ -59,3 +59,48 @@ class UpdateDuelProgress extends DuelDetailEvent {
   @override
   List<Object> get props => [duelId, participantId, sessionId, contributionValue];
 }
+
+// Comment-related events
+class LoadDuelComments extends DuelDetailEvent {
+  final String duelId;
+
+  const LoadDuelComments({required this.duelId});
+
+  @override
+  List<Object> get props => [duelId];
+}
+
+class AddDuelComment extends DuelDetailEvent {
+  final String duelId;
+  final String content;
+
+  const AddDuelComment({
+    required this.duelId,
+    required this.content,
+  });
+
+  @override
+  List<Object> get props => [duelId, content];
+}
+
+class UpdateDuelComment extends DuelDetailEvent {
+  final String commentId;
+  final String content;
+
+  const UpdateDuelComment({
+    required this.commentId,
+    required this.content,
+  });
+
+  @override
+  List<Object> get props => [commentId, content];
+}
+
+class DeleteDuelComment extends DuelDetailEvent {
+  final String commentId;
+
+  const DeleteDuelComment({required this.commentId});
+
+  @override
+  List<Object> get props => [commentId];
+}

@@ -3,6 +3,10 @@ import '../../../domain/usecases/get_duel_details.dart';
 import '../../../domain/usecases/get_duel_leaderboard.dart';
 import '../../../domain/usecases/join_duel.dart' as join_duel_usecase;
 import '../../../domain/usecases/update_duel_progress.dart' as update_progress_usecase;
+import '../../../domain/usecases/get_duel_comments.dart';
+import '../../../domain/usecases/add_duel_comment.dart';
+import '../../../domain/usecases/update_duel_comment.dart';
+import '../../../domain/usecases/delete_duel_comment.dart';
 import 'duel_detail_event.dart';
 import 'duel_detail_state.dart';
 
@@ -11,31 +15,41 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
   final GetDuelLeaderboard getDuelLeaderboard;
   final join_duel_usecase.JoinDuel joinDuel;
   final update_progress_usecase.UpdateDuelProgress updateDuelProgress;
+  final GetDuelComments getDuelComments;
+  final AddDuelComment addDuelComment;
+  final UpdateDuelComment updateDuelComment;
+  final DeleteDuelComment deleteDuelComment;
 
   DuelDetailBloc({
     required this.getDuelDetails,
     required this.getDuelLeaderboard,
     required this.joinDuel,
     required this.updateDuelProgress,
+    required this.getDuelComments,
+    required this.addDuelComment,
+    required this.updateDuelComment,
+    required this.deleteDuelComment,
   }) : super(DuelDetailInitial()) {
     on<LoadDuelDetail>(_onLoadDuelDetail);
     on<RefreshDuelDetail>(_onRefreshDuelDetail);
     on<JoinDuelFromDetail>(_onJoinDuelFromDetail);
     on<LoadLeaderboard>(_onLoadLeaderboard);
     on<UpdateDuelProgress>(_onUpdateDuelProgress);
+    on<LoadDuelComments>(_onLoadDuelComments);
+    on<AddDuelComment>(_onAddDuelComment);
+    on<UpdateDuelComment>(_onUpdateDuelComment);
+    on<DeleteDuelComment>(_onDeleteDuelComment);
   }
 
   void _onLoadDuelDetail(LoadDuelDetail event, Emitter<DuelDetailState> emit) async {
     emit(DuelDetailLoading());
-
     final result = await getDuelDetails(GetDuelDetailsParams(duelId: event.duelId));
-
     result.fold(
       (failure) => emit(DuelDetailError(message: failure.message)),
       (duel) {
         emit(DuelDetailLoaded(duel: duel));
-        // Auto-load leaderboard after loading duel
         add(LoadLeaderboard(duelId: event.duelId));
+        add(LoadDuelComments(duelId: event.duelId));
       },
     );
   }
@@ -121,5 +135,74 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
         add(RefreshDuelDetail(duelId: event.duelId));
       },
     );
+  }
+
+  void _onLoadDuelComments(LoadDuelComments event, Emitter<DuelDetailState> emit) async {
+    if (state is DuelDetailLoaded) {
+      final currentState = state as DuelDetailLoaded;
+
+      final result = await getDuelComments(GetDuelCommentsParams(duelId: event.duelId));
+
+      result.fold(
+        (failure) => emit(DuelDetailError(message: failure.message)),
+        (comments) {
+          emit(currentState.copyWith(comments: comments));
+        },
+      );
+    }
+  }
+
+  void _onAddDuelComment(AddDuelComment event, Emitter<DuelDetailState> emit) async {
+    if (state is DuelDetailLoaded) {
+      final currentState = state as DuelDetailLoaded;
+
+      final result = await addDuelComment(AddDuelCommentParams(
+        duelId: event.duelId,
+        content: event.content,
+      ));
+
+      result.fold(
+        (failure) => emit(DuelDetailError(message: failure.message)),
+        (_) {
+          // Refresh comments
+          add(LoadDuelComments(duelId: event.duelId));
+        },
+      );
+    }
+  }
+
+  void _onUpdateDuelComment(UpdateDuelComment event, Emitter<DuelDetailState> emit) async {
+    if (state is DuelDetailLoaded) {
+      final result = await updateDuelComment(UpdateDuelCommentParams(
+        commentId: event.commentId,
+        content: event.content,
+      ));
+
+      result.fold(
+        (failure) => emit(DuelDetailError(message: failure.message)),
+        (_) {
+          // Need duelId to refresh comments - get it from current state
+          final currentState = state as DuelDetailLoaded;
+          add(LoadDuelComments(duelId: currentState.duel.id));
+        },
+      );
+    }
+  }
+
+  void _onDeleteDuelComment(DeleteDuelComment event, Emitter<DuelDetailState> emit) async {
+    if (state is DuelDetailLoaded) {
+      final result = await deleteDuelComment(DeleteDuelCommentParams(
+        commentId: event.commentId,
+      ));
+
+      result.fold(
+        (failure) => emit(DuelDetailError(message: failure.message)),
+        (_) {
+          // Need duelId to refresh comments - get it from current state
+          final currentState = state as DuelDetailLoaded;
+          add(LoadDuelComments(duelId: currentState.duel.id));
+        },
+      );
+    }
   }
 }

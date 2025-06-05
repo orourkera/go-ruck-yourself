@@ -19,6 +19,8 @@ import 'package:rucking_app/features/duels/presentation/bloc/create_duel/create_
 import 'package:rucking_app/features/duels/presentation/bloc/duel_stats/duel_stats_bloc.dart';
 import 'package:rucking_app/features/duels/presentation/bloc/duel_invitations/duel_invitations_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,6 +81,12 @@ void main() async {
   
   // Initialize Firebase
   await Firebase.initializeApp();
+  
+  // Initialize Firebase Messaging
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  
+  // Initialize Firebase Messaging Service
+  await FirebaseMessagingService.initialize();
   
   // Initialize Supabase
   final supabaseUrl = dotenv.env['SUPABASE_URL'];
@@ -171,4 +179,8 @@ class AppBlocObserver extends BlocObserver {
     AppLogger.error('${bloc.runtimeType} $error');
     super.onError(bloc, error, stackTrace);
   }
+}
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await FirebaseMessagingService.handleBackgroundMessage(message);
 }
