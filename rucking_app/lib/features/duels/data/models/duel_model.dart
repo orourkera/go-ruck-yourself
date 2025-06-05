@@ -39,8 +39,8 @@ class DuelModel extends Duel {
       ),
       targetValue: (json['target_value'] as num).toDouble(),
       timeframeHours: json['timeframe_hours'] as int,
-      creatorCity: json['creator_city'] as String,
-      creatorState: json['creator_state'] as String,
+      creatorCity: json['creator_city'] as String?,
+      creatorState: json['creator_state'] as String?,
       isPublic: json['is_public'] as bool,
       status: DuelStatus.values.firstWhere(
         (e) => e.name == json['status'],

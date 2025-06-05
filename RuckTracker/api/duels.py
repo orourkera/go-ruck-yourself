@@ -52,7 +52,7 @@ class DuelListResource(Resource):
             supabase = get_supabase_client()
             
             # Base query for public duels or user's duels
-            query = supabase.table('duels').select('*, creator_id(username)')
+            query = supabase.table('duels').select('*')
             
             # Add filters
             if is_public:
@@ -71,14 +71,32 @@ class DuelListResource(Resource):
             
             duels_response = query.execute()
             
-            # Get participants for each duel
+            # Get participants for each duel and enrich with creator info
             result = []
             for duel in duels_response.data:
-                participants_query = supabase.table('duel_participants').select('*, user_id(username), user_id(email)').eq('duel_id', duel['id']).order('current_value', desc=True)
+                # Get creator username
+                creator_query = supabase.table('users').select('username').eq('id', duel['creator_id'])
+                creator_response = creator_query.execute()
+                creator_username = creator_response.data[0]['username'] if creator_response.data else 'Unknown'
+                
+                # Get participants for this duel
+                participants_query = supabase.table('duel_participants').select('*').eq('duel_id', duel['id']).order('current_value', desc=True)
                 participants_response = participants_query.execute()
                 
+                # Get user info for each participant
+                enriched_participants = []
+                for participant in participants_response.data:
+                    user_query = supabase.table('users').select('username, email').eq('id', participant['user_id'])
+                    user_response = user_query.execute()
+                    if user_response.data:
+                        participant_data = dict(participant)
+                        participant_data['user_username'] = user_response.data[0]['username']
+                        participant_data['user_email'] = user_response.data[0]['email']
+                        enriched_participants.append(participant_data)
+                
                 duel_data = dict(duel)
-                duel_data['participants'] = [dict(p) for p in participants_response.data]
+                duel_data['creator_username'] = creator_username
+                duel_data['participants'] = enriched_participants
                 result.append(duel_data)
             
             return {
@@ -181,14 +199,14 @@ class DuelResource(Resource):
             supabase = get_supabase_client()
             
             # Get duel with creator info
-            duel_response = supabase.table('duels').select('*, creator_id(username)').eq('id', duel_id).execute()
+            duel_response = supabase.table('duels').select('*').eq('id', duel_id).execute()
             duel = duel_response.data[0] if duel_response.data else None
             
             if not duel:
                 return {'error': 'Duel not found'}, 404
             
             # Get participants with user info and progress
-            participants_response = supabase.table('duel_participants').select('*, user_id(username), user_id(email)').eq('duel_id', duel_id).order('current_value', desc=True).execute()
+            participants_response = supabase.table('duel_participants').select('*').eq('duel_id', duel_id).order('current_value', desc=True).execute()
             participants = participants_response.data
             
             result = dict(duel)
