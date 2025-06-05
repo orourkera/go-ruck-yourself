@@ -143,58 +143,65 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
     }
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Statistics'),
-        centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.secondary,
-          unselectedLabelColor: AppColors.textDarkSecondary,
-          indicatorColor: AppColors.primary,
-          labelStyle: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
-          unselectedLabelStyle: AppTextStyles.titleMedium,
-          tabs: const [
-            Tab(text: 'WEEKLY'),
-            Tab(text: 'MONTHLY'),
-            Tab(text: 'YEARLY'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          // Weekly tab
-          _isLoadingWeekly
-              ? const Center(child: CircularProgressIndicator())
-              : _weeklyStats.isEmpty
-                  ? const _EmptyStatsWidget(timeframe: 'weekly')
-                  : _StatsContentWidget(
-                      stats: _weeklyStats,
-                      timeframe: 'weekly',
-                      preferMetric: preferMetric,
-                    ),
-          
-          // Monthly tab
-          _isLoadingMonthly
-              ? const Center(child: CircularProgressIndicator())
-              : _monthlyStats.isEmpty
-                  ? const _EmptyStatsWidget(timeframe: 'monthly')
-                  : _StatsContentWidget(
-                      stats: _monthlyStats,
-                      timeframe: 'monthly',
-                      preferMetric: preferMetric,
-                    ),
-          
-          // Yearly tab
-          _isLoadingYearly
-              ? const Center(child: CircularProgressIndicator())
-              : _yearlyStats.isEmpty
-                  ? const _EmptyStatsWidget(timeframe: 'yearly')
-                  : _StatsContentWidget(
-                      stats: _yearlyStats,
-                      timeframe: 'yearly',
-                      preferMetric: preferMetric,
-                    ),
+          // Tab bar directly without AppBar
+          Container(
+            color: AppColors.primary,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              indicatorColor: AppColors.accent,
+              labelStyle: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+              unselectedLabelStyle: AppTextStyles.titleMedium,
+              tabs: const [
+                Tab(text: 'WEEKLY'),
+                Tab(text: 'MONTHLY'),
+                Tab(text: 'YEARLY'),
+              ],
+            ),
+          ),
+          // Tab content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Weekly tab
+                _isLoadingWeekly
+                    ? const Center(child: CircularProgressIndicator())
+                    : _weeklyStats.isEmpty
+                        ? const _EmptyStatsWidget(timeframe: 'weekly')
+                        : _StatsContentWidget(
+                            stats: _weeklyStats,
+                            timeframe: 'weekly',
+                            preferMetric: preferMetric,
+                          ),
+                
+                // Monthly tab
+                _isLoadingMonthly
+                    ? const Center(child: CircularProgressIndicator())
+                    : _monthlyStats.isEmpty
+                        ? const _EmptyStatsWidget(timeframe: 'monthly')
+                        : _StatsContentWidget(
+                            stats: _monthlyStats,
+                            timeframe: 'monthly',
+                            preferMetric: preferMetric,
+                          ),
+                
+                // Yearly tab
+                _isLoadingYearly
+                    ? const Center(child: CircularProgressIndicator())
+                    : _yearlyStats.isEmpty
+                        ? const _EmptyStatsWidget(timeframe: 'yearly')
+                        : _StatsContentWidget(
+                            stats: _yearlyStats,
+                            timeframe: 'yearly',
+                            preferMetric: preferMetric,
+                          ),
+              ],
+            ),
+          ),
         ],
       ),
     );

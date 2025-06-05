@@ -54,9 +54,6 @@ class DuelsRepositoryImpl implements DuelsRepository {
     required int timeframeHours,
     required int maxParticipants,
     required bool isPublic,
-    String? description,
-    String? creatorCity,
-    String? creatorState,
     List<String>? inviteeEmails,
   }) async {
     try {
@@ -67,9 +64,6 @@ class DuelsRepositoryImpl implements DuelsRepository {
         timeframeHours: timeframeHours,
         maxParticipants: maxParticipants,
         isPublic: isPublic,
-        description: description,
-        creatorCity: creatorCity,
-        creatorState: creatorState,
         inviteeEmails: inviteeEmails,
       );
       return Right(duelModel);

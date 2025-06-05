@@ -30,6 +30,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Duels'),
+        centerTitle: true,
         elevation: 0,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -47,13 +48,21 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const CreateDuelScreen()),
         ),
-        backgroundColor: AppColors.accent,
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text(
+          'Create Duel',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -166,31 +175,48 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
               size: 80,
               color: Colors.grey[300],
             ),
-            const SizedBox(height: 16),
-            Text(
-              state.hasFilters 
-                  ? 'No duels match your filters'
-                  : 'No duels available',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              state.hasFilters
-                  ? 'Try adjusting your filters or create a new duel'
-                  : 'Be the first to create a duel!',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[500],
-              ),
-              textAlign: TextAlign.center,
-            ),
             const SizedBox(height: 24),
-            if (state.hasFilters)
+            if (state.hasFilters) ...[
+              Text(
+                'No duels match your filters',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Try adjusting your filters or create a new duel',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
               TextButton(
                 onPressed: () => context.read<DuelListBloc>().add(ClearFilters()),
                 child: const Text('Clear Filters'),
               ),
+            ] else ...[
+              Text(
+                'Welcome to Duels!',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  'Duels are your chance to connect and compete with other ruckers. Create a duel, be matched with a rucker at your level and enjoy a little healthy competition! Create your first duel today!',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ],
         ),
       );

@@ -21,12 +21,12 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
   final _targetValueController = TextEditingController();
   final _timeframeController = TextEditingController();
   final _maxParticipantsController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _stateController = TextEditingController();
+  // final _cityController = TextEditingController(); // Not needed - backend uses user profile location
+  // final _stateController = TextEditingController(); // Not needed - backend uses user profile location
   final _inviteEmailsController = TextEditingController();
 
   String _selectedChallengeType = 'distance';
-  bool _isPublic = true;
+  bool _isPublic = true; // Always public for now
 
   @override
   void dispose() {
@@ -35,8 +35,8 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     _targetValueController.dispose();
     _timeframeController.dispose();
     _maxParticipantsController.dispose();
-    _cityController.dispose();
-    _stateController.dispose();
+    // _cityController.dispose(); // Not needed - backend uses user profile location
+    // _stateController.dispose(); // Not needed - backend uses user profile location
     _inviteEmailsController.dispose();
     super.dispose();
   }
@@ -98,8 +98,8 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
                   _buildTitleField(state),
                   const SizedBox(height: 16),
                   
-                  _buildDescriptionField(),
-                  const SizedBox(height: 24),
+                  // _buildDescriptionField(),
+                  // const SizedBox(height: 24),
                   
                   _buildSectionHeader('Challenge Details'),
                   const SizedBox(height: 16),
@@ -119,21 +119,21 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
                   _buildMaxParticipantsField(state),
                   const SizedBox(height: 16),
                   
-                  _buildVisibilityToggle(),
-                  const SizedBox(height: 24),
+                  // _buildVisibilityToggle(),
+                  // const SizedBox(height: 24),
                   
-                  _buildSectionHeader('Location (Optional)'),
-                  const SizedBox(height: 16),
+                  // _buildSectionHeader('Location (Optional)'),
+                  // const SizedBox(height: 16),
                   
-                  _buildLocationFields(),
-                  const SizedBox(height: 24),
+                  // _buildLocationFields(),
+                  // const SizedBox(height: 24),
                   
-                  if (!_isPublic) ...[
-                    _buildSectionHeader('Invite Friends'),
-                    const SizedBox(height: 16),
-                    _buildInviteEmailsField(state),
-                    const SizedBox(height: 24),
-                  ],
+                  // if (!_isPublic) ...[
+                  //   _buildSectionHeader('Invite Friends'),
+                  //   const SizedBox(height: 16),
+                  //   _buildInviteEmailsField(state),
+                  //   const SizedBox(height: 24),
+                  // ],
                   
                   _buildCreateButton(state),
                   const SizedBox(height: 32),
@@ -177,18 +177,18 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     );
   }
 
-  Widget _buildDescriptionField() {
-    return TextFormField(
-      controller: _descriptionController,
-      decoration: const InputDecoration(
-        labelText: 'Description (Optional)',
-        hintText: 'Add more details about this duel...',
-        border: OutlineInputBorder(),
-      ),
-      maxLines: 3,
-      maxLength: 500,
-    );
-  }
+  // Widget _buildDescriptionField() {
+  //   return TextFormField(
+  //     controller: _descriptionController,
+  //     decoration: const InputDecoration(
+  //       labelText: 'Description (Optional)',
+  //       hintText: 'Add more details about this duel...',
+  //       border: OutlineInputBorder(),
+  //     ),
+  //     maxLines: 3,
+  //     maxLength: 500,
+  //   );
+  // }
 
   Widget _buildChallengeTypeDropdown() {
     return DropdownButtonFormField<String>(
@@ -243,11 +243,11 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     return TextFormField(
       controller: _timeframeController,
       decoration: InputDecoration(
-        labelText: 'Timeframe (Hours) *',
+        labelText: 'Timeframe (Days) *',
         hintText: 'How long will this duel last?',
         errorText: hasError ? state.errors['timeframeHours'] : null,
         border: const OutlineInputBorder(),
-        suffixText: 'hours',
+        suffixText: 'days',
       ),
       keyboardType: TextInputType.number,
       validator: (value) {
@@ -256,7 +256,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
         }
         final numValue = int.tryParse(value);
         if (numValue == null || numValue <= 0) {
-          return 'Enter a valid number of hours';
+          return 'Enter a valid number of days';
         }
         return null;
       },
@@ -288,79 +288,79 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     );
   }
 
-  Widget _buildVisibilityToggle() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Duel Visibility',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: Text(_isPublic ? 'Public Duel' : 'Private Duel'),
-              subtitle: Text(
-                _isPublic 
-                    ? 'Anyone can discover and join this duel'
-                    : 'Only invited users can join this duel',
-              ),
-              value: _isPublic,
-              onChanged: (value) {
-                setState(() {
-                  _isPublic = value;
-                });
-              },
-              activeColor: AppColors.accent,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Widget _buildVisibilityToggle() {
+  //   return Card(
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(16),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Text(
+  //             'Duel Visibility',
+  //             style: Theme.of(context).textTheme.titleMedium,
+  //           ),
+  //           const SizedBox(height: 8),
+  //           SwitchListTile(
+  //             title: Text(_isPublic ? 'Public Duel' : 'Private Duel'),
+  //             subtitle: Text(
+  //               _isPublic 
+  //                   ? 'Anyone can discover and join this duel'
+  //                   : 'Only invited users can join this duel',
+  //             ),
+  //             value: _isPublic,
+  //             onChanged: (value) {
+  //               setState(() {
+  //                 _isPublic = value;
+  //               });
+  //             },
+  //             activeColor: AppColors.accent,
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
-  Widget _buildLocationFields() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextFormField(
-            controller: _cityController,
-            decoration: const InputDecoration(
-              labelText: 'City',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: TextFormField(
-            controller: _stateController,
-            decoration: const InputDecoration(
-              labelText: 'State',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  // Widget _buildLocationFields() {
+  //   return Row(
+  //     children: [
+  //       Expanded(
+  //         child: TextFormField(
+  //           controller: _cityController,
+  //           decoration: const InputDecoration(
+  //             labelText: 'City',
+  //             border: OutlineInputBorder(),
+  //           ),
+  //         ),
+  //       ),
+  //       const SizedBox(width: 16),
+  //       Expanded(
+  //         child: TextFormField(
+  //           controller: _stateController,
+  //           decoration: const InputDecoration(
+  //             labelText: 'State',
+  //             border: OutlineInputBorder(),
+  //           ),
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  // }
 
-  Widget _buildInviteEmailsField(CreateDuelState state) {
-    final hasError = state is CreateDuelFormInvalid && state.errors.containsKey('inviteeEmails');
+  // Widget _buildInviteEmailsField(CreateDuelState state) {
+  //   final hasError = state is CreateDuelFormInvalid && state.errors.containsKey('inviteeEmails');
     
-    return TextFormField(
-      controller: _inviteEmailsController,
-      decoration: InputDecoration(
-        labelText: 'Invite by Email',
-        hintText: 'Enter email addresses separated by commas',
-        errorText: hasError ? state.errors['inviteeEmails'] : null,
-        border: const OutlineInputBorder(),
-      ),
-      maxLines: 3,
-    );
-  }
+  //   return TextFormField(
+  //     controller: _inviteEmailsController,
+  //     decoration: InputDecoration(
+  //       labelText: 'Invite by Email',
+  //       hintText: 'Enter email addresses separated by commas',
+  //       errorText: hasError ? state.errors['inviteeEmails'] : null,
+  //       border: const OutlineInputBorder(),
+  //     ),
+  //     maxLines: 3,
+  //   );
+  // }
 
   Widget _buildCreateButton(CreateDuelState state) {
     final isLoading = state is CreateDuelSubmitting;
@@ -368,7 +368,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     return ElevatedButton(
       onPressed: isLoading ? null : _submitForm,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.accent,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(
@@ -424,17 +424,18 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
       final targetValue = double.parse(_targetValueController.text);
-      final timeframeHours = int.parse(_timeframeController.text);
+      final timeframeDays = int.parse(_timeframeController.text);
+      final timeframeHours = timeframeDays * 24;
       final maxParticipants = int.parse(_maxParticipantsController.text);
       
-      List<String>? inviteeEmails;
-      if (!_isPublic && _inviteEmailsController.text.trim().isNotEmpty) {
-        inviteeEmails = _inviteEmailsController.text
-            .split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList();
-      }
+      // List<String>? inviteeEmails;
+      // if (!_isPublic && _inviteEmailsController.text.trim().isNotEmpty) {
+      //   inviteeEmails = _inviteEmailsController.text
+      //       .split(',')
+      //       .map((e) => e.trim())
+      //       .where((e) => e.isNotEmpty)
+      //       .toList();
+      // }
 
       // First validate the form
       context.read<CreateDuelBloc>().add(ValidateCreateDuelForm(
@@ -443,7 +444,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
         targetValue: targetValue,
         timeframeHours: timeframeHours,
         maxParticipants: maxParticipants,
-        inviteeEmails: inviteeEmails,
+        inviteeEmails: null, // Always null since all duels are public
       ));
 
       // Then submit if validation passes
@@ -453,17 +454,17 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
         targetValue: targetValue,
         timeframeHours: timeframeHours,
         maxParticipants: maxParticipants,
-        isPublic: _isPublic,
-        description: _descriptionController.text.isNotEmpty 
-            ? _descriptionController.text 
-            : null,
-        creatorCity: _cityController.text.isNotEmpty 
-            ? _cityController.text 
-            : null,
-        creatorState: _stateController.text.isNotEmpty 
-            ? _stateController.text 
-            : null,
-        inviteeEmails: inviteeEmails,
+        isPublic: true, // Always public for now
+        // description: _descriptionController.text.isNotEmpty 
+        //     ? _descriptionController.text 
+        //     : null,
+        // creatorCity: _cityController.text.isNotEmpty 
+        //     ? _cityController.text 
+        //     : null,
+        // creatorState: _stateController.text.isNotEmpty 
+        //     ? _stateController.text 
+        //     : null,
+        inviteeEmails: null, // Always null since all duels are public
       ));
     }
   }
@@ -474,8 +475,8 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     _targetValueController.clear();
     _timeframeController.clear();
     _maxParticipantsController.clear();
-    _cityController.clear();
-    _stateController.clear();
+    // _cityController.clear();
+    // _stateController.clear();
     _inviteEmailsController.clear();
     setState(() {
       _selectedChallengeType = 'distance';
