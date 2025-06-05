@@ -22,17 +22,26 @@ class DuelsRepositoryImpl implements DuelsRepository {
     String? location,
     int? limit,
   }) async {
+    print('[DEBUG] DuelsRepositoryImpl.getDuels() - Starting with params: status=$status, challengeType=$challengeType, location=$location, limit=$limit');
+    
     try {
+      print('[DEBUG] DuelsRepositoryImpl.getDuels() - Calling remoteDataSource.getDuels()');
+      
       final duelModels = await remoteDataSource.getDuels(
         status: status,
         challengeType: challengeType,
         location: location,
         limit: limit,
       );
+      
+      print('[DEBUG] DuelsRepositoryImpl.getDuels() - Successfully got ${duelModels.length} duels from data source');
       return Right(duelModels);
     } on ServerException catch (e) {
+      print('[ERROR] DuelsRepositoryImpl.getDuels() - ServerException: ${e.message}');
       return Left(ServerFailure(message: e.message));
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[ERROR] DuelsRepositoryImpl.getDuels() - Unexpected exception: $e');
+      print('[ERROR] DuelsRepositoryImpl.getDuels() - Stack trace: $stackTrace');
       return Left(ServerFailure(message: 'Unexpected error occurred'));
     }
   }

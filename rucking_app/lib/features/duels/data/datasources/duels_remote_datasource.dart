@@ -68,14 +68,30 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     if (location != null) queryParams['location'] = location;
     if (limit != null) queryParams['limit'] = limit.toString();
 
-    final response = await apiClient.get('/duels', queryParams: queryParams);
+    print('[DEBUG] getDuels() - Making API call with params: $queryParams');
     
-    if (response.statusCode == 200) {
-      final jsonData = json.decode(response.body);
+    try {
+      // ApiClient.get() returns the parsed JSON data directly, not a response object
+      final jsonData = await apiClient.get('/duels', queryParams: queryParams);
+      
+      print('[DEBUG] getDuels() - Received JSON data: $jsonData');
+      
+      // Extract duels array from the response
       final List<dynamic> duelsData = jsonData['duels'] ?? [];
-      return duelsData.map((duelJson) => DuelModel.fromJson(duelJson)).toList();
-    } else {
-      throw ServerException(message: 'Failed to fetch duels');
+      print('[DEBUG] getDuels() - Duels array: $duelsData');
+      print('[DEBUG] getDuels() - Duels array length: ${duelsData.length}');
+      
+      final result = duelsData.map((duelJson) {
+        print('[DEBUG] getDuels() - Parsing duel: $duelJson');
+        return DuelModel.fromJson(duelJson);
+      }).toList();
+      
+      print('[DEBUG] getDuels() - Successfully parsed ${result.length} duels');
+      return result;
+    } catch (e, stackTrace) {
+      print('[ERROR] getDuels() - Error: $e');
+      print('[ERROR] getDuels() - Stack trace: $stackTrace');
+      throw ServerException(message: 'Failed to fetch duels: $e');
     }
   }
 
