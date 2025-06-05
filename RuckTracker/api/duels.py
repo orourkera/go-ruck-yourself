@@ -15,10 +15,13 @@ class DuelCreateSchema(Schema):
     title = fields.Str(required=True, validate=lambda x: 1 <= len(x) <= 50)
     challenge_type = fields.Str(required=True, validate=lambda x: x in ['distance', 'time', 'elevation', 'power_points'])
     target_value = fields.Float(required=True, validate=lambda x: x > 0)
-    timeframe_hours = fields.Int(required=True, validate=lambda x: 1 <= x <= 168)  # 1 hour to 1 week
+    timeframe_hours = fields.Int(required=True, validate=lambda x: 1 <= x <= 720)  # 1 hour to 30 days
     is_public = fields.Bool(missing=True)
     max_participants = fields.Int(missing=2, validate=lambda x: 2 <= x <= 20)
     invitee_emails = fields.List(fields.Email(), missing=[])
+    description = fields.Str(missing=None, allow_none=True)
+    creator_city = fields.Str(missing=None, allow_none=True)
+    creator_state = fields.Str(missing=None, allow_none=True)
 
     @validates_schema
     def validate_schema(self, data, **kwargs):
