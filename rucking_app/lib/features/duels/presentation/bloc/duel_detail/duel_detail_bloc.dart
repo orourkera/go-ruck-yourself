@@ -168,9 +168,21 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
       final result = await getDuelComments(GetDuelCommentsParams(duelId: event.duelId));
 
       result.fold(
-        (failure) => emit(DuelDetailError(message: failure.message)),
+        (failure) {
+          // Check if the failure is due to permission issues (user not being a participant)
+          if (failure.message.contains('must be a participant') || 
+              failure.message.contains('participant to view comments') ||
+              failure.message.contains('403') ||
+              failure.message.contains('Forbidden')) {
+            // Handle permission error gracefully - don't emit error state
+            emit(currentState.copyWith(canViewComments: false, comments: []));
+          } else {
+            // For other errors, emit error state
+            emit(DuelDetailError(message: failure.message));
+          }
+        },
         (comments) {
-          emit(currentState.copyWith(comments: comments));
+          emit(currentState.copyWith(comments: comments, canViewComments: true));
         },
       );
     }
