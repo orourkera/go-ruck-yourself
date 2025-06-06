@@ -22,6 +22,8 @@ abstract class DuelsRemoteDataSource {
     required double targetValue,
     required int timeframeHours,
     required int maxParticipants,
+    required int minParticipants,
+    required String startMode,
     required bool isPublic,
     List<String>? inviteeEmails,
   });
@@ -29,6 +31,7 @@ abstract class DuelsRemoteDataSource {
   Future<DuelModel> getDuel(String duelId);
   Future<DuelModel> updateDuel(String duelId, Map<String, dynamic> updates);
   Future<void> joinDuel(String duelId);
+  Future<void> startDuel(String duelId);
 
   // Participant management
   Future<void> updateParticipantStatus(String duelId, String participantId, String status);
@@ -106,6 +109,8 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     required double targetValue,
     required int timeframeHours,
     required int maxParticipants,
+    required int minParticipants,
+    required String startMode,
     required bool isPublic,
     List<String>? inviteeEmails,
   }) async {
@@ -115,6 +120,8 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
       'target_value': targetValue,
       'timeframe_hours': timeframeHours,
       'max_participants': maxParticipants,
+      'min_participants': minParticipants,
+      'start_mode': startMode,
       'is_public': isPublic,
       if (inviteeEmails != null) 'invitee_emails': inviteeEmails,
     };
@@ -160,6 +167,18 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
       return;
     } catch (e) {
       rethrow;
+    }
+  }
+  
+  @override
+  Future<void> startDuel(String duelId) async {
+    try {
+      // To manually start a duel, we send a status update with 'start' value
+      final body = {'status': 'start'};
+      await apiClient.put('/duels/$duelId', body);
+      return;
+    } catch (e) {
+      throw ServerException(message: 'Failed to start duel: $e');
     }
   }
 

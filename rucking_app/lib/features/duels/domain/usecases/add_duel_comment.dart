@@ -11,7 +11,10 @@ class AddDuelComment implements UseCase<DuelComment, AddDuelCommentParams> {
 
   @override
   Future<Either<Failure, DuelComment>> call(AddDuelCommentParams params) async {
-    return await repository.addDuelComment(params.duelId, params.content);
+    return await repository.addDuelComment(
+      duelId: params.duelId,
+      content: params.content
+    );
   }
 }
 

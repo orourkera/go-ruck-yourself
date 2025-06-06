@@ -21,12 +21,14 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
   final _targetValueController = TextEditingController();
   final _timeframeController = TextEditingController();
   final _maxParticipantsController = TextEditingController();
+  final _minParticipantsController = TextEditingController(text: '2');
   // final _cityController = TextEditingController(); // Not needed - backend uses user profile location
   // final _stateController = TextEditingController(); // Not needed - backend uses user profile location
   final _inviteEmailsController = TextEditingController();
 
   String _selectedChallengeType = 'distance';
   bool _isPublic = true; // Always public for now
+  String _startMode = 'auto'; // Default to auto-start
 
   @override
   void dispose() {
@@ -35,6 +37,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     _targetValueController.dispose();
     _timeframeController.dispose();
     _maxParticipantsController.dispose();
+    _minParticipantsController.dispose();
     // _cityController.dispose(); // Not needed - backend uses user profile location
     // _stateController.dispose(); // Not needed - backend uses user profile location
     _inviteEmailsController.dispose();
@@ -119,8 +122,20 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
                   _buildMaxParticipantsField(state),
                   const SizedBox(height: 16),
                   
-                  // _buildVisibilityToggle(),
-                  // const SizedBox(height: 24),
+                  _buildSectionHeader('Start Settings'),
+                  const SizedBox(height: 16),
+                  
+                  _buildStartModeSelector(),
+                  const SizedBox(height: 16),
+                  
+                  // Only show min participants if auto start is selected
+                  if (_startMode == 'auto')
+                    _buildMinParticipantsField(state),
+                  if (_startMode == 'auto')
+                    const SizedBox(height: 16),
+                  
+                  _buildSectionHeader('Visibility'),
+                  const SizedBox(height: 8),
                   
                   // _buildSectionHeader('Location (Optional)'),
                   // const SizedBox(height: 16),
@@ -264,27 +279,118 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
   }
 
   Widget _buildMaxParticipantsField(CreateDuelState state) {
-    final hasError = state is CreateDuelFormInvalid && state.errors.containsKey('maxParticipants');
-    
+    final hasError = state is CreateDuelFormInvalid &&
+        state.errors.containsKey('maxParticipants');
+
     return TextFormField(
       controller: _maxParticipantsController,
       decoration: InputDecoration(
-        labelText: 'Max Participants *',
-        hintText: 'Maximum number of participants',
+        labelText: 'Maximum Participants',
+        hintText: 'e.g., 10',
         errorText: hasError ? state.errors['maxParticipants'] : null,
         border: const OutlineInputBorder(),
+        suffixText: 'people',
       ),
       keyboardType: TextInputType.number,
       validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Max participants is required';
+        if (value == null || value.isEmpty) {
+          return 'Please enter maximum participants';
         }
-        final numValue = int.tryParse(value);
-        if (numValue == null || numValue < 2) {
-          return 'At least 2 participants required';
+        final intValue = int.tryParse(value);
+        if (intValue == null) {
+          return 'Please enter a valid number';
+        }
+        if (intValue < 2 || intValue > 20) {
+          return 'Participants must be between 2 and 20';
         }
         return null;
       },
+    );
+  }
+
+  Widget _buildMinParticipantsField(CreateDuelState state) {
+    final hasError = state is CreateDuelFormInvalid &&
+        state.errors.containsKey('minParticipants');
+
+    return TextFormField(
+      controller: _minParticipantsController,
+      decoration: InputDecoration(
+        labelText: 'Minimum Participants to Start',
+        hintText: 'e.g., 2',
+        errorText: hasError ? state.errors['minParticipants'] : null,
+        border: const OutlineInputBorder(),
+        suffixText: 'people',
+        helperText: 'The duel will automatically start when this many people join',
+      ),
+      keyboardType: TextInputType.number,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter minimum participants';
+        }
+        final intValue = int.tryParse(value);
+        if (intValue == null) {
+          return 'Please enter a valid number';
+        }
+        if (intValue < 2 || intValue > 20) {
+          return 'Participants must be between 2 and 20';
+        }
+        final maxParticipants = int.tryParse(_maxParticipantsController.text) ?? 20;
+        if (intValue > maxParticipants) {
+          return 'Cannot be more than maximum participants';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildStartModeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Start Mode',
+          style: TextStyle(fontSize: 16),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: RadioListTile<String>(
+                title: const Text('Auto Start'),
+                value: 'auto',
+                groupValue: _startMode,
+                onChanged: (value) {
+                  setState(() {
+                    _startMode = value!;
+                  });
+                },
+              ),
+            ),
+            Expanded(
+              child: RadioListTile<String>(
+                title: const Text('Manual Start'),
+                value: 'manual',
+                groupValue: _startMode,
+                onChanged: (value) {
+                  setState(() {
+                    _startMode = value!;
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            _startMode == 'auto' 
+                ? 'Duel will automatically start once minimum participants join'
+                : 'You\'ll need to manually start the duel after participants join',
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+          ),
+        ),
+      ],
     );
   }
 
@@ -427,6 +533,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       final timeframeDays = int.parse(_timeframeController.text);
       final timeframeHours = timeframeDays * 24;
       final maxParticipants = int.parse(_maxParticipantsController.text);
+      final minParticipants = _startMode == 'auto' 
+          ? int.parse(_minParticipantsController.text) 
+          : 2;
       
       // List<String>? inviteeEmails;
       // if (!_isPublic && _inviteEmailsController.text.trim().isNotEmpty) {
@@ -444,6 +553,8 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
         targetValue: targetValue,
         timeframeHours: timeframeHours,
         maxParticipants: maxParticipants,
+        minParticipants: minParticipants,
+        startMode: _startMode,
         inviteeEmails: null, // Always null since all duels are public
       ));
 
@@ -454,6 +565,8 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
         targetValue: targetValue,
         timeframeHours: timeframeHours,
         maxParticipants: maxParticipants,
+        minParticipants: minParticipants,
+        startMode: _startMode,
         isPublic: true, // Always public for now
         // description: _descriptionController.text.isNotEmpty 
         //     ? _descriptionController.text 
@@ -475,12 +588,14 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     _targetValueController.clear();
     _timeframeController.clear();
     _maxParticipantsController.clear();
+    _minParticipantsController.text = '2';
     // _cityController.clear();
     // _stateController.clear();
     _inviteEmailsController.clear();
     setState(() {
       _selectedChallengeType = 'distance';
       _isPublic = true;
+      _startMode = 'auto';
     });
   }
 }

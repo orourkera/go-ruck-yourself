@@ -23,6 +23,7 @@ import '../domain/usecases/get_duel_comments.dart';
 import '../domain/usecases/add_duel_comment.dart';
 import '../domain/usecases/update_duel_comment.dart';
 import '../domain/usecases/delete_duel_comment.dart';
+import '../domain/usecases/start_duel.dart';
 
 // BLoCs
 import '../presentation/bloc/duel_list/duel_list_bloc.dart';
@@ -58,6 +59,7 @@ void initDuelsFeature(GetIt sl) {
   sl.registerLazySingleton(() => AddDuelComment(sl()));
   sl.registerLazySingleton(() => UpdateDuelComment(sl()));
   sl.registerLazySingleton(() => DeleteDuelComment(sl()));
+  sl.registerLazySingleton(() => StartDuel(sl()));
 
   // BLoCs
   sl.registerFactory(() => DuelListBloc(
@@ -74,6 +76,7 @@ void initDuelsFeature(GetIt sl) {
     addDuelComment: sl(),
     updateDuelComment: sl(),
     deleteDuelComment: sl(),
+    startDuel: sl(),
   ));
 
   sl.registerFactory(() => CreateDuelBloc(

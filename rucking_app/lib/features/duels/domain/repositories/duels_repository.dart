@@ -21,6 +21,8 @@ abstract class DuelsRepository {
     required double targetValue,
     required int timeframeHours,
     required int maxParticipants,
+    required int minParticipants,
+    required String startMode,
     required bool isPublic,
     // String? description, // Removed - not supported by backend yet
     // String? creatorCity, // Removed - backend uses user profile location
@@ -89,9 +91,22 @@ abstract class DuelsRepository {
   // Comments
   Future<Either<Failure, List<DuelComment>>> getDuelComments(String duelId);
 
-  Future<Either<Failure, DuelComment>> addDuelComment(String duelId, String content);
+  Future<Either<Failure, DuelComment>> addDuelComment({
+    required String duelId,
+    required String content,
+  });
 
-  Future<Either<Failure, DuelComment>> updateDuelComment(String commentId, String content);
+  Future<Either<Failure, DuelComment>> updateDuelComment({
+    required String commentId,
+    required String content,
+  });
 
-  Future<Either<Failure, void>> deleteDuelComment(String commentId);
+  Future<Either<Failure, void>> deleteDuelComment({
+    required String commentId,
+  });
+  
+  // Manual duel start
+  Future<Either<Failure, void>> startDuel({
+    required String duelId,
+  });
 }

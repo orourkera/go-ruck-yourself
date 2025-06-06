@@ -27,6 +27,20 @@ class CreateDuel implements UseCase<Duel, CreateDuelParams> {
     if (params.maxParticipants < 2 || params.maxParticipants > 50) {
       return Left(ValidationFailure('Max participants must be between 2 and 50'));
     }
+    
+    // Validate min participants
+    if (params.minParticipants < 2) {
+      return Left(ValidationFailure('Minimum participants must be at least 2'));
+    }
+    if (params.minParticipants > params.maxParticipants) {
+      return Left(ValidationFailure('Minimum participants cannot exceed maximum participants'));
+    }
+    
+    // Validate start mode
+    final validStartModes = ['auto', 'manual'];
+    if (!validStartModes.contains(params.startMode)) {
+      return Left(ValidationFailure('Invalid start mode'));
+    }
 
     // Validate challenge type
     final validChallengeTypes = ['distance', 'time', 'elevation', 'power_points'];
@@ -49,6 +63,8 @@ class CreateDuel implements UseCase<Duel, CreateDuelParams> {
       targetValue: params.targetValue,
       timeframeHours: params.timeframeHours,
       maxParticipants: params.maxParticipants,
+      minParticipants: params.minParticipants,
+      startMode: params.startMode,
       isPublic: params.isPublic,
       inviteeEmails: params.inviteeEmails,
     );
@@ -65,6 +81,8 @@ class CreateDuelParams {
   final double targetValue;
   final int timeframeHours;
   final int maxParticipants;
+  final int minParticipants;
+  final String startMode;
   final bool isPublic;
   final List<String>? inviteeEmails;
 
@@ -74,6 +92,8 @@ class CreateDuelParams {
     required this.targetValue,
     required this.timeframeHours,
     required this.maxParticipants,
+    required this.minParticipants,
+    required this.startMode,
     required this.isPublic,
     this.inviteeEmails,
   });

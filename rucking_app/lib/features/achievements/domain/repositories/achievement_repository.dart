@@ -22,4 +22,10 @@ abstract class AchievementRepository {
   
   /// Get recently earned achievements across the platform
   Future<List<UserAchievement>> getRecentAchievements();
+  
+  /// Clears all cached achievement data
+  Future<void> clearCache();
+  
+  /// Checks if the cache is expired
+  Future<bool> isCacheExpired();
 }

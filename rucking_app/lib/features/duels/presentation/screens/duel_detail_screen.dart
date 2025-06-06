@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/duel.dart';
 import '../bloc/duel_detail/duel_detail_bloc.dart';
 import '../bloc/duel_detail/duel_detail_event.dart';
 import '../bloc/duel_detail/duel_detail_state.dart';
@@ -85,6 +86,20 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
                 backgroundColor: Colors.red,
               ),
             );
+          } else if (state is DuelStartedManually) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Duel started successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else if (state is DuelStartError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         },
         builder: (context, state) {
@@ -146,7 +161,14 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
                     JoinDuelFromDetail(duelId: widget.duelId),
                   )
                 : null,
+            showStartButton: _canUserStartDuel(duel),
+            onStartDuel: _canUserStartDuel(duel)
+                ? () => context.read<DuelDetailBloc>().add(
+                    StartDuelManually(duelId: widget.duelId),
+                  )
+                : null,
             isJoining: state is DuelJoiningFromDetail,
+            isStarting: state is DuelStartingManually,
           ),
           
           // Tabs
@@ -167,9 +189,10 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
           
           // Tab Content
           SizedBox(
-            height: 400, // Fixed height for TabBarView
+            height: 280, // Reduced height for TabBarView when content is minimal
             child: TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(), // Prevent vertical scrolling inside tabs
               children: [
                 // Progress Tab
                 DuelProgressChart(
@@ -204,5 +227,31 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
     // - Check if duel is still accepting participants
     // - Check if max participants reached
     return duel.status == 'pending' || duel.status == 'active';
+  }
+  
+  bool _canUserStartDuel(Duel duel) {
+    // Only the creator can manually start a duel
+    // The duel must be in pending status
+    // The duel must have manual start mode
+    // Check if the current user is the creator (for now always allow it for testing)
+    final bool isCreator = true; // TODO: Check if current user is creator
+    
+    final bool canStart = isCreator && 
+                        duel.status == DuelStatus.pending &&
+                        duel.startMode == DuelStartMode.manual;
+                        
+    // Also ensure there are enough participants
+    if (canStart) {
+      final state = context.read<DuelDetailBloc>().state;
+      if (state is DuelDetailLoaded) {
+        // Count accepted participants
+        final acceptedParticipants = state.leaderboard
+            .where((p) => p.status == 'accepted')
+            .length;
+        return acceptedParticipants >= 2; // Minimum 2 participants required
+      }
+    }
+    
+    return false;
   }
 }

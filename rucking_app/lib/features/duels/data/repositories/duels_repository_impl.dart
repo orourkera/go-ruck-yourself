@@ -55,6 +55,8 @@ class DuelsRepositoryImpl implements DuelsRepository {
     required double targetValue,
     required int timeframeHours,
     required int maxParticipants,
+    required int minParticipants,
+    required String startMode,
     required bool isPublic,
     List<String>? inviteeEmails,
   }) async {
@@ -65,6 +67,8 @@ class DuelsRepositoryImpl implements DuelsRepository {
         targetValue: targetValue,
         timeframeHours: timeframeHours,
         maxParticipants: maxParticipants,
+        minParticipants: minParticipants,
+        startMode: startMode,
         isPublic: isPublic,
         inviteeEmails: inviteeEmails,
       );
@@ -294,7 +298,10 @@ class DuelsRepositoryImpl implements DuelsRepository {
   }
 
   @override
-  Future<Either<Failure, DuelComment>> addDuelComment(String duelId, String content) async {
+  Future<Either<Failure, DuelComment>> addDuelComment({
+    required String duelId,
+    required String content,
+  }) async {
     try {
       final commentModel = await remoteDataSource.createDuelComment(duelId, content);
       return Right(commentModel);
@@ -306,7 +313,10 @@ class DuelsRepositoryImpl implements DuelsRepository {
   }
 
   @override
-  Future<Either<Failure, DuelComment>> updateDuelComment(String commentId, String content) async {
+  Future<Either<Failure, DuelComment>> updateDuelComment({
+    required String commentId,
+    required String content,
+  }) async {
     try {
       // Note: We need to get the duelId somehow - this may need to be passed differently
       // For now, we'll assume the commentId contains enough info or modify the interface later
@@ -333,7 +343,9 @@ class DuelsRepositoryImpl implements DuelsRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteDuelComment(String commentId) async {
+  Future<Either<Failure, void>> deleteDuelComment({
+    required String commentId,
+  }) async {
     try {
       // Note: We need to get the duelId somehow - this may need to be passed differently
       await remoteDataSource.deleteDuelComment('', commentId);
@@ -342,6 +354,20 @@ class DuelsRepositoryImpl implements DuelsRepository {
       return Left(ServerFailure(message: e.message));
     } catch (e) {
       return Left(ServerFailure(message: 'Failed to delete comment'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> startDuel({
+    required String duelId,
+  }) async {
+    try {
+      await remoteDataSource.startDuel(duelId);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to start duel'));
     }
   }
 }

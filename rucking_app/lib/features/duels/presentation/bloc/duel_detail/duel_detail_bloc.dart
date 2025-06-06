@@ -7,6 +7,7 @@ import '../../../domain/usecases/get_duel_comments.dart';
 import '../../../domain/usecases/add_duel_comment.dart' as add_comment_usecase;
 import '../../../domain/usecases/update_duel_comment.dart' as update_comment_usecase;
 import '../../../domain/usecases/delete_duel_comment.dart' as delete_comment_usecase;
+import '../../../domain/usecases/start_duel.dart' as start_duel_usecase;
 import 'duel_detail_event.dart';
 import 'duel_detail_state.dart';
 
@@ -19,6 +20,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
   final add_comment_usecase.AddDuelComment addDuelComment;
   final update_comment_usecase.UpdateDuelComment updateDuelComment;
   final delete_comment_usecase.DeleteDuelComment deleteDuelComment;
+  final start_duel_usecase.StartDuel startDuel;
 
   DuelDetailBloc({
     required this.getDuelDetails,
@@ -29,12 +31,14 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
     required this.addDuelComment,
     required this.updateDuelComment,
     required this.deleteDuelComment,
+    required this.startDuel,
   }) : super(DuelDetailInitial()) {
     on<LoadDuelDetail>(_onLoadDuelDetail);
     on<RefreshDuelDetail>(_onRefreshDuelDetail);
     on<JoinDuelFromDetail>(_onJoinDuelFromDetail);
     on<LoadLeaderboard>(_onLoadLeaderboard);
     on<UpdateDuelProgress>(_onUpdateDuelProgress);
+    on<StartDuelManually>(_onStartDuelManually);
     on<LoadDuelComments>(_onLoadDuelComments);
     on<AddDuelComment>(_onAddDuelComment);
     on<UpdateDuelComment>(_onUpdateDuelComment);
@@ -87,6 +91,26 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
       (_) {
         emit(DuelJoinedFromDetail(duelId: event.duelId));
         // Refresh the duel details to show updated participant list
+        add(RefreshDuelDetail(duelId: event.duelId));
+      },
+    );
+  }
+
+  void _onStartDuelManually(StartDuelManually event, Emitter<DuelDetailState> emit) async {
+    emit(DuelStartingManually(duelId: event.duelId));
+
+    final result = await startDuel(start_duel_usecase.StartDuelParams(
+      duelId: event.duelId,
+    ));
+
+    result.fold(
+      (failure) => emit(DuelStartError(
+        duelId: event.duelId,
+        message: failure.message,
+      )),
+      (_) {
+        emit(DuelStartedManually(duelId: event.duelId));
+        // Refresh the duel details to show updated status
         add(RefreshDuelDetail(duelId: event.duelId));
       },
     );

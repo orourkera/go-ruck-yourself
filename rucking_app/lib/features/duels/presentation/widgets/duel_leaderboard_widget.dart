@@ -309,26 +309,27 @@ class DuelLeaderboardWidget extends StatelessWidget {
 
   Widget _buildEmptyState() {
     return Card(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.leaderboard,
               size: 64,
               color: Colors.grey[300],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Text(
               'No participants yet',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 color: Colors.grey[600],
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               'The leaderboard will appear when participants join the duel',
               style: TextStyle(

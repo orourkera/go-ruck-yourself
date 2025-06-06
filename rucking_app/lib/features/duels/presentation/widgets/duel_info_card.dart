@@ -8,8 +8,11 @@ class DuelInfoCard extends StatelessWidget {
   final List<DuelParticipant> participants;
   final String currentUserId;
   final VoidCallback? onJoin;
+  final VoidCallback? onStartDuel;
   final bool isJoining;
+  final bool isStarting;
   final bool showJoinButton;
+  final bool showStartButton;
 
   const DuelInfoCard({
     super.key,
@@ -17,8 +20,11 @@ class DuelInfoCard extends StatelessWidget {
     required this.participants,
     required this.currentUserId,
     this.onJoin,
+    this.onStartDuel,
     this.isJoining = false,
+    this.isStarting = false,
     this.showJoinButton = false,
+    this.showStartButton = false,
   });
 
   @override
@@ -37,8 +43,8 @@ class DuelInfoCard extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppColors.accent,
-                AppColors.accent.withOpacity(0.8),
+                AppColors.secondary,
+                AppColors.secondary.withOpacity(0.8),
               ],
             ),
           ),
@@ -53,6 +59,10 @@ class DuelInfoCard extends StatelessWidget {
               _buildChallengeDetails(),
               const SizedBox(height: 16),
               _buildStats(),
+              if (onStartDuel != null && showStartButton) ...[                
+                const SizedBox(height: 16),
+                _buildStartButton(),
+              ],
               if (onJoin != null && showJoinButton) ...[
                 const SizedBox(height: 16),
                 _buildJoinButton(),
@@ -286,6 +296,39 @@ class DuelInfoCard extends StatelessWidget {
       ),
     );
   }
+  
+  Widget _buildStartButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: isStarting ? null : onStartDuel,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: isStarting
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : const Text(
+                'Start Duel',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+      ),
+    );
+  }
 
   String _getStatusText() {
     switch (duel.status) {
@@ -306,13 +349,13 @@ class DuelInfoCard extends StatelessWidget {
 
   IconData _getChallengeIcon() {
     switch (duel.challengeType) {
-      case 'distance':
+      case DuelChallengeType.distance:
         return Icons.straighten;
-      case 'time':
+      case DuelChallengeType.time:
         return Icons.timer;
-      case 'elevation':
+      case DuelChallengeType.elevation:
         return Icons.terrain;
-      case 'power_points':
+      case DuelChallengeType.powerPoints:
         return Icons.bolt;
       default:
         return Icons.sports;
@@ -326,13 +369,13 @@ class DuelInfoCard extends StatelessWidget {
 
   String _getUnit() {
     switch (duel.challengeType) {
-      case 'distance':
+      case DuelChallengeType.distance:
         return 'km';
-      case 'time':
+      case DuelChallengeType.time:
         return 'minutes';
-      case 'elevation':
+      case DuelChallengeType.elevation:
         return 'meters';
-      case 'power_points':
+      case DuelChallengeType.powerPoints:
         return 'power points';
       default:
         return '';
