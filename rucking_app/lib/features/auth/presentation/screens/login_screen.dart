@@ -73,8 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
               builder: (_) => RegisterScreen(
                 prefilledEmail: state.email,
                 prefilledDisplayName: state.displayName,
-                googleIdToken: state.googleIdToken,
-                googleAccessToken: state.googleAccessToken,
               ),
             ),
           );

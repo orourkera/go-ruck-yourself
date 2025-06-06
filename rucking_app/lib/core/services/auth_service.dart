@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
@@ -10,7 +11,8 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, OAuthProvider, AuthResponse;
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, OAuthProvider, AuthResponse, AuthState, AuthChangeEvent;
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase show User;
 
 /// Interface for authentication operations
 abstract class AuthService {
@@ -68,8 +70,6 @@ abstract class AuthService {
   Future<User> googleRegister({
     required String email,
     required String displayName,
-    required String googleIdToken,
-    required String googleAccessToken,
     required String username,
     required bool preferMetric,
     double? weightKg,
@@ -83,9 +83,15 @@ abstract class AuthService {
 class AuthServiceImpl implements AuthService {
   final ApiClient _apiClient;
   final StorageService _storageService;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email']);
-  
-  AuthServiceImpl(this._apiClient, this._storageService);
+  late final GoogleSignIn _googleSignIn;
+
+  AuthServiceImpl(this._apiClient, this._storageService) {
+    // Initialize Google Sign-In with web client ID
+    // This will fallback to web OAuth flow on Android if no Android client is configured
+    _googleSignIn = GoogleSignIn(
+      scopes: ['email', 'profile'],
+    );
+  }
   
   @override
   Future<User> signIn(String email, String password) async {
@@ -133,10 +139,10 @@ class AuthServiceImpl implements AuthService {
     try {
       AppLogger.info('Attempting Google Sign-In');
       
-      // Use Google Sign-In SDK to get the user's ID token
+      // Use Google Sign-In to get tokens
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        throw AuthException('Google Sign-In failed', 'GOOGLE_SIGN_IN_FAILED');
+        throw AuthException('Google Sign-In was cancelled', 'GOOGLE_SIGNIN_CANCELLED');
       }
       
       final googleAuth = await googleUser.authentication;
@@ -144,23 +150,24 @@ class AuthServiceImpl implements AuthService {
       final accessToken = googleAuth.accessToken;
       
       if (idToken == null) {
-        throw AuthException('No ID Token found', 'GOOGLE_TOKEN_FAILED');
+        throw AuthException('Failed to get Google ID token', 'GOOGLE_TOKEN_ERROR');
       }
       
-      // Use Supabase's built-in Google OAuth flow
+      AppLogger.info('Google tokens obtained, authenticating with Supabase');
+      
+      // Authenticate with Supabase using Google tokens
       final response = await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
       );
       
-      if (response.user == null || response.session == null) {
-        throw AuthException('Google OAuth flow failed to launch', 'GOOGLE_OAUTH_FAILED');
+      if (response.user == null) {
+        throw AuthException('Supabase authentication failed', 'SUPABASE_AUTH_FAILED');
       }
       
       final supabaseUser = response.user!;
       final session = response.session!;
-      
       AppLogger.info('Supabase Google authentication successful');
       
       // Set the token first so API calls work
@@ -196,8 +203,6 @@ class AuthServiceImpl implements AuthService {
           'Google user needs to complete registration',
           email: email,
           displayName: displayName,
-          googleIdToken: idToken,
-          googleAccessToken: accessToken,
         );
       }
       
@@ -209,20 +214,6 @@ class AuthServiceImpl implements AuthService {
         rethrow;
       }
       
-      // Handle specific Google Sign-In platform exceptions
-      if (e.toString().contains('PlatformException')) {
-        final errorString = e.toString();
-        if (errorString.contains('sign_in_failed') || errorString.contains('SIGN_IN_FAILED')) {
-          if (errorString.contains('10')) {
-            throw AuthException('Google Sign-In configuration error. Please contact support.', 'GOOGLE_CONFIG_ERROR');
-          } else if (errorString.contains('7')) {
-            throw AuthException('Network error. Please check your internet connection and try again.', 'GOOGLE_NETWORK_ERROR');
-          } else if (errorString.contains('sign_in_canceled') || errorString.contains('SIGN_IN_CANCELED')) {
-            throw AuthException('Google Sign-In was canceled.', 'GOOGLE_SIGN_IN_CANCELED');
-          }
-        }
-      }
-      
       // Generic error handling
       throw AuthException('Google sign-in failed: $e', 'GOOGLE_SIGN_IN_FAILED');
     }
@@ -232,8 +223,6 @@ class AuthServiceImpl implements AuthService {
   Future<User> googleRegister({
     required String email,
     required String displayName,
-    required String googleIdToken,
-    required String googleAccessToken,
     required String username,
     required bool preferMetric,
     double? weightKg,
@@ -242,38 +231,31 @@ class AuthServiceImpl implements AuthService {
     String? gender,
   }) async {
     try {
-      // Re-authenticate with Supabase using provided Google tokens
-      final response = await Supabase.instance.client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: googleIdToken,
-        accessToken: googleAccessToken,
-      );
-      
-      if (response.user == null || response.session == null) {
-        throw Exception('Failed to re-authenticate with Google');
+      // Get current session (should already be authenticated from OAuth flow)
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        throw AuthException('No active Google session found', 'GOOGLE_SESSION_MISSING');
       }
+
+      final supabaseUser = session.user;
       
-      final supabaseUser = response.user!;
-      final session = response.session!;
-      
-      // Set the auth token for API calls
+      // Set the token first so API calls work
       _apiClient.setAuthToken(session.accessToken);
       
-      // Create user profile via our API
-      final createResponse = await _apiClient.post('/users/register', {
-        'username': username,
+      // Create user profile in our backend
+      final response = await _apiClient.post('/auth/google-register', {
         'email': email,
-        'password': null, // Google OAuth users don't have passwords
-        'id': supabaseUser.id, // Use Supabase user ID
+        'display_name': displayName,
+        'username': username,
         'prefer_metric': preferMetric,
         'weight_kg': weightKg,
         'height_cm': heightCm,
         'date_of_birth': dateOfBirth,
         'gender': gender,
-        'is_google_oauth': true, // Flag to indicate this is a Google OAuth user
       });
       
-      final user = User.fromJson(createResponse['user']);
+      final userData = response['user'] as Map<String, dynamic>;
+      final user = User.fromJson(userData);
       
       // Store tokens and user data
       await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
@@ -281,7 +263,7 @@ class AuthServiceImpl implements AuthService {
       await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
       await _storageService.setString(AppConfig.userIdKey, user.userId);
       
-      AppLogger.info('Google registration successful for user: ${user.userId}');
+      AppLogger.info('Google user registration completed successfully');
       return user;
       
     } catch (e) {
@@ -615,4 +597,4 @@ class AuthServiceImpl implements AuthService {
     
     return ApiException('Authentication error: $error');
   }
-} 
+}

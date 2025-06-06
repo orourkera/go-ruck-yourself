@@ -59,8 +59,6 @@ class AuthGoogleRegisterRequested extends AuthEvent {
   final String username;
   final String email;
   final String? displayName;
-  final String googleIdToken;
-  final String googleAccessToken;
   final double? weightKg;
   final double? heightCm;
   final String? dateOfBirth;
@@ -71,8 +69,6 @@ class AuthGoogleRegisterRequested extends AuthEvent {
     required this.username,
     required this.email,
     this.displayName,
-    required this.googleIdToken,
-    required this.googleAccessToken,
     this.weightKg,
     this.heightCm,
     this.dateOfBirth,
@@ -81,7 +77,7 @@ class AuthGoogleRegisterRequested extends AuthEvent {
   });
 
   @override
-  List<Object?> get props => [username, email, displayName, googleIdToken, googleAccessToken, weightKg, heightCm, dateOfBirth, preferMetric, gender];
+  List<Object?> get props => [username, email, displayName, weightKg, heightCm, dateOfBirth, preferMetric, gender];
 }
 
 /// Event to request user logout

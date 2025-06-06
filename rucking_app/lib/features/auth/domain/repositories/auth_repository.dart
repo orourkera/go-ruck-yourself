@@ -15,8 +15,6 @@ abstract class AuthRepository {
   Future<User> googleRegister({
     required String email,
     required String displayName,
-    required String googleIdToken,
-    required String googleAccessToken,
     required String username,
     required bool preferMetric,
     double? weightKg,
