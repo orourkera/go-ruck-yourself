@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
@@ -14,6 +15,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Screen for registering new users
 class RegisterScreen extends StatefulWidget {
@@ -589,9 +591,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           activeColor: _primaryColor,
                         ),
                         Expanded(
-                          child: Text(
-                            'I accept the Terms and Conditions and Privacy Policy',
-                            style: AppTextStyles.bodyMedium,
+                          child: RichText(
+                            text: TextSpan(
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: Theme.of(context).textTheme.bodyMedium?.color,
+                              ),
+                              children: [
+                                const TextSpan(text: 'I accept the '),
+                                TextSpan(
+                                  text: 'Terms of Service',
+                                  style: const TextStyle(decoration: TextDecoration.underline),
+                                  recognizer: (TapGestureRecognizer()
+                                    ..onTap = () async {
+                                      final uri = Uri.parse('https://getrucky.com/terms');
+                                      if (await canLaunchUrl(uri)) {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      }
+                                    }),
+                                ),
+                                const TextSpan(text: ' and '),
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: const TextStyle(decoration: TextDecoration.underline),
+                                  recognizer: (TapGestureRecognizer()
+                                    ..onTap = () async {
+                                      final uri = Uri.parse('https://getrucky.com/privacy');
+                                      if (await canLaunchUrl(uri)) {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      }
+                                    }),
+                                ),
+                                const TextSpan(text: '.'),
+                              ],
+                            ),
                           ),
                         ),
                       ],

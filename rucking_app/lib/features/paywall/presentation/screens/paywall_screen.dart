@@ -321,8 +321,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             ),
                           ),
                           
-                          // Legal text and links
-                          SizedBox(height: isTablet ? 20 : 15),
+                          // Info text below CTA button
+                          SizedBox(height: isTablet ? 16 : 12),
+                          Text(
+                            'Only subscribers have access to social features and detailed ruck tracking.',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              fontSize: isTablet ? 14 : null,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+ 
+                           // Legal text and links
+                           SizedBox(height: isTablet ? 20 : 15),
                           Text(
                             'Ruck! Premium\nAuto-renewing subscription',
                             style: AppTextStyles.bodySmall.copyWith(
