@@ -50,7 +50,6 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
   bool _isAddingComment = false;
   String? _editingCommentId;
   bool _commentsLoaded = false; // Track if comments have been loaded to prevent duplicate requests
-  bool _canViewComments = true; // Track if user can view comments (default true, set false on 403)
   
   // Store loaded comments locally to keep them across all state changes
   List<DuelComment> _currentComments = [];
@@ -187,7 +186,6 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
             // Don't show error snackbar for participant restriction - handle it in UI
             setState(() {
               _isAddingComment = false;
-              _canViewComments = false;
             });
           } else {
             // Show error for other comment operations
@@ -204,16 +202,18 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
       child: BlocBuilder<DuelDetailBloc, DuelDetailState>(
         builder: (context, state) {
           List<DuelComment> comments = _currentComments;
+          bool canViewComments = false;
           
           if (state is DuelDetailLoaded) {
             comments = state.comments;
+            canViewComments = state.canViewComments;
           }
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Comment input field (if not hidden and can view comments)
-              if (!widget.hideInput && _canViewComments) ...[
+              if (!widget.hideInput && canViewComments) ...[
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -278,13 +278,13 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
               ],
               
               // Comments list (only show if can view comments and there are comments)
-              if (_canViewComments && comments.isNotEmpty) ...[
+              if (canViewComments && comments.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _buildCommentsList(comments),
               ],
               
               // Show message when user cannot view comments
-              if (!_canViewComments) ...[
+              if (!canViewComments) ...[
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),

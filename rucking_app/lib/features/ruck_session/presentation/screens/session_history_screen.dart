@@ -16,7 +16,6 @@ import 'package:rucking_app/features/ruck_session/data/repositories/session_repo
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/premium/presentation/widgets/premium_tab_interceptor.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
-import 'package:rucking_app/shared/theme/app_colors.dart';
 
 class SessionHistoryScreen extends StatefulWidget {
   const SessionHistoryScreen({Key? key}) : super(key: key);
@@ -53,14 +52,14 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
     return Scaffold(
       appBar: AppBar(
         title: const Text('History & Stats'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          indicatorColor: AppColors.accent,
+          indicatorColor: Colors.white,
           tabs: const [
             Tab(
               icon: Icon(Icons.history),

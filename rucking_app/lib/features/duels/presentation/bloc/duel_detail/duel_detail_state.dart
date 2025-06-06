@@ -19,12 +19,14 @@ class DuelDetailLoaded extends DuelDetailState {
   final List<DuelParticipant> leaderboard;
   final bool isLeaderboardLoading;
   final List<DuelComment> comments;
+  final bool canViewComments;
 
   const DuelDetailLoaded({
     required this.duel,
     this.leaderboard = const [],
     this.isLeaderboardLoading = false,
     this.comments = const [],
+    this.canViewComments = true,
   });
 
   DuelDetailLoaded copyWith({
@@ -32,17 +34,19 @@ class DuelDetailLoaded extends DuelDetailState {
     List<DuelParticipant>? leaderboard,
     bool? isLeaderboardLoading,
     List<DuelComment>? comments,
+    bool? canViewComments,
   }) {
     return DuelDetailLoaded(
       duel: duel ?? this.duel,
       leaderboard: leaderboard ?? this.leaderboard,
       isLeaderboardLoading: isLeaderboardLoading ?? this.isLeaderboardLoading,
       comments: comments ?? this.comments,
+      canViewComments: canViewComments ?? this.canViewComments,
     );
   }
 
   @override
-  List<Object?> get props => [duel, leaderboard, isLeaderboardLoading, comments];
+  List<Object?> get props => [duel, leaderboard, isLeaderboardLoading, comments, canViewComments];
 }
 
 class DuelDetailError extends DuelDetailState {

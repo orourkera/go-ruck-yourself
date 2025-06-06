@@ -50,6 +50,19 @@ class DuelCard extends StatelessWidget {
   Widget _buildHeader() {
     return Row(
       children: [
+        // Move title to header row
+        Expanded(
+          child: Text(
+            duel.title,
+            style: const TextStyle(
+              fontSize: 20, // Increased from 18
+              fontWeight: FontWeight.bold,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
         if (!duel.isPublic)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -61,23 +74,23 @@ class DuelCard extends StatelessWidget {
               'Private',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 12,
+                fontSize: 13, // Increased from 12
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
-        const Spacer(),
+        if (!duel.isPublic) const SizedBox(width: 8),
         Text(
           '${participants.length}/${duel.maxParticipants}',
           style: TextStyle(
             color: Colors.grey[600],
-            fontSize: 12,
+            fontSize: 14, // Increased from 12
           ),
         ),
         const SizedBox(width: 4),
         Icon(
           Icons.people,
-          size: 16,
+          size: 18, // Increased from 16
           color: Colors.grey[600],
         ),
       ],
@@ -88,21 +101,11 @@ class DuelCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          duel.title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 8),
         Row(
           children: [
             Icon(
               _getChallengeIcon(),
-              size: 16,
+              size: 18, // Increased from 16
               color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 4),
@@ -110,7 +113,7 @@ class DuelCard extends StatelessWidget {
               _getChallengeDescription(),
               style: TextStyle(
                 color: Colors.grey[700],
-                fontSize: 14,
+                fontSize: 16, // Increased from 14
               ),
             ),
           ],
@@ -121,7 +124,7 @@ class DuelCard extends StatelessWidget {
             children: [
               Icon(
                 Icons.location_on,
-                size: 16,
+                size: 18, // Increased from 16
                 color: Colors.grey[500],
               ),
               const SizedBox(width: 4),
@@ -129,7 +132,7 @@ class DuelCard extends StatelessWidget {
                 _getLocationText(),
                 style: TextStyle(
                   color: Colors.grey[600],
-                  fontSize: 12,
+                  fontSize: 14, // Increased from 12
                 ),
               ),
             ],
@@ -151,16 +154,16 @@ class DuelCard extends StatelessWidget {
             Text(
               'Progress',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14, // Increased from 12
                 color: Colors.grey[600],
               ),
             ),
             Text(
               '${(progress * 100).toInt()}%',
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+                fontSize: 14, // Increased from 12
                 fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
               ),
             ),
           ],
@@ -187,7 +190,7 @@ class DuelCard extends StatelessWidget {
               Text(
                 _getTimeInfo(),
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 14, // Increased from 12
                   color: Colors.grey[600],
                 ),
               ),
@@ -195,7 +198,7 @@ class DuelCard extends StatelessWidget {
                 Text(
                   'Winner: ${_getWinnerText()}',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 14, // Increased from 12
                     color: Colors.green,
                     fontWeight: FontWeight.w500,
                   ),
@@ -206,25 +209,25 @@ class DuelCard extends StatelessWidget {
         if (_shouldShowJoinButton()) ...[
           const SizedBox(width: 12),
           SizedBox(
-            height: 32,
+            height: 38, // Increased from 32
             child: ElevatedButton(
               onPressed: showJoinButton ? () => onJoin?.call() : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20), // Increased from 16
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
               child: showJoinButton
                   ? const Text(
-                      'Join',
-                      style: TextStyle(fontSize: 12),
+                      'JOIN',
+                      style: TextStyle(fontSize: 14), // Increased from 12
                     )
                   : const SizedBox(
-                      width: 16,
-                      height: 16,
+                      width: 18, // Increased from 16
+                      height: 18, // Increased from 16
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
