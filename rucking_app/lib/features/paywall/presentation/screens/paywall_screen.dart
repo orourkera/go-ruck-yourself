@@ -216,6 +216,46 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         children: [
                           // No need for extra spacing as the carousel is now separate
                           
+                          // Big Orange "Continue for Free" Button
+                          Container(
+                            width: double.infinity,
+                            margin: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                // Mark paywall as seen so user doesn't see it again
+                                await FirstLaunchService.markPaywallSeen();
+                                // Navigate to home screen in free mode
+                                Navigator.of(context).pushNamedAndRemoveUntil(
+                                  '/home',
+                                  (route) => false,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isTablet ? 16 : 14,
+                                  horizontal: isTablet ? 32 : 24,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                              ),
+                              child: Text(
+                                'START FOR FREE!',
+                                style: TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: isTablet ? 22 : 20,
+                                  fontWeight: FontWeight.normal,
+                                  letterSpacing: 1.2,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: isTablet ? 32 : 24),
+                          
                           // Subscription Plans heading
                           Text(
                             'SUBSCRIPTION PLANS',
@@ -278,31 +318,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                   color: Colors.white,
                                 ),
                               ),
-                            ),
-                          ),
-                          
-                          // Start for free link
-                          SizedBox(height: isTablet ? 15 : 12),
-                          GestureDetector(
-                            onTap: () async {
-                              // Mark paywall as seen so user doesn't see it again
-                              await FirstLaunchService.markPaywallSeen();
-                              // Navigate to home screen in free mode
-                              Navigator.of(context).pushNamedAndRemoveUntil(
-                                '/home',
-                                (route) => false,
-                              );
-                            },
-                            child: Text(
-                              'Continue for Free',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.primary,
-                                fontSize: isTablet ? 16 : 14,
-                                fontWeight: FontWeight.w500,
-                                decoration: TextDecoration.underline,
-                                decorationColor: AppColors.primary,
-                              ),
-                              textAlign: TextAlign.center,
                             ),
                           ),
                           

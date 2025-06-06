@@ -209,6 +209,20 @@ class AuthServiceImpl implements AuthService {
         rethrow;
       }
       
+      // Handle specific Google Sign-In platform exceptions
+      if (e.toString().contains('PlatformException')) {
+        final errorString = e.toString();
+        if (errorString.contains('sign_in_failed') || errorString.contains('SIGN_IN_FAILED')) {
+          if (errorString.contains('10')) {
+            throw AuthException('Google Sign-In configuration error. Please contact support.', 'GOOGLE_CONFIG_ERROR');
+          } else if (errorString.contains('7')) {
+            throw AuthException('Network error. Please check your internet connection and try again.', 'GOOGLE_NETWORK_ERROR');
+          } else if (errorString.contains('sign_in_canceled') || errorString.contains('SIGN_IN_CANCELED')) {
+            throw AuthException('Google Sign-In was canceled.', 'GOOGLE_SIGN_IN_CANCELED');
+          }
+        }
+      }
+      
       // Generic error handling
       throw AuthException('Google sign-in failed: $e', 'GOOGLE_SIGN_IN_FAILED');
     }
@@ -347,20 +361,16 @@ class AuthServiceImpl implements AuthService {
   @override
   Future<User?> getCurrentUser() async {
     User? userToReturn;
-    String? userId = await _storageService.getString(AppConfig.userIdKey);
     
-    // If we do not have a stored ID we cannot fetch a profile, just return null (don't log out)
-    if (userId == null) {
-        return null;
-    }
-
     try {
-      // Fetch the latest user profile
+      // Try to fetch the latest user profile first - if this succeeds, the user is authenticated
       final profileResponse = await _apiClient.get('/users/profile');
       
       final userFromProfile = User.fromJson(profileResponse);
-      // Update stored user data (might overwrite email if missing from profile)
+      // Update stored user data 
       await _storageService.setObject(AppConfig.userProfileKey, userFromProfile.toJson());
+      // Also store the user ID to avoid this issue in the future
+      await _storageService.setString(AppConfig.userIdKey, userFromProfile.userId);
       userToReturn = userFromProfile;
       
     } catch (e) {
@@ -371,6 +381,7 @@ class AuthServiceImpl implements AuthService {
           final profileResponse = await _apiClient.get('/users/profile');
           userToReturn = User.fromJson(profileResponse);
           await _storageService.setObject(AppConfig.userProfileKey, userToReturn!.toJson());
+          await _storageService.setString(AppConfig.userIdKey, userToReturn!.userId);
         } catch (_) {
           // If still failing, fall back to stored data (do not force sign-out)
         }

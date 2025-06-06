@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/duel.dart';
+import '../../domain/entities/duel_participant.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/duel_detail/duel_detail_bloc.dart';
 import '../bloc/duel_detail/duel_detail_event.dart';
 import '../bloc/duel_detail/duel_detail_state.dart';
@@ -45,7 +47,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
       appBar: AppBar(
         title: const Text('Duel Details'),
         elevation: 0,
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -154,7 +156,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
           DuelInfoCard(
             duel: duel,
             participants: participants,
-            currentUserId: 'current_user_id', // TODO: Get actual current user ID
+            currentUserId: _getCurrentUserId() ?? '',
             showJoinButton: _canUserJoin(duel),
             onJoin: _canUserJoin(duel) 
                 ? () => context.read<DuelDetailBloc>().add(
@@ -173,12 +175,12 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
           
           // Tabs
           Container(
-            color: Colors.grey[100],
+            color: Theme.of(context).colorScheme.surface,
             child: TabBar(
               controller: _tabController,
-              labelColor: AppColors.primary,
-              unselectedLabelColor: Colors.grey[600],
-              indicatorColor: AppColors.accent,
+              labelColor: Theme.of(context).colorScheme.primary,
+              unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+              indicatorColor: Theme.of(context).colorScheme.secondary,
               tabs: const [
                 Tab(text: 'Progress'),
                 Tab(text: 'Leaderboard'),
@@ -215,6 +217,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
               ],
             ),
           ),
+          // Comments section
           DuelCommentsSection(duelId: duel.id),
         ],
       ),
@@ -229,12 +232,38 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
     return duel.status == 'pending' || duel.status == 'active';
   }
   
+  String? _getCurrentUserId() {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        return authState.user.userId;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting current user ID: $e');
+      return null;
+    }
+  }
+  
+  bool _isUserParticipant(List<DuelParticipant> participants) {
+    final currentUserId = _getCurrentUserId();
+    if (currentUserId == null) return false;
+    
+    return participants.any((p) => p.userId == currentUserId);
+  }
+  
+  bool _isUserCreator(Duel duel) {
+    final currentUserId = _getCurrentUserId();
+    if (currentUserId == null) return false;
+    
+    return duel.creatorId == currentUserId;
+  }
+  
   bool _canUserStartDuel(Duel duel) {
     // Only the creator can manually start a duel
     // The duel must be in pending status
     // The duel must have manual start mode
-    // Check if the current user is the creator (for now always allow it for testing)
-    final bool isCreator = true; // TODO: Check if current user is creator
+    final bool isCreator = _isUserCreator(duel);
     
     final bool canStart = isCreator && 
                         duel.status == DuelStatus.pending &&

@@ -50,22 +50,6 @@ class DuelCard extends StatelessWidget {
   Widget _buildHeader() {
     return Row(
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: _getStatusColor(),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            _getStatusText(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
         if (!duel.isPublic)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -226,7 +210,7 @@ class DuelCard extends StatelessWidget {
             child: ElevatedButton(
               onPressed: showJoinButton ? () => onJoin?.call() : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.secondary,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 shape: RoundedRectangleBorder(
@@ -251,32 +235,6 @@ class DuelCard extends StatelessWidget {
         ],
       ],
     );
-  }
-
-  Color _getStatusColor() {
-    switch (duel.status) {
-      case DuelStatus.pending:
-        return Colors.orange;
-      case DuelStatus.active:
-        return Colors.blue;
-      case DuelStatus.completed:
-        return Colors.green;
-      case DuelStatus.cancelled:
-        return Colors.red;
-    }
-  }
-
-  String _getStatusText() {
-    switch (duel.status) {
-      case DuelStatus.pending:
-        return 'Pending';
-      case DuelStatus.active:
-        return 'Active';
-      case DuelStatus.completed:
-        return 'Completed';
-      case DuelStatus.cancelled:
-        return 'Cancelled';
-    }
   }
 
   IconData _getChallengeIcon() {
@@ -344,7 +302,13 @@ class DuelCard extends StatelessWidget {
       }
     }
     
-    return '${duel.timeframeHours}h duration';
+    // Convert hours to days for better readability
+    if (duel.timeframeHours >= 24) {
+      final days = (duel.timeframeHours / 24).round();
+      return '${days} day${days == 1 ? '' : 's'} duration';
+    } else {
+      return '${duel.timeframeHours}h duration';
+    }
   }
 
   String _getWinnerText() {
