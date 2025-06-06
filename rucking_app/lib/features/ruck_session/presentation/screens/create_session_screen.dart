@@ -41,6 +41,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   int? _plannedDuration; // Default is now empty
   bool _preferMetric = false; // Default to standard
   
+  // Controller and flag for custom ruck weight input
+  final TextEditingController _customRuckWeightController = TextEditingController();
+  bool _showCustomRuckWeightInput = false;
+  
   // Add loading state variable
   bool _isCreating = false;
   bool _isLoading = true;
@@ -309,7 +313,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       if (lastWeightKg != null) {
         setState(() {
           _ruckWeight = lastWeightKg;
-          _displayRuckWeight = _preferMetric ? _ruckWeight : (_ruckWeight * AppConfig.kgToLbs);
+          _displayRuckWeight = _preferMetric ? lastWeightKg : (lastWeightKg * AppConfig.kgToLbs);
           // Explicitly log to verify state update
           
         });
@@ -390,6 +394,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   void dispose() {
     _weightScrollController.dispose();
     _userWeightController.dispose();
+    _customRuckWeightController.dispose();
     _durationController.removeListener(_durationListener);
     _durationController.dispose();
     _durationFocusNode.dispose();
@@ -571,7 +576,72 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                           separatorBuilder: (context, index) => const SizedBox(width: 8),
                         ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+
+                // Link to toggle custom ruck weight input
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _showCustomRuckWeightInput = !_showCustomRuckWeightInput;
+                        if (!_showCustomRuckWeightInput) {
+                          // Clear any entered custom weight when hiding
+                          _customRuckWeightController.clear();
+                        }
+                      });
+                    },
+                    child: Text(
+                      _showCustomRuckWeightInput ? 'Hide custom weight' : 'Enter custom weight',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+                if (_showCustomRuckWeightInput) ...[
+                  const SizedBox(height: 8),
+                  CustomTextField(
+                    controller: _customRuckWeightController,
+                    label: 'Custom Ruck Weight ($weightUnit)',
+                    hint: 'e.g. 37',
+                    keyboardType: TextInputType.number,
+                    prefixIcon: Icons.fitness_center_outlined,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    validator: (value) {
+                      if (!_showCustomRuckWeightInput) return null; // Skip if not shown
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a weight';
+                      }
+                      final parsed = double.tryParse(value);
+                      if (parsed == null || parsed <= 0) {
+                        return sessionInvalidWeight;
+                      }
+                      return null;
+                    },
+                    onChanged: (value) {
+                      final parsed = double.tryParse(value);
+                      if (parsed != null && parsed > 0) {
+                        setState(() {
+                          if (_preferMetric) {
+                            _ruckWeight = parsed;
+                            _displayRuckWeight = parsed;
+                          } else {
+                            _ruckWeight = parsed / AppConfig.kgToLbs;
+                            _displayRuckWeight = parsed;
+                          }
+                          _selectedRuckWeight = _ruckWeight;
+                        });
+                      }
+                    },
+                  ),
+                ],
                 const SizedBox(height: 32),
                 
                 // User weight field (optional)
@@ -660,7 +730,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     ),
                     onPressed: () {
                       HapticFeedback.mediumImpact();
-                      _snapToNearestWeight(); 
                       if (_formKey.currentState!.validate()) {
                         if (!_isCreating) _createSession();
                       }
