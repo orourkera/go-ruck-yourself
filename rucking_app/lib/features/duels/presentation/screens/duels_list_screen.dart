@@ -110,10 +110,10 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
         onTap: (index) {
           if (index == 0) {
             // My Duels - show duels user is participating in
-            context.read<DuelListBloc>().add(LoadMyDuels());
+            context.read<DuelListBloc>().add(const LoadMyDuels());
           } else {
             // Discover - show duels available to join
-            context.read<DuelListBloc>().add(LoadDiscoverDuels());
+            context.read<DuelListBloc>().add(const LoadDiscoverDuels());
           }
         },
         tabs: const [
@@ -166,7 +166,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () => context.read<DuelListBloc>().add(RefreshDuels()),
+                  onPressed: () => context.read<DuelListBloc>().add(const RefreshDuels()),
                   child: const Text('Retry'),
                 ),
               ],
@@ -175,7 +175,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
         } else if (state is DuelListLoaded) {
           return RefreshIndicator(
             onRefresh: () async {
-              context.read<DuelListBloc>().add(RefreshDuels());
+              context.read<DuelListBloc>().add(const RefreshDuels());
             },
             child: _buildDuelsList(state, isMyDuels: isMyDuels),
           );
@@ -215,7 +215,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
               ),
               const SizedBox(height: 24),
               TextButton(
-                onPressed: () => context.read<DuelListBloc>().add(ClearFilters()),
+                onPressed: () => context.read<DuelListBloc>().add(const ClearFilters()),
                 child: const Text('Clear Filters'),
               ),
             ] else ...[
@@ -290,7 +290,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
           Navigator.pop(context);
         },
         onClearFilters: () {
-          context.read<DuelListBloc>().add(ClearFilters());
+          context.read<DuelListBloc>().add(const ClearFilters());
           Navigator.pop(context);
         },
       ),

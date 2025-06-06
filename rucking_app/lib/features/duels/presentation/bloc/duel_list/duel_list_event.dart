@@ -24,11 +24,17 @@ class LoadDuels extends DuelListEvent {
   List<Object?> get props => [status, challengeType, location, limit];
 }
 
-class RefreshDuels extends DuelListEvent {}
+class RefreshDuels extends DuelListEvent {
+  const RefreshDuels();
+}
 
-class LoadMyDuels extends DuelListEvent {}
+class LoadMyDuels extends DuelListEvent {
+  const LoadMyDuels();
+}
 
-class LoadDiscoverDuels extends DuelListEvent {}
+class LoadDiscoverDuels extends DuelListEvent {
+  const LoadDiscoverDuels();
+}
 
 class FilterDuels extends DuelListEvent {
   final String? status;
@@ -54,4 +60,6 @@ class JoinDuel extends DuelListEvent {
   List<Object?> get props => [duelId];
 }
 
-class ClearFilters extends DuelListEvent {}
+class ClearFilters extends DuelListEvent {
+  const ClearFilters();
+}
