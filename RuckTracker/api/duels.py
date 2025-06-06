@@ -47,28 +47,54 @@ class DuelListResource(Resource):
             user_id = g.user.id
             
             # Query parameters
-            status = request.args.get('status', 'active')
+            status = request.args.get('status')
             challenge_type = request.args.get('challenge_type')
             is_public = request.args.get('is_public', 'true').lower() == 'true'
+            user_participating = request.args.get('user_participating')
             page = int(request.args.get('page', 1))
             per_page = min(int(request.args.get('per_page', 20)), 100)
             
-            logging.info(f"DuelList.get filters: status={status}, is_public={is_public}, challenge_type={challenge_type}, user_id={user_id}")
+            logging.info(f"DuelList.get filters: status={status}, is_public={is_public}, challenge_type={challenge_type}, user_participating={user_participating}, user_id={user_id}")
             
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
-            # Base query for public duels or user's duels
-            query = supabase.table('duels').select('*')
-            
-            # Add filters
-            if is_public:
-                query = query.eq('is_public', True)
-                logging.info("Applied is_public=True filter")
+            if user_participating == 'true':
+                # My Duels - get duels where user is participating or created
+                # First get all duel_ids where user is a participant
+                participant_duels_response = supabase.table('duel_participants').select('duel_id').eq('user_id', user_id).execute()
+                participant_duel_ids = [p['duel_id'] for p in participant_duels_response.data]
+                
+                # Get duels where user is creator OR participant
+                if participant_duel_ids:
+                    # Create OR condition for participant duels and creator duels
+                    duel_ids_str = ','.join(participant_duel_ids)
+                    query = supabase.table('duels').select('*').or_(f'creator_id.eq.{user_id},id.in.({duel_ids_str})')
+                else:
+                    # Only get duels where user is creator
+                    query = supabase.table('duels').select('*').eq('creator_id', user_id)
+                    
+            elif user_participating == 'false':
+                # Discover - get public duels where user is NOT participating
+                # First get all duel_ids where user is already participating
+                participant_duels_response = supabase.table('duel_participants').select('duel_id').eq('user_id', user_id).execute()
+                participant_duel_ids = [p['duel_id'] for p in participant_duels_response.data]
+                
+                # Get public duels where user is not creator and not participant
+                query = supabase.table('duels').select('*').eq('is_public', True).neq('creator_id', user_id)
+                
+                if participant_duel_ids:
+                    duel_ids_str = ','.join(participant_duel_ids)
+                    query = query.not_.in_('id', participant_duel_ids)
+                    
             else:
-                # For private duels, show duels where user is creator or participant
-                query = query.or_(f'creator_id.eq.{user_id}')
-                logging.info(f"Applied creator_id filter for user {user_id}")
+                # Default behavior - get public duels or user's duels
+                query = supabase.table('duels').select('*')
+                if is_public:
+                    query = query.eq('is_public', True)
+                else:
+                    query = query.or_(f'creator_id.eq.{user_id}')
             
+            # Add additional filters
             if status:
                 query = query.eq('status', status)
                 logging.info(f"Applied status filter: {status}")

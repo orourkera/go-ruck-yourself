@@ -16,6 +16,7 @@ class GetDuels implements UseCase<List<Duel>, GetDuelsParams> {
       challengeType: params.challengeType,
       location: params.location,
       limit: params.limit,
+      userParticipating: params.userParticipating,
     );
   }
 }
@@ -25,11 +26,13 @@ class GetDuelsParams {
   final String? challengeType;
   final String? location;
   final int? limit;
+  final bool? userParticipating;
 
   const GetDuelsParams({
     this.status,
     this.challengeType,
     this.location,
     this.limit,
+    this.userParticipating,
   });
 }

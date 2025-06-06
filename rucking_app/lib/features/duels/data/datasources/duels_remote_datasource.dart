@@ -14,6 +14,7 @@ abstract class DuelsRemoteDataSource {
     String? challengeType,
     String? location,
     int? limit,
+    bool? userParticipating,
   });
 
   Future<DuelModel> createDuel({
@@ -68,12 +69,14 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     String? challengeType,
     String? location,
     int? limit,
+    bool? userParticipating,
   }) async {
     final queryParams = <String, String>{};
     if (status != null) queryParams['status'] = status;
     if (challengeType != null) queryParams['challenge_type'] = challengeType;
     if (location != null) queryParams['location'] = location;
     if (limit != null) queryParams['limit'] = limit.toString();
+    if (userParticipating != null) queryParams['user_participating'] = userParticipating.toString();
 
     print('[DEBUG] getDuels() - Making API call with params: $queryParams');
     

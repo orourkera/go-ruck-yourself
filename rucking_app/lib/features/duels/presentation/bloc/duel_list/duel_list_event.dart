@@ -26,6 +26,10 @@ class LoadDuels extends DuelListEvent {
 
 class RefreshDuels extends DuelListEvent {}
 
+class LoadMyDuels extends DuelListEvent {}
+
+class LoadDiscoverDuels extends DuelListEvent {}
+
 class FilterDuels extends DuelListEvent {
   final String? status;
   final String? challengeType;

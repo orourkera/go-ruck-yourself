@@ -28,7 +28,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
   void initState() {
     super.initState();
     _loadCurrentUser();
-    context.read<DuelListBloc>().add(const LoadDuels());
+    context.read<DuelListBloc>().add(const LoadMyDuels());
   }
 
   Future<void> _loadCurrentUser() async {
@@ -47,7 +47,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
         title: const Text('Duels'),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -68,7 +68,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
           context,
           MaterialPageRoute(builder: (context) => const CreateDuelScreen()),
         ),
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text(
@@ -79,107 +79,114 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          _buildStatusTabs(),
-          Expanded(
-            child: BlocConsumer<DuelListBloc, DuelListState>(
-              listener: (context, state) {
-                if (state is DuelJoined) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(state.message),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                } else if (state is DuelJoinError) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(state.message),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
-              builder: (context, state) {
-                if (state is DuelListLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                } else if (state is DuelListError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          state.message,
-                          style: Theme.of(context).textTheme.titleMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => context.read<DuelListBloc>().add(RefreshDuels()),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (state is DuelListLoaded) {
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      context.read<DuelListBloc>().add(RefreshDuels());
-                    },
-                    child: _buildDuelsList(state),
-                  );
-                }
-                
-                return const SizedBox.shrink();
-              },
+      body: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            _buildStatusTabs(),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  // My Duels Tab
+                  _buildDuelsView(isMyDuels: true),
+                  // Discover Tab  
+                  _buildDuelsView(isMyDuels: false),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusTabs() {
-    return Container(
-      color: AppColors.primary,
-      child: DefaultTabController(
-        length: 4,
-        child: TabBar(
-          indicatorColor: AppColors.accent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          onTap: (index) {
-            final statusMap = {
-              0: null, // All
-              1: 'pending',
-              2: 'active',
-              3: 'completed',
-            };
-            context.read<DuelListBloc>().add(
-              LoadDuels(status: statusMap[index]),
-            );
-          },
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Pending'),
-            Tab(text: 'Active'),
-            Tab(text: 'Completed'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDuelsList(DuelListLoaded state) {
+  Widget _buildStatusTabs() {
+    return Container(
+      color: Theme.of(context).colorScheme.primary,
+      child: TabBar(
+        indicatorColor: Theme.of(context).colorScheme.secondary,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        onTap: (index) {
+          if (index == 0) {
+            // My Duels - show duels user is participating in
+            context.read<DuelListBloc>().add(LoadMyDuels());
+          } else {
+            // Discover - show duels available to join
+            context.read<DuelListBloc>().add(LoadDiscoverDuels());
+          }
+        },
+        tabs: const [
+          Tab(text: 'My Duels'),
+          Tab(text: 'Discover'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDuelsView({required bool isMyDuels}) {
+    return BlocConsumer<DuelListBloc, DuelListState>(
+      listener: (context, state) {
+        if (state is DuelJoined) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (state is DuelJoinError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is DuelListLoading) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        } else if (state is DuelListError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  state.message,
+                  style: Theme.of(context).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.read<DuelListBloc>().add(RefreshDuels()),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        } else if (state is DuelListLoaded) {
+          return RefreshIndicator(
+            onRefresh: () async {
+              context.read<DuelListBloc>().add(RefreshDuels());
+            },
+            child: _buildDuelsList(state, isMyDuels: isMyDuels),
+          );
+        }
+        
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  Widget _buildDuelsList(DuelListLoaded state, {required bool isMyDuels}) {
     if (state.duels.isEmpty) {
       return Center(
         child: Column(
@@ -213,7 +220,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
               ),
             ] else ...[
               Text(
-                'Welcome to Duels!',
+                isMyDuels ? 'No Duels Yet!' : 'No Duels to Discover!',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: Colors.grey[700],
                   fontWeight: FontWeight.bold,
@@ -223,10 +230,11 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
-                  'Duels are your chance to connect and compete with other ruckers. Create a duel, be matched with a rucker at your level and enjoy a little healthy competition! Create your first duel today!',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.grey[600],
-                    height: 1.5,
+                  isMyDuels 
+                    ? 'You haven\'t joined or created any duels yet. Get started by creating your first duel or browsing available duels to join!'
+                    : 'No duels are currently available to join. Create a new duel to get started!',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[500],
                   ),
                   textAlign: TextAlign.center,
                 ),
