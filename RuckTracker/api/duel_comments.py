@@ -461,14 +461,14 @@ class DuelCommentsResource(Resource):
 
         # Get user profile information for display name
         try:
-            user_profile = supabase.table('users') \
-                                 .select('display_name, avatar_url') \
+            user_profile = supabase.table('user') \
+                                 .select('username') \
                                  .eq('id', user_id) \
                                  .execute()
             
             if user_profile.data:
-                user_display_name = user_profile.data[0].get('display_name') or user_email
-                user_avatar_url = user_profile.data[0].get('avatar_url')
+                user_display_name = user_profile.data[0].get('username') or user_email
+                user_avatar_url = None  # Not available in user table
             else:
                 user_display_name = user_email or 'Anonymous'
                 user_avatar_url = None
