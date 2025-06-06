@@ -89,6 +89,7 @@ class AuthRepositoryImpl implements AuthRepository {
     bool? preferMetric,
     bool? allowRuckSharing,
     String? gender,
+    String? avatarUrl,
   }) async {
     return await _authService.updateProfile(
       username: username,
@@ -97,6 +98,7 @@ class AuthRepositoryImpl implements AuthRepository {
       preferMetric: preferMetric,
       allowRuckSharing: allowRuckSharing,
       gender: gender,
+      avatarUrl: avatarUrl,
     );
   }
 

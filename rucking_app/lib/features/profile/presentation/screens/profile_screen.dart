@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/profile/presentation/bloc/profile_bloc.dart';
+import 'package:rucking_app/shared/widgets/user_avatar.dart';
+import 'package:rucking_app/shared/utils/image_picker_utils.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/feedback_form_screen.dart';
@@ -37,290 +40,323 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<AuthBloc, AuthState>(
-      listener: (context, state) {
-        if (state is AuthError) {
-          if (Navigator.of(context, rootNavigator: true).canPop()) {
-            Navigator.of(context, rootNavigator: true).pop();
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${state.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        } else if (state is Unauthenticated) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => LoginScreen()),
-          );
-        }
-      },
-      child: BlocBuilder<AuthBloc, AuthState>(
-        builder: (context, state) {
-          if (state is Authenticated) {
-            final user = state.user;
-            _selectedUnit ??= user.preferMetric ? 'Metric' : 'Standard';
-            String initials = user.username.isNotEmpty ? _getInitials(user.username) : '';
-
-            String weightDisplay = 'Not set';
-            if (user.weightKg != null) {
-              weightDisplay = user.preferMetric
-                  ? '${user.weightKg!.toStringAsFixed(1)} kg'
-                  : '${(user.weightKg! * kgToLbs).toStringAsFixed(1)} lbs';
+    return BlocProvider(
+      create: (context) => GetIt.instance<ProfileBloc>(),
+      child: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is AuthError) {
+            if (Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true).pop();
             }
-
-            String heightDisplay = 'Not set';
-            if (user.heightCm != null) {
-              if (user.preferMetric) {
-                heightDisplay = '${user.heightCm!.toStringAsFixed(1)} cm';
-              } else {
-                final totalInches = user.heightCm! * cmToInches;
-                final feet = (totalInches / 12).floor();
-                final inches = (totalInches % 12).round();
-                heightDisplay = "$feet' $inches\"";
-              }
-            }
-
-            // Determine if we're in lady mode
-            final bool isLadyMode = user.gender == 'female';
-            final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
-            
-            return Scaffold(
-              backgroundColor: isLadyMode ? primaryColor.withOpacity(0.05) : Colors.white,
-              appBar: AppBar(
-                backgroundColor: isLadyMode ? primaryColor : Colors.white,
-                elevation: 0,
-                title: Text(
-                  'Profile',
-                  style: TextStyle(
-                    color: isLadyMode ? Colors.white : Colors.black,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                actions: [
-                  IconButton(
-                    icon: Icon(Icons.edit, color: isLadyMode ? Colors.white : Colors.black),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EditProfileScreen(
-                            user: user,
-                            preferMetric: user.preferMetric,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error: ${state.message}'),
+                backgroundColor: Colors.red,
               ),
-              body: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 20),
-                      Text(
-                        user.username,
-                        style: AppTextStyles.headlineMedium.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user.email,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.textDarkSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      _buildSection(
-                        title: 'Personal Information',
-                        children: [
-                          _buildInfoItem(
-                            icon: Icons.email_outlined,
-                            label: 'Email',
-                            value: user.email,
-                          ),
-                          const Divider(),
-                          _buildInfoItem(
-                            icon: Icons.monitor_weight_outlined,
-                            label: 'Weight',
-                            value: weightDisplay,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      _buildSection(
-                        title: 'SETTINGS',
-                        children: [
-                          _buildClickableHealthKitItem(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => BlocProvider(
-                                    create: (context) => HealthBloc(
-                                      healthService: GetIt.instance<HealthService>(),
-                                    ),
-                                    child: const HealthIntegrationIntroScreen(
-                                      navigateToHome: false,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          const Divider(),
-                          _buildSettingItem(
-                            icon: Icons.straighten,
-                            label: 'Units',
-                            trailing: DropdownButton<String>(
-                              value: _selectedUnit,
-                              onChanged: (newValue) {
-                                if (newValue != null) {
-                                  setState(() => _selectedUnit = newValue);
-                                  context.read<AuthBloc>().add(
-                                        AuthUpdateProfileRequested(
-                                          preferMetric: newValue == 'Metric',
-                                        ),
-                                      );
-                                }
-                              },
-                              items: ['Metric', 'Standard']
-                                  .map((value) => DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(value),
-                                      ))
-                                  .toList(),
+            );
+          } else if (state is Unauthenticated) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => LoginScreen()),
+            );
+          }
+        },
+        child: BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) {
+            if (state is Authenticated) {
+              final user = state.user;
+              _selectedUnit ??= user.preferMetric ? 'Metric' : 'Standard';
+              String initials = user.username.isNotEmpty ? _getInitials(user.username) : '';
+
+              String weightDisplay = 'Not set';
+              if (user.weightKg != null) {
+                weightDisplay = user.preferMetric
+                    ? '${user.weightKg!.toStringAsFixed(1)} kg'
+                    : '${(user.weightKg! * kgToLbs).toStringAsFixed(1)} lbs';
+              }
+
+              String heightDisplay = 'Not set';
+              if (user.heightCm != null) {
+                if (user.preferMetric) {
+                  heightDisplay = '${user.heightCm!.toStringAsFixed(1)} cm';
+                } else {
+                  final totalInches = user.heightCm! * cmToInches;
+                  final feet = (totalInches / 12).floor();
+                  final inches = (totalInches % 12).round();
+                  heightDisplay = "$feet' $inches\"";
+                }
+              }
+
+              // Determine if we're in lady mode
+              final bool isLadyMode = user.gender == 'female';
+              final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+              
+              return Scaffold(
+                backgroundColor: isLadyMode ? primaryColor.withOpacity(0.05) : Colors.white,
+                appBar: AppBar(
+                  backgroundColor: isLadyMode ? primaryColor : Colors.white,
+                  elevation: 0,
+                  title: Text(
+                    'Profile',
+                    style: TextStyle(
+                      color: isLadyMode ? Colors.white : Colors.black,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: Icon(Icons.edit, color: isLadyMode ? Colors.white : Colors.black),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditProfileScreen(
+                              user: user,
+                              preferMetric: user.preferMetric,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      _buildSection(
-                        title: 'About',
-                        children: [
-                          _buildClickableItem(
-                            icon: Icons.info_outline,
-                            label: 'About App',
-                            onTap: () {
-                              showAboutDialog(
-                                context: context,
-                                applicationName: 'Go Rucky Yourself App',
-                                applicationVersion: '1.0.0',
-                                applicationIcon: Image.asset(
-                                  'assets/images/app_icon.png',
-                                  width: 48,
-                                  height: 48,
-                                ),
-                                applicationLegalese: ' 2025 Get Rucky',
-                                children: [
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Track your rucking sessions, monitor your progress, and have a great rucking time',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Made by the Get Rucky team.',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                body: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 20),
+                        // Avatar section with upload functionality
+                        BlocListener<ProfileBloc, ProfileState>(
+                          listener: (context, profileState) {
+                            if (profileState is AvatarUploadSuccess) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Avatar updated successfully!')),
+                              );
+                            } else if (profileState is AvatarUploadFailure) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to upload avatar: ${profileState.error}')),
+                              );
+                            }
+                          },
+                          child: BlocBuilder<ProfileBloc, ProfileState>(
+                            builder: (context, profileState) {
+                              return EditableUserAvatar(
+                                user: user,
+                                size: 100,
+                                isLoading: profileState is AvatarUploading,
+                                onTap: () async {
+                                  final imageFile = await ImagePickerUtils.showImageSourcePicker(context);
+                                  if (imageFile != null) {
+                                    context.read<ProfileBloc>().add(UploadAvatar(imageFile));
+                                  }
+                                },
                               );
                             },
                           ),
-                          const Divider(),
-                          _buildClickableItem(
-                            icon: Icons.privacy_tip_outlined,
-                            label: 'Privacy Policy',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
-                              );
-                            },
-                          ),
-                          const Divider(),
-                          _buildClickableItem(
-                            icon: Icons.description_outlined,
-                            label: 'Terms of Service',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const TermsOfServiceScreen()),
-                              );
-                            },
-                          ),
-                          const Divider(),
-                          _buildClickableItem(
-                            icon: Icons.article_outlined,
-                            label: 'Terms of Use (EULA)',
-                            onTap: () async {
-                              final url = Uri.parse('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/');
-                              if (await canLaunchUrl(url)) {
-                                await launchUrl(url);
-                              }
-                            },
-                          ),
-                          const Divider(),
-                          _buildClickableItem(
-                            icon: Icons.feedback,
-                            label: 'Give Feedback',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const FeedbackFormScreen()),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      _buildSection(
-                        title: 'Danger Zone',
-                        children: [
-                          _buildClickableItem(
-                            icon: Icons.delete_forever_outlined,
-                            label: 'Delete Account',
-                            onTap: () => _showDeleteAccountDialog(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.subscriptions_outlined),
-                        label: const Text('Manage Subscription'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 50),
-                          backgroundColor: isLadyMode ? AppColors.ladyPrimary : AppColors.primary,
-                          foregroundColor: Colors.white,
-                          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
-                        onPressed: () async {
-                          final url = Uri.parse(Theme.of(context).platform == TargetPlatform.iOS
-                              ? 'https://apps.apple.com/account/subscriptions'
-                              : 'https://play.google.com/store/account/subscriptions');
-                          if (await canLaunchUrl(url)) {
-                            await launchUrl(url);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Could not open subscription management page.')),
-                            );
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      CustomButton(
-                        text: 'Logout',
-                        icon: Icons.logout,
-                        color: AppColors.error,
-                        onPressed: () => _showLogoutConfirmationDialog(context),
-                      ),
-                      const SizedBox(height: 32),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(
+                          user.username,
+                          style: AppTextStyles.headlineMedium.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          user.email,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textDarkSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSection(
+                          title: 'Personal Information',
+                          children: [
+                            _buildInfoItem(
+                              icon: Icons.email_outlined,
+                              label: 'Email',
+                              value: user.email,
+                            ),
+                            const Divider(),
+                            _buildInfoItem(
+                              icon: Icons.monitor_weight_outlined,
+                              label: 'Weight',
+                              value: weightDisplay,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSection(
+                          title: 'SETTINGS',
+                          children: [
+                            _buildClickableHealthKitItem(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => BlocProvider(
+                                      create: (context) => HealthBloc(
+                                        healthService: GetIt.instance<HealthService>(),
+                                      ),
+                                      child: const HealthIntegrationIntroScreen(
+                                        navigateToHome: false,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const Divider(),
+                            _buildSettingItem(
+                              icon: Icons.straighten,
+                              label: 'Units',
+                              trailing: DropdownButton<String>(
+                                value: _selectedUnit,
+                                onChanged: (newValue) {
+                                  if (newValue != null) {
+                                    setState(() => _selectedUnit = newValue);
+                                    context.read<AuthBloc>().add(
+                                          AuthUpdateProfileRequested(
+                                            preferMetric: newValue == 'Metric',
+                                          ),
+                                        );
+                                  }
+                                },
+                                items: ['Metric', 'Standard']
+                                    .map((value) => DropdownMenuItem<String>(
+                                          value: value,
+                                          child: Text(value),
+                                        ))
+                                    .toList(),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSection(
+                          title: 'About',
+                          children: [
+                            _buildClickableItem(
+                              icon: Icons.info_outline,
+                              label: 'About App',
+                              onTap: () {
+                                showAboutDialog(
+                                  context: context,
+                                  applicationName: 'Go Rucky Yourself App',
+                                  applicationVersion: '1.0.0',
+                                  applicationIcon: Image.asset(
+                                    'assets/images/app_icon.png',
+                                    width: 48,
+                                    height: 48,
+                                  ),
+                                  applicationLegalese: ' 2025 Get Rucky',
+                                  children: [
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'Track your rucking sessions, monitor your progress, and have a great rucking time',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Made by the Get Rucky team.',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.privacy_tip_outlined,
+                              label: 'Privacy Policy',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                                );
+                              },
+                            ),
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.description_outlined,
+                              label: 'Terms of Service',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const TermsOfServiceScreen()),
+                                );
+                              },
+                            ),
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.article_outlined,
+                              label: 'Terms of Use (EULA)',
+                              onTap: () async {
+                                final url = Uri.parse('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/');
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url);
+                                }
+                              },
+                            ),
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.feedback,
+                              label: 'Give Feedback',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const FeedbackFormScreen()),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSection(
+                          title: 'Danger Zone',
+                          children: [
+                            _buildClickableItem(
+                              icon: Icons.delete_forever_outlined,
+                              label: 'Delete Account',
+                              onTap: () => _showDeleteAccountDialog(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.subscriptions_outlined),
+                          label: const Text('Manage Subscription'),
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 50),
+                            backgroundColor: isLadyMode ? AppColors.ladyPrimary : AppColors.primary,
+                            foregroundColor: Colors.white,
+                            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () async {
+                            final url = Uri.parse(Theme.of(context).platform == TargetPlatform.iOS
+                                ? 'https://apps.apple.com/account/subscriptions'
+                                : 'https://play.google.com/store/account/subscriptions');
+                            if (await canLaunchUrl(url)) {
+                              await launchUrl(url);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not open subscription management page.')),
+                              );
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        CustomButton(
+                          text: 'Logout',
+                          icon: Icons.logout,
+                          color: AppColors.error,
+                          onPressed: () => _showLogoutConfirmationDialog(context),
+                        ),
+                        const SizedBox(height: 32),
+                      ],
+                    ),
                   ),
                 ),
               ),
