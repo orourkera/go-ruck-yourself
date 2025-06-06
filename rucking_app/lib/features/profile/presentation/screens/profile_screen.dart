@@ -143,11 +143,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: BlocBuilder<ProfileBloc, ProfileState>(
                             builder: (context, profileState) {
                               return EditableUserAvatar(
-                                user: user,
+                                avatarUrl: user.avatarUrl,
+                                username: user.username,
                                 size: 100,
                                 isLoading: profileState is AvatarUploading,
-                                onTap: () async {
-                                  final imageFile = await ImagePickerUtils.showImageSourcePicker(context);
+                                onEditPressed: () async {
+                                  final imageFile = await ImagePickerUtils.pickImage(context);
                                   if (imageFile != null) {
                                     context.read<ProfileBloc>().add(UploadAvatar(imageFile));
                                   }
@@ -359,20 +360,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-              ),
-            );
-          } else {
-            return Scaffold(
-              appBar: AppBar(
-                title: const Text('Profile'),
-                centerTitle: true,
-              ),
-              body: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-        },
+              );
+            } else {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('Profile'),
+                  centerTitle: true,
+                ),
+                body: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+          },
+        ),
       ),
     );
   }

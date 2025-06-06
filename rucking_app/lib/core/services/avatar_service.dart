@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:rucking_app/core/config/api_config.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 
 /// Service for handling avatar upload operations
@@ -22,7 +22,7 @@ class AvatarService {
   Future<String> uploadAvatar(File imageFile) async {
     try {
       // Get access token
-      final token = await _authService.getAccessToken();
+      final token = await _authService.getToken();
       if (token == null) {
         throw Exception('No access token available');
       }
@@ -39,7 +39,7 @@ class AvatarService {
 
       // Prepare request
       final response = await _dio.post(
-        '${ApiConfig.baseUrl}/api/auth/avatar',
+        '${AppConfig.apiBaseUrl}/auth/avatar',
         data: {
           'image': dataUrl,
         },
