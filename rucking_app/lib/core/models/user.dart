@@ -33,6 +33,9 @@ class User extends Equatable {
   /// User's gender: 'male', 'female', 'other', or null if unspecified
   final String? gender;
   
+  /// User's avatar image URL
+  final String? avatarUrl;
+  
   /// User stats information
   final UserStats? stats;
 
@@ -48,6 +51,7 @@ class User extends Equatable {
     required this.preferMetric,
     this.allowRuckSharing = true,
     this.gender,
+    this.avatarUrl,
     this.stats,
   });
   
@@ -63,6 +67,7 @@ class User extends Equatable {
     bool? preferMetric,
     bool? allowRuckSharing,
     String? gender,
+    String? avatarUrl,
     UserStats? stats,
   }) {
     return User(
@@ -76,6 +81,7 @@ class User extends Equatable {
       preferMetric: preferMetric ?? this.preferMetric,
       allowRuckSharing: allowRuckSharing ?? this.allowRuckSharing,
       gender: gender ?? this.gender,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       stats: stats ?? this.stats,
     );
   }
@@ -116,6 +122,7 @@ class User extends Equatable {
       preferMetric: json['prefer_metric'] as bool? ?? true,
       allowRuckSharing: json['allow_ruck_sharing'] as bool? ?? true,
       gender: json['gender'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
@@ -141,13 +148,14 @@ class User extends Equatable {
     if (dateOfBirth != null) data['date_of_birth'] = dateOfBirth;
     if (createdAt != null) data['created_at'] = createdAt;
     if (gender != null) data['gender'] = gender;
+    if (avatarUrl != null) data['avatar_url'] = avatarUrl;
     if (stats != null) data['stats'] = stats!.toJson();
     return data;
   }
   
   @override
   List<Object?> get props => [
-    userId, email, username, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, allowRuckSharing, gender, stats
+    userId, email, username, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, stats
   ];
 }
 

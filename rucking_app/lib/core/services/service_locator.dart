@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
@@ -17,6 +18,7 @@ import 'package:rucking_app/core/security/token_refresh_interceptor.dart';
 import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
@@ -61,6 +63,10 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<ApiClient>(apiClient);
   getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
   getIt.registerSingleton<AuthService>(AuthServiceImpl(getIt<ApiClient>(), getIt<StorageService>()));
+  getIt.registerSingleton<AvatarService>(AvatarService(
+    dio: getIt<Dio>(),
+    authService: getIt<AuthService>(),
+  ));
   
   // Connect services to resolve circular dependencies
   apiClient.setStorageService(getIt<StorageService>());
@@ -142,6 +148,10 @@ Future<void> setupServiceLocator() async {
   ));
 
   getIt.registerFactory<HealthBloc>(() => HealthBloc(healthService: getIt<HealthService>()));
+  getIt.registerFactory<ProfileBloc>(() => ProfileBloc(
+    avatarService: getIt<AvatarService>(),
+    authBloc: getIt<AuthBloc>(),
+  ));
   
   // Initialize Ruck Buddies feature
   initRuckBuddiesFeature(getIt);

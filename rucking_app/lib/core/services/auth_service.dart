@@ -58,6 +58,7 @@ abstract class AuthService {
     bool? preferMetric,
     bool? allowRuckSharing,
     String? gender,
+    String? avatarUrl,
   });
 
   /// Delete the current user's account
@@ -518,6 +519,7 @@ class AuthServiceImpl implements AuthService {
     bool? preferMetric,
     bool? allowRuckSharing,
     String? gender,
+    String? avatarUrl,
   }) async {
     try {
       final data = <String, dynamic>{};
@@ -527,6 +529,7 @@ class AuthServiceImpl implements AuthService {
       if (preferMetric != null) data['preferMetric'] = preferMetric;
       if (allowRuckSharing != null) data['allow_ruck_sharing'] = allowRuckSharing;
       if (gender != null) data['gender'] = gender;
+      if (avatarUrl != null) data['avatar_url'] = avatarUrl;
       
       // Only send request if there is data to update
       if (data.isEmpty) {
