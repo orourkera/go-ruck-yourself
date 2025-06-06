@@ -6,6 +6,8 @@ import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:rucking_app/features/auth/presentation/screens/password_reset_screen.dart';
+import 'package:rucking_app/features/auth/presentation/screens/auth_callback_screen.dart';
 import 'package:rucking_app/features/splash/presentation/screens/splash_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen.dart';
@@ -136,6 +138,17 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   return MaterialPageRoute(builder: (_) => const HomeScreen());
                 case '/login':
                   return MaterialPageRoute(builder: (_) => LoginScreen());
+                case '/password_reset':
+                  final args = settings.arguments;
+                  String? token;
+                  if (args is Map<String, dynamic>) {
+                    token = args['token'] as String?;
+                  } else if (args is String) {
+                    token = args;
+                  }
+                  return MaterialPageRoute(
+                    builder: (_) => PasswordResetScreen(token: token),
+                  );
                 case '/paywall':
                   return MaterialPageRoute(builder: (_) => const PaywallScreen());
                 case '/ruck_buddies':
@@ -242,6 +255,12 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                 case '/duel_stats':
                   return MaterialPageRoute(
                     builder: (_) => const DuelStatsScreen(),
+                  );
+                case '/auth/callback':
+                  // Parse the full URI from the route settings
+                  final uri = Uri.parse('https://getrucky.com${settings.name}?${settings.arguments ?? ''}');
+                  return MaterialPageRoute(
+                    builder: (_) => AuthCallbackScreen(uri: uri),
                   );
                 
                 default:
