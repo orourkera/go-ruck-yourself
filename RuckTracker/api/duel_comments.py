@@ -461,7 +461,7 @@ class DuelCommentsResource(Resource):
 
         # Get user profile information for display name
         try:
-            user_profile = supabase.table('user') \
+            user_profile = supabase.table('users') \
                                  .select('display_name, avatar_url') \
                                  .eq('id', user_id) \
                                  .execute()
@@ -497,7 +497,7 @@ class DuelCommentsResource(Resource):
         # Insert the comment
         try:
             insert_data = {
-                'duel_id': int(duel_id),
+                'duel_id': duel_id,
                 'user_id': user_id,
                 'user_display_name': user_display_name,
                 'user_avatar_url': user_avatar_url,
