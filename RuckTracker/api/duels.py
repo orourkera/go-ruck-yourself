@@ -395,7 +395,7 @@ class DuelJoinResource(Resource):
             }).execute()
             
             # Get user name for notification
-            user_response = supabase.table('users').select('username').eq('id', user_id).single().execute()
+            user_response = supabase.table('user').select('username').eq('id', user_id).single().execute()
             user_name = user_response.data.get('username', 'Unknown User') if user_response.data else 'Unknown User'
             
             # Create duel joined notification for creator
