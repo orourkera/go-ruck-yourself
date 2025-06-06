@@ -30,14 +30,20 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   FlutterError.onError = (details) {
-    // AppLogger.error('Flutter Error: ${details.exception}');
-    // AppLogger.error('Stack trace: ${details.stack}');
+    // Print errors during development to help debug white screen
+    FlutterError.presentError(details);
+    // Optionally log with AppLogger if desired
+    AppLogger.error('Flutter Error: ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      AppLogger.error('Stack trace: ${details.stack}');
+    }
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    // AppLogger.error('Platform Error: $error');
-    // AppLogger.error('Stack trace: $stack');
-    return true;
+    // Log platform errors and DO NOT swallow them (return false) so Flutter prints them.
+    AppLogger.error('Platform Error: $error');
+    AppLogger.error('Stack trace: $stack');
+    return false;
   };
 
   // Attach Bloc observer for detailed logging of state changes & errors
@@ -46,7 +52,23 @@ void main() async {
   // Load environment variables from .env
   await dotenv.load();
   
-  // Initialize dependency injection after env vars are loaded
+  // --------------------------
+  // Initialize Supabase FIRST
+  // --------------------------
+  final supabaseUrl = dotenv.env['SUPABASE_URL'];
+  final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
+
+  if (supabaseUrl == null || supabaseKey == null || supabaseUrl.isEmpty || supabaseKey.isEmpty) {
+    AppLogger.error('Supabase configuration missing from .env file');
+    throw Exception('SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env file');
+  }
+
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseKey,
+  );
+  
+  // Initialize dependency injection after env vars & Supabase are loaded
   await setupServiceLocator();
   
   // Request App Tracking Transparency authorization
@@ -88,20 +110,7 @@ void main() async {
   // Initialize Firebase Messaging Service
   await FirebaseMessagingService().initialize();
   
-  // Initialize Supabase
-  final supabaseUrl = dotenv.env['SUPABASE_URL'];
-  final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
-  
-  if (supabaseUrl == null || supabaseKey == null || supabaseUrl.isEmpty || supabaseKey.isEmpty) {
-    AppLogger.error('Supabase configuration missing from .env file');
-    throw Exception('SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env file');
-  }
-  
-  await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseKey,
-    debug: true,
-  );
+  // Supabase already initialized earlier
   
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([

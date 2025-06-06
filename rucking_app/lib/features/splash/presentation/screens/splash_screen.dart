@@ -163,6 +163,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     debugPrint('[Splash] build: _SplashScreenState build method called. Animation controller status: ${_animationController.status}');
+    debugPrint('[Splash] BUILD METHOD CALLED - Widget is building');
     
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
@@ -173,12 +174,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       child: FutureBuilder<bool>(
         future: SplashHelper.isLadyModeActive(),
         builder: (context, snapshot) {
+          debugPrint('[Splash] FutureBuilder called - snapshot: ${snapshot.data}');
           bool isLadyMode = snapshot.data ?? false;
           
           String? userGender;
           try {
             // Reading AuthBloc state here is for UI purposes (e.g. lady mode). Navigation is driven by the listener.
             final authStateFromBuildContext = context.read<AuthBloc>().state;
+            debugPrint('[Splash] Successfully read AuthBloc state: ${authStateFromBuildContext.runtimeType}');
             if (authStateFromBuildContext is Authenticated) {
               userGender = authStateFromBuildContext.user.gender;
               isLadyMode = (userGender == 'female');
@@ -188,6 +191,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               debugPrint('[Splash] UI Build - Gender from auth state: $userGender, Lady mode: $isLadyMode');
             }
           } catch (e) {
+            debugPrint('[Splash] ERROR reading AuthBloc: $e');
             debugPrint('[Splash] UI Build - Using cached lady mode value: $isLadyMode');
           }
           
