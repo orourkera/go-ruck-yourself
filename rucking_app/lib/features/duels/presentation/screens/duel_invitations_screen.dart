@@ -196,7 +196,7 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
                 : null,
             onViewDuel: () {
               // Navigate to duel detail - for now just show snackbar
-              StyledSnackBar.showInfo(
+              StyledSnackBar.show(
                 context: context,
                 message: 'Navigate to duel ${invitation.duelId}',
               );

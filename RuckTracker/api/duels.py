@@ -264,7 +264,7 @@ class DuelResource(Resource):
             # Enrich participants with user info (username, email, avatar_url)
             enriched_participants = []
             for participant in participants:
-                user_query = supabase.table('users').select('username, email, avatar_url').eq('id', participant['user_id'])
+                user_query = supabase.table('user').select('username, email, avatar_url').eq('id', participant['user_id'])
                 user_response = user_query.execute()
                 if user_response.data:
                     participant_data = dict(participant)
