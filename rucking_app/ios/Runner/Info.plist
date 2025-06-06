@@ -74,7 +74,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Go Rucky Yourself needs permission to save photos to your photo library.</string>
 	<key>GIDClientID</key>
-	<string>514839968860-gbmear4okr5baujshsjk87r9c76tug8q.apps.googleusercontent.com</string>
+	<string>966278977337-l132nm2pas6ifl0kc3oh9977icfja6au.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -82,7 +82,7 @@
 			<string>com.goruckyourself.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.514839968860-gbmear4okr5baujshsjk87r9c76tug8q</string>
+				<string>com.googleusercontent.apps.966278977337-l132nm2pas6ifl0kc3oh9977icfja6au</string>
 			</array>
 		</dict>
 	</array>

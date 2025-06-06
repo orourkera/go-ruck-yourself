@@ -1,5 +1,5 @@
-import 'dart:async';
 import 'dart:convert';
+import 'dart:async';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart'; 
@@ -13,6 +13,7 @@ import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, OAuthProvider, AuthResponse, AuthState, AuthChangeEvent;
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase show User;
+import 'package:url_launcher/url_launcher.dart';
 
 /// Interface for authentication operations
 abstract class AuthService {
@@ -86,10 +87,10 @@ class AuthServiceImpl implements AuthService {
   late final GoogleSignIn _googleSignIn;
 
   AuthServiceImpl(this._apiClient, this._storageService) {
-    // Initialize Google Sign-In with web client ID
-    // This will fallback to web OAuth flow on Android if no Android client is configured
     _googleSignIn = GoogleSignIn(
       scopes: ['email', 'profile'],
+      serverClientId: '966278977337-730qujnni7h9ukafh5brafjd06j1skqu.apps.googleusercontent.com', // Exact Web client ID from Google Cloud Console
+      clientId: '966278977337-l132nm2pas6ifl0kc3oh9977icfja6au.apps.googleusercontent.com', // iOS client ID
     );
   }
   
@@ -108,24 +109,18 @@ class AuthServiceImpl implements AuthService {
       
       final token = response['token'] as String;
       final refreshToken = response['refresh_token'] as String;
-      final userData = response['user'] as Map<String, dynamic>;
-      final user = User.fromJson(userData);
-      
-      // Store token and user data
-      AppLogger.info('[AUTH] Storing authentication tokens and user data');
+
+      // Store tokens securely
       await _storageService.setSecureString(AppConfig.tokenKey, token);
       await _storageService.setSecureString(AppConfig.refreshTokenKey, refreshToken);
-      await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
-      await _storageService.setString(AppConfig.userIdKey, user.userId);
-      
-      // Verify storage worked (Android debugging)
-      final storedToken = await _storageService.getSecureString(AppConfig.tokenKey);
-      final storedUser = await _storageService.getObject(AppConfig.userProfileKey);
-      AppLogger.info('[AUTH] Storage verification - token stored: ${storedToken != null}, user stored: ${storedUser != null}');
-      
-      // Set token in API client
+
+      // Set auth token for subsequent API calls
       _apiClient.setAuthToken(token);
-      
+
+      // Get user profile from API
+      final userResponse = await _apiClient.get('/users/profile');
+      final user = User.fromJson(userResponse);
+
       AppLogger.info('Login successful for user: ${user.userId}');
       return user;
     } catch (e) {
@@ -137,85 +132,84 @@ class AuthServiceImpl implements AuthService {
   @override
   Future<User> googleSignIn() async {
     try {
-      AppLogger.info('Attempting Google Sign-In');
+      AppLogger.info('Attempting native Google Sign-In');
       
-      // Use Google Sign-In to get tokens
-      final googleUser = await _googleSignIn.signIn();
+      // Sign in with Google using native approach
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         throw AuthException('Google Sign-In was cancelled', 'GOOGLE_SIGNIN_CANCELLED');
       }
-      
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
+
+      // Get authentication details from Google
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final accessToken = googleAuth.accessToken;
-      
-      if (idToken == null) {
-        throw AuthException('Failed to get Google ID token', 'GOOGLE_TOKEN_ERROR');
+      final idToken = googleAuth.idToken;
+
+      if (accessToken == null) {
+        throw AuthException('No Access Token found', 'GOOGLE_AUTH_NO_ACCESS_TOKEN');
       }
-      
+      if (idToken == null) {
+        throw AuthException('No ID Token found', 'GOOGLE_AUTH_NO_ID_TOKEN');
+      }
+
       AppLogger.info('Google tokens obtained, authenticating with Supabase');
-      
+
       // Authenticate with Supabase using Google tokens
       final response = await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
       );
+
+      final supabaseUser = response.user;
+      final session = response.session;
       
-      if (response.user == null) {
+      if (supabaseUser == null || session == null) {
         throw AuthException('Supabase authentication failed', 'SUPABASE_AUTH_FAILED');
       }
+
+      AppLogger.info('Google authentication successful, user: ${supabaseUser.email}');
       
-      final supabaseUser = response.user!;
-      final session = response.session!;
-      AppLogger.info('Supabase Google authentication successful');
-      
-      // Set the token first so API calls work
+      // Set auth token for API calls
       _apiClient.setAuthToken(session.accessToken);
       
-      // Check if user profile exists in our user table
       try {
+        // Try to get existing user profile from your backend
         final profileResponse = await _apiClient.get('/users/profile');
-        
-        // If we get here, profile exists, convert to our User model
         final user = User.fromJson(profileResponse);
         
-        // Store tokens and user data
+        // Store tokens
         await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
-        await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken ?? '');
-        await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
-        await _storageService.setString(AppConfig.userIdKey, user.userId);
+        await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken!);
         
-        AppLogger.info('Existing Google user signed in successfully');
+        AppLogger.info('Google Sign-In successful for existing user: ${user.email}');
         return user;
+      } catch (e) {
+        // User doesn't exist in your backend, create new profile
+        AppLogger.info('Creating new user profile for Google user: ${supabaseUser.email}');
         
-      } catch (profileError) {
-        // Profile doesn't exist, user needs registration
-        AppLogger.info('Google user needs to complete registration');
+        final newUserData = {
+          'email': supabaseUser.email!,
+          'username': supabaseUser.userMetadata?['full_name'] ?? supabaseUser.email!.split('@')[0],
+          'is_metric': true, // Default to metric
+        };
         
-        // Extract user info from Supabase auth
-        final email = supabaseUser.email ?? '';
-        final displayName = supabaseUser.userMetadata?['full_name'] as String? ?? 
-                           supabaseUser.userMetadata?['name'] as String? ?? 
-                           email.split('@')[0];
+        final createResponse = await _apiClient.post('/users/profile', newUserData);
+        final newUser = User.fromJson(createResponse);
         
-        throw GoogleUserNeedsRegistrationException(
-          'Google user needs to complete registration',
-          email: email,
-          displayName: displayName,
-        );
+        // Store tokens
+        await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
+        await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken!);
+        
+        AppLogger.info('Google Sign-In successful for new user: ${newUser.email}');
+        return newUser;
       }
-      
     } catch (e) {
       AppLogger.error('Google sign-in failed', exception: e);
-      
-      // Re-throw specific exceptions
-      if (e is GoogleUserNeedsRegistrationException || e is AuthException) {
-        rethrow;
+      if (e is AuthException) {
+        throw e;
       }
-      
-      // Generic error handling
-      throw AuthException('Google sign-in failed: $e', 'GOOGLE_SIGN_IN_FAILED');
+      throw AuthException('Google Sign-In failed: ${e.toString()}', 'GOOGLE_SIGNIN_ERROR');
     }
   }
   
@@ -472,19 +466,19 @@ class AuthServiceImpl implements AuthService {
       if (e is DioException) {
         if (e.response?.statusCode == 400) {
           // Bad request (expired token) - keep the user logged in
-          AppLogger.warning('Refresh token issue detected, but maintaining user session');
+          AppLogger.warning('[AUTH] Refresh token issue detected, but maintaining user session');
           await _cleanupInvalidAuthState();
         } else if (e.type == DioExceptionType.connectionError || 
                   e.type == DioExceptionType.connectionTimeout) {
           // Network connectivity issues
-          AppLogger.warning('Network connectivity issue during token refresh');
+          AppLogger.warning('[AUTH] Network connectivity issue during token refresh');
         } else {
           // Other API errors
-          AppLogger.error('Server error during token refresh: ${e.response?.statusCode}');
+          AppLogger.error('[AUTH] Server error during token refresh: ${e.response?.statusCode}');
         }
       } else {
         // Non-Dio exceptions
-        AppLogger.error('Unexpected error during token refresh: $e');
+        AppLogger.error('[AUTH] Unexpected error during token refresh: $e');
       }
       // Return null instead of throwing - this indicates token refresh failed
       // but we're NOT logging the user out
@@ -501,14 +495,14 @@ class AuthServiceImpl implements AuthService {
 
   // Helper method to handle invalid tokens without logging out the user
   Future<void> _cleanupInvalidAuthState() async {
-    AppLogger.warning('Invalid or expired tokens detected, but maintaining user session');
+    AppLogger.warning('[AUTH] Invalid or expired tokens detected, but maintaining user session');
     // Only clear the API client's current token, but DO NOT remove stored tokens
     // This allows auto-recovery when network conditions improve
     _apiClient.clearAuthToken();
     
     // The user profile and other data remains intact
     // Next API call will trigger a new token refresh attempt
-    AppLogger.info('User session maintained - will attempt to recover on next API call');
+    AppLogger.info('[AUTH] User session maintained - will attempt to recover on next API call');
   }
   
   @override
