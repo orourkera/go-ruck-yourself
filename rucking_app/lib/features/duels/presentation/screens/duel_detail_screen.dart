@@ -132,72 +132,69 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
     final duel = state.duel;
     final participants = state.leaderboard; // Use leaderboard as participants list
     
-    return Column(
-      children: [
-        // Duel Info Header
-        DuelInfoCard(
-          duel: duel,
-          participants: participants,
-          currentUserId: 'current_user_id', // TODO: Get actual current user ID
-          showJoinButton: _canUserJoin(duel),
-          onJoin: _canUserJoin(duel) 
-              ? () => context.read<DuelDetailBloc>().add(
-                  JoinDuelFromDetail(duelId: widget.duelId),
-                )
-              : null,
-          isJoining: state is DuelJoiningFromDetail,
-        ),
-        
-        // Tabs
-        Container(
-          color: Colors.grey[100],
-          child: TabBar(
-            controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: Colors.grey[600],
-            indicatorColor: AppColors.accent,
-            tabs: const [
-              Tab(text: 'Progress'),
-              Tab(text: 'Leaderboard'),
-              Tab(text: 'Participants'),
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Duel Info Header
+          DuelInfoCard(
+            duel: duel,
+            participants: participants,
+            currentUserId: 'current_user_id', // TODO: Get actual current user ID
+            showJoinButton: _canUserJoin(duel),
+            onJoin: _canUserJoin(duel) 
+                ? () => context.read<DuelDetailBloc>().add(
+                    JoinDuelFromDetail(duelId: widget.duelId),
+                  )
+                : null,
+            isJoining: state is DuelJoiningFromDetail,
           ),
-        ),
-        
-        // Tab Content
-        Expanded(
-          child: Column(
-            children: [
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Progress Tab
-                    DuelProgressChart(
-                      duel: duel,
-                      participants: participants,
-                    ),
-                    
-                    // Leaderboard Tab
-                    DuelLeaderboardWidget(
-                      duel: duel,
-                      participants: participants,
-                      showAllParticipants: true,
-                    ),
-                    
-                    // Participants Tab
-                    DuelParticipantsList(
-                      duel: duel,
-                      participants: participants,
-                    ),
-                  ],
+          
+          // Tabs
+          Container(
+            color: Colors.grey[100],
+            child: TabBar(
+              controller: _tabController,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: Colors.grey[600],
+              indicatorColor: AppColors.accent,
+              tabs: const [
+                Tab(text: 'Progress'),
+                Tab(text: 'Leaderboard'),
+                Tab(text: 'Participants'),
+              ],
+            ),
+          ),
+          
+          // Tab Content
+          SizedBox(
+            height: 400, // Fixed height for TabBarView
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Progress Tab
+                DuelProgressChart(
+                  duel: duel,
+                  participants: participants,
                 ),
-              ),
-              DuelCommentsSection(duelId: duel.id),
-            ],
+                
+                // Leaderboard Tab
+                DuelLeaderboardWidget(
+                  duel: duel,
+                  participants: participants,
+                  showAllParticipants: true,
+                ),
+                
+                // Participants Tab
+                DuelParticipantsList(
+                  duel: duel,
+                  participants: participants,
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          DuelCommentsSection(duelId: duel.id),
+        ],
+      ),
     );
   }
 
