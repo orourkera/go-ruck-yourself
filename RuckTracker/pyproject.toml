@@ -16,4 +16,5 @@ dependencies = [
     "geopy>=2.4.1",
     "marshmallow>=3.26.1",
     "flask-limiter>=3.6.0", # Added flask-limiter
+    "pillow>=10.0.0", # Added for avatar image processing
 ]

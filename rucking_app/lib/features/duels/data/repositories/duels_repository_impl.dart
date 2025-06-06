@@ -328,7 +328,7 @@ class DuelsRepositoryImpl implements DuelsRepository {
       // In a real implementation, you'd want to fetch the updated comment or modify the data source
       final updatedComment = DuelCommentModel(
         id: commentId,
-        duelId: 0, // Placeholder - in real implementation would need actual duel ID
+        duelId: '', // Placeholder - in real implementation would need actual duel ID
         userId: '',
         content: content,
         createdAt: DateTime.now(),

@@ -287,7 +287,7 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing', 'gender', 'date_of_birth'] 
+            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing', 'gender', 'date_of_birth', 'avatar_url']
             for field in allowed_fields:
                 if field == 'prefer_metric': # Check for snake_case field name
                     # Expect camelCase 'preferMetric' in the incoming JSON data for updates too
@@ -348,3 +348,96 @@ class UserProfileResource(Resource):
         except Exception as e:
             logger.error(f"Error updating user profile: {str(e)}", exc_info=True)
             return {'message': f'Error updating user profile: {str(e)}'}, 500
+
+
+class UserAvatarUploadResource(Resource):
+    @auth_required
+    def post(self):
+        """Upload user avatar image"""
+        try:
+            from flask import request
+            import base64
+            import io
+            from PIL import Image
+            
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+                
+            user_id = g.user.id
+            logger.debug(f"Avatar upload for user ID: {user_id}")
+            
+            # Get image data from request
+            data = request.get_json()
+            if not data or 'image' not in data:
+                return {'message': 'Image data is required'}, 400
+                
+            image_data = data['image']
+            
+            # Handle base64 encoded image
+            if image_data.startswith('data:image/'):
+                # Remove data URL prefix
+                header, image_data = image_data.split(',', 1)
+                
+            try:
+                # Decode base64 image
+                image_bytes = base64.b64decode(image_data)
+                
+                # Process image with PIL (resize and compress)
+                image = Image.open(io.BytesIO(image_bytes))
+                
+                # Convert to RGB if necessary
+                if image.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', image.size, (255, 255, 255))
+                    if image.mode == 'P':
+                        image = image.convert('RGBA')
+                    background.paste(image, mask=image.split()[-1] if 'A' in image.mode else None)
+                    image = background
+                
+                # Resize to 200x200 for avatars
+                image = image.resize((200, 200), Image.Resampling.LANCZOS)
+                
+                # Save as JPEG with compression
+                output = io.BytesIO()
+                image.save(output, format='JPEG', quality=85, optimize=True)
+                compressed_bytes = output.getvalue()
+                
+                # Upload to Supabase Storage
+                supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+                
+                # Generate unique filename
+                filename = f"avatars/{user_id}_{uuid.uuid4().hex}.jpg"
+                
+                # Upload file to Supabase storage
+                storage_response = supabase.storage.from_('user-avatars').upload(
+                    filename, 
+                    compressed_bytes,
+                    file_options={'content-type': 'image/jpeg'}
+                )
+                
+                if hasattr(storage_response, 'error') and storage_response.error:
+                    logger.error(f"Storage upload error: {storage_response.error}")
+                    return {'message': 'Failed to upload avatar'}, 500
+                
+                # Get public URL
+                avatar_url = supabase.storage.from_('user-avatars').get_public_url(filename)
+                
+                # Update user profile with avatar URL
+                profile_update = {'avatar_url': avatar_url}
+                update_response = supabase.table('user').update(profile_update).eq('id', user_id).execute()
+                
+                if hasattr(update_response, 'error') and update_response.error:
+                    logger.error(f"Profile update error: {update_response.error}")
+                    return {'message': 'Failed to update profile with avatar URL'}, 500
+                
+                return {
+                    'message': 'Avatar uploaded successfully',
+                    'avatar_url': avatar_url
+                }, 200
+                
+            except Exception as img_error:
+                logger.error(f"Image processing error: {img_error}")
+                return {'message': 'Invalid image format'}, 400
+                
+        except Exception as e:
+            logger.error(f"Avatar upload error: {str(e)}", exc_info=True)
+            return {'message': f'Error uploading avatar: {str(e)}'}, 500
