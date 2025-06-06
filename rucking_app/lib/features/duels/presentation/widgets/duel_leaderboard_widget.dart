@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 
 class DuelLeaderboardWidget extends StatelessWidget {
   final Duel duel;
@@ -194,6 +195,14 @@ class DuelLeaderboardWidget extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           
+          // Participant Avatar
+          UserAvatar(
+            avatarUrl: participant.avatarUrl,
+            displayName: participant.username,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          
           // Participant Info
           Expanded(
             child: Column(
@@ -203,7 +212,7 @@ class DuelLeaderboardWidget extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        participant.username, // TODO: Get actual user name
+                        participant.username,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: isTopThree ? FontWeight.bold : FontWeight.w500,

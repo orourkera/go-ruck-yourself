@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 
 class DuelProgressChart extends StatelessWidget {
   final Duel duel;
@@ -147,28 +148,44 @@ class DuelProgressChart extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: isLeader ? AppColors.accent : Colors.grey[400],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(
-                    rank.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+              // Participant Avatar with Rank Badge
+              Stack(
+                children: [
+                  UserAvatar(
+                    avatarUrl: participant.avatarUrl,
+                    displayName: participant.username,
+                    size: 36,
                   ),
-                ),
+                  if (rank <= 3)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: isLeader ? AppColors.accent : Colors.grey[400],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        child: Center(
+                          child: Text(
+                            rank.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  participant.username, // Fix: use username instead of userName
+                  participant.username,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: isLeader ? FontWeight.bold : FontWeight.w500,
@@ -267,7 +284,7 @@ class DuelProgressChart extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  winner.username, // Fix: use username instead of userName
+                  winner.username,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
