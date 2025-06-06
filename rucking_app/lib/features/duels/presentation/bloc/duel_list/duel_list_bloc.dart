@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../domain/entities/duel.dart';
 import '../../../domain/usecases/get_duels.dart';
 import '../../../domain/usecases/join_duel.dart' as join_duel_usecase;
 import 'duel_list_event.dart';
@@ -13,6 +14,8 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
     required this.joinDuel,
   }) : super(DuelListInitial()) {
     on<LoadDuels>(_onLoadDuels);
+    on<LoadMyDuels>(_onLoadMyDuels);
+    on<LoadDiscoverDuels>(_onLoadDiscoverDuels);
     on<RefreshDuels>(_onRefreshDuels);
     on<FilterDuels>(_onFilterDuels);
     on<JoinDuel>(_onJoinDuel);
@@ -116,6 +119,67 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
 
   void _onClearFilters(ClearFilters event, Emitter<DuelListState> emit) async {
     add(const LoadDuels());
+  }
+
+  void _onLoadMyDuels(LoadMyDuels event, Emitter<DuelListState> emit) async {
+    print('[DEBUG] DuelListBloc._onLoadMyDuels() - Loading duels user is participating in');
+    emit(DuelListLoading());
+
+    final result = await getDuels(const GetDuelsParams(
+      userParticipating: true,
+    ));
+
+    result.fold(
+      (failure) {
+        print('[ERROR] DuelListBloc._onLoadMyDuels() - Failure: ${failure.message}');
+        emit(DuelListError(message: failure.message));
+      },
+      (duels) {
+        print('[DEBUG] DuelListBloc._onLoadMyDuels() - Success: got ${duels.length} my duels');
+        // Sort duels: active first, then pending, then completed
+        final sortedDuels = List<Duel>.from(duels);
+        sortedDuels.sort((a, b) {
+          const statusOrder = {'active': 0, 'pending': 1, 'completed': 2};
+          final aOrder = statusOrder[a.status] ?? 3;
+          final bOrder = statusOrder[b.status] ?? 3;
+          return aOrder.compareTo(bOrder);
+        });
+
+        emit(DuelListLoaded(
+          duels: sortedDuels,
+          activeStatus: null,
+          activeChallengeType: null,
+          activeLocation: null,
+          hasFilters: false,
+        ));
+      },
+    );
+  }
+
+  void _onLoadDiscoverDuels(LoadDiscoverDuels event, Emitter<DuelListState> emit) async {
+    print('[DEBUG] DuelListBloc._onLoadDiscoverDuels() - Loading duels available to join');
+    emit(DuelListLoading());
+
+    final result = await getDuels(const GetDuelsParams(
+      userParticipating: false,
+    ));
+
+    result.fold(
+      (failure) {
+        print('[ERROR] DuelListBloc._onLoadDiscoverDuels() - Failure: ${failure.message}');
+        emit(DuelListError(message: failure.message));
+      },
+      (duels) {
+        print('[DEBUG] DuelListBloc._onLoadDiscoverDuels() - Success: got ${duels.length} discover duels');
+        emit(DuelListLoaded(
+          duels: duels,
+          activeStatus: null,
+          activeChallengeType: null,
+          activeLocation: null,
+          hasFilters: false,
+        ));
+      },
+    );
   }
 
   bool _hasActiveFilters(String? status, String? challengeType, String? location) {

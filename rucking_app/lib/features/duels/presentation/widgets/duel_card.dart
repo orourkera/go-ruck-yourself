@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
-import '../../../../shared/theme/app_colors.dart';
 
 class DuelCard extends StatelessWidget {
   final Duel duel;
@@ -36,9 +35,9 @@ class DuelCard extends StatelessWidget {
             children: [
               _buildHeader(),
               const SizedBox(height: 12),
-              _buildChallengeInfo(),
+              _buildChallengeInfo(context),
               const SizedBox(height: 12),
-              _buildProgressBar(),
+              _buildProgressBar(context),
               const SizedBox(height: 12),
               _buildFooter(context),
             ],
@@ -101,7 +100,7 @@ class DuelCard extends StatelessWidget {
     );
   }
 
-  Widget _buildChallengeInfo() {
+  Widget _buildChallengeInfo(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -120,7 +119,7 @@ class DuelCard extends StatelessWidget {
             Icon(
               _getChallengeIcon(),
               size: 16,
-              color: AppColors.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 4),
             Text(
@@ -156,7 +155,7 @@ class DuelCard extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressBar() {
+  Widget _buildProgressBar(BuildContext context) {
     final progress = _calculateProgress();
     
     return Column(
@@ -187,7 +186,7 @@ class DuelCard extends StatelessWidget {
           value: progress,
           backgroundColor: Colors.grey[200],
           valueColor: AlwaysStoppedAnimation<Color>(
-            progress >= 1.0 ? Colors.green : AppColors.accent,
+            progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
           ),
         ),
       ],
@@ -227,7 +226,7 @@ class DuelCard extends StatelessWidget {
             child: ElevatedButton(
               onPressed: showJoinButton ? () => onJoin?.call() : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
+                backgroundColor: Theme.of(context).colorScheme.secondary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 shape: RoundedRectangleBorder(

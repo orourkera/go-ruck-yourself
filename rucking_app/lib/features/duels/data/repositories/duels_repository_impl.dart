@@ -23,8 +23,9 @@ class DuelsRepositoryImpl implements DuelsRepository {
     String? challengeType,
     String? location,
     int? limit,
+    bool? userParticipating,
   }) async {
-    print('[DEBUG] DuelsRepositoryImpl.getDuels() - Starting with params: status=$status, challengeType=$challengeType, location=$location, limit=$limit');
+    print('[DEBUG] DuelsRepositoryImpl.getDuels() - Starting with params: status=$status, challengeType=$challengeType, location=$location, limit=$limit, userParticipating=$userParticipating');
     
     try {
       print('[DEBUG] DuelsRepositoryImpl.getDuels() - Calling remoteDataSource.getDuels()');
@@ -34,6 +35,7 @@ class DuelsRepositoryImpl implements DuelsRepository {
         challengeType: challengeType,
         location: location,
         limit: limit,
+        userParticipating: userParticipating,
       );
       
       print('[DEBUG] DuelsRepositoryImpl.getDuels() - Successfully got ${duelModels.length} duels from data source');

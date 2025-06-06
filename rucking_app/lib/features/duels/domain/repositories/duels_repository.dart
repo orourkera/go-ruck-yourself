@@ -13,6 +13,7 @@ abstract class DuelsRepository {
     String? challengeType,
     String? location,
     int? limit,
+    bool? userParticipating, // true for "My Duels", false for "Discover", null for all
   });
 
   Future<Either<Failure, Duel>> createDuel({
