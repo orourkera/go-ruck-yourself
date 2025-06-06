@@ -6,6 +6,7 @@ import '../bloc/create_duel/create_duel_state.dart';
 import '../widgets/create_duel_form.dart';
 import 'duel_detail_screen.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/widgets/styled_snackbar.dart';
 
 class CreateDuelScreen extends StatefulWidget {
   const CreateDuelScreen({super.key});
@@ -65,11 +66,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       body: BlocConsumer<CreateDuelBloc, CreateDuelState>(
         listener: (context, state) {
           if (state is CreateDuelSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-              ),
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: state.message,
             );
             // Navigate to the created duel detail
             Navigator.pushReplacement(
@@ -77,11 +76,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
               MaterialPageRoute(builder: (context) => DuelDetailScreen(duelId: state.createdDuel.id)),
             );
           } else if (state is CreateDuelError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
+            StyledSnackBar.showError(
+              context: context,
+              message: state.message,
             );
           } else if (state is CreateDuelInitial) {
             _resetForm();

@@ -12,6 +12,7 @@ import '../widgets/duel_leaderboard_widget.dart';
 import '../widgets/duel_participants_list.dart';
 import '../widgets/duel_comments_section.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/widgets/styled_snackbar.dart';
 
 class DuelDetailScreen extends StatefulWidget {
   final String duelId;
@@ -61,46 +62,34 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
       body: BlocConsumer<DuelDetailBloc, DuelDetailState>(
         listener: (context, state) {
           if (state is DuelJoinedFromDetail) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-              ),
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: state.message,
             );
           } else if (state is DuelJoinErrorFromDetail) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
+            StyledSnackBar.showError(
+              context: context,
+              message: state.message,
             );
           } else if (state is DuelProgressUpdated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-              ),
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: state.message,
             );
           } else if (state is DuelProgressUpdateError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
+            StyledSnackBar.showError(
+              context: context,
+              message: state.message,
             );
           } else if (state is DuelStartedManually) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Duel started successfully!'),
-                backgroundColor: Colors.green,
-              ),
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: 'Duel started successfully!',
             );
           } else if (state is DuelStartError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
+            StyledSnackBar.showError(
+              context: context,
+              message: state.message,
             );
           }
         },

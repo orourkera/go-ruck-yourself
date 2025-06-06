@@ -13,6 +13,7 @@ class DuelParticipant extends Equatable {
   final String userId;
   final String username;
   final String? email;
+  final String? avatarUrl;
   final DuelParticipantStatus status;
   final double currentValue;
   final String? lastSessionId;
@@ -28,6 +29,7 @@ class DuelParticipant extends Equatable {
     required this.userId,
     required this.username,
     this.email,
+    this.avatarUrl,
     required this.status,
     required this.currentValue,
     this.lastSessionId,
@@ -68,6 +70,7 @@ class DuelParticipant extends Equatable {
     String? userId,
     String? username,
     String? email,
+    String? avatarUrl,
     DuelParticipantStatus? status,
     double? currentValue,
     String? lastSessionId,
@@ -83,6 +86,7 @@ class DuelParticipant extends Equatable {
       userId: userId ?? this.userId,
       username: username ?? this.username,
       email: email ?? this.email,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       status: status ?? this.status,
       currentValue: currentValue ?? this.currentValue,
       lastSessionId: lastSessionId ?? this.lastSessionId,
@@ -101,6 +105,7 @@ class DuelParticipant extends Equatable {
         userId,
         username,
         email,
+        avatarUrl,
         status,
         currentValue,
         lastSessionId,
