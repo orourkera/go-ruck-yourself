@@ -60,6 +60,15 @@ class UpdateDuelProgress extends DuelDetailEvent {
   List<Object> get props => [duelId, participantId, sessionId, contributionValue];
 }
 
+class StartDuelManually extends DuelDetailEvent {
+  final String duelId;
+
+  const StartDuelManually({required this.duelId});
+
+  @override
+  List<Object> get props => [duelId];
+}
+
 // Comment-related events
 class LoadDuelComments extends DuelDetailEvent {
   final String duelId;

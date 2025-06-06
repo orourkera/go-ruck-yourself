@@ -13,6 +13,8 @@ class CreateDuelSubmitted extends CreateDuelEvent {
   final double targetValue;
   final int timeframeHours;
   final int maxParticipants;
+  final int minParticipants;
+  final String startMode;
   final bool isPublic;
   // final String? description; // Removed - not supported by backend yet
   // final String? creatorCity; // Removed - backend uses user profile location
@@ -25,6 +27,8 @@ class CreateDuelSubmitted extends CreateDuelEvent {
     required this.targetValue,
     required this.timeframeHours,
     required this.maxParticipants,
+    required this.minParticipants,
+    required this.startMode,
     required this.isPublic,
     // this.description, // Removed - not supported by backend yet
     // this.creatorCity, // Removed - backend uses user profile location
@@ -39,6 +43,8 @@ class CreateDuelSubmitted extends CreateDuelEvent {
         targetValue,
         timeframeHours,
         maxParticipants,
+        minParticipants,
+        startMode,
         isPublic,
         // description, // Removed - not supported by backend yet
         // creatorCity, // Removed - backend uses user profile location
@@ -55,6 +61,8 @@ class ValidateCreateDuelForm extends CreateDuelEvent {
   final double targetValue;
   final int timeframeHours;
   final int maxParticipants;
+  final int minParticipants;
+  final String startMode;
   final List<String>? inviteeEmails;
 
   const ValidateCreateDuelForm({
@@ -63,6 +71,8 @@ class ValidateCreateDuelForm extends CreateDuelEvent {
     required this.targetValue,
     required this.timeframeHours,
     required this.maxParticipants,
+    required this.minParticipants,
+    required this.startMode,
     this.inviteeEmails,
   });
 
@@ -73,6 +83,8 @@ class ValidateCreateDuelForm extends CreateDuelEvent {
         targetValue,
         timeframeHours,
         maxParticipants,
+        minParticipants,
+        startMode,
         inviteeEmails,
       ];
 }

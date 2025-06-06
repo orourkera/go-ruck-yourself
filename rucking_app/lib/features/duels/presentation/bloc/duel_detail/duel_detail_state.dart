@@ -123,3 +123,38 @@ class DuelProgressUpdateError extends DuelDetailState {
   @override
   List<Object> get props => [duelId, message];
 }
+
+class DuelStartingManually extends DuelDetailState {
+  final String duelId;
+
+  const DuelStartingManually({required this.duelId});
+
+  @override
+  List<Object> get props => [duelId];
+}
+
+class DuelStartedManually extends DuelDetailState {
+  final String duelId;
+  final String message;
+
+  const DuelStartedManually({
+    required this.duelId,
+    this.message = 'Duel started successfully!',
+  });
+
+  @override
+  List<Object> get props => [duelId, message];
+}
+
+class DuelStartError extends DuelDetailState {
+  final String duelId;
+  final String message;
+
+  const DuelStartError({
+    required this.duelId,
+    required this.message,
+  });
+
+  @override
+  List<Object> get props => [duelId, message];
+}

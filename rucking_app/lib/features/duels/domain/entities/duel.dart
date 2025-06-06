@@ -14,6 +14,11 @@ enum DuelStatus {
   cancelled,
 }
 
+enum DuelStartMode {
+  auto, // Automatically start when min participants is reached
+  manual, // Manually start by duel creator
+}
+
 class Duel extends Equatable {
   final String id;
   final String title;
@@ -32,6 +37,8 @@ class Duel extends Equatable {
   final DateTime? endsAt;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DuelStartMode startMode; // How the duel starts (auto or manual)
+  final int minParticipants; // Minimum participants needed to auto-start
 
   const Duel({
     required this.id,
@@ -51,6 +58,8 @@ class Duel extends Equatable {
     this.endsAt,
     required this.createdAt,
     required this.updatedAt,
+    this.startMode = DuelStartMode.auto,
+    this.minParticipants = 2,
   });
 
   // Utility getters
@@ -124,6 +133,8 @@ class Duel extends Equatable {
     DateTime? endsAt,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DuelStartMode? startMode,
+    int? minParticipants,
   }) {
     return Duel(
       id: id ?? this.id,
@@ -143,6 +154,8 @@ class Duel extends Equatable {
       endsAt: endsAt ?? this.endsAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      startMode: startMode ?? this.startMode,
+      minParticipants: minParticipants ?? this.minParticipants,
     );
   }
 
@@ -165,5 +178,7 @@ class Duel extends Equatable {
         endsAt,
         createdAt,
         updatedAt,
+        startMode,
+        minParticipants,
       ];
 }

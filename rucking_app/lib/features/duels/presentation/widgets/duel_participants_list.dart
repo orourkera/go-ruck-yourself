@@ -275,29 +275,30 @@ class DuelParticipantsList extends StatelessWidget {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.group_off,
-              size: 80,
+              size: 64,
               color: Colors.grey[300],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Text(
               'No participants yet',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 15,
                 color: Colors.grey[600],
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               'Be the first to join this duel!',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 color: Colors.grey[500],
               ),
               textAlign: TextAlign.center,

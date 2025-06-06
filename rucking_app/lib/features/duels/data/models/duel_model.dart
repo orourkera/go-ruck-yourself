@@ -3,34 +3,63 @@ import 'duel_participant_model.dart';
 
 class DuelModel extends Duel {
   final int? currentParticipants;
-  final int? minParticipants;
   final List<DuelParticipantModel> participants;
 
-  const DuelModel({
-    required super.id,
-    required super.title,
-    super.description,
-    required super.challengeType,
-    required super.targetValue,
-    required super.timeframeHours,
-    required super.maxParticipants,
-    required super.isPublic,
-    required super.status,
-    required super.creatorId,
-    super.winnerId,
-    super.creatorCity,
-    super.creatorState,
-    super.startsAt,
-    super.endsAt,
-    required super.createdAt,
-    required super.updatedAt,
+  DuelModel({
+    required String id,
+    required String title,
+    String? description,
+    required DuelChallengeType challengeType,
+    required double targetValue,
+    required int timeframeHours,
+    required int maxParticipants,
+    required bool isPublic,
+    required DuelStatus status,
+    required String creatorId,
+    String? winnerId,
+    String? creatorCity,
+    String? creatorState,
+    DateTime? startsAt,
+    DateTime? endsAt,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    DuelStartMode startMode = DuelStartMode.auto,
     this.currentParticipants,
-    this.minParticipants,
+    int minParticipants = 2,
     this.participants = const [],
-  });
+  }) : super(
+    id: id,
+    title: title,
+    description: description,
+    challengeType: challengeType,
+    targetValue: targetValue,
+    timeframeHours: timeframeHours,
+    maxParticipants: maxParticipants,
+    isPublic: isPublic,
+    status: status,
+    creatorId: creatorId,
+    winnerId: winnerId,
+    creatorCity: creatorCity,
+    creatorState: creatorState,
+    startsAt: startsAt,
+    endsAt: endsAt,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    minParticipants: minParticipants,
+    startMode: startMode
+  );
 
   factory DuelModel.fromJson(Map<String, dynamic> json) {
     try {
+      // Parse start mode from string or default to auto
+      DuelStartMode startMode = DuelStartMode.auto;
+      if (json['start_mode'] != null) {
+        final startModeStr = json['start_mode'].toString();
+        if (startModeStr == 'manual') {
+          startMode = DuelStartMode.manual;
+        }
+      }
+
       return DuelModel(
         id: json['id']?.toString() ?? '',
         creatorId: json['creator_id']?.toString() ?? '',
@@ -54,10 +83,11 @@ class DuelModel extends Duel {
         description: json['description']?.toString(),
         maxParticipants: json['max_participants'] as int? ?? 2,
         currentParticipants: json['current_participants'] as int?,
-        minParticipants: json['min_participants'] as int?,
+        minParticipants: json['min_participants'] as int? ?? 2,
         participants: (json['participants'] as List<dynamic>?)
             ?.map((p) => DuelParticipantModel.fromJson(p as Map<String, dynamic>))
             .toList() ?? [],
+        startMode: startMode,
       );
     } catch (e, stackTrace) {
       print('[ERROR] DuelModel.fromJson failed: $e');
@@ -113,6 +143,7 @@ class DuelModel extends Duel {
       'max_participants': maxParticipants,
       'current_participants': currentParticipants,
       'min_participants': minParticipants,
+      'start_mode': startMode.name,
       'participants': participants.map((p) => p.toJson()).toList(),
     };
   }
@@ -138,6 +169,7 @@ class DuelModel extends Duel {
     int? maxParticipants,
     int? currentParticipants,
     int? minParticipants,
+    DuelStartMode? startMode,
     List<DuelParticipantModel>? participants,
   }) {
     return DuelModel(
@@ -159,7 +191,8 @@ class DuelModel extends Duel {
       description: description ?? this.description,
       maxParticipants: maxParticipants ?? this.maxParticipants,
       currentParticipants: currentParticipants ?? this.currentParticipants,
-      minParticipants: minParticipants ?? this.minParticipants,
+      minParticipants: minParticipants ?? super.minParticipants,
+      startMode: startMode ?? super.startMode,
       participants: participants ?? this.participants,
     );
   }

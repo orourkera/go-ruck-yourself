@@ -141,12 +141,16 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     try {
       print('[DEBUG] AchievementBloc: Checking achievements for session ${event.sessionId}');
       final newAchievements = await _achievementRepository.checkSessionAchievements(event.sessionId);
-      print('[DEBUG] AchievementBloc: Found ${newAchievements.length} new achievements');
-      
-      if (state is AchievementsLoaded) {
-        final currentState = state as AchievementsLoaded;
+           if (newAchievements.isNotEmpty) {
+        print('[DEBUG] AchievementBloc: ${newAchievements.length} new achievements earned!');
         
-        if (newAchievements.isNotEmpty) {
+        // Clear cache when new achievements are found so data will be refreshed
+        await _achievementRepository.clearCache();
+        print('[DEBUG] AchievementBloc: Cleared achievement cache due to new achievements');
+        
+        if (state is AchievementsLoaded) {
+          final currentState = state as AchievementsLoaded;
+          
           print('[DEBUG] AchievementBloc: Emitting AchievementsSessionChecked with new achievements');
           // Update the newly earned list and emit session checked state
           emit(AchievementsSessionChecked(
@@ -154,13 +158,6 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
             previousState: currentState.copyWith(newlyEarned: newAchievements),
           ));
         } else {
-          print('[DEBUG] AchievementBloc: No new achievements found');
-        }
-      } else {
-        print('[DEBUG] AchievementBloc: Current state is not AchievementsLoaded: ${state.runtimeType}');
-        // If no current state, just emit the new achievements
-        if (newAchievements.isNotEmpty) {
-          print('[DEBUG] AchievementBloc: Emitting AchievementsSessionChecked (no previous state)');
           emit(AchievementsSessionChecked(
             newAchievements: newAchievements,
             previousState: AchievementsLoaded(
@@ -173,6 +170,8 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
             ),
           ));
         }
+      } else {
+        print('[DEBUG] AchievementBloc: No new achievements earned');
       }
     } catch (e) {
       print('[DEBUG] AchievementBloc: Error checking session achievements: $e');
@@ -238,6 +237,10 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
   ) async {
     try {
       emit(AchievementsLoading());
+      
+      // Clear cache first to force fresh data fetch
+      debugPrint('🏆 [AchievementBloc] Clearing achievement cache for refresh');
+      await _achievementRepository.clearCache();
       
       // Load all data in parallel for better performance
       final results = await Future.wait([

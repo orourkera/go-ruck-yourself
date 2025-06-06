@@ -165,6 +165,8 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
                         targetValue: _targetValue,
                         timeframeHours: (_endDate.difference(DateTime.now()).inHours),
                         maxParticipants: 10, // Default value
+                        minParticipants: 2, // Default value
+                        startMode: 'auto', // Default value
                         isPublic: _isPublic,
                       ),
                     );

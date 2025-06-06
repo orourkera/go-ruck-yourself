@@ -20,6 +20,8 @@ class DuelCreateSchema(Schema):
     max_participants = fields.Int(missing=2, validate=lambda x: 2 <= x <= 20)
     invitee_emails = fields.List(fields.Email(), missing=[])
     description = fields.Str(missing=None, allow_none=True)
+    start_mode = fields.Str(missing='auto', validate=lambda x: x in ['auto', 'manual'])
+    min_participants = fields.Int(missing=2, validate=lambda x: 2 <= x <= 20)
 
     @validates_schema
     def validate_schema(self, data, **kwargs):
@@ -27,7 +29,8 @@ class DuelCreateSchema(Schema):
             raise ValidationError('Private duels must include invitee emails')
 
 class DuelUpdateSchema(Schema):
-    status = fields.Str(validate=lambda x: x in ['active', 'cancelled'])
+    status = fields.Str(validate=lambda x: x in ['active', 'cancelled', 'start'])
+    # 'start' is a special value used only for manually starting a duel
 
 class DuelParticipantSchema(Schema):
     status = fields.Str(required=True, validate=lambda x: x in ['accepted', 'declined'])
@@ -243,30 +246,72 @@ class DuelResource(Resource):
 
     @auth_required
     def put(self, duel_id):
-        """Update duel (status changes)"""
+        """Update duel (status changes or manual start)"""
         try:
             schema = DuelUpdateSchema()
             data = schema.load(request.get_json())
             user_id = g.user.id
+            now = datetime.utcnow()
             
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
-            # Check if user is creator
-            duel_response = supabase.table('duels').select('creator_id').eq('id', duel_id).execute()
+            # Check if user is the creator
+            duel_response = supabase.table('duels').select('creator_id,status,timeframe_hours,start_mode').eq('id', duel_id).execute()
             duel = duel_response.data[0] if duel_response.data else None
             
             if not duel:
                 return {'error': 'Duel not found'}, 404
+            
             if duel['creator_id'] != user_id:
-                return {'error': 'Only duel creator can update duel'}, 403
+                return {'error': 'Only the creator can update this duel'}, 403
             
-            # Update duel
-            supabase.table('duels').update({
-                'status': data['status'], 
-                'updated_at': datetime.utcnow().isoformat()
-            }).eq('id', duel_id).execute()
+            if duel['status'] == 'completed':
+                return {'error': 'Cannot update a completed duel'}, 400
+                
+            # Special handling for manual start
+            if data['status'] == 'start' and duel['status'] == 'pending':
+                # Make sure duel is in manual start mode
+                if duel.get('start_mode', 'auto') != 'manual':
+                    return {'error': 'Cannot manually start a duel configured for automatic start'}, 400
+                    
+                # Count accepted participants
+                participant_count_response = supabase.table('duel_participants')\
+                    .select('id', count='exact')\
+                    .eq('duel_id', duel_id)\
+                    .eq('status', 'accepted')\
+                    .execute()
+                participant_count = participant_count_response.count
+                
+                # Make sure there are at least 2 participants
+                if participant_count < 2:
+                    return {'error': 'At least 2 accepted participants are required to start a duel'}, 400
+                    
+                # Calculate start and end times
+                starts_at = now
+                timeframe = duel['timeframe_hours']
+                ends_at = starts_at + timedelta(hours=timeframe)
+                
+                # Update the duel to active status
+                updates = {
+                    'status': 'active',
+                    'starts_at': starts_at.isoformat(),
+                    'ends_at': ends_at.isoformat(),
+                    'updated_at': now.isoformat()
+                }
+                
+                supabase.table('duels').update(updates).eq('id', duel_id).execute()
+                
+                return {'message': 'Duel has been started successfully'}
             
-            return {'message': 'Duel updated successfully'}
+            # Normal status updates (e.g., cancelled)
+            updates = {
+                'status': data['status'],
+                'updated_at': now.isoformat()
+            }
+            
+            supabase.table('duels').update(updates).eq('id', duel_id).execute()
+            
+            return {'message': f"Duel status updated to {data['status']}"}
             
         except ValidationError as e:
             return {'error': str(e)}, 400
@@ -350,15 +395,28 @@ class DuelJoinResource(Resource):
                 # Log the error but don't fail duel join
                 logging.warning(f"Failed to update user duel join stats: {e}")
             
-            # Check if duel should become active
+            # Check if duel should become active based on start_mode
             participant_count_response = supabase.table('duel_participants').select('id', count='exact').eq('duel_id', duel_id).eq('status', 'accepted').execute()
             participant_count = participant_count_response.count
             
-            if participant_count >= 2:
+            # Get duel configuration
+            duel_config = supabase.table('duels').select('start_mode', 'min_participants', 'timeframe_hours').eq('id', duel_id).execute()
+            
+            if not duel_config.data:
+                return {'error': 'Duel not found'}, 404
+                
+            # Extract duel settings
+            duel_settings = duel_config.data[0]
+            start_mode = duel_settings.get('start_mode', 'auto')
+            min_participants = duel_settings.get('min_participants', 2)
+            timeframe = duel_settings.get('timeframe_hours')
+            
+            # Only auto-start the duel if:
+            # 1. Start mode is auto AND
+            # 2. We have at least the minimum required participants
+            if start_mode == 'auto' and participant_count >= min_participants:
                 # Activate duel
                 starts_at = now
-                timeframe_response = supabase.table('duels').select('timeframe_hours').eq('id', duel_id).execute()
-                timeframe = timeframe_response.data[0]['timeframe_hours']
                 ends_at = starts_at + timedelta(hours=timeframe)
                 
                 supabase.table('duels').update({

@@ -10,7 +10,7 @@ class DeleteDuelComment implements UseCase<void, DeleteDuelCommentParams> {
 
   @override
   Future<Either<Failure, void>> call(DeleteDuelCommentParams params) async {
-    return await repository.deleteDuelComment(params.commentId);
+    return await repository.deleteDuelComment(commentId: params.commentId);
   }
 }
 

@@ -23,6 +23,8 @@ class CreateDuelBloc extends Bloc<CreateDuelEvent, CreateDuelState> {
       targetValue: event.targetValue,
       timeframeHours: event.timeframeHours,
       maxParticipants: event.maxParticipants,
+      minParticipants: event.minParticipants,
+      startMode: event.startMode,
       isPublic: event.isPublic,
       // description: event.description, // Removed - not supported by backend yet
       // creatorCity: event.creatorCity, // Removed - backend uses user profile location
@@ -79,6 +81,19 @@ class CreateDuelBloc extends Bloc<CreateDuelEvent, CreateDuelState> {
       errors['maxParticipants'] = 'At least 2 participants required';
     } else if (event.maxParticipants > 50) {
       errors['maxParticipants'] = 'Maximum 50 participants allowed';
+    }
+    
+    // Validate min participants
+    if (event.minParticipants < 2) {
+      errors['minParticipants'] = 'At least 2 participants required';
+    } else if (event.minParticipants > event.maxParticipants) {
+      errors['minParticipants'] = 'Cannot exceed maximum participants';
+    }
+    
+    // Validate start mode
+    final validStartModes = ['auto', 'manual'];
+    if (!validStartModes.contains(event.startMode)) {
+      errors['startMode'] = 'Invalid start mode';
     }
 
     // Validate email formats if provided
