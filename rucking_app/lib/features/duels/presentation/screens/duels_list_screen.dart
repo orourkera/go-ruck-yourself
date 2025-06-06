@@ -12,6 +12,7 @@ import 'duel_detail_screen.dart';
 import 'duel_invitations_screen.dart';
 import 'duel_stats_screen.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/widgets/styled_snackbar.dart';
 
 class DuelsListScreen extends StatefulWidget {
   const DuelsListScreen({super.key});
@@ -128,18 +129,14 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
     return BlocConsumer<DuelListBloc, DuelListState>(
       listener: (context, state) {
         if (state is DuelJoined) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: Colors.green,
-            ),
+          StyledSnackBar.showSuccess(
+            context: context,
+            message: state.message,
           );
         } else if (state is DuelJoinError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: Colors.red,
-            ),
+          StyledSnackBar.showError(
+            context: context,
+            message: state.message,
           );
         }
       },

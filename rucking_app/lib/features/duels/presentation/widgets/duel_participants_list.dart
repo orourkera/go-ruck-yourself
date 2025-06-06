@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 
 class DuelParticipantsList extends StatelessWidget {
   final Duel duel;
@@ -89,31 +90,33 @@ class DuelParticipantsList extends StatelessWidget {
   Widget _buildParticipantHeader(DuelParticipant participant, bool isWinner) {
     return Row(
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: isWinner ? Colors.amber : AppColors.primary,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Center(
-            child: isWinner
-                ? const Icon(
+        Stack(
+          children: [
+            UserAvatar(
+              avatarUrl: participant.avatarUrl,
+              username: participant.username,
+              size: 48,
+            ),
+            if (isWinner)
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.amber,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(
                     Icons.emoji_events,
                     color: Colors.white,
-                    size: 24,
-                  )
-                : Text(
-                    participant.username.isNotEmpty 
-                        ? participant.username[0].toUpperCase()
-                        : 'U',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    size: 12,
                   ),
-          ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -124,7 +127,7 @@ class DuelParticipantsList extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      participant.username, // TODO: Get actual user name
+                      participant.username,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: isWinner ? FontWeight.bold : FontWeight.w600,

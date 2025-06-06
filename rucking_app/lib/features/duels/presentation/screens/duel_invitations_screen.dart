@@ -5,6 +5,7 @@ import '../bloc/duel_invitations/duel_invitations_event.dart';
 import '../bloc/duel_invitations/duel_invitations_state.dart';
 import '../widgets/duel_invitation_card.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/widgets/styled_snackbar.dart';
 
 class DuelInvitationsScreen extends StatefulWidget {
   const DuelInvitationsScreen({super.key});
@@ -70,18 +71,14 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
       body: BlocConsumer<DuelInvitationsBloc, DuelInvitationsState>(
         listener: (context, state) {
           if (state is InvitationResponseSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-              ),
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: state.message,
             );
           } else if (state is InvitationResponseError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
+            StyledSnackBar.showError(
+              context: context,
+              message: state.message,
             );
           }
         },
@@ -199,8 +196,9 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
                 : null,
             onViewDuel: () {
               // Navigate to duel detail - for now just show snackbar
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Navigate to duel ${invitation.duelId}')),
+              StyledSnackBar.showInfo(
+                context: context,
+                message: 'Navigate to duel ${invitation.duelId}',
               );
             },
             isResponding: state is InvitationResponding && 

@@ -261,8 +261,28 @@ class DuelResource(Resource):
             participants_response = supabase.table('duel_participants').select('*').eq('duel_id', duel_id).order('current_value', desc=True).execute()
             participants = participants_response.data
             
+            # Enrich participants with user info (username, email, avatar_url)
+            enriched_participants = []
+            for participant in participants:
+                user_query = supabase.table('users').select('username, email, avatar_url').eq('id', participant['user_id'])
+                user_response = user_query.execute()
+                if user_response.data:
+                    participant_data = dict(participant)
+                    user_data = user_response.data[0]
+                    participant_data['username'] = user_data['username']
+                    participant_data['email'] = user_data['email']
+                    participant_data['avatar_url'] = user_data.get('avatar_url')
+                    enriched_participants.append(participant_data)
+                else:
+                    # Fallback if user not found
+                    participant_data = dict(participant)
+                    participant_data['username'] = 'Unknown User'
+                    participant_data['email'] = None
+                    participant_data['avatar_url'] = None
+                    enriched_participants.append(participant_data)
+            
             result = dict(duel)
-            result['participants'] = [dict(p) for p in participants]
+            result['participants'] = enriched_participants
             
             return result
             
