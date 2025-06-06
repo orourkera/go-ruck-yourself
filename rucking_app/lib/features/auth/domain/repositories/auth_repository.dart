@@ -60,4 +60,13 @@ abstract class AuthRepository {
 
   /// Delete the current user's account
   Future<void> deleteAccount({required String userId});
+  
+  /// Request password reset for email
+  Future<void> requestPasswordReset({required String email});
+  
+  /// Confirm password reset with token and new password
+  Future<void> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  });
 }

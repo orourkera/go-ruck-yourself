@@ -79,6 +79,15 @@ abstract class AuthService {
     String? dateOfBirth,
     String? gender,
   });
+  
+  /// Request password reset for email
+  Future<void> requestPasswordReset({required String email});
+  
+  /// Confirm password reset with token and new password
+  Future<void> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  });
 }
 
 /// Implementation of AuthService using ApiClient and StorageService
@@ -583,6 +592,48 @@ class AuthServiceImpl implements AuthService {
       AppLogger.error("AuthService: Error during delete account API call for $userId: $e");
       // Rethrow the error so the Bloc/UI layer knows it failed
       throw _handleAuthError(e); 
+    }
+  }
+
+  @override
+  Future<void> requestPasswordReset({required String email}) async {
+    try {
+      final response = await _apiClient.post(
+        '/auth/password-reset',
+        {
+          'email': email,
+        },
+      );
+      if (response == null) {
+        throw Exception('Password reset request failed: No response from server.');
+      }
+      AppLogger.info('Password reset request successful for email: $email');
+    } catch (e) {
+      AppLogger.error('Password reset request failed', exception: e);
+      throw _handleAuthError(e);
+    }
+  }
+
+  @override
+  Future<void> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        '/auth/password-reset-confirm',
+        {
+          'token': token,
+          'new_password': newPassword,
+        },
+      );
+      if (response == null) {
+        throw Exception('Password reset confirmation failed: No response from server.');
+      }
+      AppLogger.info('Password reset confirmation successful');
+    } catch (e) {
+      AppLogger.error('Password reset confirmation failed', exception: e);
+      throw _handleAuthError(e);
     }
   }
 
