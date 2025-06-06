@@ -126,4 +126,20 @@ class AuthRepositoryImpl implements AuthRepository {
       throw Exception('Failed to refresh token: $userFriendlyMessage');
     }
   }
-} 
+  
+  @override
+  Future<void> requestPasswordReset({required String email}) async {
+    await _authService.requestPasswordReset(email: email);
+  }
+  
+  @override
+  Future<void> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _authService.confirmPasswordReset(
+      token: token,
+      newPassword: newPassword,
+    );
+  }
+}

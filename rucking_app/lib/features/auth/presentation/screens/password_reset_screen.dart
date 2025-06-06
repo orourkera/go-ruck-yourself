@@ -96,7 +96,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                 const SizedBox(height: 48),
                 CustomTextField(
                   controller: _passwordController,
-                  labelText: 'New Password',
+                  label: 'New Password',
+                  hint: 'Enter your new password',
                   obscureText: _obscurePassword,
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -121,7 +122,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                 const SizedBox(height: 16),
                 CustomTextField(
                   controller: _confirmPasswordController,
-                  labelText: 'Confirm Password',
+                  label: 'Confirm Password',
+                  hint: 'Confirm your new password',
                   obscureText: _obscureConfirmPassword,
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -147,10 +149,9 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                 BlocBuilder<AuthBloc, AuthState>(
                   builder: (context, state) {
                     return CustomButton(
+                      text: 'Reset Password',
                       onPressed: state is AuthLoading ? null : _resetPassword,
-                      child: state is AuthLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Reset Password'),
+                      isLoading: state is AuthLoading,
                     );
                   },
                 ),
