@@ -112,8 +112,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(GoogleUserNeedsRegistration(
           email: e.email,
           displayName: e.displayName,
-          googleIdToken: e.googleIdToken,
-          googleAccessToken: e.googleAccessToken,
         ));
       } else {
         emit(AuthError('Google login failed: $e'));
@@ -161,8 +159,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final user = await _authRepository.googleRegister(
         email: event.email,
         displayName: event.displayName ?? event.username,
-        googleIdToken: event.googleIdToken,
-        googleAccessToken: event.googleAccessToken,
         username: event.username,
         preferMetric: event.preferMetric,
         weightKg: event.weightKg,
