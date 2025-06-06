@@ -82,6 +82,273 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
         logger.error(f"Failed to create duel comment notifications: {e}")
         # Don't fail the comment creation if notification fails
 
+
+def create_duel_joined_notification(duel_id, joiner_id, joiner_name):
+    """
+    Create notification for duel creator when someone joins their duel
+    """
+    try:
+        admin_client = get_supabase_admin_client()
+        
+        # Get duel creator and name
+        duel_response = admin_client.table('duels') \
+            .select('creator_id, name') \
+            .eq('id', duel_id) \
+            .single() \
+            .execute()
+            
+        if not duel_response.data:
+            logger.warning(f"Duel {duel_id} not found for join notification")
+            return
+            
+        creator_id = duel_response.data.get('creator_id')
+        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        
+        # Don't notify if creator joined their own duel (shouldn't happen)
+        if creator_id == joiner_id:
+            return
+            
+        # Create notification for creator
+        notification = {
+            'recipient_id': creator_id,
+            'sender_id': joiner_id,
+            'type': 'duel_joined',
+            'duel_id': duel_id,
+            'data': {
+                'message': f"{joiner_name} joined your duel '{duel_name}'",
+                'duel_name': duel_name,
+                'joiner_name': joiner_name,
+                'created_at': 'NOW()'
+            }
+        }
+        
+        admin_client.table('notifications').insert(notification).execute()
+        logger.info(f"Created duel joined notification for creator {creator_id}")
+        
+        # Send push notification
+        push_notification_service = PushNotificationService()
+        device_tokens = get_user_device_tokens([creator_id])
+        if device_tokens:
+            push_notification_service.send_duel_joined_notification(
+                device_tokens=device_tokens,
+                joiner_name=joiner_name,
+                duel_name=duel_name,
+                duel_id=duel_id
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to create duel joined notification: {e}")
+
+
+def create_duel_started_notification(duel_id):
+    """
+    Create notifications for all participants when duel starts
+    """
+    try:
+        admin_client = get_supabase_admin_client()
+        
+        # Get duel details and participants
+        duel_response = admin_client.table('duels') \
+            .select('name') \
+            .eq('id', duel_id) \
+            .single() \
+            .execute()
+            
+        if not duel_response.data:
+            logger.warning(f"Duel {duel_id} not found for started notification")
+            return
+            
+        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        
+        # Get all participants
+        participants_response = admin_client.table('duel_participants') \
+            .select('user_id') \
+            .eq('duel_id', duel_id) \
+            .eq('status', 'accepted') \
+            .execute()
+        
+        if not participants_response.data:
+            logger.info(f"No participants to notify for duel start {duel_id}")
+            return
+            
+        # Create notifications for each participant
+        notifications = []
+        participant_ids = []
+        for participant in participants_response.data:
+            user_id = participant['user_id']
+            participant_ids.append(user_id)
+            notification = {
+                'recipient_id': user_id,
+                'sender_id': None,  # System notification
+                'type': 'duel_started',
+                'duel_id': duel_id,
+                'data': {
+                    'message': f"'{duel_name}' has started! Begin your challenge",
+                    'duel_name': duel_name,
+                    'created_at': 'NOW()'
+                }
+            }
+            notifications.append(notification)
+        
+        if notifications:
+            admin_client.table('notifications').insert(notifications).execute()
+            logger.info(f"Created {len(notifications)} duel started notifications")
+            
+            # Send push notifications
+            push_notification_service = PushNotificationService()
+            device_tokens = get_user_device_tokens(participant_ids)
+            if device_tokens:
+                push_notification_service.send_duel_started_notification(
+                    device_tokens=device_tokens,
+                    duel_name=duel_name,
+                    duel_id=duel_id
+                )
+                    
+    except Exception as e:
+        logger.error(f"Failed to create duel started notifications: {e}")
+
+
+def create_duel_completed_notification(duel_id):
+    """
+    Create notifications for all participants when duel completes
+    """
+    try:
+        admin_client = get_supabase_admin_client()
+        
+        # Get duel details and participants
+        duel_response = admin_client.table('duels') \
+            .select('name') \
+            .eq('id', duel_id) \
+            .single() \
+            .execute()
+            
+        if not duel_response.data:
+            logger.warning(f"Duel {duel_id} not found for completed notification")
+            return
+            
+        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        
+        # Get all participants
+        participants_response = admin_client.table('duel_participants') \
+            .select('user_id') \
+            .eq('duel_id', duel_id) \
+            .eq('status', 'accepted') \
+            .execute()
+        
+        if not participants_response.data:
+            logger.info(f"No participants to notify for duel completion {duel_id}")
+            return
+            
+        # Create notifications for each participant
+        notifications = []
+        participant_ids = []
+        for participant in participants_response.data:
+            user_id = participant['user_id']
+            participant_ids.append(user_id)
+            notification = {
+                'recipient_id': user_id,
+                'sender_id': None,  # System notification
+                'type': 'duel_completed',
+                'duel_id': duel_id,
+                'data': {
+                    'message': f"'{duel_name}' has completed! Check the results",
+                    'duel_name': duel_name,
+                    'created_at': 'NOW()'
+                }
+            }
+            notifications.append(notification)
+        
+        if notifications:
+            admin_client.table('notifications').insert(notifications).execute()
+            logger.info(f"Created {len(notifications)} duel completed notifications")
+            
+            # Send push notifications
+            push_notification_service = PushNotificationService()
+            device_tokens = get_user_device_tokens(participant_ids)
+            if device_tokens:
+                push_notification_service.send_duel_completed_notification(
+                    device_tokens=device_tokens,
+                    duel_name=duel_name,
+                    duel_id=duel_id
+                )
+                    
+    except Exception as e:
+        logger.error(f"Failed to create duel completed notifications: {e}")
+
+
+def create_duel_progress_notification(duel_id, participant_id, participant_name, ruck_id):
+    """
+    Create notifications for all other participants when someone completes a ruck for the duel
+    """
+    try:
+        admin_client = get_supabase_admin_client()
+        
+        # Get duel name
+        duel_response = admin_client.table('duels') \
+            .select('name') \
+            .eq('id', duel_id) \
+            .single() \
+            .execute()
+            
+        if not duel_response.data:
+            logger.warning(f"Duel {duel_id} not found for progress notification")
+            return
+            
+        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        
+        # Get all other participants (excluding the one who completed the ruck)
+        participants_response = admin_client.table('duel_participants') \
+            .select('user_id') \
+            .eq('duel_id', duel_id) \
+            .eq('status', 'accepted') \
+            .neq('user_id', participant_id) \
+            .execute()
+        
+        if not participants_response.data:
+            logger.info(f"No other participants to notify for duel progress {duel_id}")
+            return
+            
+        # Create notifications for each other participant
+        notifications = []
+        participant_ids = []
+        for participant in participants_response.data:
+            user_id = participant['user_id']
+            participant_ids.append(user_id)
+            notification = {
+                'recipient_id': user_id,
+                'sender_id': participant_id,
+                'type': 'duel_progress',
+                'duel_id': duel_id,
+                'ruck_id': ruck_id,
+                'data': {
+                    'message': f"{participant_name} completed a ruck for '{duel_name}'",
+                    'duel_name': duel_name,
+                    'participant_name': participant_name,
+                    'created_at': 'NOW()'
+                }
+            }
+            notifications.append(notification)
+        
+        if notifications:
+            admin_client.table('notifications').insert(notifications).execute()
+            logger.info(f"Created {len(notifications)} duel progress notifications")
+            
+            # Send push notifications
+            push_notification_service = PushNotificationService()
+            device_tokens = get_user_device_tokens(participant_ids)
+            if device_tokens:
+                push_notification_service.send_duel_progress_notification(
+                    device_tokens=device_tokens,
+                    participant_name=participant_name,
+                    duel_name=duel_name,
+                    duel_id=duel_id,
+                    ruck_id=str(ruck_id)
+                )
+                    
+    except Exception as e:
+        logger.error(f"Failed to create duel progress notifications: {e}")
+
+
 class DuelCommentsResource(Resource):
     @auth_required
     def get(self, duel_id):

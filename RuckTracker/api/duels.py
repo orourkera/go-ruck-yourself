@@ -394,6 +394,14 @@ class DuelJoinResource(Resource):
                 'updated_at': now.isoformat()
             }).execute()
             
+            # Get user name for notification
+            user_response = supabase.table('users').select('username').eq('id', user_id).single().execute()
+            user_name = user_response.data.get('username', 'Unknown User') if user_response.data else 'Unknown User'
+            
+            # Create duel joined notification for creator
+            from api.duel_comments import create_duel_joined_notification
+            create_duel_joined_notification(duel_id, user_id, user_name)
+            
             # Update user stats (optional - don't fail duel join if this fails)
             try:
                 supabase_admin = get_supabase_admin_client()
@@ -451,6 +459,10 @@ class DuelJoinResource(Resource):
                     'ends_at': ends_at.isoformat(), 
                     'updated_at': now.isoformat()
                 }).eq('id', duel_id).execute()
+                
+                # Create duel started notifications for all participants
+                from api.duel_comments import create_duel_started_notification
+                create_duel_started_notification(duel_id)
             
             return {'message': 'Successfully joined duel'}
             

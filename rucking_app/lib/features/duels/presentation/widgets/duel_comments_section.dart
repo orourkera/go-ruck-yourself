@@ -27,7 +27,7 @@ class DuelCommentsSection extends StatefulWidget {
   final bool hideInput;
   
   /// Callback when a comment edit button is pressed, allows parent to handle editing
-  final Function(DuelComment)? onEditCommentRequest;
+  final Function(String commentId, String currentText)? onEditCommentRequest;
 
   /// Creates a comment section for duels
   const DuelCommentsSection({
@@ -50,6 +50,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
   bool _isAddingComment = false;
   String? _editingCommentId;
   bool _commentsLoaded = false; // Track if comments have been loaded to prevent duplicate requests
+  bool _canViewComments = true; // Track if user can view comments (default true, set false on 403)
   
   // Store loaded comments locally to keep them across all state changes
   List<DuelComment> _currentComments = [];
@@ -72,7 +73,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
   void initState() {
     super.initState();
     
-    // Load comments on init
+    // Always try to load comments - if user isn't a participant, we'll handle the error gracefully
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DuelDetailBloc>().add(LoadDuelComments(duelId: widget.duelId));
     });
@@ -180,14 +181,24 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
             _cancelEditing();
           }
         } else if (state is DuelDetailError && state.message.contains('comment')) {
-          // Show error for comment operations
-          StyledSnackBar.showError(
-            context: context,
-            message: state.message,
-          );
-          setState(() {
-            _isAddingComment = false;
-          });
+          // Handle specific "must be participant" error gracefully
+          if (state.message.contains('must be a participant') || 
+              state.message.contains('participant to view comments')) {
+            // Don't show error snackbar for participant restriction - handle it in UI
+            setState(() {
+              _isAddingComment = false;
+              _canViewComments = false;
+            });
+          } else {
+            // Show error for other comment operations
+            StyledSnackBar.showError(
+              context: context,
+              message: state.message,
+            );
+            setState(() {
+              _isAddingComment = false;
+            });
+          }
         }
       },
       child: BlocBuilder<DuelDetailBloc, DuelDetailState>(
@@ -201,8 +212,8 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Comment input field (if not hidden)
-              if (!widget.hideInput) ...[
+              // Comment input field (if not hidden and can view comments)
+              if (!widget.hideInput && _canViewComments) ...[
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -266,10 +277,43 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                 ),
               ],
               
-              // Comments list (only show if there are comments)
-              if (comments.isNotEmpty) ...[
+              // Comments list (only show if can view comments and there are comments)
+              if (_canViewComments && comments.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _buildCommentsList(comments),
+              ],
+              
+              // Show message when user cannot view comments
+              if (!_canViewComments) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lock_outline,
+                        color: Colors.grey.shade600,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Join this duel to view and participate in discussions',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ],
           );

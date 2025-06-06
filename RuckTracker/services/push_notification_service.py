@@ -227,6 +227,104 @@ class PushNotificationService:
             body=body,
             notification_data=data
         )
+    
+    def send_duel_joined_notification(
+        self,
+        device_tokens: List[str],
+        joiner_name: str,
+        duel_name: str,
+        duel_id: str
+    ) -> bool:
+        """Send duel joined notification to duel creator"""
+        title = "New Duel Participant"
+        body = f"{joiner_name} joined your duel '{duel_name}'"
+        
+        data = {
+            'type': 'duel_joined',
+            'duel_id': duel_id,
+            'duel_name': duel_name,
+            'joiner_name': joiner_name
+        }
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
+    
+    def send_duel_started_notification(
+        self,
+        device_tokens: List[str],
+        duel_name: str,
+        duel_id: str
+    ) -> bool:
+        """Send duel started notification to all participants"""
+        title = "Duel Started!"
+        body = f"'{duel_name}' has started! Begin your challenge"
+        
+        data = {
+            'type': 'duel_started',
+            'duel_id': duel_id,
+            'duel_name': duel_name
+        }
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
+    
+    def send_duel_completed_notification(
+        self,
+        device_tokens: List[str],
+        duel_name: str,
+        duel_id: str
+    ) -> bool:
+        """Send duel completed notification to all participants"""
+        title = "Duel Completed!"
+        body = f"'{duel_name}' has completed! Check the results"
+        
+        data = {
+            'type': 'duel_completed',
+            'duel_id': duel_id,
+            'duel_name': duel_name
+        }
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
+    
+    def send_duel_progress_notification(
+        self,
+        device_tokens: List[str],
+        participant_name: str,
+        duel_name: str,
+        duel_id: str,
+        ruck_id: str
+    ) -> bool:
+        """Send duel progress notification when participant completes a ruck"""
+        title = "Duel Progress Update"
+        body = f"{participant_name} completed a ruck for '{duel_name}'"
+        
+        data = {
+            'type': 'duel_progress',
+            'duel_id': duel_id,
+            'duel_name': duel_name,
+            'participant_name': participant_name,
+            'ruck_id': ruck_id
+        }
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
 
 
 # Helper function to get user device tokens
