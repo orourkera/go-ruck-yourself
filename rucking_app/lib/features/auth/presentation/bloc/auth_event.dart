@@ -111,3 +111,29 @@ class AuthUpdateProfileRequested extends AuthEvent {
 class AuthDeleteAccountRequested extends AuthEvent {
   const AuthDeleteAccountRequested();
 }
+
+/// Event to request password reset email
+class AuthPasswordResetRequested extends AuthEvent {
+  final String email;
+
+  const AuthPasswordResetRequested({
+    required this.email,
+  });
+
+  @override
+  List<Object> get props => [email];
+}
+
+/// Event to confirm password reset with new password
+class AuthPasswordResetConfirmed extends AuthEvent {
+  final String token;
+  final String newPassword;
+
+  const AuthPasswordResetConfirmed({
+    required this.token,
+    required this.newPassword,
+  });
+
+  @override
+  List<Object> get props => [token, newPassword];
+}

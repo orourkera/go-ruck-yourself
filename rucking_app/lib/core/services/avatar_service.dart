@@ -3,71 +3,86 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
-/// Service for handling avatar upload operations
+/// Service for handling avatar upload operations using Supabase Storage
 class AvatarService {
   final Dio _dio;
   final AuthService _authService;
+  final SupabaseClient _supabase;
 
   AvatarService({
     required Dio dio,
     required AuthService authService,
   })  : _dio = dio,
-        _authService = authService;
+        _authService = authService,
+        _supabase = Supabase.instance.client;
 
-  /// Upload a user avatar image
+  /// Upload a user avatar image directly to Supabase Storage
   /// 
   /// [imageFile] - The image file to upload
-  /// Returns the avatar URL from the server
+  /// Returns the public avatar URL from Supabase Storage
   Future<String> uploadAvatar(File imageFile) async {
     try {
-      // Get access token
-      final token = await _authService.getToken();
-      if (token == null) {
-        throw Exception('No access token available');
+      AppLogger.info('Starting avatar upload to Supabase Storage');
+      
+      // Get current user
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
       }
+
+      final userId = user.id;
+      final String mimeType = _getMimeType(imageFile.path);
+      final String fileName = 'avatar.${_getFileExtension(mimeType)}';
+      final String filePath = '$userId/$fileName';
+
+      AppLogger.info('Uploading avatar for user $userId to path: $filePath');
 
       // Read image file as bytes
       final imageBytes = await imageFile.readAsBytes();
-      
-      // Convert to base64
-      final base64Image = base64Encode(imageBytes);
-      
-      // Create data URL with MIME type
-      final String mimeType = _getMimeType(imageFile.path);
-      final String dataUrl = 'data:$mimeType;base64,$base64Image';
 
-      // Prepare request
-      final response = await _dio.post(
-        '${AppConfig.apiBaseUrl}/auth/avatar',
-        data: {
-          'image': dataUrl,
-        },
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-      );
+      // Upload to Supabase Storage
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(
+            filePath,
+            imageBytes,
+            fileOptions: FileOptions(
+              contentType: mimeType,
+              upsert: true, // Allow overwriting existing avatar
+            ),
+          );
 
-      if (response.statusCode == 200) {
-        final data = response.data as Map<String, dynamic>;
-        return data['avatar_url'] as String;
-      } else {
-        throw Exception('Failed to upload avatar: ${response.statusMessage}');
-      }
+      AppLogger.info('Avatar uploaded successfully to Supabase Storage');
+
+      // Get public URL
+      final publicUrl = _supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+      AppLogger.info('Generated public URL: $publicUrl');
+
+      // Update user table with avatar URL
+      await _supabase
+          .from('user')
+          .update({'avatar_url': publicUrl})
+          .eq('id', userId);
+
+      AppLogger.info('User avatar_url updated in database');
+
+      return publicUrl;
     } catch (e) {
-      if (e is DioException) {
-        if (e.response != null) {
-          final errorData = e.response!.data;
-          if (errorData is Map<String, dynamic> && errorData.containsKey('message')) {
-            throw Exception('Avatar upload failed: ${errorData['message']}');
-          }
-        }
-        throw Exception('Network error during avatar upload: ${e.message}');
+      AppLogger.error('Failed to upload avatar: $e');
+      
+      if (e is StorageException) {
+        throw Exception('Storage error: ${e.message}');
+      } else if (e is PostgrestException) {
+        throw Exception('Database error: ${e.message}');
+      } else {
+        throw Exception('Failed to upload avatar: $e');
       }
-      throw Exception('Failed to upload avatar: $e');
     }
   }
 
@@ -86,6 +101,22 @@ class AvatarService {
         return 'image/webp';
       default:
         return 'image/jpeg'; // Default fallback
+    }
+  }
+
+  /// Get file extension from MIME type
+  String _getFileExtension(String mimeType) {
+    switch (mimeType) {
+      case 'image/jpeg':
+        return 'jpg';
+      case 'image/png':
+        return 'png';
+      case 'image/gif':
+        return 'gif';
+      case 'image/webp':
+        return 'webp';
+      default:
+        return 'jpg'; // Default fallback
     }
   }
 }

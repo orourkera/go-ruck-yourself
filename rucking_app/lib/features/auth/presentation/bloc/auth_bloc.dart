@@ -21,6 +21,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLogoutRequested>(_onAuthLogoutRequested);
     on<AuthUpdateProfileRequested>(_onAuthUpdateProfileRequested);
     on<AuthDeleteAccountRequested>(_onAuthDeleteAccountRequested);
+    on<AuthPasswordResetRequested>(_onAuthPasswordResetRequested);
+    on<AuthPasswordResetConfirmed>(_onAuthPasswordResetConfirmed);
   }
 
   /// Verify authentication status on app start
@@ -249,6 +251,43 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (currentState is! Authenticated) {
            emit(Unauthenticated()); // Ensure state is Unauthenticated if it wasn't already
       }
+    }
+  }
+
+  /// Handle password reset request
+  Future<void> _onAuthPasswordResetRequested(
+    AuthPasswordResetRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    
+    try {
+      await _authRepository.requestPasswordReset(email: event.email);
+      // For password reset request, we don't change auth state
+      // Just show success message via UI
+      emit(AuthInitial()); // Return to initial state
+    } catch (e) {
+      emit(AuthError('Password reset request failed: $e'));
+    }
+  }
+
+  /// Handle password reset confirmation
+  Future<void> _onAuthPasswordResetConfirmed(
+    AuthPasswordResetConfirmed event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    
+    try {
+      await _authRepository.confirmPasswordReset(
+        token: event.token,
+        newPassword: event.newPassword,
+      );
+      
+      // After successful password reset, user needs to login again
+      emit(Unauthenticated());
+    } catch (e) {
+      emit(AuthError('Password reset failed: $e'));
     }
   }
 }

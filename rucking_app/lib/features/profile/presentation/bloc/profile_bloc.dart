@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
@@ -33,10 +32,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       
       // Get the current user
       final currentState = _authBloc.state;
-      if (currentState is AuthAuthenticated && currentState.user != null) {
-        // Update the user with the new avatar URL
-        final updatedUser = currentState.user!.copyWith(avatarUrl: avatarUrl);
-        
+      if (currentState is Authenticated) {
         // Trigger auth bloc to update the user
         _authBloc.add(AuthUpdateProfileRequested(avatarUrl: avatarUrl));
         
