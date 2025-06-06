@@ -333,7 +333,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     try {
       final body = {'content': content};
       final response = await apiClient.post('/duels/$duelId/comments', body);
-      return DuelCommentModel.fromJson(response['comment']);
+      return DuelCommentModel.fromJson(response['data']);
     } catch (e) {
       rethrow;
     }

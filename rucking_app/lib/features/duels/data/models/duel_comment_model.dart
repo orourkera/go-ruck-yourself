@@ -15,7 +15,7 @@ class DuelCommentModel extends DuelComment {
   factory DuelCommentModel.fromJson(Map<String, dynamic> json) {
     return DuelCommentModel(
       id: json['id'] as String,
-      duelId: json['duel_id'] as int,
+      duelId: json['duel_id'] as String,
       userId: json['user_id'] as String,
       userDisplayName: json['user_display_name'] as String,
       userAvatarUrl: json['user_avatar_url'] as String?,

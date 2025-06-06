@@ -6,7 +6,7 @@ class DuelComment extends Equatable {
   final String id;
   
   /// ID of the duel that was commented on
-  final int duelId;
+  final String duelId;
   
   /// ID of the user who wrote the comment
   final String userId;
@@ -77,7 +77,7 @@ class DuelComment extends Equatable {
   /// Creates a copy of this DuelComment with the given fields replaced
   DuelComment copyWith({
     String? id,
-    int? duelId,
+    String? duelId,
     String? userId,
     String? userDisplayName,
     String? userAvatarUrl,

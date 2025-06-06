@@ -169,6 +169,7 @@ from .api.auth import (
     RefreshTokenResource,
     ForgotPasswordResource,
     UserProfileResource,
+    UserAvatarUploadResource,
 )
     
 from .api.stats import ( # Import new stats resources
@@ -302,6 +303,7 @@ api.add_resource(SignOutResource, '/api/auth/signout', '/api/auth/logout')
 api.add_resource(RefreshTokenResource, '/api/auth/refresh')
 api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
 api.add_resource(UserProfileResource, '/api/auth/profile', '/api/users/profile')
+api.add_resource(UserAvatarUploadResource, '/api/auth/avatar')
 
 api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
 
