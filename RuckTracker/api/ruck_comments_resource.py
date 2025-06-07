@@ -29,7 +29,8 @@ class RuckCommentsResource(Resource):
             user_id = user_response.user.id
             logger.debug(f"RuckCommentsResource: Authenticated user {user_id}")
         except Exception as e:
-            logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {e}")
+            logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {str(e)}")
+            logger.error(f"RuckCommentsResource: Token length: {len(token) if token else 'None'}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
 
         # Get comments for the ruck
@@ -70,7 +71,8 @@ class RuckCommentsResource(Resource):
             user_email = user_response.user.email
             logger.debug(f"RuckCommentsResource: Authenticated user {user_id} ({user_email})")
         except Exception as e:
-            logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {e}")
+            logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {str(e)}")
+            logger.error(f"RuckCommentsResource: Token length: {len(token) if token else 'None'}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
 
         # Get request data
@@ -187,7 +189,8 @@ class RuckCommentsResource(Resource):
             user_id = user_response.user.id
             logger.debug(f"RuckCommentsResource: Authenticated user {user_id}")
         except Exception as e:
-            logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {e}")
+            logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {str(e)}")
+            logger.error(f"RuckCommentsResource: Token length: {len(token) if token else 'None'}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
 
         # Get request data
@@ -287,7 +290,8 @@ class RuckCommentsResource(Resource):
             user_id = user_response.user.id
             logger.debug(f"RuckCommentsResource: Authenticated user {user_id}")
         except Exception as e:
-            logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {e}")
+            logger.error(f"RuckCommentsResource: Error during Supabase client initialization or user auth: {str(e)}")
+            logger.error(f"RuckCommentsResource: Token length: {len(token) if token else 'None'}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
 
         # Get comment_id from query parameters
