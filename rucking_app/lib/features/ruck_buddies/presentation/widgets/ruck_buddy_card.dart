@@ -16,15 +16,13 @@ import 'package:rucking_app/features/social/presentation/bloc/social_event.dart'
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/utils/logger.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/shared/widgets/photo/safe_network_image.dart';
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/di/service_locator.dart';
+import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';

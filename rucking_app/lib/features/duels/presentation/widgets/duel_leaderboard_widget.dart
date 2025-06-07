@@ -198,7 +198,7 @@ class DuelLeaderboardWidget extends StatelessWidget {
           // Participant Avatar
           UserAvatar(
             avatarUrl: participant.avatarUrl,
-            displayName: participant.username,
+            username: participant.username,
             size: 40,
           ),
           const SizedBox(width: 12),

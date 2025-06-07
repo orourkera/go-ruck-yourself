@@ -25,10 +25,9 @@ class StableCachedImage extends StatefulWidget {
   final bool useProgressiveLoading;
   final Duration fadeInDuration;
   final Duration fadeOutDuration;
-  final Key? key;
 
   const StableCachedImage({
-    Key? key,
+    super.key,
     required this.imageUrl,
     this.thumbnailUrl,
     this.width,
@@ -40,7 +39,7 @@ class StableCachedImage extends StatefulWidget {
     this.useProgressiveLoading = true,
     this.fadeInDuration = const Duration(milliseconds: 300),
     this.fadeOutDuration = const Duration(milliseconds: 150),
-  }) : super(key: key);
+  });
 
   @override
   State<StableCachedImage> createState() => _StableCachedImageState();
@@ -171,7 +170,7 @@ class _StableCachedImageState extends State<StableCachedImage>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     
     return CachedNetworkImage(
-      key: ValueKey('stable_cached_${_currentUrl}'),
+      key: ValueKey('stable_cached_$_currentUrl'),
       imageUrl: _currentUrl,
       cacheManager: ImageCacheManager.instance,
       width: widget.width,
