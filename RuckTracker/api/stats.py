@@ -53,17 +53,9 @@ def calculate_aggregates(sessions):
     avg_distance_km = total_distance_km / total_sessions if total_sessions > 0 else 0.0
     avg_duration_seconds = total_duration_seconds / total_sessions if total_sessions > 0 else 0
     
-    total_pace_seconds_per_km = 0.0
-    valid_pace_sessions = 0
-    for s in sessions:
-        dist = s.get('distance_km', 0) or 0
-        dur = s.get('duration_seconds', 0) or 0
-        if dist > 0 and dur > 0:
-             pace = dur / dist 
-             total_pace_seconds_per_km += pace
-             valid_pace_sessions += 1
-             
-    avg_pace_seconds_per_km = total_pace_seconds_per_km / valid_pace_sessions if valid_pace_sessions > 0 else 0.0
+    # Calculate overall pace as total_duration / total_distance (correct approach)
+    # This gives the true average pace across all sessions, weighted by distance
+    avg_pace_seconds_per_km = total_duration_seconds / total_distance_km if total_distance_km > 0 else 0.0
 
     return {
         'total_sessions': total_sessions,
