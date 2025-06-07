@@ -32,6 +32,7 @@ class RuckPhoto extends Equatable {
       // Extract the primary data fields
       final String id = json['id']?.toString() ?? '';
       final String url = json['photo_url']?.toString() ?? json['url']?.toString() ?? '';
+      final String thumbnailUrl = json['thumbnail_url']?.toString() ?? '';
       final String ruckSessionId = json['ruck_session_id']?.toString() ?? '';
       
       // Handle the timestamp parsing with enhanced fallback options
@@ -82,7 +83,7 @@ class RuckPhoto extends Equatable {
         filename: '',
         createdAt: parsedAt,
         url: url,
-        thumbnailUrl: '',
+        thumbnailUrl: thumbnailUrl,
       );
       
       return photo;
@@ -98,7 +99,7 @@ class RuckPhoto extends Equatable {
           filename: '',
           createdAt: DateTime.now(),
           url: json['photo_url']?.toString() ?? json['url']?.toString() ?? '',
-          thumbnailUrl: '',
+          thumbnailUrl: json['thumbnail_url']?.toString() ?? '',
         );
         return fallbackPhoto;
       } catch (fallbackError) {

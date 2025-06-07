@@ -2,29 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/shared/widgets/stable_cached_image.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
+import 'package:rucking_app/core/theme/app_colors.dart';
+import 'package:rucking_app/core/utils/logger.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
+import 'package:rucking_app/shared/widgets/photo/safe_network_image.dart';
+import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/di/service_locator.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
-import 'package:rucking_app/core/services/image_cache_manager.dart';
-
 import 'package:get_it/get_it.dart';
 import 'dart:developer' as developer;
 
@@ -201,6 +207,40 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
           ? (shouldBustCache ? '$url?cache=$cacheValue' : url) 
           : '';
     }).where((url) => url.isNotEmpty).toList();
+  }
+
+  /// Process photos to return both full URLs and thumbnail URLs for progressive loading
+  List<Map<String, String?>> _getProcessedPhotoData(List<dynamic> photos, {bool addCacheBuster = false}) {
+    final shouldBustCache = addCacheBuster;
+    final cacheValue = (DateTime.now().millisecondsSinceEpoch % 1000000);
+    
+    return photos.map((photo) {
+      String? fullUrl;
+      String? thumbnailUrl;
+      
+      if (photo is RuckPhoto) {
+        fullUrl = photo.url;
+        thumbnailUrl = photo.thumbnailUrl;
+      } else if (photo is Map) {
+        fullUrl = photo['url'];
+        thumbnailUrl = photo['thumbnail_url'];
+      }
+      
+      // Apply cache buster if requested
+      if (shouldBustCache && fullUrl != null && fullUrl.isNotEmpty) {
+        fullUrl = '$fullUrl?cache=$cacheValue';
+      }
+      if (shouldBustCache && thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
+        thumbnailUrl = '$thumbnailUrl?cache=$cacheValue';
+      }
+      
+      return {
+        'fullUrl': fullUrl,
+        'thumbnailUrl': thumbnailUrl,
+      };
+    }).where((data) => 
+      data['fullUrl'] != null && data['fullUrl']!.isNotEmpty
+    ).toList();
   }
 
   void _handleLikeTap() {
@@ -432,17 +472,20 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                       ));
                       
                       // Add photos after the map
-                      final processedUrls = _getProcessedPhotoUrls(_photos, addCacheBuster: true);
-                      for (String photoUrl in processedUrls) {
-                        mediaItems.add(MediaCarouselItem.photo(photoUrl));
+                      final processedPhotoData = _getProcessedPhotoData(_photos, addCacheBuster: true);
+                      for (Map<String, String?> photoData in processedPhotoData) {
+                        mediaItems.add(MediaCarouselItem.photo(
+                          photoData['fullUrl'] ?? '',
+                          thumbnailUrl: photoData['thumbnailUrl'],
+                        ));
                       }
                       
-                      developer.log('[MEDIA_DEBUG] Building media carousel with ${mediaItems.length} items (1 map + ${processedUrls.length} photos)', name: 'RuckBuddyCard');
+                      developer.log('[MEDIA_DEBUG] Building media carousel with ${mediaItems.length} items (1 map + ${processedPhotoData.length} photos)', name: 'RuckBuddyCard');
                       
                       return MediaCarousel(
                         mediaItems: mediaItems,
                         height: 200, // Updated to 200px tall
-                        initialPage: processedUrls.isNotEmpty ? 1 : 0, // Start at first photo if photos exist
+                        initialPage: processedPhotoData.isNotEmpty ? 1 : 0, // Start at first photo if photos exist
                         onPhotoTap: (index) {
                           // Only handle photo taps, skip map items
                           final photoUrls = mediaItems
@@ -702,19 +745,25 @@ enum MediaType { photo, map }
 class MediaCarouselItem {
   final MediaType type;
   final String? photoUrl;
+  final String? thumbnailUrl;
   final List<dynamic>? locationPoints;
   final double? ruckWeightKg;
 
   MediaCarouselItem._({
     required this.type,
     this.photoUrl,
+    this.thumbnailUrl,
     this.locationPoints,
     this.ruckWeightKg,
   });
 
   // Factory constructor for photo items
-  factory MediaCarouselItem.photo(String photoUrl) {
-    return MediaCarouselItem._(type: MediaType.photo, photoUrl: photoUrl);
+  factory MediaCarouselItem.photo(String photoUrl, {String? thumbnailUrl}) {
+    return MediaCarouselItem._(
+      type: MediaType.photo, 
+      photoUrl: photoUrl,
+      thumbnailUrl: thumbnailUrl,
+    );
   }
 
   // Factory constructor for map items
@@ -749,10 +798,14 @@ class MediaCarousel extends StatefulWidget {
   State<MediaCarousel> createState() => _MediaCarouselState();
 }
 
-class _MediaCarouselState extends State<MediaCarousel> with TickerProviderStateMixin {
+class _MediaCarouselState extends State<MediaCarousel> 
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late PageController _pageController;
   int _currentPage = 0;
   bool _shouldPreloadRemaining = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -778,6 +831,8 @@ class _MediaCarouselState extends State<MediaCarousel> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     if (widget.mediaItems.isEmpty) {
       return SizedBox(
         height: widget.height,
@@ -831,20 +886,13 @@ class _MediaCarouselState extends State<MediaCarousel> with TickerProviderStateM
                           topLeft: Radius.circular(12),
                           topRight: Radius.circular(12),
                         ), // Rounded top corners to match Card
-                        child: CachedNetworkImage(
+                        child: StableCachedImage(
+                          key: ValueKey('carousel_image_${item.photoUrl}'),
                           imageUrl: item.photoUrl!,
+                          thumbnailUrl: item.thumbnailUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          cacheManager: ImageCacheManager.instance, // Add custom cache manager
-                          placeholder: (context, url) => Container(
-                            color: Colors.grey.shade200,
-                            child: const Center(child: CircularProgressIndicator()),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            color: Colors.grey.shade200,
-                            child: const Center(child: Icon(Icons.error)),
-                          ),
                         ),
                       ),
                     );
@@ -864,14 +912,14 @@ class _MediaCarouselState extends State<MediaCarousel> with TickerProviderStateM
                     children: widget.mediaItems
                         .where((item) => item.type == MediaType.photo)
                         .skip(1) // Skip first photo (already visible), only preload remaining
-                        .map((item) => CachedNetworkImage(
+                        .map((item) => StableCachedImage(
+                              key: ValueKey('preload_image_${item.photoUrl}'),
                               imageUrl: item.photoUrl!,
+                              thumbnailUrl: item.thumbnailUrl,
                               width: 1,
                               height: 1,
                               fit: BoxFit.cover,
-                              cacheManager: ImageCacheManager.instance, // Add custom cache manager
-                              placeholder: (context, url) => const SizedBox.shrink(),
-                              errorWidget: (context, url, error) => const SizedBox.shrink(),
+                              useShimmer: false, // Disable shimmer for preloading
                             ))
                         .toList(),
                   ),

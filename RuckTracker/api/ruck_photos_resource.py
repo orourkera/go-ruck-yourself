@@ -200,7 +200,13 @@ class RuckPhotosResource(Resource):
                 if isinstance(public_url, str) and public_url.endswith('?'):
                     public_url = public_url[:-1] # Remove trailing '?'
                 
-                thumbnail_url = public_url # For MVP, thumbnail is same as original
+                # Generate thumbnail URL using Supabase image transformations
+                # Convert from /object/public/ to /render/image/public/ and add size parameters
+                if '/object/public/' in public_url:
+                    thumbnail_url = public_url.replace('/object/public/', '/render/image/public/') + '?width=300&height=300&quality=80'
+                else:
+                    # Fallback to original URL if transformation fails
+                    thumbnail_url = public_url
                 
                 # Prepare metadata for database insert
                 photo_metadata = {
