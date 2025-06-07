@@ -484,7 +484,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                       ));
                       
                       // Add photos after the map
-                      final processedPhotoData = _getProcessedPhotoData(_photos, addCacheBuster: true);
+                      final processedPhotoData = _getProcessedPhotoData(_photos, addCacheBuster: false);
                       for (Map<String, String?> photoData in processedPhotoData) {
                         developer.log('[MEDIA_DEBUG] Photo URL: ${photoData['fullUrl']}, Thumbnail: ${photoData['thumbnailUrl']}', name: 'RuckBuddyCard');
                         mediaItems.add(MediaCarouselItem.photo(
@@ -1076,9 +1076,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
     // These calculations are based on a map container that's approximately 200px tall
     double latDiff = maxLat - minLat;
     double lngDiff = maxLng - minLng;
-
-    // Approximate zoom calculation based on degrees of lat/lng difference
-    // These values are tuned for the map preview size
+    
     double zoom;
     if (latDiff < 0.0005 && lngDiff < 0.0005) {
       zoom = 17.0; // Very close zoom for tiny routes
