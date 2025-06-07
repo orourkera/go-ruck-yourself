@@ -57,8 +57,8 @@ class MeasurementUtils {
     if (!paceSeconds.isFinite || paceSeconds <= 0) return '--';
     
     // Convert from seconds/km to seconds/mile if not metric
-    // For conversion: seconds/mile = seconds/km * 0.621371 (km to mile factor)
-    final pace = metric ? paceSeconds : paceSeconds / 0.621371;
+    // For conversion: seconds/mile = seconds/km * 1.609344 (km to mile distance factor)
+    final pace = metric ? paceSeconds : paceSeconds * 1.609344;
     
     // Cap extremely slow paces (>60min/km or mile) to avoid UI glitches
     // Also handles if conversion resulted in non-finite or if original pace was too high

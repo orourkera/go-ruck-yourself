@@ -9,7 +9,7 @@ class ImagePickerUtils {
 
   /// Show a dialog to choose between camera and gallery
   static Future<File?> pickImage(BuildContext context) async {
-    return await showDialog<File?>(
+    final result = await showDialog<String?>(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
@@ -17,18 +17,11 @@ class ImagePickerUtils {
           content: const Text('Choose how you\'d like to select your avatar image:'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () => Navigator.pop(dialogContext, null),
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                final file = await _pickImageFromCamera();
-                // Check if the original context is still mounted before popping
-                if (context.mounted) {
-                  Navigator.pop(context, file);
-                }
-              },
+              onPressed: () => Navigator.pop(dialogContext, 'camera'),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -39,14 +32,7 @@ class ImagePickerUtils {
               ),
             ),
             TextButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                final file = await _pickImageFromGallery();
-                // Check if the original context is still mounted before popping
-                if (context.mounted) {
-                  Navigator.pop(context, file);
-                }
-              },
+              onPressed: () => Navigator.pop(dialogContext, 'gallery'),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -60,6 +46,16 @@ class ImagePickerUtils {
         );
       },
     );
+
+    if (result == null) return null;
+    
+    if (result == 'camera') {
+      return await _pickImageFromCamera();
+    } else if (result == 'gallery') {
+      return await _pickImageFromGallery();
+    }
+    
+    return null;
   }
 
   /// Pick image from camera

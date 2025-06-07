@@ -64,8 +64,8 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
   getIt.registerSingleton<AuthService>(AuthServiceImpl(getIt<ApiClient>(), getIt<StorageService>()));
   getIt.registerSingleton<AvatarService>(AvatarService(
-    dio: getIt<Dio>(),
     authService: getIt<AuthService>(),
+    apiClient: getIt<ApiClient>(),
   ));
   
   // Connect services to resolve circular dependencies
