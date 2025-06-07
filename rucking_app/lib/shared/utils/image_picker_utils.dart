@@ -11,20 +11,23 @@ class ImagePickerUtils {
   static Future<File?> pickImage(BuildContext context) async {
     return await showDialog<File?>(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Select Image'),
           content: const Text('Choose how you\'d like to select your avatar image:'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 final file = await _pickImageFromCamera();
-                Navigator.pop(context, file);
+                // Check if the original context is still mounted before popping
+                if (context.mounted) {
+                  Navigator.pop(context, file);
+                }
               },
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
@@ -37,9 +40,12 @@ class ImagePickerUtils {
             ),
             TextButton(
               onPressed: () async {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 final file = await _pickImageFromGallery();
-                Navigator.pop(context, file);
+                // Check if the original context is still mounted before popping
+                if (context.mounted) {
+                  Navigator.pop(context, file);
+                }
               },
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
