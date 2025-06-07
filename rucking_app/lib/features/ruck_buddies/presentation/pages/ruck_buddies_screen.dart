@@ -219,6 +219,10 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16.0),
+      // Critical optimizations to prevent widget disposal during scroll
+      addAutomaticKeepAlives: true, // Preserve widget state during scroll
+      addRepaintBoundaries: true, // Better rendering performance
+      cacheExtent: 1000, // Cache widgets 1000 pixels outside viewport
       itemCount: isLoadingMore ? ruckBuddies.length + 1 : ruckBuddies.length,
       itemBuilder: (context, index) {
         // debugPrint('🐞 [_RuckBuddiesScreenState._buildRuckBuddiesList itemBuilder] Index: $index, Total items including loader: ${isLoadingMore ? ruckBuddies.length + 1 : ruckBuddies.length}');
@@ -242,6 +246,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
             child: Builder(builder: (context) {
               try {
                 return RuckBuddyCard(
+                  key: ValueKey(ruckBuddy.id), // Unique key for stable widget identity
                   ruckBuddy: ruckBuddy,
                   onTap: () async {
                     // Navigate to detail screen and await return
@@ -257,8 +262,9 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                       debugPrint('🔄 Returned to RuckBuddiesScreen from detail view - refreshing social states');
                       final ruckId = int.tryParse(ruckBuddy.id);
                       if (ruckId != null) {
-                        // Also reload all ruck buddies to ensure we have the latest data
-                        context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+                        // Only refresh social data for this specific ruck to avoid image reloads
+                        context.read<SocialBloc>().add(CheckRuckLikeStatus(ruckId));
+                        context.read<SocialBloc>().add(LoadRuckComments(ruckBuddy.id));
                       }
                     }
                   },
