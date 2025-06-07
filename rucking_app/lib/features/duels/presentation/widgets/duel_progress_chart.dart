@@ -153,7 +153,7 @@ class DuelProgressChart extends StatelessWidget {
                 children: [
                   UserAvatar(
                     avatarUrl: participant.avatarUrl,
-                    displayName: participant.username,
+                    username: participant.username,
                     size: 36,
                   ),
                   if (rank <= 3)
