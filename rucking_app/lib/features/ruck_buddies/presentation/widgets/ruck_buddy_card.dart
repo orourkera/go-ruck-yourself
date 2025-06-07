@@ -48,7 +48,7 @@ class RuckBuddyCard extends StatefulWidget {
   State<RuckBuddyCard> createState() => _RuckBuddyCardState();
 }
 
-class _RuckBuddyCardState extends State<RuckBuddyCard> {
+class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveClientMixin {
   int? _likeCount;
   bool _isLiked = false;
   bool _isProcessingLike = false;
@@ -57,6 +57,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   int? _ruckId;
   int? _commentCount;  // Track comment count locally
   SocialRepository? _socialRepository;
+
+  @override
+  bool get wantKeepAlive => true; // Prevent disposal during scroll
 
   @override
   void initState() {
@@ -107,8 +110,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
     _photos = widget.ruckBuddy.photos != null ? List<RuckPhoto>.from(widget.ruckBuddy.photos!) : [];
     developer.log('[PHOTO_DEBUG] RuckBuddyCard initState for ruckId: $_ruckId - initial photos count: ${_photos.length}', name: 'RuckBuddyCard');
     
-    // Explicitly request photos for this ruck session
-    if (_ruckId != null) {
+    // Only request photos for this ruck session if no photos are available from widget data
+    if (_ruckId != null && _photos.isEmpty) {
       try {
         // Request photos for this ruck from ActiveSessionBloc
         final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
@@ -135,23 +138,32 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
   void didUpdateWidget(RuckBuddyCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     
-    // Re-fetch photos when returning to this screen to ensure they display correctly
-    if (_ruckId != null) {
-      try {
-        // 1. Force update photos from the widget if available
-        if (widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty) {
-          setState(() {
-            _photos = List<RuckPhoto>.from(widget.ruckBuddy.photos!);
-            developer.log('[PHOTO_DEBUG] RuckBuddyCard directly updated photos from widget: ${_photos.length}', name: 'RuckBuddyCard');
-          });
+    // Only fetch photos when the ruck buddy actually changes, not during scroll rebuilds
+    if (oldWidget.ruckBuddy.id != widget.ruckBuddy.id) {
+      developer.log('[PHOTO_DEBUG] RuckBuddy ID changed from ${oldWidget.ruckBuddy.id} to ${widget.ruckBuddy.id} - updating photos', name: 'RuckBuddyCard');
+      
+      // Update the ruckId
+      _ruckId = int.tryParse(widget.ruckBuddy.id);
+      
+      if (_ruckId != null) {
+        try {
+          // 1. Force update photos from the widget if available
+          if (widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty) {
+            setState(() {
+              _photos = List<RuckPhoto>.from(widget.ruckBuddy.photos!);
+            });
+            developer.log('[PHOTO_DEBUG] Updated photos from widget data for ruckId: $_ruckId', name: 'RuckBuddyCard');
+          }
+          
+          // 2. Only request fresh photos if no photos are already cached
+          if (_photos.isEmpty) {
+            final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+            activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+            developer.log('[PHOTO_DEBUG] RuckBuddyCard requested photos for new ruckId: $_ruckId', name: 'RuckBuddyCard');
+          }
+        } catch (e) {
+          developer.log('[PHOTO_DEBUG] Error handling photos in RuckBuddyCard.didUpdateWidget: $e', name: 'RuckBuddyCard');
         }
-        
-        // 2. Request fresh photos from ActiveSessionBloc
-        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-        activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
-        developer.log('[PHOTO_DEBUG] RuckBuddyCard re-requested photos on update for ruckId: $_ruckId', name: 'RuckBuddyCard');
-      } catch (e) {
-        developer.log('[PHOTO_DEBUG] Error re-requesting photos in RuckBuddyCard.didUpdateWidget: $e', name: 'RuckBuddyCard');
       }
     }
   }
@@ -266,6 +278,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     // Calculate pace if not already done
     if (_calculatedPace == 0.0 && widget.ruckBuddy.distanceKm > 0 && widget.ruckBuddy.durationSeconds > 0) {
       _calculatedPace = widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm;
@@ -472,6 +486,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                       // Add photos after the map
                       final processedPhotoData = _getProcessedPhotoData(_photos, addCacheBuster: true);
                       for (Map<String, String?> photoData in processedPhotoData) {
+                        developer.log('[MEDIA_DEBUG] Photo URL: ${photoData['fullUrl']}, Thumbnail: ${photoData['thumbnailUrl']}', name: 'RuckBuddyCard');
                         mediaItems.add(MediaCarouselItem.photo(
                           photoData['fullUrl'] ?? '',
                           thumbnailUrl: photoData['thumbnailUrl'],
@@ -503,6 +518,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> {
                             );
                           }
                         },
+                        ruckBuddyId: widget.ruckBuddy.id, // Add ruckBuddyId parameter
                       );
                     }),
                     
@@ -783,6 +799,7 @@ class MediaCarousel extends StatefulWidget {
   final double height;
   final int initialPage;
   final Function(int index)? onPhotoTap;
+  final String ruckBuddyId; // Add ruckBuddyId parameter
 
   const MediaCarousel({
     Key? key,
@@ -790,6 +807,7 @@ class MediaCarousel extends StatefulWidget {
     this.height = 240.0,
     this.initialPage = 0,
     this.onPhotoTap,
+    required this.ruckBuddyId, // Add required parameter
   }) : super(key: key);
 
   @override
@@ -885,7 +903,7 @@ class _MediaCarouselState extends State<MediaCarousel>
                           topRight: Radius.circular(12),
                         ), // Rounded top corners to match Card
                         child: StableCachedImage(
-                          key: ValueKey('carousel_image_${item.photoUrl}'),
+                          key: ValueKey('${widget.ruckBuddyId}_${item.photoUrl}'), // Unique across cards
                           imageUrl: item.photoUrl!,
                           thumbnailUrl: item.thumbnailUrl,
                           fit: BoxFit.cover,
@@ -911,7 +929,7 @@ class _MediaCarouselState extends State<MediaCarousel>
                         .where((item) => item.type == MediaType.photo)
                         .skip(1) // Skip first photo (already visible), only preload remaining
                         .map((item) => StableCachedImage(
-                              key: ValueKey('preload_image_${item.photoUrl}'),
+                              key: ValueKey('${widget.ruckBuddyId}_preload_${item.photoUrl}'), // Unique across cards
                               imageUrl: item.photoUrl!,
                               thumbnailUrl: item.thumbnailUrl,
                               width: 1,

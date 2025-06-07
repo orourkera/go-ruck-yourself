@@ -59,16 +59,22 @@ class _StableCachedImageState extends State<StableCachedImage>
     super.initState();
     _currentUrl = widget.imageUrl;
     _currentThumbnailUrl = widget.thumbnailUrl;
+    print('[StableCachedImage] Loading image: $_currentUrl, thumbnail: $_currentThumbnailUrl');
   }
 
   @override
   void didUpdateWidget(StableCachedImage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Only update URLs if they actually changed to prevent unnecessary rebuilds
     if (oldWidget.imageUrl != widget.imageUrl) {
-      _currentUrl = widget.imageUrl;
+      setState(() {
+        _currentUrl = widget.imageUrl;
+      });
     }
     if (oldWidget.thumbnailUrl != widget.thumbnailUrl) {
-      _currentThumbnailUrl = widget.thumbnailUrl;
+      setState(() {
+        _currentThumbnailUrl = widget.thumbnailUrl;
+      });
     }
   }
 
@@ -88,31 +94,15 @@ class _StableCachedImageState extends State<StableCachedImage>
     return widget.height!.toInt();
   }
 
-  /// Safe disk cache dimension calculation with reasonable defaults
-  int _getMaxDiskCacheWidth() {
-    if (widget.width == null || widget.width == double.infinity) {
-      return 800; // Reasonable default for full-res images
-    }
-    return widget.width!.toInt().clamp(200, 1200); // Clamp to reasonable range
-  }
-
-  /// Safe disk cache dimension calculation with reasonable defaults
-  int _getMaxDiskCacheHeight() {
-    if (widget.height == null || widget.height == double.infinity) {
-      return 600; // Reasonable default for full-res images
-    }
-    return widget.height!.toInt().clamp(150, 1000); // Clamp to reasonable range
-  }
-
   Widget _buildShimmerPlaceholder() {
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
+      baseColor: const Color(0xFF4A5D23), // Army green base
+      highlightColor: const Color(0xFF6B7F3A), // Lighter army green highlight
       child: Container(
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(
-          color: Colors.grey.shade300,
+          color: const Color(0xFF4A5D23), // Army green background
           borderRadius: BorderRadius.circular(8),
         ),
       ),
@@ -156,8 +146,6 @@ class _StableCachedImageState extends State<StableCachedImage>
         // Use smaller cache sizes for thumbnails to save memory
         memCacheWidth: _getMemoryCacheWidth() != null ? (_getMemoryCacheWidth()! * 0.5).toInt() : null,
         memCacheHeight: _getMemoryCacheHeight() != null ? (_getMemoryCacheHeight()! * 0.5).toInt() : null,
-        maxWidthDiskCache: (_getMaxDiskCacheWidth() * 0.5).toInt(),
-        maxHeightDiskCache: (_getMaxDiskCacheHeight() * 0.5).toInt(),
       );
     }
     
@@ -169,8 +157,10 @@ class _StableCachedImageState extends State<StableCachedImage>
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     
+    print('[StableCachedImage] Building widget for URL: $_currentUrl (key: ${widget.key})');
+    
     return CachedNetworkImage(
-      key: ValueKey('stable_cached_$_currentUrl'),
+      key: widget.key ?? ValueKey(_currentUrl), // Use provided key or fallback to URL
       imageUrl: _currentUrl,
       cacheManager: ImageCacheManager.instance,
       width: widget.width,
@@ -186,6 +176,7 @@ class _StableCachedImageState extends State<StableCachedImage>
       
       // Error handling with fallback to placeholder
       errorWidget: (context, url, error) {
+        print('[StableCachedImage] ERROR loading image: $url, error: $error');
         return widget.errorWidget ?? Container(
           width: widget.width,
           height: widget.height,
@@ -207,12 +198,14 @@ class _StableCachedImageState extends State<StableCachedImage>
       memCacheWidth: _getMemoryCacheWidth(),
       memCacheHeight: _getMemoryCacheHeight(),
       
-      // Prevent flashing when URL changes
+      // Prevent flashing when URL changes and improve scroll performance
       useOldImageOnUrlChange: true,
+      filterQuality: FilterQuality.medium, // Better performance during scroll
       
-      // Reduce memory usage by limiting max disk cache size
-      maxWidthDiskCache: _getMaxDiskCacheWidth(),
-      maxHeightDiskCache: _getMaxDiskCacheHeight(),
+      // Additional stability options
+      fadeInCurve: Curves.easeInOut,
+      fadeOutCurve: Curves.easeInOut,
+      matchTextDirection: false, // Prevent RTL layout issues
     );
   }
 }
