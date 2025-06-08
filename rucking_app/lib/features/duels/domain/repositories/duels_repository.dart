@@ -50,6 +50,8 @@ abstract class DuelsRepository {
     required String status,
   });
 
+  Future<Either<Failure, void>> withdrawFromDuel(String duelId);
+
   Future<Either<Failure, void>> updateParticipantProgress({
     required String duelId,
     required String participantId,

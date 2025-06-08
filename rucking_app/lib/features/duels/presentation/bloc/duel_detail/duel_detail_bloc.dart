@@ -9,6 +9,7 @@ import '../../../domain/usecases/update_duel_comment.dart' as update_comment_use
 import '../../../domain/usecases/delete_duel_comment.dart' as delete_comment_usecase;
 import '../../../domain/usecases/start_duel.dart' as start_duel_usecase;
 import '../../../domain/usecases/get_duel_sessions.dart';
+import '../../../domain/usecases/withdraw_from_duel.dart' as withdraw_usecase;
 import '../../../domain/entities/duel_participant.dart';
 import '../../../data/models/duel_model.dart';
 import 'duel_detail_event.dart';
@@ -25,6 +26,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
   final delete_comment_usecase.DeleteDuelComment deleteDuelComment;
   final start_duel_usecase.StartDuel startDuel;
   final GetDuelSessions getDuelSessions;
+  final withdraw_usecase.WithdrawFromDuel withdrawFromDuel;
 
   DuelDetailBloc({
     required this.getDuelDetails,
@@ -37,6 +39,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
     required this.deleteDuelComment,
     required this.startDuel,
     required this.getDuelSessions,
+    required this.withdrawFromDuel,
   }) : super(DuelDetailInitial()) {
     on<LoadDuelDetail>(_onLoadDuelDetail);
     on<RefreshDuelDetail>(_onRefreshDuelDetail);
@@ -49,6 +52,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
     on<UpdateDuelComment>(_onUpdateDuelComment);
     on<DeleteDuelComment>(_onDeleteDuelComment);
     on<LoadDuelSessions>(_onLoadDuelSessions);
+    on<WithdrawFromDuel>(_onWithdrawFromDuel);
   }
 
   void _onLoadDuelDetail(LoadDuelDetail event, Emitter<DuelDetailState> emit) async {
@@ -267,5 +271,25 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
 
   void _onLoadDuelSessions(LoadDuelSessions event, Emitter<DuelDetailState> emit) async {
     // TO DO: implement _onLoadDuelSessions
+  }
+
+  void _onWithdrawFromDuel(WithdrawFromDuel event, Emitter<DuelDetailState> emit) async {
+    emit(DuelWithdrawing(duelId: event.duelId));
+
+    final result = await withdrawFromDuel(withdraw_usecase.WithdrawFromDuelParams(
+      duelId: event.duelId,
+    ));
+
+    result.fold(
+      (failure) => emit(DuelWithdrawError(
+        duelId: event.duelId,
+        message: failure.message,
+      )),
+      (_) {
+        emit(DuelWithdrawn(duelId: event.duelId));
+        // Refresh the duel details to show updated participant list
+        add(RefreshDuelDetail(duelId: event.duelId));
+      },
+    );
   }
 }
