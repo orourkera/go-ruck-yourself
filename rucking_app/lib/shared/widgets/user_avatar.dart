@@ -43,6 +43,7 @@ class UserAvatar extends StatelessWidget {
                 fit: BoxFit.cover,
                 placeholder: (context, url) => _buildInitialsAvatar(),
                 errorWidget: (context, url, error) => _buildInitialsAvatar(),
+                cacheKey: avatarUrl, // Force refresh when URL changes
               )
             : _buildInitialsAvatar(),
       ),

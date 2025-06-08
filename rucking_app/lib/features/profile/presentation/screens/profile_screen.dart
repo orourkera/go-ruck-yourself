@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:rucking_app/shared/widgets/user_avatar.dart';
@@ -28,6 +29,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   String? _selectedUnit;
+  User? _currentUser; // Track current user to avoid losing state during loading
 
   // Constants for conversion
   static const double kgToLbs = 2.20462;
@@ -62,8 +64,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         },
         child: BlocBuilder<AuthBloc, AuthState>(
           builder: (context, state) {
+            // Update current user when we have an authenticated state
             if (state is Authenticated) {
-              final user = state.user;
+              _currentUser = state.user;
+            }
+            
+            // Always use current user if available, even during loading
+            if (_currentUser != null) {
+              final user = _currentUser!;
               _selectedUnit ??= user.preferMetric ? 'Metric' : 'Standard';
               String initials = user.username.isNotEmpty ? _getInitials(user.username) : '';
 
