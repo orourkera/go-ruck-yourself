@@ -139,7 +139,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
               'Allow anyone to join this challenge',
             ),
             value: _isPublic,
-            activeColor: AppColors.primary,
+            activeColor: Theme.of(context).colorScheme.primary,
             onChanged: (newValue) {
               setState(() {
                 _isPublic = newValue;
@@ -151,7 +151,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
           // Submit Button
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onPressed: () {

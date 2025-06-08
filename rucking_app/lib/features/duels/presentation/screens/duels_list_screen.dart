@@ -27,11 +27,14 @@ class DuelsListScreen extends StatefulWidget {
 class _DuelsListScreenState extends State<DuelsListScreen> {
   final AuthService _authService = getIt<AuthService>();
   String? _currentUserId;
+  bool _hasActiveInactivelyNavigated = false;
+  bool _hasActiveDuel = false;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
+    // First load user's duels to check for active ones
     context.read<DuelListBloc>().add(const LoadMyDuels());
   }
 
@@ -67,7 +70,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: _hasActiveDuel ? null : FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const CreateDuelScreen()),
@@ -83,24 +86,58 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
           ),
         ),
       ),
-      body: DefaultTabController(
-        length: 3,
-        child: Column(
-          children: [
-            _buildStatusTabs(),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  // My Duels Tab
-                  _buildDuelsView(isMyDuels: true),
-                  // Discover Tab  
-                  _buildDuelsView(isMyDuels: false),
-                  // How Duels Work Tab
-                  const HowDuelsWork(),
-                ],
+      body: BlocListener<DuelListBloc, DuelListState>(
+        listener: (context, state) {
+          if (state is DuelListLoaded && _currentUserId != null) {
+            // Always check for active duels to update FAB visibility
+            final activeDuel = state.duels.where((duel) {
+              final isParticipant = _isCurrentUserParticipant(duel);
+              final isCreator = duel.creatorId == _currentUserId;
+              final isActive = duel.status == DuelStatus.active || duel.status == DuelStatus.pending;
+              return (isParticipant || isCreator) && isActive;
+            }).firstOrNull;
+            
+            setState(() {
+              _hasActiveDuel = activeDuel != null;
+            });
+            
+            // Only navigate if we haven't already navigated and there's an active duel
+            if (!_hasActiveInactivelyNavigated && activeDuel != null) {
+              _hasActiveInactivelyNavigated = true;
+              // Navigate to the active duel detail page
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DuelDetailScreen(duelId: activeDuel.id),
+                  ),
+                );
+              });
+              return;
+            } else if (!_hasActiveInactivelyNavigated && activeDuel == null) {
+              // No active duel found, load discover duels
+              _hasActiveInactivelyNavigated = true;
+              context.read<DuelListBloc>().add(const LoadDiscoverDuels());
+            }
+          }
+        },
+        child: DefaultTabController(
+          length: 2,
+          child: Column(
+            children: [
+              _buildStatusTabs(),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    // Discover Tab
+                    _buildDuelsView(isMyDuels: false),
+                    // How Duels Work Tab
+                    const HowDuelsWork(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -115,15 +152,11 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
         unselectedLabelColor: Colors.white70,
         onTap: (index) {
           if (index == 0) {
-            // My Duels - show duels user is participating in
-            context.read<DuelListBloc>().add(const LoadMyDuels());
-          } else if (index == 1) {
             // Discover - show duels available to join
             context.read<DuelListBloc>().add(const LoadDiscoverDuels());
           }
         },
         tabs: const [
-          Tab(text: 'My Duels'),
           Tab(text: 'Discover'),
           Tab(text: 'How Duels Work'),
         ],

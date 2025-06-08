@@ -53,11 +53,67 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => context.read<DuelDetailBloc>().add(
-              RefreshDuelDetail(duelId: widget.duelId),
-            ),
+          BlocBuilder<DuelDetailBloc, DuelDetailState>(
+            builder: (context, state) {
+              if (state is DuelDetailLoaded) {
+                return PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'refresh':
+                        context.read<DuelDetailBloc>().add(
+                          RefreshDuelDetail(duelId: widget.duelId),
+                        );
+                        break;
+                      case 'withdraw':
+                        HapticFeedback.vibrate();
+                        context.read<DuelDetailBloc>().add(
+                          WithdrawFromDuel(duelId: widget.duelId),
+                        );
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) {
+                    final items = <PopupMenuEntry<String>>[
+                      const PopupMenuItem<String>(
+                        value: 'refresh',
+                        child: Row(
+                          children: [
+                            Icon(Icons.refresh),
+                            SizedBox(width: 8),
+                            Text('Refresh'),
+                          ],
+                        ),
+                      ),
+                    ];
+
+                    // Add withdraw option if user can withdraw
+                    if (_canUserWithdraw(state.duel, state.participants)) {
+                      items.add(
+                        const PopupMenuItem<String>(
+                          value: 'withdraw',
+                          child: Row(
+                            children: [
+                              Icon(Icons.exit_to_app, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Withdraw', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return items;
+                  },
+                );
+              }
+              return IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () => context.read<DuelDetailBloc>().add(
+                  RefreshDuelDetail(duelId: widget.duelId),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -173,18 +229,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
                     StartDuelManually(duelId: widget.duelId),
                   )
                 : null,
-            showWithdrawButton: _canUserWithdraw(duel, participants),
-            onWithdraw: _canUserWithdraw(duel, participants)
-                ? () {
-                    HapticFeedback.vibrate();
-                    context.read<DuelDetailBloc>().add(
-                      WithdrawFromDuel(duelId: widget.duelId),
-                    );
-                  }
-                : null,
             isJoining: state is DuelJoiningFromDetail,
             isStarting: state is DuelStartingManually,
-            isWithdrawing: state is DuelWithdrawing,
           ),
           
           // Tabs

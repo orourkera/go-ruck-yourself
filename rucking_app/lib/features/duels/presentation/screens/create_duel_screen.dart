@@ -51,7 +51,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       appBar: AppBar(
         title: const Text('Create Duel'),
         elevation: 0,
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
           TextButton(
@@ -131,22 +131,6 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
                   if (_startMode == 'auto')
                     const SizedBox(height: 16),
                   
-                  _buildSectionHeader('Visibility'),
-                  const SizedBox(height: 8),
-                  
-                  // _buildSectionHeader('Location (Optional)'),
-                  // const SizedBox(height: 16),
-                  
-                  // _buildLocationFields(),
-                  // const SizedBox(height: 24),
-                  
-                  // if (!_isPublic) ...[
-                  //   _buildSectionHeader('Invite Friends'),
-                  //   const SizedBox(height: 16),
-                  //   _buildInviteEmailsField(state),
-                  //   const SizedBox(height: 24),
-                  // ],
-                  
                   _buildCreateButton(state),
                   const SizedBox(height: 32),
                 ],
@@ -162,8 +146,8 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-        fontWeight: FontWeight.bold,
-        color: AppColors.primary,
+        fontWeight: FontWeight.normal,
+        color: Colors.black,
       ),
     );
   }
@@ -175,7 +159,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _titleController,
       decoration: InputDecoration(
         labelText: 'Duel Title *',
+        labelStyle: const TextStyle(color: Colors.black),
         hintText: 'Enter a catchy title for your duel',
+        hintStyle: TextStyle(color: Colors.grey[600]),
         errorText: hasError ? state.errors['title'] : null,
         border: const OutlineInputBorder(),
       ),
@@ -207,6 +193,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       value: _selectedChallengeType,
       decoration: const InputDecoration(
         labelText: 'Challenge Type *',
+        labelStyle: TextStyle(color: Colors.black),
         border: OutlineInputBorder(),
       ),
       items: const [
@@ -230,7 +217,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _targetValueController,
       decoration: InputDecoration(
         labelText: 'Target Value *',
+        labelStyle: const TextStyle(color: Colors.black),
         hintText: _getTargetValueHint(),
+        hintStyle: TextStyle(color: Colors.grey[600]),
         errorText: hasError ? state.errors['targetValue'] : null,
         border: const OutlineInputBorder(),
         suffixText: _getTargetValueUnit(),
@@ -256,7 +245,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _timeframeController,
       decoration: InputDecoration(
         labelText: 'Timeframe (Days) *',
+        labelStyle: const TextStyle(color: Colors.black),
         hintText: 'How long will this duel last?',
+        hintStyle: TextStyle(color: Colors.grey[600]),
         errorText: hasError ? state.errors['timeframeHours'] : null,
         border: const OutlineInputBorder(),
         suffixText: 'days',
@@ -283,7 +274,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _maxParticipantsController,
       decoration: InputDecoration(
         labelText: 'Maximum Participants',
+        labelStyle: const TextStyle(color: Colors.black),
         hintText: 'e.g., 10',
+        hintStyle: TextStyle(color: Colors.grey[600]),
         errorText: hasError ? state.errors['maxParticipants'] : null,
         border: const OutlineInputBorder(),
         suffixText: 'people',
@@ -313,7 +306,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _minParticipantsController,
       decoration: InputDecoration(
         labelText: 'Minimum Participants to Start',
+        labelStyle: const TextStyle(color: Colors.black),
         hintText: 'e.g., 2',
+        hintStyle: TextStyle(color: Colors.grey[600]),
         errorText: hasError ? state.errors['minParticipants'] : null,
         border: const OutlineInputBorder(),
         suffixText: 'people',
@@ -346,16 +341,17 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       children: [
         const Text(
           'Start Mode',
-          style: TextStyle(fontSize: 16),
+          style: TextStyle(fontSize: 16, color: Colors.black),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: RadioListTile<String>(
-                title: const Text('Auto Start'),
+                title: const Text('Auto Start', style: TextStyle(fontSize: 14)),
                 value: 'auto',
                 groupValue: _startMode,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                 onChanged: (value) {
                   setState(() {
                     _startMode = value!;
@@ -365,9 +361,10 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
             ),
             Expanded(
               child: RadioListTile<String>(
-                title: const Text('Manual Start'),
+                title: const Text('Manual Start', style: TextStyle(fontSize: 14)),
                 value: 'manual',
                 groupValue: _startMode,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                 onChanged: (value) {
                   setState(() {
                     _startMode = value!;
@@ -471,7 +468,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     return ElevatedButton(
       onPressed: isLoading ? null : _submitForm,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(
