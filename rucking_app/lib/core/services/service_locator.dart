@@ -111,8 +111,8 @@ Future<void> setupServiceLocator() async {
   // Register TerrainService
   getIt.registerSingleton<TerrainService>(TerrainService());
   
-  // Register TerrainTracker
-  getIt.registerSingleton<TerrainTracker>(TerrainTracker(getIt<TerrainService>()));
+  // Register TerrainTracker  
+  getIt.registerSingleton<TerrainTracker>(TerrainTracker());
   
   // Repositories
   getIt.registerSingleton<AuthRepository>(
