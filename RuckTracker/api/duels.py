@@ -120,15 +120,38 @@ class DuelListResource(Resource):
                 participants_query = supabase.table('duel_participants').select('*').eq('duel_id', duel['id']).neq('status', 'withdrawn').order('current_value', desc=True)
                 participants_response = participants_query.execute()
                 
-                # Get user info for each participant
+                # Enrich participants with user info (username, email, avatar_url)
                 enriched_participants = []
                 for participant in participants_response.data:
-                    user_query = supabase.table('user').select('username, email').eq('id', participant['user_id'])
+                    user_query = supabase.table('user').select('username, email, avatar_url').eq('id', participant['user_id'])
                     user_response = user_query.execute()
                     if user_response.data:
                         participant_data = dict(participant)
-                        participant_data['username'] = user_response.data[0]['username']
-                        participant_data['email'] = user_response.data[0]['email']
+                        user_data = user_response.data[0]
+                        participant_data['username'] = user_data['username']
+                        participant_data['email'] = user_data['email']
+                        participant_data['avatar_url'] = user_data.get('avatar_url')
+                        
+                        # Set role based on whether this participant is the creator
+                        if participant['user_id'] == duel['creator_id']:
+                            participant_data['role'] = 'Creator'
+                        else:
+                            participant_data['role'] = 'Participant'
+                        
+                        enriched_participants.append(participant_data)
+                    else:
+                        # Fallback if user not found
+                        participant_data = dict(participant)
+                        participant_data['username'] = 'Unknown User'
+                        participant_data['email'] = None
+                        participant_data['avatar_url'] = None
+                        
+                        # Set role based on whether this participant is the creator
+                        if participant['user_id'] == duel['creator_id']:
+                            participant_data['role'] = 'Creator'
+                        else:
+                            participant_data['role'] = 'Participant'
+                        
                         enriched_participants.append(participant_data)
                 
                 duel_data = dict(duel)
@@ -272,6 +295,13 @@ class DuelResource(Resource):
                     participant_data['username'] = user_data['username']
                     participant_data['email'] = user_data['email']
                     participant_data['avatar_url'] = user_data.get('avatar_url')
+                    
+                    # Set role based on whether this participant is the creator
+                    if participant['user_id'] == duel['creator_id']:
+                        participant_data['role'] = 'Creator'
+                    else:
+                        participant_data['role'] = 'Participant'
+                    
                     enriched_participants.append(participant_data)
                 else:
                     # Fallback if user not found
@@ -279,6 +309,13 @@ class DuelResource(Resource):
                     participant_data['username'] = 'Unknown User'
                     participant_data['email'] = None
                     participant_data['avatar_url'] = None
+                    
+                    # Set role based on whether this participant is the creator
+                    if participant['user_id'] == duel['creator_id']:
+                        participant_data['role'] = 'Creator'
+                    else:
+                        participant_data['role'] = 'Participant'
+                    
                     enriched_participants.append(participant_data)
             
             result = dict(duel)

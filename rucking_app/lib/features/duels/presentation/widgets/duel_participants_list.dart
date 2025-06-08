@@ -313,10 +313,7 @@ class DuelParticipantsList extends StatelessWidget {
   }
 
   String _getParticipantSubtitle(DuelParticipant participant) {
-    if (participant.id == duel.creatorId) {
-      return 'Duel Creator';
-    }
-    return 'Participant';
+    return participant.role ?? 'Participant';
   }
 
   String _getUnit() {

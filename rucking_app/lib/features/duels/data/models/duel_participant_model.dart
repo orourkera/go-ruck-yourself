@@ -16,6 +16,7 @@ class DuelParticipantModel extends DuelParticipant {
     required super.updatedAt,
     super.rank,
     super.targetReached,
+    super.role,
   });
 
   factory DuelParticipantModel.fromJson(Map<String, dynamic> json) {
@@ -40,6 +41,7 @@ class DuelParticipantModel extends DuelParticipant {
         updatedAt: DateTime.parse(json['updated_at'] as String),
         rank: json['rank'] as int?,
         targetReached: json['target_reached'] as bool?,
+        role: json['role']?.toString(),
       );
     } catch (e, stackTrace) {
       print('[ERROR] DuelParticipantModel.fromJson failed: $e');
@@ -65,6 +67,7 @@ class DuelParticipantModel extends DuelParticipant {
       'updated_at': updatedAt.toIso8601String(),
       'rank': rank,
       'target_reached': targetReached,
+      'role': role,
     };
   }
 
@@ -84,6 +87,7 @@ class DuelParticipantModel extends DuelParticipant {
     DateTime? updatedAt,
     int? rank,
     bool? targetReached,
+    String? role,
   }) {
     return DuelParticipantModel(
       id: id ?? this.id,
@@ -100,6 +104,7 @@ class DuelParticipantModel extends DuelParticipant {
       updatedAt: updatedAt ?? this.updatedAt,
       rank: rank ?? this.rank,
       targetReached: targetReached ?? this.targetReached,
+      role: role ?? this.role,
     );
   }
 
@@ -121,5 +126,6 @@ class DuelParticipantModel extends DuelParticipant {
         updatedAt,
         rank,
         targetReached,
+        role,
       ];
 }
