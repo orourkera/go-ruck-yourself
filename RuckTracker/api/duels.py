@@ -116,8 +116,8 @@ class DuelListResource(Resource):
                 creator_response = creator_query.execute()
                 creator_username = creator_response.data[0]['username'] if creator_response.data else 'Unknown'
                 
-                # Get participants for this duel
-                participants_query = supabase.table('duel_participants').select('*').eq('duel_id', duel['id']).order('current_value', desc=True)
+                # Get participants for this duel (exclude withdrawn)
+                participants_query = supabase.table('duel_participants').select('*').eq('duel_id', duel['id']).neq('status', 'withdrawn').order('current_value', desc=True)
                 participants_response = participants_query.execute()
                 
                 # Get user info for each participant
@@ -257,8 +257,8 @@ class DuelResource(Resource):
             if not duel:
                 return {'error': 'Duel not found'}, 404
             
-            # Get participants with user info and progress
-            participants_response = supabase.table('duel_participants').select('*').eq('duel_id', duel_id).order('current_value', desc=True).execute()
+            # Get participants with user info and progress (exclude withdrawn)
+            participants_response = supabase.table('duel_participants').select('*').eq('duel_id', duel_id).neq('status', 'withdrawn').order('current_value', desc=True).execute()
             participants = participants_response.data
             
             # Enrich participants with user info (username, email, avatar_url)
