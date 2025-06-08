@@ -10,13 +10,10 @@ class DuelInfoCard extends StatelessWidget {
   final String currentUserId;
   final VoidCallback? onJoin;
   final VoidCallback? onStartDuel;
-  final VoidCallback? onWithdraw;
   final bool isJoining;
   final bool isStarting;
-  final bool isWithdrawing;
   final bool showJoinButton;
   final bool showStartButton;
-  final bool showWithdrawButton;
 
   const DuelInfoCard({
     super.key,
@@ -25,13 +22,10 @@ class DuelInfoCard extends StatelessWidget {
     required this.currentUserId,
     this.onJoin,
     this.onStartDuel,
-    this.onWithdraw,
     this.isJoining = false,
     this.isStarting = false,
-    this.isWithdrawing = false,
     this.showJoinButton = false,
     this.showStartButton = false,
-    this.showWithdrawButton = false,
   });
 
   @override
@@ -73,10 +67,6 @@ class DuelInfoCard extends StatelessWidget {
               if (onJoin != null && showJoinButton) ...[
                 const SizedBox(height: 16),
                 _buildJoinButton(),
-              ],
-              if (onWithdraw != null && showWithdrawButton) ...[
-                const SizedBox(height: 16),
-                _buildWithdrawButton(),
               ],
             ],
           ),
@@ -335,39 +325,6 @@ class DuelInfoCard extends StatelessWidget {
               )
             : const Text(
                 'Start Duel',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildWithdrawButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isWithdrawing ? null : onWithdraw,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: isWithdrawing
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Text(
-                'Withdraw',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,

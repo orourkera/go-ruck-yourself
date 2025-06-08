@@ -82,7 +82,7 @@ class HowDuelsWork extends StatelessWidget {
             number: 3,
             icon: Icons.flag,
             title: 'Duel Endings',
-            description: 'The Duel will end either when there is a winner, when all participants finish or when the time window ends.',
+            description: 'The Duel will end when all participants finish or the time window ends.',
             color: Colors.green,
           ),
           
@@ -92,6 +92,18 @@ class HowDuelsWork extends StatelessWidget {
           _buildRule(
             context,
             number: 4,
+            icon: Icons.emoji_events,
+            title: 'Winner Selection',
+            description: 'The winner is the person who hits the goal in the least amount of time. If no one achieves the goal, no winner is achieved and we\'re all a little sad about it.',
+            color: Colors.purple,
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Rule 5
+          _buildRule(
+            context,
+            number: 5,
             icon: Icons.block,
             title: 'No Withdrawals',
             description: 'You cannot withdraw from a Duel once it starts. Ruckers finish what they start.',
