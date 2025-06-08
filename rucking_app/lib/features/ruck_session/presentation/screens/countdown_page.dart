@@ -17,6 +17,8 @@ import 'package:rucking_app/features/ruck_session/domain/services/split_tracking
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/core/services/connectivity_service.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// A dedicated countdown page that shows a countdown before starting a ruck session
 /// This avoids showing any map or loading screens before the session is ready
@@ -69,19 +71,12 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       terrainTracker: locator<TerrainTracker>(),
       sessionRepository: locator<SessionRepository>(),
       activeSessionStorage: locator<ActiveSessionStorage>(),
+      connectivityService: locator<ConnectivityService>(),
     );
     
     // Start countdown after a brief delay to ensure screen is visible
     Future.delayed(const Duration(milliseconds: 200), () {
       _startCountdown();
-      
-      // Start session initialization in the background while countdown runs
-      _sessionBloc.add(SessionStarted(
-        ruckWeightKg: widget.args.ruckWeight,
-        userWeightKg: widget.args.userWeightKg,
-        notes: widget.args.notes ?? '',
-        plannedDuration: widget.args.plannedDuration,
-      ));
     });
   }
 
@@ -108,6 +103,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
           _blocSubscription = _sessionBloc.stream.listen((state) {
             if (state is ActiveSessionRunning && mounted) {
               // Session is now running - mark as ready
+              AppLogger.debug('[COUNTDOWN] ActiveSessionRunning state received - setting isLoading=false');
               setState(() {
                 _isLoading = false;
               });
@@ -129,6 +125,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
         _controller.forward(from: 0.0);
       } else {
         // Final countdown animation
+        AppLogger.debug('[COUNTDOWN] Countdown completed');
         setState(() {
           _countdownComplete = true;
         });
@@ -150,12 +147,17 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     // Try to fetch the user's last known location quickly
     try {
       final locationService = GetIt.instance<LocationService>();
-      final last = await locationService.getCurrentLocation();
+      // Add timeout to prevent hanging
+      final last = await locationService.getCurrentLocation().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => null,
+      );
       if (last != null) {
         _initialCenter = latlong.LatLng(last.latitude, last.longitude);
       }
-    } catch (_) {
+    } catch (e) {
       // Silent failure – fallback to default center in ActiveSessionPage
+      AppLogger.debug('[COUNTDOWN] Location fetch failed: $e');
     }
     
     // Simulate resource loading with a minimum delay so the countdown animation isn't cut short
@@ -164,6 +166,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     setState(() {
       _preloadComplete = true;
     });
+    AppLogger.debug('[COUNTDOWN] Preload complete');
     _checkAndNavigateIfReady();
   }
   
@@ -172,7 +175,11 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     // 1. Countdown is complete
     // 2. Preloading has finished
     // 3. Session state is ready
+    AppLogger.debug('[COUNTDOWN] Navigation check: countdownComplete=$_countdownComplete, preloadComplete=$_preloadComplete, isLoading=$_isLoading, mounted=$mounted');
+    
     if (_countdownComplete && _preloadComplete && !_isLoading && mounted) {
+      AppLogger.debug('[COUNTDOWN] All conditions met - navigating to ActiveSessionPage');
+      
       // Start the session timer before navigating
       _sessionBloc.add(TimerStarted());
 

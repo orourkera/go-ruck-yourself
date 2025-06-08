@@ -36,6 +36,7 @@ import 'package:rucking_app/features/duels/di/duels_injection_container.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
+import 'package:rucking_app/core/services/connectivity_service.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -114,6 +115,9 @@ Future<void> setupServiceLocator() async {
   // Register TerrainTracker  
   getIt.registerSingleton<TerrainTracker>(TerrainTracker());
   
+  // Register ConnectivityService
+  getIt.registerSingleton<ConnectivityService>(ConnectivityServiceImpl());
+  
   // Repositories
   getIt.registerSingleton<AuthRepository>(
     AuthRepositoryImpl(getIt<AuthService>())
@@ -149,6 +153,7 @@ Future<void> setupServiceLocator() async {
         sessionRepository: getIt<SessionRepository>(),
         activeSessionStorage: getIt<ActiveSessionStorage>(),
         terrainTracker: getIt<TerrainTracker>(),
+        connectivityService: getIt<ConnectivityService>(),
       ));
       
   // Register session bloc for operations like delete

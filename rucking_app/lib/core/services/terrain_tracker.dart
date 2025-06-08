@@ -6,8 +6,8 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Service for tracking terrain during an active session
 class TerrainTracker {
-  static const double _minSegmentDistanceKm = 0.1; // Only query terrain every 100m
-  static const Duration _queryThrottle = Duration(seconds: 30); // Throttle API calls
+  static const double _minSegmentDistanceKm = 0.01; // Only query terrain every 10m (reduced for testing)
+  static const Duration _queryThrottle = Duration(seconds: 5); // Throttle API calls (reduced for testing)
   
   LocationPoint? _lastTerrainQueryLocation;
   DateTime? _lastQueryTime;

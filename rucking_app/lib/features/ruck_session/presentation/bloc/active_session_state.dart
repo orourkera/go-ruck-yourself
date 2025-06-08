@@ -78,6 +78,7 @@ class ActiveSessionRunning extends ActiveSessionState {
   final DateTime? currentPauseStartTimeUtc; // Tracks when the current pause began
   final List<HeartRateSample> heartRateSamples;
   final bool isGpsReady; // Flag to indicate if GPS has acquired the first point
+  final bool hasGpsAccess; // Flag to indicate if GPS permission/access is available
   final List<RuckPhoto> photos;
   final bool isPhotosLoading;
   final String? photosError;
@@ -142,6 +143,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     this.maxHeartRate,
     this.validationMessage,
     this.isGpsReady = false, // Default to false
+    this.hasGpsAccess = false, // Default to false
   });
   
   @override
@@ -172,6 +174,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     currentPauseStartTimeUtc,
     heartRateSamples,
     isGpsReady, // Add to props
+    hasGpsAccess, // Add to props
     photos,
     isPhotosLoading,
     photosError,
@@ -233,6 +236,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     DateTime? currentPauseStartTimeUtc,
     bool clearCurrentPauseStartTimeUtc = false,
     bool? isGpsReady, // Add to copyWith parameters
+    bool? hasGpsAccess, // Add to copyWith parameters
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -274,6 +278,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       totalPausedDuration: totalPausedDuration ?? this.totalPausedDuration,
       currentPauseStartTimeUtc: clearCurrentPauseStartTimeUtc ? null : currentPauseStartTimeUtc ?? this.currentPauseStartTimeUtc,
       isGpsReady: isGpsReady ?? this.isGpsReady, // Use in copyWith
+      hasGpsAccess: hasGpsAccess ?? this.hasGpsAccess, // Use in copyWith
     );
   }
 }
