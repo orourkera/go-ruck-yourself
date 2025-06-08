@@ -34,6 +34,8 @@ import 'package:rucking_app/features/achievements/di/achievement_injection_conta
 import 'package:rucking_app/features/premium/di/premium_injection_container.dart';
 import 'package:rucking_app/features/duels/di/duels_injection_container.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
+import 'package:rucking_app/core/services/terrain_service.dart';
+import 'package:rucking_app/core/services/terrain_tracker.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -106,6 +108,12 @@ Future<void> setupServiceLocator() async {
     SplitTrackingService(watchService: getIt<WatchService>()),
   );
   
+  // Register TerrainService
+  getIt.registerSingleton<TerrainService>(TerrainService());
+  
+  // Register TerrainTracker
+  getIt.registerSingleton<TerrainTracker>(TerrainTracker(getIt<TerrainService>()));
+  
   // Repositories
   getIt.registerSingleton<AuthRepository>(
     AuthRepositoryImpl(getIt<AuthService>())
@@ -140,6 +148,7 @@ Future<void> setupServiceLocator() async {
         splitTrackingService: getIt<SplitTrackingService>(),
         sessionRepository: getIt<SessionRepository>(),
         activeSessionStorage: getIt<ActiveSessionStorage>(),
+        terrainTracker: getIt<TerrainTracker>(),
       ));
       
   // Register session bloc for operations like delete
