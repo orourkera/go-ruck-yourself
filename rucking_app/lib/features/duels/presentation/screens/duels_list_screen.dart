@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/service_locator.dart';
+import '../../data/models/duel_model.dart';
+import '../../domain/entities/duel.dart';
 import '../bloc/duel_list/duel_list_bloc.dart';
 import '../bloc/duel_list/duel_list_event.dart';
 import '../bloc/duel_list/duel_list_state.dart';
 import '../widgets/duel_card.dart';
 import '../widgets/duel_filter_sheet.dart';
+import '../widgets/how_duels_work.dart';
 import 'create_duel_screen.dart';
 import 'duel_detail_screen.dart';
 import 'duel_invitations_screen.dart';
@@ -81,7 +84,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
         ),
       ),
       body: DefaultTabController(
-        length: 2,
+        length: 3,
         child: Column(
           children: [
             _buildStatusTabs(),
@@ -92,6 +95,8 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
                   _buildDuelsView(isMyDuels: true),
                   // Discover Tab  
                   _buildDuelsView(isMyDuels: false),
+                  // How Duels Work Tab
+                  const HowDuelsWork(),
                 ],
               ),
             ),
@@ -112,7 +117,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
           if (index == 0) {
             // My Duels - show duels user is participating in
             context.read<DuelListBloc>().add(const LoadMyDuels());
-          } else {
+          } else if (index == 1) {
             // Discover - show duels available to join
             context.read<DuelListBloc>().add(const LoadDiscoverDuels());
           }
@@ -120,6 +125,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
         tabs: const [
           Tab(text: 'My Duels'),
           Tab(text: 'Discover'),
+          Tab(text: 'How Duels Work'),
         ],
       ),
     );
@@ -248,26 +254,34 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
       itemBuilder: (context, index) {
         final duel = state.duels[index];
         final isCurrentUserCreator = _currentUserId != null && duel.creatorId == _currentUserId;
+        final isCurrentUserParticipant = _isCurrentUserParticipant(duel);
         
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: DuelCard(
             duel: duel,
-            participants: [], // TODO: Get actual participants for this duel
-            showJoinButton: !isCurrentUserCreator,
+            participants: duel is DuelModel ? duel.participants : [],
+            showJoinButton: !isCurrentUserCreator && !isCurrentUserParticipant,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => DuelDetailScreen(duelId: duel.id),
               ),
             ),
-            onJoin: !isCurrentUserCreator ? () => context.read<DuelListBloc>().add(
+            onJoin: (!isCurrentUserCreator && !isCurrentUserParticipant) ? () => context.read<DuelListBloc>().add(
               JoinDuel(duelId: duel.id),
             ) : null,
           ),
         );
       },
     );
+  }
+
+  bool _isCurrentUserParticipant(Duel duel) {
+    if (duel is DuelModel) {
+      return duel.participants.any((participant) => participant.userId == _currentUserId);
+    }
+    return false;
   }
 
   void _showFiltersSheet(BuildContext context) {

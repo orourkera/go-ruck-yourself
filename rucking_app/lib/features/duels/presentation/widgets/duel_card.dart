@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
 
@@ -211,7 +212,10 @@ class DuelCard extends StatelessWidget {
           SizedBox(
             height: 38, // Increased from 32
             child: ElevatedButton(
-              onPressed: showJoinButton ? () => onJoin?.call() : null,
+              onPressed: showJoinButton ? () {
+                HapticFeedback.vibrate();
+                onJoin?.call();
+              } : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,

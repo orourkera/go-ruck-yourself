@@ -19,6 +19,7 @@ import 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
+import 'package:rucking_app/shared/widgets/user_avatar.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/widgets.dart';
@@ -524,26 +525,38 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Welcome back,',
-                                      style: AppTextStyles.bodyLarge.copyWith(
-                                        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
-                                      ),
+                              Row(
+                                children: [
+                                  // User avatar (only show if authenticated)
+                                  if (state is Authenticated) ...[
+                                    UserAvatar(
+                                      avatarUrl: state.user.avatarUrl,
+                                      username: userName,
+                                      size: 50,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      userName,
-                                      style: AppTextStyles.displayLarge.copyWith(
-                                        color: AppColors.textDark,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                    const SizedBox(width: 12),
                                   ],
-                                ),
+                                  // Welcome text
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Welcome back,',
+                                        style: AppTextStyles.bodyLarge.copyWith(
+                                          color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        userName,
+                                        style: AppTextStyles.displayLarge.copyWith(
+                                          color: AppColors.textDark,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                               // Notification bell with unread count
                               Transform.scale(

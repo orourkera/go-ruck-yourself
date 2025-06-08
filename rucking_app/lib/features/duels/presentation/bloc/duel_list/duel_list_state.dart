@@ -1,6 +1,12 @@
 import 'package:equatable/equatable.dart';
 import '../../../domain/entities/duel.dart';
 
+enum DuelListViewMode {
+  all,
+  myDuels,
+  discover,
+}
+
 abstract class DuelListState extends Equatable {
   const DuelListState();
 
@@ -18,6 +24,7 @@ class DuelListLoaded extends DuelListState {
   final String? activeChallengeType;
   final String? activeLocation;
   final bool hasFilters;
+  final DuelListViewMode viewMode;
 
   const DuelListLoaded({
     required this.duels,
@@ -25,6 +32,7 @@ class DuelListLoaded extends DuelListState {
     this.activeChallengeType,
     this.activeLocation,
     this.hasFilters = false,
+    this.viewMode = DuelListViewMode.all,
   });
 
   DuelListLoaded copyWith({
@@ -33,6 +41,7 @@ class DuelListLoaded extends DuelListState {
     String? activeChallengeType,
     String? activeLocation,
     bool? hasFilters,
+    DuelListViewMode? viewMode,
   }) {
     return DuelListLoaded(
       duels: duels ?? this.duels,
@@ -40,6 +49,7 @@ class DuelListLoaded extends DuelListState {
       activeChallengeType: activeChallengeType ?? this.activeChallengeType,
       activeLocation: activeLocation ?? this.activeLocation,
       hasFilters: hasFilters ?? this.hasFilters,
+      viewMode: viewMode ?? this.viewMode,
     );
   }
 
@@ -50,6 +60,7 @@ class DuelListLoaded extends DuelListState {
         activeChallengeType,
         activeLocation,
         hasFilters,
+        viewMode,
       ];
 }
 

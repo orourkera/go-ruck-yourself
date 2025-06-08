@@ -79,6 +79,16 @@ class LoadDuelComments extends DuelDetailEvent {
   List<Object> get props => [duelId];
 }
 
+// Session-related events
+class LoadDuelSessions extends DuelDetailEvent {
+  final String duelId;
+
+  const LoadDuelSessions({required this.duelId});
+
+  @override
+  List<Object> get props => [duelId];
+}
+
 class AddDuelComment extends DuelDetailEvent {
   final String duelId;
   final String content;

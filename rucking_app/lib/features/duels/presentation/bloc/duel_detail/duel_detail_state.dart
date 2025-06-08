@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import '../../../domain/entities/duel.dart';
 import '../../../domain/entities/duel_participant.dart';
 import '../../../domain/entities/duel_comment.dart';
+import '../../../domain/entities/duel_session.dart';
 
 abstract class DuelDetailState extends Equatable {
   const DuelDetailState();
@@ -16,37 +17,49 @@ class DuelDetailLoading extends DuelDetailState {}
 
 class DuelDetailLoaded extends DuelDetailState {
   final Duel duel;
+  final List<DuelParticipant> participants;
   final List<DuelParticipant> leaderboard;
   final bool isLeaderboardLoading;
   final List<DuelComment> comments;
   final bool canViewComments;
+  final List<DuelSession> sessions;
+  final bool isSessionsLoading;
 
   const DuelDetailLoaded({
     required this.duel,
+    this.participants = const [],
     this.leaderboard = const [],
     this.isLeaderboardLoading = false,
     this.comments = const [],
     this.canViewComments = true,
+    this.sessions = const [],
+    this.isSessionsLoading = false,
   });
 
   DuelDetailLoaded copyWith({
     Duel? duel,
+    List<DuelParticipant>? participants,
     List<DuelParticipant>? leaderboard,
     bool? isLeaderboardLoading,
     List<DuelComment>? comments,
     bool? canViewComments,
+    List<DuelSession>? sessions,
+    bool? isSessionsLoading,
   }) {
     return DuelDetailLoaded(
       duel: duel ?? this.duel,
+      participants: participants ?? this.participants,
       leaderboard: leaderboard ?? this.leaderboard,
       isLeaderboardLoading: isLeaderboardLoading ?? this.isLeaderboardLoading,
       comments: comments ?? this.comments,
       canViewComments: canViewComments ?? this.canViewComments,
+      sessions: sessions ?? this.sessions,
+      isSessionsLoading: isSessionsLoading ?? this.isSessionsLoading,
     );
   }
 
   @override
-  List<Object?> get props => [duel, leaderboard, isLeaderboardLoading, comments, canViewComments];
+  List<Object?> get props => [duel, participants, leaderboard, isLeaderboardLoading, comments, canViewComments, sessions, isSessionsLoading];
 }
 
 class DuelDetailError extends DuelDetailState {
