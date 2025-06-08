@@ -161,8 +161,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
               context: context,
               message: state.message,
             );
-            // Navigate back to duels home after successful withdrawal
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            // Navigate back to duels list after successful withdrawal
+            Navigator.of(context).pop();
           } else if (state is DuelWithdrawError) {
             StyledSnackBar.showError(
               context: context,
