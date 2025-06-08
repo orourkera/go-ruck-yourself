@@ -82,7 +82,7 @@ limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://",
+    storage_uri=os.environ.get('REDIS_URL', 'redis://localhost:6379'),
     strategy="fixed-window"
 )
 limiter.init_app(app)
