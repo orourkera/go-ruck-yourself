@@ -18,6 +18,7 @@ class TerrainTracker {
     
     // Throttle by time
     if (_lastQueryTime != null && now.difference(_lastQueryTime!) < _queryThrottle) {
+      AppLogger.debug('[TERRAIN_THROTTLE] Time throttled: ${now.difference(_lastQueryTime!).inSeconds}s < ${_queryThrottle.inSeconds}s');
       return false;
     }
     
@@ -25,10 +26,12 @@ class TerrainTracker {
     if (_lastTerrainQueryLocation != null) {
       final distance = _calculateDistance(_lastTerrainQueryLocation!, newLocation);
       if (distance < _minSegmentDistanceKm) {
+        AppLogger.debug('[TERRAIN_THROTTLE] Distance throttled: ${(distance * 1000).toStringAsFixed(1)}m < ${(_minSegmentDistanceKm * 1000).toStringAsFixed(1)}m');
         return false;
       }
     }
     
+    AppLogger.debug('[TERRAIN_THROTTLE] Query allowed - distance moved or first query');
     return true;
   }
   
