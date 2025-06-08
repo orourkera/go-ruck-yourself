@@ -12,10 +12,13 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/models/api_exception.dart';
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:rucking_app/core/services/terrain_service.dart';
+import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/config/app_config.dart';
@@ -50,6 +53,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final SessionRepository _sessionRepository;
   final SplitTrackingService _splitTrackingService;
   final ActiveSessionStorage _activeSessionStorage;
+  final TerrainTracker _terrainTracker;
 
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
@@ -87,6 +91,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required SplitTrackingService splitTrackingService,
     required SessionRepository sessionRepository,
     required ActiveSessionStorage activeSessionStorage,
+    required TerrainTracker terrainTracker,
     SessionValidationService? validationService,
   })  : _apiClient = apiClient,
         _locationService = locationService,
@@ -96,6 +101,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _splitTrackingService = splitTrackingService,
         _sessionRepository = sessionRepository,
         _activeSessionStorage = activeSessionStorage,
+        _terrainTracker = terrainTracker,
         _validationService = validationService ?? SessionValidationService(),
         super(ActiveSessionInitial()) {
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
@@ -219,6 +225,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         photos: const [],
         isPhotosLoading: false,
         splits: const [],
+        terrainSegments: const [],
       );
       emit(initialSessionState);
       AppLogger.debug('ActiveSessionRunning emitted for $sessionId');
@@ -304,6 +311,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       double newDistanceKm = currentState.distanceKm;
       double newElevationGain = currentState.elevationGain;
       double newElevationLoss = currentState.elevationLoss;
+      List<TerrainSegment> newTerrainSegments = List.from(currentState.terrainSegments);
 
       if (newLocationPoints.length > 1) {
         final prevPoint = newLocationPoints[newLocationPoints.length - 2];
@@ -317,6 +325,24 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         );
         newElevationGain += elevationResult['gain']!;
         newElevationLoss += elevationResult['loss']!;
+        
+        // Track terrain for this segment
+        if (_terrainTracker.shouldQueryTerrain(newPoint)) {
+          try {
+            final terrainSegment = await _terrainTracker.trackTerrainSegment(
+              startLocation: prevPoint,
+              endLocation: newPoint,
+            );
+            
+            if (terrainSegment != null) {
+              newTerrainSegments.add(terrainSegment);
+              AppLogger.debug('[TERRAIN] Added terrain segment: ${terrainSegment.surfaceType} (${terrainSegment.energyMultiplier}x)');
+            }
+          } catch (e) {
+            AppLogger.warning('[TERRAIN] Failed to track terrain segment: $e');
+            // Continue without terrain data - session continues normally
+          }
+        }
       }
       
       _splitTrackingService.checkForMilestone(
@@ -343,6 +369,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elevationLoss: newElevationLoss,
         isGpsReady: _validLocationCount > 5,
         splits: _splitTrackingService.getSplits(),
+        terrainSegments: newTerrainSegments,
       ));
     }
   }
@@ -413,6 +440,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Check if auth state is Authenticated before accessing user property
       double userWeightKg = currentState.userWeightKg;
 
+      // Calculate terrain multiplier for more accurate calorie calculation
+      double terrainMultiplier = TerrainSegment.calculateWeightedTerrainMultiplier(currentState.terrainSegments);
+
+      // Enhanced MET calculation with elevation data
+      double avgGrade = 0.0;
+      if (currentState.distanceKm > 0) {
+        avgGrade = MetCalculator.calculateGrade(
+          elevationChangeMeters: currentState.elevationGain - currentState.elevationLoss,
+          distanceMeters: currentState.distanceKm * 1000,
+        );
+      }
+
       // Convert pace (seconds per km) to speed (km/h), then to mph for MetCalculator
       // Speed (km/h) = 60 / pace (seconds per km)
       double speedKmh = newPace != null && newPace > 0 ? (60 / newPace) : 0;
@@ -422,14 +461,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       double metValue = MetCalculator.calculateRuckingMetByGrade(
         speedMph: speedMph,
-        grade: 0, // Assuming flat ground if no grade info available
+        grade: avgGrade, // Use calculated grade instead of assuming flat ground
         ruckWeightLbs: ruckWeightLbs,
       );
 
-      // Calculate calories per minute using the standard MET formula
-      // MET formula: Calories = MET value × Weight (kg) × Duration (hours)
-      // For calories per minute: Calories = MET value × Weight (kg) / 60
-      double caloriesPerMinute = metValue * (userWeightKg + currentState.ruckWeightKg) / 60;
+      // Calculate calories per minute using enhanced MET formula with terrain
+      // MET formula: Calories = MET value × Weight (kg) × Duration (hours) × Terrain Multiplier
+      // For calories per minute: Calories = MET value × Weight (kg) × Terrain Multiplier / 60
+      double caloriesPerMinute = metValue * (userWeightKg + currentState.ruckWeightKg) * terrainMultiplier / 60;
       double newCalories = currentState.calories + (caloriesPerMinute / 60.0);
 
       // Duration is now tracked via checkForMilestone instead of updateDuration
@@ -592,20 +631,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final authState = GetIt.I<AuthBloc>().state;
         final User? currentUser = authState is Authenticated ? authState.user : null;
         final double userWeightKg = currentUser?.weightKg ?? 70.0;
-        // Convert km/h to mph for MetCalculator
-        double speedMph = MetCalculator.kmhToMph(currentState.pace != null && currentState.pace! > 0 ? (60 / currentState.pace!) : 0);
-        // Convert kg to lbs for rucksack weight
-        double ruckWeightLbs = currentState.ruckWeightKg * 2.20462;
-
-        final double metValue = MetCalculator.calculateRuckingMetByGrade(
-            speedMph: speedMph,
-            grade: 0, // Assuming flat ground if no grade info available
-            ruckWeightLbs: ruckWeightLbs,
+        
+        // Calculate final terrain multiplier and stats
+        final double terrainMultiplier = TerrainSegment.calculateWeightedTerrainMultiplier(currentState.terrainSegments);
+        final Map<String, dynamic> terrainStats = TerrainSegment.getTerrainStats(currentState.terrainSegments);
+        
+        // Enhanced calorie calculation using the MetCalculator with terrain support
+        final double finalCalories = MetCalculator.calculateRuckingCalories(
+          userWeightKg: userWeightKg,
+          ruckWeightKg: currentState.ruckWeightKg,
+          distanceKm: finalDistanceKm,
+          elapsedSeconds: finalDurationSeconds,
+          elevationGain: currentState.elevationGain,
+          elevationLoss: currentState.elevationLoss,
+          gender: currentUser?.gender,
+          terrainMultiplier: terrainMultiplier,
         );
-
-        // Calculate calories per minute using the standard MET formula
-        final double caloriesPerMinute = metValue * (userWeightKg + currentState.ruckWeightKg) / 60;
-        final double finalCalories = (caloriesPerMinute / 60.0) * finalDurationSeconds;
 
         int? avgHeartRate;
         if (_allHeartRateSamples.isNotEmpty) {
@@ -626,6 +667,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           'max_heart_rate': _maxHeartRate,
           'session_photos': currentState.photos.map((p) => p.id).toList(),
           'splits': _splitTrackingService.getSplits(), // Already a List<Map<String, dynamic>>
+          'terrain_stats': terrainStats, // Include terrain stats in payload
           'is_public': currentUser?.allowRuckSharing ?? false, // Share based on user preference
         };
         
@@ -1305,7 +1347,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _allHeartRateSamples.addAll(heartRateSamples);
       _latestHeartRate = recoveredData['latest_heart_rate'] as int?;
       _minHeartRate = recoveredData['min_heart_rate'] as int?;
-      _maxHeartRate = recoveredData['max_heart_rate'] as int?;
+      _maxHeartRate = recoveredData['max_heartRate'] as int?;
       
       // Reset heart rate throttling timers for fresh session
       _lastSavedHeartRateTime = null;
@@ -1339,6 +1381,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         minHeartRate: _minHeartRate,
         maxHeartRate: _maxHeartRate,
         splits: [], // Will be recalculated if needed
+        terrainSegments: [], // Will be recalculated if needed
       );
 
       emit(recoveredState);

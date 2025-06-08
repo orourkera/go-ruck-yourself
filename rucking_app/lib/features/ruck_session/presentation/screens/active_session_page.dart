@@ -27,6 +27,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/session_split.da
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/terrain_info_widget.dart';
 
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
@@ -129,6 +130,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   bool mapReady = false;
   bool sessionRunning = false;
   bool uiInitialized = false;
+  bool _terrainExpanded = false;
 
   void _checkAnimateOverlay() {
     // No animation needed anymore since we removed the gray overlay
@@ -696,16 +698,30 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
         // Stats area or spinner below the map
         Expanded(
           flex: 1,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-            child: state is ActiveSessionRunning
-                ? SessionStatsOverlay(
-                    state: state as ActiveSessionRunning,
-                    preferMetric: preferMetric,
-                    useCardLayout: true,
-                  )
-                : const Center(child: CircularProgressIndicator()),
-          ),
+          child: state is ActiveSessionRunning
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                  child: Column(
+                    children: [
+                      SessionStatsOverlay(
+                        state: state as ActiveSessionRunning,
+                        preferMetric: preferMetric,
+                        useCardLayout: true,
+                      ),
+                      const SizedBox(height: 8),
+                      TerrainInfoWidget(
+                        terrainSegments: (state as ActiveSessionRunning).terrainSegments,
+                        isExpanded: _terrainExpanded,
+                        onToggle: () {
+                          setState(() {
+                            _terrainExpanded = !_terrainExpanded;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                )
+              : const Center(child: CircularProgressIndicator()),
         ),
       ],
     );

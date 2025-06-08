@@ -137,7 +137,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
     try {
-      final repo = context.read<SessionRepository>();
+      final repo = GetIt.instance<SessionRepository>();
       final fullSession = await repo.fetchSessionById(session.id!);
       Navigator.of(context).pop(); // Remove loading dialog
       if (fullSession != null) {

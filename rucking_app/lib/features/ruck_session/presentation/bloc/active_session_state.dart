@@ -94,6 +94,9 @@ class ActiveSessionRunning extends ActiveSessionState {
   
   // Split tracking
   final List<dynamic> splits;
+  
+  // Terrain tracking
+  final List<TerrainSegment> terrainSegments;
 
   static const _unset = Object();
 
@@ -131,6 +134,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     this.isDeleting = false,
     this.deleteError,
     this.splits = const [],
+    this.terrainSegments = const [], // Add default value
     this.currentPauseStartTimeUtc,
     this.notes,
     this.latestHeartRate,
@@ -181,6 +185,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     deleteError,
     // Split tracking
     splits,
+    terrainSegments, // Add to props
   ];
   
   ActiveSessionRunning copyWith({
@@ -220,6 +225,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     String? deleteError,
     bool clearDeleteError = false,
     List<dynamic>? splits,
+    List<TerrainSegment>? terrainSegments, // Add to copyWith parameters
     String? validationMessage,
     bool clearValidationMessage = false,
     DateTime? originalSessionStartTimeUtc,
@@ -261,6 +267,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       isDeleting: isDeleting ?? this.isDeleting,
       deleteError: clearDeleteError ? null : (deleteError ?? this.deleteError),
       splits: splits ?? this.splits,
+      terrainSegments: terrainSegments ?? this.terrainSegments, // Use in copyWith
       validationMessage: clearValidationMessage ? null : (validationMessage ?? this.validationMessage),
       plannedDuration: plannedDuration ?? this.plannedDuration,
       originalSessionStartTimeUtc: originalSessionStartTimeUtc ?? this.originalSessionStartTimeUtc,
