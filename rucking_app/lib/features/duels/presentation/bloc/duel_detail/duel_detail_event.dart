@@ -69,6 +69,15 @@ class StartDuelManually extends DuelDetailEvent {
   List<Object> get props => [duelId];
 }
 
+class WithdrawFromDuel extends DuelDetailEvent {
+  final String duelId;
+
+  const WithdrawFromDuel({required this.duelId});
+
+  @override
+  List<Object> get props => [duelId];
+}
+
 // Comment-related events
 class LoadDuelComments extends DuelDetailEvent {
   final String duelId;

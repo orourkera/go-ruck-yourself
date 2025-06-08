@@ -175,3 +175,38 @@ class DuelStartError extends DuelDetailState {
   @override
   List<Object> get props => [duelId, message];
 }
+
+class DuelWithdrawing extends DuelDetailState {
+  final String duelId;
+
+  const DuelWithdrawing({required this.duelId});
+
+  @override
+  List<Object> get props => [duelId];
+}
+
+class DuelWithdrawn extends DuelDetailState {
+  final String duelId;
+  final String message;
+
+  const DuelWithdrawn({
+    required this.duelId,
+    this.message = 'Successfully withdrawn from duel!',
+  });
+
+  @override
+  List<Object> get props => [duelId, message];
+}
+
+class DuelWithdrawError extends DuelDetailState {
+  final String duelId;
+  final String message;
+
+  const DuelWithdrawError({
+    required this.duelId,
+    required this.message,
+  });
+
+  @override
+  List<Object> get props => [duelId, message];
+}

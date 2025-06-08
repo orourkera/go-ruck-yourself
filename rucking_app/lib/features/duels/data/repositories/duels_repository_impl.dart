@@ -6,6 +6,7 @@ import '../../domain/entities/duel_participant.dart';
 import '../../domain/entities/duel_stats.dart';
 import '../../domain/entities/duel_invitation.dart';
 import '../../domain/entities/duel_comment.dart';
+import '../../domain/entities/duel_session.dart';
 import '../../domain/repositories/duels_repository.dart';
 import '../datasources/duels_remote_datasource.dart';
 import '../models/duel_comment_model.dart';
@@ -370,6 +371,34 @@ class DuelsRepositoryImpl implements DuelsRepository {
       return Left(ServerFailure(message: e.message));
     } catch (e) {
       return Left(ServerFailure(message: 'Failed to start duel'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> withdrawFromDuel(String duelId) async {
+    try {
+      // TODO: Implement actual withdraw functionality in remote data source
+      // For now, return success - this would need to be implemented in the backend
+      await Future.delayed(const Duration(milliseconds: 500)); // Simulate network call
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to withdraw from duel'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<DuelSession>>> getDuelSessions(String duelId) async {
+    try {
+      // TODO: Implement actual duel sessions functionality in remote data source
+      // For now, return empty list - this would need to be implemented in the backend
+      await Future.delayed(const Duration(milliseconds: 300)); // Simulate network call
+      return const Right([]);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to fetch duel sessions'));
     }
   }
 }

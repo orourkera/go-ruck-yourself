@@ -36,9 +36,9 @@ class _DuelRuckSessionsListState extends State<DuelRuckSessionsList> {
 
   bool _isDuelStarted() {
     // Check if duel has started based on its status or start date
-    return widget.duel.status == 'active' || 
-           (widget.duel.startDate != null && 
-            DateTime.now().isAfter(widget.duel.startDate!));
+    return widget.duel.status == DuelStatus.active || 
+           (widget.duel.startsAt != null && 
+            DateTime.now().isAfter(widget.duel.startsAt!));
   }
 
   void _loadDuelRuckSessions() {
@@ -118,7 +118,7 @@ class _DuelRuckSessionsListState extends State<DuelRuckSessionsList> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                'Status: ${widget.duel.status.toUpperCase()}',
+                'Status: ${widget.duel.status.name.toUpperCase()}',
                 style: AppTextStyles.bodySmall.copyWith(
                   color: Theme.of(context).colorScheme.onSecondaryContainer,
                   fontWeight: FontWeight.bold,

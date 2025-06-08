@@ -93,6 +93,16 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
               context: context,
               message: state.message,
             );
+          } else if (state is DuelWithdrawn) {
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: state.message,
+            );
+          } else if (state is DuelWithdrawError) {
+            StyledSnackBar.showError(
+              context: context,
+              message: state.message,
+            );
           }
         },
         builder: (context, state) {
@@ -163,8 +173,18 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
                     StartDuelManually(duelId: widget.duelId),
                   )
                 : null,
+            showWithdrawButton: _canUserWithdraw(duel, participants),
+            onWithdraw: _canUserWithdraw(duel, participants)
+                ? () {
+                    HapticFeedback.vibrate();
+                    context.read<DuelDetailBloc>().add(
+                      WithdrawFromDuel(duelId: widget.duelId),
+                    );
+                  }
+                : null,
             isJoining: state is DuelJoiningFromDetail,
             isStarting: state is DuelStartingManually,
+            isWithdrawing: state is DuelWithdrawing,
           ),
           
           // Tabs
@@ -268,5 +288,30 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
     }
     
     return false;
+  }
+  
+  bool _canUserWithdraw(Duel duel, List<DuelParticipant> participants) {
+    // User can only withdraw if:
+    // 1. They are a participant (not the creator)
+    // 2. The duel hasn't started yet (status is pending)
+    // 3. They are in accepted status
+    
+    if (!_isUserParticipant(participants) || _isUserCreator(duel)) {
+      return false;
+    }
+    
+    if (duel.status != DuelStatus.pending) {
+      return false;
+    }
+    
+    final currentUserId = _getCurrentUserId();
+    if (currentUserId == null) return false;
+    
+    final userParticipant = participants.firstWhere(
+      (p) => p.userId == currentUserId,
+      orElse: () => throw StateError('User is participant but not found in list'),
+    );
+    
+    return userParticipant.status == DuelParticipantStatus.accepted;
   }
 }
