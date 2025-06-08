@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
@@ -73,16 +74,16 @@ class TerrainTracker {
   double _calculateDistance(LocationPoint start, LocationPoint end) {
     const double earthRadius = 6371; // km
     
-    final lat1Rad = start.latitude * (3.14159 / 180);
-    final lat2Rad = end.latitude * (3.14159 / 180);
-    final deltaLatRad = (end.latitude - start.latitude) * (3.14159 / 180);
-    final deltaLonRad = (end.longitude - start.longitude) * (3.14159 / 180);
+    final lat1Rad = start.latitude * (math.pi / 180);
+    final lat2Rad = end.latitude * (math.pi / 180);
+    final deltaLatRad = (end.latitude - start.latitude) * (math.pi / 180);
+    final deltaLonRad = (end.longitude - start.longitude) * (math.pi / 180);
     
-    final a = (deltaLatRad / 2).sin() * (deltaLatRad / 2).sin() +
-        lat1Rad.cos() * lat2Rad.cos() *
-        (deltaLonRad / 2).sin() * (deltaLonRad / 2).sin();
+    final a = math.sin(deltaLatRad / 2) * math.sin(deltaLatRad / 2) +
+        math.cos(lat1Rad) * math.cos(lat2Rad) *
+        math.sin(deltaLonRad / 2) * math.sin(deltaLonRad / 2);
     
-    final c = 2 * (a.sqrt()).asin();
+    final c = 2 * math.asin(math.sqrt(a));
     
     return earthRadius * c;
   }
