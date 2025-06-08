@@ -22,11 +22,16 @@ class DuelParticipantsList extends StatelessWidget {
 
     final sortedParticipants = List<DuelParticipant>.from(participants)
       ..sort((a, b) {
-        // Handle nullable joinedAt dates
-        if (a.joinedAt == null && b.joinedAt == null) return 0;
-        if (a.joinedAt == null) return 1; // nulls last
-        if (b.joinedAt == null) return -1; // nulls last
-        return a.joinedAt!.compareTo(b.joinedAt!);
+        // Sort by percentage achievement (highest first)
+        final aProgress = (a.currentValue / duel.targetValue).clamp(0.0, 1.0);
+        final bProgress = (b.currentValue / duel.targetValue).clamp(0.0, 1.0);
+        
+        // If progress is equal, sort by current value (higher wins)
+        if (aProgress == bProgress) {
+          return b.currentValue.compareTo(a.currentValue);
+        }
+        
+        return bProgress.compareTo(aProgress); // Descending order
       });
 
     return RefreshIndicator(
