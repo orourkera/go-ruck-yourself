@@ -22,6 +22,7 @@ class DuelParticipant extends Equatable {
   final DateTime updatedAt;
   final int? rank;
   final bool? targetReached;
+  final String? role; // 'Creator' or 'Participant'
 
   const DuelParticipant({
     required this.id,
@@ -38,6 +39,7 @@ class DuelParticipant extends Equatable {
     required this.updatedAt,
     this.rank,
     this.targetReached,
+    this.role,
   });
 
   // Utility getters
@@ -79,6 +81,7 @@ class DuelParticipant extends Equatable {
     DateTime? updatedAt,
     int? rank,
     bool? targetReached,
+    String? role,
   }) {
     return DuelParticipant(
       id: id ?? this.id,
@@ -95,6 +98,7 @@ class DuelParticipant extends Equatable {
       updatedAt: updatedAt ?? this.updatedAt,
       rank: rank ?? this.rank,
       targetReached: targetReached ?? this.targetReached,
+      role: role ?? this.role,
     );
   }
 
@@ -114,5 +118,6 @@ class DuelParticipant extends Equatable {
         updatedAt,
         rank,
         targetReached,
+        role,
       ];
 }
