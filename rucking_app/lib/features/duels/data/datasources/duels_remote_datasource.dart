@@ -56,6 +56,9 @@ abstract class DuelsRemoteDataSource {
   Future<DuelCommentModel> createDuelComment(String duelId, String content);
   Future<void> updateDuelComment(String duelId, String commentId, String content);
   Future<void> deleteDuelComment(String duelId, String commentId);
+  
+  // Withdrawal
+  Future<void> withdrawFromDuel(String duelId);
 }
 
 class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
@@ -357,6 +360,16 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     if (response.statusCode != 200) {
       final errorData = json.decode(response.body);
       throw ServerException(message: errorData['error'] ?? 'Failed to delete comment');
+    }
+  }
+
+  @override
+  Future<void> withdrawFromDuel(String duelId) async {
+    try {
+      await apiClient.post('/duels/$duelId/withdraw', {});
+      return;
+    } catch (e) {
+      rethrow;
     }
   }
 }

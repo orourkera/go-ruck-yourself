@@ -377,9 +377,7 @@ class DuelsRepositoryImpl implements DuelsRepository {
   @override
   Future<Either<Failure, void>> withdrawFromDuel(String duelId) async {
     try {
-      // TODO: Implement actual withdraw functionality in remote data source
-      // For now, return success - this would need to be implemented in the backend
-      await Future.delayed(const Duration(milliseconds: 500)); // Simulate network call
+      await remoteDataSource.withdrawFromDuel(duelId);
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
