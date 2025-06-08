@@ -28,19 +28,16 @@ class DuelDetailScreen extends StatefulWidget {
   State<DuelDetailScreen> createState() => _DuelDetailScreenState();
 }
 
-class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProviderStateMixin {
-  late TabController _tabController;
+class _DuelDetailScreenState extends State<DuelDetailScreen> {
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     context.read<DuelDetailBloc>().add(LoadDuelDetail(duelId: widget.duelId));
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -213,7 +210,20 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
 
   Widget _buildDuelDetailContent(DuelDetailLoaded state) {
     final duel = state.duel;
-    final participants = state.participants; // Use actual participants list
+    final participants = state.participants;
+    
+    // Sort participants by achievement percentage
+    final sortedParticipants = List<DuelParticipant>.from(participants)
+      ..sort((a, b) {
+        final aProgress = (a.currentValue / duel.targetValue).clamp(0.0, 1.0);
+        final bProgress = (b.currentValue / duel.targetValue).clamp(0.0, 1.0);
+        
+        if (aProgress == bProgress) {
+          return b.currentValue.compareTo(a.currentValue);
+        }
+        
+        return bProgress.compareTo(aProgress);
+      });
     
     return SingleChildScrollView(
       child: Column(
@@ -242,42 +252,143 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
             isStarting: state is DuelStartingManually,
           ),
           
-          // Tabs
+          // Leaderboard Section Header
           Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
             color: Theme.of(context).colorScheme.surface,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: Theme.of(context).colorScheme.primary,
-              unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
-              indicatorColor: Theme.of(context).colorScheme.secondary,
-              tabs: const [
-                Tab(text: 'Leaderboard'),
-                Tab(text: 'Ruck Sessions'),
-              ],
+            child: Text(
+              'Leaderboard',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           
-          // Tab Content
-          SizedBox(
-            height: 400, // Fixed height for TabBarView
-            child: TabBarView(
-              controller: _tabController,
-              physics: const NeverScrollableScrollPhysics(), // Prevent vertical scrolling inside tabs
-              children: [
-                // Leaderboard Tab (previously Participants)
-                DuelParticipantsList(
-                  duel: duel,
-                  participants: participants,
+          // Leaderboard List
+          ...sortedParticipants.asMap().entries.map((entry) {
+            final index = entry.key;
+            final participant = entry.value;
+            final progress = (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
+            final isCompleted = progress >= 1.0;
+            final isWinner = participant.id == duel.winnerId;
+            
+            return Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: index == 0 ? 8 : 4,
+              ),
+              child: Card(
+                elevation: isWinner ? 4 : 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: isWinner ? BorderSide(color: Colors.amber, width: 2) : BorderSide.none,
                 ),
-                
-                // Ruck Sessions Tab
-                DuelRuckSessionsList(
-                  duel: duel,
-                  participants: participants,
+                child: Container(
+                  decoration: isWinner
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.amber.withOpacity(0.1),
+                              Colors.orange.withOpacity(0.05),
+                            ],
+                          ),
+                        )
+                      : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          child: Text(
+                            '${index + 1}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      participant.username,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: isWinner ? FontWeight.bold : FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isWinner)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Text(
+                                        'WINNER',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              Text(
+                                participant.role ?? 'Participant',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: LinearProgressIndicator(
+                                      value: progress,
+                                      backgroundColor: Colors.grey[200],
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        isCompleted ? Colors.green : Theme.of(context).colorScheme.primary,
+                                      ),
+                                      minHeight: 6,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${(progress * 100).toInt()}%',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: isCompleted ? Colors.green : Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          }).toList(),
+          
           // Comments section
           DuelCommentsSection(duelId: duel.id),
         ],
