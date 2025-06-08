@@ -16,6 +16,7 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
+import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
@@ -104,6 +105,7 @@ class ActiveSessionPage extends StatelessWidget {
             sessionRepository: locator<SessionRepository>(),
             activeSessionStorage: locator<ActiveSessionStorage>(),
             terrainTracker: locator<TerrainTracker>(),
+            connectivityService: locator<ConnectivityService>(),
           ),
         ),
         BlocProvider(
@@ -705,21 +707,59 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                   padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
                   child: Column(
                     children: [
+                      // GPS Status Indicator
+                      if (state is ActiveSessionRunning && !state.hasGpsAccess)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            border: Border.all(color: Colors.orange, width: 1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_off, color: Colors.orange, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Offline Mode - No GPS tracking (perfect for indoor workouts or airplanes)',
+                                  style: TextStyle(
+                                    color: Colors.orange,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      () {
+                        print('[DEBUG] Building stats column children...');
+                        print('[DEBUG] State type: ${state.runtimeType}');
+                        print('[DEBUG] Terrain segments count: ${(state as ActiveSessionRunning).terrainSegments.length}');
+                        return Container();
+                      }(),
                       SessionStatsOverlay(
                         state: state as ActiveSessionRunning,
                         preferMetric: preferMetric,
                         useCardLayout: true,
                       ),
                       const SizedBox(height: 8),
-                      TerrainInfoWidget(
-                        terrainSegments: (state as ActiveSessionRunning).terrainSegments,
-                        isExpanded: _terrainExpanded,
-                        onToggle: () {
-                          setState(() {
-                            _terrainExpanded = !_terrainExpanded;
-                          });
-                        },
-                      ),
+                      () {
+                        print('[DEBUG] About to create TerrainInfoWidget...');
+                        print('[ACTIVE_SESSION] Building TerrainInfoWidget with ${(state as ActiveSessionRunning).terrainSegments.length} segments');
+                        return TerrainInfoWidget(
+                          terrainSegments: (state as ActiveSessionRunning).terrainSegments,
+                          isExpanded: _terrainExpanded,
+                          onToggle: () {
+                            setState(() {
+                              _terrainExpanded = !_terrainExpanded;
+                            });
+                          },
+                        );
+                      }(),
                     ],
                   ),
                 )

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
+import 'package:rucking_app/core/utils/app_logger.dart'; // Changed import statement
 
 class TerrainInfoWidget extends StatelessWidget {
   final List<TerrainSegment> terrainSegments;
@@ -16,7 +17,11 @@ class TerrainInfoWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('[TERRAIN_WIDGET] BUILD METHOD CALLED - ${terrainSegments.length} segments');
+    AppLogger.debug('[TERRAIN_WIDGET] Building with ${terrainSegments.length} terrain segments');
+    
     if (terrainSegments.isEmpty) {
+      AppLogger.debug('[TERRAIN_WIDGET] No terrain segments - hiding widget');
       return const SizedBox.shrink();
     }
 
@@ -24,6 +29,8 @@ class TerrainInfoWidget extends StatelessWidget {
     final terrainBreakdown = stats['terrainBreakdown'] as Map<String, double>;
     final weightedMultiplier = stats['weightedMultiplier'] as double;
     final totalDistance = stats['totalDistance'] as double;
+    
+    AppLogger.debug('[TERRAIN_WIDGET] Showing terrain data: ${terrainSegments.length} segments, ${totalDistance.toStringAsFixed(3)}km total');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

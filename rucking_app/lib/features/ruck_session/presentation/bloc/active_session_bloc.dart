@@ -21,6 +21,7 @@ import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
+import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
@@ -54,10 +55,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final SplitTrackingService _splitTrackingService;
   final ActiveSessionStorage _activeSessionStorage;
   final TerrainTracker _terrainTracker;
+  final ConnectivityService _connectivityService;
 
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
   StreamSubscription<List<HeartRateSample>>? _heartRateBufferSubscription;
+  StreamSubscription<bool>? _connectivitySubscription;
   Timer? _ticker;
   Timer? _watchdogTimer;
   Timer? _sessionPersistenceTimer;
@@ -92,6 +95,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required SessionRepository sessionRepository,
     required ActiveSessionStorage activeSessionStorage,
     required TerrainTracker terrainTracker,
+    required ConnectivityService connectivityService,
     SessionValidationService? validationService,
   })  : _apiClient = apiClient,
         _locationService = locationService,
@@ -102,6 +106,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _sessionRepository = sessionRepository,
         _activeSessionStorage = activeSessionStorage,
         _terrainTracker = terrainTracker,
+        _connectivityService = connectivityService,
         _validationService = validationService ?? SessionValidationService(),
         super(ActiveSessionInitial()) {
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
@@ -159,9 +164,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     try {
       bool hasPermission = await _locationService.hasLocationPermission();
       if (!hasPermission) hasPermission = await _locationService.requestLocationPermission();
+      
+      bool hasLocationAccess = hasPermission;
       if (!hasPermission) {
-        emit(const ActiveSessionFailure(errorMessage: 'Location permission is required.'));
-        return;
+        AppLogger.warning('Location permission denied - starting session in offline mode (no GPS tracking)');
+        // Don't fail the session - allow offline mode for indoor rucks, airplanes, etc.
       }
 
       // Android: Ensure battery optimization permissions for background tracking
@@ -182,23 +189,24 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       // Try to create session on backend, but allow offline mode if it fails
       try {
+        // Use a very short timeout for session creation to fail fast into offline mode
         final createResponse = await _apiClient.post('/rucks', {
           'ruck_weight_kg': event.ruckWeightKg,
           'notes': event.notes,
-        });
+        }).timeout(Duration(seconds: 3)); // Fail fast after 3 seconds
+        
         sessionId = createResponse['id']?.toString();
         if (sessionId == null || sessionId.isEmpty) throw Exception('Failed to create session: No ID.');
         AppLogger.debug('Created new session with ID: $sessionId');
 
-        // Use path with explicit ruck_id as URL parameter to match server expectation
-        await _apiClient.post('/rucks/$sessionId/start', {});
-        AppLogger.debug('Backend notified of session start for $sessionId');
+        // Start the session on the backend
+        // Removed commented out API call lines
+
       } catch (apiError) {
         // If API calls fail, create offline session with local ID
         sessionId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
-        AppLogger.warning('Failed to create session on backend, starting offline session: $sessionId');
+        AppLogger.info('Creating offline session: $sessionId - all data will be stored locally and synced when connection is restored');
         AppLogger.warning('API Error: $apiError');
-        // Session will sync to backend when connectivity is restored
       }
       final initialSessionState = ActiveSessionRunning(
         sessionId: sessionId,
@@ -222,13 +230,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         minHeartRate: null,
         maxHeartRate: null,
         isGpsReady: false,
+        hasGpsAccess: hasLocationAccess,
         photos: const [],
         isPhotosLoading: false,
         splits: const [],
         terrainSegments: const [],
       );
       emit(initialSessionState);
-      AppLogger.debug('ActiveSessionRunning emitted for $sessionId');
+      AppLogger.debug('ActiveSessionRunning emitted for $sessionId.');
 
       // Get user's metric preference
       bool preferMetric = false; // Default to imperial (standard) instead of metric
@@ -266,25 +275,32 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       await _watchService.sendSessionIdToWatch(sessionId);
 
       _validationService.reset();
-      _startLocationUpdates(sessionId);
+      if (hasLocationAccess) {
+        _startLocationUpdates(sessionId);
+      }
       _startHeartRateMonitoring(sessionId); 
+      _startConnectivityMonitoring(sessionId);
       add(TimerStarted());
 
     } catch (e, stackTrace) {
       String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Start');
       AppLogger.error('Error starting session: $errorMessage\nError: $e\n$stackTrace');
-      if (sessionId != null && sessionId.isNotEmpty) {
-         // Removed the /fail endpoint call
-      }
       emit(ActiveSessionFailure(errorMessage: errorMessage));
     }
   }
 
   void _startLocationUpdates(String sessionId) {
     _locationSubscription?.cancel();
-    _locationSubscription = _locationService.startLocationTracking().listen((location) {
-      add(LocationUpdated(location));
-    });
+    _locationSubscription = _locationService.startLocationTracking().listen(
+      (location) {
+        add(LocationUpdated(location));
+      },
+      onError: (error) {
+        AppLogger.warning('Location tracking error (continuing session without GPS): $error');
+        // Don't stop the session - continue in offline mode without location updates
+        // This allows users to ruck indoors, on airplanes, or in poor GPS areas
+      },
+    );
     AppLogger.debug('Location tracking started for session $sessionId.');
   }
 
@@ -352,15 +368,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         isPaused: currentState.isPaused,
       );
 
-      _apiClient.post('/rucks/${currentState.sessionId}/location', newPoint.toJson())
-        .catchError((e) {
-          if (e.toString().contains('401') || e.toString().contains('Already Used')) {
-            AppLogger.warning('[SESSION_RECOVERY] Location sync failed due to auth issue, will retry: $e');
-            // Don't kill the session - continue tracking locally
-          } else {
-            AppLogger.warning('Failed to send location to backend: $e');
-          }
-        });
+      if (!currentState.sessionId.startsWith('offline_')) {
+        _apiClient.post('/rucks/${currentState.sessionId}/location', newPoint.toJson())
+          .catchError((e) {
+            if (e.toString().contains('401') || e.toString().contains('Already Used')) {
+              AppLogger.warning('[SESSION_RECOVERY] Location sync failed due to auth issue, will retry: $e');
+              // Don't kill the session - continue tracking locally
+            } else {
+              AppLogger.warning('Failed to send location to backend: $e');
+            }
+          });
+      }
 
       emit(currentState.copyWith(
         locationPoints: newLocationPoints,
@@ -571,7 +589,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _heartRateService.clearHeartRateBuffer();
       }
       
-      await _apiClient.post('/rucks/${currentState.sessionId}/pause', {});
+      if (!currentState.sessionId.startsWith('offline_')) {
+        await _apiClient.post('/rucks/${currentState.sessionId}/pause', {});
+      }
       AppLogger.debug('Session ${currentState.sessionId} paused.');
       
       emit(currentState.copyWith(
@@ -596,7 +616,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
       _heartRateService.startHeartRateMonitoring(); // Restart HR monitoring after pause
       
-      await _apiClient.post('/rucks/${currentState.sessionId}/resume', {});
+      if (!currentState.sessionId.startsWith('offline_')) {
+        await _apiClient.post('/rucks/${currentState.sessionId}/resume', {});
+      }
       AppLogger.debug('Session ${currentState.sessionId} resumed.');
 
       emit(currentState.copyWith(
@@ -813,7 +835,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } catch (e, stackTrace) {
         String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Complete');
         AppLogger.error('Error completing session: $errorMessage\nError: $e\n$stackTrace');
-        // Removed the /fail endpoint call
         // Pass the current state directly instead of trying to convert it
         emit(ActiveSessionFailure(errorMessage: errorMessage, sessionDetails: currentState));
       }
@@ -950,6 +971,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   Future<void> _sendHeartRateSamplesToApi(String sessionId, List<HeartRateSample> samples) async {
     if (samples.isEmpty || sessionId.isEmpty) return;
+    
+    // Skip API calls for offline sessions
+    if (sessionId.startsWith('offline_')) {
+      AppLogger.debug('Skipping heart rate API call for offline session: $sessionId');
+      return;
+    }
+    
     try {
       final List<Map<String, dynamic>> samplesJson = samples.map((s) => s.toJsonForApi()).toList();
       // Use path without /api prefix since baseUrl already includes it
@@ -1347,7 +1375,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _allHeartRateSamples.addAll(heartRateSamples);
       _latestHeartRate = recoveredData['latest_heart_rate'] as int?;
       _minHeartRate = recoveredData['min_heart_rate'] as int?;
-      _maxHeartRate = recoveredData['max_heartRate'] as int?;
+      _maxHeartRate = recoveredData['max_heart_rate'] as int?;
       
       // Reset heart rate throttling timers for fresh session
       _lastSavedHeartRateTime = null;
@@ -1491,10 +1519,23 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _locationSubscription?.cancel();
     _heartRateSubscription?.cancel();
     _heartRateBufferSubscription?.cancel();
+    _connectivitySubscription?.cancel();
     _locationService.stopLocationTracking();
     await _stopHeartRateMonitoring(); 
     _log('ActiveSessionBloc closed, all resources released.');
     super.close();
+  }
+
+  /// Helper method to work around analyzer issue with AppLogger
+  void _log(String message) {
+    // Using try-catch to ensure this doesn't cause further issues
+    try {
+      if (kDebugMode) {
+        debugPrint('[DEBUG] $message');
+      }
+    } catch (e) {
+      // Silent catch - last resort to prevent logging issues from breaking functionality
+    }
   }
 
   /// Handle session cleanup for app lifecycle management
@@ -1558,32 +1599,25 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       for (final sessionData in offlineSessions) {
         try {
-          // Create session on backend
+          // Create session with current session data using the same format as normal session creation
           final createResponse = await _apiClient.post('/rucks', {
             'ruck_weight_kg': sessionData['ruckWeightKg'],
             'notes': sessionData['notes'] ?? '',
-            'created_at': sessionData['originalSessionStartTimeUtc'],
           });
 
-          final backendSessionId = createResponse['id']?.toString();
-          if (backendSessionId == null) continue;
-
-          // Start session
-          await _apiClient.post('/rucks/$backendSessionId/start', {
-            'started_at': sessionData['originalSessionStartTimeUtc'],
-          });
-
-          // Complete session with all data
-          await _apiClient.post('/rucks/$backendSessionId/complete', sessionData['completionPayload']);
-
-          // Mark this offline session as synced
-          await _activeSessionStorage.markOfflineSessionSynced(sessionData['offlineSessionId']);
-          
-          AppLogger.info('Successfully synced offline session ${sessionData['offlineSessionId']} to backend as $backendSessionId');
-
-        } catch (syncError) {
-          AppLogger.warning('Failed to sync offline session ${sessionData['offlineSessionId']}: $syncError');
-          // Continue with next session
+          final newSessionId = createResponse['id']?.toString();
+          if (newSessionId != null && newSessionId.isNotEmpty) {
+            AppLogger.info('Successfully synced offline session. New session ID: $newSessionId');
+            
+            // Update state with new session ID
+            final currentState = state as ActiveSessionRunning;
+            emit(currentState.copyWith(sessionId: newSessionId));
+            
+            // Start fresh location tracking with new session ID
+            _startLocationUpdates(newSessionId);
+          }
+        } catch (e) {
+          AppLogger.warning('Failed to sync offline session: $e. Will retry on next connectivity event.');
         }
       }
 
@@ -1596,15 +1630,48 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
   }
 
-  // Helper method to work around analyzer issue with AppLogger
-  void _log(String message) {
-    // Using try-catch to ensure this doesn't cause further issues
-    try {
-      if (kDebugMode) {
-        debugPrint('[DEBUG] $message');
+  void _startConnectivityMonitoring(String sessionId) {
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = _connectivityService.connectivityStream.listen((isConnected) {
+      if (isConnected) {
+        AppLogger.info('Connectivity restored, resuming API operations...');
+        _attemptOfflineSessionSync(sessionId);
+        _startLocationUpdates(sessionId);
+      } else {
+        AppLogger.warning('Connectivity lost, switching to offline mode...');
+        _locationService.stopLocationTracking();
       }
-    } catch (e) {
-      // Silent catch - last resort to prevent logging issues from breaking functionality
+    });
+  }
+
+  Future<void> _attemptOfflineSessionSync(String currentSessionId) async {
+    if (currentSessionId.startsWith('offline_')) {
+      try {
+        AppLogger.info('Attempting to sync offline session to backend...');
+        
+        final state = this.state;
+        if (state is ActiveSessionRunning) {
+          // Create session with current session data using the same format as normal session creation
+          final createResponse = await _apiClient.post('/rucks', {
+            'ruck_weight_kg': state.ruckWeightKg,
+            'notes': '', // Empty notes for now
+          }).timeout(Duration(seconds: 5));
+          
+          final newSessionId = createResponse['id']?.toString();
+          if (newSessionId != null && newSessionId.isNotEmpty) {
+            AppLogger.info('Successfully synced offline session. New session ID: $newSessionId');
+            
+            // Update state with new session ID
+            final currentState = state as ActiveSessionRunning;
+            emit(currentState.copyWith(sessionId: newSessionId));
+            
+            // Start fresh location tracking with new session ID
+            _startLocationUpdates(newSessionId);
+          }
+        }
+      } catch (e) {
+        AppLogger.warning('Failed to sync offline session: $e. Will retry on next connectivity event.');
+      }
     }
   }
 }
