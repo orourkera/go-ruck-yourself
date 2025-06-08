@@ -36,7 +36,7 @@ class TerrainService {
       // Create terrain data
       final terrainData = TerrainData(
         surfaceType: surfaceType,
-        energyMultiplier: _getEnergyMultiplier(surfaceType),
+        energyMultiplier: getEnergyMultiplier(surfaceType),
       );
       
       // Cache the result
@@ -132,7 +132,7 @@ out tags;
   }
   
   /// Get energy cost multiplier for different surface types
-  static double _getEnergyMultiplier(String surfaceType) {
+  static double getEnergyMultiplier(String surfaceType) {
     switch (surfaceType.toLowerCase()) {
       // Paved surfaces (baseline)
       case 'paved':

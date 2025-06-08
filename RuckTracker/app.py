@@ -77,12 +77,18 @@ app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 db.init_app(app)
 migrate.init_app(app, db)
 
-# Initialize rate limiter
+# Configure Redis connection with SSL options to skip certificate verification for Heroku Redis
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+
+# For Heroku Redis, we need to configure SSL settings to skip certificate verification
+if redis_url.startswith('rediss://'):  # Heroku Redis uses rediss:// for SSL
+    redis_url += '?ssl_cert_reqs=none'
+
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=os.environ.get('REDIS_URL', 'redis://localhost:6379'),
+    storage_uri=redis_url,
     strategy="fixed-window"
 )
 limiter.init_app(app)

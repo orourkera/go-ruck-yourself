@@ -7,6 +7,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
+import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
@@ -65,6 +66,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       watchService: locator<WatchService>(),
       heartRateService: locator<HeartRateService>(),
       splitTrackingService: locator<SplitTrackingService>(),
+      terrainTracker: locator<TerrainTracker>(),
       sessionRepository: locator<SessionRepository>(),
       activeSessionStorage: locator<ActiveSessionStorage>(),
     );

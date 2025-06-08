@@ -15,6 +15,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
+import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
@@ -102,6 +103,7 @@ class ActiveSessionPage extends StatelessWidget {
             splitTrackingService: locator<SplitTrackingService>(),
             sessionRepository: locator<SessionRepository>(),
             activeSessionStorage: locator<ActiveSessionStorage>(),
+            terrainTracker: locator<TerrainTracker>(),
           ),
         ),
         BlocProvider(
