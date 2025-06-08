@@ -8,6 +8,7 @@ import '../bloc/duel_detail/duel_detail_event.dart';
 import '../bloc/duel_detail/duel_detail_state.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/widgets/styled_snackbar.dart';
+import '../../../../shared/widgets/user_avatar.dart';
 
 /// A widget for displaying and interacting with comments on a duel
 class DuelCommentsSection extends StatefulWidget {
@@ -212,6 +213,12 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Comments list (only show if can view comments and there are comments)
+              if (canViewComments && comments.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildCommentsList(comments),
+              ],
+              
               // Comment input field (if not hidden and can view comments)
               if (!widget.hideInput && canViewComments) ...[
                 Padding(
@@ -275,12 +282,6 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                     ],
                   ),
                 ),
-              ],
-              
-              // Comments list (only show if can view comments and there are comments)
-              if (canViewComments && comments.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _buildCommentsList(comments),
               ],
               
               // Show message when user cannot view comments
@@ -389,24 +390,10 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Avatar
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: comment.userAvatarUrl != null
-                    ? NetworkImage(comment.userAvatarUrl!)
-                    : null,
-                backgroundColor: AppColors.primary,
-                child: comment.userAvatarUrl == null
-                    ? Text(
-                        comment.userDisplayName.isNotEmpty 
-                            ? comment.userDisplayName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
+              UserAvatar(
+                avatarUrl: comment.userAvatarUrl,
+                username: comment.userDisplayName,
+                size: 32,
               ),
               
               const SizedBox(width: 12),

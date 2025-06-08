@@ -8,6 +8,7 @@ import 'package:rucking_app/features/social/presentation/bloc/social_event.dart'
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/user_avatar.dart';
 
 /// A widget for displaying and interacting with comments on a ruck session
 class CommentsSection extends StatefulWidget {
@@ -496,10 +497,10 @@ class _CommentsSectionState extends State<CommentsSection> {
               // User info
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.grey.shade300,
-                    child: const Icon(Icons.person, color: Colors.white),
+                  UserAvatar(
+                    avatarUrl: comment.userAvatarUrl,
+                    username: comment.userDisplayName,
+                    size: 32,
                   ),
                   const SizedBox(width: 8.0),
                   Text(

@@ -5,6 +5,7 @@ import '../entities/duel_participant.dart';
 import '../entities/duel_stats.dart';
 import '../entities/duel_invitation.dart';
 import '../entities/duel_comment.dart';
+import '../entities/duel_session.dart';
 
 abstract class DuelsRepository {
   // Duel management
@@ -105,6 +106,9 @@ abstract class DuelsRepository {
   Future<Either<Failure, void>> deleteDuelComment({
     required String commentId,
   });
+  
+  // Sessions
+  Future<Either<Failure, List<DuelSession>>> getDuelSessions(String duelId);
   
   // Manual duel start
   Future<Either<Failure, void>> startDuel({

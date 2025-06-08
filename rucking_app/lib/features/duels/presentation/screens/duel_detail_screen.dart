@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
@@ -11,6 +12,7 @@ import '../widgets/duel_progress_chart.dart';
 import '../widgets/duel_leaderboard_widget.dart';
 import '../widgets/duel_participants_list.dart';
 import '../widgets/duel_comments_section.dart';
+import '../widgets/duel_ruck_sessions_list.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/widgets/styled_snackbar.dart';
 
@@ -32,7 +34,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     context.read<DuelDetailBloc>().add(LoadDuelDetail(duelId: widget.duelId));
   }
 
@@ -136,7 +138,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
 
   Widget _buildDuelDetailContent(DuelDetailLoaded state) {
     final duel = state.duel;
-    final participants = state.leaderboard; // Use leaderboard as participants list
+    final participants = state.participants; // Use actual participants list
     
     return SingleChildScrollView(
       child: Column(
@@ -148,9 +150,12 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
             currentUserId: _getCurrentUserId() ?? '',
             showJoinButton: _canUserJoin(duel),
             onJoin: _canUserJoin(duel) 
-                ? () => context.read<DuelDetailBloc>().add(
-                    JoinDuelFromDetail(duelId: widget.duelId),
-                  )
+                ? () {
+                    HapticFeedback.vibrate();
+                    context.read<DuelDetailBloc>().add(
+                      JoinDuelFromDetail(duelId: widget.duelId),
+                    );
+                  }
                 : null,
             showStartButton: _canUserStartDuel(duel),
             onStartDuel: _canUserStartDuel(duel)
@@ -171,35 +176,27 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
               unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
               indicatorColor: Theme.of(context).colorScheme.secondary,
               tabs: const [
-                Tab(text: 'Progress'),
                 Tab(text: 'Leaderboard'),
-                Tab(text: 'Participants'),
+                Tab(text: 'Ruck Sessions'),
               ],
             ),
           ),
           
           // Tab Content
           SizedBox(
-            height: 280, // Reduced height for TabBarView when content is minimal
+            height: 400, // Fixed height for TabBarView
             child: TabBarView(
               controller: _tabController,
               physics: const NeverScrollableScrollPhysics(), // Prevent vertical scrolling inside tabs
               children: [
-                // Progress Tab
-                DuelProgressChart(
-                  duel: duel,
-                  participants: participants,
-                ),
-                
-                // Leaderboard Tab
-                DuelLeaderboardWidget(
-                  duel: duel,
-                  participants: participants,
-                  showAllParticipants: true,
-                ),
-                
-                // Participants Tab
+                // Leaderboard Tab (previously Participants)
                 DuelParticipantsList(
+                  duel: duel,
+                  participants: participants,
+                ),
+                
+                // Ruck Sessions Tab
+                DuelRuckSessionsList(
                   duel: duel,
                   participants: participants,
                 ),
@@ -263,10 +260,10 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
       final state = context.read<DuelDetailBloc>().state;
       if (state is DuelDetailLoaded) {
         // Count accepted participants
-        final acceptedParticipants = state.leaderboard
-            .where((p) => p.status == 'accepted')
+        final acceptedParticipants = state.participants
+            .where((p) => p.status == DuelParticipantStatus.accepted)
             .length;
-        return acceptedParticipants >= 2; // Minimum 2 participants required
+        return acceptedParticipants >= duel.minParticipants;
       }
     }
     

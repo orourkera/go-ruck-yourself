@@ -8,6 +8,9 @@ import '../../../domain/usecases/add_duel_comment.dart' as add_comment_usecase;
 import '../../../domain/usecases/update_duel_comment.dart' as update_comment_usecase;
 import '../../../domain/usecases/delete_duel_comment.dart' as delete_comment_usecase;
 import '../../../domain/usecases/start_duel.dart' as start_duel_usecase;
+import '../../../domain/usecases/get_duel_sessions.dart';
+import '../../../domain/entities/duel_participant.dart';
+import '../../../data/models/duel_model.dart';
 import 'duel_detail_event.dart';
 import 'duel_detail_state.dart';
 
@@ -21,6 +24,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
   final update_comment_usecase.UpdateDuelComment updateDuelComment;
   final delete_comment_usecase.DeleteDuelComment deleteDuelComment;
   final start_duel_usecase.StartDuel startDuel;
+  final GetDuelSessions getDuelSessions;
 
   DuelDetailBloc({
     required this.getDuelDetails,
@@ -32,6 +36,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
     required this.updateDuelComment,
     required this.deleteDuelComment,
     required this.startDuel,
+    required this.getDuelSessions,
   }) : super(DuelDetailInitial()) {
     on<LoadDuelDetail>(_onLoadDuelDetail);
     on<RefreshDuelDetail>(_onRefreshDuelDetail);
@@ -43,15 +48,27 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
     on<AddDuelComment>(_onAddDuelComment);
     on<UpdateDuelComment>(_onUpdateDuelComment);
     on<DeleteDuelComment>(_onDeleteDuelComment);
+    on<LoadDuelSessions>(_onLoadDuelSessions);
   }
 
   void _onLoadDuelDetail(LoadDuelDetail event, Emitter<DuelDetailState> emit) async {
     emit(DuelDetailLoading());
+    
     final result = await getDuelDetails(GetDuelDetailsParams(duelId: event.duelId));
+
     result.fold(
       (failure) => emit(DuelDetailError(message: failure.message)),
       (duel) {
-        emit(DuelDetailLoaded(duel: duel));
+        // Extract participants from DuelModel if available
+        List<DuelParticipant> participants = [];
+        if (duel is DuelModel) {
+          participants = duel.participants.cast<DuelParticipant>();
+        }
+        
+        emit(DuelDetailLoaded(
+          duel: duel,
+          participants: participants,
+        ));
         add(LoadLeaderboard(duelId: event.duelId));
         add(LoadDuelComments(duelId: event.duelId));
       },
@@ -68,7 +85,13 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
       result.fold(
         (failure) => emit(DuelDetailError(message: failure.message)),
         (duel) {
-          emit(currentState.copyWith(duel: duel));
+          // Extract participants from DuelModel if available
+          List<DuelParticipant> participants = [];
+          if (duel is DuelModel) {
+            participants = duel.participants.cast<DuelParticipant>();
+          }
+          
+          emit(currentState.copyWith(duel: duel, participants: participants));
           // Refresh leaderboard too
           add(LoadLeaderboard(duelId: event.duelId));
         },
@@ -240,5 +263,9 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
         },
       );
     }
+  }
+
+  void _onLoadDuelSessions(LoadDuelSessions event, Emitter<DuelDetailState> emit) async {
+    // TO DO: implement _onLoadDuelSessions
   }
 }

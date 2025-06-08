@@ -14,6 +14,7 @@ import 'package:rucking_app/features/profile/presentation/screens/terms_of_servi
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
@@ -139,12 +140,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         BlocListener<ProfileBloc, ProfileState>(
                           listener: (context, profileState) {
                             if (profileState is AvatarUploadSuccess) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Avatar updated successfully!')),
+                              StyledSnackBar.showSuccess(
+                                context: context,
+                                message: 'Avatar updated successfully!',
                               );
                             } else if (profileState is AvatarUploadFailure) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Failed to upload avatar: ${profileState.error}')),
+                              StyledSnackBar.showError(
+                                context: context,
+                                message: 'Failed to upload avatar: ${profileState.error}',
                               );
                             }
                           },

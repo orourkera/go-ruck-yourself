@@ -55,6 +55,7 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
             event.challengeType,
             event.location,
           ),
+          viewMode: DuelListViewMode.all,
         ));
       },
     );
@@ -64,11 +65,17 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
     // Keep current filters if duels are loaded
     if (state is DuelListLoaded) {
       final currentState = state as DuelListLoaded;
-      add(LoadDuels(
-        status: currentState.activeStatus,
-        challengeType: currentState.activeChallengeType,
-        location: currentState.activeLocation,
-      ));
+      if (currentState.viewMode == DuelListViewMode.myDuels) {
+        add(const LoadMyDuels());
+      } else if (currentState.viewMode == DuelListViewMode.discover) {
+        add(const LoadDiscoverDuels());
+      } else {
+        add(LoadDuels(
+          status: currentState.activeStatus,
+          challengeType: currentState.activeChallengeType,
+          location: currentState.activeLocation,
+        ));
+      }
     } else {
       add(const LoadDuels());
     }
@@ -95,6 +102,7 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
           event.challengeType,
           event.location,
         ),
+        viewMode: DuelListViewMode.all,
       )),
     );
   }
@@ -151,6 +159,7 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
           activeChallengeType: null,
           activeLocation: null,
           hasFilters: false,
+          viewMode: DuelListViewMode.myDuels,
         ));
       },
     );
@@ -177,6 +186,7 @@ class DuelListBloc extends Bloc<DuelListEvent, DuelListState> {
           activeChallengeType: null,
           activeLocation: null,
           hasFilters: false,
+          viewMode: DuelListViewMode.discover,
         ));
       },
     );
