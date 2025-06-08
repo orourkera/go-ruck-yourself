@@ -85,6 +85,14 @@
 				<string>com.googleusercontent.apps.966278977337-l132nm2pas6ifl0kc3oh9977icfja6au</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.getrucky.app.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.getrucky.app</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

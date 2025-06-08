@@ -40,18 +40,37 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         );
         final data = jsonDecode(response.body);
         if (response.statusCode == 200) {
+          // Success - show success message
           setState(() {
-            _message = mapFriendlyErrorMessage(data['message'] ?? 'If an account exists for this email, a password reset link has been sent.');
+            _message = data['message'] ?? 'If an account exists for this email, a password reset link has been sent.';
           });
         } else {
-          setState(() {
-            _message = mapFriendlyErrorMessage(data['message'] ?? 'Failed to send reset link.');
-          });
+          // Error - show in SnackBar and navigate back to login
+          final errorMessage = mapFriendlyErrorMessage(data['message'] ?? 'Failed to send reset link.');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+            Navigator.of(context).pop(); // Go back to login
+          }
         }
       } catch (e) {
-        setState(() {
-          _message = mapFriendlyErrorMessage(e.toString());
-        });
+        // Exception - show in SnackBar and navigate back to login
+        final errorMessage = mapFriendlyErrorMessage(e.toString());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          Navigator.of(context).pop(); // Go back to login
+        }
       } finally {
         setState(() {
           _isLoading = false;
@@ -71,7 +90,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 16),
+              // Lost Rucker Image
+              Center(
+                child: Image.asset(
+                  'assets/images/lost rucker.png',
+                  width: 200,
+                  height: 200,
+                ),
+              ),
+              const SizedBox(height: 32),
               Text(
                 'Enter your email to receive a password reset link.',
                 style: AppTextStyles.bodyLarge,

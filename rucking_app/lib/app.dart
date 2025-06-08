@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:app_links/app_links.dart';
 
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
@@ -46,6 +47,8 @@ class RuckingApp extends StatefulWidget {
 
 class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
   late AppLifecycleService _lifecycleService;
+  late AppLinks _appLinks;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -55,6 +58,32 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     _lifecycleService = getIt<AppLifecycleService>();
     _lifecycleService.initialize();
     WidgetsBinding.instance?.addObserver(this);
+    
+    // Initialize deep links
+    _appLinks = AppLinks();
+    _initDeepLinks();
+  }
+
+  void _initDeepLinks() {
+    // Listen for incoming deep links when app is already running
+    _appLinks.uriLinkStream.listen((Uri uri) {
+      _handleDeepLink(uri);
+    }, onError: (err) {
+      print('Deep link error: $err');
+    });
+  }
+
+  void _handleDeepLink(Uri uri) {
+    print('Received deep link: $uri');
+    
+    // Check if this is an auth callback
+    if (uri.scheme == 'com.getrucky.app' && uri.path == '/auth/callback') {
+      // Navigate to auth callback screen
+      _navigatorKey.currentState?.pushNamed(
+        '/auth_callback',
+        arguments: uri,
+      );
+    }
   }
 
   @override
@@ -130,11 +159,20 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
             darkTheme: DynamicTheme.getThemeData(user, true),
             themeMode: ThemeMode.system,
             home: const SplashScreen(),
+            navigatorKey: _navigatorKey,
             onGenerateRoute: (settings) {
               switch (settings.name) {
                 case '/home':
                   return MaterialPageRoute(builder: (_) => const HomeScreen());
                 case '/login':
+                  return MaterialPageRoute(builder: (_) => LoginScreen());
+                case '/auth_callback':
+                  final uri = settings.arguments as Uri?;
+                  if (uri != null) {
+                    return MaterialPageRoute(
+                      builder: (_) => AuthCallbackScreen(uri: uri),
+                    );
+                  }
                   return MaterialPageRoute(builder: (_) => LoginScreen());
                 case '/password_reset':
                   final args = settings.arguments;
