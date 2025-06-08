@@ -525,3 +525,36 @@ class DuelParticipantResource(Resource):
         except Exception as e:
             logging.error(f"Error in DuelParticipantResource.put: {str(e)}", exc_info=True)
             return {'error': str(e)}, 500
+
+
+class DuelWithdrawResource(Resource):
+    @auth_required
+    def post(self, duel_id):
+        """Withdraw from a duel"""
+        try:
+            user_id = g.user.id
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Find the user's participation in this duel
+            participant_response = supabase.table('duel_participants').select('id, status').eq('duel_id', duel_id).eq('user_id', user_id).execute()
+            
+            if not participant_response.data:
+                return {'error': 'You are not participating in this duel'}, 404
+            
+            participant = participant_response.data[0]
+            
+            # Check if user is in a state where they can withdraw
+            if participant['status'] not in ['accepted', 'pending']:
+                return {'error': 'Cannot withdraw from duel in current status'}, 400
+            
+            # Update participant status to withdrawn
+            supabase.table('duel_participants').update({
+                'status': 'withdrawn',
+                'updated_at': datetime.utcnow().isoformat()
+            }).eq('id', participant['id']).execute()
+            
+            return {'message': 'Successfully withdrew from duel'}
+            
+        except Exception as e:
+            logging.error(f"Error in DuelWithdrawResource.post: {str(e)}", exc_info=True)
+            return {'error': str(e)}, 500

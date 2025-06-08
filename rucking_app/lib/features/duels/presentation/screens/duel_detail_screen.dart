@@ -52,6 +52,13 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.home),
+          onPressed: () {
+            // Navigate back to homepage - pop all routes and go to home
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+        ),
         actions: [
           BlocBuilder<DuelDetailBloc, DuelDetailState>(
             builder: (context, state) {
@@ -154,6 +161,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> with TickerProvider
               context: context,
               message: state.message,
             );
+            // Navigate back to duels home after successful withdrawal
+            Navigator.of(context).popUntil((route) => route.isFirst);
           } else if (state is DuelWithdrawError) {
             StyledSnackBar.showError(
               context: context,

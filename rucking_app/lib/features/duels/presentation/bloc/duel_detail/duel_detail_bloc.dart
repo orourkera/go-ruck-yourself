@@ -287,8 +287,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
       )),
       (_) {
         emit(DuelWithdrawn(duelId: event.duelId));
-        // Refresh the duel details to show updated participant list
-        add(RefreshDuelDetail(duelId: event.duelId));
+        // Don't refresh duel details after withdrawal since user will be navigated away
       },
     );
   }
