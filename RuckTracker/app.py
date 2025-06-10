@@ -98,7 +98,6 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"],
     storage_uri=redis_url,
     strategy="fixed-window",
-    storage_options={"connection_pool_kwargs": {"max_connections": 20}},
     swallow_errors=True
 )
 limiter.init_app(app)
