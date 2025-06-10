@@ -462,8 +462,8 @@ def password_reset_confirm():
         if not data:
             return jsonify({"error": "Request body is required"}), 400
             
-        new_password = data.get('password')
-        access_token = data.get('access_token')  # Token from password reset link
+        new_password = data.get('new_password')  # Changed from 'password'
+        access_token = data.get('token')  # Changed from 'access_token'
         
         if not new_password:
             return jsonify({"error": "New password is required"}), 400
