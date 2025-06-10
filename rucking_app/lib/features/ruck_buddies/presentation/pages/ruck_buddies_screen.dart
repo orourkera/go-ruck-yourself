@@ -14,6 +14,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/empty_state.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 
 class RuckBuddiesScreen extends StatefulWidget {
   const RuckBuddiesScreen({Key? key}) : super(key: key);
@@ -169,7 +170,11 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                   
                   // Handle initial and loading states
                   if (state is RuckBuddiesInitial || state is RuckBuddiesLoading) {
-                    return const Center(child: CircularProgressIndicator());
+                    return SingleChildScrollView(
+                      child: Column(
+                        children: List.generate(3, (index) => const RuckBuddyCardSkeleton()),
+                      ),
+                    );
                   } 
                   // Handle loaded state with data
                   else if (state is RuckBuddiesLoaded) {
@@ -203,7 +208,9 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                   }
                   
                   // Fallback
-                  return const Center(child: CircularProgressIndicator());
+                  return Column(
+                    children: List.generate(3, (index) => const RuckBuddyCardSkeleton()),
+                  );
                 },
               ),
             ),
@@ -228,12 +235,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
         // debugPrint('🐞 [_RuckBuddiesScreenState._buildRuckBuddiesList itemBuilder] Index: $index, Total items including loader: ${isLoadingMore ? ruckBuddies.length + 1 : ruckBuddies.length}');
         if (isLoadingMore && index == ruckBuddies.length) {
           debugPrint('🐞 [_RuckBuddiesScreenState._buildRuckBuddiesList itemBuilder] Showing loading more indicator at index $index.');
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ),
-          );
+          return const RuckBuddyCardSkeleton();
         }
         
         // Wrap each card in an error boundary to prevent entire list from failing if one card fails

@@ -89,4 +89,35 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
     _ruckBuddiesCacheTime = null;
     AppLogger.debug('[RUCK_BUDDIES] Cache cleared');
   }
+  
+  /// Check if we have valid cached data for the given parameters
+  static List<RuckBuddy>? getCachedRuckBuddies({
+    required String filter,
+    double? latitude,
+    double? longitude,
+    required int limit,
+    required int offset,
+  }) {
+    // Only check cache for first page
+    if (offset != 0) return null;
+    
+    final cacheKey = _createCacheKey(
+      filter: filter,
+      latitude: latitude,
+      longitude: longitude,
+      limit: limit,
+      offset: offset,
+    );
+    
+    final now = DateTime.now();
+    if (_ruckBuddiesCache != null && 
+        _ruckBuddiesCacheTime != null &&
+        now.difference(_ruckBuddiesCacheTime!) < _ruckBuddiesCacheValidity &&
+        _ruckBuddiesCache!.containsKey(cacheKey)) {
+      AppLogger.debug('[RUCK_BUDDIES] Found cached data for filter: $filter (${_ruckBuddiesCache![cacheKey]!.length} items)');
+      return _ruckBuddiesCache![cacheKey]!;
+    }
+    
+    return null;
+  }
 }

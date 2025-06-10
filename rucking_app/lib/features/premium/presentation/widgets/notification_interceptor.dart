@@ -7,6 +7,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Intercepts notification taps for free users and shows premium upsell instead
+/// TEMPORARILY DISABLED: All features are currently free
 class NotificationInterceptor extends StatelessWidget {
   final String notificationType;
   final Map<String, dynamic> notificationData;
@@ -23,6 +24,16 @@ class NotificationInterceptor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // PAYWALL DISABLED: Always allow access and execute premium navigation
+    if (onPremiumNavigation != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onPremiumNavigation!();
+      });
+    }
+    return fallbackWidget ?? const SizedBox.shrink();
+
+    /*
+    // ORIGINAL PAYWALL LOGIC - PRESERVED FOR FUTURE RESTORATION
     return BlocBuilder<PremiumBloc, PremiumState>(
       builder: (context, state) {
         if (state is PremiumLoaded && state.isPremium) {
@@ -39,8 +50,11 @@ class NotificationInterceptor extends StatelessWidget {
         return _buildEngagementTeaser(context);
       },
     );
+    */
   }
 
+  /*
+  // PRESERVED FOR FUTURE RESTORATION
   Widget _buildEngagementTeaser(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -266,6 +280,7 @@ class NotificationInterceptor extends StatelessWidget {
         return 'Something exciting happened with your ruck session!';
     }
   }
+  */
 }
 
 /// Static helper for handling notification taps

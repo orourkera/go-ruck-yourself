@@ -3,6 +3,7 @@ import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 
 /// A reusable carousel widget for displaying photos
 class PhotoCarousel extends StatefulWidget {
@@ -88,12 +89,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   Widget build(BuildContext context) {
     // Show loading state
     if (widget.isLoading) {
-      return SizedBox(
-        height: widget.height,
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return PhotoCarouselSkeleton(height: widget.height);
     }
     
     // Show empty state when there are no photos
@@ -262,8 +258,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       borderRadius: BorderRadius.circular(0.0), // Square corners
       child: CachedNetworkImage(
         imageUrl: imageUrl,
-        // Use the custom cache manager for longer cache duration
-        cacheManager: ImageCacheManager.instance,
+        cacheManager: ImageCacheManager.photoCache,
         // Create a stable key based on URL to improve cache hits
         cacheKey: Uri.parse(imageUrl).pathSegments.last,
         // Visual settings

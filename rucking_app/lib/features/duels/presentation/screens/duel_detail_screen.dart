@@ -52,8 +52,11 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
         leading: IconButton(
           icon: const Icon(Icons.home),
           onPressed: () {
-            // Navigate back to homepage - pop all routes and go to home
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            // Navigate to home screen using named route, removing all other routes
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/home',
+              (route) => false,
+            );
           },
         ),
         actions: [

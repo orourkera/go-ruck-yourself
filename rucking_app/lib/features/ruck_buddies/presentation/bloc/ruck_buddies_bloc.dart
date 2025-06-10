@@ -28,8 +28,6 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
     FetchRuckBuddiesEvent event, 
     Emitter<RuckBuddiesState> emit
   ) async {
-    emit(RuckBuddiesLoading());
-
     double? lat = event.latitude;
     double? lon = event.longitude;
     String filterToUse = event.filter;
@@ -50,6 +48,36 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       }
     }
     
+    // Check for cached data first (offset 0 = first page)
+    final cachedData = RuckBuddiesRepositoryImpl.getCachedRuckBuddies(
+      filter: filterToUse,
+      latitude: lat,
+      longitude: lon,
+      limit: event.limit,
+      offset: 0,
+    );
+    
+    // If we have cached data, emit it immediately
+    if (cachedData != null) {
+      debugPrint(' [RuckBuddiesBloc] Emitting cached data immediately (${cachedData.length} items)');
+      emit(
+        RuckBuddiesLoaded(
+          ruckBuddies: cachedData,
+          hasReachedMax: cachedData.length < event.limit,
+          filter: event.filter,
+          latitude: lat,
+          longitude: lon,
+        ),
+      );
+      
+      // Continue to fetch fresh data in background without showing loading state
+      debugPrint(' [RuckBuddiesBloc] Fetching fresh data in background...');
+    } else {
+      // No cached data, show loading skeleton
+      debugPrint(' [RuckBuddiesBloc] No cached data, showing loading skeleton');
+      emit(RuckBuddiesLoading());
+    }
+    
     final params = RuckBuddiesParams(
       limit: event.limit,
       offset: 0, // Offset is 0 for a new fetch, managed by FetchMoreRuckBuddiesEvent for pagination
@@ -64,7 +92,10 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       result.fold(
         (failure) {
           debugPrint('[BLOC] Error fetching ruck buddies: ${failure.message}');
-          emit(RuckBuddiesError(message: failure.message));
+          // Only emit error if we don't have cached data already showing
+          if (cachedData == null) {
+            emit(RuckBuddiesError(message: failure.message));
+          }
         },
         (ruckBuddies) async {
           if (ruckBuddies.isEmpty) {
@@ -99,7 +130,10 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
         },
       );
     } catch (e) {
-      emit(RuckBuddiesError(message: 'Failed to load ruck buddies: ${e.toString()}'));
+      // Only emit error if we don't have cached data already showing
+      if (cachedData == null) {
+        emit(RuckBuddiesError(message: 'Failed to load ruck buddies: ${e.toString()}'));
+      }
     }
   }
 

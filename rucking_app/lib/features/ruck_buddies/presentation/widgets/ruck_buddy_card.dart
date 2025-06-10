@@ -79,26 +79,16 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     _commentCount = widget.ruckBuddy.commentCount ?? 0;
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser ?? false;
     
-    // Cache the social data for consistency
-    if (_ruckId != null && _socialRepository != null) {
-      _socialRepository!.setCachedLikeStatus(_ruckId!, _isLiked);
-      _socialRepository!.setCachedLikeCount(_ruckId!, _likeCount!);
-      developer.log('[SOCIAL_DEBUG] Cached social data from API response for ruck $_ruckId: likes=$_likeCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
-    }
+    developer.log('[SOCIAL_DEBUG] Initialized RuckBuddyCard with API data for ruck $_ruckId: likes=$_likeCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
     
     // No need to fetch social data separately since it's included in the API response
     // This improves performance by avoiding unnecessary API calls
     
-    // Initialize photos and log status
-    _photos = widget.ruckBuddy.photos != null ? List<RuckPhoto>.from(widget.ruckBuddy.photos!) : [];
-    developer.log('[PHOTO_DEBUG] RuckBuddyCard initState for ruckId: $_ruckId - initial photos count: ${_photos.length}', name: 'RuckBuddyCard');
-    
-    // Only request photos for this ruck session if no photos are available from widget data
-    if (_ruckId != null && _photos.isEmpty) {
+    // Request photos for this ruck if we have an ID
+    if (_ruckId != null) {
       try {
-        // Request photos for this ruck from ActiveSessionBloc
         final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
-        activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+        activeSessionBloc.add(FetchSessionPhotosRequested(_ruckId.toString()));
         developer.log('[PHOTO_DEBUG] RuckBuddyCard requested photos for ruckId: $_ruckId', name: 'RuckBuddyCard');
       } catch (e) {
         developer.log('[PHOTO_DEBUG] Error requesting photos in RuckBuddyCard: $e', name: 'RuckBuddyCard');
