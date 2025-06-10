@@ -458,17 +458,24 @@ def password_reset_confirm():
     """
     try:
         data = request.get_json()
+        logger.info(f"Password reset request received. Raw data: {data}")
         
         if not data:
+            logger.error("No request body received")
             return jsonify({"error": "Request body is required"}), 400
             
         new_password = data.get('new_password')  # Changed from 'password'
         access_token = data.get('token')  # Changed from 'access_token'
         
+        logger.info(f"Extracted - new_password: {'[PRESENT]' if new_password else '[MISSING]'}, token: {'[PRESENT]' if access_token else '[MISSING]'}")
+        logger.info(f"new_password value: '{new_password}', token length: {len(access_token) if access_token else 0}")
+        
         if not new_password:
+            logger.error("New password missing from request")
             return jsonify({"error": "New password is required"}), 400
             
         if not access_token:
+            logger.error("Access token missing from request")
             return jsonify({"error": "Access token is required"}), 400
             
         # Use Supabase client with the user's token to update password
