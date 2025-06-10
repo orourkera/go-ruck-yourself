@@ -466,8 +466,9 @@ def password_reset_confirm():
             
         new_password = data.get('new_password')  # Changed from 'password'
         access_token = data.get('token')  # Changed from 'access_token'
+        refresh_token = data.get('refresh_token')
         
-        logger.info(f"Extracted - new_password: {'[PRESENT]' if new_password else '[MISSING]'}, token: {'[PRESENT]' if access_token else '[MISSING]'}")
+        logger.info(f"Extracted - new_password: {'[PRESENT]' if new_password else '[MISSING]'}, token: {'[PRESENT]' if access_token else '[MISSING]'}, refresh_token: {'[PRESENT]' if refresh_token else '[MISSING]'}")
         logger.info(f"new_password value: '{new_password}', token length: {len(access_token) if access_token else 0}")
         
         if not new_password:
@@ -480,7 +481,12 @@ def password_reset_confirm():
             
         # Use Supabase client with the user's token to update password
         try:
-            supabase = get_supabase_client(user_jwt=access_token)
+            # First, try to set the session with the recovery token
+            supabase = get_supabase_client()
+            
+            # Set the session using the access token from password reset
+            logger.info(f"Setting session with recovery token")
+            supabase.auth.set_session(access_token, refresh_token or "")
             
             # Update the user's password
             response = supabase.auth.update_user({
@@ -499,7 +505,6 @@ def password_reset_confirm():
             else:
                 logger.error("Password reset failed - no user returned")
                 return jsonify({"error": "Failed to update password"}), 400
-                
         except Exception as supabase_error:
             logger.error(f"Supabase password update error: {str(supabase_error)}")
             return jsonify({"error": "Failed to update password"}), 400
