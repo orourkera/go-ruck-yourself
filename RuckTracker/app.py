@@ -8,7 +8,7 @@ from flask import Flask, render_template, Blueprint, g, jsonify, request, redire
 from flask_restful import Api
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
-from flask_limiter import Limiter, exempt
+from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate # Import Migrate
