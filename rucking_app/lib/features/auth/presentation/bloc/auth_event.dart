@@ -128,14 +128,16 @@ class AuthPasswordResetRequested extends AuthEvent {
 class AuthPasswordResetConfirmed extends AuthEvent {
   final String token;
   final String newPassword;
+  final String? refreshToken;
 
   const AuthPasswordResetConfirmed({
     required this.token,
     required this.newPassword,
+    this.refreshToken,
   });
 
   @override
-  List<Object> get props => [token, newPassword];
+  List<Object?> get props => [token, newPassword, refreshToken];
 }
 
 /// Event to verify OTP code for password reset

@@ -68,5 +68,6 @@ abstract class AuthRepository {
   Future<void> confirmPasswordReset({
     required String token,
     required String newPassword,
+    String? refreshToken,
   });
 }

@@ -37,6 +37,11 @@ class AuthError extends AuthState {
   List<Object> get props => [message];
 }
 
+/// Success state for password reset confirmation
+class PasswordResetSuccess extends AuthState {
+  const PasswordResetSuccess();
+}
+
 /// Error state for when a user tries to register with an email that already exists
 class AuthUserAlreadyExists extends AuthState {
   final String message;

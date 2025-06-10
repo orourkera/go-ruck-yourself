@@ -136,10 +136,12 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> confirmPasswordReset({
     required String token,
     required String newPassword,
+    String? refreshToken,
   }) async {
     await _authService.confirmPasswordReset(
       token: token,
       newPassword: newPassword,
+      refreshToken: refreshToken,
     );
   }
 }

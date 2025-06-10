@@ -87,6 +87,7 @@ abstract class AuthService {
   Future<void> confirmPasswordReset({
     required String token,
     required String newPassword,
+    String? refreshToken,
   });
 }
 
@@ -618,14 +619,22 @@ class AuthServiceImpl implements AuthService {
   Future<void> confirmPasswordReset({
     required String token,
     required String newPassword,
+    String? refreshToken,
   }) async {
     try {
+      final payload = {
+        'token': token,
+        'new_password': newPassword,
+      };
+      
+      // Add refresh token if available
+      if (refreshToken != null) {
+        payload['refresh_token'] = refreshToken;
+      }
+      
       final response = await _apiClient.post(
         '/auth/password-reset-confirm',
-        {
-          'token': token,
-          'new_password': newPassword,
-        },
+        payload,
       );
       if (response == null) {
         throw Exception('Password reset confirmation failed: No response from server.');

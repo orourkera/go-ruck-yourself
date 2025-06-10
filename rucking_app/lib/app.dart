@@ -332,13 +332,26 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                 case '/password_reset':
                   final args = settings.arguments;
                   String? token;
+                  String? accessToken;
+                  String? refreshToken;
+                  
                   if (args is Map<String, dynamic>) {
-                    token = args['token'] as String?;
+                    // New format with both tokens
+                    accessToken = args['access_token'] as String?;
+                    refreshToken = args['refresh_token'] as String?;
+                    token = accessToken; // For backward compatibility
                   } else if (args is String) {
+                    // Legacy format with just token
                     token = args;
+                    accessToken = args;
                   }
+                  
                   return MaterialPageRoute(
-                    builder: (_) => PasswordResetScreen(token: token),
+                    builder: (_) => PasswordResetScreen(
+                      token: token,
+                      accessToken: accessToken,
+                      refreshToken: refreshToken,
+                    ),
                   );
                 case '/paywall':
                   return MaterialPageRoute(builder: (_) => const PaywallScreen());

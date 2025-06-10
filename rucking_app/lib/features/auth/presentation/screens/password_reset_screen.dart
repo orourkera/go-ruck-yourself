@@ -7,10 +7,14 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 
 class PasswordResetScreen extends StatefulWidget {
   final String? token;
+  final String? accessToken;
+  final String? refreshToken;
   
   const PasswordResetScreen({
     super.key,
     this.token,
+    this.accessToken,
+    this.refreshToken,
   });
 
   @override
@@ -33,11 +37,13 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
 
   void _resetPassword() {
     if (_formKey.currentState!.validate()) {
-      if (widget.token != null) {
+      final token = widget.accessToken ?? widget.token;
+      if (token != null) {
         context.read<AuthBloc>().add(
           AuthPasswordResetConfirmed(
-            token: widget.token!,
+            token: token,
             newPassword: _passwordController.text,
+            refreshToken: widget.refreshToken,
           ),
         );
       }
@@ -61,6 +67,18 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                 backgroundColor: Colors.red,
               ),
             );
+          } else if (state is PasswordResetSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Password reset successfully! Please log in with your new password.'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+            // Redirect to login screen after a short delay
+            Future.delayed(const Duration(seconds: 1), () {
+              Navigator.of(context).pushReplacementNamed('/login');
+            });
           } else if (state is Authenticated) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

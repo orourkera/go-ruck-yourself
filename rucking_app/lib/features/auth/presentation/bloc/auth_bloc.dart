@@ -282,10 +282,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _authRepository.confirmPasswordReset(
         token: event.token,
         newPassword: event.newPassword,
+        refreshToken: event.refreshToken,
       );
       
-      // After successful password reset, user needs to login again
-      emit(Unauthenticated());
+      // After successful password reset, emit success state
+      emit(const PasswordResetSuccess());
     } catch (e) {
       emit(AuthError('Password reset failed: $e'));
     }

@@ -51,12 +51,24 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
     
     if (type == 'recovery' && accessToken != null) {
       // This is a password reset callback
-      // Navigate to password reset screen with the token
+      // Navigate to password reset screen with the tokens
       print('🔑 Password reset callback detected');
-      Navigator.of(context).pushReplacementNamed(
-        '/password_reset',
-        arguments: accessToken,
-      );
+      print('🔑 Access token length: ${accessToken.length}');
+      print('🔑 Refresh token present: ${refreshToken != null}');
+      print('🔑 About to navigate to /password_reset');
+      
+      try {
+        Navigator.of(context).pushReplacementNamed(
+          '/password_reset',
+          arguments: {
+            'access_token': accessToken,
+            'refresh_token': refreshToken,
+          },
+        );
+        print('🔑 Navigation call completed successfully');
+      } catch (e) {
+        print('🔑 Navigation failed: $e');
+      }
     } else if (type == 'signup') {
       // Email confirmation callback
       _showSuccessAndRedirect('Email confirmed successfully!');
