@@ -10,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/core/models/terrain_segment.dart';
 
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
@@ -134,7 +135,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   bool mapReady = false;
   bool sessionRunning = false;
   bool uiInitialized = false;
-  bool _terrainExpanded = true; // Changed to true
+  bool _terrainExpanded = false; // Changed to false to be collapsed by default
+  ActiveSessionRunning? _lastActiveSessionRunning;
 
   void _checkAnimateOverlay() {
     // No animation needed anymore since we removed the gray overlay
@@ -174,6 +176,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
         setState(() {
           sessionRunning = true;
         });
+      }
+      if (state is ActiveSessionRunning) {
+        _lastActiveSessionRunning = state;
       }
     });
   }
@@ -303,30 +308,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         final notes = state.session.notes;
                         final heartRateSamples = state.session.heartRateSamples;
                         final splits = state.session.splits;
-
-                        if (state.session.endTime == null) {
-                          debugPrint('[SessionCompleteScreen] endTime was null, using DateTime.now()');
-                        }
-                        if (state.session.id == null) {
-                          debugPrint('[SessionCompleteScreen] ruckId was null, using empty string');
-                        }
-                        if (state.session.duration == null) {
-                          debugPrint('[SessionCompleteScreen] duration was null, using Duration.zero');
-                        }
-                        if (state.session.distance == null) {
-                          debugPrint('[SessionCompleteScreen] distance was null, using 0.0');
-                        }
-                        if (state.session.caloriesBurned == null) {
-                          debugPrint('[SessionCompleteScreen] caloriesBurned was null, using 0');
-                        }
-                        if (state.session.elevationGain == null) {
-                          debugPrint('[SessionCompleteScreen] elevationGain was null, using 0.0');
-                        }
-                        if (state.session.elevationLoss == null) {
-                          debugPrint('[SessionCompleteScreen] elevationLoss was null, using 0.0');
-                        }
-                        if (state.session.ruckWeightKg == null) {
-                          debugPrint('[SessionCompleteScreen] ruckWeightKg was null, using 0.0');
+                        
+                        // Get terrain segments from the previous running state if available
+                        List<TerrainSegment> terrainSegments = [];
+                        if (sessionRunning && _lastActiveSessionRunning != null) {
+                          terrainSegments = _lastActiveSessionRunning!.terrainSegments;
                         }
 
                         Navigator.of(context).pushReplacementNamed(
@@ -339,10 +325,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                             'caloriesBurned': caloriesBurned,
                             'elevationGain': elevationGain,
                             'elevationLoss': elevationLoss,
-                            'ruckWeight': ruckWeightKg,
+                            'ruckWeight': ruckWeightKg, // Changed back to ruckWeight
                             'initialNotes': notes,
                             'heartRateSamples': heartRateSamples,
                             'splits': splits,
+                            'terrainSegments': terrainSegments,
                           },
                         );
                       } else if (state is ActiveSessionRunning && !sessionRunning) {
@@ -517,7 +504,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       child: state is ActiveSessionRunning
                                           ? SessionStatsOverlay(
                                               state: state,
-                                              preferMetric: true,
+                                              preferMetric: context.read<AuthBloc>().state is Authenticated
+                                                  ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
+                                                  : true,
                                               useCardLayout: true,
                                             )
                                           : const Center(child: CircularProgressIndicator()),
@@ -525,37 +514,27 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   },
                                 ),
                               ),
-                              const SizedBox(height: 8.0), // Added for spacing
+                              const SizedBox(height: 4.0), // Reduced spacing before terrain widget
                               // Terrain Info Widget
                               if (state.terrainSegments.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.red, width: 2),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          'TERRAIN WIDGET AREA',
-                                          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                                        ),
-                                        TerrainInfoWidget(
-                                          terrainSegments: state.terrainSegments,
-                                          isExpanded: _terrainExpanded,
-                                          onToggle: () {
-                                            print('[ACTIVE_SESSION] TerrainInfoWidget toggle - was expanded: $_terrainExpanded');
-                                            setState(() {
-                                              _terrainExpanded = !_terrainExpanded;
-                                            });
-                                          },
-                                        ),
-                                      ],
-                                    ),
+                                  child: TerrainInfoWidget(
+                                    terrainSegments: state.terrainSegments,
+                                    preferMetric: context.read<AuthBloc>().state is Authenticated
+                                        ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
+                                        : true,
+                                    isExpanded: _terrainExpanded,
+                                    onToggle: () {
+                                      print('[ACTIVE_SESSION] TerrainInfoWidget toggle - was expanded: $_terrainExpanded');
+                                      setState(() {
+                                        _terrainExpanded = !_terrainExpanded;
+                                      });
+                                      print('[ACTIVE_SESSION] TerrainInfoWidget toggle - now expanded: $_terrainExpanded');
+                                    },
                                   ),
                                 ),
-                              const SizedBox(height: 8.0), // Added for spacing
+                              const SizedBox(height: 4.0), // Reduced spacing after terrain widget
                               // Controls at bottom
                               Padding(
                                 padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 10.0, top: 4.0),
@@ -665,7 +644,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                           'caloriesBurned': sessionDetails.calories.round(),
                                           'elevationGain': sessionDetails.elevationGain,
                                           'elevationLoss': sessionDetails.elevationLoss,
-                                          'ruckWeightKg': sessionDetails.ruckWeightKg,
+                                          'ruckWeight': sessionDetails.ruckWeightKg, // Changed back to ruckWeight
                                           'notes': null,
                                           'session': mockSession,
                                           'splits': sessionDetails.splits.map((splitData) => SessionSplit.fromJson(splitData as Map<String, dynamic>)).toList(),

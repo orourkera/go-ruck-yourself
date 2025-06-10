@@ -15,6 +15,8 @@ import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/core/models/terrain_segment.dart';
+import 'package:rucking_app/core/services/terrain_service.dart';
 
 // Achievement imports
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
@@ -62,6 +64,7 @@ class SessionCompleteScreen extends StatefulWidget {
   final String? initialNotes;
   final List<HeartRateSample>? heartRateSamples;
   final List<SessionSplit>? splits;
+  final List<TerrainSegment>? terrainSegments;
 
   const SessionCompleteScreen({
     super.key,
@@ -76,6 +79,7 @@ class SessionCompleteScreen extends StatefulWidget {
     this.initialNotes,
     this.heartRateSamples,
     this.splits,
+    this.terrainSegments,
   });
 
   @override
@@ -575,6 +579,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 _buildHeader(),
                 const SizedBox(height: 24),
                 _buildStatsGrid(preferMetric),
+                if (widget.terrainSegments != null && widget.terrainSegments!.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildTerrainBreakdownSection(preferMetric),
+                ],
                 if (widget.splits != null && widget.splits!.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   _buildSplitsSection(preferMetric),
@@ -645,6 +653,73 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           StatCard(title: 'Max HR', value: _maxHeartRate?.toString() ?? '--', icon: Icons.favorite_border, color: AppColors.error, centerContent: true, valueFontSize: 36),
       ],
     );
+  }
+
+  Widget _buildTerrainBreakdownSection(bool preferMetric) {
+    final stats = TerrainSegment.getTerrainStats(widget.terrainSegments!);
+    final surfaceBreakdown = stats['surface_breakdown'] as Map<String, double>? ?? <String, double>{};
+    final weightedMultiplier = stats['weighted_multiplier'] as double? ?? 1.0;
+    final mostCommonSurface = stats['most_common_surface'] as String? ?? 'paved';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.terrain, color: AppColors.success, size: 20),
+              const SizedBox(width: 8),
+              Text('Terrain Impact', style: AppTextStyles.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Primary Surface:', style: AppTextStyles.bodyMedium),
+              Text(_formatSurfaceType(mostCommonSurface), style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Energy Multiplier:', style: AppTextStyles.bodyMedium),
+              Text('${weightedMultiplier.toStringAsFixed(2)}x', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          if (surfaceBreakdown.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('Surface Breakdown:', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...surfaceBreakdown.entries.map((entry) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(_formatSurfaceType(entry.key), style: AppTextStyles.bodySmall),
+                  Text('${MeasurementUtils.formatDistance(entry.value, metric: preferMetric)}', style: AppTextStyles.bodySmall),
+                ],
+              ),
+            )),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatSurfaceType(String surfaceType) {
+    return surfaceType
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 
   Widget _buildSplitsSection(bool preferMetric) {

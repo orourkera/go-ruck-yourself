@@ -18,6 +18,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
+import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
@@ -374,6 +375,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           initialNotes: args['initialNotes'] as String?,
                           heartRateSamples: args['heartRateSamples'] as List<HeartRateSample>?,
                           splits: args['splits'] as List<SessionSplit>?,
+                          terrainSegments: args['terrainSegments'] as List<TerrainSegment>?,
                         ),
                       ),
                     );

@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
-import 'package:rucking_app/core/utils/app_logger.dart'; // Changed import statement
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 class TerrainInfoWidget extends StatelessWidget {
   final List<TerrainSegment> terrainSegments;
   final bool isExpanded;
+  final bool preferMetric;
   final VoidCallback? onToggle;
 
   const TerrainInfoWidget({
     Key? key,
     required this.terrainSegments,
+    required this.preferMetric,
     this.isExpanded = false,
     this.onToggle,
   }) : super(key: key);
@@ -24,6 +27,7 @@ class TerrainInfoWidget extends StatelessWidget {
     final terrainBreakdown = stats['surface_breakdown'] as Map<String, double>? ?? <String, double>{};
     final weightedMultiplier = stats['weighted_multiplier'] as double? ?? 1.0;
     final totalDistance = stats['total_distance_km'] as double? ?? 0.0;
+    final mostCommonSurface = stats['most_common_surface'] as String? ?? 'paved';
     
     AppLogger.debug('[TERRAIN_WIDGET] Showing terrain data: ${terrainSegments.length} segments, ${totalDistance.toStringAsFixed(3)}km total');
 
@@ -39,7 +43,7 @@ class TerrainInfoWidget extends StatelessWidget {
               color: terrainSegments.isEmpty ? Colors.grey : _getTerrainColor(weightedMultiplier),
             ),
             title: Text(
-              'Terrain Impact',
+              terrainSegments.isEmpty ? 'Terrain' : _formatSurfaceType(mostCommonSurface),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -47,7 +51,7 @@ class TerrainInfoWidget extends StatelessWidget {
             subtitle: Text(
               terrainSegments.isEmpty 
                 ? 'Tracking terrain - data will appear as you move'
-                : '${(weightedMultiplier * 100).toStringAsFixed(0)}% intensity',
+                : '${weightedMultiplier.toStringAsFixed(2)}x multiplier',
               style: TextStyle(
                 color: terrainSegments.isEmpty ? Colors.grey : _getTerrainColor(weightedMultiplier),
                 fontWeight: FontWeight.w600,
@@ -137,7 +141,7 @@ class TerrainInfoWidget extends StatelessWidget {
             ),
           ),
           Text(
-            '${distance.toStringAsFixed(1)}km',
+            MeasurementUtils.formatDistance(distance, metric: preferMetric),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
