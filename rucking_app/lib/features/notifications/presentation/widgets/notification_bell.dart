@@ -84,8 +84,8 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
           clipBehavior: Clip.none,
           children: [
             SizedBox(
-              width: 96, // 50% larger container
-              height: 96,
+              width: 48, // Optimized for mobile touch - 48px minimum touch target
+              height: 48,
               child: AnimatedBuilder(
                 animation: _rotationAnimation,
                 builder: (context, child) {
@@ -97,52 +97,59 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                     child: child,
                   );
                 },
-                child: IconButton(
-                  iconSize: 96, // 50% larger icon size
-                  padding: EdgeInsets.zero, // Remove padding to maximize space
-                  constraints: const BoxConstraints(), // Remove constraints to allow full size
-                  icon: Image.asset(
-                    'assets/images/notifications.png',
-                    width: 96, // 50% larger (previously 64px)
-                    height: 96, // 50% larger (previously 64px)
-                  ),
-                onPressed: () async {
-                  // Navigate to notifications screen
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const NotificationsScreen(),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24), // Circular ripple effect
+                    onTap: () async {
+                      // Navigate to notifications screen
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationsScreen(),
+                        ),
+                      );
+                      
+                      // When returning from the notifications screen, explicitly request
+                      // notification state refresh to update the counter
+                      if (context.mounted) {
+                        context.read<NotificationBloc>().add(const NotificationsRequested());
+                      }
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center, // Center the icon within tap target
+                      child: Image.asset(
+                        'assets/images/notifications.png',
+                        width: 32, // Slightly smaller icon but larger tap target
+                        height: 32,
+                      ),
                     ),
-                  );
-                  
-                  // When returning from the notifications screen, explicitly request
-                  // notification state refresh to update the counter
-                  if (context.mounted) {
-                    context.read<NotificationBloc>().add(const NotificationsRequested());
-                  }
-                  },
+                  ),
                 ),
               ),
             ),
             if (unreadCount > 0)
               Positioned(
-                right: 18,
-                top: 18,
+                right: 8, // Adjusted positioning for smaller icon
+                top: 8,
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(4), // Slightly smaller badge
                   decoration: BoxDecoration(
                     color: AppColors.error,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
+                    minWidth: 20,
+                    minHeight: 20,
                   ),
                   child: Text(
                     unreadCount > 99 ? '99+' : '$unreadCount',
-                    style: AppTextStyles.titleSmall.copyWith(
+                    style: AppTextStyles.bodySmall.copyWith( // Smaller text for smaller badge
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
+                      fontSize: 10,
                     ),
                     textAlign: TextAlign.center,
                   ),
