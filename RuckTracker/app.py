@@ -411,6 +411,43 @@ api.add_resource(DeviceTokenResource, '/api/device-token')
 def landing():
     return render_template('landing.html')
 
+# Auth redirect route to handle password reset from email and avoid Gmail scanner issues
+@app.route('/auth/redirect')
+def auth_redirect():
+    """
+    Handles redirect from email links to avoid Gmail scanner issues.
+    Redirects to the original Supabase URL after validation.
+    """
+    to_url = request.args.get('to')
+    
+    if not to_url:
+        logger.warning("Auth redirect called without 'to' parameter")
+        return "Missing redirect URL", 400
+    
+    # Validate that the 'to' URL is a legitimate Supabase URL
+    # This should match your Supabase project URL pattern
+    supabase_url = os.environ.get('SUPABASE_URL', '')
+    if not supabase_url:
+        logger.error("SUPABASE_URL environment variable not set")
+        return "Server configuration error", 500
+    
+    # Extract the domain from Supabase URL for validation
+    supabase_domain = supabase_url.replace('https://', '').replace('http://', '')
+    
+    if not to_url.startswith(f'https://{supabase_domain}/auth/v1/verify'):
+        logger.warning(f"Invalid redirect URL attempted: {to_url}")
+        return "Invalid redirect URL", 400
+    
+    logger.info(f"Redirecting to Supabase auth URL: {to_url}")
+    
+    # Add security headers to prevent caching and scanning
+    response = redirect(to_url, code=302)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
+    return response
+
 @app.route('/privacy')
 def privacy():
     return render_template('privacy.html')
