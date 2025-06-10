@@ -59,6 +59,10 @@
 	<array>
 		<string>com.getrucky.gfy.backgroundTask</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:getrucky.com</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

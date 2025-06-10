@@ -82,21 +82,100 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     
     // Clean up potentially duplicated URL
     String uriString = uri.toString();
-    if (uriString.contains('com.getrucky.app://auth/callbackcom.getrucky.app://auth/callback')) {
-      // Fix duplicated URL by extracting the proper parts
-      final duplicatedPart = 'com.getrucky.app://auth/callback';
-      final startIndex = uriString.indexOf(duplicatedPart);
-      if (startIndex > 0) {
-        // Take everything from the second occurrence onward
-        uriString = uriString.substring(startIndex);
+    print('🔍 Original URL: $uriString');
+    
+    // Handle extremely malformed URLs by extracting essential parts
+    if (uriString.contains('com.getrucky.app') && 
+        (uriString.contains('auth/callback') || uriString.contains('/callback'))) {
+      try {
+        // Extract the essential parameters from the malformed URL
+        String? accessToken;
+        String? refreshToken;
+        String? type;
+        String? error;
+        String? errorDescription;
+        String? errorCode;
+        
+        // Handle both query parameters (?) and hash fragments (#)
+        String paramString = '';
+        if (uriString.contains('?')) {
+          paramString = uriString.split('?').last;
+        } else if (uriString.contains('#')) {
+          paramString = uriString.split('#').last;
+        }
+        
+        // Use regex to extract parameters from the mess
+        final accessTokenMatch = RegExp(r'access_token=([^&]+)').firstMatch(paramString);
+        final refreshTokenMatch = RegExp(r'refresh_token=([^&]+)').firstMatch(paramString);
+        final typeMatch = RegExp(r'type=([^&]+)').firstMatch(paramString);
+        final errorMatch = RegExp(r'error=([^&]+)').firstMatch(paramString);
+        final errorDescMatch = RegExp(r'error_description=([^&]+)').firstMatch(paramString);
+        final errorCodeMatch = RegExp(r'error_code=([^&]+)').firstMatch(paramString);
+        
+        if (accessTokenMatch != null) accessToken = Uri.decodeComponent(accessTokenMatch.group(1)!);
+        if (refreshTokenMatch != null) refreshToken = Uri.decodeComponent(refreshTokenMatch.group(1)!);
+        if (typeMatch != null) type = Uri.decodeComponent(typeMatch.group(1)!);
+        if (errorMatch != null) error = Uri.decodeComponent(errorMatch.group(1)!);
+        if (errorDescMatch != null) errorDescription = Uri.decodeComponent(errorDescMatch.group(1)!);
+        if (errorCodeMatch != null) errorCode = Uri.decodeComponent(errorCodeMatch.group(1)!);
+        
+        // Rebuild a clean URL
+        String cleanUrl = 'com.getrucky.app://auth/callback';
+        List<String> params = [];
+        
+        if (accessToken != null) params.add('access_token=$accessToken');
+        if (refreshToken != null) params.add('refresh_token=$refreshToken');
+        if (type != null) params.add('type=$type');
+        if (error != null) params.add('error=$error');
+        if (errorDescription != null) params.add('error_description=$errorDescription');
+        if (errorCode != null) params.add('error_code=$errorCode');
+        
+        if (params.isNotEmpty) {
+          cleanUrl += '?' + params.join('&');
+        }
+        
+        uriString = cleanUrl;
         uri = Uri.parse(uriString);
-        print('🔧 Fixed duplicated URL: $uri');
+        print('🔧 Rebuilt clean URL: $uri');
+        
+      } catch (e) {
+        print('❌ Failed to clean malformed URL: $e');
+        return; // Skip processing this malformed URL
       }
     }
     
-    // Check if this is an auth callback
+    // Handle various malformed URL patterns
+    if (uriString.contains('com.getrucky.app://auth/callbackcom.getrucky.app://auth/callback') ||
+        uriString.contains('/callbackcom.getrucky.app://auth/callback') ||
+        uriString.contains('callbackcom.getrucky.app://auth/callback')) {
+      
+      // Fix duplicated URL by finding the last valid occurrence
+      const targetScheme = 'com.getrucky.app://auth/callback';
+      final lastIndex = uriString.lastIndexOf(targetScheme);
+      
+      if (lastIndex >= 0) {
+        // Extract from the last valid occurrence
+        uriString = uriString.substring(lastIndex);
+        uri = Uri.parse(uriString);
+        print('🔧 Fixed malformed URL: $uri');
+      }
+    }
+    
+    // Check if this is an auth callback (custom scheme OR universal link)
+    bool isAuthCallback = false;
+    
     if (uri.scheme == 'com.getrucky.app' && uri.path == '/auth/callback') {
-      print('✅ Auth callback detected, navigating...');
+      isAuthCallback = true;
+      print('✅ Custom scheme auth callback detected');
+    } else if (uri.scheme == 'https' && 
+               uri.host == 'getrucky.com' && 
+               uri.path == '/auth/callback') {
+      isAuthCallback = true;
+      print('✅ Universal Link auth callback detected');
+    }
+    
+    if (isAuthCallback) {
+      print('🔗 Processing auth callback with URI: $uri');
       // Navigate to auth callback screen
       _navigatorKey.currentState?.pushNamed(
         '/auth_callback',
