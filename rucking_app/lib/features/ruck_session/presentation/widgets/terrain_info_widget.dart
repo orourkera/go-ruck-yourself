@@ -20,11 +20,6 @@ class TerrainInfoWidget extends StatelessWidget {
     print('[TERRAIN_WIDGET] BUILD METHOD CALLED - ${terrainSegments.length} segments');
     AppLogger.debug('[TERRAIN_WIDGET] Building with ${terrainSegments.length} terrain segments');
     
-    if (terrainSegments.isEmpty) {
-      AppLogger.debug('[TERRAIN_WIDGET] No terrain segments - hiding widget');
-      return const SizedBox.shrink();
-    }
-
     final stats = TerrainSegment.getTerrainStats(terrainSegments);
     final terrainBreakdown = stats['terrainBreakdown'] as Map<String, double>;
     final weightedMultiplier = stats['weightedMultiplier'] as double;
@@ -39,7 +34,7 @@ class TerrainInfoWidget extends StatelessWidget {
           ListTile(
             leading: Icon(
               Icons.terrain,
-              color: _getTerrainColor(weightedMultiplier),
+              color: terrainSegments.isEmpty ? Colors.grey : _getTerrainColor(weightedMultiplier),
             ),
             title: Text(
               'Terrain Impact',
@@ -48,9 +43,11 @@ class TerrainInfoWidget extends StatelessWidget {
               ),
             ),
             subtitle: Text(
-              '${(weightedMultiplier * 100).toStringAsFixed(0)}% intensity',
+              terrainSegments.isEmpty 
+                ? 'No terrain data yet'
+                : '${(weightedMultiplier * 100).toStringAsFixed(0)}% intensity',
               style: TextStyle(
-                color: _getTerrainColor(weightedMultiplier),
+                color: terrainSegments.isEmpty ? Colors.grey : _getTerrainColor(weightedMultiplier),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -70,21 +67,36 @@ class TerrainInfoWidget extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Surface Breakdown',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  if (terrainSegments.isEmpty) 
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(
+                        child: Text(
+                          'Terrain data will appear as you move',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    )
+                  else ...[
+                    Text(
+                      'Surface Breakdown',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  ...terrainBreakdown.entries
-                      .where((entry) => entry.value > 0)
-                      .map((entry) => _buildTerrainRow(
-                            context,
-                            entry.key,
-                            entry.value,
-                            totalDistance,
-                          )),
+                    const SizedBox(height: 12),
+                    ...terrainBreakdown.entries
+                        .where((entry) => entry.value > 0)
+                        .map((entry) => _buildTerrainRow(
+                              context,
+                              entry.key,
+                              entry.value,
+                              totalDistance,
+                            )),
+                  ],
                 ],
               ),
             ),
