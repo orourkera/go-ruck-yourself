@@ -507,7 +507,22 @@ def password_reset_confirm():
                 return jsonify({"error": "Failed to update password"}), 400
         except Exception as supabase_error:
             logger.error(f"Supabase password update error: {str(supabase_error)}")
-            return jsonify({"error": "Failed to update password"}), 400
+            
+            # Extract the specific error message from Supabase
+            error_message = str(supabase_error)
+            
+            # For common user-facing errors, provide cleaner messages
+            if "New password should be different from the old password" in error_message:
+                error_message = "New password must be different from your current password"
+            elif "Password should be at least" in error_message:
+                error_message = "Password is too short. Please use at least 6 characters"
+            elif "Auth session missing" in error_message:
+                error_message = "Session expired. Please request a new password reset link"
+            else:
+                # For other errors, use a generic message but still informative
+                error_message = f"Password update failed: {error_message}"
+            
+            return jsonify({"error": error_message}), 400
             
     except Exception as e:
         logger.error(f"Password reset confirmation error: {str(e)}", exc_info=True)
