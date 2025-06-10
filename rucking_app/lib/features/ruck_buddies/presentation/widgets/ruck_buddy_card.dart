@@ -74,37 +74,20 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       developer.log('[SOCIAL_DEBUG] Could not get SocialRepository from GetIt: $e', name: 'RuckBuddyCard');
     }
     
-    // IMPORTANT: Immediately use the data from widget.ruckBuddy to prevent initial zero values
+    // Use the social data from widget.ruckBuddy directly (now included in API response)
     _likeCount = widget.ruckBuddy.likeCount ?? 0;
     _commentCount = widget.ruckBuddy.commentCount ?? 0;
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser ?? false;
     
-    // Try to get cached social data first for immediate display
+    // Cache the social data for consistency
     if (_ruckId != null && _socialRepository != null) {
-      final cachedLikeStatus = _socialRepository!.getCachedLikeStatus(_ruckId!);
-      final cachedLikeCount = _socialRepository!.getCachedLikeCount(_ruckId!);
-      
-      if (cachedLikeStatus != null) {
-        _isLiked = cachedLikeStatus;
-        developer.log('[SOCIAL_DEBUG] Using cached like status for ruck $_ruckId: $_isLiked', name: 'RuckBuddyCard');
-      }
-      
-      if (cachedLikeCount != null) {
-        _likeCount = cachedLikeCount;
-        developer.log('[SOCIAL_DEBUG] Using cached like count for ruck $_ruckId: $_likeCount', name: 'RuckBuddyCard');
-      }
+      _socialRepository!.setCachedLikeStatus(_ruckId!, _isLiked);
+      _socialRepository!.setCachedLikeCount(_ruckId!, _likeCount!);
+      developer.log('[SOCIAL_DEBUG] Cached social data from API response for ruck $_ruckId: likes=$_likeCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
     }
     
-    // Fetch fresh data from SocialBloc (this will update if different from cache)
-    if (_ruckId != null) {
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard initState for ruckId: $_ruckId - dispatching CheckRuckLikeStatus and LoadRuckComments', name: 'RuckBuddyCard');
-      try {
-        context.read<SocialBloc>().add(CheckRuckLikeStatus(_ruckId!));
-        context.read<SocialBloc>().add(LoadRuckComments(_ruckId!.toString()));
-      } catch (e) {
-        developer.log('[SOCIAL_DEBUG] Error dispatching events in RuckBuddyCard initState: $e. Ensure SocialBloc is provided.', name: 'RuckBuddyCard');
-      }
-    }
+    // No need to fetch social data separately since it's included in the API response
+    // This improves performance by avoiding unnecessary API calls
     
     // Initialize photos and log status
     _photos = widget.ruckBuddy.photos != null ? List<RuckPhoto>.from(widget.ruckBuddy.photos!) : [];
@@ -257,10 +240,13 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     if (_isProcessingLike || _ruckId == null) return;
 
     try {
+      // Provide immediate strong haptic feedback
+      HapticFeedback.heavyImpact();
+      
       // Use ToggleRuckLike event for both liking and unliking
       context.read<SocialBloc>().add(ToggleRuckLike(_ruckId!));
       
-      // Optimistically update UI
+      // Optimistically update UI immediately
       setState(() {
         _isLiked = !_isLiked;
         _likeCount = _isLiked ? (_likeCount ?? 0) + 1 : (_likeCount ?? 1) - 1;
@@ -269,8 +255,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       });
       
       developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Sent ToggleRuckLike event for ruckId: $_ruckId, new status: $_isLiked', name: 'RuckBuddyCard');
-      
-      HapticFeedback.mediumImpact();
     } catch (e) {
       developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Error toggling like: $e');
     }
@@ -586,7 +570,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         // Like button
-                        InkWell(
+                        GestureDetector(
                           onTap: widget.onLikeTap ?? _handleLikeTap,
                           child: Row(
                             children: [
