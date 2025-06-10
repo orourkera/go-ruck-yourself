@@ -17,10 +17,6 @@ class ImagePickerUtils {
           content: const Text('Choose how you\'d like to select your avatar image:'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext, null),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
               onPressed: () => Navigator.pop(dialogContext, 'camera'),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
@@ -40,6 +36,14 @@ class ImagePickerUtils {
                   SizedBox(width: 8),
                   Text('Gallery'),
                 ],
+              ),
+            ),
+            // Cancel button moved to bottom left
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => Navigator.pop(dialogContext, null),
+                child: const Text('Cancel'),
               ),
             ),
           ],

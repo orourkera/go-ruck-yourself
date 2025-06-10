@@ -52,13 +52,13 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
         title: const Text('Create Duel'),
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
         actions: [
           TextButton(
             onPressed: () => context.read<CreateDuelBloc>().add(ResetCreateDuel()),
-            child: const Text(
+            child: Text(
               'Reset',
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
             ),
           ),
         ],
@@ -147,7 +147,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       title,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
         fontWeight: FontWeight.normal,
-        color: Colors.black,
+        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
       ),
     );
   }
@@ -159,9 +159,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _titleController,
       decoration: InputDecoration(
         labelText: 'Duel Title *',
-        labelStyle: const TextStyle(color: Colors.black),
+        labelStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
         hintText: 'Enter a catchy title for your duel',
-        hintStyle: TextStyle(color: Colors.grey[600]),
+        hintStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600]),
         errorText: hasError ? state.errors['title'] : null,
         border: const OutlineInputBorder(),
       ),
@@ -191,16 +191,17 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
   Widget _buildChallengeTypeDropdown() {
     return DropdownButtonFormField<String>(
       value: _selectedChallengeType,
-      decoration: const InputDecoration(
+      dropdownColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.white,
+      decoration: InputDecoration(
         labelText: 'Challenge Type *',
-        labelStyle: TextStyle(color: Colors.black),
-        border: OutlineInputBorder(),
+        labelStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+        border: const OutlineInputBorder(),
       ),
-      items: const [
-        DropdownMenuItem(value: 'distance', child: Text('Distance (km)')),
-        DropdownMenuItem(value: 'time', child: Text('Time (minutes)')),
-        DropdownMenuItem(value: 'elevation', child: Text('Elevation (meters)')),
-        DropdownMenuItem(value: 'power_points', child: Text('Power Points')),
+      items: [
+        DropdownMenuItem(value: 'distance', child: Text('Distance (km)', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87))),
+        DropdownMenuItem(value: 'time', child: Text('Time (minutes)', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87))),
+        DropdownMenuItem(value: 'elevation', child: Text('Elevation (meters)', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87))),
+        DropdownMenuItem(value: 'power_points', child: Text('Power Points', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87))),
       ],
       onChanged: (value) {
         setState(() {
@@ -217,9 +218,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _targetValueController,
       decoration: InputDecoration(
         labelText: 'Target Value *',
-        labelStyle: const TextStyle(color: Colors.black),
+        labelStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
         hintText: _getTargetValueHint(),
-        hintStyle: TextStyle(color: Colors.grey[600]),
+        hintStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600]),
         errorText: hasError ? state.errors['targetValue'] : null,
         border: const OutlineInputBorder(),
         suffixText: _getTargetValueUnit(),
@@ -245,9 +246,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _timeframeController,
       decoration: InputDecoration(
         labelText: 'Timeframe (Days) *',
-        labelStyle: const TextStyle(color: Colors.black),
+        labelStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
         hintText: 'How long will this duel last?',
-        hintStyle: TextStyle(color: Colors.grey[600]),
+        hintStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600]),
         errorText: hasError ? state.errors['timeframeHours'] : null,
         border: const OutlineInputBorder(),
         suffixText: 'days',
@@ -274,9 +275,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _maxParticipantsController,
       decoration: InputDecoration(
         labelText: 'Maximum Participants',
-        labelStyle: const TextStyle(color: Colors.black),
+        labelStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
         hintText: 'e.g., 10',
-        hintStyle: TextStyle(color: Colors.grey[600]),
+        hintStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600]),
         errorText: hasError ? state.errors['maxParticipants'] : null,
         border: const OutlineInputBorder(),
         suffixText: 'people',
@@ -306,9 +307,9 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       controller: _minParticipantsController,
       decoration: InputDecoration(
         labelText: 'Minimum Participants to Start',
-        labelStyle: const TextStyle(color: Colors.black),
+        labelStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
         hintText: 'e.g., 2',
-        hintStyle: TextStyle(color: Colors.grey[600]),
+        hintStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600]),
         errorText: hasError ? state.errors['minParticipants'] : null,
         border: const OutlineInputBorder(),
         suffixText: 'people',
@@ -339,16 +340,16 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Start Mode',
-          style: TextStyle(fontSize: 16, color: Colors.black),
+          style: TextStyle(fontSize: 16, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: RadioListTile<String>(
-                title: const Text('Auto Start', style: TextStyle(fontSize: 14)),
+                title: Text('Auto Start', style: TextStyle(fontSize: 14, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87)),
                 value: 'auto',
                 groupValue: _startMode,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -361,7 +362,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
             ),
             Expanded(
               child: RadioListTile<String>(
-                title: const Text('Manual Start', style: TextStyle(fontSize: 14)),
+                title: Text('Manual Start', style: TextStyle(fontSize: 14, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87)),
                 value: 'manual',
                 groupValue: _startMode,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -381,7 +382,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
             _startMode == 'auto' 
                 ? 'Duel will automatically start once minimum participants join'
                 : 'You\'ll need to manually start the duel after participants join',
-            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600]),
           ),
         ),
       ],
@@ -469,24 +470,24 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       onPressed: isLoading ? null : _submitForm,
       style: ElevatedButton.styleFrom(
         backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
       ),
       child: isLoading
-          ? const SizedBox(
+          ? SizedBox(
               height: 20,
               width: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             )
-          : const Text(
+          : Text(
               'Create Duel',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
     );
   }
