@@ -26,7 +26,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  void _submit() async {
+  void _sendResetLink() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -43,6 +43,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           // Success - show success message
           setState(() {
             _message = data['message'] ?? 'If an account exists for this email, a password reset link has been sent.';
+          });
+          // Show success and navigate back after delay
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              Navigator.of(context).pop(); // Go back to login
+            }
           });
         } else {
           // Error - show in SnackBar and navigate back to login
@@ -83,54 +89,74 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Forgot Password')),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Lost Rucker Image
-              Center(
-                child: Image.asset(
-                  'assets/images/lost rucker.png',
-                  width: 200,
-                  height: 200,
-                ),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                'Enter your email to receive a password reset link.',
-                style: AppTextStyles.bodyLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              CustomTextField(
-                controller: _emailController,
-                label: 'Email',
-                hint: 'Enter your email',
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return mapFriendlyErrorMessage('Please enter your email');
-                  }
-                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                    return mapFriendlyErrorMessage('Please enter a valid email');
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              if (_message != null)
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 32),
+                // Lost Rucker Image
                 Center(
-                  child: Text(_message!, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.success)),
+                  child: Image.asset(
+                    'assets/images/lost rucker.png',
+                    width: 200,
+                    height: 200,
+                  ),
                 ),
-              CustomButton(
-                text: 'Send Reset Link',
-                onPressed: _isLoading ? null : _submit,
-                isLoading: _isLoading,
-              ),
-            ],
+                const SizedBox(height: 32),
+                Text(
+                  'Enter your email to receive a password reset link.',
+                  style: AppTextStyles.bodyLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                CustomTextField(
+                  controller: _emailController,
+                  label: 'Email',
+                  hint: 'Enter your email',
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return mapFriendlyErrorMessage('Please enter your email');
+                    }
+                    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                      return mapFriendlyErrorMessage('Please enter a valid email');
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                if (_message != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.success),
+                    ),
+                    child: Text(
+                      _message!,
+                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.success),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                if (_message != null) const SizedBox(height: 24),
+                CustomButton(
+                  text: 'Send Reset Link',
+                  onPressed: _isLoading ? null : _sendResetLink,
+                  isLoading: _isLoading,
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Back to Login'),
+                ),
+                const SizedBox(height: 32), // Extra padding at bottom
+              ],
+            ),
           ),
         ),
       ),
