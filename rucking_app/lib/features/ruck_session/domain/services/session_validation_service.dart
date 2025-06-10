@@ -101,7 +101,8 @@ class SessionValidationService {
     }
 
     if (speedKmh != null) {
-      // Check for too-fast movement
+      // Check for too-fast movement - DISABLED FOR NOW
+      /*
       if (speedKmh > maxSpeedKmh) {
         if (_overSpeedStartTime == null) {
           _overSpeedStartTime = point.timestamp;
@@ -113,6 +114,7 @@ class SessionValidationService {
       } else {
         _overSpeedStartTime = null;
       }
+      */
 
       // Check for not moving (auto-pause) - DISABLED
       /*

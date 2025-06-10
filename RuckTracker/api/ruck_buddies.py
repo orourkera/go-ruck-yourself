@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, g, request
+from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import jwt_required
 import os
 from datetime import datetime, timedelta
@@ -16,39 +16,46 @@ def get_ruck_buddies():
     Filters by is_public = true and user.allow_ruck_sharing = true.
     
     Query params:
-    - limit: Number of sessions to return (default: 20)
-    - offset: Pagination offset (default: 0)
-    - filter: 'closest' (default), 'calories', 'distance' (furthest), 'duration' (longest), 'elevation' (most elevation)
+    - page: Page number (default: 1)
+    - per_page: Number of sessions per page (default: 20)
+    - sort_by: Sorting option - 'proximity_asc', 'calories_desc', 'distance_desc', 'duration_desc', 'elevation_gain_desc'
+    - latitude, longitude: Required for proximity_asc sorting
     """
     # Ensure g.user is available from auth_required decorator
     if not hasattr(g, 'user') or not g.user:
         return jsonify({'error': 'Authentication required'}), 401
 
-    limit = request.args.get('limit', 20, type=int)
-    offset = request.args.get('offset', 0, type=int)
-    filter_type = request.args.get('filter', 'closest')
+    # Get pagination parameters (convert from page-based to offset-based)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    offset = (page - 1) * per_page
     
-    # Get latitude and longitude for closest filter if provided
+    # Get sort_by parameter (this matches what the frontend sends)
+    sort_by = request.args.get('sort_by', 'proximity_asc')
+    
+    # Get latitude and longitude for proximity sorting
     latitude = request.args.get('latitude', type=float)
     longitude = request.args.get('longitude', type=float)
     
-    # Define ordering based on filter type
-    if filter_type == 'calories':
+    # Define ordering based on sort_by parameter
+    if sort_by == 'calories_desc':
         order_by = "calories_burned.desc"
-    elif filter_type == 'distance':
+    elif sort_by == 'distance_desc':
         order_by = "distance_km.desc"
-    elif filter_type == 'duration':
+    elif sort_by == 'duration_desc':
         order_by = "duration_seconds.desc"
-    elif filter_type == 'elevation':
+    elif sort_by == 'elevation_gain_desc':
         order_by = "elevation_gain_m.desc"
-    else:  # 'closest' is default, but fallback to completed_at if no coordinates provided
+    elif sort_by == 'proximity_asc':
         if latitude is not None and longitude is not None:
             # For proximity, we'll need to handle this separately
             # This is a placeholder - in a real implementation, we would use geospatial functions
-            order_by = "completed_at.desc"  # Fallback ordering
+            order_by = "completed_at.desc"  # Fallback ordering for now
         else:
             order_by = "completed_at.desc"  # Default if no coordinates
-    
+    else:
+        order_by = "completed_at.desc"  # Default fallback
+
     # Get supabase client
     supabase = get_supabase_client(g.access_token if hasattr(g, 'access_token') else None)
 
@@ -67,7 +74,7 @@ def get_ruck_buddies():
         .eq('user.allow_ruck_sharing', True) \
         .neq('user_id', g.user.id) \
         .order(order_by) \
-        .limit(limit) \
+        .limit(per_page) \
         .offset(offset)
 
     # Execute the query
@@ -81,8 +88,8 @@ def get_ruck_buddies():
         'ruck_sessions': response.data,
         'meta': {
             'count': len(response.data),
-            'limit': limit,
-            'offset': offset,
-            'filter': filter_type
+            'per_page': per_page,
+            'page': page,
+            'sort_by': sort_by
         }
     }), 200
