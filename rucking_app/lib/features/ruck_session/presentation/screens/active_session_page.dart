@@ -134,7 +134,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   bool mapReady = false;
   bool sessionRunning = false;
   bool uiInitialized = false;
-  bool _terrainExpanded = false;
+  bool _terrainExpanded = true; // Changed to true
 
   void _checkAnimateOverlay() {
     // No animation needed anymore since we removed the gray overlay
@@ -417,9 +417,15 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       }
 
                       if (state is ActiveSessionInitial || state is ActiveSessionLoading) {
-                        return _buildSessionContent(state);
+                        return const Center(child: CircularProgressIndicator());
                       }
                       if (state is ActiveSessionRunning) {
+                        print('[ACTIVE_SESSION_PAGE] ActiveSessionRunning - building UI');
+                        print('[ACTIVE_SESSION_PAGE] Terrain segments count: ${state.terrainSegments.length}');
+                        if (state.terrainSegments.isEmpty) {
+                          print('[ACTIVE_SESSION_PAGE] No terrain segments available yet');
+                        }
+                        
                         final route = state.locationPoints
                             .map((p) => latlong.LatLng(p.latitude, p.longitude))
                             .toList();
@@ -443,8 +449,12 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                             initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
                                             onMapReady: () {
                                               if (!mapReady) {
-                                                setState(() {
-                                                  mapReady = true;
+                                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                  if (mounted) {
+                                                    setState(() {
+                                                      mapReady = true;
+                                                    });
+                                                  }
                                                 });
                                                 _checkAnimateOverlay();
                                               }
@@ -492,22 +502,59 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                     return true;
                                   },
                                   builder: (context, state) {
+                                    print('[ACTIVE_SESSION_PAGE] BlocBuilder build called with state: ${state.runtimeType}');
                                     if (state is ActiveSessionRunning) {
-                                      final authBloc = Provider.of<AuthBloc>(context, listen: false);
-                                      final bool preferMetric = authBloc.state is Authenticated
-                                          ? (authBloc.state as Authenticated).user.preferMetric
-                                          : true;
-                                      return SessionStatsOverlay(
-                                        state: state,
-                                        preferMetric: preferMetric,
-                                        useCardLayout: true,
-                                      );
+                                      print('[ACTIVE_SESSION_PAGE] ActiveSessionRunning state - terrainSegments: ${state.terrainSegments.length}');
+                                      print('[ACTIVE_SESSION_PAGE] Terrain segments: ${state.terrainSegments.map((s) => s.surfaceType).toList()}');
                                     }
-                                    // Fallback: show placeholder stats instead of spinner
-                                    return SessionStatsOverlay.placeholder();
+                                    
+                                    if (state is ActiveSessionRunning) {
+                                      sessionRunning = true;
+                                      _checkAnimateOverlay();
+                                    }
+                                    return AnimatedSwitcher(
+                                      duration: const Duration(milliseconds: 300),
+                                      child: state is ActiveSessionRunning
+                                          ? SessionStatsOverlay(
+                                              state: state,
+                                              preferMetric: true,
+                                              useCardLayout: true,
+                                            )
+                                          : const Center(child: CircularProgressIndicator()),
+                                    );
                                   },
                                 ),
                               ),
+                              const SizedBox(height: 8.0), // Added for spacing
+                              // Terrain Info Widget
+                              if (state.terrainSegments.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.red, width: 2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          'TERRAIN WIDGET AREA',
+                                          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                                        ),
+                                        TerrainInfoWidget(
+                                          terrainSegments: state.terrainSegments,
+                                          isExpanded: _terrainExpanded,
+                                          onToggle: () {
+                                            print('[ACTIVE_SESSION] TerrainInfoWidget toggle - was expanded: $_terrainExpanded');
+                                            setState(() {
+                                              _terrainExpanded = !_terrainExpanded;
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(height: 8.0), // Added for spacing
                               // Controls at bottom
                               Padding(
@@ -668,107 +715,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     );
   }
 
-  Widget _buildSessionContent(ActiveSessionState state) {
-    final authBloc = Provider.of<AuthBloc>(context, listen: false);
-    final bool preferMetric = authBloc.state is Authenticated
-        ? (authBloc.state as Authenticated).user.preferMetric
-        : true;
-    
-    List<latlong.LatLng> route = [];
-    if (state is ActiveSessionRunning) {
-      route = state.locationPoints
-          .map((point) => latlong.LatLng(point.latitude, point.longitude))
-          .toList();
-    }
-    
-    return Column(
-      children: [
-        // Map section always visible
-        Expanded(
-          flex: 2,
-          child: _RouteMap(
-            route: route,
-            initialCenter: route.isNotEmpty ? route.last : null,
-            onMapReady: () {
-              if (!mapReady) {
-                setState(() {
-                  mapReady = true;
-                });
-                _checkAnimateOverlay();
-              }
-            },
-          ),
-        ),
-        // Stats area or spinner below the map
-        Expanded(
-          flex: 1,
-          child: state is ActiveSessionRunning
-              ? SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-                  child: Column(
-                    children: [
-                      // GPS Status Indicator
-                      if (state is ActiveSessionRunning && !state.hasGpsAccess)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
-                            border: Border.all(color: Colors.orange, width: 1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.location_off, color: Colors.orange, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Offline Mode - No GPS tracking (perfect for indoor workouts or airplanes)',
-                                  style: TextStyle(
-                                    color: Colors.orange,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      () {
-                        print('[DEBUG] Building stats column children...');
-                        print('[DEBUG] State type: ${state.runtimeType}');
-                        print('[DEBUG] Terrain segments count: ${(state as ActiveSessionRunning).terrainSegments.length}');
-                        return Container();
-                      }(),
-                      SessionStatsOverlay(
-                        state: state as ActiveSessionRunning,
-                        preferMetric: preferMetric,
-                        useCardLayout: true,
-                      ),
-                      const SizedBox(height: 8),
-                      () {
-                        print('[DEBUG] About to create TerrainInfoWidget...');
-                        print('[ACTIVE_SESSION] Building TerrainInfoWidget with ${(state as ActiveSessionRunning).terrainSegments.length} segments');
-                        return TerrainInfoWidget(
-                          terrainSegments: (state as ActiveSessionRunning).terrainSegments,
-                          isExpanded: _terrainExpanded,
-                          onToggle: () {
-                            setState(() {
-                              _terrainExpanded = !_terrainExpanded;
-                            });
-                          },
-                        );
-                      }(),
-                    ],
-                  ),
-                )
-              : const Center(child: CircularProgressIndicator()),
-        ),
-      ],
-    );
-  }
-
   Widget _buildPaceDisplay(ActiveSessionState state) {
     final authBloc = Provider.of<AuthBloc>(context, listen: false);
     final bool preferMetric = authBloc.state is Authenticated
@@ -842,8 +788,12 @@ class _RouteMapState extends State<_RouteMap> {
   // This method will be called when map tiles are loaded
   void _onTilesLoaded() {
     if (!_tilesLoaded && mounted) {
-      setState(() {
-        _tilesLoaded = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _tilesLoaded = true;
+          });
+        }
       });
     }
   }
@@ -1199,5 +1149,3 @@ class _PauseOverlay extends StatelessWidget {
     );
   }
 }
-
-// CountdownOverlay has been moved to a dedicated CountdownPage

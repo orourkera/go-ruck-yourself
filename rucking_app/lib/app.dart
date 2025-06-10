@@ -171,20 +171,53 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       }
     }
     
-    // Check if this is an auth callback (custom scheme OR universal link)
+    // Determine if this is an auth callback (login, signup, password recovery)
     bool isAuthCallback = false;
+    if ((uri.scheme == 'com.getrucky.app' &&
+            (uri.path == '/auth/callback' || uri.path == '/callback')) ||
+        (uri.scheme == 'https' &&
+            uri.host == 'getrucky.com' &&
+            uri.path == '/auth/callback')) {
+      isAuthCallback = true;
+    }
+
+    // Supabase may send parameters in the URI fragment (after '#').
+    // Convert fragment to query parameters so they can be read by Uri.queryParameters.
+    if (isAuthCallback && uri.fragment.isNotEmpty && uri.query.isEmpty) {
+      try {
+        final rebuilt = Uri(
+          scheme: uri.scheme,
+          host: uri.host,
+          path: uri.path,
+          query: uri.fragment, // treat fragment as query
+        );
+        uri = rebuilt;
+        print('🔄 Converted fragment to query: $uri');
+      } catch (e) {
+        print('❌ Failed to convert fragment to query: $e');
+      }
+    }
+
+    if (isAuthCallback) {
+      print('🔗 Processing auth callback with URI: $uri');
+      _navigatorKey.currentState?.pushNamed('/auth_callback', arguments: uri);
+      return;
+    }
+    
+    // Check if this is an auth callback (custom scheme OR universal link)
+    bool isAuthCallbackOld = false;
     
     if (uri.scheme == 'com.getrucky.app' && uri.path == '/auth/callback') {
-      isAuthCallback = true;
+      isAuthCallbackOld = true;
       print('✅ Custom scheme auth callback detected');
     } else if (uri.scheme == 'https' && 
                uri.host == 'getrucky.com' && 
                uri.path == '/auth/callback') {
-      isAuthCallback = true;
+      isAuthCallbackOld = true;
       print('✅ Universal Link auth callback detected');
     }
     
-    if (isAuthCallback) {
+    if (isAuthCallbackOld) {
       print('🔗 Processing auth callback with URI: $uri');
       // Navigate to auth callback screen
       _navigatorKey.currentState?.pushNamed(

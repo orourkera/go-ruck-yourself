@@ -559,10 +559,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                 ],
                               ),
                               // Notification bell with unread count
-                              Transform.scale(
-                                scale: 0.75,
-                                child: NotificationBell(useLadyMode: isLadyMode),
-                              ),
+                              NotificationBell(useLadyMode: isLadyMode),
                             ],
                           ),
                           const SizedBox(height: 16),

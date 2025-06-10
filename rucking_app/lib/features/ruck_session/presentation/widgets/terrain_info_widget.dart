@@ -21,14 +21,16 @@ class TerrainInfoWidget extends StatelessWidget {
     AppLogger.debug('[TERRAIN_WIDGET] Building with ${terrainSegments.length} terrain segments');
     
     final stats = TerrainSegment.getTerrainStats(terrainSegments);
-    final terrainBreakdown = stats['terrainBreakdown'] as Map<String, double>;
-    final weightedMultiplier = stats['weightedMultiplier'] as double;
-    final totalDistance = stats['totalDistance'] as double;
+    final terrainBreakdown = stats['surface_breakdown'] as Map<String, double>? ?? <String, double>{};
+    final weightedMultiplier = stats['weighted_multiplier'] as double? ?? 1.0;
+    final totalDistance = stats['total_distance_km'] as double? ?? 0.0;
     
     AppLogger.debug('[TERRAIN_WIDGET] Showing terrain data: ${terrainSegments.length} segments, ${totalDistance.toStringAsFixed(3)}km total');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      color: terrainSegments.isEmpty ? Colors.grey[50] : null,
       child: Column(
         children: [
           ListTile(
@@ -44,7 +46,7 @@ class TerrainInfoWidget extends StatelessWidget {
             ),
             subtitle: Text(
               terrainSegments.isEmpty 
-                ? 'No terrain data yet'
+                ? 'Tracking terrain - data will appear as you move'
                 : '${(weightedMultiplier * 100).toStringAsFixed(0)}% intensity',
               style: TextStyle(
                 color: terrainSegments.isEmpty ? Colors.grey : _getTerrainColor(weightedMultiplier),
