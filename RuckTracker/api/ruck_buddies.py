@@ -62,13 +62,16 @@ def get_ruck_buddies():
     
     # Base query getting public ruck sessions that aren't from the current user
     # Also join with users table to get user display info and check allow_ruck_sharing
+    # Include social data (likes, comments) to avoid separate API calls
     query = supabase.table('ruck_session') \
         .select(
             'id, user_id, ruck_weight_kg, duration_seconds, distance_km, calories_burned,'
             ' elevation_gain_m, elevation_loss_m, started_at, completed_at, created_at,'
             ' avg_heart_rate, '
             ' user:user_id(id,username,allow_ruck_sharing,gender),'
-            ' location_points:location_point!location_point_session_id_fkey(id,latitude,longitude,altitude,timestamp)'
+            ' location_points:location_point!location_point_session_id_fkey(id,latitude,longitude,altitude,timestamp),'
+            ' likes:ruck_like!ruck_like_session_id_fkey(id,user_id),'
+            ' comments:ruck_comment!ruck_comment_session_id_fkey(id,user_id,content,created_at)'
         ) \
         .eq('is_public', True) \
         .eq('user.allow_ruck_sharing', True) \
@@ -83,9 +86,34 @@ def get_ruck_buddies():
     if hasattr(response, 'error') and response.error:
         return jsonify({'error': response.error}), 500
     
-    # Return the data
+    # Process the response to add computed social data
+    processed_sessions = []
+    current_user_id = g.user.id
+    
+    for session in response.data:
+        # Count likes and check if current user liked it
+        likes = session.get('likes', [])
+        like_count = len(likes)
+        is_liked_by_current_user = any(like.get('user_id') == current_user_id for like in likes)
+        
+        # Count comments
+        comments = session.get('comments', [])
+        comment_count = len(comments)
+        
+        # Add computed fields to session data
+        session['like_count'] = like_count
+        session['is_liked_by_current_user'] = is_liked_by_current_user
+        session['comment_count'] = comment_count
+        
+        # Remove the raw likes/comments arrays to keep response clean
+        session.pop('likes', None)
+        session.pop('comments', None)
+        
+        processed_sessions.append(session)
+    
+    # Return the processed data
     return jsonify({
-        'ruck_sessions': response.data,
+        'ruck_sessions': processed_sessions,
         'meta': {
             'count': len(response.data),
             'per_page': per_page,
