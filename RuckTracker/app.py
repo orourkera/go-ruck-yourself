@@ -22,6 +22,8 @@ load_dotenv()
 log_level = logging.INFO
 if os.environ.get("FLASK_ENV") == "development":
     log_level = logging.DEBUG
+elif os.environ.get("FLASK_ENV") == "production":
+    log_level = logging.WARNING
 
 logging.basicConfig(
     level=log_level,
@@ -69,6 +71,12 @@ if database_url.startswith("postgres://"):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Recommended to disable
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 5,
+    'pool_recycle': 300,
+    'pool_pre_ping': True,
+    'max_overflow': 0
+}
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
@@ -89,7 +97,9 @@ limiter = Limiter(
     app=app,
     default_limits=["200 per day", "50 per hour"],
     storage_uri=redis_url,
-    strategy="fixed-window"
+    strategy="fixed-window",
+    storage_options={"connection_pool_kwargs": {"max_connections": 20}},
+    swallow_errors=True
 )
 limiter.init_app(app)
 
@@ -302,6 +312,21 @@ def enforce_https():
         url = request.url.replace("http://", "https://", 1)
         return redirect(url, code=301)
 
+# Add teardown handler to ensure database sessions are cleaned up
+@app.teardown_appcontext
+def cleanup_db(error):
+    if hasattr(g, 'db_session'):
+        g.db_session.remove()
+    db.session.remove()
+
+# Add periodic cleanup
+@app.before_request
+def before_request():
+    # Ensure we don't accumulate sessions
+    db.session.remove()
+
+logger.info("Application initialized successfully! All API endpoints registered.")
+
 # Auth endpoints (prefixed with /api)
 api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
 api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin')
@@ -467,10 +492,6 @@ def health():
         'status': 'ok',
         'version': '1.0.0'
     })
-
-logger.info("Application initialized successfully! All API endpoints registered.")
-
-# Trigger redeploy: Cascade forced comment
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
