@@ -75,14 +75,37 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
 
   void _handleDeepLink(Uri uri) {
     print('Received deep link: $uri');
+    print('Deep link scheme: ${uri.scheme}');
+    print('Deep link host: ${uri.host}');
+    print('Deep link path: ${uri.path}');
+    print('Deep link query: ${uri.query}');
+    
+    // Clean up potentially duplicated URL
+    String uriString = uri.toString();
+    if (uriString.contains('com.getrucky.app://auth/callbackcom.getrucky.app://auth/callback')) {
+      // Fix duplicated URL by extracting the proper parts
+      final duplicatedPart = 'com.getrucky.app://auth/callback';
+      final startIndex = uriString.indexOf(duplicatedPart);
+      if (startIndex > 0) {
+        // Take everything from the second occurrence onward
+        uriString = uriString.substring(startIndex);
+        uri = Uri.parse(uriString);
+        print('🔧 Fixed duplicated URL: $uri');
+      }
+    }
     
     // Check if this is an auth callback
     if (uri.scheme == 'com.getrucky.app' && uri.path == '/auth/callback') {
+      print('✅ Auth callback detected, navigating...');
       // Navigate to auth callback screen
       _navigatorKey.currentState?.pushNamed(
         '/auth_callback',
         arguments: uri,
       );
+    } else {
+      print('❌ Not an auth callback:');
+      print('  Expected scheme: com.getrucky.app, got: ${uri.scheme}');
+      print('  Expected path: /auth/callback, got: ${uri.path}');
     }
   }
 

@@ -53,7 +53,7 @@ void main() async {
   await dotenv.load();
   
   // --------------------------
-  // Initialize Supabase FIRST
+  // Initialize Supabase FIRST (with network error handling)
   // --------------------------
   final supabaseUrl = dotenv.env['SUPABASE_URL'];
   final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
@@ -63,13 +63,25 @@ void main() async {
     throw Exception('SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env file');
   }
 
-  await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseKey,
-  );
+  try {
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseKey,
+    );
+    AppLogger.info('Supabase initialized successfully');
+  } catch (e) {
+    AppLogger.error('Failed to initialize Supabase (network issue): $e');
+    // Continue anyway - app can still work in offline mode
+  }
   
   // Initialize dependency injection after env vars & Supabase are loaded
-  await setupServiceLocator();
+  try {
+    await setupServiceLocator();
+    AppLogger.info('Service locator initialized successfully');
+  } catch (e) {
+    AppLogger.error('Failed to initialize some services (network issue): $e');
+    // Continue anyway - essential services should still work
+  }
   
   // Request App Tracking Transparency authorization
   // This is required for iOS 14.5+ to comply with Apple's App Store guidelines
