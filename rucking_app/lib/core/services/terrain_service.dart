@@ -5,7 +5,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 /// Service for querying terrain surface data from OpenStreetMap
 class TerrainService {
   static const String _overpassUrl = 'https://overpass-api.de/api/interpreter';
-  static const Duration _requestTimeout = Duration(seconds: 10);
+  static const Duration _requestTimeout = Duration(seconds: 8); // Increased from 10s to 8s for faster fallback
   
   // Cache for surface data to avoid repeated API calls
   static final Map<String, TerrainData> _surfaceCache = {};
@@ -22,11 +22,13 @@ class TerrainService {
     
     // Check cache first
     if (_surfaceCache.containsKey(cacheKey)) {
-      AppLogger.debug('[TERRAIN] Using cached data for segment: $cacheKey');
+      AppLogger.debug('[TERRAIN] 🎯 Using cached data for segment: $cacheKey');
       return _surfaceCache[cacheKey]!;
     }
     
     try {
+      AppLogger.debug('[TERRAIN] 🌐 Querying OSM for segment: $cacheKey');
+      
       // Create bounding box around the route segment
       final bbox = _createBoundingBox(startLat, startLon, endLat, endLon);
       
@@ -42,12 +44,12 @@ class TerrainService {
       // Cache the result
       _surfaceCache[cacheKey] = terrainData;
       
-      AppLogger.debug('[TERRAIN] Found surface: $surfaceType (multiplier: ${terrainData.energyMultiplier}) for segment: $cacheKey');
+      AppLogger.debug('[TERRAIN] ✅ Found surface: $surfaceType (multiplier: ${terrainData.energyMultiplier}) for segment: $cacheKey');
       
       return terrainData;
       
     } catch (e) {
-      AppLogger.error('[TERRAIN] Error getting terrain data: $e');
+      AppLogger.error('[TERRAIN] ❌ Error getting terrain data: $e');
       
       // Return default (pavement) on error
       final defaultTerrain = TerrainData(
@@ -56,6 +58,7 @@ class TerrainService {
       );
       
       _surfaceCache[cacheKey] = defaultTerrain;
+      AppLogger.debug('[TERRAIN] 🔄 Using default terrain (paved/1.0x) for segment: $cacheKey');
       return defaultTerrain;
     }
   }
@@ -66,14 +69,16 @@ class TerrainService {
     final query = '''
 [out:json][timeout:5];
 (
-  way["highway"]["surface"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["footway"]["surface"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["path"]["surface"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+way["highway"]["surface"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+way["footway"]["surface"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+way["path"]["surface"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 out tags;
 ''';
     
     try {
+      AppLogger.debug('[TERRAIN] 📡 Making OSM API request...');
+      
       final response = await http.post(
         Uri.parse(_overpassUrl),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -81,15 +86,16 @@ out tags;
       ).timeout(_requestTimeout);
       
       if (response.statusCode == 200) {
+        AppLogger.debug('[TERRAIN] ✅ OSM API response received (${response.body.length} chars)');
         final data = json.decode(response.body);
         return _extractMostCommonSurface(data);
       } else {
-        AppLogger.warning('[TERRAIN] OSM API returned status: ${response.statusCode}');
+        AppLogger.warning('[TERRAIN] ⚠️ OSM API returned status: ${response.statusCode}');
         return 'paved'; // Default fallback
       }
       
     } catch (e) {
-      AppLogger.error('[TERRAIN] Error querying OSM: $e');
+      AppLogger.error('[TERRAIN] ❌ Error querying OSM: $e');
       return 'paved'; // Default fallback
     }
   }

@@ -5,6 +5,7 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/widgets/stat_row.dart';
 
 /// A card widget that displays session information
 class SessionCard extends StatelessWidget {
@@ -83,36 +84,17 @@ class SessionCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: _buildSessionStat(
-                      Icons.timer,
-                      'Duration',
-                      durationText,
+                    child: StatRow(
+                      icon: Icons.timer,
+                      label: 'Duration',
+                      value: durationText,
                     ),
                   ),
                   Expanded(
-                    child: _buildSessionStat(
-                      Icons.straighten,
-                      'Distance',
-                      distanceValue,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSessionStat(
-                      Icons.local_fire_department,
-                      'Calories',
-                      calories,
-                    ),
-                  ),
-                  Expanded(
-                    child: _buildSessionStat(
-                      Icons.terrain,
-                      'Elevation',
-                      elevationDisplay,
+                    child: StatRow(
+                      icon: Icons.straighten,
+                      label: 'Distance',
+                      value: distanceValue,
                     ),
                   ),
                 ],
@@ -121,10 +103,29 @@ class SessionCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: _buildSessionStat(
-                      Icons.fitness_center,
-                      'Weight',
-                      weightDisplay,
+                    child: StatRow(
+                      icon: Icons.local_fire_department,
+                      label: 'Calories',
+                      value: calories,
+                    ),
+                  ),
+                  Expanded(
+                    child: StatRow(
+                      icon: Icons.terrain,
+                      label: 'Elevation',
+                      value: elevationDisplay,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatRow(
+                      icon: Icons.fitness_center,
+                      label: 'Weight',
+                      value: weightDisplay,
                     ),
                   ),
                 ],
@@ -133,37 +134,6 @@ class SessionCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-  
-  Widget _buildSessionStat(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: AppColors.secondary,
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textDarkSecondary,
-                ),
-              ),
-              Text(
-                value,
-                style: AppTextStyles.titleMedium,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

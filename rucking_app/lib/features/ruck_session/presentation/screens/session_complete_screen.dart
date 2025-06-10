@@ -49,6 +49,7 @@ import 'package:rucking_app/core/services/share_service.dart';
 import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_state.dart';
+import 'package:rucking_app/shared/widgets/stat_row.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -210,7 +211,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         }
         
         // Try to get location points from active session state first or the repository
-        List<Map<String, dynamic>>? locationPoints;
+        List<dynamic>? locationPoints;
         final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
         
         if (activeSessionState is ActiveSessionRunning && activeSessionState.locationPoints.isNotEmpty) {
@@ -323,7 +324,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       final bool isLadyMode = authState is Authenticated ? authState.user.gender == 'female' : false;
       
       // Try to get location points from active session state first
-      List<Map<String, dynamic>>? locationPoints;
+      List<dynamic>? locationPoints;
       final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
       
       if (activeSessionState is ActiveSessionRunning && activeSessionState.locationPoints.isNotEmpty) {

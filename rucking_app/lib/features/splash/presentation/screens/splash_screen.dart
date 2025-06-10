@@ -132,6 +132,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         debugPrint('[Splash] User is subscribed. Navigating to HomeScreen.');
         Navigator.pushReplacementNamed(context, '/home');
       } else if (!hasSeenPaywall) {
+        // PAYWALL DISABLED: Skip paywall and go straight to home
+        debugPrint('[Splash] First launch - PAYWALL DISABLED, navigating to HomeScreen.');
+        await FirstLaunchService.markPaywallSeen();
+        Navigator.pushReplacementNamed(context, '/home');
+        
+        /* ORIGINAL PAYWALL LOGIC - PRESERVED FOR FUTURE RESTORATION
         // First time user sees paywall - show it and mark as seen
         debugPrint('[Splash] First launch - showing PaywallScreen.');
         await FirstLaunchService.markPaywallSeen();
@@ -139,6 +145,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           context,
           MaterialPageRoute(builder: (context) => const PaywallScreen()),
         );
+        */
       } else {
         // User has seen paywall before - go straight to home
         debugPrint('[Splash] User has seen paywall before. Navigating to HomeScreen.');

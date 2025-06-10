@@ -21,8 +21,14 @@ class TerrainInfoWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     print('[TERRAIN_WIDGET] BUILD METHOD CALLED - ${terrainSegments.length} segments');
-    AppLogger.debug('[TERRAIN_WIDGET] Building with ${terrainSegments.length} terrain segments');
+    AppLogger.debug('[TERRAIN_WIDGET] 🏗️ Building with ${terrainSegments.length} terrain segments');
     
+    // Debug log all segments
+    for (int i = 0; i < terrainSegments.length; i++) {
+      final segment = terrainSegments[i];
+      AppLogger.debug('[TERRAIN_WIDGET] Segment $i: ${segment.surfaceType} - ${(segment.distanceKm * 1000).toStringAsFixed(1)}m (${segment.energyMultiplier}x)');
+    }
+
     final stats = TerrainSegment.getTerrainStats(terrainSegments);
     final terrainBreakdown = stats['surface_breakdown'] as Map<String, double>? ?? <String, double>{};
     final weightedMultiplier = stats['weighted_multiplier'] as double? ?? 1.0;

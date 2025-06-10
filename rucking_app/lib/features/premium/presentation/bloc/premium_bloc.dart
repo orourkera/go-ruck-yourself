@@ -33,7 +33,8 @@ class PremiumBloc extends Bloc<PremiumEvent, PremiumState> {
     Emitter<PremiumState> emit,
   ) async {
     try {
-      final isPremium = await _premiumService.isPremium();
+      // Force refresh to bypass cache and get latest subscription status
+      final isPremium = await _premiumService.isPremium(forceRefresh: true);
       emit(PremiumLoaded(isPremium: isPremium));
     } catch (e) {
       emit(PremiumError('Failed to check premium status: ${e.toString()}'));

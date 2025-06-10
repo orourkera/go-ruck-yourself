@@ -354,6 +354,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         
         // Track terrain for this segment
         if (_terrainTracker.shouldQueryTerrain(newPoint)) {
+          AppLogger.debug('[TERRAIN] 🌍 Attempting to track terrain segment...');
           try {
             final terrainSegment = await _terrainTracker.trackTerrainSegment(
               startLocation: prevPoint,
@@ -362,12 +363,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             
             if (terrainSegment != null) {
               newTerrainSegments.add(terrainSegment);
-              AppLogger.debug('[TERRAIN] Added terrain segment: ${terrainSegment.surfaceType} (${terrainSegment.energyMultiplier}x)');
+              AppLogger.debug('[TERRAIN] ✅ Added terrain segment: ${terrainSegment.surfaceType} (${terrainSegment.energyMultiplier}x) - Total segments: ${newTerrainSegments.length}');
+            } else {
+              AppLogger.warning('[TERRAIN] ⚠️ Terrain segment was null');
             }
           } catch (e) {
-            AppLogger.warning('[TERRAIN] Failed to track terrain segment: $e');
+            AppLogger.warning('[TERRAIN] ❌ Failed to track terrain segment: $e');
             // Continue without terrain data - session continues normally
           }
+        } else {
+          AppLogger.debug('[TERRAIN] ⏳ Terrain query skipped (throttled)');
         }
       }
       

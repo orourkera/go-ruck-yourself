@@ -9,6 +9,7 @@ import 'package:rucking_app/features/achievements/presentation/bloc/achievement_
 import 'package:rucking_app/features/achievements/data/models/achievement_model.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 
 /// Achievement Summary widget for displaying quick achievement stats
 class AchievementSummary extends StatefulWidget {
@@ -51,6 +52,11 @@ class _AchievementSummaryState extends State<AchievementSummary> {
   Widget build(BuildContext context) {
     return BlocBuilder<AchievementBloc, AchievementState>(
       builder: (context, state) {
+        // Show skeleton loading while loading
+        if (state is AchievementsLoading) {
+          return const AchievementSummarySkeleton();
+        }
+        
         return Card(
           elevation: 4,
           shape: RoundedRectangleBorder(
@@ -122,12 +128,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
 
   Widget _buildStatsRow(AchievementState state) {
     if (state is AchievementsLoading || (state is AchievementsLoaded && state.stats == null)) {
-      return const Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-        ],
-      );
+      return const AchievementStatsSkeleton();
     }
 
     final stats = (state is AchievementsLoaded) ? state.stats : null;
@@ -147,32 +148,7 @@ class _AchievementSummaryState extends State<AchievementSummary> {
 
   Widget _buildRecentAchievements(AchievementState state) {
     if (state is AchievementsLoading) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Loading next challenge...',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      );
+      return const RecentAchievementSkeleton();
     }
 
     if (state is! AchievementsLoaded) {

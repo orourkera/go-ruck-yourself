@@ -16,6 +16,7 @@ import 'package:rucking_app/features/ruck_session/data/repositories/session_repo
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/premium/presentation/widgets/premium_tab_interceptor.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 
 class SessionHistoryScreen extends StatefulWidget {
   const SessionHistoryScreen({Key? key}) : super(key: key);
@@ -44,6 +45,8 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
   Future<void> _loadSessions() async {
     // Get the session history bloc and request sessions
     final historyBloc = context.read<SessionHistoryBloc>();
+    
+    // Trigger fresh load
     historyBloc.add(const LoadSessionHistory());
   }
   
@@ -97,7 +100,11 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       child: BlocBuilder<SessionHistoryBloc, SessionHistoryState>(
         builder: (context, state) {
           if (state is SessionHistoryLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return SingleChildScrollView(
+              child: Column(
+                children: List.generate(5, (index) => const SessionCardSkeleton()),
+              ),
+            );
           } else if (state is SessionHistoryLoaded) {
             final sessions = state.sessions;
             
@@ -134,7 +141,16 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (context) => const AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Deleting session...'),
+          ],
+        ),
+      ),
     );
     try {
       final repo = GetIt.instance<SessionRepository>();

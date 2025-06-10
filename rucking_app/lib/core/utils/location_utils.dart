@@ -55,8 +55,11 @@ class LocationUtils {
     try {
       // OpenStreetMap Nominatim API for reverse geocoding
       final response = await http.get(
-        Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${point.latitude}&lon=${point.longitude}&zoom=18&addressdetails=1'),
-        headers: {'User-Agent': 'RuckingApp/1.0'},
+        Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${point.latitude}&lon=${point.longitude}&zoom=18&addressdetails=1&accept-language=en'),
+        headers: {
+          'User-Agent': 'RuckingApp/1.0',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
       ).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
@@ -84,43 +87,56 @@ class LocationUtils {
       String? park = address['park'] ?? 
                      address['national_park'] ?? 
                      address['protected_area'] ?? 
-                     address['monument'];
-                     
-      String? tourism = address['tourism'];
-      String? attraction = address['attraction'];
+                     address['nature_reserve'] ??
+                     address['memorial'] ??
+                     address['monument'] ??
+                     address['leisure'] ??
+                     address['attraction'] ??
+                     address['tourism'];
+      
+      String? neighbourhood = address['neighbourhood'] ?? 
+                             address['suburb'] ?? 
+                             address['residential'] ??
+                             address['quarter'] ??
+                             address['district'];
+      
       String? city = address['city'] ?? 
                      address['town'] ?? 
                      address['village'] ?? 
+                     address['municipality'] ??
                      address['hamlet'];
-                     
-      String? county = address['county'];
-      String? state = address['state'];
-      String? country = address['country_code']?.toUpperCase();
       
-      // Build the location string prioritizing landmarks, then city, state
+      String? state = address['state'] ?? 
+                      address['province'] ?? 
+                      address['region'];
+      
+      String? country = address['country'];
+      
+      // Build location string prioritizing most specific/interesting info
       List<String> locationParts = [];
       
-      // First priority: Parks, monuments, tourist attractions
-      if (park != null) {
+      // Add park/monument first (most specific/interesting)
+      if (park != null && park.isNotEmpty) {
         locationParts.add(park);
-      } else if (tourism != null) {
-        locationParts.add(tourism);
-      } else if (attraction != null) {
-        locationParts.add(attraction);
       }
       
-      // Second priority: City/State (or international equivalent)
-      List<String> civilianParts = [];
-      if (city != null) civilianParts.add(city);
-      if (state != null) civilianParts.add(state);
-      if (civilianParts.isEmpty && county != null) civilianParts.add(county);
-      
-      if (civilianParts.isNotEmpty) {
-        locationParts.add(civilianParts.join(", "));
+      // Add neighbourhood if no park
+      if (locationParts.isEmpty && neighbourhood != null && neighbourhood.isNotEmpty) {
+        locationParts.add(neighbourhood);
       }
       
-      // Fallback: Use country code if nothing else is available
-      if (locationParts.isEmpty && country != null) {
+      // Add city
+      if (city != null && city.isNotEmpty) {
+        locationParts.add(city);
+      }
+      
+      // Add state  
+      if (state != null && state.isNotEmpty) {
+        locationParts.add(state);
+      }
+      
+      // Add country if we don't have enough info
+      if (locationParts.length < 2 && country != null && country.isNotEmpty) {
         return country;
       }
       

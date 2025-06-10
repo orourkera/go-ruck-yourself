@@ -1,624 +1,457 @@
-# Ruck Club – Product Requirements & Technical Implementation Plan
+# Ruck Clubs & Events - Product Requirements Document and Technical Implementation Plan
 
-## 1. Product Requirements Document (PRD)
+## Overview
+The Ruck Clubs & Events feature introduces two core social concepts to the rucking app:
+- **Clubs**: Persistent communities for ruck organization and administration
+- **Events**: Individual ruck sessions that users can create, join, and optionally associate with clubs
 
-### 1.1 Purpose
-Enable social rucking by allowing users to form **Clubs** that can schedule and perform **Club Rucks** together, compete on leader-boards, and view collective history – all tightly integrated with existing Ruck session flow.
+## Core Concepts
 
-### 1.3 Key Features
-1. **Club Management**
-   * Admin creates club (title, description, photo, location).
-   * Invite members via email / SMS, approve/deny joins, remove members.
-2. **Club Ruck Coordination**
-   * **Scheduled Rucks**: Creator schedules rucks for specific time/place with automatic club notifications.
-   * **RSVP System**: Members can confirm attendance; creator sees headcount before ruck starts.
-   * Waiting-room lobby – members tap *Join*; creator taps *Start* to begin synchronized session for all participants.
-   * Push notification sent when lobby opens and for scheduled ruck reminders.
-3. **Leader-Boards**
-   * Global & monthly totals plus per-member averages for distance, weight, elevation & power points.
-4. **Club History** 
-   * List of past Club Rucks with participant list & aggregated stats.
-   * Upcoming scheduled rucks with RSVP status.
-5. **Navigation Updates**
-   * New **Club** tab in bottom nav.
-   * Existing *Stats* panel moved inside *History* tab as sub-tab.
+### **Clubs**
+- Persistent communities with member management
+- Admin-controlled membership (invite/approve system)
+- Can host club-specific events with automatic member notifications
+- Accessible via dedicated top-bar icon (separate from main navigation)
 
-### 1.5 Non-Functional Requirements
-* Real-time lobby latency <1 s.
-* Notification delivery ≥95 % within 5 s.
-* Feature behind remote config flag for staged rollout.
+### **Events** 
+- Individual ruck sessions (replacing/extending current duels concept)
+- Open to all users or club-specific
+- Can be standalone or club-affiliated
+- Club events automatically notify all club members
+- Accessible via main navigation tab (replacing Profile tab)
 
----
+## Navigation & UI Architecture Changes
 
-## 2. Technical Implementation Plan
+### Top Bar (Home Screen)
+**Current**: `[Notifications] [Home Title] [Profile]`
+**New**: `[Notifications] [Clubs] [Home Title] [Profile]`
 
-### 2.1 Architecture Overview
-```
-Flutter UI  ─► BLoC  ─► Repository  ─► Supabase RPC / Realtime Channels / DB
-                                       ▲                                │
-        FCM push  ◄────────────────────┘                                │
-```
-* **Database**: Supabase Postgres with RLS.
-* **Realtime**: Supabase Realtime Channels for lobby presence & live stats.
-* **Notifications**: Firebase Cloud Messaging triggered by Supabase Edge Functions.
+- **Clubs Icon**: New icon next to notifications for club management
+- **Profile Icon**: Moved from main navigation to top bar
 
-### 2.2 Database Schema (new tables only)
-| Table | Columns | Notes |
-| ----- | ------- | ----- |
-| club | id (PK), title, description, photo_url, location (GEOGRAPHY), admin_id (FK → users) | |
-| club_member | club_id FK, user_id FK, role (admin/member), joined_at | Composite PK (club_id,user_id) |
-| club_ruck | id PK, club_id FK, creator_id FK, started_at, ended_at, status (waiting/active/complete), scheduled_at | |
-| club_ruck_participant | ruck_id FK, user_id FK, join_time, leave_time, stats_json, rsvp_status (yes/no/maybe) | Aggregated per-person stats |
-| scheduled_ruck | id PK, club_id FK, creator_id FK, scheduled_at, location (GEOGRAPHY), description | |
+### Main Navigation
+**Current**: `[Home] [Buddies] [History] [Profile]`
+**New**: `[Home] [Buddies] [History] [Events]`
 
-RLS rules ensure only members access their club data.
+- **Events Tab**: Replaces Profile tab, uses calendar icon
+- **Profile Access**: Now only available via top bar
 
-### 2.3 Backend / Edge Functions
-| Endpoint / Topic | Method | Description |
-| ---------------- | ------ | ----------- |
-| /api/clubs | POST | Create club (admin only) |
-| /api/clubs/{id}/invite | POST | Invite/add users |
-| /api/clubs/{id}/members/{uid} | DELETE | Remove member |
-| /api/club-rucks | POST | Create lobby (status=waiting) |
-| /api/scheduled-rucks | POST | Create scheduled ruck |
-| /api/scheduled-rucks/{id}/rsvp | POST | Update RSVP status |
-| realtime channel `club_ruck_{id}` | WS | Presence & live totals |
-| Edge Function `notify_club_ruck_start` | Trigger on club_rucks insert | Send FCM to club members |
-| Edge Function `notify_scheduled_ruck_reminder` | Trigger on scheduled_rucks scheduled_at | Send FCM to club members |
+## Feature Requirements
 
-### 2.4 Flutter Front-End
-1. **Navigation**
-   * Add `ClubTab` in `MainNavBar`.
-   * Move Stats under History (`HistoryScreen` with `TabBar` [History | Stats]).
-2. **Screens / Widgets**
-   * `ClubListScreen` – user’s clubs & create button.
-   * `CreateClubScreen` – form + image picker + location autocomplete (Mapbox geocoding).
-   * `ClubDetailScreen` – members, description, leader-board, history, upcoming scheduled rucks.
-   * `InviteMembersSheet` – share link or select contacts.
-   * `ClubRuckLobbyScreen` – waiting room list & Start button.
-   * `ScheduledRuckScreen` – schedule ruck form.
-   * `RSVPScreen` – RSVP list for scheduled ruck.
-   * `ActiveSessionScreen` – add aggregate view when `clubRuckId != null` & user is creator.
-   * `AvailableLobbiesBottomSheet` – surfaced on Create Session if member has open lobby.
-3. **State Management (BLoC)**
-   * `ClubBloc` – CRUD, invites, members.
-   * `ClubRuckBloc` – lobby state, realtime updates, stats aggregation.
-   * `ScheduledRuckBloc` – scheduled ruck state, RSVP updates.
-4. **Repositories**
-   * `ClubRepository` – Supabase calls for clubs & members.
-   * `ClubRuckRepository` – Supabase + realtime.
-   * `ScheduledRuckRepository` – Supabase calls for scheduled rucks.
-5. **Notifications**
-   * Configure FCM topic per club → `club_{id}`.
-   * Tap action deep-links to lobby screen or scheduled ruck screen.
+### Clubs Feature (Top Bar Access)
+1. **Club Discovery & Management**
+   - Browse/search available clubs
+   - View club details, member count, recent activity
+   - Create new clubs (with approval process)
 
-### 2.5 Task Breakdown & Estimates
-| # | Task | Owner | Est (hrs) |
-| - | ---- | ----- | --------- |
-| **Backend** |||
-| B1 | DB schema migrations & RLS | BE | 8 |
-| B2 | CRUD REST/RPC endpoints | BE | 10 |
-| B3 | Edge Function for notifications | BE | 6 |
-| B4 | Realtime channel setup & row-level triggers | BE | 8 |
-| **Flutter** |||
-| F1 | Navigation refactor (new Club tab, Stats move) | FE | 4 |
-| F2 | Club list & create screens | FE | 12 |
-| F3 | Club detail (members, leader-board, history, upcoming scheduled rucks) | FE | 16 |
-| F4 | Invite workflow (email/SMS share) | FE | 8 |
-| F5 | Lobby screen with realtime presence | FE | 12 |
-| F6 | Scheduled ruck screen & RSVP workflow | FE | 14 |
-| F7 | Available lobbies selection bottom sheet | FE | 6 |
-| F8 | Active session aggregate overlay | FE | 6 |
-| **State/BLoC** |||
-| S1 | ClubBloc & repository | FE | 10 |
-| S2 | ClubRuckBloc & repository | FE | 12 |
-| S3 | ScheduledRuckBloc & repository | FE | 10 |
-| **Notifications / Deep Links** |||
-| N1 | FCM topic subscription management | FE | 4 |
-| N2 | Deep link handling into lobby or scheduled ruck | FE | 6 |
-| **QA / Testing** |||
-| Q1 | Unit tests (repos, blocs) | QA | 10 |
-| Q2 | Widget tests (screens) | QA | 8 |
-| Q3 | Integration & e2e (2 devices synchronous ruck) | QA | 12 |
-| **Dev Ops** |||
-| D1 | Feature flag & staged rollout config | DevOps | 2 |
-| D2 | CI pipeline updates (migrations, tests) | DevOps | 2 |
-| **Total** | | ~170 hrs (~4.5 weeks with 2 devs) |
+2. **Membership Management**
+   - Join club (request-based approval)
+   - Leave club
+   - Admin functions: approve/deny requests, remove members
 
-### 2.6 Risks & Mitigations
-| Risk | Impact | Mitigation |
-| ---- | ------ | ---------- |
-| Realtime sync latency | Poor UX | Use Supabase presence; throttle payloads; fallback polling |
-| Notification spam | User annoyance | Throttle function: only one start-notification per lobby |
-| Privacy of location | GDPR | Do not expose live GPS; only aggregate/show distance etc. |
+3. **Club Administration** 
+   - Edit club details, logo, description
+   - Manage member roles and permissions
+   - Club settings and privacy controls
 
-### 2.7 Rollout Plan
-1. Internal QA (feature flag off)
-2. Closed beta with selected clubs
-3. Gradual 10 % → 50 % → 100 % rollout
-4. Post-launch KPI review after 2 weeks
+### Events Feature (Main Nav Tab)
+1. **Event Discovery**
+   - List view similar to current duels interface
+   - Filter by: upcoming, past, club events, public events
+   - Club events display club logo prominently
 
----
+2. **Event Creation**
+   - Standard event details (location, time, difficulty, etc.)
+   - **Club Event Toggle**: If user belongs to clubs, option to make it a club event
+   - Club events automatically notify all club members
 
-## 3. Detailed Implementation Guide
+3. **Event Participation**
+   - RSVP system with capacity limits
+   - Real-time participant list
+   - Event-specific chat/comments
 
-### 3.1 Detailed Database Schema
+## Database Schema Changes
 
-#### 3.1.1 club table
+### New Tables
+
 ```sql
-CREATE TABLE club (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
+-- Clubs table
+CREATE TABLE clubs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
     description TEXT,
-    photo_url TEXT,
-    location GEOGRAPHY(POINT, 4326),
-    location_name VARCHAR(255),
-    admin_id UUID NOT NULL REFERENCES auth.users(id),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    member_count INTEGER DEFAULT 1,
-    total_distance_km NUMERIC DEFAULT 0,
-    total_elevation_m NUMERIC DEFAULT 0,
-    is_active BOOLEAN DEFAULT true,
-    settings JSONB DEFAULT '{}',
-    CONSTRAINT club_title_check CHECK (char_length(title) >= 3)
+    logo_url TEXT,
+    admin_user_id UUID REFERENCES auth.users(id) NOT NULL,
+    is_public BOOLEAN DEFAULT true,
+    max_members INTEGER DEFAULT 50,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_club_admin_id ON club(admin_id);
-CREATE INDEX idx_club_location ON club USING GIST(location);
-CREATE INDEX idx_club_created_at ON club(created_at DESC);
-```
-
-#### 3.1.2 club_member table
-```sql
-CREATE TABLE club_member (
-    club_id UUID REFERENCES club(id) ON DELETE CASCADE,
+-- Club memberships
+CREATE TABLE club_memberships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    club_id UUID REFERENCES clubs(id) ON DELETE CASCADE,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    role VARCHAR(20) DEFAULT 'member' CHECK (role IN ('admin', 'member')),
-    joined_at TIMESTAMPTZ DEFAULT NOW(),
-    invite_status VARCHAR(20) DEFAULT 'accepted' CHECK (invite_status IN ('pending', 'accepted', 'rejected')),
-    invited_by UUID REFERENCES auth.users(id),
-    stats JSONB DEFAULT '{"total_distance": 0, "total_rucks": 0, "total_weight": 0}',
-    notification_preferences JSONB DEFAULT '{"club_ruck_start": true, "scheduled_reminders": true}',
-    PRIMARY KEY (club_id, user_id)
+    role VARCHAR(20) DEFAULT 'member', -- 'admin', 'member'  
+    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(club_id, user_id)
 );
 
-CREATE INDEX idx_club_member_user_id ON club_member(user_id);
-CREATE INDEX idx_club_member_joined_at ON club_member(joined_at DESC);
+-- Events table (evolution of duels)
+CREATE TABLE events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    creator_user_id UUID REFERENCES auth.users(id) NOT NULL,
+    club_id UUID REFERENCES clubs(id) ON DELETE SET NULL, -- NULL for public events
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    location_name VARCHAR(200),
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    scheduled_start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    max_participants INTEGER,
+    difficulty_level INTEGER CHECK (difficulty_level BETWEEN 1 AND 5),
+    ruck_weight_kg DECIMAL(5, 2),
+    status VARCHAR(20) DEFAULT 'scheduled', -- 'scheduled', 'active', 'completed', 'cancelled'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Event participants (evolution of duel participants)
+CREATE TABLE event_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    status VARCHAR(20) DEFAULT 'registered', -- 'registered', 'joined', 'completed', 'no_show'
+    registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(event_id, user_id)
+);
 ```
 
-#### 3.1.3 club_ruck table
+### Row Level Security Policies
+
 ```sql
-CREATE TABLE club_ruck (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    club_id UUID REFERENCES club(id) ON DELETE CASCADE,
-    creator_id UUID REFERENCES auth.users(id),
-    scheduled_ruck_id UUID REFERENCES scheduled_ruck(id),
-    status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'complete', 'cancelled')),
-    started_at TIMESTAMPTZ,
-    ended_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    lobby_settings JSONB DEFAULT '{"max_participants": null, "auto_start": false}',
-    aggregated_stats JSONB DEFAULT '{}',
-    CONSTRAINT club_ruck_times_check CHECK (
-        (status = 'waiting' AND started_at IS NULL) OR
-        (status IN ('active', 'complete') AND started_at IS NOT NULL)
+-- Clubs RLS
+ALTER TABLE clubs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public clubs viewable by everyone" ON clubs
+FOR SELECT USING (is_public = true OR auth.uid() IN (
+    SELECT user_id FROM club_memberships 
+    WHERE club_id = clubs.id AND status = 'approved'
+));
+
+CREATE POLICY "Club admins can update clubs" ON clubs
+FOR UPDATE USING (admin_user_id = auth.uid());
+
+-- Club memberships RLS  
+ALTER TABLE club_memberships ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Members can view club memberships" ON club_memberships
+FOR SELECT USING (
+    user_id = auth.uid() OR 
+    club_id IN (
+        SELECT club_id FROM club_memberships cm2 
+        WHERE cm2.user_id = auth.uid() AND cm2.status = 'approved'
     )
 );
 
-CREATE INDEX idx_club_ruck_club_id ON club_ruck(club_id);
-CREATE INDEX idx_club_ruck_status ON club_ruck(status);
-CREATE INDEX idx_club_ruck_created_at ON club_ruck(created_at DESC);
-```
+-- Events RLS
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 
-#### 3.1.4 club_ruck_participant table
-```sql
-CREATE TABLE club_ruck_participant (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    ruck_id UUID REFERENCES club_ruck(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id),
-    ruck_session_id INTEGER REFERENCES ruck_session(id),
-    join_time TIMESTAMPTZ DEFAULT NOW(),
-    leave_time TIMESTAMPTZ,
-    rsvp_status VARCHAR(20) CHECK (rsvp_status IN ('yes', 'no', 'maybe')),
-    stats_json JSONB DEFAULT '{}',
-    is_active BOOLEAN DEFAULT true,
-    UNIQUE(ruck_id, user_id)
+CREATE POLICY "Public events viewable by everyone" ON events
+FOR SELECT USING (
+    club_id IS NULL OR 
+    auth.uid() IN (
+        SELECT user_id FROM club_memberships 
+        WHERE club_id = events.club_id AND status = 'approved'
+    )
 );
 
-CREATE INDEX idx_club_ruck_participant_ruck_id ON club_ruck_participant(ruck_id);
-CREATE INDEX idx_club_ruck_participant_user_id ON club_ruck_participant(user_id);
+CREATE POLICY "Event creators can update events" ON events
+FOR UPDATE USING (creator_user_id = auth.uid());
 ```
 
-#### 3.1.5 scheduled_ruck table
-```sql
-CREATE TABLE scheduled_ruck (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    club_id UUID REFERENCES club(id) ON DELETE CASCADE,
-    creator_id UUID REFERENCES auth.users(id),
-    title VARCHAR(200) NOT NULL,
-    description TEXT,
-    scheduled_at TIMESTAMPTZ NOT NULL,
-    location GEOGRAPHY(POINT, 4326),
-    location_name VARCHAR(255),
-    recurring_pattern JSONB,
-    reminder_sent BOOLEAN DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT scheduled_ruck_future_check CHECK (scheduled_at > NOW())
-);
+## Backend API Changes
 
-CREATE INDEX idx_scheduled_ruck_club_id ON scheduled_ruck(club_id);
-CREATE INDEX idx_scheduled_ruck_scheduled_at ON scheduled_ruck(scheduled_at);
+### New Club Endpoints
+```
+GET    /api/clubs                    # List/search clubs
+POST   /api/clubs                    # Create club
+GET    /api/clubs/{id}               # Get club details
+PUT    /api/clubs/{id}               # Update club (admin only)
+DELETE /api/clubs/{id}               # Delete club (admin only)
+
+GET    /api/clubs/{id}/members       # List club members  
+POST   /api/clubs/{id}/join          # Request to join club
+PUT    /api/clubs/{id}/members/{user_id} # Approve/deny membership
+DELETE /api/clubs/{id}/members/{user_id} # Remove member/leave club
 ```
 
-#### 3.1.6 Power Points Addition to ruck_session
-```sql
--- Add power_points as a calculated column to existing ruck_session table
-ALTER TABLE ruck_session 
-ADD COLUMN power_points NUMERIC GENERATED ALWAYS AS 
-  (ruck_weight_kg * distance_km * (elevation_gain_m / 1000.0)) STORED;
+### Enhanced Event Endpoints (Evolution of Duels)
+```
+GET    /api/events                   # List events (with club filtering)
+POST   /api/events                   # Create event
+GET    /api/events/{id}              # Get event details
+PUT    /api/events/{id}              # Update event
+DELETE /api/events/{id}              # Cancel event
 
--- Add index for performance when querying by power points
-CREATE INDEX idx_ruck_session_power_points ON ruck_session(power_points DESC);
+POST   /api/events/{id}/join         # RSVP to event
+DELETE /api/events/{id}/leave        # Leave event
+GET    /api/events/{id}/participants # List event participants
 ```
 
-### 3.2 Row Level Security (RLS) Policies
-
-#### 3.2.1 club table RLS
-```sql
--- Enable RLS
-ALTER TABLE club ENABLE ROW LEVEL SECURITY;
-
--- Policies
-CREATE POLICY "Users can view clubs they are members of"
-    ON club FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM club_member 
-            WHERE club_member.club_id = club.id 
-            AND club_member.user_id = auth.uid()
-            AND club_member.invite_status = 'accepted'
-        )
-    );
-
-CREATE POLICY "Only admins can update their clubs"
-    ON club FOR UPDATE
-    USING (admin_id = auth.uid())
-    WITH CHECK (admin_id = auth.uid());
-
-CREATE POLICY "Any authenticated user can create a club"
-    ON club FOR INSERT
-    WITH CHECK (auth.uid() = admin_id);
-
-CREATE POLICY "Only admins can delete their clubs"
-    ON club FOR DELETE
-    USING (admin_id = auth.uid());
+### Push Notification Updates
+```
+POST   /api/notifications/club-event # Notify club members of new event
+POST   /api/notifications/event-reminder # Event reminder notifications
 ```
 
-#### 3.2.2 club_member table RLS
-```sql
-ALTER TABLE club_member ENABLE ROW LEVEL SECURITY;
+## Frontend Implementation
 
-CREATE POLICY "Members can view other members in their clubs"
-    ON club_member FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM club_member cm
-            WHERE cm.club_id = club_member.club_id 
-            AND cm.user_id = auth.uid()
-            AND cm.invite_status = 'accepted'
-        )
-    );
+### 1. Navigation Updates
 
-CREATE POLICY "Club admins can insert members"
-    ON club_member FOR INSERT
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM club 
-            WHERE club.id = club_member.club_id 
-            AND club.admin_id = auth.uid()
-        )
-    );
-
-CREATE POLICY "Club admins can update members"
-    ON club_member FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM club 
-            WHERE club.id = club_member.club_id 
-            AND club.admin_id = auth.uid()
-        )
-    );
-
-CREATE POLICY "Club admins can delete members"
-    ON club_member FOR DELETE
-    USING (
-        EXISTS (
-            SELECT 1 FROM club 
-            WHERE club.id = club_member.club_id 
-            AND club.admin_id = auth.uid()
-        )
-    );
-```
-
-### 3.3 Backend Implementation
-
-#### 3.3.1 New Flask Resources
-
-Create `/RuckTracker/api/clubs.py`:
-```python
-# Club management resources with endpoints:
-# /api/clubs - ClubListResource (GET, POST)
-# /api/clubs/<uuid:club_id> - ClubResource (GET, PUT, DELETE)
-# /api/clubs/<uuid:club_id>/members - ClubMembersResource (GET, POST)
-# /api/clubs/<uuid:club_id>/members/<uuid:user_id> - ClubMemberResource (DELETE)
-# /api/clubs/<uuid:club_id>/invites - ClubInvitesResource (POST)
-# /api/clubs/<uuid:club_id>/stats - ClubStatsResource (GET)
-```
-
-Create `/RuckTracker/api/club_rucks.py`:
-```python
-# Club ruck coordination resources with endpoints:
-# /api/club-rucks - ClubRuckListResource (GET, POST)
-# /api/club-rucks/<uuid:ruck_id> - ClubRuckResource (GET, PUT)
-# /api/club-rucks/<uuid:ruck_id>/lobby - ClubRuckLobbyResource (POST, DELETE)
-# /api/club-rucks/<uuid:ruck_id>/participants - ClubRuckParticipantsResource (GET)
-```
-
-Create `/RuckTracker/api/scheduled_rucks.py`:
-```python
-# Scheduled ruck resources with endpoints:
-# /api/scheduled-rucks - ScheduledRuckListResource (GET, POST)
-# /api/scheduled-rucks/<uuid:scheduled_id> - ScheduledRuckResource (GET, PUT, DELETE)
-# /api/scheduled-rucks/<uuid:scheduled_id>/rsvp - ScheduledRuckRSVPResource (POST, DELETE)
-```
-
-#### 3.3.2 API Endpoint Registration in app.py
-```python
-# Add to app.py imports
-from RuckTracker.api.clubs import (
-    ClubListResource, ClubResource, ClubMembersResource, 
-    ClubMemberResource, ClubInvitesResource, ClubStatsResource
+#### Top Bar Component (`home_screen.dart`)
+```dart
+AppBar(
+  leading: IconButton(/* notifications */),
+  title: Text('Home'),
+  actions: [
+    IconButton(
+      icon: Icon(Icons.group),
+      onPressed: () => Navigator.pushNamed(context, '/clubs'),
+    ),
+    IconButton(
+      icon: Icon(Icons.person),
+      onPressed: () => Navigator.pushNamed(context, '/profile'),
+    ),
+  ],
 )
-from RuckTracker.api.club_rucks import (
-    ClubRuckListResource, ClubRuckResource, 
-    ClubRuckLobbyResource, ClubRuckParticipantsResource
-)
-from RuckTracker.api.scheduled_rucks import (
-    ScheduledRuckListResource, ScheduledRuckResource, 
-    ScheduledRuckRSVPResource
-)
-
-# Add resource registrations
-# Club endpoints
-api.add_resource(ClubListResource, '/api/clubs')
-api.add_resource(ClubResource, '/api/clubs/<uuid:club_id>')
-api.add_resource(ClubMembersResource, '/api/clubs/<uuid:club_id>/members')
-api.add_resource(ClubMemberResource, '/api/clubs/<uuid:club_id>/members/<uuid:user_id>')
-api.add_resource(ClubInvitesResource, '/api/clubs/<uuid:club_id>/invites')
-api.add_resource(ClubStatsResource, '/api/clubs/<uuid:club_id>/stats')
-
-# Club ruck endpoints
-api.add_resource(ClubRuckListResource, '/api/club-rucks')
-api.add_resource(ClubRuckResource, '/api/club-rucks/<uuid:ruck_id>')
-api.add_resource(ClubRuckLobbyResource, '/api/club-rucks/<uuid:ruck_id>/lobby')
-api.add_resource(ClubRuckParticipantsResource, '/api/club-rucks/<uuid:ruck_id>/participants')
-
-# Scheduled ruck endpoints
-api.add_resource(ScheduledRuckListResource, '/api/scheduled-rucks')
-api.add_resource(ScheduledRuckResource, '/api/scheduled-rucks/<uuid:scheduled_id>')
-api.add_resource(ScheduledRuckRSVPResource, '/api/scheduled-rucks/<uuid:scheduled_id>/rsvp')
 ```
 
-#### 3.3.3 Supabase Edge Functions for Push Notifications
+#### Main Navigation Update (`app.dart`)
+```dart
+BottomNavigationBar(
+  items: [
+    BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+    BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Buddies'),
+    BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+    BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Events'), // Was Profile
+  ],
+)
+```
 
-{{ ... }}
+### 2. New Feature Modules
 
-### 3.4 Flutter Frontend Structure
-
-#### 3.4.1 Directory Structure
+#### Club Feature Structure
 ```
 lib/features/clubs/
 ├── data/
-│   ├── datasources/
-│   │   ├── clubs_remote_datasource.dart
-│   │   └── clubs_realtime_datasource.dart
 │   ├── models/
 │   │   ├── club_model.dart
-│   │   ├── club_member_model.dart
-│   │   ├── club_ruck_model.dart
-│   │   └── scheduled_ruck_model.dart
-│   └── repositories/
-│       └── clubs_repository_impl.dart
+│   │   └── club_membership_model.dart
+│   ├── repositories/
+│   │   └── clubs_repository_impl.dart
+│   └── datasources/
+│       └── clubs_remote_datasource.dart
 ├── domain/
 │   ├── entities/
 │   │   ├── club.dart
-│   │   ├── club_member.dart
-│   │   ├── club_ruck.dart
-│   │   └── scheduled_ruck.dart
+│   │   └── club_membership.dart
 │   ├── repositories/
 │   │   └── clubs_repository.dart
 │   └── usecases/
+│       ├── get_clubs.dart
 │       ├── create_club.dart
-│       ├── join_club_ruck.dart
-│       ├── schedule_ruck.dart
-│       └── get_club_stats.dart
-├── presentation/
-│   ├── blocs/
-│   │   ├── club_bloc/
-│   │   ├── club_ruck_bloc/
-│   │   └── scheduled_ruck_bloc/
-│   ├── screens/
-│   │   ├── club_list_screen.dart
-│   │   ├── create_club_screen.dart
-│   │   ├── club_detail_screen.dart
-│   │   ├── club_ruck_lobby_screen.dart
-│   │   ├── schedule_ruck_screen.dart
-│   │   └── club_leaderboard_screen.dart
-│   └── widgets/
-│       ├── club_card.dart
-│       ├── member_list_item.dart
-│       ├── lobby_participant_tile.dart
-│       └── ruck_stats_aggregate.dart
-└── di/
-    └── clubs_injection.dart
+│       ├── join_club.dart
+│       └── manage_club_members.dart
+└── presentation/
+    ├── bloc/
+    │   ├── clubs_bloc.dart
+    │   ├── club_management_bloc.dart
+    │   └── club_membership_bloc.dart
+    ├── screens/
+    │   ├── clubs_screen.dart
+    │   ├── club_detail_screen.dart
+    │   ├── create_club_screen.dart
+    │   └── club_management_screen.dart
+    └── widgets/
+        ├── club_card.dart
+        ├── club_member_list.dart
+        └── club_logo_picker.dart
 ```
 
-### 3.5 Push Notifications Implementation
-
-#### 3.5.1 FCM Topic Structure
+#### Events Feature Structure (Evolution of Duels)
 ```
-- club_{club_id} - All club notifications
-- club_{club_id}_rucks - Club ruck start notifications
-- club_{club_id}_scheduled - Scheduled ruck reminders
+lib/features/events/
+├── data/
+│   ├── models/
+│   │   ├── event_model.dart
+│   │   └── event_participant_model.dart
+│   ├── repositories/
+│   │   └── events_repository_impl.dart
+│   └── datasources/
+│       └── events_remote_datasource.dart
+├── domain/
+│   ├── entities/
+│   │   ├── event.dart
+│   │   └── event_participant.dart
+│   ├── repositories/
+│   │   └── events_repository.dart
+│   └── usecases/
+│       ├── get_events.dart
+│       ├── create_event.dart
+│       ├── join_event.dart
+│       └── manage_event.dart
+└── presentation/
+    ├── bloc/
+    │   ├── events_bloc.dart
+    │   ├── event_creation_bloc.dart
+    │   └── event_participation_bloc.dart
+    ├── screens/
+    │   ├── events_screen.dart
+    │   ├── event_detail_screen.dart
+    │   └── create_event_screen.dart
+    └── widgets/
+        ├── event_card.dart
+        ├── event_participants_list.dart
+        └── club_event_toggle.dart
 ```
 
-#### 3.5.2 Notification Payload Structure
-```json
-{
-  "notification": {
-    "title": "Club Ruck Starting!",
-    "body": "Join the Iron Warriors ruck now"
-  },
-  "data": {
-    "type": "club_ruck_start",
-    "club_id": "uuid",
-    "ruck_id": "uuid",
-    "click_action": "FLUTTER_NOTIFICATION_CLICK"
-  },
-  "apns": {
-    "payload": {
-      "aps": {
-        "category": "CLUB_RUCK",
-        "sound": "default"
-      }
-    }
-  },
-  "android": {
-    "priority": "high",
-    "notification": {
-      "channel_id": "club_rucks"
-    }
+### 3. Key UI Components
+
+#### Event Card with Club Integration
+```dart
+class EventCard extends StatelessWidget {
+  final Event event;
+  
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          if (event.club != null) 
+            Container(
+              // Prominent club logo and name header
+              child: Row(
+                children: [
+                  ClubLogo(club: event.club!, size: 40),
+                  Text(event.club!.name, style: boldStyle),
+                ],
+              ),
+            ),
+          // Event details
+          ListTile(
+            title: Text(event.title),
+            subtitle: Text(event.description),
+            trailing: EventJoinButton(event: event),
+          ),
+        ],
+      ),
+    );
   }
 }
 ```
 
-#### 3.5.3 Platform-Specific Considerations
-
-**iOS:**
-- Request notification permissions with provisional authorization
-- Handle background fetch for scheduled ruck reminders
-- Configure notification categories for quick actions
-- Add NSLocationWhenInUseUsageDescription for club location features
-
-**Android:**
-- Create notification channels: club_rucks, scheduled_reminders
-- Handle notification trampolining for Android 12+
-- Request POST_NOTIFICATIONS permission for Android 13+
-- Configure ProGuard rules for FCM
-
-### 3.6 Real-time Implementation
-
-#### 3.6.1 Supabase Realtime Channels
+#### Club Event Toggle in Creation
 ```dart
-// Club ruck lobby presence
-final channel = supabase.channel('club_ruck_$ruckId')
-  .on(
-    RealtimeListenTypes.presence,
-    ChannelFilter(event: 'sync'),
-    (payload, [ref]) {
-      // Update participant list
-    },
-  )
-  .on(
-    RealtimeListenTypes.broadcast,
-    ChannelFilter(event: 'stats_update'),
-    (payload, [ref]) {
-      // Update aggregated stats
-    },
-  )
-  .subscribe();
+class ClubEventToggle extends StatelessWidget {
+  final List<Club> userClubs;
+  final Function(Club?) onClubSelected;
+  
+  Widget build(BuildContext context) {
+    if (userClubs.isEmpty) return SizedBox.shrink();
+    
+    return Column(
+      children: [
+        SwitchListTile(
+          title: Text('Make this a club event'),
+          subtitle: Text('Notify all club members'),
+          value: selectedClub != null,
+          onChanged: (value) => _toggleClubEvent(value),
+        ),
+        if (showClubSelector)
+          DropdownButton<Club>(
+            items: userClubs.map((club) => 
+              DropdownMenuItem(value: club, child: Text(club.name))
+            ).toList(),
+            onChanged: onClubSelected,
+          ),
+      ],
+    );
+  }
+}
 ```
 
-#### 3.6.2 Aggregate Stats Broadcasting
-```dart
-// Broadcast stats every 10 seconds during active ruck
-Timer.periodic(Duration(seconds: 10), (timer) {
-  channel.send(
-    type: RealtimeListenTypes.broadcast,
-    event: 'stats_update',
-    payload: {
-      'user_id': userId,
-      'distance': currentDistance,
-      'elevation': currentElevation,
-      'pace': currentPace,
-    },
-  );
-});
-```
+## Real-time Features
 
-### 3.7 API Endpoints Update
+### Supabase Realtime Channels
+- **Club Events Channel**: `club_events:{club_id}` for club-specific event notifications
+- **Event Updates Channel**: `event_updates:{event_id}` for participant changes, event updates
+- **Club Management Channel**: `club_management:{club_id}` for membership approvals, admin actions
 
-Add to `/RuckTracker/app.py`:
-```python
-# Club endpoints
-api.add_resource(ClubResource, '/api/clubs', '/api/clubs/<string:club_id>')
-api.add_resource(ClubMembersResource, '/api/clubs/<string:club_id>/members')
-api.add_resource(ClubInvitesResource, '/api/clubs/<string:club_id>/invites')
-api.add_resource(ClubRuckResource, '/api/club-rucks', '/api/club-rucks/<string:ruck_id>')
-api.add_resource(ClubRuckLobbyResource, '/api/club-rucks/<string:ruck_id>/lobby')
-api.add_resource(ScheduledRuckResource, '/api/scheduled-rucks', '/api/scheduled-rucks/<string:id>')
-api.add_resource(ScheduledRuckRSVPResource, '/api/scheduled-rucks/<string:id>/rsvp')
-```
+### Push Notifications via FCM
+- **Club Event Created**: Notify all club members when admin creates club event
+- **Event Reminders**: 24h and 1h before event start time  
+- **Membership Updates**: Club join approvals/denials
+- **Event Participant Updates**: When someone joins/leaves event you created
 
-### 3.8 Navigation Updates
+## Migration Strategy
 
-Modify `/lib/core/navigation/app.dart`:
-```dart
-// Add new routes
-static const String clubList = '/clubs';
-static const String clubDetail = '/clubs/:id';
-static const String createClub = '/clubs/create';
-static const String clubRuckLobby = '/clubs/:clubId/rucks/:ruckId/lobby';
-static const String scheduleRuck = '/clubs/:clubId/schedule-ruck';
+### Phase 1: Navigation & Structure
+1. Update main navigation and top bar
+2. Create new Events screen (initially showing existing duels data)
+3. Move profile to top bar access
+4. Create empty Clubs screen with "Coming Soon"
 
-// Update bottom navigation
-BottomNavigationBarItem(
-  icon: Icon(Icons.group),
-  label: 'Clubs',
-),
-```
+### Phase 2: Events Evolution  
+1. Migrate duels data to events table structure
+2. Implement enhanced events functionality
+3. Add event filtering and improved UI
+4. Test event creation and participation
 
-### 3.9 Testing Strategy
+### Phase 3: Clubs Integration
+1. Implement club creation and management
+2. Add club membership system
+3. Integrate club events with notifications
+4. Test end-to-end club event workflow
 
-#### 3.9.1 Unit Tests
-- Club repository tests
-- Club bloc tests
-- Notification handler tests
-- Real-time sync tests
+### Phase 4: Polish & Optimization
+1. Real-time updates and notifications
+2. Performance optimization
+3. Advanced filtering and discovery
+4. Analytics and monitoring
 
-#### 3.9.2 Integration Tests
-- Multi-device club ruck synchronization
-- Notification delivery across platforms
-- RLS policy validation
-- Performance under load (50+ participants)
+## Estimated Implementation Effort
 
-### 3.10 Performance Considerations
+### Backend (Flask + Supabase)
+- Database schema and RLS policies: **8 hours**
+- Club management APIs: **16 hours**
+- Events API enhancement: **12 hours** 
+- Push notifications integration: **8 hours**
+- **Backend Total: ~44 hours**
 
-- Implement pagination for club member lists (50 per page)
-- Throttle real-time updates to max 1 per second per user
-- Cache club data locally with 5-minute TTL
-- Use database indexes for all foreign keys and frequently queried fields
-- Implement connection pooling for Supabase real-time
+### Frontend (Flutter)
+- Navigation restructure: **6 hours**
+- Clubs feature complete: **32 hours**
+- Events feature enhancement: **24 hours**
+- Real-time integration: **12 hours**
+- UI polish and testing: **16 hours**
+- **Frontend Total: ~90 hours**
 
-### 3.11 Migration & Rollback Plan
+### **Grand Total: ~134 hours** (3.5 weeks with 2 developers)
 
-1. Database migrations versioned in `/supabase/migrations/`
-2. Feature flag: `enable_clubs` in remote config
-3. Gradual rollout: 5% → 25% → 50% → 100%
-4. Rollback procedure: Disable feature flag, no DB rollback needed
+## Risk Considerations
 
----
+1. **Data Migration**: Existing duels → events migration must be seamless
+2. **Notification Performance**: Club event notifications could create spam
+3. **Real-time Scaling**: Multiple club channels require careful resource management
+4. **User Adoption**: New navigation might confuse existing users initially
 
-*Last updated: 2025-06-04*
+## Success Metrics
+
+- **Club Adoption**: % of users who join/create clubs within 30 days
+- **Event Engagement**: Event creation rate vs. old duels creation rate
+- **Club Event Participation**: Higher participation rates for club vs. public events
+- **Notification Engagement**: Click-through rates on club event notifications
+- **User Retention**: Impact on DAU/MAU after feature launch

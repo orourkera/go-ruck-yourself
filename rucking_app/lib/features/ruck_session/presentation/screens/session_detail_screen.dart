@@ -518,33 +518,40 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 child: _SessionRouteMap(session: widget.session),
               ),
 
-              // Location Display
+              // Location Display - only show if location data is available and valid
               if (widget.session.locationPoints != null && widget.session.locationPoints!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Center(
-                    child: FutureBuilder<String>(
-                      future: LocationUtils.getLocationName(widget.session.locationPoints),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          return Text(
-                            snapshot.data!,
-                            style: TextStyle(
-                              fontFamily: 'Bangers',
-                              fontSize: 24,
-                              color: AppColors.primary,
-                              letterSpacing: 1.2,
+                FutureBuilder<String>(
+                  future: LocationUtils.getLocationName(widget.session.locationPoints),
+                  builder: (context, snapshot) {
+                    // Only show location if we have valid data and it's not "Unknown Location"
+                    if (snapshot.hasData && 
+                        snapshot.data != null && 
+                        snapshot.data!.trim().isNotEmpty && 
+                        snapshot.data!.toLowerCase() != 'unknown location') {
+                      return Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Center(
+                              child: Text(
+                                snapshot.data!,
+                                style: TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: 24,
+                                  color: AppColors.primary,
+                                  letterSpacing: 1.2,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
-                            textAlign: TextAlign.center,
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ),
+                          ),
+                        ],
+                      );
+                    }
+                    // Return empty widget if no location data - fail silently
+                    return const SizedBox.shrink();
+                  },
                 ),
-
-              const SizedBox(height: 16),
 
               // Photo Gallery Section - only shown when there are photos
               BlocBuilder<ActiveSessionBloc, ActiveSessionState>(

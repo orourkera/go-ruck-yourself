@@ -13,14 +13,15 @@ class PremiumService {
   PremiumService(this._revenueCatService);
 
   /// Check if user has premium subscription
-  Future<bool> isPremium() async {
+  Future<bool> isPremium({bool forceRefresh = false}) async {
     // Debug bypass for testing
     if (kDebugMode && const bool.fromEnvironment('PREMIUM_BYPASS', defaultValue: false)) {
       return true;
     }
 
-    // Use cache if valid
-    if (_cachedStatus != null && 
+    // Use cache if valid and not forcing refresh
+    if (!forceRefresh && 
+        _cachedStatus != null && 
         _lastCheck != null && 
         DateTime.now().difference(_lastCheck!) < _cacheDuration) {
       return _cachedStatus!;
@@ -30,6 +31,7 @@ class PremiumService {
       final isPremium = await _revenueCatService.checkSubscriptionStatus();
       _cachedStatus = isPremium;
       _lastCheck = DateTime.now();
+      debugPrint('Premium status checked: $isPremium (forceRefresh: $forceRefresh)');
       return isPremium;
     } catch (e) {
       debugPrint('Error checking premium status: $e');
@@ -73,9 +75,10 @@ class PremiumService {
     }
   }
 
-  /// Clear cache (useful for logout)
+  /// Clear cache (useful for logout or forcing subscription status refresh)
   void clearCache() {
     _cachedStatus = null;
     _lastCheck = null;
+    debugPrint('Premium status cache cleared');
   }
 }

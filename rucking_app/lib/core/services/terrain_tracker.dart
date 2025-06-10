@@ -7,7 +7,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 /// Service for tracking terrain during an active session
 class TerrainTracker {
   static const double _minSegmentDistanceKm = 0.005; // Reduced to 5m for better accuracy
-  static const Duration _queryThrottle = Duration(seconds: 5); // Throttle API calls (reduced for testing)
+  static const Duration _queryThrottle = Duration(seconds: 2); // Reduced from 5s to 2s for testing
   
   LocationPoint? _lastTerrainQueryLocation;
   DateTime? _lastQueryTime;
@@ -31,7 +31,7 @@ class TerrainTracker {
       }
     }
     
-    AppLogger.debug('[TERRAIN_THROTTLE] Query allowed - distance moved or first query');
+    AppLogger.debug('[TERRAIN_THROTTLE] Query allowed - distance: ${_lastTerrainQueryLocation != null ? (_calculateDistance(_lastTerrainQueryLocation!, newLocation) * 1000).toStringAsFixed(1) : 'first'}m');
     return true;
   }
   
@@ -41,7 +41,8 @@ class TerrainTracker {
     required LocationPoint endLocation,
   }) async {
     try {
-      AppLogger.debug('[TERRAIN_TRACKER] Querying terrain for segment');
+      final distance = _calculateDistance(startLocation, endLocation);
+      AppLogger.debug('[TERRAIN_TRACKER] Querying terrain for ${(distance * 1000).toStringAsFixed(1)}m segment');
       
       final terrainData = await TerrainService.getTerrainForSegment(
         startLat: startLocation.latitude,
@@ -49,8 +50,6 @@ class TerrainTracker {
         endLat: endLocation.latitude,
         endLon: endLocation.longitude,
       );
-      
-      final distance = _calculateDistance(startLocation, endLocation);
       
       final segment = TerrainSegment(
         distanceKm: distance,
@@ -63,13 +62,29 @@ class TerrainTracker {
       _lastTerrainQueryLocation = endLocation;
       _lastQueryTime = DateTime.now();
       
-      AppLogger.debug('[TERRAIN_TRACKER] Created terrain segment: $segment');
+      AppLogger.debug('[TERRAIN_TRACKER] Created terrain segment: ${segment.surfaceType} (${segment.energyMultiplier}x) - ${(segment.distanceKm * 1000).toStringAsFixed(1)}m');
       
       return segment;
       
     } catch (e) {
       AppLogger.error('[TERRAIN_TRACKER] Error tracking terrain segment: $e');
-      return null;
+      
+      // Create a fallback segment with default values instead of returning null
+      final distance = _calculateDistance(startLocation, endLocation);
+      final fallbackSegment = TerrainSegment(
+        distanceKm: distance,
+        surfaceType: 'paved', // Default surface type
+        energyMultiplier: 1.0, // Default multiplier
+        timestamp: DateTime.now(),
+      );
+      
+      // Update tracking state even for fallback
+      _lastTerrainQueryLocation = endLocation;
+      _lastQueryTime = DateTime.now();
+      
+      AppLogger.debug('[TERRAIN_TRACKER] Created fallback terrain segment: ${(fallbackSegment.distanceKm * 1000).toStringAsFixed(1)}m (paved/1.0x)');
+      
+      return fallbackSegment;
     }
   }
   

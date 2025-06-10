@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:developer' as developer;
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
@@ -8,13 +12,16 @@ import 'package:rucking_app/features/premium/presentation/widgets/premium_tab_in
 import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_event.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
+import 'package:rucking_app/features/notifications/presentation/widgets/notification_bell.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_history_screen.dart';
-import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
-import 'package:rucking_app/features/notifications/presentation/widgets/notification_bell.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -99,14 +106,38 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   
   @override
   void initState() {
     super.initState();
+    
+    // PAYWALL DISABLED: Commenting out premium status initialization
     // Initialize premium status when home screen loads
-    context.read<PremiumBloc>().add(InitializePremiumStatus());
+    // context.read<PremiumBloc>().add(InitializePremiumStatus());
+    
+    // Add lifecycle observer to handle app state changes
+    WidgetsBinding.instance.addObserver(this);
+  }
+  
+  @override
+  void dispose() {
+    // Remove lifecycle observer when disposing
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // PAYWALL DISABLED: Commenting out premium status refresh
+    // Refresh premium status when app resumes from background
+    // This helps catch subscription status changes after purchases
+    // if (state == AppLifecycleState.resumed) {
+    //   context.read<PremiumBloc>().add(CheckPremiumStatus());
+    // }
   }
   
   // List of screens for the bottom navigation bar
@@ -346,28 +377,33 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     if (!mounted) return;
     
     try {
-      // Fetch recent sessions
-      final sessionsResponse = await _apiClient!.get('/rucks?limit=20');
+      // Combine both API calls into parallel execution for better performance
+      final futures = await Future.wait([
+        _apiClient!.get('/rucks?limit=20'),
+        _apiClient!.get('/stats/monthly'),
+      ]);
+      
+      final sessionsResponse = futures[0];
+      final statsResponse = futures[1];
+      
+      // Process sessions
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
-
-      // Filter out incomplete sessions
       List<dynamic> completedSessions = processedSessions
           .where((session) => session is Map && session['status'] == 'completed')
           .toList();
 
-      // Fetch monthly stats
-      final statsResponse = await _apiClient!.get('/stats/monthly');
-      
+      // Process stats
       Map<String, dynamic> processedStats = {};
       if (statsResponse is Map && statsResponse.containsKey('data') && statsResponse['data'] is Map) {
           processedStats = statsResponse['data'] as Map<String, dynamic>;
       }
 
-      // Cache the results
-      await _cacheService.cacheRecentSessions(completedSessions);
-      await _cacheService.cacheMonthlyStats(processedStats);
+      // Cache both results in parallel
+      await Future.wait([
+        _cacheService.cacheRecentSessions(completedSessions),
+        _cacheService.cacheMonthlyStats(processedStats),
+      ]);
 
-      // Add safety check in case widget is disposed during the async operation
       if (!mounted) return;
       
       setState(() {
@@ -376,22 +412,21 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         _isLoading = false;
         _isRefreshing = false;
       });
+
+      // Preload images for better UX
+      await _preloadSessionImages(completedSessions.take(5).toList());
     } catch (e, stack) {
       debugPrint('Error fetching data: $e');
       debugPrint('Stack trace: $stack');
       
-      // Final safety check before setState
       if (!mounted) return;
       
-      // If this was triggered after a session deletion, we should show empty state
-      // rather than potentially stale data from the cache
       final wasManualRefresh = _isRefreshing;
       
       setState(() {
         _isLoading = false;
         _isRefreshing = false;
         
-        // Clear cache if it was a manual refresh (e.g., after delete)
         if (wasManualRefresh) {
           _recentSessions = [];
         }
@@ -550,7 +585,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                       Text(
                                         userName,
                                         style: AppTextStyles.displayLarge.copyWith(
-                                          color: AppColors.textDark,
+                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -683,7 +718,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                   ? const Center(
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 30),
-                        child: CircularProgressIndicator(),
+                        child: Column(
+                          children: [
+                            SessionCardSkeleton(),
+                            SessionCardSkeleton(),
+                            SessionCardSkeleton(),
+                          ],
+                        ),
                       ),
                     )
                   : _recentSessions.isEmpty
@@ -1057,11 +1098,55 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     );
   }
   
-  // Format duration as HH:MM:SS
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
     String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
     return '${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds';
+  }
+
+  /// Preload images from recent sessions for better perceived performance
+  Future<void> _preloadSessionImages(List<dynamic> sessions) async {
+    if (sessions.isEmpty) return;
+    
+    try {
+      // Extract profile picture URLs from session data
+      final profileUrls = <String>[];
+      final photoUrls = <String>[];
+      
+      for (final sessionData in sessions) {
+        if (sessionData is Map<String, dynamic>) {
+          // Check for user profile picture
+          final user = sessionData['user'];
+          if (user is Map<String, dynamic>) {
+            final profilePic = user['profile_picture'];
+            if (profilePic is String && profilePic.isNotEmpty) {
+              profileUrls.add(profilePic);
+            }
+          }
+          
+          // Check for session photos
+          final photos = sessionData['photos'];
+          if (photos is List && photos.isNotEmpty) {
+            final firstPhoto = photos.first;
+            if (firstPhoto is String && firstPhoto.isNotEmpty) {
+              photoUrls.add(firstPhoto);
+            }
+          }
+        }
+      }
+      
+      // Preload in background - don't block UI
+      if (profileUrls.isNotEmpty) {
+        unawaited(ImageCacheManager.preloadProfilePictures(profileUrls.toSet().toList()));
+      }
+      if (photoUrls.isNotEmpty) {
+        unawaited(ImageCacheManager.preloadSessionPhotos(photoUrls));
+      }
+      
+      developer.log('[HOME_DEBUG] Started preloading ${profileUrls.length} profile pics and ${photoUrls.length} session photos');
+    } catch (e) {
+      developer.log('[HOME_DEBUG] Error preloading images: $e');
+    }
   }
 } // Closes _HomeTabState class

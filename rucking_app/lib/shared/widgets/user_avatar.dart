@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 
 /// A reusable user avatar widget that displays profile pictures with fallback to initials
 class UserAvatar extends StatelessWidget {
@@ -38,6 +39,7 @@ class UserAvatar extends StatelessWidget {
         child: avatarUrl != null && avatarUrl!.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: avatarUrl!,
+                cacheManager: ImageCacheManager.profileCache, // Fix cache manager reference
                 width: size,
                 height: size,
                 fit: BoxFit.cover,
