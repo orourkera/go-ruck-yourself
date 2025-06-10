@@ -137,3 +137,17 @@ class AuthPasswordResetConfirmed extends AuthEvent {
   @override
   List<Object> get props => [token, newPassword];
 }
+
+/// Event to verify OTP code for password reset
+class AuthOtpVerified extends AuthEvent {
+  final String email;
+  final String otpCode;
+
+  const AuthOtpVerified({
+    required this.email,
+    required this.otpCode,
+  });
+
+  @override
+  List<Object> get props => [email, otpCode];
+}
