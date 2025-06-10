@@ -70,8 +70,8 @@ def get_ruck_buddies():
             ' avg_heart_rate, '
             ' user:user_id(id,username,allow_ruck_sharing,gender),'
             ' location_points:location_point!location_point_session_id_fkey(id,latitude,longitude,altitude,timestamp),'
-            ' likes:ruck_likes!ruck_likes_session_id_fkey(id,user_id),'
-            ' comments:ruck_comment!ruck_comment_session_id_fkey(id,user_id,content,created_at)'
+            ' likes:ruck_likes!ruck_likes_ruck_id_fkey(id,user_id),'
+            ' comments:ruck_comments!ruck_comments_ruck_id_fkey(id,user_id,content,created_at)'
         ) \
         .eq('is_public', True) \
         .eq('user.allow_ruck_sharing', True) \
