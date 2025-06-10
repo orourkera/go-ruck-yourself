@@ -71,6 +71,16 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     }, onError: (err) {
       print('Deep link error: $err');
     });
+    
+    // Handle initial URL when app is launched cold from a link
+    _appLinks.getInitialLink().then((Uri? uri) {
+      if (uri != null) {
+        print('🚀 App launched with initial URL: $uri');
+        _handleDeepLink(uri);
+      }
+    }).catchError((err) {
+      print('Initial link error: $err');
+    });
   }
 
   void _handleDeepLink(Uri uri) {

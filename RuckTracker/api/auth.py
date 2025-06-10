@@ -205,7 +205,14 @@ class ForgotPasswordResource(Resource):
             if not email:
                 return {'message': 'Email is required'}, 400
             supabase = get_supabase_client()
-            response = supabase.auth.reset_password_email(email)
+            
+            # Use the correct redirect URL for mobile app callback
+            redirect_url = 'com.getrucky.app://auth/callback'
+            response = supabase.auth.reset_password_email(
+                email=email,
+                options={'redirect_to': redirect_url}
+            )
+            
             if hasattr(response, 'error') and response.error:
                 return {'message': f'Failed to send reset email: {response.error.message}'}, 400
             return {'message': 'If an account exists for this email, a password reset link has been sent.'}, 200
