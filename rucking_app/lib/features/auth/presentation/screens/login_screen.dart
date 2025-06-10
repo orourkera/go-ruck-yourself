@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // App logo
                   Center(
                     child: Image.asset(
-                      'assets/images/go ruck yourself.png',
+                      'assets/images/go ruck yourself copy.png',
                       width: 150,
                       height: 150,
                       fit: BoxFit.contain,
@@ -113,23 +113,52 @@ class _LoginScreenState extends State<LoginScreen> {
                       fontFamily: 'Bangers',
                       fontSize: 32,
                       letterSpacing: 1.5,
-                      color: Color(0xFFCC6A2A), // Brownish-orange (secondary)
+                      color: AppColors.textDark,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 32),
                   
-                  // Subtitle
-                  Text(
-                    'Sign in to continue tracking your ruck sessions',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.green,
+                  // Google Sign-In Button
+                  OutlinedButton.icon(
+                    onPressed: _handleGoogleLogin, 
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      side: BorderSide(color: AppColors.primary),
                     ),
-                    textAlign: TextAlign.center,
+                    icon: Icon(
+                      Icons.g_translate, // You can replace with Google icon
+                      color: AppColors.primary,
+                    ),
+                    label: Text(
+                      'Continue with Google',
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 24),
+                  
+                  // OR divider
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: AppColors.textDarkSecondary)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'OR',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textDarkSecondary,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: AppColors.textDarkSecondary)),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
                   
                   // Email field
                   CustomTextField(
@@ -240,29 +269,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _login,
                       );
                     },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Google Sign-In Button
-                  OutlinedButton.icon(
-                    onPressed: _handleGoogleLogin, 
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      side: BorderSide(color: AppColors.primary),
-                    ),
-                    icon: Icon(
-                      Icons.g_translate, // You can replace with Google icon
-                      color: AppColors.primary,
-                    ),
-                    label: Text(
-                      'Continue with Google',
-                      style: AppTextStyles.labelLarge.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 32),
                   

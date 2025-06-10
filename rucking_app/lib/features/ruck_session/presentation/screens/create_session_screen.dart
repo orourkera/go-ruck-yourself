@@ -5,6 +5,7 @@ import 'package:keyboard_actions/keyboard_actions.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:provider/provider.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
@@ -192,21 +193,31 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         // ---- Step 1: Create session in the backend ----
         
         final apiClient = GetIt.instance<ApiClient>();
-        final createResponse = await apiClient.post('/rucks', createRequestData);
-
-        if (!mounted) return;
         
-        // Check if response has the correct ID key
-        if (createResponse == null || createResponse['id'] == null) {
+        // Try to create online session first, but fall back quickly to offline
+        try {
+          AppLogger.info('Attempting to create online session...');
+          final createResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(milliseconds: 800));
+
+          if (!mounted) return;
           
-          throw Exception('Invalid response from server when creating session');
+          // Check if response has the correct ID key
+          if (createResponse == null || createResponse['id'] == null) {
+            throw Exception('Invalid response from server when creating session');
+          }
+          
+          // Extract ruck ID from response
+          ruckId = createResponse['id'].toString();
+          AppLogger.info('✅ Created online session: $ruckId');
+        } catch (e) {
+          // Any error (network, timeout, etc.) immediately goes to offline mode
+          AppLogger.warning('Failed to create online session, proceeding offline: $e');
+          
+          // Create offline session ID
+          ruckId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
+          AppLogger.info('🔄 Created offline session: $ruckId');
         }
         
-        // Extract ruck ID from response
-        ruckId = createResponse['id'].toString();
-        
-        
-
         // Save the used weight (always in KG) to SharedPreferences on success
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('lastRuckWeightKg', weightForApiKg);

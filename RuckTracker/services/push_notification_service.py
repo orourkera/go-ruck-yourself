@@ -325,6 +325,43 @@ class PushNotificationService:
             body=body,
             notification_data=data
         )
+    
+    def send_achievement_notification(
+        self,
+        device_tokens: List[str],
+        achievement_names: List[str],
+        session_id: str
+    ) -> bool:
+        """Send achievement earned notification for one or multiple achievements"""
+        if not achievement_names:
+            return False
+        
+        count = len(achievement_names)
+        
+        if count == 1:
+            title = "Achievement Unlocked! 🏆"
+            body = f"Congratulations! You've earned '{achievement_names[0]}'"
+        else:
+            title = f"{count} Achievements Unlocked! 🏆"
+            if count == 2:
+                body = f"Congratulations! You've earned '{achievement_names[0]}' and '{achievement_names[1]}'"
+            else:
+                body = f"Congratulations! You've earned {count} new achievements including '{achievement_names[0]}'"
+        
+        data = {
+            'type': 'achievement_earned',
+            'achievement_names': achievement_names,
+            'achievement_count': count,
+            'session_id': session_id,
+            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+        }
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
 
 
 # Helper function to get user device tokens

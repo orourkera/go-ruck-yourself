@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
+import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/models/api_exception.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/models/terrain_segment.dart';
@@ -189,11 +190,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       // Try to create session on backend, but allow offline mode if it fails
       try {
+        // Check connectivity first before making API call
+        final connectivityService = GetIt.I<ConnectivityService>();
+        final isConnected = await connectivityService.isConnected();
+        
+        if (!isConnected) {
+          // Immediately go offline if no connection
+          throw NetworkException('No internet connection - starting offline mode');
+        }
+        
         // Use a very short timeout for session creation to fail fast into offline mode
         final createResponse = await _apiClient.post('/rucks', {
           'ruck_weight_kg': event.ruckWeightKg,
           'notes': event.notes,
-        }).timeout(Duration(seconds: 3)); // Fail fast after 3 seconds
+        }).timeout(Duration(seconds: 1)); // Reduced from 3 to 1 second for faster offline detection
         
         sessionId = createResponse['id']?.toString();
         if (sessionId == null || sessionId.isEmpty) throw Exception('Failed to create session: No ID.');
@@ -205,7 +215,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } catch (apiError) {
         // If API calls fail, create offline session with local ID
         sessionId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
-        AppLogger.info('Creating offline session: $sessionId - all data will be stored locally and synced when connection is restored');
+        AppLogger.info('🔄 Creating offline session: $sessionId - all data will be stored locally and synced when connection is restored');
         AppLogger.warning('API Error: $apiError');
       }
       final initialSessionState = ActiveSessionRunning(
@@ -1609,12 +1619,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           if (newSessionId != null && newSessionId.isNotEmpty) {
             AppLogger.info('Successfully synced offline session. New session ID: $newSessionId');
             
-            // Update state with new session ID
-            final currentState = state as ActiveSessionRunning;
-            emit(currentState.copyWith(sessionId: newSessionId));
-            
-            // Start fresh location tracking with new session ID
-            _startLocationUpdates(newSessionId);
+            // Only update state if session is still running
+            if (state is ActiveSessionRunning) {
+              final currentState = state as ActiveSessionRunning;
+              emit(currentState.copyWith(sessionId: newSessionId));
+              
+              // Start fresh location tracking with new session ID
+              _startLocationUpdates(newSessionId);
+            } else {
+              AppLogger.info('Session already completed, not updating state');
+            }
           }
         } catch (e) {
           AppLogger.warning('Failed to sync offline session: $e. Will retry on next connectivity event.');
@@ -1632,7 +1646,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   void _startConnectivityMonitoring(String sessionId) {
     _connectivitySubscription?.cancel();
-    _connectivitySubscription = _connectivityService.connectivityStream.listen((isConnected) {
+    _connectivitySubscription = GetIt.I<ConnectivityService>().connectivityStream.listen((isConnected) {
       if (isConnected) {
         AppLogger.info('Connectivity restored, resuming API operations...');
         _attemptOfflineSessionSync(sessionId);
@@ -1661,12 +1675,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           if (newSessionId != null && newSessionId.isNotEmpty) {
             AppLogger.info('Successfully synced offline session. New session ID: $newSessionId');
             
-            // Update state with new session ID
-            final currentState = state as ActiveSessionRunning;
-            emit(currentState.copyWith(sessionId: newSessionId));
-            
-            // Start fresh location tracking with new session ID
-            _startLocationUpdates(newSessionId);
+            // Only update state if session is still running
+            if (state is ActiveSessionRunning) {
+              final currentState = state as ActiveSessionRunning;
+              emit(currentState.copyWith(sessionId: newSessionId));
+              
+              // Start fresh location tracking with new session ID
+              _startLocationUpdates(newSessionId);
+            } else {
+              AppLogger.info('Session already completed, not updating state');
+            }
           }
         }
       } catch (e) {

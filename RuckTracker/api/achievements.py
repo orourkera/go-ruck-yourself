@@ -8,6 +8,7 @@ from flask_restful import Resource, Api
 from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
+from ..services.push_notification_service import PushNotificationService, get_user_device_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +188,18 @@ class CheckSessionAchievementsResource(Resource):
                     new_achievements.append(achievement)
                     
                     logger.info(f"Awarded achievement {achievement['name']} to user {user_id}")
+            
+            # Send push notification
+            if new_achievements:
+                device_tokens = get_user_device_tokens([user_id])
+                if device_tokens:
+                    push_service = PushNotificationService()
+                    achievement_names = [achievement['name'] for achievement in new_achievements]
+                    push_service.send_achievement_notification(
+                        device_tokens=device_tokens,
+                        achievement_names=achievement_names,
+                        session_id=session_id
+                    )
             
             return {
                 'status': 'success',
