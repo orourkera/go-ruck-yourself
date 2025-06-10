@@ -15,24 +15,44 @@ class AuthCallbackScreen extends StatefulWidget {
 }
 
 class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
+  bool _hasHandledCallback = false;
+
   @override
   void initState() {
     super.initState();
-    _handleAuthCallback();
+    // Don't handle callback here - wait for didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Handle callback after the widget tree is built
+    if (!_hasHandledCallback) {
+      _hasHandledCallback = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleAuthCallback();
+      });
+    }
   }
 
   void _handleAuthCallback() {
     final uri = widget.uri;
     final queryParams = uri.queryParameters;
     
+    print('🔍 AuthCallback - Full URI: $uri');
+    print('🔍 AuthCallback - Query params: $queryParams');
+    
     // Check what type of callback this is
     final type = queryParams['type'];
     final accessToken = queryParams['access_token'];
     final refreshToken = queryParams['refresh_token'];
     
+    print('🔍 AuthCallback - Type: $type, Token: ${accessToken?.substring(0, 20)}...');
+    
     if (type == 'recovery' && accessToken != null) {
       // This is a password reset callback
       // Navigate to password reset screen with the token
+      print('🔑 Password reset callback detected');
       Navigator.of(context).pushReplacementNamed(
         '/password_reset',
         arguments: accessToken,

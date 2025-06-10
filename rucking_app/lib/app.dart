@@ -118,7 +118,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         // Use regex to extract parameters from the mess
         final accessTokenMatch = RegExp(r'access_token=([^&]+)').firstMatch(paramString);
         final refreshTokenMatch = RegExp(r'refresh_token=([^&]+)').firstMatch(paramString);
-        final typeMatch = RegExp(r'type=([^&]+)').firstMatch(paramString);
+        final typeMatch = RegExp(r'(?<!token_)type=([^&]+)').firstMatch(paramString); // Exclude token_type
         final errorMatch = RegExp(r'error=([^&]+)').firstMatch(paramString);
         final errorDescMatch = RegExp(r'error_description=([^&]+)').firstMatch(paramString);
         final errorCodeMatch = RegExp(r'error_code=([^&]+)').firstMatch(paramString);
@@ -186,11 +186,20 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     // Convert fragment to query parameters so they can be read by Uri.queryParameters.
     if (isAuthCallback && uri.fragment.isNotEmpty && uri.query.isEmpty) {
       try {
+        // Parse fragment manually to avoid type/token_type conflicts
+        String fragmentQuery = uri.fragment;
+        
+        // Fix potential type/token_type conflict by ensuring type=recovery is preserved
+        if (fragmentQuery.contains('type=recovery') && fragmentQuery.contains('token_type=bearer')) {
+          // Replace any 'type=bearer' with 'token_type=bearer' to preserve type=recovery
+          fragmentQuery = fragmentQuery.replaceAll(RegExp(r'(?<!token_)type=bearer'), 'token_type=bearer');
+        }
+        
         final rebuilt = Uri(
           scheme: uri.scheme,
           host: uri.host,
           path: uri.path,
-          query: uri.fragment, // treat fragment as query
+          query: fragmentQuery, // treat fragment as query
         );
         uri = rebuilt;
         print('🔄 Converted fragment to query: $uri');
@@ -442,6 +451,47 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                 case '/auth/callback':
                   // Parse the full URI from the route settings
                   final uri = Uri.parse('https://getrucky.com${settings.name}?${settings.arguments ?? ''}');
+                  return MaterialPageRoute(
+                    builder: (_) => AuthCallbackScreen(uri: uri),
+                  );
+                case '/callback':
+                  // Debug logging to see what we're receiving
+                  print('🔍 /callback route - settings.name: ${settings.name}');
+                  print('🔍 /callback route - settings.arguments: ${settings.arguments}');
+                  
+                  String fullUrl = settings.name ?? '/callback';
+                  if (settings.arguments != null) {
+                    fullUrl += '?${settings.arguments}';
+                  }
+                  
+                  print('🔍 /callback route - fullUrl: $fullUrl');
+                  
+                  // Handle Supabase redirects that come to /callback instead of /auth/callback
+                  // Parse the URL properly, including fragment parameters
+                  Uri uri;
+                  try {
+                    // If this is a fragment-based URL, we need to parse it manually
+                    if (fullUrl.contains('#')) {
+                      final parts = fullUrl.split('#');
+                      if (parts.length > 1) {
+                        // Convert fragment to query parameters
+                        uri = Uri(
+                          scheme: 'https',
+                          host: 'getrucky.com',
+                          path: '/auth/callback',
+                          query: parts[1], // Use fragment as query
+                        );
+                      } else {
+                        uri = Uri.parse('https://getrucky.com$fullUrl');
+                      }
+                    } else {
+                      uri = Uri.parse('https://getrucky.com$fullUrl');
+                    }
+                  } catch (e) {
+                    // Fallback if parsing fails
+                    uri = Uri.parse('https://getrucky.com/auth/callback');
+                  }
+                  
                   return MaterialPageRoute(
                     builder: (_) => AuthCallbackScreen(uri: uri),
                   );

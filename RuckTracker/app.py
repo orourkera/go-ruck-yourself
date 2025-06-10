@@ -449,6 +449,58 @@ def auth_redirect():
     
     return response
 
+@app.route('/api/auth/password-reset-confirm', methods=['POST'])
+@limiter.limit("5 per minute")
+def password_reset_confirm():
+    """
+    Confirm password reset with new password.
+    This uses Supabase's password update functionality.
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "Request body is required"}), 400
+            
+        new_password = data.get('password')
+        access_token = data.get('access_token')  # Token from password reset link
+        
+        if not new_password:
+            return jsonify({"error": "New password is required"}), 400
+            
+        if not access_token:
+            return jsonify({"error": "Access token is required"}), 400
+            
+        # Use Supabase client with the user's token to update password
+        try:
+            supabase = get_supabase_client(user_jwt=access_token)
+            
+            # Update the user's password
+            response = supabase.auth.update_user({
+                'password': new_password
+            })
+            
+            if response.user:
+                logger.info(f"Password reset successful for user: {response.user.id}")
+                return jsonify({
+                    "message": "Password updated successfully",
+                    "user": {
+                        "id": response.user.id,
+                        "email": response.user.email
+                    }
+                }), 200
+            else:
+                logger.error("Password reset failed - no user returned")
+                return jsonify({"error": "Failed to update password"}), 400
+                
+        except Exception as supabase_error:
+            logger.error(f"Supabase password update error: {str(supabase_error)}")
+            return jsonify({"error": "Failed to update password"}), 400
+            
+    except Exception as e:
+        logger.error(f"Password reset confirmation error: {str(e)}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
 @app.route('/privacy')
 def privacy():
     return render_template('privacy.html')
