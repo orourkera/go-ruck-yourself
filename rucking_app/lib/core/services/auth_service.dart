@@ -106,7 +106,16 @@ class AuthServiceImpl implements AuthService {
       scopes: ['email', 'profile'],
       serverClientId: '966278977337-730qujnni7h9ukafh5brafjd06j1skqu.apps.googleusercontent.com', // Exact Web client ID from Google Cloud Console
       clientId: '966278977337-l132nm2pas6ifl0kc3oh9977icfja6au.apps.googleusercontent.com', // iOS client ID
+      hostedDomain: 'getrucky.com',
     );
+    
+    // Set up the API client to use our refresh token method (with circuit breaker)
+    _apiClient.setTokenRefreshCallback(() async {
+      final newToken = await refreshToken();
+      if (newToken == null) {
+        throw Exception('Token refresh failed');
+      }
+    });
   }
   
   @override
@@ -189,45 +198,56 @@ class AuthServiceImpl implements AuthService {
 
       AppLogger.info('Google authentication successful, user: ${supabaseUser.email}');
       
-      // Set auth token for API calls
+      // Store tokens FIRST before making any API calls to prevent token expiration issues
+      await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
+      await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken!);
+      
+      // Set auth token for API calls AFTER storing
       _apiClient.setAuthToken(session.accessToken);
+      
+      // Reset refresh failure counter on successful login
+      _consecutiveRefreshFailures = 0;
+      
+      // Add small delay to ensure token is properly set in all systems
+      await Future.delayed(const Duration(milliseconds: 100));
       
       try {
         // Try to get existing user profile from your backend
+        AppLogger.info('Fetching user profile after Google authentication');
         final profileResponse = await _apiClient.get('/users/profile');
         final user = User.fromJson(profileResponse);
-        
-        // Store tokens
-        await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
-        await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken!);
-        
-        // Reset refresh failure counter on successful login
-        _consecutiveRefreshFailures = 0;
         
         AppLogger.info('Google Sign-In successful for existing user: ${user.email}');
         return user;
       } catch (e) {
-        // User doesn't exist in your backend, create new profile
-        AppLogger.info('Creating new user profile for Google user: ${supabaseUser.email}');
+        AppLogger.info('User profile not found, creating new profile for Google user: ${supabaseUser.email}');
         
+        // User doesn't exist in your backend, create new profile
         final newUserData = {
           'email': supabaseUser.email!,
           'username': supabaseUser.userMetadata?['full_name'] ?? supabaseUser.email!.split('@')[0],
           'is_metric': true, // Default to metric
         };
         
-        final createResponse = await _apiClient.post('/users/profile', newUserData);
-        final newUser = User.fromJson(createResponse);
-        
-        // Store tokens
-        await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
-        await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken!);
-        
-        // Reset refresh failure counter on successful login
-        _consecutiveRefreshFailures = 0;
-        
-        AppLogger.info('Google Sign-In successful for new user: ${newUser.email}');
-        return newUser;
+        try {
+          final createResponse = await _apiClient.post('/users/profile', newUserData);
+          final newUser = User.fromJson(createResponse);
+          
+          AppLogger.info('Google Sign-In successful for new user: ${newUser.email}');
+          return newUser;
+        } catch (createError) {
+          AppLogger.error('Failed to create user profile after Google login', exception: createError);
+          // If profile creation fails, still return basic user info
+          final basicUser = User(
+            id: supabaseUser.id,
+            email: supabaseUser.email!,
+            username: supabaseUser.userMetadata?['full_name'] ?? supabaseUser.email!.split('@')[0],
+            isMetric: true,
+            createdAt: DateTime.now(),
+            isAdmin: false,
+          );
+          return basicUser;
+        }
       }
     } catch (e) {
       AppLogger.error('Google sign-in failed', exception: e);
@@ -450,75 +470,50 @@ class AuthServiceImpl implements AuthService {
   @override
   Future<String?> refreshToken() async {
     try {
-      final storedRefreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
+      AppLogger.info('[AUTH] Attempting token refresh...');
       
-      try {
-        // Make the token refresh request
-        final response = await _apiClient.post(
-          '/auth/refresh',
-          {'refresh_token': storedRefreshToken},
-        );
-        
-        if (response == null) {
-          AppLogger.error('Token refresh failed: Null response from server');
-          _consecutiveRefreshFailures++;
-          await _handleRefreshFailure();
-          return null;
-        }
-        
-        final newToken = response['token'] as String;
-        final newRefreshToken = response['refresh_token'] as String;
-
-        if (newToken.isEmpty || newRefreshToken.isEmpty) {
-          AppLogger.error('Token refresh failed: Received empty tokens from server');
-          _consecutiveRefreshFailures++;
-          await _handleRefreshFailure();
-          throw UnauthorizedException('Received empty tokens from refresh');
-        }
-
-        // Store new tokens
-        await _storageService.setSecureString(AppConfig.tokenKey, newToken);
-        await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
-        
-        // Set new token in API client
-        _apiClient.setAuthToken(newToken);
-        
-        // Reset failure counter on success
-        _consecutiveRefreshFailures = 0;
-        
-        AppLogger.info('Token refresh successful');
-        return newToken;
-      } catch (e) {
-        AppLogger.error('Token refresh failed', exception: e);
-        
-        _consecutiveRefreshFailures++;
-        
-        if (e is DioException) {
-          if (e.response?.statusCode == 400 || e.response?.statusCode == 401) {
-            // Bad request/unauthorized - likely user deleted or token invalid
-            AppLogger.warning('[AUTH] Refresh token rejected by server - user may be deleted');
-            await _handleRefreshFailure();
-          } else if (e.type == DioExceptionType.connectionError || 
-                    e.type == DioExceptionType.connectionTimeout) {
-            // Network connectivity issues - don't count as auth failure
-            _consecutiveRefreshFailures--;
-            AppLogger.warning('[AUTH] Network connectivity issue during token refresh');
-          } else {
-            // Other API errors
-            AppLogger.error('[AUTH] Server error during token refresh: ${e.response?.statusCode}');
-            await _handleRefreshFailure();
-          }
-        } else {
-          // Non-Dio exceptions
-          AppLogger.error('[AUTH] Unexpected error during token refresh: $e');
-          await _handleRefreshFailure();
-        }
-        
+      final refreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
+      if (refreshToken == null) {
+        AppLogger.warning('[AUTH] No refresh token available');
+        await _handleRefreshFailure();
         return null;
       }
+
+      final response = await _apiClient.post('/auth/refresh', {
+        'refresh_token': refreshToken,
+      });
+
+      // Safely extract tokens with null checks
+      final newToken = response['token'] as String?;
+      final newRefreshToken = response['refresh_token'] as String?;
+      
+      if (newToken == null || newRefreshToken == null || newToken.isEmpty || newRefreshToken.isEmpty) {
+        AppLogger.error('[AUTH] Invalid refresh response - missing or empty tokens');
+        await _handleRefreshFailure();
+        return null;
+      }
+
+      await _storageService.setSecureString(AppConfig.tokenKey, newToken);
+      await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
+
+      _apiClient.setAuthToken(newToken);
+      
+      // Test the new token immediately by making a profile request
+      try {
+        await _apiClient.get('/users/profile');
+        // If profile request succeeds, reset failure counter
+        _consecutiveRefreshFailures = 0;
+        AppLogger.info('[AUTH] Token refresh successful and verified');
+        return newToken;
+      } catch (testError) {
+        // New token was rejected - this counts as a refresh failure
+        AppLogger.warning('[AUTH] Refreshed token was immediately rejected: $testError');
+        await _handleRefreshFailure();
+        return null;
+      }
+
     } catch (e) {
       AppLogger.error('Error in refreshToken', exception: e);
-      _consecutiveRefreshFailures++;
       await _handleRefreshFailure();
       return null;
     }
@@ -530,9 +525,9 @@ class AuthServiceImpl implements AuthService {
       AppLogger.warning('[AUTH] Too many consecutive refresh failures ($_consecutiveRefreshFailures). User may be deleted. Forcing logout.');
       
       // Clear all stored authentication data
-      await _storageService.removeSecureString(AppConfig.tokenKey);
-      await _storageService.removeSecureString(AppConfig.refreshTokenKey);
-      await _storageService.removeObject(AppConfig.userProfileKey);
+      await _storageService.removeSecure(AppConfig.tokenKey);
+      await _storageService.removeSecure(AppConfig.refreshTokenKey);
+      await _storageService.remove(AppConfig.userProfileKey);
       
       // Clear API client token
       _apiClient.clearAuthToken();

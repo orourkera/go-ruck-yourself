@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
 import logging
+import threading
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -17,17 +18,42 @@ key = os.environ.get("SUPABASE_KEY")
 if not url or not key:
     raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in environment variables")
 
+# Global client instances with thread safety
+_client_instance = None
+_client_lock = threading.Lock()
+
 def get_supabase_client(user_jwt=None):
     """
-    Returns a Supabase client instance. If user_jwt is provided, attaches it for RLS-authenticated requests.
+    Returns a Supabase client instance with thread-safe singleton pattern.
+    Prevents thread exhaustion by disabling auto-refresh and reusing clients.
     """
-    options = None
+    global _client_instance
+    
+    # For user-authenticated requests, create a temporary client without auto-refresh
     if user_jwt:
         options = ClientOptions(
-            headers={"Authorization": f"Bearer {user_jwt}"}
+            headers={"Authorization": f"Bearer {user_jwt}"},
+            # CRITICAL: disable auto-refresh to prevent thread creation
+            auto_refresh_token=False
         )
-    client = create_client(url, key, options)
-    return client
+        return create_client(url, key, options)
+    
+    # For service-level requests, use singleton pattern
+    if _client_instance is None:
+        with _client_lock:
+            if _client_instance is None:
+                try:
+                    options = ClientOptions(
+                        # CRITICAL: disable auto-refresh to prevent thread exhaustion
+                        auto_refresh_token=False
+                    )
+                    _client_instance = create_client(url, key, options)
+                    logger.info("Supabase client singleton created successfully (auto-refresh disabled)")
+                except Exception as e:
+                    logger.error(f"Failed to create Supabase client: {e}")
+                    raise
+    
+    return _client_instance
 
 # Function to get an admin client using the service role key
 def get_supabase_admin_client():

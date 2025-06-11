@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
@@ -11,6 +12,13 @@ class ApiClient {
   final Dio _dio;
   late final StorageService _storageService;
   
+  // Callback to refresh token via auth service (with circuit breaker)
+  Function()? _tokenRefreshCallback;
+  
+  // Prevent simultaneous refresh attempts
+  bool _isRefreshing = false;
+  final List<Completer<void>> _refreshCompleters = [];
+
   ApiClient(this._dio) {
     // Add logging interceptor only in debug mode
     if (kDebugMode) {
@@ -33,7 +41,7 @@ class ApiClient {
       ));
     }
     
-    // Add token refresh interceptor with enhanced retry mechanism
+    // Add simplified token refresh interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
         onError: (error, handler) async {
@@ -45,79 +53,65 @@ class ApiClient {
               return handler.next(error);
             }
             
-            debugPrint('[API] Authentication error (401). Attempting to refresh token...');
+            debugPrint('[API] Authentication error (401). Attempting coordinated refresh...');
             
-            try {              
-              // Get refresh token from storage (without failing if not found)
-              final refreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
-              if (refreshToken == null || refreshToken.isEmpty) {
-                debugPrint('[API] No refresh token available - continuing with error');
+            // Use auth service's refresh method (with circuit breaker and coordination)
+            if (_tokenRefreshCallback != null) {
+              try {
+                await _coordinatedRefresh();
+                // If refresh succeeded, retry the original request
+                debugPrint('[API] Coordinated refresh completed. Retrying original request...');
+                final response = await _dio.fetch(error.requestOptions);
+                return handler.resolve(response);
+              } catch (refreshError) {
+                debugPrint('[API] Coordinated refresh failed: $refreshError');
                 return handler.next(error);
               }
-              
-              // Create a new Dio instance for refresh request to avoid interceptor loop
-              final refreshDio = Dio(_dio.options);
-              // Add specific timeout for refresh requests - longer for reliability during long sessions
-              refreshDio.options.connectTimeout = const Duration(seconds: 60);
-              refreshDio.options.receiveTimeout = const Duration(seconds: 60);
-              
-              debugPrint('[API] Attempting token refresh with backend...');
-              final refreshResponse = await refreshDio.post(
-                '/auth/refresh',
-                data: {'refresh_token': refreshToken},
-              );
-              
-              if (refreshResponse.statusCode == 200 && 
-                  refreshResponse.data != null && 
-                  refreshResponse.data['token'] != null) {
-                
-                // Extract and validate tokens
-                final newToken = refreshResponse.data['token'] as String;
-                final newRefreshToken = refreshResponse.data['refresh_token'] as String;
-                
-                if (newToken.isNotEmpty && newRefreshToken.isNotEmpty) {
-                  await _storageService.setSecureString(AppConfig.tokenKey, newToken);
-                  await _storageService.setSecureString(AppConfig.refreshTokenKey, newRefreshToken);
-                  
-                  // Update token in the current Dio instance
-                  setAuthToken(newToken);
-                  
-                  debugPrint('[API] Token refreshed successfully. Retrying original request...');
-                  
-                  // Retry the original request with the new token
-                  final options = Options(
-                    method: error.requestOptions.method,
-                    headers: {...error.requestOptions.headers, 'Authorization': 'Bearer $newToken'},
-                  );
-                  
-                  final retryResponse = await _dio.request<dynamic>(
-                    error.requestOptions.path,
-                    data: error.requestOptions.data,
-                    queryParameters: error.requestOptions.queryParameters,
-                    options: options,
-                  );
-                  
-                  // Return the response from the retry
-                  return handler.resolve(retryResponse);
-                } else {
-                  debugPrint('[API] Received empty tokens from refresh response');
-                }
-              } else {
-                debugPrint('[API] Token refresh failed with status: ${refreshResponse.statusCode}');
-              }
-            } catch (e) {
-              // Handle refresh errors gracefully without logging the user out
-              debugPrint('[API] Token refresh attempt failed: $e');
-              // Save the error for later analysis but don't interfere with user session
-              // We'll try again next time an API call fails
+            } else {
+              debugPrint('[API] No token refresh callback available');
+              return handler.next(error);
             }
           }
           
-          // If token refresh failed or error is not 401, continue with the original error
           return handler.next(error);
         },
       ),
     );
+  }
+  
+  /// Coordinates token refresh to prevent multiple simultaneous attempts
+  Future<void> _coordinatedRefresh() async {
+    if (_isRefreshing) {
+      // If refresh is already in progress, wait for it to complete
+      debugPrint('[API] Refresh already in progress, waiting...');
+      final completer = Completer<void>();
+      _refreshCompleters.add(completer);
+      return completer.future;
+    }
+    
+    _isRefreshing = true;
+    try {
+      debugPrint('[API] Starting coordinated token refresh...');
+      await _tokenRefreshCallback!();
+      debugPrint('[API] Coordinated token refresh successful');
+      
+      // Notify all waiting requests
+      for (final completer in _refreshCompleters) {
+        completer.complete();
+      }
+      _refreshCompleters.clear();
+    } catch (error) {
+      debugPrint('[API] Coordinated token refresh failed: $error');
+      
+      // Notify all waiting requests of failure
+      for (final completer in _refreshCompleters) {
+        completer.completeError(error);
+      }
+      _refreshCompleters.clear();
+      rethrow;
+    } finally {
+      _isRefreshing = false;
+    }
   }
   
   /// Set the storage service after it has been initialized
@@ -551,4 +545,9 @@ class ApiClient {
     
     return ApiException('Unexpected error: $error');
   }
-} 
+  
+  /// Sets the token refresh callback
+  void setTokenRefreshCallback(Function() callback) {
+    _tokenRefreshCallback = callback;
+  }
+}

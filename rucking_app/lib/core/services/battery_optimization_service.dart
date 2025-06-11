@@ -37,7 +37,10 @@ class BatteryOptimizationService {
   
   /// Check if battery optimization permissions are needed and configured
   static Future<bool> ensureBackgroundExecutionPermissions({BuildContext? context}) async {
-    if (!Platform.isAndroid) return true;
+    if (!Platform.isAndroid) {
+      AppLogger.info('[BATTERY] Not Android - skipping battery optimization check');
+      return true;
+    }
     
     try {
       AppLogger.info('[BATTERY] Checking battery optimization permissions...');
@@ -45,24 +48,33 @@ class BatteryOptimizationService {
       // Check if we can ignore battery optimizations
       final batteryOptimizationStatus = await Permission.ignoreBatteryOptimizations.status;
       AppLogger.info('[BATTERY] Battery optimization status: $batteryOptimizationStatus');
+      AppLogger.info('[BATTERY] Status details - isDenied: ${batteryOptimizationStatus.isDenied}, isGranted: ${batteryOptimizationStatus.isGranted}, isPermanentlyDenied: ${batteryOptimizationStatus.isPermanentlyDenied}');
       
       if (batteryOptimizationStatus.isDenied) {
+        AppLogger.info('[BATTERY] Permission is denied - showing explanation dialog');
         // Show custom explanation dialog first if context is provided
         if (context != null) {
           final userAccepted = await showBatteryOptimizationExplanation(context);
+          AppLogger.info('[BATTERY] User response to dialog: $userAccepted');
           if (!userAccepted) {
             AppLogger.info('[BATTERY] User declined battery optimization exemption');
             return false;
           }
+        } else {
+          AppLogger.warning('[BATTERY] No context provided - cannot show dialog');
         }
         
         AppLogger.info('[BATTERY] Requesting battery optimization exemption...');
         final result = await Permission.ignoreBatteryOptimizations.request();
         AppLogger.info('[BATTERY] Battery optimization request result: $result');
         return result.isGranted;
+      } else {
+        AppLogger.info('[BATTERY] Permission not denied (status: $batteryOptimizationStatus) - no dialog needed');
       }
       
-      return batteryOptimizationStatus.isGranted;
+      final isGranted = batteryOptimizationStatus.isGranted;
+      AppLogger.info('[BATTERY] Final permission status - isGranted: $isGranted');
+      return isGranted;
     } catch (e) {
       AppLogger.error('[BATTERY] Error checking battery optimization permissions: $e');
       return false;
