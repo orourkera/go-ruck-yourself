@@ -12,7 +12,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate # Import Migrate
-from .supabase_client import get_supabase_client # Relative import for supabase_client within RuckTracker package
+from .supabase_client import get_supabase_client, get_supabase_admin_client # Relative import for supabase_client within RuckTracker package
 from flask_limiter.util import get_remote_address
 
 # Load environment variables from .env file
@@ -203,22 +203,12 @@ rate_limit_resource(SignInResource, "5 per minute")
 # User authentication middleware
 @app.before_request
 def load_user():
-    # Skip token validation for public signup/register endpoints
-    public_paths = ['/api/auth/signup', '/api/users/register']
-    if request.path in public_paths:
-        g.user = None
-        g.user_id = None
-        g.access_token = None
-        logger.debug(f"Skipping token auth for public path: {request.path}")
-        return
-
-    # Extract auth token from headers
-    auth_header = request.headers.get('Authorization')
+    """Load user from authorization header"""
     g.user = None
     g.user_id = None
     g.access_token = None
     
-    # Check if this is a development environment
+    auth_header = request.headers.get('Authorization')
     is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
     
     if auth_header and auth_header.startswith('Bearer '):
@@ -226,23 +216,24 @@ def load_user():
         try:
             logger.debug(f"Validating token (first 10 chars): {token[:10]}...")
             
-            # Use the shared singleton client – no new thread creation per request
-            supabase = get_supabase_client()
+            # Use the admin client to validate tokens without creating threads
+            # The admin client has service role permissions to validate any user's token
+            supabase_admin = get_supabase_admin_client()
             
-            # Pass the JWT explicitly to get_user() per Supabase Python docs
-            user_response = supabase.auth.get_user(token)
-            user_obj = getattr(user_response, 'user', None)
-
-            if user_obj:
-                g.user = user_obj
-                g.user_id = user_obj.id
+            # Call the Supabase auth API directly to validate the token
+            # This avoids thread creation from the auth refresh logic
+            user_response = supabase_admin.auth.get_user(token)
+            
+            if user_response and hasattr(user_response, 'user') and user_response.user:
+                g.user = user_response.user
+                g.user_id = user_response.user.id
                 g.access_token = token
-                logger.debug(f"User {user_obj.id} authenticated successfully")
+                logger.debug(f"User {user_response.user.id} authenticated successfully")
                 return
             else:
                 logger.warning("Token validation failed – no user returned from Supabase")
         except Exception as token_error:
-            logger.error(f"Token validation exception: {str(token_error)}", exc_info=True)
+            logger.error(f"Token validation exception: {str(token_error)}")
 
         # Fallback to mock user flow happens below for dev environments
     else:

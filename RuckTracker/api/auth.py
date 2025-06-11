@@ -187,21 +187,36 @@ class RefreshTokenResource(Resource):
                 
             # Refresh token with Supabase
             supabase = get_supabase_client()
-            auth_response = supabase.auth.refresh_session(refresh_token)
             
-            if auth_response.session:
-                # Convert user model to a JSON-serializable dictionary
-                user_data = auth_response.user.model_dump(mode='json') if auth_response.user else None
+            try:
+                auth_response = supabase.auth.refresh_session(refresh_token)
                 
-                return {
-                    'token': auth_response.session.access_token,
-                    'refresh_token': auth_response.session.refresh_token,
-                    'user': user_data
-                }, 200
-            else:
-                return {'message': 'Invalid refresh token'}, 401
+                # Check if we got a valid response with a session
+                if auth_response and auth_response.session:
+                    # Convert user model to a JSON-serializable dictionary
+                    user_data = auth_response.user.model_dump(mode='json') if auth_response.user else None
+                    
+                    return {
+                        'token': auth_response.session.access_token,
+                        'refresh_token': auth_response.session.refresh_token,
+                        'user': user_data
+                    }, 200
+                else:
+                    logger.error("Invalid auth response or no session in refresh token response")
+                    return {'message': 'Invalid refresh token'}, 401
+                    
+            except Exception as auth_error:
+                # Check if this is a rate limit error
+                error_message = str(auth_error)
+                if '429' in error_message or 'Too Many Requests' in error_message:
+                    logger.warning(f"Rate limit hit for refresh token: {error_message}")
+                    return {'message': 'Too many requests. Please try again later.'}, 429
+                else:
+                    logger.error(f"Supabase auth error during refresh: {error_message}")
+                    return {'message': 'Authentication service error'}, 503
                 
         except Exception as e:
+            logger.error(f"Unexpected error in refresh token: {str(e)}")
             return {'message': f'Error refreshing token: {str(e)}'}, 500
 
 class ForgotPasswordResource(Resource):
