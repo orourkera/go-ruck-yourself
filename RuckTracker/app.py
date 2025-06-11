@@ -189,7 +189,7 @@ from .api.ruck_photos_resource import RuckPhotosResource # Added import for Ruck
 from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesResource
 from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
 from .api.notifications_resource import NotificationsResource, NotificationReadResource, ReadAllNotificationsResource # Import for Notification resources
-from .api.resources import UserResource, UserProfileResource # Import UserResource and UserProfileResource
+from .api.resources import UserResource # Import UserResource
 from .api.duels import DuelListResource, DuelResource, DuelJoinResource, DuelParticipantResource, DuelWithdrawResource
 from .api.duel_participants import DuelParticipantProgressResource, DuelLeaderboardResource
 from .api.duel_stats import UserDuelStatsResource, DuelStatsLeaderboardResource, DuelAnalyticsResource
@@ -385,9 +385,6 @@ api.add_resource(DuelCommentsResource, '/api/duels/<string:duel_id>/comments')
 
 # Device Token Endpoints
 api.add_resource(DeviceTokenResource, '/api/device-token')
-
-# User Profile Endpoints (for Google auth and profile management)
-api.add_resource(UserProfileResource, '/api/users/profile')
 
 # Add route for homepage (remains unprefixed)
 @app.route('/')
