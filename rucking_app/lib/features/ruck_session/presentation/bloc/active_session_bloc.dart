@@ -172,18 +172,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Don't fail the session - allow offline mode for indoor rucks, airplanes, etc.
       }
 
-      // Android: Ensure battery optimization permissions for background tracking
-      AppLogger.info('[SESSION_START] Checking battery optimization permissions...');
+      // Android: Log battery optimization status for debugging
+      AppLogger.info('[SESSION_START] Logging battery optimization status...');
       await BatteryOptimizationService.logPowerManagementState();
       
       final backgroundPermissions = await BatteryOptimizationService.checkBackgroundLocationPermissions();
       if (!backgroundPermissions['all_granted']!) {
-        AppLogger.warning('[SESSION_START] Some background permissions missing, requesting...');
-        final granted = await BatteryOptimizationService.requestAllBackgroundPermissions();
-        if (!granted) {
-          AppLogger.warning('[SESSION_START] Background permissions not fully granted - session may be interrupted');
-          // Continue anyway but warn user in the future
-        }
+        AppLogger.warning('[SESSION_START] Some background permissions missing - session may be interrupted');
+        AppLogger.warning('[SESSION_START] Permission status: $backgroundPermissions');
+        // Don't request permissions here anymore - they should be handled at app startup
       } else {
         AppLogger.info('[SESSION_START] All background permissions granted');
       }

@@ -1,14 +1,42 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/shared/widgets/battery_optimization_dialog.dart';
 
 /// Service to handle Android battery optimization and background app restrictions
 /// Critical for ensuring location tracking continues when app is backgrounded
 class BatteryOptimizationService {
   static const String _ignoreBatteryOptimizationChecked = 'ignore_battery_optimization_checked';
   
+  /// Show custom dialog explaining battery optimization before requesting system permission
+  static Future<bool> showBatteryOptimizationExplanation(BuildContext context) async {
+    if (!Platform.isAndroid) return true;
+    
+    bool userAccepted = false;
+    
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return BatteryOptimizationDialog(
+          onAllow: () {
+            userAccepted = true;
+            Navigator.of(context).pop(true);
+          },
+          onDeny: () {
+            userAccepted = false;
+            Navigator.of(context).pop(false);
+          },
+        );
+      },
+    );
+    
+    return userAccepted;
+  }
+  
   /// Check if battery optimization permissions are needed and configured
-  static Future<bool> ensureBackgroundExecutionPermissions() async {
+  static Future<bool> ensureBackgroundExecutionPermissions({BuildContext? context}) async {
     if (!Platform.isAndroid) return true;
     
     try {
@@ -19,6 +47,15 @@ class BatteryOptimizationService {
       AppLogger.info('[BATTERY] Battery optimization status: $batteryOptimizationStatus');
       
       if (batteryOptimizationStatus.isDenied) {
+        // Show custom explanation dialog first if context is provided
+        if (context != null) {
+          final userAccepted = await showBatteryOptimizationExplanation(context);
+          if (!userAccepted) {
+            AppLogger.info('[BATTERY] User declined battery optimization exemption');
+            return false;
+          }
+        }
+        
         AppLogger.info('[BATTERY] Requesting battery optimization exemption...');
         final result = await Permission.ignoreBatteryOptimizations.request();
         AppLogger.info('[BATTERY] Battery optimization request result: $result');
@@ -66,7 +103,7 @@ class BatteryOptimizationService {
   }
   
   /// Request all necessary permissions for background tracking
-  static Future<bool> requestAllBackgroundPermissions() async {
+  static Future<bool> requestAllBackgroundPermissions({BuildContext? context}) async {
     if (!Platform.isAndroid) return true;
     
     try {
@@ -85,8 +122,23 @@ class BatteryOptimizationService {
       final locationAlways = await Permission.location.request();
       AppLogger.info('[BATTERY] Location always: $locationAlways');
       
-      // Request battery optimization exemption
-      final batteryOptimization = await Permission.ignoreBatteryOptimizations.request();
+      // Request battery optimization exemption with custom explanation
+      PermissionStatus batteryOptimization = await Permission.ignoreBatteryOptimizations.status;
+      
+      if (batteryOptimization.isDenied && context != null) {
+        // Show custom explanation dialog first
+        final userAccepted = await showBatteryOptimizationExplanation(context);
+        if (!userAccepted) {
+          AppLogger.info('[BATTERY] User declined battery optimization exemption');
+          batteryOptimization = PermissionStatus.denied;
+        } else {
+          batteryOptimization = await Permission.ignoreBatteryOptimizations.request();
+        }
+      } else if (batteryOptimization.isDenied) {
+        // Fallback to direct request if no context
+        batteryOptimization = await Permission.ignoreBatteryOptimizations.request();
+      }
+      
       AppLogger.info('[BATTERY] Battery optimization: $batteryOptimization');
       
       final allGranted = locationWhenInUse.isGranted && 

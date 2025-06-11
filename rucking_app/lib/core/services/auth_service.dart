@@ -96,6 +96,10 @@ class AuthServiceImpl implements AuthService {
   final ApiClient _apiClient;
   final StorageService _storageService;
   late final GoogleSignIn _googleSignIn;
+  
+  // Track consecutive refresh failures to detect deleted users
+  static int _consecutiveRefreshFailures = 0;
+  static const int _maxRefreshFailures = 3;
 
   AuthServiceImpl(this._apiClient, this._storageService) {
     _googleSignIn = GoogleSignIn(
@@ -128,11 +132,15 @@ class AuthServiceImpl implements AuthService {
       // Set auth token for subsequent API calls
       _apiClient.setAuthToken(token);
 
-      // Get user profile from API
-      final userResponse = await _apiClient.get('/users/profile');
-      final user = User.fromJson(userResponse);
+      // Get full user profile after successful authentication
+      final user = await getCurrentUser();
+      if (user == null) {
+        throw ApiException('Authentication succeeded but could not get user data');
+      }
 
-      AppLogger.info('Login successful for user: ${user.userId}');
+      // Reset refresh failure counter on successful login
+      _consecutiveRefreshFailures = 0;
+
       return user;
     } catch (e) {
       AppLogger.error('Login failed', exception: e);
@@ -193,6 +201,9 @@ class AuthServiceImpl implements AuthService {
         await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
         await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken!);
         
+        // Reset refresh failure counter on successful login
+        _consecutiveRefreshFailures = 0;
+        
         AppLogger.info('Google Sign-In successful for existing user: ${user.email}');
         return user;
       } catch (e) {
@@ -211,6 +222,9 @@ class AuthServiceImpl implements AuthService {
         // Store tokens
         await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
         await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken!);
+        
+        // Reset refresh failure counter on successful login
+        _consecutiveRefreshFailures = 0;
         
         AppLogger.info('Google Sign-In successful for new user: ${newUser.email}');
         return newUser;
@@ -447,7 +461,8 @@ class AuthServiceImpl implements AuthService {
         
         if (response == null) {
           AppLogger.error('Token refresh failed: Null response from server');
-          await _cleanupInvalidAuthState();
+          _consecutiveRefreshFailures++;
+          await _handleRefreshFailure();
           return null;
         }
         
@@ -456,7 +471,8 @@ class AuthServiceImpl implements AuthService {
 
         if (newToken.isEmpty || newRefreshToken.isEmpty) {
           AppLogger.error('Token refresh failed: Received empty tokens from server');
-          await _cleanupInvalidAuthState();
+          _consecutiveRefreshFailures++;
+          await _handleRefreshFailure();
           throw UnauthorizedException('Received empty tokens from refresh');
         }
 
@@ -467,44 +483,68 @@ class AuthServiceImpl implements AuthService {
         // Set new token in API client
         _apiClient.setAuthToken(newToken);
         
+        // Reset failure counter on success
+        _consecutiveRefreshFailures = 0;
+        
         AppLogger.info('Token refresh successful');
         return newToken;
       } catch (e) {
         AppLogger.error('Token refresh failed', exception: e);
         
-        // All token refresh errors are treated as temporary issues
-      // We'll never force a logout due to token problems
-      if (e is DioException) {
-        if (e.response?.statusCode == 400) {
-          // Bad request (expired token) - keep the user logged in
-          AppLogger.warning('[AUTH] Refresh token issue detected, but maintaining user session');
-          await _cleanupInvalidAuthState();
-        } else if (e.type == DioExceptionType.connectionError || 
-                  e.type == DioExceptionType.connectionTimeout) {
-          // Network connectivity issues
-          AppLogger.warning('[AUTH] Network connectivity issue during token refresh');
+        _consecutiveRefreshFailures++;
+        
+        if (e is DioException) {
+          if (e.response?.statusCode == 400 || e.response?.statusCode == 401) {
+            // Bad request/unauthorized - likely user deleted or token invalid
+            AppLogger.warning('[AUTH] Refresh token rejected by server - user may be deleted');
+            await _handleRefreshFailure();
+          } else if (e.type == DioExceptionType.connectionError || 
+                    e.type == DioExceptionType.connectionTimeout) {
+            // Network connectivity issues - don't count as auth failure
+            _consecutiveRefreshFailures--;
+            AppLogger.warning('[AUTH] Network connectivity issue during token refresh');
+          } else {
+            // Other API errors
+            AppLogger.error('[AUTH] Server error during token refresh: ${e.response?.statusCode}');
+            await _handleRefreshFailure();
+          }
         } else {
-          // Other API errors
-          AppLogger.error('[AUTH] Server error during token refresh: ${e.response?.statusCode}');
+          // Non-Dio exceptions
+          AppLogger.error('[AUTH] Unexpected error during token refresh: $e');
+          await _handleRefreshFailure();
         }
-      } else {
-        // Non-Dio exceptions
-        AppLogger.error('[AUTH] Unexpected error during token refresh: $e');
-      }
-      // Return null instead of throwing - this indicates token refresh failed
-      // but we're NOT logging the user out
-      return null;
+        
+        return null;
       }
     } catch (e) {
-      // Never throw session expiration exceptions
       AppLogger.error('Error in refreshToken', exception: e);
-      // Return null instead of throwing - caller should handle this gracefully
-      // without forcing user logout
+      _consecutiveRefreshFailures++;
+      await _handleRefreshFailure();
       return null;
     }
   }
-
-  // Helper method to handle invalid tokens without logging out the user
+  
+  /// Handle refresh failure and logout if too many consecutive failures
+  Future<void> _handleRefreshFailure() async {
+    if (_consecutiveRefreshFailures >= _maxRefreshFailures) {
+      AppLogger.warning('[AUTH] Too many consecutive refresh failures ($_consecutiveRefreshFailures). User may be deleted. Forcing logout.');
+      
+      // Clear all stored authentication data
+      await _storageService.removeSecureString(AppConfig.tokenKey);
+      await _storageService.removeSecureString(AppConfig.refreshTokenKey);
+      await _storageService.removeObject(AppConfig.userProfileKey);
+      
+      // Clear API client token
+      _apiClient.clearAuthToken();
+      
+      // Reset counter after cleanup
+      _consecutiveRefreshFailures = 0;
+      
+      AppLogger.info('[AUTH] User logged out due to authentication failures. App should redirect to login.');
+    }
+  }
+  
+  /// Helper method to handle invalid tokens without logging out the user
   Future<void> _cleanupInvalidAuthState() async {
     AppLogger.warning('[AUTH] Invalid or expired tokens detected, but maintaining user session');
     // Only clear the API client's current token, but DO NOT remove stored tokens

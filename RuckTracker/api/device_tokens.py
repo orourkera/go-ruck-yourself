@@ -68,7 +68,7 @@ class DeviceTokenResource(Resource):
             return build_api_response(
                 success=True,
                 message="Device token registered successfully",
-                data={'token_id': result.data},
+                data={'token_id': str(result.data) if result.data else None},
                 status_code=200
             )
             

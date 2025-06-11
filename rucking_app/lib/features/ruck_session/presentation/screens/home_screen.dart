@@ -568,6 +568,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                       avatarUrl: state.user.avatarUrl,
                                       username: userName,
                                       size: 50,
+                                      onTap: () {
+                                        // Navigate to profile page
+                                        Navigator.pushNamed(context, '/profile');
+                                      },
                                     ),
                                     const SizedBox(width: 12),
                                   ],

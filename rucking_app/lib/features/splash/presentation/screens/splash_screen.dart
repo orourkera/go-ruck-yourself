@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/first_launch_service.dart';
+import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -127,6 +128,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
       // Check if user has seen the paywall before
       final bool hasSeenPaywall = await FirstLaunchService.hasSeenPaywall();
+
+      // Check battery optimization permissions for authenticated users
+      try {
+        debugPrint('[Splash] Checking battery optimization permissions...');
+        await BatteryOptimizationService.ensureBackgroundExecutionPermissions(context: context);
+        if (!mounted) return; // Check mounted after await
+      } catch (e) {
+        debugPrint('[Splash] Error checking battery optimization: $e');
+        // Continue anyway - don't block app startup for this
+      }
 
       if (isSubscribed) {
         debugPrint('[Splash] User is subscribed. Navigating to HomeScreen.');
