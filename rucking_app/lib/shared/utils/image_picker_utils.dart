@@ -2,13 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:rucking_app/shared/widgets/image_crop_modal.dart';
 
 /// Utility class for handling image selection and processing
 class ImagePickerUtils {
   static final ImagePicker _picker = ImagePicker();
 
-  /// Show a dialog to choose between camera and gallery
-  static Future<File?> pickImage(BuildContext context) async {
+  /// Show a dialog to choose between camera and gallery, then show crop modal
+  static Future<File?> pickImage(BuildContext context, {bool showCropModal = true}) async {
     final result = await showDialog<String?>(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -53,13 +54,37 @@ class ImagePickerUtils {
 
     if (result == null) return null;
     
+    File? selectedFile;
     if (result == 'camera') {
-      return await _pickImageFromCamera();
+      selectedFile = await _pickImageFromCamera();
     } else if (result == 'gallery') {
-      return await _pickImageFromGallery();
+      selectedFile = await _pickImageFromGallery();
     }
     
-    return null;
+    if (selectedFile == null) return null;
+    
+    // Show crop modal if requested
+    if (showCropModal && context.mounted) {
+      final croppedFile = await Navigator.of(context).push<File>(
+        MaterialPageRoute(
+          builder: (context) => ImageCropModal(
+            imageFile: selectedFile!,
+            title: 'Crop Profile Picture',
+            aspectRatio: 1.0, // Square for profile pictures
+          ),
+          fullscreenDialog: true,
+        ),
+      );
+      
+      return croppedFile ?? selectedFile;
+    }
+    
+    return selectedFile;
+  }
+
+  /// Pick image for profile (always shows crop modal)
+  static Future<File?> pickProfileImage(BuildContext context) async {
+    return pickImage(context, showCropModal: true);
   }
 
   /// Pick image from camera

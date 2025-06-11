@@ -85,6 +85,12 @@ class AchievementRepositoryImpl implements AchievementRepository {
     try {
       debugPrint('🏆 [AchievementRepository] getUserAchievements called for userId: $userId');
       
+      // Validate userId to prevent malformed API URLs that cause 500 errors
+      if (userId.isEmpty) {
+        debugPrint('🏆 [AchievementRepository] Error: userId is empty, cannot fetch achievements');
+        throw Exception('User ID is required to fetch achievements');
+      }
+      
       // Try to get cached data first
       final cachedData = await _cacheService.getCachedUserAchievements(userId);
       if (cachedData != null) {

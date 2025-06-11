@@ -189,7 +189,7 @@ from .api.ruck_photos_resource import RuckPhotosResource # Added import for Ruck
 from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesResource
 from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
 from .api.notifications_resource import NotificationsResource, NotificationReadResource, ReadAllNotificationsResource # Import for Notification resources
-from .api.resources import UserResource # Import UserResource
+from .api.resources import UserResource, UserProfileResource # Import UserResource and UserProfileResource
 from .api.duels import DuelListResource, DuelResource, DuelJoinResource, DuelParticipantResource, DuelWithdrawResource
 from .api.duel_participants import DuelParticipantProgressResource, DuelLeaderboardResource
 from .api.duel_stats import UserDuelStatsResource, DuelStatsLeaderboardResource, DuelAnalyticsResource
@@ -206,13 +206,16 @@ def load_user():
     # Skip token validation for public signup/register endpoints
     public_paths = ['/api/auth/signup', '/api/users/register']
     if request.path in public_paths:
-        g.user = None # Ensure g.user is None for these paths
+        g.user = None
+        g.user_id = None
+        g.access_token = None
         logger.debug(f"Skipping token auth for public path: {request.path}")
         return
 
     # Extract auth token from headers
     auth_header = request.headers.get('Authorization')
     g.user = None
+    g.user_id = None
     g.access_token = None
     
     # Check if this is a development environment
@@ -221,80 +224,56 @@ def load_user():
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.split("Bearer ")[1]
         try:
-            logger.debug(f"Setting session with token: {token[:10]}...")
+            logger.debug(f"Validating token: {token[:10]}...")
             
-            # Create a JWT client to decode the token
-            # In a proper setup, you would verify the token signature
-            # Supabase JWT tokens don't require a refresh token in many operations
+            # Create Supabase client with user JWT and validate token
             try:
-                # Use Supabase admin API to verify the token and get user
                 supabase = get_supabase_client(user_jwt=token)
-                user_response = supabase.auth.get_user(token)
+                # Correct way to get user from Supabase with JWT token
+                user_response = supabase.auth.get_user()
                 
                 if user_response.user:
                     g.user = user_response.user
+                    g.user_id = user_response.user.id
                     g.access_token = token
-                    logger.info(f"Token storage code is active")
-                    logger.debug(f"User {user_response.user.id} loaded successfully.")
+                    logger.debug(f"User {user_response.user.id} authenticated successfully")
                     return
                 else:
-                    logger.warning("No user data returned from Supabase")
+                    logger.warning("No user data returned from Supabase token validation")
                     
-                    # In development, create a mock user
-                    if is_development:
-                        logger.debug("Creating mock user for development")
-                        from types import SimpleNamespace
-                        g.user = SimpleNamespace(
-                            id="dev-user-id",
-                            email="dev@example.com", 
-                            user_metadata={"name": "Development User"}
-                        )
-                        g.access_token = token
-                    logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
-                    return
             except Exception as token_error:
-                logger.error(f"Token validation error: {str(token_error)}")
+                logger.error(f"Supabase token validation error: {str(token_error)}")
                 
-                # In development, create a mock user
+                # In development, create a mock user on token validation failure
                 if is_development:
-                    logger.debug("Creating mock user for development after token error")
+                    logger.debug("Creating mock user for development after token validation error")
                     from types import SimpleNamespace
                     g.user = SimpleNamespace(
                         id="dev-user-id",
                         email="dev@example.com", 
                         user_metadata={"name": "Development User"}
                     )
+                    g.user_id = "dev-user-id"
                     g.access_token = token
-                logger.debug(f"Authenticated user: {getattr(g.user, 'id', None)}")
-                return
+                    return
                 
         except Exception as e:
-            logger.error(f"Error authenticating user: {str(e)}", exc_info=True)
-            g.user = None
+            logger.error(f"Error in token processing: {str(e)}", exc_info=True)
             
-            # In development, create a mock user
-            if is_development:
-                logger.debug("Creating mock user for development after error")
-                from types import SimpleNamespace
-                g.user = SimpleNamespace(
-                    id="dev-user-id",
-                    email="dev@example.com", 
-                    user_metadata={"name": "Development User"}
-                )
-                g.access_token = None
     else:
         logger.debug("No authorization header found")
         
-        # In development, create a mock user even when no token is present
-        if is_development:
-            logger.debug("Creating mock user for development (no auth header)")
-            from types import SimpleNamespace
-            g.user = SimpleNamespace(
-                id="dev-user-id",
-                email="dev@example.com", 
-                user_metadata={"name": "Development User"}
-            )
-            g.access_token = None
+    # In development, create a mock user when no valid token is present
+    if is_development:
+        logger.debug("Creating mock user for development (no valid auth)")
+        from types import SimpleNamespace
+        g.user = SimpleNamespace(
+            id="dev-user-id",
+            email="dev@example.com", 
+            user_metadata={"name": "Development User"}
+        )
+        g.user_id = "dev-user-id"
+        g.access_token = None
 
 # Force HTTPS redirect in production
 @app.before_request
@@ -407,6 +386,9 @@ api.add_resource(DuelCommentsResource, '/api/duels/<string:duel_id>/comments')
 # Device Token Endpoints
 api.add_resource(DeviceTokenResource, '/api/device-token')
 
+# User Profile Endpoints (for Google auth and profile management)
+api.add_resource(UserProfileResource, '/api/users/profile')
+
 # Add route for homepage (remains unprefixed)
 @app.route('/')
 def landing():
@@ -513,11 +495,11 @@ def password_reset_confirm():
             
             # For common user-facing errors, provide cleaner messages
             if "New password should be different from the old password" in error_message:
-                error_message = "New password must be different from your current password"
+                error_message = "New password must be different from your current password, rucker."
             elif "Password should be at least" in error_message:
-                error_message = "Password is too short. Please use at least 6 characters"
+                error_message = "Password is too short, rucker. Please use at least 6 characters"
             elif "Auth session missing" in error_message:
-                error_message = "Session expired. Please request a new password reset link"
+                error_message = "Session expired, rucker. Please request a new password reset link"
             else:
                 # For other errors, use a generic message but still informative
                 error_message = f"Password update failed: {error_message}"

@@ -6,11 +6,16 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- Foreground service permission for background session tracking -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Declare that this app uses location foreground service (Android 10+) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Wake lock to prevent CPU sleep during active sessions -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- Boot receiver to restore sessions after device restart -->
+    <!-- Boot receiver permission for session resurrection -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Schedule exact alarms for heartbeat monitoring -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Needed for requesting exclusion from Doze / battery optimisation -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Camera permission -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Storage permissions -->
@@ -82,6 +87,23 @@
         <meta-data
             android:name="com.google.android.gms.permission.AD_ID"
             android:value="true"/>
+            
+        <!-- Register receiver for session resurrection -->
+        <receiver android:name=".BootReceiver" android:enabled="true" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- Heartbeat receiver for session monitoring -->
+        <receiver android:name=".SessionHeartbeatReceiver" android:enabled="true" android:exported="false" />
+        
+        <!-- Location tracking service -->
+        <service 
+            android:name=".LocationTrackingService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location" />
             
     </application>
     

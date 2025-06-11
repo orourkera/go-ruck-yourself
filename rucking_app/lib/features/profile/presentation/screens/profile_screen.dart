@@ -98,23 +98,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Determine if we're in lady mode
               final bool isLadyMode = user.gender == 'female';
               final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+              final bool isDark = Theme.of(context).brightness == Brightness.dark;
               
               return Scaffold(
-                backgroundColor: isLadyMode ? primaryColor.withOpacity(0.05) : Colors.white,
+                backgroundColor: isDark 
+                    ? Theme.of(context).scaffoldBackgroundColor
+                    : (isLadyMode ? primaryColor.withOpacity(0.05) : Colors.white),
                 appBar: AppBar(
-                  backgroundColor: isLadyMode ? primaryColor : Colors.white,
+                  backgroundColor: isDark
+                      ? Theme.of(context).appBarTheme.backgroundColor
+                      : (isLadyMode ? primaryColor : Colors.white),
                   elevation: 0,
                   title: Text(
                     'Profile',
                     style: TextStyle(
-                      color: isLadyMode ? Colors.white : Colors.black,
+                      color: isDark
+                          ? Theme.of(context).appBarTheme.foregroundColor
+                          : (isLadyMode ? Colors.white : Colors.black),
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   actions: [
                     IconButton(
-                      icon: Icon(Icons.edit, color: isLadyMode ? Colors.white : Colors.black),
+                      icon: Icon(
+                        Icons.edit, 
+                        color: isDark
+                            ? Theme.of(context).appBarTheme.foregroundColor
+                            : (isLadyMode ? Colors.white : Colors.black)
+                      ),
                       onPressed: () {
                         Navigator.push(
                           context,
@@ -159,8 +171,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 size: 100,
                                 isLoading: profileState is AvatarUploading,
                                 onEditPressed: () async {
-                                  final imageFile = await ImagePickerUtils.pickImage(context);
-                                  if (imageFile != null) {
+                                  final imageFile = await ImagePickerUtils.pickProfileImage(context);
+                                  if (imageFile != null && mounted) {
                                     context.read<ProfileBloc>().add(UploadAvatar(imageFile));
                                   }
                                 },
@@ -173,13 +185,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           user.username,
                           style: AppTextStyles.headlineMedium.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           user.email,
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textDarkSecondary,
+                            color: isDark 
+                                ? const Color(0xFF728C69).withOpacity(0.8) 
+                                : AppColors.textDarkSecondary,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -226,6 +241,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               label: 'Units',
                               trailing: DropdownButton<String>(
                                 value: _selectedUnit,
+                                dropdownColor: isDark ? Theme.of(context).cardColor : null,
+                                style: TextStyle(
+                                  color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                                ),
                                 onChanged: (newValue) {
                                   if (newValue != null) {
                                     setState(() => _selectedUnit = newValue);
@@ -239,7 +258,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 items: ['Metric', 'Standard']
                                     .map((value) => DropdownMenuItem<String>(
                                           value: value,
-                                          child: Text(value),
+                                          child: Text(
+                                            value,
+                                            style: TextStyle(
+                                              color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                                            ),
+                                          ),
                                         ))
                                     .toList(),
                               ),
@@ -342,7 +366,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           label: const Text('Manage Subscription'),
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 50),
-                            backgroundColor: isLadyMode ? AppColors.ladyPrimary : AppColors.primary,
+                            backgroundColor: isDark 
+                                ? const Color(0xFF728C69)
+                                : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
                             foregroundColor: Colors.white,
                             textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
@@ -453,7 +479,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary, size: 24),
+          Icon(
+            icon, 
+            color: isDark ? const Color(0xFF728C69) : AppColors.primary, 
+            size: 24
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -491,7 +521,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary, size: 24),
+          Icon(
+            icon, 
+            color: isDark ? const Color(0xFF728C69) : AppColors.primary, 
+            size: 24
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
@@ -521,7 +555,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.primary, size: 24),
+            Icon(
+              icon, 
+              color: isDark ? const Color(0xFF728C69) : AppColors.primary, 
+              size: 24
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -531,7 +569,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            Icon(
+              Icons.chevron_right, 
+              color: isDark ? const Color(0xFF728C69).withOpacity(0.6) : Colors.grey
+            ),
           ],
         ),
       ),
@@ -545,10 +586,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
-          title: const Text('Logout'),
+          backgroundColor: isDark ? Theme.of(context).cardColor : null,
+          title: Text(
+            'Logout',
+            style: TextStyle(
+              color: isDark ? const Color(0xFF728C69) : null,
+            ),
+          ),
           content: Text(
             'Are you sure you want to logout?',
-            style: TextStyle(color: isDark ? Colors.black : null),
+            style: TextStyle(
+              color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : null,
+            ),
           ),
           actions: [
             TextButton(
@@ -630,7 +679,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            Icon(
+              Icons.chevron_right, 
+              color: isDark ? const Color(0xFF728C69).withOpacity(0.6) : Colors.grey
+            ),
           ],
         ),
       ),
@@ -638,11 +690,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showDeleteAccountDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Account'),
-        content: const Text('Are you sure you want to delete your account? This action cannot be undone.'),
+        backgroundColor: isDark ? Theme.of(context).cardColor : null,
+        title: Text(
+          'Delete Account',
+          style: TextStyle(
+            color: isDark ? const Color(0xFF728C69) : null,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete your account? This action cannot be undone.',
+          style: TextStyle(
+            color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : null,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

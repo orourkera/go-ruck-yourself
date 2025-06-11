@@ -4,6 +4,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 class PasswordResetScreen extends StatefulWidget {
   final String? token;
@@ -61,30 +62,26 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
+            StyledSnackBar.show(
+              context: context,
+              message: state.message,
+              type: SnackBarType.error,
             );
           } else if (state is PasswordResetSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Password reset successfully! Please log in with your new password.'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
+            StyledSnackBar.show(
+              context: context,
+              message: 'Password reset successfully! Please log in with your new password.',
+              type: SnackBarType.success,
             );
             // Redirect to login screen after a short delay
             Future.delayed(const Duration(seconds: 1), () {
               Navigator.of(context).pushReplacementNamed('/login');
             });
           } else if (state is Authenticated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Password reset successfully!'),
-                backgroundColor: Colors.green,
-              ),
+            StyledSnackBar.show(
+              context: context,
+              message: 'Password reset successfully!',
+              type: SnackBarType.success,
             );
             Navigator.of(context).pushReplacementNamed('/');
           }

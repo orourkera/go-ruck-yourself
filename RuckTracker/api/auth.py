@@ -24,13 +24,21 @@ def auth_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not hasattr(g, 'user') or g.user is None:
-            return jsonify({'message': 'Authentication required'}), 401
+            logger.warning(f"Authentication failed for {request.path}: No user in context")
+            return jsonify({'message': 'Authentication required', 'error': 'no_user'}), 401
+        
+        if not hasattr(g, 'user_id') or g.user_id is None:
+            logger.warning(f"Authentication failed for {request.path}: No user_id in context")
+            return jsonify({'message': 'Authentication required', 'error': 'no_user_id'}), 401
+            
         return f(*args, **kwargs)
     return decorated
 
 def get_user_id():
     """Helper function to get the current user's ID"""
-    if hasattr(g, 'user') and g.user and hasattr(g.user, 'id'):
+    if hasattr(g, 'user_id') and g.user_id:
+        return g.user_id
+    elif hasattr(g, 'user') and g.user and hasattr(g.user, 'id'):
         return g.user.id
     return None
 

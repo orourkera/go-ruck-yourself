@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/background_location_service.dart';
 
 /// Interface for location services
 abstract class LocationService {
@@ -31,8 +32,8 @@ abstract class LocationService {
 
 /// Implementation of location service using Geolocator
 class LocationServiceImpl implements LocationService {
-  static const double _minDistanceFilter = 1.0; // Reduced from 5.0 to 1.0 meters for better accuracy
-  static const int _batchInterval = 5; // Send batch updates every 5 seconds
+  static const double _minDistanceFilter = 5.0; // Balanced: 5m like FitoTrack for better battery
+  static const int _batchInterval = 15; // Longer batching like FitoTrack for efficiency
   
   final List<LocationPoint> _locationBatch = [];
   Timer? _batchTimer;
@@ -66,6 +67,14 @@ class LocationServiceImpl implements LocationService {
           return alwaysStatus.isGranted;
         } else {
           // Android can work with when-in-use + foreground service
+          // Request exclusion from battery optimisations so the OS does not throttle
+          // the foreground service while a workout is active. This is critical on
+          // OEM builds such as Samsung OneUI or Xiaomi MIUI that are very
+          // aggressive in killing background location.
+          if (await Permission.ignoreBatteryOptimizations.isDenied) {
+            AppLogger.info('Requesting ignore battery optimisations...');
+            await Permission.ignoreBatteryOptimizations.request();
+          }
           return true;
         }
       }
@@ -120,10 +129,10 @@ class LocationServiceImpl implements LocationService {
       locationSettings = AndroidSettings(
         accuracy: LocationAccuracy.best,
         distanceFilter: _minDistanceFilter.toInt(),
-        intervalDuration: const Duration(seconds: 1),
+        intervalDuration: const Duration(seconds: 5), // FitoTrack: 5s interval for better battery
         // Critical: Configure foreground service for background tracking
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'Rucking in Progress',
+          notificationTitle: 'Ruck in Progress',
           notificationText: 'Tracking your ruck session - tap to return to app',
           enableWakeLock: true, // Prevent CPU sleep
           notificationChannelName: 'Ruck Session Tracking',
@@ -174,6 +183,11 @@ class LocationServiceImpl implements LocationService {
       },
     );
     
+    // Integrate with background location service
+    BackgroundLocationService.startBackgroundTracking().catchError((error) {
+      AppLogger.error('Failed to start background service: $error');
+    });
+    
     return _batchedLocationController.stream;
   }
   
@@ -181,6 +195,9 @@ class LocationServiceImpl implements LocationService {
   Future<void> stopLocationTracking() async {
     await _rawLocationSubscription?.cancel();
     _batchTimer?.cancel();
+    
+    // Stop background location service
+    await BackgroundLocationService.stopBackgroundTracking();
   }
   
   /// Send a batch of location updates to the API

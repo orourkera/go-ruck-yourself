@@ -252,6 +252,10 @@ class _StatsContentWidget extends StatelessWidget {
   final String timeframe;
   final bool preferMetric;
   
+  static const List<String> _weekdayNames = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+  ];
+  
   const _StatsContentWidget({
     Key? key, 
     required this.stats, 
@@ -590,7 +594,22 @@ class _StatsContentWidget extends StatelessWidget {
           itemCount: dailyBreakdown.length,
           itemBuilder: (context, index) {
             final day = dailyBreakdown[index];
-            final dayName = day['day_name'] ?? 'Unknown';
+            String dayName;
+            if (day['day_name'] != null && day['day_name'].toString().isNotEmpty) {
+              dayName = day['day_name'];
+            } else if (day['date'] != null) {
+              try {
+                final parsed = DateTime.tryParse(day['date']);
+                dayName = parsed != null
+                    ? _StatsContentWidget._weekdayNames[parsed.weekday - 1]
+                    : 'Unknown';
+              } catch (_) {
+                dayName = 'Unknown';
+              }
+            } else {
+              dayName = 'Unknown';
+            }
+            
             final sessionsCount = day['sessions_count'] ?? 0;
             final distanceKm = (day['distance_km'] ?? 0.0).toDouble();
             

@@ -89,6 +89,13 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
+      // Validate userId before making API call to prevent 500 errors
+      if (event.userId.isEmpty) {
+        AppLogger.error('Cannot load achievements: User ID is empty');
+        emit(const AchievementsError(message: 'User profile not found. Please sign in again.'));
+        return;
+      }
+      
       final userAchievements = await _achievementRepository.getUserAchievements(event.userId);
       
       if (state is AchievementsLoaded) {
@@ -114,6 +121,13 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
+      // Validate userId before making API call to prevent 500 errors
+      if (event.userId.isEmpty) {
+        AppLogger.error('Cannot load achievement progress: User ID is empty');
+        emit(const AchievementsError(message: 'User profile not found. Please sign in again.'));
+        return;
+      }
+      
       final userProgress = await _achievementRepository.getUserAchievementProgress(event.userId);
       
       if (state is AchievementsLoaded) {
@@ -185,6 +199,13 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
+      // Validate userId before making API call to prevent 500 errors
+      if (event.userId.isEmpty) {
+        AppLogger.error('Cannot load achievement stats: User ID is empty');
+        emit(const AchievementsError(message: 'User profile not found. Please sign in again.'));
+        return;
+      }
+      
       final stats = await _achievementRepository.getAchievementStats(event.userId, unitPreference: event.unitPreference);
       
       if (state is AchievementsLoaded) {
@@ -236,6 +257,13 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
+      // Validate userId before making API call to prevent 500 errors
+      if (event.userId.isEmpty) {
+        AppLogger.error('Cannot refresh achievement data: User ID is empty');
+        emit(const AchievementsError(message: 'User profile not found. Please sign in again.'));
+        return;
+      }
+      
       emit(AchievementsLoading());
       
       // Clear cache first to force fresh data fetch

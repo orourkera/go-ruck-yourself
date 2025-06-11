@@ -501,3 +501,66 @@ class YearlyStatisticsResource(Resource):
             stats['monthly_breakdown'] = monthly_breakdown
         
         return {"statistics": stats}, 200
+
+
+class UserProfileResource(Resource):
+    """Resource for user profile management (Google auth and general profile ops)"""
+    
+    def get(self):
+        """Get current user's profile"""
+        if not g.user:
+            return {'message': 'Authentication required'}, 401
+            
+        return {"user": g.user.to_dict()}, 200
+    
+    def post(self):
+        """Create or update user profile (primarily for Google auth users)"""
+        if not g.user:
+            return {'message': 'Authentication required'}, 401
+        
+        try:
+            data = request.get_json()
+            
+            # Check if user record already exists
+            existing_user = User.query.filter_by(id=g.user.id).first()
+            
+            if existing_user:
+                # Update existing user
+                if 'username' in data:
+                    existing_user.username = data['username']
+                if 'email' in data:
+                    existing_user.email = data['email']
+                if 'is_metric' in data:
+                    existing_user.prefer_metric = data['is_metric']
+                if 'weight_kg' in data:
+                    existing_user.weight_kg = data['weight_kg']
+                if 'height_cm' in data:
+                    existing_user.height_cm = data['height_cm']
+                if 'gender' in data:
+                    existing_user.gender = data['gender']
+                
+                db.session.commit()
+                logger.info(f"Updated user profile for {existing_user.id}")
+                return {"user": existing_user.to_dict()}, 200
+            else:
+                # Create new user record (for Google auth users)
+                new_user = User(
+                    id=g.user.id,  # Use Supabase user ID
+                    username=data.get('username', ''),
+                    email=data.get('email', ''),
+                    prefer_metric=data.get('is_metric', True),
+                    weight_kg=data.get('weight_kg'),
+                    height_cm=data.get('height_cm'),
+                    gender=data.get('gender'),
+                )
+                
+                db.session.add(new_user)
+                db.session.commit()
+                
+                logger.info(f"Created new user profile for Google auth user: {new_user.id}")
+                return {"user": new_user.to_dict()}, 201
+                
+        except Exception as e:
+            logger.error(f"Error creating/updating user profile: {str(e)}", exc_info=True)
+            db.session.rollback()
+            return {'message': f'Failed to create/update profile: {str(e)}'}, 500
