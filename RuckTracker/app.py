@@ -222,56 +222,29 @@ def load_user():
     is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
     
     if auth_header and auth_header.startswith('Bearer '):
-        token = auth_header.split("Bearer ")[1]
+        token = auth_header.split("Bearer ")[1].strip()
         try:
-            logger.debug(f"Validating token: {token[:10]}...")
+            logger.debug(f"Validating token (first 10 chars): {token[:10]}...")
             
-            try:
-                supabase = get_supabase_client(user_jwt=token)
-                # Correct way to get user from Supabase with JWT token
-                user_response = supabase.auth.get_user()
-                
-                if user_response.user:
-                    g.user = user_response.user
-                    g.user_id = user_response.user.id
-                    g.access_token = token
-                    logger.debug(f"User {user_response.user.id} authenticated successfully")
-                    return
-                else:
-                    logger.warning("No user data returned from Supabase token validation")
-                    
-            except Exception as token_error:
-                logger.error(f"Token validation error: {str(token_error)}")
-                
-                # In development, create a mock user on token validation failure
-                if is_development:
-                    logger.debug("Creating mock user for development after token validation error")
-                    from types import SimpleNamespace
-                    g.user = SimpleNamespace(
-                        id="dev-user-id",
-                        email="dev@example.com", 
-                        user_metadata={"name": "Development User"}
-                    )
-                    g.user_id = "dev-user-id"
-                    g.access_token = token
-                    return
-                    
-        except Exception as token_error:
-            logger.error(f"Token validation error: {str(token_error)}")
+            # Use the shared singleton client – no new thread creation per request
+            supabase = get_supabase_client()
             
-            # In development, create a mock user on token validation failure
-            if is_development:
-                logger.debug("Creating mock user for development after token validation error")
-                from types import SimpleNamespace
-                g.user = SimpleNamespace(
-                    id="dev-user-id",
-                    email="dev@example.com", 
-                    user_metadata={"name": "Development User"}
-                )
-                g.user_id = "dev-user-id"
+            # Pass the JWT explicitly to get_user() per Supabase Python docs
+            user_response = supabase.auth.get_user(token)
+            user_obj = getattr(user_response, 'user', None)
+
+            if user_obj:
+                g.user = user_obj
+                g.user_id = user_obj.id
                 g.access_token = token
+                logger.debug(f"User {user_obj.id} authenticated successfully")
                 return
-                
+            else:
+                logger.warning("Token validation failed – no user returned from Supabase")
+        except Exception as token_error:
+            logger.error(f"Token validation exception: {str(token_error)}", exc_info=True)
+
+        # Fallback to mock user flow happens below for dev environments
     else:
         logger.debug("No authorization header found")
         
