@@ -89,8 +89,11 @@ def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at
     # Convert to array format for frontend
     result = []
     for i in range(7):
+        # Calculate the actual date for this day of the week
+        day_date = start_date + timedelta(days=i)
         result.append({
-            'day': day_names[i],
+            'day_name': day_names[i],  # Frontend expects 'day_name' field
+            'date': day_date.strftime('%Y-%m-%d'),  # Also provide date as backup
             'sessions_count': daily_data[i]['sessions_count'],
             'distance_km': daily_data[i]['distance_km']
         })
