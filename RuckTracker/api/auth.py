@@ -1,4 +1,4 @@
-from flask import g, jsonify, request
+from flask import g, request
 from flask_restful import Resource
 from flask import Blueprint, make_response
 import uuid
@@ -25,11 +25,11 @@ def auth_required(f):
     def decorated(*args, **kwargs):
         if not hasattr(g, 'user') or g.user is None:
             logger.warning(f"Authentication failed for {request.path}: No user in context")
-            return jsonify({'message': 'Authentication required', 'error': 'no_user'}), 401
+            return {'message': 'Authentication required', 'error': 'no_user'}, 401
         
         if not hasattr(g, 'user_id') or g.user_id is None:
             logger.warning(f"Authentication failed for {request.path}: No user_id in context")
-            return jsonify({'message': 'Authentication required', 'error': 'no_user_id'}), 401
+            return {'message': 'Authentication required', 'error': 'no_user_id'}, 401
             
         return f(*args, **kwargs)
     return decorated
