@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 class EventFilterChips extends StatelessWidget {
   final String? selectedStatus;
@@ -84,14 +85,13 @@ class EventFilterChips extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: AppTextStyles.labelMedium.copyWith(
             color: isSelected 
                 ? Colors.white 
                 : Theme.of(context).brightness == Brightness.dark
                     ? Colors.white
                     : Colors.black87,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            fontSize: 14,
           ),
         ),
       ),

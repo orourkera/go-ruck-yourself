@@ -14,7 +14,6 @@ import 'package:rucking_app/features/events/presentation/bloc/event_progress_eve
 import 'package:rucking_app/features/events/presentation/bloc/event_progress_state.dart';
 import 'package:rucking_app/features/events/presentation/widgets/event_leaderboard_widget.dart';
 import 'package:rucking_app/features/events/presentation/widgets/event_comments_section.dart';
-import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
@@ -75,7 +74,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             style: AppTextStyles.titleLarge.copyWith(
               color: Theme.of(context).brightness == Brightness.dark 
                   ? Colors.white 
-                  : AppColors.textDark,
+                  : Theme.of(context).primaryColor,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -219,9 +218,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         // Tab bar for content sections
         TabBar(
           controller: _tabController,
-          labelColor: AppColors.primary,
+          labelColor: Theme.of(context).primaryColor,
           unselectedLabelColor: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-          indicatorColor: AppColors.primary,
+          indicatorColor: Theme.of(context).primaryColor,
           tabs: const [
             Tab(text: 'Details'),
             Tab(text: 'Leaderboard'),
@@ -263,14 +262,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   return Container(
                     height: 200,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
                       child: Icon(
                         Icons.event,
                         size: 60,
-                        color: AppColors.primary,
+                        color: Theme.of(context).primaryColor,
                       ),
                     ),
                   );
@@ -287,13 +286,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.groups,
                     size: 24,
-                    color: AppColors.primary,
+                    color: Theme.of(context).primaryColor,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -306,7 +305,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     Text(
                       event.title,
                       style: AppTextStyles.headlineSmall.copyWith(
-                        color: isDarkMode ? Colors.white : AppColors.textDark,
+                        color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -315,7 +314,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                       Text(
                         event.hostingClub!.name,
                         style: AppTextStyles.bodyLarge.copyWith(
-                          color: AppColors.primary,
+                          color: Theme.of(context).primaryColor,
                           fontWeight: FontWeight.w500,
                         ),
                       )
@@ -386,13 +385,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               Icon(
                 Icons.people,
                 size: 20,
-                color: AppColors.primary,
+                color: Theme.of(context).primaryColor,
               ),
               const SizedBox(width: 8),
               Text(
                 '${event.participantCount} participant${event.participantCount != 1 ? 's' : ''}',
                 style: AppTextStyles.bodyLarge.copyWith(
-                  color: AppColors.primary,
+                  color: Theme.of(context).primaryColor,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -423,7 +422,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             Text(
               'Description',
               style: AppTextStyles.titleMedium.copyWith(
-                color: isDarkMode ? Colors.white : AppColors.textDark,
+                color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -456,7 +455,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         Text(
           'Event Details',
           style: AppTextStyles.titleMedium.copyWith(
-            color: isDarkMode ? Colors.white : AppColors.textDark,
+            color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -525,7 +524,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           Text(
             value,
             style: AppTextStyles.bodyMedium.copyWith(
-              color: isDarkMode ? Colors.white : AppColors.textDark,
+              color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -543,7 +542,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         Text(
           'Participants',
           style: AppTextStyles.titleMedium.copyWith(
-            color: isDarkMode ? Colors.white : AppColors.textDark,
+            color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -569,13 +568,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
+            backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
             child: Text(
               (participant.user?.firstName.isNotEmpty == true 
                   ? participant.user!.firstName[0].toUpperCase()
                   : '?'),
               style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.primary,
+                color: Theme.of(context).primaryColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -585,7 +584,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             child: Text(
               participant.user?.fullName ?? 'Unknown User',
               style: AppTextStyles.bodyMedium.copyWith(
-                color: isDarkMode ? Colors.white : AppColors.textDark,
+                color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
               ),
             ),
           ),
@@ -676,7 +675,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             _eventsBloc.add(StartRuckFromEvent(event.id));
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: Theme.of(context).primaryColor,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
@@ -693,7 +692,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             _eventsBloc.add(JoinEvent(event.id));
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: Theme.of(context).primaryColor,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),

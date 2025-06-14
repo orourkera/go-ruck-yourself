@@ -6,6 +6,7 @@ import '../bloc/create_duel/create_duel_state.dart';
 import '../widgets/create_duel_form.dart';
 import 'duel_detail_screen.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/theme/app_text_styles.dart';
 import '../../../../shared/widgets/styled_snackbar.dart';
 
 class CreateDuelScreen extends StatefulWidget {
@@ -51,10 +52,8 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       appBar: AppBar(
         title: Text(
           'Create Duel',
-          style: TextStyle(
+          style: AppTextStyles.titleLarge.copyWith(
             color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
           ),
         ),
         backgroundColor: Colors.transparent,
@@ -151,7 +150,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+      style: AppTextStyles.titleMedium.copyWith(
         fontWeight: FontWeight.normal,
         color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
       ),
@@ -348,14 +347,14 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
       children: [
         Text(
           'Start Mode',
-          style: TextStyle(fontSize: 16, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+          style: AppTextStyles.titleMedium.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: RadioListTile<String>(
-                title: Text('Auto Start', style: TextStyle(fontSize: 14, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87)),
+                title: Text('Auto Start', style: AppTextStyles.bodyMedium.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87)),
                 value: 'auto',
                 groupValue: _startMode,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -368,7 +367,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
             ),
             Expanded(
               child: RadioListTile<String>(
-                title: Text('Manual Start', style: TextStyle(fontSize: 14, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87)),
+                title: Text('Manual Start', style: AppTextStyles.bodyMedium.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87)),
                 value: 'manual',
                 groupValue: _startMode,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -388,7 +387,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
             _startMode == 'auto' 
                 ? 'Duel will automatically start once minimum participants join'
                 : 'You\'ll need to manually start the duel after participants join',
-            style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600]),
+            style: AppTextStyles.bodyMedium.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600]),
           ),
         ),
       ],
@@ -404,7 +403,7 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
   //         children: [
   //           Text(
   //             'Duel Visibility',
-  //             style: Theme.of(context).textTheme.titleMedium,
+  //             style: AppTextStyles.titleLarge,
   //           ),
   //           const SizedBox(height: 8),
   //           SwitchListTile(

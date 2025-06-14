@@ -4,7 +4,6 @@ import 'package:rucking_app/features/events/domain/models/event_progress.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_progress_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_progress_event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_progress_state.dart';
-import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
@@ -273,7 +272,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
                 Text(
                   entry.user?.fullName ?? 'Unknown User',
                   style: AppTextStyles.bodyLarge.copyWith(
-                    color: isDarkMode ? Colors.white : AppColors.textDark,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -295,7 +294,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
               Text(
                 entry.formattedTotalDistance,
                 style: AppTextStyles.bodyLarge.copyWith(
-                  color: AppColors.primary,
+                  color: Theme.of(context).primaryColor,
                   fontWeight: FontWeight.bold,
                 ),
               ),

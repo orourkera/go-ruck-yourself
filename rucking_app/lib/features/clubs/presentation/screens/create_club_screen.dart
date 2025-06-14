@@ -194,7 +194,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   // Club Name
                   Text(
                     'Club Name',
-                    style: AppTextStyles.bodyLarge.copyWith(
+                    style: AppTextStyles.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -228,7 +228,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   // Club Logo
                   Text(
                     'Club Logo (Optional)',
-                    style: AppTextStyles.bodyLarge.copyWith(
+                    style: AppTextStyles.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -306,7 +306,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   // Description
                   Text(
                     'Description *',
-                    style: AppTextStyles.bodyLarge.copyWith(
+                    style: AppTextStyles.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -341,7 +341,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   // Location
                   Text(
                     'Location (Optional)',
-                    style: AppTextStyles.bodyLarge.copyWith(
+                    style: AppTextStyles.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -417,7 +417,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   // Max Members
                   Text(
                     'Member Limit (Optional)',
-                    style: AppTextStyles.bodyLarge.copyWith(
+                    style: AppTextStyles.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),

@@ -118,7 +118,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 children: [
                   Icon(Icons.delete, color: Colors.red),
                   SizedBox(width: 8),
-                  Text('Delete Club', style: TextStyle(color: Colors.red)),
+                  Text('Delete Club', style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
                 ],
               ),
             ),
@@ -169,7 +169,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                   backgroundColor: Theme.of(context).primaryColor,
                   child: Text(
                     clubDetails.club.name.isNotEmpty ? clubDetails.club.name[0].toUpperCase() : 'C',
-                    style: const TextStyle(fontSize: 24, color: Colors.white),
+                    style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -309,7 +309,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         backgroundColor: Theme.of(context).primaryColor,
         child: Text(
           member.username.isNotEmpty ? member.username[0].toUpperCase() : 'U',
-          style: const TextStyle(color: Colors.white),
+          style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
         ),
       ),
       title: Text(
@@ -356,7 +356,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             children: [
               Icon(Icons.remove_circle, color: Colors.red),
               SizedBox(width: 8),
-              Text('Remove Member', style: TextStyle(color: Colors.red)),
+              Text('Remove Member', style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
             ],
           ),
         ),
@@ -397,7 +397,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         backgroundColor: Theme.of(context).primaryColor,
         child: Text(
           request.username.isNotEmpty ? request.username[0].toUpperCase() : 'U',
-          style: const TextStyle(color: Colors.white),
+          style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
         ),
       ),
       title: Text('${request.username}'),
