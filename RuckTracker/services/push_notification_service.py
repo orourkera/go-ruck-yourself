@@ -21,14 +21,15 @@ class PushNotificationService:
         """
         self.project_id = os.getenv('FIREBASE_PROJECT_ID')
         self.service_account_path = os.getenv('FIREBASE_SERVICE_ACCOUNT_PATH')
+        self.service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
         self.fcm_url = f"https://fcm.googleapis.com/v1/projects/{self.project_id}/messages:send"
         self._access_token = None
         self._token_expiry = 0
         
         if not self.project_id:
             logger.error("FIREBASE_PROJECT_ID environment variable not set")
-        if not self.service_account_path:
-            logger.error("FIREBASE_SERVICE_ACCOUNT_PATH environment variable not set")
+        if not self.service_account_path and not self.service_account_json:
+            logger.error("Either FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON environment variable must be set")
     
     def _get_access_token(self) -> str:
         """Get OAuth2 access token for Firebase V1 API"""
@@ -38,10 +39,19 @@ class PushNotificationService:
             
         try:
             # Load service account credentials
-            credentials = service_account.Credentials.from_service_account_file(
-                self.service_account_path,
-                scopes=['https://www.googleapis.com/auth/firebase.messaging']
-            )
+            if self.service_account_path:
+                credentials = service_account.Credentials.from_service_account_file(
+                    self.service_account_path,
+                    scopes=['https://www.googleapis.com/auth/firebase.messaging']
+                )
+            elif self.service_account_json:
+                credentials = service_account.Credentials.from_service_account_info(
+                    json.loads(self.service_account_json),
+                    scopes=['https://www.googleapis.com/auth/firebase.messaging']
+                )
+            else:
+                logger.error("No Firebase service account credentials configured")
+                return None
             
             # Refresh the token
             credentials.refresh(Request())
