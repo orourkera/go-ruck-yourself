@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/events/domain/models/event_comment.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_comments_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_comments_event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_comments_state.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
 
@@ -36,6 +38,8 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final authState = context.read<AuthBloc>().state;
+    final userId = authState is Authenticated ? authState.user.userId : null;
     
     return Column(
       children: [
@@ -43,7 +47,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
         Expanded(
           child: BlocConsumer<EventCommentsBloc, EventCommentsState>(
             listener: (context, state) {
-              if (state is EventCommentAdded) {
+              if (state is EventCommentActionSuccess) {
                 _commentController.clear();
                 _commentFocusNode.unfocus();
                 setState(() {
@@ -72,7 +76,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
             builder: (context, state) {
               if (state is EventCommentsLoading) {
                 return _buildLoadingSkeleton();
-              } else if (state is EventCommentsError && state.comments == null) {
+              } else if (state is EventCommentsError) {
                 return ErrorDisplay(
                   message: state.message,
                   onRetry: () {
@@ -81,13 +85,10 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                     );
                   },
                 );
-              } else if (state is EventCommentsLoaded || 
-                        (state is EventCommentsError && state.comments != null)) {
-                final comments = state is EventCommentsLoaded 
-                    ? state.comments 
-                    : (state as EventCommentsError).comments!;
+              } else if (state is EventCommentsLoaded) {
+                final comments = state.comments;
                 
-                return _buildCommentsList(comments, isDarkMode);
+                return _buildCommentsList(comments, isDarkMode, userId);
               }
               
               return _buildLoadingSkeleton();
@@ -132,7 +133,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
     );
   }
 
-  Widget _buildCommentsList(List<EventComment> comments, bool isDarkMode) {
+  Widget _buildCommentsList(List<EventComment> comments, bool isDarkMode, String? userId) {
     if (comments.isEmpty) {
       return Center(
         child: Column(
@@ -173,13 +174,13 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
         itemCount: comments.length,
         itemBuilder: (context, index) {
           final comment = comments[index];
-          return _buildCommentItem(comment, isDarkMode);
+          return _buildCommentItem(comment, isDarkMode, userId);
         },
       ),
     );
   }
 
-  Widget _buildCommentItem(EventComment comment, bool isDarkMode) {
+  Widget _buildCommentItem(EventComment comment, bool isDarkMode, String? userId) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -231,7 +232,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                 
                 // Comment text
                 Text(
-                  comment.content,
+                  comment.comment,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
                   ),
@@ -254,7 +255,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
           ),
           
           // Comment actions (for owner)
-          if (comment.isOwner)
+          if (comment.userId == userId)
             PopupMenuButton<String>(
               icon: Icon(
                 Icons.more_vert,
@@ -369,12 +370,15 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
     });
     
     context.read<EventCommentsBloc>().add(
-      AddEventComment(widget.eventId, content),
+      AddEventComment(
+        eventId: widget.eventId,
+        comment: content,
+      ),
     );
   }
 
   void _showEditCommentDialog(EventComment comment) {
-    final editController = TextEditingController(text: comment.content);
+    final editController = TextEditingController(text: comment.comment);
     
     showDialog(
       context: context,
@@ -397,9 +401,13 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
           ElevatedButton(
             onPressed: () {
               final newContent = editController.text.trim();
-              if (newContent.isNotEmpty && newContent != comment.content) {
+              if (newContent.isNotEmpty && newContent != comment.comment) {
                 context.read<EventCommentsBloc>().add(
-                  UpdateEventComment(comment.id, newContent),
+                  UpdateEventComment(
+                    eventId: widget.eventId,
+                    commentId: comment.id,
+                    comment: newContent,
+                  ),
                 );
               }
               Navigator.of(context).pop();
@@ -425,7 +433,10 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
           ElevatedButton(
             onPressed: () {
               context.read<EventCommentsBloc>().add(
-                DeleteEventComment(comment.id),
+                DeleteEventComment(
+                  eventId: widget.eventId,
+                  commentId: comment.id,
+                ),
               );
               Navigator.of(context).pop();
             },

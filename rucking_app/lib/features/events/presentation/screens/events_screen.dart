@@ -12,6 +12,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/empty_state.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 
 class EventsScreen extends StatefulWidget {

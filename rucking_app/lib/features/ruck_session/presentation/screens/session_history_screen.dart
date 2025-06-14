@@ -17,6 +17,7 @@ import 'package:rucking_app/features/statistics/presentation/screens/statistics_
 import 'package:rucking_app/features/premium/presentation/widgets/premium_tab_interceptor.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 class SessionHistoryScreen extends StatefulWidget {
   const SessionHistoryScreen({Key? key}) : super(key: key);

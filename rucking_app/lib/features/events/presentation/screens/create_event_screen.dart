@@ -5,10 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/location_search_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/features/auth/presentation/bloc/auth_state.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
-import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_state.dart';
@@ -449,7 +447,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               itemBuilder: (context, index) {
                 final suggestion = _locationSuggestions[index];
                 return ListTile(
-                  title: Text(suggestion.name),
+                  title: Text(suggestion.displayName),
                   subtitle: Text(suggestion.address),
                   onTap: () => _selectLocationSuggestion(suggestion),
                 );
@@ -657,7 +655,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         text: isEditing ? 'Update Event' : 'Create Event',
         onPressed: _isLoading ? null : _submitForm,
         isLoading: _isLoading,
-        backgroundColor: Theme.of(context).primaryColor,
+        color: Theme.of(context).primaryColor,
         textColor: Colors.white,
       ),
     );
@@ -723,7 +721,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     try {
       final results = await _locationSearchService.searchWithDebounce(
         query,
-        maxResults: 5,
+        const Duration(milliseconds: 500),
       );
       
       setState(() {
@@ -741,7 +739,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   void _selectLocationSuggestion(LocationSearchResult suggestion) {
     setState(() {
-      _locationController.text = suggestion.name;
+      _locationController.text = suggestion.displayName;
       _selectedLocationResult = suggestion;
       _showLocationSuggestions = false;
       _locationSuggestions = [];
@@ -801,9 +799,39 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     };
     
     if (widget.eventId != null) {
-      _eventsBloc.add(UpdateEvent(widget.eventId!, eventData, _bannerImage));
+      _eventsBloc.add(UpdateEvent(
+        eventId: widget.eventId!,
+        title: eventData['title'] as String,
+        description: eventData['description'] as String?,
+        scheduledStartTime: eventData['scheduled_start_time'] as DateTime,
+        durationMinutes: eventData['duration_minutes'] as int,
+        locationName: eventData['location_name'] as String?,
+        latitude: eventData['latitude'] as double?,
+        longitude: eventData['longitude'] as double?,
+        maxParticipants: eventData['max_participants'] as int?,
+        minParticipants: eventData['min_participants'] as int?,
+        approvalRequired: eventData['approval_required'] as bool,
+        difficultyLevel: eventData['difficulty_level'] as int?,
+        ruckWeightKg: eventData['ruck_weight_kg'] as double?,
+        bannerImageUrl: _bannerImage?.path,
+      ));
     } else {
-      _eventsBloc.add(CreateEvent(eventData, _bannerImage));
+      _eventsBloc.add(CreateEvent(
+        title: eventData['title'] as String,
+        description: eventData['description'] as String?,
+        clubId: eventData['hosting_club_id'] as String?,
+        scheduledStartTime: eventData['scheduled_start_time'] as DateTime,
+        durationMinutes: eventData['duration_minutes'] as int,
+        locationName: eventData['location_name'] as String?,
+        latitude: eventData['latitude'] as double?,
+        longitude: eventData['longitude'] as double?,
+        maxParticipants: eventData['max_participants'] as int?,
+        minParticipants: eventData['min_participants'] as int?,
+        approvalRequired: eventData['approval_required'] as bool,
+        difficultyLevel: eventData['difficulty_level'] as int?,
+        ruckWeightKg: eventData['ruck_weight_kg'] as double?,
+        bannerImageUrl: _bannerImage?.path,
+      ));
     }
   }
 }

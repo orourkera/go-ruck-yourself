@@ -112,7 +112,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             }
           },
           itemBuilder: (context) => [
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'delete',
               child: Row(
                 children: [
@@ -350,7 +350,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             ],
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'remove',
           child: Row(
             children: [

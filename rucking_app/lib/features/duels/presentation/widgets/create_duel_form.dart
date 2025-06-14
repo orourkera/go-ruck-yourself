@@ -170,7 +170,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
                     );
               }
             },
-            backgroundColor: Theme.of(context).primaryColor,
+            color: Theme.of(context).primaryColor,
             textColor: Colors.white,
             width: double.infinity,
           ),

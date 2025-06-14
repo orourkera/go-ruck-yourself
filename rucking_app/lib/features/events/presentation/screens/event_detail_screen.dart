@@ -15,6 +15,7 @@ import 'package:rucking_app/features/events/presentation/bloc/event_progress_sta
 import 'package:rucking_app/features/events/presentation/widgets/event_leaderboard_widget.dart';
 import 'package:rucking_app/features/events/presentation/widgets/event_comments_section.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
 
@@ -178,7 +179,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Banner skeleton
-          const SkeletonRectangle(height: 200, width: double.infinity),
+          const SkeletonBox(height: 200, width: double.infinity),
           const SizedBox(height: 16),
           
           // Title and info skeleton
@@ -304,7 +305,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   children: [
                     Text(
                       event.title,
-                      style: AppTextStyles.headlineSmall.copyWith(
+                      style: AppTextStyles.headlineMedium.copyWith(
                         color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
                         fontWeight: FontWeight.bold,
                       ),

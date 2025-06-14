@@ -5,6 +5,7 @@ import 'package:rucking_app/features/events/presentation/bloc/event_progress_blo
 import 'package:rucking_app/features/events/presentation/bloc/event_progress_event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_progress_state.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
 

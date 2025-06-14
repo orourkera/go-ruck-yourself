@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 
 class EventCardSkeleton extends StatelessWidget {
@@ -33,7 +34,7 @@ class EventCardSkeleton extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SkeletonRectangle(width: 60, height: 24),
+                  const SkeletonBox(width: 60, height: 24),
                 ],
               ),
               
@@ -62,7 +63,7 @@ class EventCardSkeleton extends StatelessWidget {
                 children: [
                   const SkeletonLine(width: 100),
                   const Spacer(),
-                  const SkeletonRectangle(width: 80, height: 32),
+                  const SkeletonBox(width: 80, height: 32),
                 ],
               ),
             ],
