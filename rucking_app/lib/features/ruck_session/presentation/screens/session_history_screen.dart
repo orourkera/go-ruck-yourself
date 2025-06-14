@@ -207,11 +207,10 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
               color: Colors.grey[400],
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No rucks yet!!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              style: AppTextStyles.titleLarge.copyWith(
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 24),
@@ -250,18 +249,17 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
               color: Colors.red[300],
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Could Not Load Sessions',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              style: AppTextStyles.titleLarge.copyWith(
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               userFriendlyMessage,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: AppTextStyles.bodyMedium.copyWith(
                 color: Colors.grey,
               ),
             ),

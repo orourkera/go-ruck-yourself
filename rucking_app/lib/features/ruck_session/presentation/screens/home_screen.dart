@@ -171,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           });
         },
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.primary,
+        selectedItemColor: Theme.of(context).primaryColor,
         unselectedItemColor: AppColors.grey,
         items: [
           BottomNavigationBarItem(
@@ -656,7 +656,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: isLadyMode ? AppColors.ladyPrimary.withOpacity(0.3) : AppColors.primary.withOpacity(0.3),
+                              color: isLadyMode ? AppColors.ladyPrimary.withOpacity(0.3) : Theme.of(context).primaryColor.withOpacity(0.3),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -954,7 +954,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                             polylines: [
                                               Polyline(
                                                 points: routePoints,
-                                                color: AppColors.secondary,
+                                                color: Theme.of(context).primaryColor,
                                                 strokeWidth: 4,
                                               ),
                                             ],
@@ -1052,7 +1052,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                     child: Text(
                       'View All Sessions',
                       style: AppTextStyles.labelLarge.copyWith(
-                        color: AppColors.primary,
+                        color: Theme.of(context).primaryColor,
                       ),
                     ),
                   ),
@@ -1102,7 +1102,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         Icon(
           icon,
           size: 20,
-          color: AppColors.secondary,
+          color: Theme.of(context).primaryColor,
         ),
         const SizedBox(width: 8),
         Expanded(

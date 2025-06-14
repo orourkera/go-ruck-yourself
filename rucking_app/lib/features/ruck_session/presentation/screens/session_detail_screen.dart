@@ -218,12 +218,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     try {
       final authState = context.read<AuthBloc>().state;
       if (authState is Authenticated && authState.user.gender == 'female') {
-        return AppColors.ladyPrimary;
+        return Theme.of(context).primaryColor;
       }
     } catch (e) {
       // If we can't access the AuthBloc, fall back to default color
     }
-    return AppColors.primary;
+    return Theme.of(context).primaryColor;
   }
 
   // Heart rate calculation helper methods (from feature/heart-rate-viz)
@@ -260,8 +260,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
             const SizedBox(height: 4),
             Text(
               value, 
-              style: AppTextStyles.headlineMedium.copyWith(
-                fontSize: 30, // Larger font for the heart rate value
+              style: AppTextStyles.displaySmall.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -382,7 +381,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                               children: [
                                 Text(
                                   MeasurementUtils.formatDate(widget.session.startTime),
-                                  style: Theme.of(context).textTheme.titleLarge,
+                                  style: AppTextStyles.titleLarge,
                                 ),
                                 // Add the like button here
                                 if (widget.session.id != null)
@@ -443,9 +442,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                                 const SizedBox(width: 2),
                                                 Text(
                                                   '$likeCount',
-                                                  style: TextStyle(
-                                                    fontFamily: 'Bangers',
-                                                    fontSize: 20,
+                                                  style: AppTextStyles.titleMedium.copyWith(
                                                     color: Colors.grey[800],
                                                   ),
                                                 ),
@@ -461,7 +458,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             const SizedBox(height: 8),
                             Text(
                               "${MeasurementUtils.formatTime(widget.session.startTime)} - ${MeasurementUtils.formatTime(widget.session.endTime)}",
-                              style: Theme.of(context).textTheme.bodyLarge,
+                              style: AppTextStyles.bodyLarge,
                             ),
                           ],
                         ),
@@ -535,11 +532,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             child: Center(
                               child: Text(
                                 snapshot.data!,
-                                style: TextStyle(
-                                  fontFamily: 'Bangers',
-                                  fontSize: 24,
-                                  color: AppColors.primary,
-                                  letterSpacing: 1.2,
+                                style: AppTextStyles.statValue.copyWith(
+                                  color: Theme.of(context).primaryColor,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -603,7 +597,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             const SizedBox(width: 8),
                             Text(
                               'Ruck Shots',
-                              style: Theme.of(context).textTheme.titleMedium,
+                              style: AppTextStyles.titleMedium,
                             ),
                           ],
                         ),
@@ -679,7 +673,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                   children: [
                     Text(
                       'Stats',
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: AppTextStyles.titleLarge,
                     ),
                     const SizedBox(height: 16),
                     _buildDetailRow(
@@ -721,7 +715,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       const SizedBox(height: 24),
                       Text(
                         'Notes',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: AppTextStyles.titleLarge,
                       ),
                       const SizedBox(height: 8),
                       Container(
@@ -733,7 +727,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                         ),
                         child: Text(
                           widget.session.notes!,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          style: AppTextStyles.bodyMedium,
                         ),
                       ),
                     ],
@@ -765,10 +759,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             // Title with Bangers font
                             Text(
                               'HEART RATE',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontFamily: 'Bangers',
+                              style: AppTextStyles.displaySmall.copyWith(
                                 color: const Color(0xFF3E2723),
-                                letterSpacing: 1.0,
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -781,7 +773,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 'Average HR',
                                 '${widget.session.avgHeartRate ?? _calculateAvgHeartRate(widget.session.heartRateSamples ?? [])} bpm',
                                 Icons.favorite,
-                                iconColor: AppColors.error
+                                iconColor: Theme.of(context).primaryColor
                               ),
                               
                             // Max HR stat item
@@ -792,7 +784,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 'Max HR',
                                 '${widget.session.maxHeartRate ?? _calculateMaxHeartRate(widget.session.heartRateSamples ?? [])} bpm',
                                 Icons.whatshot,
-                                iconColor: AppColors.error
+                                iconColor: Theme.of(context).primaryColor
                               ),
                               
                             // Min HR stat item
@@ -878,10 +870,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                             const SizedBox(height: 16),
                                             Text(
                                               'No heart rate data available',
-                                              style: TextStyle(
+                                              style: AppTextStyles.statValue.copyWith(
                                                 color: Colors.grey.shade600,
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w500,
                                               ),
                                             ),
                                           ],
@@ -911,7 +901,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           const SizedBox(width: 8),
                           Text(
                             'Comments',
-                            style: Theme.of(context).textTheme.titleLarge,
+                            style: AppTextStyles.titleLarge,
                           ),
                         ],
                       ),
@@ -948,12 +938,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         const SizedBox(height: 4),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall,
+          style: AppTextStyles.bodySmall,
         ),
         const SizedBox(height: 2),
         Text(
           value,
-          style: Theme.of(context).textTheme.titleMedium!.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -980,12 +970,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: AppTextStyles.titleMedium,
             ),
           ),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleMedium!.copyWith(
+            style: AppTextStyles.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
           ),
@@ -1011,7 +1001,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           children: [
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: AppTextStyles.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1042,14 +1032,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 Icon(icon, size: 16, color: iconColor ?? Colors.grey[600]),
                 const SizedBox(width: 8),
               ],
-              Text(label, style: Theme.of(context).textTheme.bodyMedium),
+              Text(label, style: AppTextStyles.bodyMedium),
             ],
           ),
           Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: AppTextStyles.bodyMedium.copyWith(
               fontWeight: FontWeight.bold,
-              // We no longer have a valueColor parameter, just use the default text color
             ),
           ),
         ],
@@ -1494,7 +1483,7 @@ class _SessionRouteMap extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         alignment: Alignment.center,
-        child: Text('No route data available', style: Theme.of(context).textTheme.bodyMedium),
+        child: Text('No route data available', style: AppTextStyles.bodyMedium),
       );
     }
 
@@ -1523,7 +1512,7 @@ class _SessionRouteMap extends StatelessWidget {
               polylines: [
                 Polyline(
                   points: points,
-                  color: AppColors.secondary,
+                  color: Theme.of(context).primaryColor,
                   strokeWidth: 4,
                 ),
               ],

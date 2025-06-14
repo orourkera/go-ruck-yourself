@@ -428,16 +428,13 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: Theme.of(context).primaryColor,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             formattedDistance,
-                            style: const TextStyle(
-                              fontFamily: 'Bangers',
-                              fontSize: 28,
+                            style: AppTextStyles.statValue.copyWith(
                               color: Colors.white,
-                              letterSpacing: 1.0,
                             ),
                           ),
                         ),
@@ -510,7 +507,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                                 icon: Icons.timer,
                                 label: 'Time',
                                 value: formattedDuration,
-                                compact: true,
                               ),
                             ),
                             Expanded(
@@ -519,7 +515,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                                 icon: Icons.trending_up,
                                 label: 'Elevation',
                                 value: formattedElevation,
-                                compact: true,
                               ),
                             ),
                           ],
@@ -536,7 +531,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                                 icon: Icons.speed,
                                 label: 'Pace',
                                 value: formattedPace,
-                                compact: true,
                               ),
                             ),
                             Expanded(
@@ -545,7 +539,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                                 icon: Icons.local_fire_department,
                                 label: 'Calories',
                                 value: formattedCalories,
-                                compact: true,
                               ),
                             ),
                           ],
@@ -574,9 +567,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                               const SizedBox(width: 4),
                               Text(
                                 '${_likeCount ?? 0}',
-                                style: TextStyle(
-                                  fontFamily: 'Bangers',
-                                  fontSize: 20,
+                                style: AppTextStyles.titleMedium.copyWith(
                                   color: isDarkMode ? Colors.white : Colors.black,
                                 ),
                               ),
@@ -602,14 +593,12 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                               Icon(
                                 Icons.comment,
                                 size: 40,
-                                color: AppColors.secondary,
+                                color: Theme.of(context).primaryColor,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 '${_commentCount ?? 0}',
-                                style: TextStyle(
-                                  fontFamily: 'Bangers',
-                                  fontSize: 20,
+                                style: AppTextStyles.titleMedium.copyWith(
                                   color: isDarkMode ? Colors.white : Colors.black,
                                 ),
                               ),
@@ -690,7 +679,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     required IconData icon,
     required String label,
     required String value,
-    bool compact = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,15 +687,13 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
           children: [
             Icon(
               icon,
-              color: AppColors.secondary,
-              size: compact ? 16 : 20,
+              color: Theme.of(context).primaryColor,
             ),
             const SizedBox(width: 4),
             Text(
               label,
               style: AppTextStyles.bodySmall.copyWith(
                 color: Colors.grey[600],
-                fontSize: compact ? 12 : 14,
               ),
             ),
           ],
@@ -717,7 +703,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
           value,
           style: AppTextStyles.bodyMedium.copyWith(
             fontWeight: FontWeight.bold,
-            fontSize: compact ? 16 : 22,
           ),
           overflow: TextOverflow.ellipsis,
         ),
@@ -932,7 +917,7 @@ class _MediaCarouselState extends State<MediaCarousel>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _currentPage == index
-                        ? AppColors.secondary
+                        ? Theme.of(context).primaryColor
                         : Colors.grey.withOpacity(0.4),
                   ),
                 ),
@@ -1108,7 +1093,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.secondary,
+                    color: Theme.of(context).primaryColor,
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Text(
@@ -1150,7 +1135,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
               polylines: [
                 Polyline(
                   points: routePoints,
-                  color: AppColors.secondary,
+                  color: Theme.of(context).primaryColor,
                   strokeWidth: 4,
                 )
               ],
@@ -1179,7 +1164,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppColors.secondary,
+                  color: Theme.of(context).primaryColor,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Text(

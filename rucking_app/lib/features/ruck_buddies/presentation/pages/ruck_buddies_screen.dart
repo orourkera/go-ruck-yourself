@@ -109,8 +109,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     }
     debugPrint('🐞 [_RuckBuddiesScreenState.build] AuthState: $authStateInfo, isLadyMode: $isLadyMode');
     
-    // Use lady mode colors for female users
-    final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+    // Lady mode support is handled by the theme system, so we don't need manual color selection
     
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,

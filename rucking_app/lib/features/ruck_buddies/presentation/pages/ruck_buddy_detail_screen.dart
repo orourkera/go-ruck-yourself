@@ -690,11 +690,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
                             : true,
                         ),
-                        style: TextStyle(
-                          fontFamily: 'Bangers',
-                          fontSize: 28,
+                        style: AppTextStyles.displayMedium.copyWith(
                           color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                          letterSpacing: 1.0,
                         ),
                       ),
                     ],
@@ -724,13 +721,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty && snapshot.data!.toLowerCase() != 'unknown location') {
                         return Text(
                           snapshot.data!,
-                          style: TextStyle(
-                            fontFamily: 'Bangers',
-                            fontSize: 26,
-                            color: AppColors.primary,
-                            letterSpacing: 1.2,
+                          style: AppTextStyles.displayMedium.copyWith(
+                            color: Theme.of(context).primaryColor,
                           ),
-                          textAlign: TextAlign.center,
                         );
                       } else {
                         return const SizedBox.shrink();
@@ -749,10 +742,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                         child: Text(
                           'RUCK SHOTS', 
-                          style: TextStyle(
-                            fontFamily: 'Bangers',
-                            fontSize: 26,
-                            letterSpacing: 1.2,
+                          style: AppTextStyles.displayMedium.copyWith(
                             color: AppColors.secondary,
                           ),
                         ),
@@ -882,9 +872,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                   const SizedBox(width: 4),
                                   Text(
                                     '$_likeCount',
-                                    style: TextStyle(
-                                      fontFamily: 'Bangers',
-                                      fontSize: 24,
+                                    style: AppTextStyles.statValue.copyWith(
                                       color: Colors.grey[800],
                                     ),
                                   ),
@@ -912,9 +900,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                 const SizedBox(width: 4),
                                 Text(
                                   '$_commentCount',
-                                  style: TextStyle(
-                                    fontFamily: 'Bangers',
-                                    fontSize: 24,
+                                  style: AppTextStyles.statValue.copyWith(
                                     color: Colors.grey[800],
                                   ),
                                 ),
@@ -992,9 +978,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                     padding: const EdgeInsets.only(bottom: 8.0),
                                     child: Text(
                                       'Editing comment',
-                                      style: TextStyle(
+                                      style: AppTextStyles.bodySmall.copyWith(
                                         fontStyle: FontStyle.italic,
-                                        fontSize: 12,
                                         color: Colors.grey[600],
                                       ),
                                     ),
