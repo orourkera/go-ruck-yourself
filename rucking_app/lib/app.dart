@@ -37,6 +37,7 @@ import 'package:rucking_app/features/duels/presentation/screens/duel_detail_scre
 import 'package:rucking_app/features/duels/presentation/screens/create_duel_screen.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duel_invitations_screen.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duel_stats_screen.dart';
+import 'package:rucking_app/features/clubs/presentation/screens/clubs_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -508,7 +509,8 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   return MaterialPageRoute(
                     builder: (_) => AuthCallbackScreen(uri: uri),
                   );
-                
+                case '/clubs':
+                  return MaterialPageRoute(builder: (_) => const ClubsScreen());
                 default:
                   // Optionally handle unknown routes
                   return MaterialPageRoute(

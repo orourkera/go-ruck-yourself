@@ -39,6 +39,7 @@ import 'package:rucking_app/core/services/session_cache_service.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
+import 'package:rucking_app/features/events/presentation/screens/events_screen.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duels_list_screen.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
@@ -150,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: RuckBuddiesScreen(),
     ),
     const DuelsListScreen(),
-    const ProfileScreen(),
+    const EventsScreen(),
   ];
   
   @override
@@ -226,9 +227,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             label: 'Duels',
           ),
           BottomNavigationBarItem(
-            icon: _buildProfileIcon(false),
-            activeIcon: _buildProfileIcon(true),
-            label: 'Profile',
+            icon: Icon(
+              Icons.event,
+              size: 32,
+              color: Colors.grey,
+            ),
+            activeIcon: Icon(
+              Icons.event,
+              size: 32,
+              color: AppColors.primary,
+            ),
+            label: 'Events',
           ),
         ],
       ),
@@ -597,8 +606,35 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                   ),
                                 ],
                               ),
-                              // Notification bell with unread count
-                              NotificationBell(useLadyMode: isLadyMode),
+                              // Top bar action icons
+                              Row(
+                                children: [
+                                  // Clubs icon
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.group,
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
+                                      size: 28,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pushNamed(context, '/clubs');
+                                    },
+                                  ),
+                                  // Profile icon
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.person,
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
+                                      size: 28,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pushNamed(context, '/profile');
+                                    },
+                                  ),
+                                  // Notification bell with unread count
+                                  NotificationBell(useLadyMode: isLadyMode),
+                                ],
+                              ),
                             ],
                           ),
                           const SizedBox(height: 16),

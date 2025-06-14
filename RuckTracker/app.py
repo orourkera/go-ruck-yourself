@@ -157,6 +157,10 @@ app.register_blueprint(ruck_buddies_bp)
 from RuckTracker.api.achievements import achievements_bp
 app.register_blueprint(achievements_bp, url_prefix='/api')
 
+# Import and register clubs blueprint
+from RuckTracker.api.clubs import clubs_bp
+app.register_blueprint(clubs_bp, url_prefix='/api')
+
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (
     RuckSessionListResource, 

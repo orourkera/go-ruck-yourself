@@ -19,6 +19,9 @@ import 'package:rucking_app/features/auth/data/repositories/auth_repository_impl
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/bloc/profile_bloc.dart';
+import 'package:rucking_app/features/clubs/data/repositories/clubs_repository_impl.dart';
+import 'package:rucking_app/features/clubs/domain/repositories/clubs_repository.dart';
+import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
@@ -123,6 +126,11 @@ Future<void> setupServiceLocator() async {
     AuthRepositoryImpl(getIt<AuthService>())
   );
   
+  // Clubs repository
+  getIt.registerSingleton<ClubsRepository>(
+    ClubsRepositoryImpl(getIt<ApiClient>())
+  );
+  
   // Session repository for operations like delete
   getIt.registerSingleton<SessionRepository>(
     SessionRepository(apiClient: getIt<ApiClient>())
@@ -167,6 +175,9 @@ Future<void> setupServiceLocator() async {
     authBloc: getIt<AuthBloc>(),
   ));
   
+  // Clubs bloc
+  getIt.registerFactory<ClubsBloc>(() => ClubsBloc(getIt<ClubsRepository>()));
+
   // Initialize Ruck Buddies feature
   initRuckBuddiesFeature(getIt);
   

@@ -470,3 +470,66 @@ class ClubEventToggle extends StatelessWidget {
 - **Club Event Participation**: Higher participation rates for club vs. public events
 - **Notification Engagement**: Click-through rates on club event notifications
 - **User Retention**: Impact on DAU/MAU after feature launch
+
+## Implementation Progress
+
+### Phase 1: Navigation & Structure 
+- [x] **Navigation Updates**: Updated main navigation to add Events tab, moved Profile to top bar, added Clubs icon to top bar
+- [x] **Events Screen**: Created Events screen showing existing duels data with informational banner
+- [x] **Clubs Screen Placeholder**: Created initial placeholder Clubs screen (later replaced with functional version)
+- [x] **Routing**: Added `/clubs` route registration in main app routing
+
+### Phase 3: Clubs Integration 
+#### Frontend Implementation 
+- [x] **Domain Models**: Created `Club`, `ClubMember`, and `ClubDetails` data models with JSON serialization
+- [x] **Repository Interface**: Created `ClubsRepository` abstract class defining all club operations
+- [x] **Repository Implementation**: Created `ClubsRepositoryImpl` with full API integration for:
+  - Get clubs (with search/filtering)
+  - Create club
+  - Get club details
+  - Update club
+  - Delete club
+  - Request membership
+  - Manage membership (approve/deny/role changes)
+  - Remove membership/leave club
+- [x] **Bloc Architecture**: Created complete `ClubsBloc` with events and state management:
+  - `ClubsEvent`: All club-related events (LoadClubs, CreateClub, etc.)
+  - `ClubsState`: Comprehensive state management (loading, loaded, error states)
+  - `ClubsBloc`: Full business logic with error handling and logging
+- [x] **Functional Clubs Screen**: Replaced placeholder with fully functional clubs UI featuring:
+  - Search functionality
+  - Filter chips (All Clubs, My Clubs, Public, Private)
+  - Club cards showing membership status and details
+  - Empty and error states
+  - Pull-to-refresh
+  - Navigation to club details and create club screens
+- [x] **Service Registration**: Registered `ClubsRepository` and `ClubsBloc` in service locator
+
+#### Backend Implementation 
+- [x] **Database Schema**: Clubs and club_memberships tables with RLS policies
+- [x] **REST API Endpoints**: Full CRUD operations for clubs and membership management
+- [x] **Push Notifications**: Integration for club events and membership updates
+
+#### Next Steps (Pending)
+- [ ] **Club Detail Screen**: Full club details with member management
+- [ ] **Create Club Screen**: Form for creating new clubs
+- [ ] **Club Management**: Admin functions for membership approval/denial
+- [ ] **Real-time Updates**: Supabase realtime integration for live updates
+- [ ] **Push Notifications**: Test end-to-end notification flow
+
+#### Phase 2: Events Evolution (Future)
+- [ ] Migrate duels data to events table structure
+- [ ] Implement enhanced events functionality with club integration
+- [ ] Add event filtering and improved UI
+- [ ] Club event creation with member notifications
+
+### Backend Status
+**Complete** - All backend infrastructure including database schema, API endpoints, RLS policies, and push notification integration is implemented and deployed.
+
+### Current Status Summary
+- **Navigation**: 
+- **Clubs Frontend Core**:  
+- **Clubs UI Screens**: Main screen done, detail/create screens pending
+- **Events Feature**:  Placeholder only (Phase 2)
+- **Real-time Integration**:  Pending
+- **Testing & Polish**:  Pending

@@ -398,6 +398,327 @@ class PushNotificationService:
             notification_data=data
         )
 
+    def send_club_join_request_notification(self, device_tokens: List[str], requester_name: str, club_name: str, club_id: str):
+        """Send notification when someone requests to join a club"""
+        try:
+            if not device_tokens:
+                return
+                
+            payload = {
+                'message': {
+                    'token': device_tokens[0],
+                    'notification': {
+                        'title': "New Club Join Request",
+                        'body': f"{requester_name} wants to join {club_name}"
+                    },
+                    'data': {
+                        'type': 'club_join_request',
+                        'club_id': club_id,
+                        'requester_name': requester_name,
+                        'club_name': club_name
+                    },
+                    'apns': {
+                        'headers': {
+                            'apns-priority': '10'
+                        },
+                        'payload': {
+                            'aps': {
+                                'sound': 'default',
+                                'badge': 1
+                            }
+                        }
+                    },
+                    'android': {
+                        'priority': 'high',
+                        'notification': {
+                            'sound': 'default',
+                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                        }
+                    }
+                }
+            }
+            
+            access_token = self._get_access_token()
+            if not access_token:
+                logger.error("Failed to get Firebase access token")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(
+                self.fcm_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Club join request notification sent to {len(device_tokens)} devices. Success: 1, Failures: 0")
+            else:
+                logger.error(f"FCM API error for token {device_tokens[0][:10]}...: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending club join request notification: {e}")
+
+    def send_club_membership_approved_notification(self, device_tokens: List[str], club_name: str, club_id: str):
+        """Send notification when club membership is approved"""
+        try:
+            if not device_tokens:
+                return
+                
+            payload = {
+                'message': {
+                    'token': device_tokens[0],
+                    'notification': {
+                        'title': "Welcome to the Club!",
+                        'body': f"Your request to join {club_name} has been approved"
+                    },
+                    'data': {
+                        'type': 'club_membership_approved',
+                        'club_id': club_id,
+                        'club_name': club_name
+                    },
+                    'apns': {
+                        'headers': {
+                            'apns-priority': '10'
+                        },
+                        'payload': {
+                            'aps': {
+                                'sound': 'default',
+                                'badge': 1
+                            }
+                        }
+                    },
+                    'android': {
+                        'priority': 'high',
+                        'notification': {
+                            'sound': 'default',
+                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                        }
+                    }
+                }
+            }
+            
+            access_token = self._get_access_token()
+            if not access_token:
+                logger.error("Failed to get Firebase access token")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(
+                self.fcm_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Club membership approved notification sent to {len(device_tokens)} devices. Success: 1, Failures: 0")
+            else:
+                logger.error(f"FCM API error for token {device_tokens[0][:10]}...: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending club membership approved notification: {e}")
+
+    def send_club_membership_rejected_notification(self, device_tokens: List[str], club_name: str):
+        """Send notification when club membership is rejected"""
+        try:
+            if not device_tokens:
+                return
+                
+            payload = {
+                'message': {
+                    'token': device_tokens[0],
+                    'notification': {
+                        'title': "Club Membership Update",
+                        'body': f"Your request to join {club_name} was not approved"
+                    },
+                    'data': {
+                        'type': 'club_membership_rejected',
+                        'club_name': club_name
+                    },
+                    'apns': {
+                        'headers': {
+                            'apns-priority': '10'
+                        },
+                        'payload': {
+                            'aps': {
+                                'sound': 'default',
+                                'badge': 1
+                            }
+                        }
+                    },
+                    'android': {
+                        'priority': 'high',
+                        'notification': {
+                            'sound': 'default',
+                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                        }
+                    }
+                }
+            }
+            
+            access_token = self._get_access_token()
+            if not access_token:
+                logger.error("Failed to get Firebase access token")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(
+                self.fcm_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Club membership rejected notification sent to {len(device_tokens)} devices. Success: 1, Failures: 0")
+            else:
+                logger.error(f"FCM API error for token {device_tokens[0][:10]}...: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending club membership rejected notification: {e}")
+
+    def send_club_deleted_notification(self, device_tokens: List[str], club_name: str):
+        """Send notification when a club is deleted"""
+        try:
+            if not device_tokens:
+                return
+                
+            payload = {
+                'message': {
+                    'token': device_tokens[0],
+                    'notification': {
+                        'title': "Club Disbanded",
+                        'body': f"{club_name} has been disbanded by the admin"
+                    },
+                    'data': {
+                        'type': 'club_deleted',
+                        'club_name': club_name
+                    },
+                    'apns': {
+                        'headers': {
+                            'apns-priority': '10'
+                        },
+                        'payload': {
+                            'aps': {
+                                'sound': 'default',
+                                'badge': 1
+                            }
+                        }
+                    },
+                    'android': {
+                        'priority': 'high',
+                        'notification': {
+                            'sound': 'default',
+                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                        }
+                    }
+                }
+            }
+            
+            access_token = self._get_access_token()
+            if not access_token:
+                logger.error("Failed to get Firebase access token")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(
+                self.fcm_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Club deleted notification sent to {len(device_tokens)} devices. Success: 1, Failures: 0")
+            else:
+                logger.error(f"FCM API error for token {device_tokens[0][:10]}...: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending club deleted notification: {e}")
+
+    def send_club_event_notification(self, device_tokens: List[str], event_title: str, club_name: str, event_id: str, club_id: str):
+        """Send notification when a new club event is created"""
+        try:
+            if not device_tokens:
+                return
+                
+            payload = {
+                'message': {
+                    'token': device_tokens[0],
+                    'notification': {
+                        'title': f"New {club_name} Event",
+                        'body': f"{event_title} - Check it out!"
+                    },
+                    'data': {
+                        'type': 'club_event_created',
+                        'event_id': event_id,
+                        'club_id': club_id,
+                        'event_title': event_title,
+                        'club_name': club_name
+                    },
+                    'apns': {
+                        'headers': {
+                            'apns-priority': '10'
+                        },
+                        'payload': {
+                            'aps': {
+                                'sound': 'default',
+                                'badge': 1
+                            }
+                        }
+                    },
+                    'android': {
+                        'priority': 'high',
+                        'notification': {
+                            'sound': 'default',
+                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                        }
+                    }
+                }
+            }
+            
+            access_token = self._get_access_token()
+            if not access_token:
+                logger.error("Failed to get Firebase access token")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(
+                self.fcm_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Club event notification sent to {len(device_tokens)} devices. Success: 1, Failures: 0")
+            else:
+                logger.error(f"FCM API error for token {device_tokens[0][:10]}...: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending club event notification: {e}")
+
 
 # Helper function to get user device tokens
 def get_user_device_tokens(user_ids: List[str]) -> List[str]:
