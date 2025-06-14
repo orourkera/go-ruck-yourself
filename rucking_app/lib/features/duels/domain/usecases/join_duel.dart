@@ -10,6 +10,21 @@ class JoinDuel implements UseCase<void, JoinDuelParams> {
 
   @override
   Future<Either<Failure, void>> call(JoinDuelParams params) async {
+    // First check if user already has an active or pending duel
+    final userDuelsResult = await repository.getDuels(userParticipating: true);
+    
+    final hasActiveDuel = userDuelsResult.fold(
+      (failure) => false, // If we can't fetch, allow join (server will handle)
+      (duels) => duels.any((duel) => 
+        (duel.status.name == 'active' || duel.status.name == 'pending') &&
+        duel.status.name != 'cancelled'
+      ),
+    );
+    
+    if (hasActiveDuel) {
+      return Left(ValidationFailure('You can only participate in one duel at a time. Please complete or withdraw from your current duel first.'));
+    }
+
     // Get duel details to validate join conditions
     final duelResult = await repository.getDuel(params.duelId);
     

@@ -78,6 +78,15 @@ class WithdrawFromDuel extends DuelDetailEvent {
   List<Object> get props => [duelId];
 }
 
+class DeleteDuel extends DuelDetailEvent {
+  final String duelId;
+
+  const DeleteDuel({required this.duelId});
+
+  @override
+  List<Object> get props => [duelId];
+}
+
 // Comment-related events
 class LoadDuelComments extends DuelDetailEvent {
   final String duelId;

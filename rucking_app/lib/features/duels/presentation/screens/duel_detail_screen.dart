@@ -78,6 +78,9 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                           WithdrawFromDuel(duelId: widget.duelId),
                         );
                         break;
+                      case 'delete':
+                        _showDeleteConfirmationDialog(context, state.duel);
+                        break;
                     }
                   },
                   itemBuilder: (context) {
@@ -104,6 +107,22 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                               Icon(Icons.exit_to_app, color: Colors.red),
                               SizedBox(width: 8),
                               Text('Withdraw', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    // Add delete option if user can delete (creator only and duel hasn't started)
+                    if (_canUserDeleteDuel(state.duel)) {
+                      items.add(
+                        const PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Delete Duel', style: TextStyle(color: Colors.red)),
                             ],
                           ),
                         ),
@@ -162,8 +181,26 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
               message: state.message,
             );
             // Navigate back to duels list after successful withdrawal
-            Navigator.of(context).pop();
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/home',
+              (route) => false,
+            );
           } else if (state is DuelWithdrawError) {
+            StyledSnackBar.showError(
+              context: context,
+              message: state.message,
+            );
+          } else if (state is DuelDeleted) {
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: state.message,
+            );
+            // Navigate back to duels list after successful deletion
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/home',
+              (route) => false,
+            );
+          } else if (state is DuelDeleteError) {
             StyledSnackBar.showError(
               context: context,
               message: state.message,
@@ -459,6 +496,12 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
     return false;
   }
   
+  bool _canUserDeleteDuel(Duel duel) {
+    // Only the creator can delete a duel
+    // The duel must not have started yet
+    return _isUserCreator(duel) && duel.status == DuelStatus.pending;
+  }
+  
   bool _canUserWithdraw(Duel duel, List<DuelParticipant> participants) {
     // User can only withdraw if:
     // 1. They are a participant (not the creator)
@@ -482,5 +525,32 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
     );
     
     return userParticipant.status == DuelParticipantStatus.accepted;
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, Duel duel) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Duel'),
+          content: const Text('Are you sure you want to delete this duel?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                context.read<DuelDetailBloc>().add(
+                  DeleteDuel(duelId: duel.id),
+                );
+                Navigator.of(context).pop();
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

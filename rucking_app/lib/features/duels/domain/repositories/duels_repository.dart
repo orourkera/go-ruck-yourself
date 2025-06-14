@@ -41,6 +41,8 @@ abstract class DuelsRepository {
     String? status,
   });
 
+  Future<Either<Failure, void>> deleteDuel(String duelId);
+
   Future<Either<Failure, void>> joinDuel(String duelId);
 
   // Participant management

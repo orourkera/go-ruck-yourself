@@ -325,7 +325,6 @@ class AchievementSummarySkeleton extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -364,34 +363,31 @@ class AchievementStatsSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SkeletonLoader(
-      isLoading: true,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Column(
-            children: [
-              const SkeletonLine(width: 40, height: 24),
-              const SizedBox(height: 4),
-              const SkeletonLine(width: 50, height: 14),
-            ],
-          ),
-          Column(
-            children: [
-              const SkeletonLine(width: 40, height: 24),
-              const SizedBox(height: 4),
-              const SkeletonLine(width: 60, height: 14),
-            ],
-          ),
-          Column(
-            children: [
-              const SkeletonLine(width: 40, height: 24),
-              const SizedBox(height: 4),
-              const SkeletonLine(width: 70, height: 14),
-            ],
-          ),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Column(
+          children: [
+            const SkeletonLine(width: 40, height: 24),
+            const SizedBox(height: 4),
+            const SkeletonLine(width: 50, height: 14),
+          ],
+        ),
+        Column(
+          children: [
+            const SkeletonLine(width: 40, height: 24),
+            const SizedBox(height: 4),
+            const SkeletonLine(width: 60, height: 14),
+          ],
+        ),
+        Column(
+          children: [
+            const SkeletonLine(width: 40, height: 24),
+            const SizedBox(height: 4),
+            const SkeletonLine(width: 70, height: 14),
+          ],
+        ),
+      ],
     );
   }
 }

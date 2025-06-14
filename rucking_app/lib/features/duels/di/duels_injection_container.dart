@@ -26,6 +26,7 @@ import '../domain/usecases/delete_duel_comment.dart';
 import '../domain/usecases/start_duel.dart';
 import '../domain/usecases/get_duel_sessions.dart';
 import '../domain/usecases/withdraw_from_duel.dart';
+import '../domain/usecases/delete_duel.dart';
 
 // BLoCs
 import '../presentation/bloc/duel_list/duel_list_bloc.dart';
@@ -64,6 +65,7 @@ void initDuelsFeature(GetIt sl) {
   sl.registerLazySingleton(() => StartDuel(sl()));
   sl.registerLazySingleton(() => GetDuelSessions(sl()));
   sl.registerLazySingleton(() => WithdrawFromDuel(sl()));
+  sl.registerLazySingleton(() => DeleteDuel(sl()));
 
   // BLoCs
   sl.registerFactory(() => DuelListBloc(
@@ -83,6 +85,7 @@ void initDuelsFeature(GetIt sl) {
     startDuel: sl(),
     getDuelSessions: sl(),
     withdrawFromDuel: sl(),
+    deleteDuel: sl(),
   ));
 
   sl.registerFactory(() => CreateDuelBloc(

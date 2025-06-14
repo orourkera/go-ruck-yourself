@@ -29,6 +29,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
   String? _currentUserId;
   bool _hasActiveInactivelyNavigated = false;
   bool _hasActiveDuel = false;
+  bool _hasInitialized = false;
 
   @override
   void initState() {
@@ -36,6 +37,16 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
     _loadCurrentUser();
     // First load user's duels to check for active ones
     context.read<DuelListBloc>().add(const LoadMyDuels());
+    _hasInitialized = true;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh duels when coming back to this screen (except during initial load)
+    if (_hasInitialized && ModalRoute.of(context)?.isCurrent == true) {
+      context.read<DuelListBloc>().add(const RefreshDuels());
+    }
   }
 
   Future<void> _loadCurrentUser() async {
@@ -294,14 +305,14 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
           child: DuelCard(
             duel: duel,
             participants: duel is DuelModel ? duel.participants : [],
-            showJoinButton: !isCurrentUserCreator && !isCurrentUserParticipant,
+            showJoinButton: !_hasUserActiveOrPendingDuel(state.duels) && !isCurrentUserCreator && !isCurrentUserParticipant,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => DuelDetailScreen(duelId: duel.id),
               ),
             ),
-            onJoin: (!isCurrentUserCreator && !isCurrentUserParticipant) ? () => context.read<DuelListBloc>().add(
+            onJoin: (!_hasUserActiveOrPendingDuel(state.duels) && !isCurrentUserCreator && !isCurrentUserParticipant) ? () => context.read<DuelListBloc>().add(
               JoinDuel(duelId: duel.id),
             ) : null,
           ),
@@ -315,6 +326,18 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
       return duel.participants.any((participant) => participant.userId == _currentUserId);
     }
     return false;
+  }
+
+  bool _hasUserActiveOrPendingDuel(List<Duel> duels) {
+    if (_currentUserId == null) return false;
+    
+    return duels.any((duel) {
+      final isActive = (duel.status == DuelStatus.active || duel.status == DuelStatus.pending) && duel.status != DuelStatus.cancelled;
+      final isCreator = duel.creatorId == _currentUserId;
+      final isParticipant = _isCurrentUserParticipant(duel);
+      
+      return isActive && (isCreator || isParticipant);
+    });
   }
 
   void _showFiltersSheet(BuildContext context) {

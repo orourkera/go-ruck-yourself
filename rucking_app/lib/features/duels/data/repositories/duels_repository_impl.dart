@@ -118,6 +118,18 @@ class DuelsRepositoryImpl implements DuelsRepository {
   }
 
   @override
+  Future<Either<Failure, void>> deleteDuel(String duelId) async {
+    try {
+      await remoteDataSource.deleteDuel(duelId);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to delete duel'));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> joinDuel(String duelId) async {
     try {
       await remoteDataSource.joinDuel(duelId);

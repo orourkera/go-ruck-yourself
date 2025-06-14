@@ -130,6 +130,21 @@ CREATE TABLE event_participants (
 );
 ```
 
+### Performance Indexes
+
+```sql
+-- Performance indexes for efficient queries
+CREATE INDEX idx_events_club_id_scheduled ON events(club_id, scheduled_start_time);
+CREATE INDEX idx_events_creator_status ON events(creator_user_id, status);
+CREATE INDEX idx_club_memberships_user_status ON club_memberships(user_id, status);
+CREATE INDEX idx_club_memberships_club_status ON club_memberships(club_id, status);
+CREATE INDEX idx_event_participants_user ON event_participants(user_id, status);
+CREATE INDEX idx_event_participants_event ON event_participants(event_id, status);
+
+-- Geospatial index for location-based event queries (requires PostGIS extension)
+-- CREATE INDEX idx_events_location ON events USING GIST (ll_to_earth(latitude, longitude));
+```
+
 ### Row Level Security Policies
 
 ```sql

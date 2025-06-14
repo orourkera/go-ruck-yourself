@@ -31,6 +31,7 @@ abstract class DuelsRemoteDataSource {
 
   Future<DuelModel> getDuel(String duelId);
   Future<DuelModel> updateDuel(String duelId, Map<String, dynamic> updates);
+  Future<void> deleteDuel(String duelId);
   Future<void> joinDuel(String duelId);
   Future<void> startDuel(String duelId);
 
@@ -159,6 +160,16 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     try {
       final responseData = await apiClient.put('/duels/$duelId', updates);
       return DuelModel.fromJson(responseData['duel']);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> deleteDuel(String duelId) async {
+    try {
+      await apiClient.delete('/duels/$duelId');
+      return;
     } catch (e) {
       rethrow;
     }

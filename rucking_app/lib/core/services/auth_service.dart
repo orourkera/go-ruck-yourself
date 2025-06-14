@@ -239,12 +239,10 @@ class AuthServiceImpl implements AuthService {
           AppLogger.error('Failed to create user profile after Google login', exception: createError);
           // If profile creation fails, still return basic user info
           final basicUser = User(
-            id: supabaseUser.id,
+            userId: supabaseUser.id,
             email: supabaseUser.email!,
             username: supabaseUser.userMetadata?['full_name'] ?? supabaseUser.email!.split('@')[0],
-            isMetric: true,
-            createdAt: DateTime.now(),
-            isAdmin: false,
+            preferMetric: true,
           );
           return basicUser;
         }

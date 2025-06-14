@@ -95,6 +95,10 @@ class DuelListResource(Resource):
                     query = query.or_(f'creator_id.eq.{user_id}')
             
             # Add additional filters
+            # Always exclude cancelled duels unless explicitly requested
+            if status != 'cancelled':
+                query = query.neq('status', 'cancelled')
+            
             if status:
                 query = query.eq('status', status)
                 logging.info(f"Applied status filter: {status}")
@@ -425,8 +429,11 @@ class DuelResource(Resource):
             if duel['status'] != 'pending':
                 return {'error': 'Cannot delete a duel that has already started'}, 400
             
-            # Delete the duel - this will cascade delete participants and comments due to FK constraints
-            supabase.table('duels').delete().eq('id', duel_id).execute()
+            # Soft delete the duel by updating status to cancelled
+            supabase.table('duels').update({
+                'status': 'cancelled',
+                'updated_at': datetime.utcnow().isoformat()
+            }).eq('id', duel_id).execute()
             
             # Send notification about duel deletion
             from api.duel_comments import create_duel_deleted_notification

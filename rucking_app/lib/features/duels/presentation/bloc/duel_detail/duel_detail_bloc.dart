@@ -10,6 +10,7 @@ import '../../../domain/usecases/delete_duel_comment.dart' as delete_comment_use
 import '../../../domain/usecases/start_duel.dart' as start_duel_usecase;
 import '../../../domain/usecases/get_duel_sessions.dart';
 import '../../../domain/usecases/withdraw_from_duel.dart' as withdraw_usecase;
+import '../../../domain/usecases/delete_duel.dart' as delete_duel_usecase;
 import '../../../domain/entities/duel_participant.dart';
 import '../../../data/models/duel_model.dart';
 import 'duel_detail_event.dart';
@@ -27,6 +28,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
   final start_duel_usecase.StartDuel startDuel;
   final GetDuelSessions getDuelSessions;
   final withdraw_usecase.WithdrawFromDuel withdrawFromDuel;
+  final delete_duel_usecase.DeleteDuel deleteDuel;
 
   DuelDetailBloc({
     required this.getDuelDetails,
@@ -40,6 +42,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
     required this.startDuel,
     required this.getDuelSessions,
     required this.withdrawFromDuel,
+    required this.deleteDuel,
   }) : super(DuelDetailInitial()) {
     on<LoadDuelDetail>(_onLoadDuelDetail);
     on<RefreshDuelDetail>(_onRefreshDuelDetail);
@@ -53,6 +56,7 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
     on<DeleteDuelComment>(_onDeleteDuelComment);
     on<LoadDuelSessions>(_onLoadDuelSessions);
     on<WithdrawFromDuel>(_onWithdrawFromDuel);
+    on<DeleteDuel>(_onDeleteDuel);
   }
 
   void _onLoadDuelDetail(LoadDuelDetail event, Emitter<DuelDetailState> emit) async {
@@ -288,6 +292,24 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
       (_) {
         emit(DuelWithdrawn(duelId: event.duelId));
         // Don't refresh duel details after withdrawal since user will be navigated away
+      },
+    );
+  }
+
+  void _onDeleteDuel(DeleteDuel event, Emitter<DuelDetailState> emit) async {
+    emit(DuelDeleting(duelId: event.duelId));
+
+    final result = await deleteDuel(delete_duel_usecase.DeleteDuelParams(
+      duelId: event.duelId,
+    ));
+
+    result.fold(
+      (failure) => emit(DuelDeleteError(
+        duelId: event.duelId,
+        message: failure.message,
+      )),
+      (_) {
+        emit(DuelDeleted(duelId: event.duelId));
       },
     );
   }

@@ -11,6 +11,21 @@ class CreateDuel implements UseCase<Duel, CreateDuelParams> {
 
   @override
   Future<Either<Failure, Duel>> call(CreateDuelParams params) async {
+    // First check if user already has an active or pending duel
+    final userDuelsResult = await repository.getDuels(userParticipating: true);
+    
+    final hasActiveDuel = userDuelsResult.fold(
+      (failure) => false, // If we can't fetch, allow create (server will handle)
+      (duels) => duels.any((duel) => 
+        (duel.status.name == 'active' || duel.status.name == 'pending') &&
+        duel.status.name != 'cancelled'
+      ),
+    );
+    
+    if (hasActiveDuel) {
+      return Left(ValidationFailure('You can only participate in one duel at a time. Please complete or withdraw from your current duel first.'));
+    }
+
     // Validate parameters
     if (params.title.trim().isEmpty) {
       return Left(ValidationFailure('Duel title cannot be empty'));
