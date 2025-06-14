@@ -4,7 +4,7 @@ Clubs API endpoints for club management and membership
 import logging
 from flask import Blueprint, request, jsonify
 from flask_restful import Api, Resource
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from RuckTracker.api.auth import auth_required, get_user_id
 from datetime import datetime
 from RuckTracker.supabase_client import get_supabase_admin_client
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
@@ -20,11 +20,11 @@ push_service = PushNotificationService()
 class ClubListResource(Resource):
     """Handle club listing and creation"""
     
-    @jwt_required()
+    @auth_required()
     def get(self):
         """List clubs with optional search and filtering"""
         try:
-            current_user_id = get_jwt_identity()
+            current_user_id = get_user_id()
             logger.info(f"Fetching clubs for user: {current_user_id}")
             
             admin_client = get_supabase_admin_client()
@@ -126,11 +126,11 @@ class ClubListResource(Resource):
             logger.error(f"Error fetching clubs: {e}", exc_info=True)
             return {'error': f'Failed to fetch clubs: {str(e)}'}, 500
     
-    @jwt_required()
+    @auth_required()
     def post(self):
         """Create a new club"""
         try:
-            current_user_id = get_jwt_identity()
+            current_user_id = get_user_id()
             data = request.get_json()
             
             # Validate required fields
@@ -173,11 +173,11 @@ class ClubListResource(Resource):
 class ClubResource(Resource):
     """Handle individual club operations"""
     
-    @jwt_required()
+    @auth_required()
     def get(self, club_id):
         """Get club details"""
         try:
-            current_user_id = get_jwt_identity()
+            current_user_id = get_user_id()
             admin_client = get_supabase_admin_client()
             
             # Get club with admin details
@@ -233,11 +233,11 @@ class ClubResource(Resource):
             logger.error(f"Error fetching club {club_id}: {e}", exc_info=True)
             return {'error': f'Failed to fetch club details: {str(e)}'}, 500
     
-    @jwt_required()
+    @auth_required()
     def put(self, club_id):
         """Update club details (admin only)"""
         try:
-            current_user_id = get_jwt_identity()
+            current_user_id = get_user_id()
             data = request.get_json()
             admin_client = get_supabase_admin_client()
             
@@ -275,11 +275,11 @@ class ClubResource(Resource):
             logger.error(f"Error updating club {club_id}: {e}", exc_info=True)
             return {'error': f'Failed to update club: {str(e)}'}, 500
     
-    @jwt_required()
+    @auth_required()
     def delete(self, club_id):
         """Delete club (admin only)"""
         try:
-            current_user_id = get_jwt_identity()
+            current_user_id = get_user_id()
             admin_client = get_supabase_admin_client()
             
             # Check if user is club admin
@@ -321,11 +321,11 @@ class ClubResource(Resource):
 class ClubMembershipResource(Resource):
     """Handle club membership operations"""
     
-    @jwt_required()
+    @auth_required()
     def post(self, club_id):
         """Request to join club"""
         try:
-            current_user_id = get_jwt_identity()
+            current_user_id = get_user_id()
             admin_client = get_supabase_admin_client()
             
             # Check if club exists
@@ -390,11 +390,11 @@ class ClubMembershipResource(Resource):
 class ClubMemberManagementResource(Resource):
     """Handle club member management (admin operations)"""
     
-    @jwt_required()
+    @auth_required()
     def put(self, club_id, user_id):
         """Approve/deny membership request or update member role"""
         try:
-            current_user_id = get_jwt_identity()
+            current_user_id = get_user_id()
             data = request.get_json()
             admin_client = get_supabase_admin_client()
             
@@ -453,11 +453,11 @@ class ClubMemberManagementResource(Resource):
             logger.error(f"Error updating membership for user {user_id} in club {club_id}: {e}", exc_info=True)
             return {'error': f'Failed to update membership: {str(e)}'}, 500
     
-    @jwt_required()
+    @auth_required()
     def delete(self, club_id, user_id):
         """Remove member from club or leave club"""
         try:
-            current_user_id = get_jwt_identity()
+            current_user_id = get_user_id()
             admin_client = get_supabase_admin_client()
             
             # Check if club exists

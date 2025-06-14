@@ -2,18 +2,17 @@ import os
 import logging
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv # Import load_dotenv
 from flask import Flask, render_template, Blueprint, g, jsonify, request, redirect
 from flask_restful import Api
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate # Import Migrate
+from flask_cors import CORS
 from .supabase_client import get_supabase_client, get_supabase_admin_client # Relative import for supabase_client within RuckTracker package
-from flask_limiter.util import get_remote_address
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,6 +29,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 logger.info("Starting RuckTracker API server...")
+
+# Initialize Supabase
+supabase = get_supabase_client()
 
 # Custom JSON encoder to handle datetime objects
 class CustomJSONEncoder(json.JSONEncoder):

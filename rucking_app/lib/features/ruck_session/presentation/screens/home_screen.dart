@@ -594,29 +594,38 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                   ),
                                 ],
                               ),
-                              // Top bar action icons
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Clubs icon
-                                  IconButton(
-                                    icon: Image.asset(
-                                      'assets/images/clubs.png',
-                                      width: 56,
-                                      height: 56,
+                              // Top bar action icons - more compact and right-aligned
+                              Container(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Clubs icon
+                                    Container(
+                                      margin: EdgeInsets.zero,
+                                      child: IconButton(
+                                        icon: Image.asset(
+                                          'assets/images/clubs.png',
+                                          width: 56,
+                                          height: 56,
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pushNamed(context, '/clubs');
+                                        },
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 56,
+                                          minHeight: 56,
+                                        ),
+                                      ),
                                     ),
-                                    onPressed: () {
-                                      Navigator.pushNamed(context, '/clubs');
-                                    },
-                                    padding: const EdgeInsets.all(4),
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                  // Notification bell with unread count
-                                  Transform.translate(
-                                    offset: const Offset(-12, 0), // Move 12px left to bring closer to clubs icon
-                                    child: NotificationBell(useLadyMode: isLadyMode),
-                                  ),
-                                ],
+                                    const SizedBox(width: 8), // Small fixed spacing
+                                    // Notification bell with unread count
+                                    Container(
+                                      margin: EdgeInsets.zero,
+                                      child: NotificationBell(useLadyMode: isLadyMode),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
