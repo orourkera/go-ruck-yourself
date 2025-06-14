@@ -25,47 +25,81 @@ class ClubListResource(Resource):
         """List clubs with optional search and filtering"""
         try:
             current_user_id = get_jwt_identity()
+            logger.info(f"Fetching clubs for user: {current_user_id}")
+            
             admin_client = get_supabase_admin_client()
+            logger.info("Got Supabase admin client")
             
             # Get query parameters
             search = request.args.get('search', '')
             is_public = request.args.get('is_public')
             user_clubs_only = request.args.get('user_clubs_only', 'false').lower() == 'true'
+            logger.info(f"Query params - search: {search}, is_public: {is_public}, user_clubs_only: {user_clubs_only}")
+            
+            # First, check if clubs table exists
+            try:
+                test_query = admin_client.table('clubs').select('count', count='exact').limit(1).execute()
+                logger.info(f"Clubs table test query successful. Count: {test_query.count}")
+            except Exception as table_error:
+                logger.error(f"Clubs table does not exist or is inaccessible: {table_error}")
+                return {'error': 'Clubs table not found'}, 500
             
             # Base query - simplified to avoid complex joins
             query = admin_client.table('clubs').select("""
                 *,
                 admin_user:admin_user_id(id, first_name, last_name)
             """)
+            logger.info("Created base query")
             
             # Apply filters
             if search:
                 query = query.ilike('name', f'%{search}%')
+                logger.info(f"Applied search filter: {search}")
             
             if is_public is not None:
                 query = query.eq('is_public', is_public.lower() == 'true')
+                logger.info(f"Applied public filter: {is_public}")
             
             if user_clubs_only:
+                logger.info("Applying user clubs only filter")
                 # Get user's clubs only
                 user_memberships = admin_client.table('club_memberships').select('club_id').eq('user_id', current_user_id).eq('status', 'approved').execute()
                 if user_memberships.data:
                     club_ids = [membership['club_id'] for membership in user_memberships.data]
                     query = query.in_('id', club_ids)
+                    logger.info(f"Found user memberships for {len(club_ids)} clubs")
                 else:
+                    logger.info("No user memberships found, returning empty list")
                     return {'clubs': [], 'total': 0}, 200
             
             # Execute query
+            logger.info("Executing main clubs query")
             result = query.order('created_at', desc=True).execute()
+            logger.info(f"Main query returned {len(result.data)} clubs")
             
             clubs = []
-            for club in result.data:
+            for i, club in enumerate(result.data):
+                logger.info(f"Processing club {i+1}/{len(result.data)}: {club.get('name', 'Unknown')}")
+                
                 # Get member count
-                member_count_result = admin_client.table('club_memberships').select('id', count='exact').eq('club_id', club['id']).eq('status', 'approved').execute()
+                try:
+                    member_count_result = admin_client.table('club_memberships').select('id', count='exact').eq('club_id', club['id']).eq('status', 'approved').execute()
+                    member_count = member_count_result.count
+                    logger.info(f"Club {club['id']} has {member_count} members")
+                except Exception as member_error:
+                    logger.error(f"Error getting member count for club {club['id']}: {member_error}")
+                    member_count = 0
                 
                 # Check if current user is member/admin
-                user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club['id']).eq('user_id', current_user_id).execute()
-                user_role = user_membership.data[0]['role'] if user_membership.data else None
-                user_status = user_membership.data[0]['status'] if user_membership.data else None
+                try:
+                    user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club['id']).eq('user_id', current_user_id).execute()
+                    user_role = user_membership.data[0]['role'] if user_membership.data else None
+                    user_status = user_membership.data[0]['status'] if user_membership.data else None
+                    logger.info(f"User membership for club {club['id']}: role={user_role}, status={user_status}")
+                except Exception as membership_error:
+                    logger.error(f"Error getting user membership for club {club['id']}: {membership_error}")
+                    user_role = None
+                    user_status = None
                 
                 club_data = {
                     'id': club['id'],
@@ -74,7 +108,7 @@ class ClubListResource(Resource):
                     'logo_url': club['logo_url'],
                     'is_public': club['is_public'],
                     'max_members': club['max_members'],
-                    'member_count': member_count_result.count,
+                    'member_count': member_count,
                     'admin_user': club['admin_user'],
                     'user_role': user_role,
                     'user_status': user_status,
@@ -82,14 +116,15 @@ class ClubListResource(Resource):
                 }
                 clubs.append(club_data)
             
+            logger.info(f"Successfully processed {len(clubs)} clubs")
             return {
                 'clubs': clubs,
                 'total': len(clubs)
             }, 200
             
         except Exception as e:
-            logger.error(f"Error fetching clubs: {e}")
-            return {'error': 'Failed to fetch clubs'}, 500
+            logger.error(f"Error fetching clubs: {e}", exc_info=True)
+            return {'error': f'Failed to fetch clubs: {str(e)}'}, 500
     
     @jwt_required()
     def post(self):
@@ -132,8 +167,8 @@ class ClubListResource(Resource):
                 return {'error': 'Failed to create club'}, 500
                 
         except Exception as e:
-            logger.error(f"Error creating club: {e}")
-            return {'error': 'Failed to create club'}, 500
+            logger.error(f"Error creating club: {e}", exc_info=True)
+            return {'error': f'Failed to create club: {str(e)}'}, 500
 
 class ClubResource(Resource):
     """Handle individual club operations"""
@@ -195,8 +230,8 @@ class ClubResource(Resource):
             return {'club': club_data}, 200
             
         except Exception as e:
-            logger.error(f"Error fetching club {club_id}: {e}")
-            return {'error': 'Failed to fetch club details'}, 500
+            logger.error(f"Error fetching club {club_id}: {e}", exc_info=True)
+            return {'error': f'Failed to fetch club details: {str(e)}'}, 500
     
     @jwt_required()
     def put(self, club_id):
@@ -237,8 +272,8 @@ class ClubResource(Resource):
                 return {'error': 'No valid fields to update'}, 400
                 
         except Exception as e:
-            logger.error(f"Error updating club {club_id}: {e}")
-            return {'error': 'Failed to update club'}, 500
+            logger.error(f"Error updating club {club_id}: {e}", exc_info=True)
+            return {'error': f'Failed to update club: {str(e)}'}, 500
     
     @jwt_required()
     def delete(self, club_id):
@@ -280,8 +315,8 @@ class ClubResource(Resource):
                 return {'error': 'Failed to delete club'}, 500
                 
         except Exception as e:
-            logger.error(f"Error deleting club {club_id}: {e}")
-            return {'error': 'Failed to delete club'}, 500
+            logger.error(f"Error deleting club {club_id}: {e}", exc_info=True)
+            return {'error': f'Failed to delete club: {str(e)}'}, 500
 
 class ClubMembershipResource(Resource):
     """Handle club membership operations"""
@@ -349,8 +384,8 @@ class ClubMembershipResource(Resource):
                 return {'error': 'Failed to send membership request'}, 500
                 
         except Exception as e:
-            logger.error(f"Error requesting to join club {club_id}: {e}")
-            return {'error': 'Failed to request club membership'}, 500
+            logger.error(f"Error requesting to join club {club_id}: {e}", exc_info=True)
+            return {'error': f'Failed to request club membership: {str(e)}'}, 500
 
 class ClubMemberManagementResource(Resource):
     """Handle club member management (admin operations)"""
@@ -415,8 +450,8 @@ class ClubMemberManagementResource(Resource):
                 return {'error': 'No valid fields to update'}, 400
                 
         except Exception as e:
-            logger.error(f"Error updating membership for user {user_id} in club {club_id}: {e}")
-            return {'error': 'Failed to update membership'}, 500
+            logger.error(f"Error updating membership for user {user_id} in club {club_id}: {e}", exc_info=True)
+            return {'error': f'Failed to update membership: {str(e)}'}, 500
     
     @jwt_required()
     def delete(self, club_id, user_id):
@@ -450,8 +485,8 @@ class ClubMemberManagementResource(Resource):
                 return {'error': 'Membership not found'}, 404
                 
         except Exception as e:
-            logger.error(f"Error removing user {user_id} from club {club_id}: {e}")
-            return {'error': 'Failed to remove from club'}, 500
+            logger.error(f"Error removing user {user_id} from club {club_id}: {e}", exc_info=True)
+            return {'error': f'Failed to remove from club: {str(e)}'}, 500
 
 # Register API endpoints
 api.add_resource(ClubListResource, '/clubs')
