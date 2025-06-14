@@ -139,6 +139,12 @@ class RuckSessionListResource(Resource):
                 session_data['ruck_weight_kg'] = data.get('ruck_weight_kg')
             if 'weight_kg' in data and data.get('weight_kg') is not None:
                 session_data['weight_kg'] = data.get('weight_kg')
+            
+            # Add event_id if provided (for event-associated ruck sessions)
+            if 'event_id' in data and data.get('event_id') is not None:
+                session_data['event_id'] = data.get('event_id')
+                logger.info(f"Creating session for event {data.get('event_id')}")
+                
             insert_resp = supabase.table('ruck_session') \
                 .insert(session_data) \
                 .execute()
@@ -506,7 +512,44 @@ class RuckSessionCompleteResource(Resource):
             if not update_resp.data or len(update_resp.data) == 0:
                 logger.error(f"Failed to end session {ruck_id}: {update_resp.error}")
                 return {'message': 'Failed to end session'}, 500
-            return update_resp.data[0], 200
+        
+            completed_session = update_resp.data[0]
+        
+            # Check if this session is associated with an event and update progress
+            if completed_session.get('event_id'):
+                try:
+                    event_id = completed_session['event_id']
+                    logger.info(f"Updating event progress for session {ruck_id} in event {event_id}")
+                
+                    # Update event participant progress
+                    progress_update = {
+                        'ruck_session_id': int(ruck_id),  # Convert to int to match database type
+                        'distance_km': completed_session.get('distance_km', 0),
+                        'duration_minutes': int(duration_seconds / 60) if duration_seconds else 0,
+                        'calories_burned': completed_session.get('calories_burned', 0),
+                        'elevation_gain_m': completed_session.get('elevation_gain_m', 0),
+                        'average_pace_min_per_km': completed_session.get('average_pace', 0) / 60 if completed_session.get('average_pace') else None,
+                        'status': 'completed',
+                        'completed_at': completed_session['completed_at']
+                    }
+                
+                    # Update the event progress entry
+                    progress_resp = supabase.table('event_participant_progress') \
+                        .update(progress_update) \
+                        .eq('event_id', event_id) \
+                        .eq('user_id', g.user.id) \
+                        .execute()
+                
+                    if progress_resp.data:
+                        logger.info(f"Successfully updated event progress for user {g.user.id} in event {event_id}")
+                    else:
+                        logger.warning(f"Failed to update event progress for user {g.user.id} in event {event_id}")
+                    
+                except Exception as event_error:
+                    logger.error(f"Error updating event progress for session {ruck_id}: {event_error}")
+                    # Don't fail the session completion if event progress update fails
+        
+            return completed_session, 200
         except Exception as e:
             logger.error(f"Error ending ruck session {ruck_id}: {e}")
             return {'message': f"Error ending ruck session: {str(e)}"}, 500

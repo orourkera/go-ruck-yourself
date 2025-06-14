@@ -719,6 +719,201 @@ class PushNotificationService:
         except Exception as e:
             logger.error(f"Error sending club event notification: {e}")
 
+    def send_event_reminder_notification(self, device_tokens: List[str], event_title: str, event_id: str, reminder_time: str):
+        """Send reminder notification for upcoming events"""
+        try:
+            if not device_tokens:
+                return
+                
+            payload = {
+                'message': {
+                    'token': device_tokens[0],
+                    'notification': {
+                        'title': f"Event Reminder",
+                        'body': f"{event_title} starts {reminder_time}!"
+                    },
+                    'data': {
+                        'type': 'event_reminder',
+                        'event_id': event_id,
+                        'event_title': event_title,
+                        'reminder_time': reminder_time
+                    },
+                    'apns': {
+                        'headers': {
+                            'apns-priority': '10'
+                        },
+                        'payload': {
+                            'aps': {
+                                'sound': 'default',
+                                'badge': 1
+                            }
+                        }
+                    },
+                    'android': {
+                        'priority': 'high',
+                        'notification': {
+                            'sound': 'default',
+                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                        }
+                    }
+                }
+            }
+            
+            access_token = self._get_access_token()
+            if not access_token:
+                logger.error("Failed to get Firebase access token")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(
+                self.fcm_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Event reminder notification sent to {len(device_tokens)} devices")
+            else:
+                logger.error(f"FCM API error for reminder notification: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending event reminder notification: {e}")
+
+    def send_event_comment_notification(self, device_tokens: List[str], event_title: str, commenter_name: str, comment_preview: str, event_id: str):
+        """Send notification when someone comments on an event"""
+        try:
+            if not device_tokens:
+                return
+                
+            payload = {
+                'message': {
+                    'token': device_tokens[0],
+                    'notification': {
+                        'title': f"New comment on {event_title}",
+                        'body': f"{commenter_name}: {comment_preview}"
+                    },
+                    'data': {
+                        'type': 'event_comment',
+                        'event_id': event_id,
+                        'event_title': event_title,
+                        'commenter_name': commenter_name,
+                        'comment_preview': comment_preview
+                    },
+                    'apns': {
+                        'headers': {
+                            'apns-priority': '10'
+                        },
+                        'payload': {
+                            'aps': {
+                                'sound': 'default',
+                                'badge': 1
+                            }
+                        }
+                    },
+                    'android': {
+                        'priority': 'high',
+                        'notification': {
+                            'sound': 'default',
+                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                        }
+                    }
+                }
+            }
+            
+            access_token = self._get_access_token()
+            if not access_token:
+                logger.error("Failed to get Firebase access token")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(
+                self.fcm_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Event comment notification sent to {len(device_tokens)} devices")
+            else:
+                logger.error(f"FCM API error for comment notification: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending event comment notification: {e}")
+
+    def send_event_cancelled_notification(self, device_tokens: List[str], event_title: str, event_id: str):
+        """Send notification when an event is cancelled"""
+        try:
+            if not device_tokens:
+                return
+                
+            payload = {
+                'message': {
+                    'token': device_tokens[0],
+                    'notification': {
+                        'title': f"Event Cancelled",
+                        'body': f"{event_title} has been cancelled"
+                    },
+                    'data': {
+                        'type': 'event_cancelled',
+                        'event_id': event_id,
+                        'event_title': event_title
+                    },
+                    'apns': {
+                        'headers': {
+                            'apns-priority': '10'
+                        },
+                        'payload': {
+                            'aps': {
+                                'sound': 'default',
+                                'badge': 1
+                            }
+                        }
+                    },
+                    'android': {
+                        'priority': 'high',
+                        'notification': {
+                            'sound': 'default',
+                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                        }
+                    }
+                }
+            }
+            
+            access_token = self._get_access_token()
+            if not access_token:
+                logger.error("Failed to get Firebase access token")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(
+                self.fcm_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Event cancelled notification sent to {len(device_tokens)} devices")
+            else:
+                logger.error(f"FCM API error for cancellation notification: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending event cancelled notification: {e}")
+
 
 # Helper function to get user device tokens
 def get_user_device_tokens(user_ids: List[str]) -> List[str]:
