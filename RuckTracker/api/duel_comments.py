@@ -349,6 +349,88 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
         logger.error(f"Failed to create duel progress notifications: {e}")
 
 
+def create_duel_deleted_notification(duel_id, deleter_id):
+    """
+    Create notifications for all participants when a duel is deleted
+    """
+    try:
+        admin_client = get_supabase_admin_client()
+        
+        # Get duel details before it gets deleted
+        duel_response = admin_client.table('duels') \
+            .select('name, creator_id') \
+            .eq('id', duel_id) \
+            .single() \
+            .execute()
+            
+        if not duel_response.data:
+            logger.warning(f"Duel {duel_id} not found for deletion notification")
+            return
+            
+        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        creator_id = duel_response.data.get('creator_id')
+        
+        # Get all participants in the duel except the deleter (who is the creator)
+        participants_response = admin_client.table('duel_participants') \
+            .select('user_id') \
+            .eq('duel_id', duel_id) \
+            .neq('user_id', deleter_id) \
+            .execute()
+        
+        if not participants_response.data:
+            logger.info(f"No participants to notify for duel deletion {duel_id}")
+            return
+            
+        # Get deleter's name
+        deleter_response = admin_client.table('users') \
+            .select('username, display_name') \
+            .eq('id', deleter_id) \
+            .single() \
+            .execute()
+            
+        deleter_name = 'Someone'
+        if deleter_response.data:
+            deleter_name = deleter_response.data.get('display_name') or deleter_response.data.get('username', 'Someone')
+        
+        # Create notifications for each participant
+        notifications = []
+        for participant in participants_response.data:
+            notification = {
+                'recipient_id': participant['user_id'],
+                'sender_id': deleter_id,
+                'type': 'duel_deleted',
+                'duel_id': duel_id,
+                'data': {
+                    'message': f"The duel '{duel_name}' has been deleted by {deleter_name}",
+                    'duel_name': duel_name,
+                    'deleter_name': deleter_name,
+                    'created_at': 'NOW()'
+                }
+            }
+            notifications.append(notification)
+        
+        if notifications:
+            admin_client.table('notifications').insert(notifications).execute()
+            logger.info(f"Created {len(notifications)} notifications for duel deletion {duel_id}")
+            
+            # Send push notifications
+            push_notification_service = PushNotificationService()
+            participant_ids = [p['user_id'] for p in participants_response.data]
+            
+            if participant_ids:
+                device_tokens = get_user_device_tokens(participant_ids)
+                if device_tokens:
+                    push_notification_service.send_duel_deleted_notification(
+                        device_tokens=device_tokens,
+                        deleter_name=deleter_name,
+                        duel_name=duel_name,
+                        duel_id=duel_id
+                    )
+                    
+    except Exception as e:
+        logger.error(f"Failed to create duel deletion notifications: {e}")
+
+
 class DuelCommentsResource(Resource):
     @auth_required
     def get(self, duel_id):

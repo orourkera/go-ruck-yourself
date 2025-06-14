@@ -326,6 +326,31 @@ class PushNotificationService:
             notification_data=data
         )
     
+    def send_duel_deleted_notification(
+        self,
+        device_tokens: List[str],
+        deleter_name: str,
+        duel_name: str,
+        duel_id: str
+    ) -> bool:
+        """Send duel deleted notification when creator deletes a duel"""
+        title = "Duel Deleted"
+        body = f"The duel '{duel_name}' has been deleted by {deleter_name}"
+        
+        data = {
+            'type': 'duel_deleted',
+            'duel_id': duel_id,
+            'duel_name': duel_name,
+            'deleter_name': deleter_name
+        }
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
+    
     def send_achievement_notification(
         self,
         device_tokens: List[str],

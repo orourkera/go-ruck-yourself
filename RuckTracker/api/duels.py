@@ -402,6 +402,42 @@ class DuelResource(Resource):
             logging.error(f"Error in DuelResource.put: {str(e)}", exc_info=True)
             return {'error': str(e)}, 500
 
+    @auth_required
+    def delete(self, duel_id):
+        """Delete a duel (creator only, and only if it hasn't started)"""
+        try:
+            user_id = g.user.id
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # First check if the duel exists and get its details
+            duel_response = supabase.table('duels').select('creator_id, status').eq('id', duel_id).execute()
+            
+            if not duel_response.data:
+                return {'error': 'Duel not found'}, 404
+                
+            duel = duel_response.data[0]
+            
+            # Check if the current user is the creator
+            if duel['creator_id'] != user_id:
+                return {'error': 'Only the duel creator can delete this duel'}, 403
+            
+            # Check if the duel hasn't started yet
+            if duel['status'] != 'pending':
+                return {'error': 'Cannot delete a duel that has already started'}, 400
+            
+            # Delete the duel - this will cascade delete participants and comments due to FK constraints
+            supabase.table('duels').delete().eq('id', duel_id).execute()
+            
+            # Send notification about duel deletion
+            from api.duel_comments import create_duel_deleted_notification
+            create_duel_deleted_notification(duel_id, user_id)
+            
+            return {'message': 'Duel deleted successfully'}
+            
+        except Exception as e:
+            logging.error(f"Error in DuelResource.delete: {str(e)}", exc_info=True)
+            return {'error': str(e)}, 500
+
 
 class DuelJoinResource(Resource):
     @auth_required
