@@ -32,11 +32,10 @@ class ClubListResource(Resource):
             is_public = request.args.get('is_public')
             user_clubs_only = request.args.get('user_clubs_only', 'false').lower() == 'true'
             
-            # Base query
+            # Base query - simplified to avoid complex joins
             query = admin_client.table('clubs').select("""
                 *,
-                admin_user:admin_user_id(id, first_name, last_name),
-                club_memberships!inner(count)
+                admin_user:admin_user_id(id, first_name, last_name)
             """)
             
             # Apply filters

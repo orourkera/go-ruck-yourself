@@ -84,8 +84,8 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
           clipBehavior: Clip.none,
           children: [
             SizedBox(
-              width: 48, // Optimized for mobile touch - 48px minimum touch target
-              height: 48,
+              width: 96, // Doubled from 48px
+              height: 96, // Doubled from 48px
               child: AnimatedBuilder(
                 animation: _rotationAnimation,
                 builder: (context, child) {
@@ -100,7 +100,7 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(24), // Circular ripple effect
+                    borderRadius: BorderRadius.circular(48), // Doubled from 24
                     onTap: () async {
                       // Navigate to notifications screen
                       await Navigator.push(
@@ -117,13 +117,13 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                       }
                     },
                     child: Container(
-                      width: 48,
-                      height: 48,
+                      width: 96, // Doubled from 48px
+                      height: 96, // Doubled from 48px
                       alignment: Alignment.center, // Center the icon within tap target
                       child: Image.asset(
                         'assets/images/notifications.png',
-                        width: 32, // Slightly smaller icon but larger tap target
-                        height: 32,
+                        width: 64, // Doubled from 32px
+                        height: 64, // Doubled from 32px
                       ),
                     ),
                   ),

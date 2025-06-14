@@ -14,7 +14,7 @@ The Ruck Clubs & Events feature introduces two core social concepts to the rucki
 - Accessible via dedicated top-bar icon (separate from main navigation)
 
 ### **Events** 
-- Individual ruck sessions (replacing/extending current duels concept)
+- Individual ruck sessions 
 - Open to all users or club-specific
 - Can be standalone or club-affiliated
 - Club events automatically notify all club members
@@ -98,51 +98,14 @@ CREATE TABLE club_memberships (
     joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(club_id, user_id)
 );
-
--- Events table (evolution of duels)
-CREATE TABLE events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_user_id UUID REFERENCES auth.users(id) NOT NULL,
-    club_id UUID REFERENCES clubs(id) ON DELETE SET NULL, -- NULL for public events
-    title VARCHAR(200) NOT NULL,
-    description TEXT,
-    location_name VARCHAR(200),
-    latitude DECIMAL(10, 8),
-    longitude DECIMAL(11, 8),
-    scheduled_start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    duration_minutes INTEGER NOT NULL,
-    max_participants INTEGER,
-    difficulty_level INTEGER CHECK (difficulty_level BETWEEN 1 AND 5),
-    ruck_weight_kg DECIMAL(5, 2),
-    status VARCHAR(20) DEFAULT 'scheduled', -- 'scheduled', 'active', 'completed', 'cancelled'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Event participants (evolution of duel participants)
-CREATE TABLE event_participants (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_id UUID REFERENCES events(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    status VARCHAR(20) DEFAULT 'registered', -- 'registered', 'joined', 'completed', 'no_show'
-    registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(event_id, user_id)
-);
 ```
 
 ### Performance Indexes
 
 ```sql
 -- Performance indexes for efficient queries
-CREATE INDEX idx_events_club_id_scheduled ON events(club_id, scheduled_start_time);
-CREATE INDEX idx_events_creator_status ON events(creator_user_id, status);
 CREATE INDEX idx_club_memberships_user_status ON club_memberships(user_id, status);
 CREATE INDEX idx_club_memberships_club_status ON club_memberships(club_id, status);
-CREATE INDEX idx_event_participants_user ON event_participants(user_id, status);
-CREATE INDEX idx_event_participants_event ON event_participants(event_id, status);
-
--- Geospatial index for location-based event queries (requires PostGIS extension)
--- CREATE INDEX idx_events_location ON events USING GIST (ll_to_earth(latitude, longitude));
 ```
 
 ### Row Level Security Policies
@@ -171,21 +134,6 @@ FOR SELECT USING (
         WHERE cm2.user_id = auth.uid() AND cm2.status = 'approved'
     )
 );
-
--- Events RLS
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public events viewable by everyone" ON events
-FOR SELECT USING (
-    club_id IS NULL OR 
-    auth.uid() IN (
-        SELECT user_id FROM club_memberships 
-        WHERE club_id = events.club_id AND status = 'approved'
-    )
-);
-
-CREATE POLICY "Event creators can update events" ON events
-FOR UPDATE USING (creator_user_id = auth.uid());
 ```
 
 ## Backend API Changes
@@ -419,11 +367,11 @@ class ClubEventToggle extends StatelessWidget {
 3. Move profile to top bar access
 4. Create empty Clubs screen with "Coming Soon"
 
-### Phase 2: Events Evolution  
-1. Migrate duels data to events table structure
-2. Implement enhanced events functionality
-3. Add event filtering and improved UI
-4. Test event creation and participation
+### Phase 2: Events Feature Enhancement  
+1. Implement enhanced events functionality with club integration
+2. Add event filtering and improved UI
+3. Club event creation with member notifications
+4. Standalone events system (separate from existing duels)
 
 ### Phase 3: Clubs Integration
 1. Implement club creation and management
@@ -458,16 +406,14 @@ class ClubEventToggle extends StatelessWidget {
 
 ## Risk Considerations
 
-1. **Data Migration**: Existing duels → events migration must be seamless
-2. **Notification Performance**: Club event notifications could create spam
-3. **Real-time Scaling**: Multiple club channels require careful resource management
-4. **User Adoption**: New navigation might confuse existing users initially
+1. **Notification Performance**: Club event notifications could create spam
+2. **Real-time Scaling**: Multiple club channels require careful resource management
+3. **User Adoption**: New navigation might confuse existing users initially
 
 ## Success Metrics
 
 - **Club Adoption**: % of users who join/create clubs within 30 days
-- **Event Engagement**: Event creation rate vs. old duels creation rate
-- **Club Event Participation**: Higher participation rates for club vs. public events
+- **Club Event Participation**: Participation rates for club events
 - **Notification Engagement**: Click-through rates on club event notifications
 - **User Retention**: Impact on DAU/MAU after feature launch
 
@@ -511,25 +457,25 @@ class ClubEventToggle extends StatelessWidget {
 - [x] **Push Notifications**: Integration for club events and membership updates
 
 #### Next Steps (Pending)
-- [ ] **Club Detail Screen**: Full club details with member management
+- [x] **Club Detail Screen**: Full club details with member management 
 - [ ] **Create Club Screen**: Form for creating new clubs
 - [ ] **Club Management**: Admin functions for membership approval/denial
 - [ ] **Real-time Updates**: Supabase realtime integration for live updates
 - [ ] **Push Notifications**: Test end-to-end notification flow
 
 #### Phase 2: Events Evolution (Future)
-- [ ] Migrate duels data to events table structure
 - [ ] Implement enhanced events functionality with club integration
 - [ ] Add event filtering and improved UI
 - [ ] Club event creation with member notifications
+- [ ] Standalone events system (separate from existing duels)
 
 ### Backend Status
 **Complete** - All backend infrastructure including database schema, API endpoints, RLS policies, and push notification integration is implemented and deployed.
 
 ### Current Status Summary
-- **Navigation**: 
-- **Clubs Frontend Core**:  
-- **Clubs UI Screens**: Main screen done, detail/create screens pending
-- **Events Feature**:  Placeholder only (Phase 2)
-- **Real-time Integration**:  Pending
-- **Testing & Polish**:  Pending
+- **Navigation**: ✅ **COMPLETED** - Club detail routing with parameter handling
+- **Clubs Frontend Core**: ✅ **COMPLETED** - Full repository implementation with proper API client integration  
+- **Clubs UI Screens**: ✅ **Main & Detail screens COMPLETED** - Create screen pending
+- **Events Feature**: ✅ **Phase 1 COMPLETED** - Events tab shows duels (duels remain unchanged, future events will be separate)
+- **Real-time Integration**: ⏳ Pending
+- **Testing & Polish**: ⏳ Pending

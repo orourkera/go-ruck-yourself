@@ -26,7 +26,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
       queryParams['membership'] = membershipFilter;
     }
 
-    final response = await _apiClient.get('/api/clubs', queryParams: queryParams);
+    final response = await _apiClient.get('/clubs', queryParams: queryParams);
     
     return response['clubs'].map((json) => Club.fromJson(json as Map<String, dynamic>)).toList();
   }
@@ -45,14 +45,14 @@ class ClubsRepositoryImpl implements ClubsRepository {
       if (maxMembers != null) 'max_members': maxMembers,
     };
 
-    final response = await _apiClient.post('/api/clubs', body);
+    final response = await _apiClient.post('/clubs', body);
     
     return Club.fromJson(response['club'] as Map<String, dynamic>);
   }
 
   @override
   Future<ClubDetails> getClubDetails(String clubId) async {
-    final response = await _apiClient.get('/api/clubs/$clubId');
+    final response = await _apiClient.get('/clubs/$clubId');
     
     return ClubDetails.fromJson(response);
   }
@@ -72,19 +72,19 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (isPublic != null) body['is_public'] = isPublic;
     if (maxMembers != null) body['max_members'] = maxMembers;
 
-    final response = await _apiClient.put('/api/clubs/$clubId', body);
+    final response = await _apiClient.put('/clubs/$clubId', body);
     
     return Club.fromJson(response['club'] as Map<String, dynamic>);
   }
 
   @override
   Future<void> deleteClub(String clubId) async {
-    await _apiClient.delete('/api/clubs/$clubId');
+    await _apiClient.delete('/clubs/$clubId');
   }
 
   @override
   Future<void> requestMembership(String clubId) async {
-    await _apiClient.post('/api/clubs/$clubId/join', {});
+    await _apiClient.post('/clubs/$clubId/join', {});
   }
 
   @override
@@ -99,17 +99,17 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (action != null) body['action'] = action;
     if (role != null) body['role'] = role;
 
-    await _apiClient.put('/api/clubs/$clubId/members/$userId', body);
+    await _apiClient.put('/clubs/$clubId/members/$userId', body);
   }
 
   @override
   Future<void> removeMembership(String clubId, String userId) async {
-    await _apiClient.delete('/api/clubs/$clubId/members/$userId');
+    await _apiClient.delete('/clubs/$clubId/members/$userId');
   }
 
   @override
   Future<void> leaveClub(String clubId) async {
     // For leaving, we use the current user's ID - this will be handled by the backend
-    await _apiClient.delete('/api/clubs/$clubId/members/me');
+    await _apiClient.delete('/clubs/$clubId/members/me');
   }
 }

@@ -234,6 +234,17 @@ class _ClubsScreenState extends State<ClubsScreen> {
             ],
           ),
         ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            Navigator.pushNamed(context, '/create_club');
+          },
+          backgroundColor: AppColors.primary,
+          child: const Icon(
+            Icons.add,
+            color: Colors.white,
+          ),
+          tooltip: 'Create Club',
+        ),
       ),
     );
   }

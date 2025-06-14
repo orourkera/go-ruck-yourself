@@ -584,55 +584,38 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                     ),
                                     const SizedBox(width: 12),
                                   ],
-                                  // Welcome text
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Welcome back,',
-                                        style: AppTextStyles.bodyLarge.copyWith(
-                                          color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        userName,
-                                        style: AppTextStyles.displayLarge.copyWith(
-                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
+                                  // User name only (no welcome text)
+                                  Text(
+                                    userName,
+                                    style: AppTextStyles.displayLarge.copyWith(
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ],
                               ),
                               // Top bar action icons
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   // Clubs icon
                                   IconButton(
-                                    icon: Icon(
-                                      Icons.group,
-                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
-                                      size: 28,
+                                    icon: Image.asset(
+                                      'assets/images/clubs.png',
+                                      width: 56,
+                                      height: 56,
                                     ),
                                     onPressed: () {
                                       Navigator.pushNamed(context, '/clubs');
                                     },
-                                  ),
-                                  // Profile icon
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.person,
-                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
-                                      size: 28,
-                                    ),
-                                    onPressed: () {
-                                      Navigator.pushNamed(context, '/profile');
-                                    },
+                                    padding: const EdgeInsets.all(4),
+                                    constraints: const BoxConstraints(),
                                   ),
                                   // Notification bell with unread count
-                                  NotificationBell(useLadyMode: isLadyMode),
+                                  Transform.translate(
+                                    offset: const Offset(-12, 0), // Move 12px left to bring closer to clubs icon
+                                    child: NotificationBell(useLadyMode: isLadyMode),
+                                  ),
                                 ],
                               ),
                             ],
