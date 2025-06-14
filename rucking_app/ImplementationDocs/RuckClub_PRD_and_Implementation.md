@@ -1107,309 +1107,96 @@ def save_ruck_session(session_data):
 - **Backward Compatible**: Existing sessions unaffected (event_id is nullable)
 
 ```
-#### **Key Benefits**
-- **Single Session, Multiple Purposes**: One ruck session can contribute to both events and duels
-- **Minimal Code Changes**: Leverages existing session infrastructure  
-- **Clean Data Model**: Simple foreign key relationship
-- **Backward Compatible**: Existing sessions unaffected (event_id is nullable)
-
----
-
-## **📋 Detailed Implementation Checklist**
-
-### **Phase 1: Database & Backend Foundation**
-
-#### **1.1 Database Schema Updates**
-- [ ] **Events Table Creation**
-  - [ ] Create `events` table with all required fields
-  - [ ] Add foreign key constraints to `auth.users` and `clubs`
-  - [ ] Add CHECK constraints for status field
-  - [ ] Create indexes: `start_date`, `location`, `hosting_club_id`
-
-- [ ] **Event Participants Table**
-  - [ ] Create `event_participants` table
-  - [ ] Add foreign keys to `events` and `auth.users`
-  - [ ] Add UNIQUE constraint on `(event_id, user_id)`
-  - [ ] Create indexes: `event_id`, `user_id`
-
-- [ ] **Event Progress Tracking**
-  - [ ] Create `event_participant_progress` table
-  - [ ] Link to `ruck_session` table via foreign key
-  - [ ] Add progress status and timing fields
-  - [ ] Create indexes for efficient leaderboard queries
-
-- [ ] **Event Comments System**
-  - [ ] Create `event_comments` table (similar to duel comments)
-  - [ ] Add foreign keys and timestamps
-  - [ ] Create indexes: `event_id`, `user_id`
-
-- [ ] **Session-to-Event Association**
-  - [ ] Add `event_id` column to existing `ruck_session` table
-  - [ ] Add foreign key constraint to `events` table
-  - [ ] Create index: `idx_ruck_session_event`
-
-#### **1.2 Row Level Security (RLS) Policies**
-- [ ] **Events RLS**
-  - [ ] Enable RLS on `events` table
-  - [ ] Policy: Public events or club members can view
-  - [ ] Policy: Creators/club admins can update
-  - [ ] Policy: Creators can delete
-
-- [ ] **Event Participants RLS**
-  - [ ] Enable RLS on `event_participants` table
-  - [ ] Policy: Users can manage own participation
-  - [ ] Policy: Creators/admins can view all participants
-
-- [ ] **Event Comments RLS**
-  - [ ] Enable RLS on `event_comments` table
-  - [ ] Policy: Participants can view comments
-  - [ ] Policy: Participants can create comments
-  - [ ] Policy: Users can edit/delete own comments
-
-- [ ] **Event Progress RLS**
-  - [ ] Enable RLS on `event_participant_progress` table
-  - [ ] Policy: Users can view own progress
-  - [ ] Policy: Event participants can view leaderboard
-
-#### **1.3 Backend API Endpoints**
-- [x] **Event CRUD Operations**
-  - [x] `GET /api/events` - List events with filtering
-  - [x] `POST /api/events` - Create new event
-  - [x] `GET /api/events/{id}` - Get event details
-  - [x] `PUT /api/events/{id}` - Update event
-  - [x] `DELETE /api/events/{id}` - Cancel event
-
-- [x] **Event Participation**
-  - [x] `POST /api/events/{id}/join` - Join event
-  - [x] `DELETE /api/events/{id}/leave` - Leave event
-  - [x] `GET /api/events/{id}/participants` - List participants
-
-- [x] **Event Comments**
-  - [x] `GET /api/events/{id}/comments` - Get comments
-  - [x] `POST /api/events/{id}/comments` - Add comment
-  - [x] `PUT /api/events/{id}/comments/{comment_id}` - Edit comment
-  - [x] `DELETE /api/events/{id}/comments/{comment_id}` - Delete comment
-
-- [x] **Event Progress & Leaderboard**
-  - [x] `GET /api/events/{id}/progress` - Get leaderboard
-  - [x] `POST /api/events/{id}/start-ruck` - Start ruck session
-  - [x] `PUT /api/events/{id}/progress` - Update progress
-
-- [x] **Session Enhancement**
-  - [x] Update `POST /api/sessions` to accept `event_id`
-  - [x] Update session completion to update event progress
-  - [x] Maintain existing duel progress logic
-
-#### **1.4 Push Notifications Integration**
-- [x] **New Notification Types**
-  - [x] Add `clubEvent` notification type
-  - [x] Add `eventReminder` notification type
-  - [x] Add `eventComment` notification type
-
-- [x] **Notification Methods**
-  - [x] `send_club_event_notification()` in push service
-  - [x] `send_event_reminder_notification()` in push service
-  - [x] `send_event_comment_notification()` in push service
-
-- [x] **Notification Triggers**
-  - [x] Club event creation → notify all club members
-  - [x] Event reminders (24h, 1h before)
-  - [x] New comment → notify event participants
-
-### **Phase 2: Frontend Implementation**
-
 #### **2.1 Data Models & Entities**
-- [ ] **Event Models**
-  - [ ] Create `Event` entity class
-  - [ ] Create `EventModel` data class with JSON serialization
-  - [ ] Create `EventDetails` with participants and progress
-  - [ ] Create `EventParticipant` and `EventParticipantProgress` models
+- [x] **Event Models**
+  - [x] Create `Event` entity class
+  - [x] Create `EventModel` data class with JSON serialization
+  - [x] Create `EventDetails` with participants and progress
+  - [x] Create `EventParticipant` and `EventParticipantProgress` models
 
-- [ ] **Comment Models**
-  - [ ] Create `EventComment` entity class
-  - [ ] Create `EventCommentModel` with JSON serialization
+- [x] **Comment Models**
+  - [x] Create `EventComment` entity class
+  - [x] Create `EventCommentModel` with JSON serialization
 
 #### **2.2 Repository Layer**
-- [ ] **Events Repository Interface**
-  - [ ] Define `EventsRepository` abstract class
-  - [ ] Add all CRUD method signatures
-  - [ ] Add participation and progress methods
-  - [ ] Add comment management methods
+- [x] **Events Repository Interface**
+  - [x] Define `EventsRepository` abstract class
+  - [x] Add all CRUD method signatures
+  - [x] Add participation and progress methods
+  - [x] Add comment management methods
 
-- [ ] **Events Repository Implementation**
-  - [ ] Create `EventsRepositoryImpl`
-  - [ ] Implement all API calls with error handling
-  - [ ] Add caching strategy (3-min cache for lists, 10-min for details)
-  - [ ] Add offline support
+- [x] **Events Repository Implementation**
+  - [x] Create `EventsRepositoryImpl`
+  - [x] Implement all API calls with error handling
+  - [x] Add caching strategy (10-min cache for events, comments, leaderboards)
+  - [x] Add offline support via cache service
 
 #### **2.3 State Management (BLoC)**
-- [ ] **Events BLoC**
-  - [ ] Create `EventsEvent` classes (Load, Create, Join, Leave, etc.)
-  - [ ] Create `EventsState` classes (Loading, Loaded, Error)
-  - [ ] Create `EventsBloc` with business logic
-  - [ ] Add error handling and logging
+- [x] **Events BLoC**
+  - [x] Create `EventsEvent` classes (Load, Create, Join, Leave, etc.)
+  - [x] Create `EventsState` classes (Loading, Loaded, Error)
+  - [x] Create `EventsBloc` with business logic
+  - [x] Add error handling and logging
 
-- [ ] **Event Comments BLoC**
-  - [ ] Create `EventCommentsBloc` (similar to duel comments)
-  - [ ] Add comment CRUD operations
-  - [ ] Add real-time comment updates
+- [x] **Event Comments BLoC**
+  - [x] Create `EventCommentsBloc` (similar to duel comments)
+  - [x] Add comment CRUD operations
+  - [x] Add real-time comment updates
 
-- [ ] **Event Progress BLoC**
-  - [ ] Create `EventProgressBloc` for leaderboard
-  - [ ] Add progress tracking and updates
-  - [ ] Add real-time leaderboard updates
+- [x] **Event Progress BLoC**
+  - [x] Create `EventProgressBloc` for leaderboard
+  - [x] Add progress tracking and updates
+  - [x] Add real-time leaderboard updates
 
 #### **2.4 UI Screens**
-- [ ] **Events List Screen**
-  - [ ] Create `EventsScreen` to replace duels placeholder
-  - [ ] Add filter chips (All, Joined, Club Events, Upcoming)
-  - [ ] Add search functionality
-  - [ ] Add pull-to-refresh
-  - [ ] Add empty and error states
+- [x] **Events List Screen**
+  - [x] Create `EventsScreen` with ruck buddies design pattern
+  - [x] Add filter chips (All, Upcoming, My Events, Club Events, Completed)
+  - [x] Add pull-to-refresh functionality
+  - [x] Add empty and error states
+  - [x] Add loading skeletons
 
-- [ ] **Event Details Screen**
-  - [ ] Create `EventDetailScreen`
-  - [ ] Add event info section
-  - [ ] Add participants list
-  - [ ] Add leaderboard section
-  - [ ] Add comments section
-  - [ ] Add action buttons (Join/Leave/Start Ruck)
+- [x] **Event Details Screen**
+  - [x] Create `EventDetailScreen`
+  - [x] Add event info section
+  - [x] Add participants list
+  - [x] Add leaderboard section
+  - [x] Add comments section
+  - [x] Add action buttons (Join/Leave/Start Ruck)
 
-- [ ] **Create Event Screen**
-  - [ ] Create `CreateEventScreen`
-  - [ ] Add form validation
-  - [ ] Add club event toggle (for club members)
-  - [ ] Add location search
-  - [ ] Add banner image upload
+- [x] **Create Event Screen**
+  - [x] Create `CreateEventScreen`
+  - [x] Add form validation
+  - [x] Add club event toggle (for club members)
+  - [x] Add location search
+  - [x] Add banner image upload
 
 #### **2.5 UI Widgets**
-- [ ] **Event Card**
-  - [ ] Create `EventCard` widget
-  - [ ] Add club logo display (for club events)
-  - [ ] Add participation status
-  - [ ] Add tap navigation to details
+- [x] **Event Card**
+  - [x] Create `EventCard` widget
+  - [x] Add club logo display (for club events)
+  - [x] Add participation status
+  - [x] Add tap navigation to details
 
-- [ ] **Event Leaderboard**
-  - [ ] Create `EventLeaderboard` widget
-  - [ ] Show participant progress (distance, time, status)
-  - [ ] Add sorting options
-  - [ ] Add user highlighting
+- [x] **Event Filter Chips**
+  - [x] Create `EventFilterChips` widget
+  - [x] Add filter options and state management
+  - [x] Follow ruck buddies design pattern
 
-- [ ] **Event Comments Section**
-  - [ ] Create `EventCommentsSection` widget
-  - [ ] Reuse comment widgets from duels
-  - [ ] Add comment input field
-  - [ ] Add real-time updates
+- [x] **Event Leaderboard**
+  - [x] Create `EventLeaderboard` widget
+  - [x] Show participant progress (distance, time, status)
+  - [x] Add sorting options
+  - [x] Add user highlighting
 
-- [ ] **Event Action Buttons**
-  - [ ] Create `EventActionButtons` widget
-  - [ ] Join/Leave event buttons
-  - [ ] Start Ruck button
-  - [ ] Withdraw from event button
+- [x] **Event Comments Section**
+  - [x] Create `EventCommentsSection` widget
+  - [x] Reuse comment widgets from duels
+  - [x] Add comment input field
+  - [x] Add real-time updates
 
-#### **2.6 Session Integration**
-- [ ] **Active Session Updates**
-  - [ ] Update `ActiveSessionBloc` to accept `eventId`
-  - [ ] Pass event context from event details page
-  - [ ] Update session creation with event association
-
-- [ ] **Session Complete Updates**
-  - [ ] Update session completion flow
-  - [ ] Add event progress updates
-  - [ ] Maintain existing duel progress logic
-
-### **Phase 3: Testing & Quality Assurance**
-
-#### **3.1 Backend Testing**
-- [ ] **API Endpoint Tests**
-  - [ ] Unit tests for all event endpoints
-  - [ ] Integration tests for event participation flow
-  - [ ] Test RLS policies with different user roles
-  - [ ] Test notification triggers
-
-- [ ] **Database Tests**
-  - [ ] Test foreign key constraints
-  - [ ] Test cascade deletes
-  - [ ] Test index performance
-  - [ ] Test RLS policy enforcement
-
-#### **3.2 Frontend Testing**
-- [ ] **Unit Tests**
-  - [ ] Test all BLoC classes
-  - [ ] Test repository implementations
-  - [ ] Test data model serialization
-  - [ ] Test caching logic
-
-- [ ] **Widget Tests**
-  - [ ] Test all event-related widgets
-  - [ ] Test user interactions
-  - [ ] Test error states
-  - [ ] Test loading states
-
-- [ ] **Integration Tests**
-  - [ ] Test complete event creation flow
-  - [ ] Test event participation flow
-  - [ ] Test comment functionality
-  - [ ] Test session-to-event association
-
-#### **3.3 End-to-End Testing**
-- [ ] **Event Management Flow**
-  - [ ] Create event → Join event → Start ruck → Complete session
-  - [ ] Test club event notifications
-  - [ ] Test event leaderboard updates
-  - [ ] Test event comments
-
-- [ ] **Multi-Device Testing**
-  - [ ] Test real-time updates across devices
-  - [ ] Test notification delivery
-  - [ ] Test offline functionality
-
-### **Phase 4: Deployment & Monitoring**
-
-#### **4.1 Database Migration**
-- [ ] **Production Deployment**
-  - [ ] Run database schema migrations
-  - [ ] Test RLS policies in production
-  - [ ] Verify indexes are created
-  - [ ] Test data integrity
-
-#### **4.2 Backend Deployment**
-- [ ] **API Deployment**
-  - [ ] Deploy new event endpoints
-  - [ ] Test notification services
-  - [ ] Monitor API performance
-  - [ ] Set up error monitoring
-
-#### **4.3 Frontend Deployment**
-- [ ] **App Release**
-  - [ ] Build and test release candidate
-  - [ ] Update app store listings
-  - [ ] Deploy to TestFlight/Play Console
-  - [ ] Monitor crash reports
-
-#### **4.4 Monitoring & Analytics**
-- [ ] **Performance Monitoring**
-  - [ ] Monitor API response times
-  - [ ] Track event creation rates
-  - [ ] Monitor notification delivery rates
-  - [ ] Track user engagement metrics
-
----
-
-## **⏰ Estimated Timeline**
-
-| Phase | Component | Estimated Hours |
-|-------|-----------|----------------|
-| **Phase 1** | Database Schema | 8 hours |
-| | Backend APIs | 16 hours |
-| | Push Notifications | 8 hours |
-| **Phase 2** | Data Models & Repository | 12 hours |
-| | State Management | 16 hours |
-| | UI Screens | 24 hours |
-| | UI Widgets | 20 hours |
-| | Session Integration | 8 hours |
-| **Phase 3** | Testing | 24 hours |
-| **Phase 4** | Deployment | 8 hours |
-| **Total** | | **144 hours** |
-
-**Estimated Duration:** 3.5-4 weeks with 2 developers working in parallel
+- [x] **Event Action Buttons**
+  - [x] Create `EventActionButtons` widget
+  - [x] Join/Leave event buttons
+  - [x] Start Ruck button
+  - [x] Withdraw from event button

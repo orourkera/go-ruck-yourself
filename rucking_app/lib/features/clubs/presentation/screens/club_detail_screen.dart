@@ -166,7 +166,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: Theme.of(context).primaryColor,
                   child: Text(
                     clubDetails.club.name.isNotEmpty ? clubDetails.club.name[0].toUpperCase() : 'C',
                     style: const TextStyle(fontSize: 24, color: Colors.white),
@@ -255,7 +255,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   Widget _buildStatItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: AppColors.primary, size: 20),
+        Icon(icon, color: Theme.of(context).primaryColor, size: 20),
         const SizedBox(height: 4),
         Text(
           value,
@@ -306,7 +306,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).primaryColor,
         child: Text(
           member.username.isNotEmpty ? member.username[0].toUpperCase() : 'U',
           style: const TextStyle(color: Colors.white),
@@ -319,7 +319,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       subtitle: Text(
         member.role.toUpperCase(),
         style: AppTextStyles.bodySmall.copyWith(
-          color: member.role == 'admin' ? AppColors.primary : AppColors.textDarkSecondary,
+          color: member.role == 'admin' ? Theme.of(context).primaryColor : AppColors.textDarkSecondary,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -394,7 +394,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   Widget _buildPendingRequestTile(ClubMember request) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: AppColors.secondary,
+        backgroundColor: Theme.of(context).primaryColor,
         child: Text(
           request.username.isNotEmpty ? request.username[0].toUpperCase() : 'U',
           style: const TextStyle(color: Colors.white),
@@ -434,7 +434,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         onPressed: () => _requestMembership(),
         icon: const Icon(Icons.group_add),
         label: const Text('Join Club'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).primaryColor,
       );
     } else if (_clubDetails!.club.isUserPending) {
       // User has pending request

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/widgets/custom_button.dart';
 import '../bloc/create_duel/create_duel_bloc.dart';
 import '../bloc/create_duel/create_duel_event.dart';
 import '../bloc/create_duel/create_duel_state.dart';
@@ -149,11 +150,8 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
           const SizedBox(height: 24),
           
           // Submit Button
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
+          CustomButton(
+            text: 'CREATE DUEL',
             onPressed: () {
               if (_formKey.currentState!.validate()) {
                 // Send create duel event
@@ -172,13 +170,9 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
                     );
               }
             },
-            child: const Text(
-              'CREATE DUEL',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            backgroundColor: Theme.of(context).primaryColor,
+            textColor: Colors.white,
+            width: double.infinity,
           ),
         ],
       ),

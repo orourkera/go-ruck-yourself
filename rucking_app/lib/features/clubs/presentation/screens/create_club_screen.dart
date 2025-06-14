@@ -457,7 +457,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     text: 'Create Club',
                     onPressed: _isLoading ? null : _createClub,
                     isLoading: _isLoading,
-                    color: AppColors.primary,
+                    color: Theme.of(context).primaryColor,
                     width: double.infinity,
                   ),
                   

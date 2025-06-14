@@ -42,6 +42,12 @@ import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/services/location_search_service.dart';
 import 'package:rucking_app/core/services/clubs_cache_service.dart';
+import 'package:rucking_app/core/services/events_cache_service.dart';
+import 'package:rucking_app/features/events/data/repositories/events_repository_impl.dart';
+import 'package:rucking_app/features/events/domain/repositories/events_repository.dart';
+import 'package:rucking_app/features/events/presentation/bloc/events_bloc.dart';
+import 'package:rucking_app/features/events/presentation/bloc/event_comments_bloc.dart';
+import 'package:rucking_app/features/events/presentation/bloc/event_progress_bloc.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -129,6 +135,9 @@ Future<void> setupServiceLocator() async {
   // Register ClubsCacheService
   getIt.registerSingleton<ClubsCacheService>(ClubsCacheService());
   
+  // Register EventsCacheService
+  getIt.registerSingleton<EventsCacheService>(EventsCacheService());
+  
   // Repositories
   getIt.registerSingleton<AuthRepository>(
     AuthRepositoryImpl(getIt<AuthService>())
@@ -137,6 +146,11 @@ Future<void> setupServiceLocator() async {
   // Clubs repository
   getIt.registerSingleton<ClubsRepository>(
     ClubsRepositoryImpl(getIt<ApiClient>())
+  );
+  
+  // Events repository
+  getIt.registerSingleton<EventsRepository>(
+    EventsRepositoryImpl(getIt<ApiClient>())
   );
   
   // Session repository for operations like delete
@@ -185,6 +199,11 @@ Future<void> setupServiceLocator() async {
   
   // Clubs bloc
   getIt.registerFactory<ClubsBloc>(() => ClubsBloc(getIt<ClubsRepository>()));
+
+  // Events blocs
+  getIt.registerFactory<EventsBloc>(() => EventsBloc(getIt<EventsRepository>()));
+  getIt.registerFactory<EventCommentsBloc>(() => EventCommentsBloc(getIt<EventsRepository>()));
+  getIt.registerFactory<EventProgressBloc>(() => EventProgressBloc(getIt<EventsRepository>()));
 
   // Initialize Ruck Buddies feature
   initRuckBuddiesFeature(getIt);

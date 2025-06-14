@@ -86,7 +86,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: Theme.of(context).primaryColor,
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -227,7 +227,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: _showCreateClubDialog,
-          backgroundColor: AppColors.primary,
+          backgroundColor: Theme.of(context).primaryColor,
           child: const Icon(
             Icons.add,
             color: Colors.white,
@@ -244,10 +244,10 @@ class _ClubsScreenState extends State<ClubsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
+          color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.grey,
+            color: isSelected ? Theme.of(context).primaryColor : AppColors.grey,
           ),
         ),
         child: Text(
@@ -304,13 +304,13 @@ class _ClubsScreenState extends State<ClubsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: club.isPublic ? AppColors.primary.withOpacity(0.1) : AppColors.grey.withOpacity(0.1),
+                          color: club.isPublic ? Theme.of(context).primaryColor.withOpacity(0.1) : AppColors.grey.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           club.isPublic ? 'Public' : 'Private',
                           style: AppTextStyles.bodySmall.copyWith(
-                            color: club.isPublic ? AppColors.primary : AppColors.grey,
+                            color: club.isPublic ? Theme.of(context).primaryColor : AppColors.grey,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -335,7 +335,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: club.isUserAdmin ? AppColors.primary : AppColors.secondary,
+                        color: club.isUserAdmin ? Theme.of(context).primaryColor : AppColors.secondary,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(

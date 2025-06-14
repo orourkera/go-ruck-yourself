@@ -49,10 +49,16 @@ class _CreateDuelScreenState extends State<CreateDuelScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Duel'),
+        title: Text(
+          'Create Duel',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
         actions: [
           TextButton(
             onPressed: () => context.read<CreateDuelBloc>().add(ResetCreateDuel()),

@@ -40,6 +40,8 @@ import 'package:rucking_app/features/duels/presentation/screens/duel_stats_scree
 import 'package:rucking_app/features/clubs/presentation/screens/clubs_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/create_club_screen.dart';
+import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
+import 'package:rucking_app/features/events/presentation/screens/create_event_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -528,6 +530,38 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   );
                 case '/create_club':
                   return MaterialPageRoute(builder: (_) => const CreateClubScreen());
+                
+                // Events feature routes
+                case '/event_detail':
+                  final eventId = settings.arguments as String?;
+                  if (eventId != null) {
+                    return MaterialPageRoute(
+                      builder: (_) => EventDetailScreen(eventId: eventId),
+                    );
+                  }
+                  return MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('Error')),
+                      body: const Center(child: Text('Missing event ID')),
+                    ),
+                  );
+                case '/create_event':
+                  return MaterialPageRoute(
+                    builder: (_) => const CreateEventScreen(),
+                  );
+                case '/edit_event':
+                  final eventId = settings.arguments as String?;
+                  if (eventId != null) {
+                    return MaterialPageRoute(
+                      builder: (_) => CreateEventScreen(eventId: eventId),
+                    );
+                  }
+                  return MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('Error')),
+                      body: const Center(child: Text('Missing event ID')),
+                    ),
+                  );
                 default:
                   // Optionally handle unknown routes
                   return MaterialPageRoute(
