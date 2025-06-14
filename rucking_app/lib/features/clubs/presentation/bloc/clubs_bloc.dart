@@ -72,11 +72,33 @@ class ClubsBloc extends Bloc<ClubsEvent, ClubsState> {
     try {
       AppLogger.info('Creating club: ${event.name}');
       
+      String? logoUrl;
+      
+      // Upload logo if provided
+      if (event.logo != null) {
+        emit(const ClubActionLoading('Uploading logo...'));
+        try {
+          // Use the same AvatarService for club logos
+          final avatarService = getIt<AvatarService>();
+          logoUrl = await avatarService.uploadAvatar(event.logo!);
+          AppLogger.info('Club logo uploaded successfully: $logoUrl');
+        } catch (logoError) {
+          AppLogger.error('Failed to upload club logo: $logoError');
+          emit(ClubActionError('Failed to upload club logo: ${logoError.toString()}'));
+          return;
+        }
+      }
+      
+      emit(const ClubActionLoading('Creating club...'));
+      
       await _repository.createClub(
         name: event.name,
         description: event.description,
         isPublic: event.isPublic,
         maxMembers: event.maxMembers,
+        logoUrl: logoUrl,
+        latitude: event.latitude,
+        longitude: event.longitude,
       );
       
       emit(const ClubActionSuccess('Club created successfully!'));

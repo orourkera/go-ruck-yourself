@@ -28,21 +28,31 @@ class ClubsRepositoryImpl implements ClubsRepository {
 
     final response = await _apiClient.get('/clubs', queryParams: queryParams);
     
-    return response['clubs'].map((json) => Club.fromJson(json as Map<String, dynamic>)).toList();
+    final clubsList = (response['clubs'] as List)
+        .map((json) => Club.fromJson(json as Map<String, dynamic>))
+        .toList();
+    
+    return clubsList;
   }
 
   @override
   Future<Club> createClub({
     required String name,
-    String? description,
+    required String description,
     required bool isPublic,
     int? maxMembers,
+    String? logoUrl,
+    double? latitude,
+    double? longitude,
   }) async {
     final body = {
       'name': name,
+      'description': description,
       'is_public': isPublic,
-      if (description != null) 'description': description,
       if (maxMembers != null) 'max_members': maxMembers,
+      if (logoUrl != null) 'logo_url': logoUrl,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
     };
 
     final response = await _apiClient.post('/clubs', body);

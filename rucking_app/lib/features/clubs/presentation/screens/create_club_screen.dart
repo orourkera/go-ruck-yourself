@@ -1,12 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/services/avatar_service.dart';
+import 'package:rucking_app/core/services/location_search_service.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
+import 'package:rucking_app/shared/utils/image_picker_utils.dart';
 
 /// Screen for creating a new club
 class CreateClubScreen extends StatefulWidget {
@@ -21,11 +25,16 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _maxMembersController = TextEditingController();
+  final _locationController = TextEditingController();
   
-  bool _isPublic = true;
   bool _isLoading = false;
+  File? _clubLogo;
   
   late ClubsBloc _clubsBloc;
+  final _locationSearchService = getIt<LocationSearchService>();
+  LocationSearchResult? _selectedLocationResult;
+  List<LocationSearchResult> _locationSuggestions = [];
+  bool _showLocationSuggestions = false;
 
   @override
   void initState() {
@@ -38,7 +47,73 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
     _nameController.dispose();
     _descriptionController.dispose();
     _maxMembersController.dispose();
+    _locationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectLogo() async {
+    final selectedFile = await ImagePickerUtils.pickImage(context, showCropModal: true);
+    if (selectedFile != null) {
+      setState(() {
+        _clubLogo = selectedFile;
+      });
+    }
+  }
+
+  void _removeLogo() {
+    setState(() {
+      _clubLogo = null;
+    });
+  }
+
+  Future<void> _searchLocation(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _locationSuggestions = [];
+        _showLocationSuggestions = false;
+      });
+      return;
+    }
+
+    try {
+      final results = await _locationSearchService.searchWithDebounce(
+        query,
+        const Duration(milliseconds: 500),
+      );
+      
+      if (mounted) {
+        setState(() {
+          _locationSuggestions = results;
+          _showLocationSuggestions = results.isNotEmpty;
+        });
+      }
+    } catch (e) {
+      // Handle search error silently
+      if (mounted) {
+        setState(() {
+          _locationSuggestions = [];
+          _showLocationSuggestions = false;
+        });
+      }
+    }
+  }
+
+  void _selectLocation(LocationSearchResult location) {
+    setState(() {
+      _selectedLocationResult = location;
+      _locationController.text = location.displayName;
+      _showLocationSuggestions = false;
+      _locationSuggestions = [];
+    });
+  }
+
+  void _clearLocation() {
+    setState(() {
+      _selectedLocationResult = null;
+      _locationController.clear();
+      _showLocationSuggestions = false;
+      _locationSuggestions = [];
+    });
   }
 
   void _createClub() {
@@ -49,11 +124,13 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
       
       _clubsBloc.add(CreateClub(
         name: _nameController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty 
-            ? null 
-            : _descriptionController.text.trim(),
-        isPublic: _isPublic,
+        description: _descriptionController.text.trim(),
+        isPublic: true,
         maxMembers: maxMembers,
+        logo: _clubLogo,
+        location: _selectedLocationResult?.displayName,
+        latitude: _selectedLocationResult?.latitude,
+        longitude: _selectedLocationResult?.longitude,
       ));
     }
   }
@@ -148,9 +225,87 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   
                   const SizedBox(height: 24),
                   
+                  // Club Logo
+                  Text(
+                    'Club Logo (Optional)',
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 120,
+                    width: 120,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.grey[300]!,
+                        width: 2,
+                      ),
+                      color: Colors.grey[50],
+                    ),
+                    child: _clubLogo != null
+                        ? Stack(
+                            children: [
+                              // Logo preview
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.file(
+                                  _clubLogo!,
+                                  width: 116,
+                                  height: 116,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              // Remove button
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: _removeLogo,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : GestureDetector(
+                            onTap: _selectLogo,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                  size: 40,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Add Logo',
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
                   // Description
                   Text(
-                    'Description (Optional)',
+                    'Description *',
                     style: AppTextStyles.bodyLarge.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -168,7 +323,13 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                       fillColor: Colors.grey[50],
                     ),
                     validator: (value) {
-                      if (value != null && value.length > 500) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Description is required';
+                      }
+                      if (value.trim().length < 20) {
+                        return 'Description must be at least 20 characters';
+                      }
+                      if (value.length > 500) {
                         return 'Description must be less than 500 characters';
                       }
                       return null;
@@ -177,40 +338,78 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // Privacy Setting
+                  // Location
                   Text(
-                    'Privacy',
+                    'Location (Optional)',
                     style: AppTextStyles.bodyLarge.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      children: [
-                        RadioListTile<bool>(
-                          title: Text('Public Club'),
-                          subtitle: Text('Anyone can find and join this club'),
-                          value: true,
-                          groupValue: _isPublic,
-                          onChanged: (value) => setState(() => _isPublic = value!),
-                          activeColor: AppColors.primary,
+                  Stack(
+                    children: [
+                      TextFormField(
+                        controller: _locationController,
+                        decoration: InputDecoration(
+                          hintText: 'Enter city, state, address, or landmark',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                          suffixIcon: _selectedLocationResult != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: _clearLocation,
+                                )
+                              : const Icon(Icons.search),
                         ),
-                        Divider(height: 1, color: Colors.grey[300]),
-                        RadioListTile<bool>(
-                          title: Text('Private Club'),
-                          subtitle: Text('Only invited members can join'),
-                          value: false,
-                          groupValue: _isPublic,
-                          onChanged: (value) => setState(() => _isPublic = value!),
-                          activeColor: AppColors.primary,
+                        onChanged: _searchLocation,
+                      ),
+                      
+                      // Location suggestions dropdown
+                      if (_showLocationSuggestions && _locationSuggestions.isNotEmpty)
+                        Positioned(
+                          top: 60,
+                          left: 0,
+                          right: 0,
+                          child: Material(
+                            elevation: 4,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              constraints: const BoxConstraints(maxHeight: 200),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: _locationSuggestions.length,
+                                itemBuilder: (context, index) {
+                                  final suggestion = _locationSuggestions[index];
+                                  return ListTile(
+                                    leading: const Icon(Icons.location_on, size: 20),
+                                    title: Text(
+                                      suggestion.displayName,
+                                      style: AppTextStyles.bodyMedium,
+                                    ),
+                                    subtitle: suggestion.address != suggestion.displayName
+                                        ? Text(
+                                            suggestion.address,
+                                            style: AppTextStyles.bodySmall.copyWith(
+                                              color: Colors.grey[600],
+                                            ),
+                                          )
+                                        : null,
+                                    onTap: () => _selectLocation(suggestion),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                   
                   const SizedBox(height: 24),
@@ -296,7 +495,6 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                         Text(
                           '• You will be the club admin and can manage members\n'
                           '• Club names must be unique and appropriate\n'
-                          '• Private clubs require manual approval of new members\n'
                           '• You can change these settings later in club management',
                           style: AppTextStyles.bodySmall.copyWith(
                             color: AppColors.info,

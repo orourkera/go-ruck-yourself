@@ -40,6 +40,7 @@ import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
+import 'package:rucking_app/core/services/location_search_service.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -120,6 +121,9 @@ Future<void> setupServiceLocator() async {
   
   // Register ConnectivityService
   getIt.registerSingleton<ConnectivityService>(ConnectivityServiceImpl());
+  
+  // Register LocationSearchService
+  getIt.registerSingleton<LocationSearchService>(LocationSearchService());
   
   // Repositories
   getIt.registerSingleton<AuthRepository>(

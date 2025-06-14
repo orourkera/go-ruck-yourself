@@ -26,19 +26,27 @@ class RefreshClubs extends ClubsEvent {}
 
 class CreateClub extends ClubsEvent {
   final String name;
-  final String? description;
+  final String description;
   final bool isPublic;
   final int? maxMembers;
+  final File? logo;
+  final String? location;
+  final double? latitude;
+  final double? longitude;
 
   const CreateClub({
     required this.name,
-    this.description,
+    required this.description,
     required this.isPublic,
     this.maxMembers,
+    this.logo,
+    this.location,
+    this.latitude,
+    this.longitude,
   });
 
   @override
-  List<Object?> get props => [name, description, isPublic, maxMembers];
+  List<Object?> get props => [name, description, isPublic, maxMembers, logo, location, latitude, longitude];
 }
 
 class LoadClubDetails extends ClubsEvent {

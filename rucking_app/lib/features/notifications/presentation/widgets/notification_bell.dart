@@ -84,8 +84,8 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
           clipBehavior: Clip.none,
           children: [
             SizedBox(
-              width: 56, // Reduced to match clubs icon
-              height: 56, // Reduced to match clubs icon
+              width: 70, // Increased 25% from 56px
+              height: 70, // Increased 25% from 56px
               child: AnimatedBuilder(
                 animation: _rotationAnimation,
                 builder: (context, child) {
@@ -100,7 +100,7 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(28), // Adjusted for smaller size
+                    borderRadius: BorderRadius.circular(35), // Adjusted for larger size
                     onTap: () async {
                       // Navigate to notifications screen
                       await Navigator.push(
@@ -117,13 +117,13 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                       }
                     },
                     child: Container(
-                      width: 56, // Reduced to match clubs icon
-                      height: 56, // Reduced to match clubs icon
+                      width: 70, // Increased 25% from 56px
+                      height: 70, // Increased 25% from 56px
                       alignment: Alignment.center, // Center the icon within tap target
                       child: Image.asset(
                         'assets/images/notifications.png',
-                        width: 40, // Reduced from 64px
-                        height: 40, // Reduced from 64px
+                        width: 50, // Increased 25% from 40px
+                        height: 50, // Increased 25% from 40px
                       ),
                     ),
                   ),

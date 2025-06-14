@@ -112,7 +112,9 @@ class ClubListResource(Resource):
                     'admin_user': club['admin_user'],
                     'user_role': user_role,
                     'user_status': user_status,
-                    'created_at': club['created_at']
+                    'created_at': club['created_at'],
+                    'latitude': club.get('latitude'),
+                    'longitude': club.get('longitude')
                 }
                 clubs.append(club_data)
             
@@ -137,6 +139,12 @@ class ClubListResource(Resource):
             if not data.get('name'):
                 return {'error': 'Club name is required'}, 400
             
+            if not data.get('description'):
+                return {'error': 'Club description is required'}, 400
+            
+            if len(data.get('description', '').strip()) < 20:
+                return {'error': 'Club description must be at least 20 characters'}, 400
+            
             admin_client = get_supabase_admin_client()
             
             # Check if club name already exists
@@ -151,7 +159,9 @@ class ClubListResource(Resource):
                 'logo_url': data.get('logo_url'),
                 'admin_user_id': current_user_id,
                 'is_public': data.get('is_public', True),
-                'max_members': data.get('max_members', 50)
+                'max_members': data.get('max_members', 50),
+                'latitude': data.get('latitude'),
+                'longitude': data.get('longitude')
             }
             
             result = admin_client.table('clubs').insert(club_data).execute()
@@ -224,7 +234,9 @@ class ClubResource(Resource):
                 'pending_requests': pending_requests,
                 'user_role': user_role,
                 'user_status': user_status,
-                'created_at': club['created_at']
+                'created_at': club['created_at'],
+                'latitude': club.get('latitude'),
+                'longitude': club.get('longitude')
             }
             
             return {'club': club_data}, 200
@@ -251,7 +263,7 @@ class ClubResource(Resource):
             
             # Update club
             update_data = {}
-            allowed_fields = ['name', 'description', 'logo_url', 'is_public', 'max_members']
+            allowed_fields = ['name', 'description', 'logo_url', 'is_public', 'max_members', 'latitude', 'longitude']
             
             for field in allowed_fields:
                 if field in data:

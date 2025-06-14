@@ -9,9 +9,12 @@ abstract class ClubsRepository {
   
   Future<Club> createClub({
     required String name,
-    String? description,
+    required String description,
     required bool isPublic,
     int? maxMembers,
+    String? logoUrl,
+    double? latitude,
+    double? longitude,
   });
   
   Future<ClubDetails> getClubDetails(String clubId);
