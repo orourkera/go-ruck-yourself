@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/services/clubs_cache_service.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/domain/repositories/clubs_repository.dart';
 
 class ClubsRepositoryImpl implements ClubsRepository {
   final ApiClient _apiClient;
+  final ClubsCacheService _cacheService = getIt<ClubsCacheService>();
 
   ClubsRepositoryImpl(this._apiClient);
 
@@ -14,6 +17,21 @@ class ClubsRepositoryImpl implements ClubsRepository {
     bool? isPublic,
     String? membershipFilter,
   }) async {
+    // Try to get cached data first
+    final cachedData = await _cacheService.getCachedFilteredClubs(
+      search: search,
+      isPublic: isPublic,
+      membershipFilter: membershipFilter,
+    );
+    
+    if (cachedData != null) {
+      // Return cached clubs
+      return cachedData
+          .map((json) => Club.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
+    
+    // No cache or expired, fetch from API
     final queryParams = <String, String>{};
     
     if (search != null && search.isNotEmpty) {
@@ -31,6 +49,14 @@ class ClubsRepositoryImpl implements ClubsRepository {
     final clubsList = (response['clubs'] as List)
         .map((json) => Club.fromJson(json as Map<String, dynamic>))
         .toList();
+    
+    // Cache the response data
+    await _cacheService.cacheFilteredClubs(
+      response['clubs'] as List,
+      search: search,
+      isPublic: isPublic,
+      membershipFilter: membershipFilter,
+    );
     
     return clubsList;
   }
@@ -57,14 +83,30 @@ class ClubsRepositoryImpl implements ClubsRepository {
 
     final response = await _apiClient.post('/clubs', body);
     
+    // Invalidate clubs list cache since we created a new club
+    await _cacheService.invalidateCache();
+    
     return Club.fromJson(response['club'] as Map<String, dynamic>);
   }
 
   @override
   Future<ClubDetails> getClubDetails(String clubId) async {
+    // Try to get cached club details first
+    final cachedDetails = await _cacheService.getCachedClubDetails(clubId);
+    
+    if (cachedDetails != null) {
+      return ClubDetails.fromJson(cachedDetails);
+    }
+    
+    // No cache, fetch from API
     final response = await _apiClient.get('/clubs/$clubId');
     
-    return ClubDetails.fromJson(response);
+    final clubDetails = ClubDetails.fromJson(response['club'] as Map<String, dynamic>);
+    
+    // Cache the club details
+    await _cacheService.cacheClubDetails(clubId, response['club'] as Map<String, dynamic>);
+    
+    return clubDetails;
   }
 
   @override
@@ -84,17 +126,28 @@ class ClubsRepositoryImpl implements ClubsRepository {
 
     final response = await _apiClient.put('/clubs/$clubId', body);
     
+    // Invalidate caches since club was updated
+    await _cacheService.invalidateCache();
+    await _cacheService.invalidateClubDetails(clubId);
+    
     return Club.fromJson(response['club'] as Map<String, dynamic>);
   }
 
   @override
   Future<void> deleteClub(String clubId) async {
     await _apiClient.delete('/clubs/$clubId');
+    
+    // Invalidate caches since club was deleted
+    await _cacheService.invalidateCache();
+    await _cacheService.invalidateClubDetails(clubId);
   }
 
   @override
   Future<void> requestMembership(String clubId) async {
     await _apiClient.post('/clubs/$clubId/join', {});
+    
+    // Invalidate club details cache since membership changed
+    await _cacheService.invalidateClubDetails(clubId);
   }
 
   @override
@@ -110,16 +163,25 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (role != null) body['role'] = role;
 
     await _apiClient.put('/clubs/$clubId/members/$userId', body);
+    
+    // Invalidate club details cache since membership changed
+    await _cacheService.invalidateClubDetails(clubId);
   }
 
   @override
   Future<void> removeMembership(String clubId, String userId) async {
     await _apiClient.delete('/clubs/$clubId/members/$userId');
+    
+    // Invalidate club details cache since membership changed
+    await _cacheService.invalidateClubDetails(clubId);
   }
 
   @override
   Future<void> leaveClub(String clubId) async {
     // For leaving, we use the current user's ID - this will be handled by the backend
     await _apiClient.delete('/clubs/$clubId/members/me');
+    
+    // Invalidate club details cache since membership changed
+    await _cacheService.invalidateClubDetails(clubId);
   }
 }

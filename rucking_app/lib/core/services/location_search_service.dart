@@ -33,8 +33,11 @@ class LocationSearchService {
     if (query.trim().isEmpty) return [];
     
     try {
+      print('LocationSearchService: Searching for "$query"');
+      
       // Use geocoding package to search for locations
       List<Location> locations = await locationFromAddress(query);
+      print('LocationSearchService: Found ${locations.length} locations');
       
       if (locations.isEmpty) return [];
       
@@ -43,6 +46,13 @@ class LocationSearchService {
       
       for (int i = 0; i < locations.length && i < 5; i++) {
         final location = locations[i];
+        print('LocationSearchService: Processing location ${i + 1}: ${location.latitude}, ${location.longitude}');
+        
+        // Validate coordinates before processing
+        if (!_isValidCoordinate(location.latitude) || !_isValidCoordinate(location.longitude)) {
+          print('LocationSearchService: Invalid coordinates, skipping');
+          continue; // Skip invalid coordinates
+        }
         
         try {
           // Get placemark details for this location
@@ -58,6 +68,8 @@ class LocationSearchService {
             String displayName = _buildDisplayName(placemark);
             String address = _buildAddress(placemark);
             
+            print('LocationSearchService: Created result: $displayName');
+            
             results.add(LocationSearchResult(
               displayName: displayName,
               address: address,
@@ -69,7 +81,8 @@ class LocationSearchService {
             ));
           }
         } catch (e) {
-          // If reverse geocoding fails, still add basic location
+          print('LocationSearchService: Error getting placemark: $e');
+          // If reverse geocoding fails, still add basic location with validated coordinates
           results.add(LocationSearchResult(
             displayName: query,
             address: query,
@@ -79,8 +92,10 @@ class LocationSearchService {
         }
       }
       
+      print('LocationSearchService: Returning ${results.length} results');
       return results;
     } catch (e) {
+      print('LocationSearchService: Search failed: $e');
       // If geocoding fails, return empty list
       return [];
     }
@@ -108,6 +123,10 @@ class LocationSearchService {
     });
     
     return completer.future;
+  }
+  
+  bool _isValidCoordinate(double coordinate) {
+    return coordinate.isFinite && coordinate >= -180 && coordinate <= 180;
   }
   
   String _buildDisplayName(Placemark placemark) {

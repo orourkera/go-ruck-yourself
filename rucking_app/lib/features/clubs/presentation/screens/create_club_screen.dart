@@ -237,7 +237,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     height: 120,
                     width: 120,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      shape: BoxShape.circle,
                       border: Border.all(
                         color: Colors.grey[300]!,
                         width: 2,
@@ -247,9 +247,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     child: _clubLogo != null
                         ? Stack(
                             children: [
-                              // Logo preview
+                              // Logo preview - circular
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(60), // Half of 120 for perfect circle
                                 child: Image.file(
                                   _clubLogo!,
                                   width: 116,
