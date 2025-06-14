@@ -42,6 +42,7 @@ import 'package:rucking_app/features/clubs/presentation/screens/club_detail_scre
 import 'package:rucking_app/features/clubs/presentation/screens/create_club_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/create_event_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -365,6 +366,10 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                 case '/achievements':
                   return MaterialPageRoute(
                     builder: (_) => const AchievementsHubScreen(),
+                  );
+                case '/profile':
+                  return MaterialPageRoute(
+                    builder: (_) => const ProfileScreen(),
                   );
                 case '/post_session_upsell':
                   final args = settings.arguments;

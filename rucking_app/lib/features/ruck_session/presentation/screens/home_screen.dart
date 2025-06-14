@@ -1073,7 +1073,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         Icon(
           icon,
           color: Colors.white,
-          size: 24,
+          size: 20,
         ),
         const SizedBox(height: 8),
         Text(

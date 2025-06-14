@@ -17,7 +17,7 @@ class StatRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
-    this.iconSize = 16,
+    this.iconSize = 20,
     this.iconColor,
     this.showLabel = true,
     this.alignment = CrossAxisAlignment.start,
@@ -31,7 +31,7 @@ class StatRow extends StatelessWidget {
         Icon(
           icon,
           size: iconSize,
-          color: iconColor ?? AppColors.secondary,
+          color: iconColor ?? Theme.of(context).primaryColor,
         ),
         SizedBox(width: iconSize > 16 ? 8 : 4),
         Expanded(

@@ -512,7 +512,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                             Expanded(
                               child: _buildStatTile(
                                 context: context,
-                                icon: Icons.trending_up,
+                                icon: Icons.terrain,
                                 label: 'Elevation',
                                 value: formattedElevation,
                               ),
@@ -688,6 +688,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
             Icon(
               icon,
               color: Theme.of(context).primaryColor,
+              size: 20,
             ),
             const SizedBox(width: 4),
             Text(

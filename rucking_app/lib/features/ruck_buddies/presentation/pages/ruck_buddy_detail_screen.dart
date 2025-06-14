@@ -801,7 +801,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           // Elevation
                           Expanded(
                             child: _buildStatItem(
-                              icon: Icons.trending_up,
+                              icon: Icons.terrain,
                               label: 'Elevation',
                               value: MeasurementUtils.formatElevation(
                                 displayBuddy.elevationGainM,
@@ -1085,8 +1085,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
           children: [
             Icon(
               icon,
-              color: AppColors.secondary,
-              size: 18,
+              color: Theme.of(context).primaryColor,
+              size: 20,
             ),
             const SizedBox(width: 4),
             Text(
