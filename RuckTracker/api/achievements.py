@@ -346,22 +346,35 @@ class AchievementStatsResource(Resource):
                 
             total_available = len(total_response.data or [])
             
-            # Calculate total power points from all user's completed sessions
-            power_points_response = supabase.table('ruck_session').select(
-                'power_points'
-            ).eq('user_id', user_id).eq('status', 'completed').execute()
-            
-            total_power_points = 0
-            if power_points_response.data:
-                for session in power_points_response.data:
-                    power_points = session.get('power_points')
-                    if power_points is not None:
-                        try:
-                            # Convert to float and add to total
-                            total_power_points += float(power_points)
-                        except (ValueError, TypeError):
-                            # Skip invalid power_points values
-                            continue
+            # Calculate total power points using SQL aggregation for better performance
+            try:
+                # Use RPC to calculate sum directly in database
+                power_points_result = supabase.rpc('calculate_user_power_points', {
+                    'user_id_param': user_id
+                }).execute()
+                
+                total_power_points = 0
+                if power_points_result.data is not None:
+                    total_power_points = float(power_points_result.data or 0)
+                    
+            except Exception as rpc_error:
+                # Fallback to original method if RPC doesn't exist
+                logger.warning(f"RPC calculate_user_power_points not available, using fallback: {str(rpc_error)}")
+                power_points_response = supabase.table('ruck_session').select(
+                    'power_points'
+                ).eq('user_id', user_id).eq('status', 'completed').execute()
+                
+                total_power_points = 0
+                if power_points_response.data:
+                    for session in power_points_response.data:
+                        power_points = session.get('power_points')
+                        if power_points is not None:
+                            try:
+                                # Convert to float and add to total
+                                total_power_points += float(power_points)
+                            except (ValueError, TypeError):
+                                # Skip invalid power_points values
+                                continue
             
             return {
                 'status': 'success',
