@@ -79,4 +79,55 @@ class AvatarService {
       // Don't throw here - avatar upload succeeded, profile update is secondary
     }
   }
+
+  /// Upload a club logo image to Supabase Storage
+  /// 
+  /// [imageFile] - The image file to upload
+  /// Returns the public URL of the uploaded logo
+  /// Note: This does NOT update user profile
+  Future<String> uploadClubLogo(File imageFile) async {
+    try {
+      // Get authenticated user from AuthService
+      final user = await _authService.getCurrentUser();
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final userId = user.userId;
+      AppLogger.info('Uploading club logo by user $userId');
+
+      // Read image file
+      final bytes = await imageFile.readAsBytes();
+      AppLogger.info('Image size: ${bytes.length} bytes');
+
+      // Create unique filename for club logo with timestamp and user ID
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'club_logo_${userId}_${timestamp}.jpg';
+      final storagePath = 'avatars/$fileName';
+
+      // Upload directly to Supabase Storage using efficient multipart
+      final supabase = Supabase.instance.client;
+      final storageResponse = await supabase.storage
+          .from('avatars')
+          .uploadBinary(storagePath, bytes);
+
+      if (storageResponse.isEmpty) {
+        throw Exception('Failed to upload to storage');
+      }
+
+      // Get public URL
+      final logoUrl = supabase.storage
+          .from('avatars')
+          .getPublicUrl(storagePath);
+
+      AppLogger.info('Club logo uploaded successfully: $logoUrl');
+      
+      // Return URL without updating user profile
+      return logoUrl;
+      
+    } catch (e) {
+      AppLogger.error('Club logo upload failed: $e');
+      throw Exception('Failed to upload club logo: $e');
+    }
+  }
 }

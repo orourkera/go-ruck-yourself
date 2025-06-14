@@ -458,7 +458,17 @@ class ClubEventToggle extends StatelessWidget {
 
 #### Next Steps (Pending)
 - [x] **Club Detail Screen**: Full club details with member management 
-- [ ] **Create Club Screen**: Form for creating new clubs
+- [x] **Create Club Screen**: Form for creating new clubs with logo upload and location search
+- [x] **Club Logo Upload**: Integrated with avatar service and circular display
+- [x] **Location Search**: Type-ahead search with geocoding and coordinate storage
+- [x] **Clubs Caching**: 15-minute cache system for improved performance
+- [x] **UI/UX Improvements**: 
+  - Removed redundant plus button from clubs header
+  - Made club description required (20-500 characters)
+  - Fixed navigation routes and consistency
+  - Increased notification bell icon size
+- [x] **API Authentication**: Unified to use `@auth_required` decorator consistently
+- [x] **Input Validation**: Robust frontend and backend validation for all club fields
 - [ ] **Club Management**: Admin functions for membership approval/denial
 - [ ] **Real-time Updates**: Supabase realtime integration for live updates
 - [ ] **Push Notifications**: Test end-to-end notification flow
@@ -472,10 +482,296 @@ class ClubEventToggle extends StatelessWidget {
 ### Backend Status
 **Complete** - All backend infrastructure including database schema, API endpoints, RLS policies, and push notification integration is implemented and deployed.
 
+---
+
+## **API Endpoints & Methods Reference**
+
+### **Backend API Endpoints** (`/api/clubs/...`)
+- `GET /clubs` - List clubs with filters (search, is_public, membership)
+- `POST /clubs` - Create new club (requires: name, description, is_public; optional: max_members, logo_url, latitude, longitude)
+- `GET /clubs/{club_id}` - Get club details with members
+- `PUT /clubs/{club_id}` - Update club (name, description, is_public, max_members)
+- `DELETE /clubs/{club_id}` - Delete club (admin only)
+- `POST /clubs/{club_id}/join` - Request membership
+- `PUT /clubs/{club_id}/members/{user_id}` - Manage membership (action: approve/reject/promote/demote, role: admin/member)
+- `DELETE /clubs/{club_id}/members/{user_id}` - Remove member
+- `DELETE /clubs/{club_id}/members/me` - Leave club
+
+### **Flutter Repository Methods** (`ClubsRepository`)
+- `getClubs({search?, isPublic?, membershipFilter?})` - Get filtered clubs list
+- `createClub({name, description, isPublic, maxMembers?, logoUrl?, latitude?, longitude?})` - Create club
+- `getClubDetails(clubId)` - Get detailed club info
+- `updateClub({clubId, name?, description?, isPublic?, maxMembers?})` - Update club
+- `deleteClub(clubId)` - Delete club
+- `requestMembership(clubId)` - Request to join
+- `manageMembership({clubId, userId, action?, role?})` - Manage member
+- `removeMembership(clubId, userId)` - Remove member
+- `leaveClub(clubId)` - Leave club
+
+### **Flutter Navigation Routes**
+- `/clubs` - Main clubs list screen  
+- `/club_detail` - Club details screen (requires clubId parameter)
+- `/create_club` - Create new club screen
+
+### **Caching System** (`ClubsCacheService`)
+- `getCachedFilteredClubs({search?, isPublic?, membershipFilter?})` - Get cached clubs
+- `cacheFilteredClubs(data, {search?, isPublic?, membershipFilter?})` - Cache clubs list
+- `getCachedClubDetails(clubId)` - Get cached club details
+- `cacheClubDetails(clubId, data)` - Cache club details
+- `invalidateCache()` - Clear all clubs cache
+- `invalidateClubDetails(clubId)` - Clear specific club cache
+- `clearAllCache()` - Clear entire cache
+
+---
+
 ### Current Status Summary
 - **Navigation**: ✅ **COMPLETED** - Club detail routing with parameter handling
 - **Clubs Frontend Core**: ✅ **COMPLETED** - Full repository implementation with proper API client integration  
-- **Clubs UI Screens**: ✅ **Main & Detail screens COMPLETED** - Create screen pending
+- **Clubs UI Screens**: ✅ **COMPLETED** - All screens implemented with logo upload and location search
+- **Caching System**: ✅ **COMPLETED** - 15-minute cache with smart invalidation
 - **Events Feature**: ✅ **Phase 1 COMPLETED** - Events tab shows duels (duels remain unchanged, future events will be separate)
+- **Club Management**: ⏳ **IN PROGRESS** - Admin functions for membership approval/denial
 - **Real-time Integration**: ⏳ Pending
 - **Testing & Polish**: ⏳ Pending
+
+---
+
+## **🎯 Events System - Comprehensive Implementation**
+
+### **Overview**
+Transform the placeholder Events tab into a full-featured event management platform with club integration, location-based discovery, and rich user interactions.
+
+### **Core Features**
+
+#### **Event Discovery & Filtering**
+- **📍 Location-based sorting** - Sort events by distance from user's location
+- **📅 Date sorting** - Sort by start date (upcoming, recent, etc.)
+- **🏷️ Sticky filters:**
+  - "My Club Events" - Events hosted by clubs user belongs to
+  - "My Joined Events" - Events user has joined/registered for
+  - Custom location radius filter
+  - Date range filter
+
+#### **Event Creation & Management**
+- **📝 Event Details:**
+  - Event name and description (rich text editor for formatting/prizes)
+  - Start date and time (native date/time picker)
+  - Geocoded location with address search (like clubs)
+  - Duration or end time
+  - Banner image upload (medium-sized, optimized for card display)
+  
+- **👥 Participation Controls:**
+  - Minimum participant count (optional)
+  - Maximum participant count (optional)
+  - Approval required vs. open join
+  - Participant list management
+
+- **🏢 Club Integration:**
+  - Club admins can host events on behalf of their club
+  - Club logo displayed on event cards when club-hosted
+  - Club member notifications for club events
+
+#### **Event Cards & UI Design**
+- **Card Layout** (similar to ruck buddies cards):
+  - **Top Left:** Club logo (if club-hosted) or generic event icon
+  - **Banner Area:** Event banner image (where map/photos typically are)
+  - **Details Section:** Event name, date/time, location, participant count
+  - **Action Buttons:** Join/Leave, Share, More options
+
+#### **Event Details Page**
+- **Complete event information** with rich text description
+- **Interactive map** showing event location
+- **Participant list** with avatars and usernames
+- **Join/Leave functionality** with approval workflow if required
+- **Share button** with deep link generation
+- **Event updates** and announcements section
+
+### **Technical Implementation**
+
+#### **Database Schema**
+```sql
+-- Events table
+CREATE TABLE events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Basic Info
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    creator_user_id UUID NOT NULL REFERENCES auth.users(id),
+    
+    -- Club Integration
+    hosting_club_id UUID REFERENCES clubs(id),
+    
+    -- DateTime & Location
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_date TIMESTAMP WITH TIME ZONE,
+    location_name VARCHAR(500),
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    
+    -- Media
+    banner_image_url TEXT,
+    
+    -- Participation
+    min_participants INTEGER DEFAULT 1,
+    max_participants INTEGER,
+    approval_required BOOLEAN DEFAULT false,
+    
+    -- Status
+    status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'completed')),
+    
+    -- Indexes for performance
+    CONSTRAINT events_creator_fkey FOREIGN KEY (creator_user_id) REFERENCES auth.users(id),
+    CONSTRAINT events_club_fkey FOREIGN KEY (hosting_club_id) REFERENCES clubs(id)
+);
+
+-- Event participants
+CREATE TABLE event_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(event_id, user_id)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_events_start_date ON events(start_date);
+CREATE INDEX idx_events_location ON events(latitude, longitude);
+CREATE INDEX idx_events_club ON events(hosting_club_id);
+CREATE INDEX idx_event_participants_event ON event_participants(event_id);
+CREATE INDEX idx_event_participants_user ON event_participants(user_id);
+```
+
+#### **API Endpoints**
+```python
+# Events CRUD
+GET /api/events                    # List events with filters
+POST /api/events                   # Create new event
+GET /api/events/{event_id}         # Get event details
+PUT /api/events/{event_id}         # Update event (creator only)
+DELETE /api/events/{event_id}      # Delete event (creator only)
+
+# Event Participation
+POST /api/events/{event_id}/join           # Join event
+DELETE /api/events/{event_id}/leave        # Leave event
+GET /api/events/{event_id}/participants    # Get participant list
+
+# Event Management (creator/admin only)
+PUT /api/events/{event_id}/participants/{user_id}    # Approve/reject participant
+DELETE /api/events/{event_id}/participants/{user_id} # Remove participant
+
+# Event Media
+POST /api/events/upload-banner     # Upload event banner image
+```
+
+#### **Flutter Implementation**
+
+**Repository Methods:**
+```dart
+// EventsRepository
+Future<List<Event>> getEvents({
+  double? latitude,
+  double? longitude,
+  int? radiusKm,
+  DateTime? startDate,
+  DateTime? endDate,
+  String? clubId,
+  bool? joinedOnly,
+});
+
+Future<Event> createEvent({
+  required String name,
+  required String description,
+  required DateTime startDate,
+  DateTime? endDate,
+  required String locationName,
+  required double latitude,
+  required double longitude,
+  String? bannerImageUrl,
+  String? hostingClubId,
+  int? minParticipants,
+  int? maxParticipants,
+  bool approvalRequired = false,
+});
+
+Future<EventDetails> getEventDetails(String eventId);
+Future<void> joinEvent(String eventId);
+Future<void> leaveEvent(String eventId);
+Future<String> uploadEventBanner(File imageFile);
+```
+
+**Navigation Routes:**
+```dart
+/events                    # Main events list
+/events/{eventId}         # Event details
+/events/create            # Create new event
+/events/{eventId}/edit    # Edit event (creator only)
+```
+
+### **User Experience Features**
+
+#### **Notifications**
+- **Join Requests:** Notify event creator when someone requests to join
+- **Approval Status:** Notify user when join request is approved/rejected
+- **Event Reminders:** Day-before reminder for joined events
+- **Club Events:** Notify club members when club hosts new events
+- **Event Updates:** Notify participants of event changes
+
+#### **Deep Linking & Sharing**
+- **Deep Link Format:** `getrucky://events/{eventId}`
+- **Share Integration:** Native share sheet with event details
+- **Social Preview:** Rich preview with banner image and event details
+- **QR Code Generation:** For easy offline sharing
+
+#### **Location Integration**
+- **Distance Calculation:** Real-time distance from user's location
+- **Map Integration:** Interactive maps on event details
+- **Navigation:** Direct integration with Maps app for directions
+- **Location Search:** Same geocoding service as clubs
+
+### **Implementation Phases**
+
+#### **Phase 1: Core Events** 
+- [ ] Database schema and migrations
+- [ ] Basic CRUD API endpoints
+- [ ] Event list screen with filtering
+- [ ] Event creation screen
+- [ ] Event details screen
+- [ ] Basic join/leave functionality
+
+#### **Phase 2: Rich Features**
+- [ ] Banner image upload and display
+- [ ] Rich text description editor
+- [ ] Club integration for admins
+- [ ] Approval workflow for events
+- [ ] Distance-based sorting
+
+#### **Phase 3: Advanced Features**
+- [ ] Push notifications system
+- [ ] Deep linking implementation  
+- [ ] Share functionality
+- [ ] Event management dashboard
+- [ ] Analytics and insights
+
+#### **Phase 4: Polish & Optimization**
+- [ ] Performance optimization
+- [ ] Advanced filtering options
+- [ ] Event templates
+- [ ] Recurring events
+- [ ] Integration testing
+
+### **Success Metrics**
+- Event creation rate
+- Event participation rate  
+- User engagement with events
+- Club-hosted event adoption
+- Notification engagement rates
+
+---

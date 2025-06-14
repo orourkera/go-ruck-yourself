@@ -80,9 +80,9 @@ class ClubsBloc extends Bloc<ClubsEvent, ClubsState> {
       if (event.logo != null) {
         emit(const ClubActionLoading('Uploading logo...'));
         try {
-          // Use the same AvatarService for club logos
+          // Use the AvatarService uploadClubLogo method (doesn't update user profile)
           final avatarService = getIt<AvatarService>();
-          logoUrl = await avatarService.uploadAvatar(event.logo!);
+          logoUrl = await avatarService.uploadClubLogo(event.logo!);
           AppLogger.info('Club logo uploaded successfully: $logoUrl');
         } catch (logoError) {
           AppLogger.error('Failed to upload club logo: $logoError');

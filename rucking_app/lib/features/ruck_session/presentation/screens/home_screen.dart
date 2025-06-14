@@ -227,15 +227,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             label: 'Duels',
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.event,
-              size: 32,
-              color: Colors.grey,
+            icon: Image.asset(
+              'assets/images/events.png',
+              width: 48,
+              height: 48,
             ),
-            activeIcon: Icon(
-              Icons.event,
-              size: 32,
-              color: AppColors.primary,
+            activeIcon: Image.asset(
+              'assets/images/events active.png',
+              width: 48,
+              height: 48,
             ),
             label: 'Events',
           ),
