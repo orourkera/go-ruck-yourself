@@ -8,7 +8,8 @@ import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
-import 'package:rucking_app/shared/widgets/loading_indicator.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 
 /// Clubs screen with full functionality
 class ClubsScreen extends StatefulWidget {
@@ -201,7 +202,10 @@ class _ClubsScreenState extends State<ClubsScreen> {
                 child: BlocBuilder<ClubsBloc, ClubsState>(
                   builder: (context, state) {
                     if (state is ClubsLoading) {
-                      return const Center(child: LoadingIndicator());
+                      return ListSkeleton(
+                        itemCount: 5,
+                        itemBuilder: (index) => _buildClubCardSkeleton(),
+                      );
                     } else if (state is ClubsLoaded) {
                       if (state.clubs.isEmpty) {
                         return _buildEmptyState();
@@ -370,6 +374,56 @@ class _ClubsScreenState extends State<ClubsScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClubCardSkeleton() {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonLine(width: 120, height: 20),
+                      const SizedBox(height: 4),
+                      SkeletonLine(width: 100, height: 16),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    SkeletonLine(width: 60, height: 16),
+                    const SizedBox(height: 4),
+                    SkeletonLine(width: 40, height: 16),
+                  ],
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 12),
+            
+            Row(
+              children: [
+                SkeletonLine(width: 60, height: 16),
+                const Spacer(),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: AppColors.textDarkSecondary,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

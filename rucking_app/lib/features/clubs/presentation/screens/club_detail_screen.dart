@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/theme/app_text_styles.dart';
-import 'package:rucking_app/core/widgets/loading_indicator.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
-import 'package:rucking_app/features/clubs/domain/models/club_details.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
@@ -46,7 +46,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            _clubDetails?.name ?? 'Club Details',
+            _clubDetails?.club.name ?? 'Club Details',
             style: AppTextStyles.titleLarge.copyWith(
               color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
               fontWeight: FontWeight.bold,
@@ -82,7 +82,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           },
           builder: (context, state) {
             if (state is ClubsLoading || state is ClubActionLoading) {
-              return const Center(child: LoadingIndicator());
+              return _buildClubDetailSkeleton();
             } else if (state is ClubDetailsLoaded) {
               return _buildClubContent(state.clubDetails);
             } else if (state is ClubsError) {
@@ -98,7 +98,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   }
 
   List<Widget> _buildAppBarActions() {
-    if (_clubDetails?.currentUserRole == 'admin') {
+    if (_clubDetails?.club.userRole == 'admin') {
       return [
         IconButton(
           icon: const Icon(Icons.edit),
@@ -145,7 +145,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             _buildClubStats(clubDetails),
             const SizedBox(height: 24),
             _buildMembersSection(clubDetails),
-            if (clubDetails.currentUserRole == 'admin' && clubDetails.pendingRequests.isNotEmpty) ...[
+            if (clubDetails.club.userRole == 'admin' && clubDetails.pendingRequests.isNotEmpty) ...[
               const SizedBox(height: 24),
               _buildPendingRequestsSection(clubDetails),
             ],
@@ -167,15 +167,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: AppColors.primary,
-                  backgroundImage: clubDetails.logoUrl != null 
-                    ? NetworkImage(clubDetails.logoUrl!) 
-                    : null,
-                  child: clubDetails.logoUrl == null 
-                    ? Text(
-                        clubDetails.name.isNotEmpty ? clubDetails.name[0].toUpperCase() : 'C',
-                        style: const TextStyle(fontSize: 24, color: Colors.white),
-                      )
-                    : null,
+                  child: Text(
+                    clubDetails.club.name.isNotEmpty ? clubDetails.club.name[0].toUpperCase() : 'C',
+                    style: const TextStyle(fontSize: 24, color: Colors.white),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -183,7 +178,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        clubDetails.name,
+                        clubDetails.club.name,
                         style: AppTextStyles.titleLarge.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -192,13 +187,13 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                       Row(
                         children: [
                           Icon(
-                            clubDetails.isPublic ? Icons.public : Icons.lock,
+                            clubDetails.club.isPublic ? Icons.public : Icons.lock,
                             size: 16,
                             color: AppColors.textDarkSecondary,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            clubDetails.isPublic ? 'Public Club' : 'Private Club',
+                            clubDetails.club.isPublic ? 'Public Club' : 'Private Club',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: AppColors.textDarkSecondary,
                             ),
@@ -210,10 +205,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 ),
               ],
             ),
-            if (clubDetails.description.isNotEmpty) ...[
+            if (clubDetails.club.description != null && clubDetails.club.description!.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
-                clubDetails.description,
+                clubDetails.club.description!,
                 style: AppTextStyles.bodyMedium,
               ),
             ],
@@ -232,17 +227,23 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           children: [
             _buildStatItem(
               'Members',
-              '${clubDetails.members.length}/${clubDetails.maxMembers}',
+              '${clubDetails.members.length}/${clubDetails.club.maxMembers}',
               Icons.people,
             ),
             _buildStatItem(
               'Admin',
-              clubDetails.adminUser.firstName,
+              clubDetails.members.firstWhere((member) => member.role == 'admin', orElse: () => ClubMember(
+                userId: '',
+                username: 'Unknown',
+                role: 'admin',
+                status: 'approved',
+                joinedAt: DateTime.now(),
+              )).username,
               Icons.admin_panel_settings,
             ),
             _buildStatItem(
               'Created',
-              _formatDate(clubDetails.createdAt),
+              _formatDate(clubDetails.club.createdAt),
               Icons.calendar_today,
             ),
           ],
@@ -300,24 +301,20 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   }
 
   Widget _buildMemberTile(ClubMember member, ClubDetails clubDetails) {
-    final isCurrentUser = member.userId == clubDetails.currentUserId;
-    final canManageMember = clubDetails.currentUserRole == 'admin' && 
-                           member.role != 'admin' && 
-                           !isCurrentUser;
+    final canManageMember = clubDetails.club.userRole == 'admin' && 
+                           member.role != 'admin';
 
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: AppColors.primary,
         child: Text(
-          member.firstName.isNotEmpty ? member.firstName[0].toUpperCase() : 'U',
+          member.username.isNotEmpty ? member.username[0].toUpperCase() : 'U',
           style: const TextStyle(color: Colors.white),
         ),
       ),
       title: Text(
-        '${member.firstName} ${member.lastName}',
-        style: AppTextStyles.bodyMedium.copyWith(
-          fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal,
-        ),
+        member.username,
+        style: AppTextStyles.bodyMedium,
       ),
       subtitle: Text(
         member.role.toUpperCase(),
@@ -399,11 +396,11 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       leading: CircleAvatar(
         backgroundColor: AppColors.secondary,
         child: Text(
-          request.firstName.isNotEmpty ? request.firstName[0].toUpperCase() : 'U',
+          request.username.isNotEmpty ? request.username[0].toUpperCase() : 'U',
           style: const TextStyle(color: Colors.white),
         ),
       ),
-      title: Text('${request.firstName} ${request.lastName}'),
+      title: Text('${request.username}'),
       subtitle: Text(
         'Requested ${_formatDate(request.joinedAt)}',
         style: AppTextStyles.bodySmall.copyWith(
@@ -431,7 +428,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   Widget _buildFloatingActionButton() {
     if (_clubDetails == null) return const SizedBox.shrink();
 
-    if (_clubDetails!.currentUserStatus == null) {
+    if (_clubDetails!.club.canJoin) {
       // User is not a member - show join button
       return FloatingActionButton.extended(
         onPressed: () => _requestMembership(),
@@ -439,7 +436,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         label: const Text('Join Club'),
         backgroundColor: AppColors.primary,
       );
-    } else if (_clubDetails!.currentUserStatus == 'pending') {
+    } else if (_clubDetails!.club.isUserPending) {
       // User has pending request
       return FloatingActionButton.extended(
         onPressed: null,
@@ -447,7 +444,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         label: const Text('Request Pending'),
         backgroundColor: Colors.grey,
       );
-    } else if (_clubDetails!.currentUserRole != 'admin') {
+    } else if (_clubDetails!.club.isUserMember && !_clubDetails!.club.isUserAdmin) {
       // User is a member but not admin - show leave button
       return FloatingActionButton.extended(
         onPressed: () => _showLeaveClubDialog(),
@@ -544,7 +541,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       builder: (context) => AlertDialog(
         title: Text('${action.capitalizeFirst()} Member'),
         content: Text(
-          'Are you sure you want to $action ${member.firstName} ${member.lastName} to $newRole?',
+          'Are you sure you want to $action ${member.username} to $newRole?',
         ),
         actions: [
           TextButton(
@@ -573,7 +570,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Remove Member'),
         content: Text(
-          'Are you sure you want to remove ${member.firstName} ${member.lastName} from the club?',
+          'Are you sure you want to remove ${member.username} from the club?',
         ),
         actions: [
           TextButton(
@@ -583,7 +580,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop();
-              _clubsBloc.add(RemoveMember(
+              _clubsBloc.add(RemoveMembership(
                 clubId: widget.clubId,
                 userId: member.userId,
               ));
@@ -602,7 +599,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Leave Club'),
         content: Text(
-          'Are you sure you want to leave ${_clubDetails!.name}?',
+          'Are you sure you want to leave ${_clubDetails!.club.name}?',
         ),
         actions: [
           TextButton(
@@ -629,7 +626,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Delete Club'),
         content: Text(
-          'Are you sure you want to permanently delete ${_clubDetails!.name}? This action cannot be undone.',
+          'Are you sure you want to permanently delete ${_clubDetails!.club.name}? This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -646,6 +643,85 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             child: const Text('Delete'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildClubDetailSkeleton() {
+    return SkeletonLoader(
+      isLoading: true,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Club header section
+            Row(
+              children: [
+                SkeletonCircle(size: 60),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonLine(width: 150, height: 24),
+                      const SizedBox(height: 8),
+                      SkeletonLine(width: 100, height: 16),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Club stats section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Column(
+                  children: [
+                    SkeletonLine(width: 40, height: 24),
+                    const SizedBox(height: 4),
+                    SkeletonLine(width: 60, height: 16),
+                  ],
+                ),
+                Column(
+                  children: [
+                    SkeletonLine(width: 40, height: 24),
+                    const SizedBox(height: 4),
+                    SkeletonLine(width: 60, height: 16),
+                  ],
+                ),
+                Column(
+                  children: [
+                    SkeletonLine(width: 40, height: 24),
+                    const SizedBox(height: 4),
+                    SkeletonLine(width: 60, height: 16),
+                  ],
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Members section
+            SkeletonLine(width: 100, height: 20),
+            const SizedBox(height: 16),
+            
+            // Member list
+            ...List.generate(3, (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  SkeletonCircle(size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(child: SkeletonLine(width: double.infinity, height: 16)),
+                ],
+              ),
+            )),
+          ],
+        ),
       ),
     );
   }

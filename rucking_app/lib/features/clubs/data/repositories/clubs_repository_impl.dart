@@ -28,13 +28,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
 
     final response = await _apiClient.get('/api/clubs', queryParams: queryParams);
     
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final List<dynamic> clubsJson = data['clubs'] as List<dynamic>;
-      return clubsJson.map((json) => Club.fromJson(json as Map<String, dynamic>)).toList();
-    } else {
-      throw Exception('Failed to load clubs: ${response.body}');
-    }
+    return response['clubs'].map((json) => Club.fromJson(json as Map<String, dynamic>)).toList();
   }
 
   @override
@@ -51,28 +45,16 @@ class ClubsRepositoryImpl implements ClubsRepository {
       if (maxMembers != null) 'max_members': maxMembers,
     };
 
-    final response = await _apiClient.post('/api/clubs', body: json.encode(body));
+    final response = await _apiClient.post('/api/clubs', body);
     
-    if (response.statusCode == 201) {
-      final data = json.decode(response.body);
-      return Club.fromJson(data['club'] as Map<String, dynamic>);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Failed to create club');
-    }
+    return Club.fromJson(response['club'] as Map<String, dynamic>);
   }
 
   @override
   Future<ClubDetails> getClubDetails(String clubId) async {
     final response = await _apiClient.get('/api/clubs/$clubId');
     
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return ClubDetails.fromJson(data);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Failed to load club details');
-    }
+    return ClubDetails.fromJson(response);
   }
 
   @override
@@ -90,35 +72,19 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (isPublic != null) body['is_public'] = isPublic;
     if (maxMembers != null) body['max_members'] = maxMembers;
 
-    final response = await _apiClient.put('/api/clubs/$clubId', body: json.encode(body));
+    final response = await _apiClient.put('/api/clubs/$clubId', body);
     
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return Club.fromJson(data['club'] as Map<String, dynamic>);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Failed to update club');
-    }
+    return Club.fromJson(response['club'] as Map<String, dynamic>);
   }
 
   @override
   Future<void> deleteClub(String clubId) async {
-    final response = await _apiClient.delete('/api/clubs/$clubId');
-    
-    if (response.statusCode != 200) {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Failed to delete club');
-    }
+    await _apiClient.delete('/api/clubs/$clubId');
   }
 
   @override
   Future<void> requestMembership(String clubId) async {
-    final response = await _apiClient.post('/api/clubs/$clubId/join');
-    
-    if (response.statusCode != 200) {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Failed to request membership');
-    }
+    await _apiClient.post('/api/clubs/$clubId/join', {});
   }
 
   @override
@@ -133,32 +99,17 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (action != null) body['action'] = action;
     if (role != null) body['role'] = role;
 
-    final response = await _apiClient.put('/api/clubs/$clubId/members/$userId', body: json.encode(body));
-    
-    if (response.statusCode != 200) {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Failed to manage membership');
-    }
+    await _apiClient.put('/api/clubs/$clubId/members/$userId', body);
   }
 
   @override
   Future<void> removeMembership(String clubId, String userId) async {
-    final response = await _apiClient.delete('/api/clubs/$clubId/members/$userId');
-    
-    if (response.statusCode != 200) {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Failed to remove membership');
-    }
+    await _apiClient.delete('/api/clubs/$clubId/members/$userId');
   }
 
   @override
   Future<void> leaveClub(String clubId) async {
     // For leaving, we use the current user's ID - this will be handled by the backend
-    final response = await _apiClient.delete('/api/clubs/$clubId/members/me');
-    
-    if (response.statusCode != 200) {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Failed to leave club');
-    }
+    await _apiClient.delete('/api/clubs/$clubId/members/me');
   }
 }
