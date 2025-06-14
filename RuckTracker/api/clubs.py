@@ -20,7 +20,7 @@ push_service = PushNotificationService()
 class ClubListResource(Resource):
     """Handle club listing and creation"""
     
-    @auth_required()
+    @auth_required
     def get(self):
         """List clubs with optional search and filtering"""
         try:
@@ -126,7 +126,7 @@ class ClubListResource(Resource):
             logger.error(f"Error fetching clubs: {e}", exc_info=True)
             return {'error': f'Failed to fetch clubs: {str(e)}'}, 500
     
-    @auth_required()
+    @auth_required
     def post(self):
         """Create a new club"""
         try:
@@ -173,7 +173,7 @@ class ClubListResource(Resource):
 class ClubResource(Resource):
     """Handle individual club operations"""
     
-    @auth_required()
+    @auth_required
     def get(self, club_id):
         """Get club details"""
         try:
@@ -233,7 +233,7 @@ class ClubResource(Resource):
             logger.error(f"Error fetching club {club_id}: {e}", exc_info=True)
             return {'error': f'Failed to fetch club details: {str(e)}'}, 500
     
-    @auth_required()
+    @auth_required
     def put(self, club_id):
         """Update club details (admin only)"""
         try:
@@ -275,7 +275,7 @@ class ClubResource(Resource):
             logger.error(f"Error updating club {club_id}: {e}", exc_info=True)
             return {'error': f'Failed to update club: {str(e)}'}, 500
     
-    @auth_required()
+    @auth_required
     def delete(self, club_id):
         """Delete club (admin only)"""
         try:
@@ -321,7 +321,7 @@ class ClubResource(Resource):
 class ClubMembershipResource(Resource):
     """Handle club membership operations"""
     
-    @auth_required()
+    @auth_required
     def post(self, club_id):
         """Request to join club"""
         try:
@@ -390,7 +390,7 @@ class ClubMembershipResource(Resource):
 class ClubMemberManagementResource(Resource):
     """Handle club member management (admin operations)"""
     
-    @auth_required()
+    @auth_required
     def put(self, club_id, user_id):
         """Approve/deny membership request or update member role"""
         try:
@@ -453,7 +453,7 @@ class ClubMemberManagementResource(Resource):
             logger.error(f"Error updating membership for user {user_id} in club {club_id}: {e}", exc_info=True)
             return {'error': f'Failed to update membership: {str(e)}'}, 500
     
-    @auth_required()
+    @auth_required
     def delete(self, club_id, user_id):
         """Remove member from club or leave club"""
         try:
