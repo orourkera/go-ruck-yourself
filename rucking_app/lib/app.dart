@@ -38,6 +38,7 @@ import 'package:rucking_app/features/duels/presentation/screens/create_duel_scre
 import 'package:rucking_app/features/duels/presentation/screens/duel_invitations_screen.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duel_stats_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/clubs_screen.dart';
+import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -511,6 +512,19 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   );
                 case '/clubs':
                   return MaterialPageRoute(builder: (_) => const ClubsScreen());
+                case '/club_detail':
+                  final clubId = settings.arguments as String?;
+                  if (clubId != null) {
+                    return MaterialPageRoute(
+                      builder: (_) => ClubDetailScreen(clubId: clubId),
+                    );
+                  }
+                  return MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('Error')),
+                      body: const Center(child: Text('Missing club ID')),
+                    ),
+                  );
                 default:
                   // Optionally handle unknown routes
                   return MaterialPageRoute(
