@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/clubs/domain/repositories/clubs_repository.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';

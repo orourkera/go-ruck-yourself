@@ -47,7 +47,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
   }
 
   void _showCreateClubDialog() {
-    Navigator.of(context).pushNamed('/clubs/create').then((_) {
+    Navigator.of(context).pushNamed('/create_club').then((_) {
       // Refresh clubs when returning from create screen
       _clubsBloc.add(RefreshClubs());
     });
@@ -79,15 +79,6 @@ class _ClubsScreenState extends State<ClubsScreen> {
             ),
             onPressed: () => Navigator.pop(context),
           ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                Icons.add,
-                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
-              ),
-              onPressed: _showCreateClubDialog,
-            ),
-          ],
         ),
         body: BlocListener<ClubsBloc, ClubsState>(
           listener: (context, state) {
@@ -235,9 +226,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
           ),
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.pushNamed(context, '/create_club');
-          },
+          onPressed: _showCreateClubDialog,
           backgroundColor: AppColors.primary,
           child: const Icon(
             Icons.add,
