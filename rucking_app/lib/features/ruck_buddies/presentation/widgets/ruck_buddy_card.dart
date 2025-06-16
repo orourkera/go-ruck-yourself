@@ -18,6 +18,7 @@ import 'package:rucking_app/features/social/data/repositories/social_repository.
 import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/utils/route_parser.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/shared/widgets/photo/safe_network_image.dart';
@@ -975,36 +976,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
   }
 
   List<LatLng> _getRoutePoints() {
-    final pts = <LatLng>[];
-    final lp = widget.locationPoints;
-    if (lp == null || lp.isEmpty) {
-      return pts;
-    }
-
-    for (final p in lp) {
-      double? lat;
-      double? lng;
-
-      if (p is Map) {
-        lat = _parseCoord(p['latitude']);
-        lng = _parseCoord(p['longitude']);
-
-        if (lat == null) {
-          lat = _parseCoord(p['lat']);
-        }
-        if (lng == null) {
-          lng = _parseCoord(p['lng']) ?? _parseCoord(p['lon']);
-        }
-      } else if (p is List && p.length >= 2) {
-        lat = _parseCoord(p[0]);
-        lng = _parseCoord(p[1]);
-      }
-
-      if (lat != null && lng != null) {
-        pts.add(LatLng(lat, lng));
-      }
-    }
-    return pts;
+    return parseRoutePoints(widget.locationPoints);
   }
 
   LatLng _getRouteCenter(List<LatLng> points) {

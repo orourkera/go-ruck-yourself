@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:rucking_app/shared/utils/route_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -1430,8 +1431,9 @@ class _SessionRouteMap extends StatelessWidget {
   }
 
   List<LatLng> _getRoutePoints() {
-    final points = <LatLng>[];
-    final lp = session.locationPoints;
+    return parseRoutePoints(session.locationPoints);
+  }
+// (removed legacy parsing block)
     if (lp == null || lp.isEmpty) return points;
 
     for (final p in lp) {
@@ -1453,9 +1455,7 @@ class _SessionRouteMap extends StatelessWidget {
         points.add(LatLng(lat, lng));
       }
     }
-    return points;
-  }
-
+    
   @override
   Widget build(BuildContext context) {
     final points = _getRoutePoints();
