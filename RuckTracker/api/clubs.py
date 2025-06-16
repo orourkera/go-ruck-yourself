@@ -2,11 +2,11 @@
 Clubs API endpoints for club management and membership
 """
 import logging
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, g, jsonify
 from flask_restful import Api, Resource
 from RuckTracker.api.auth import auth_required, get_user_id
 from datetime import datetime
-from RuckTracker.supabase_client import get_supabase_admin_client
+from RuckTracker.supabase_client import get_supabase_admin_client, get_supabase_client
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
 
 logger = logging.getLogger(__name__)
@@ -27,8 +27,9 @@ class ClubListResource(Resource):
             current_user_id = get_user_id()
             logger.info(f"Fetching clubs for user: {current_user_id}")
             
-            admin_client = get_supabase_admin_client()
-            logger.info("Got Supabase admin client")
+            # Use user client for RLS policy compliance
+            user_client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            logger.info("Got Supabase user client")
             
             # Get query parameters
             search = request.args.get('search', '')
@@ -38,16 +39,16 @@ class ClubListResource(Resource):
             
             # First, check if clubs table exists
             try:
-                test_query = admin_client.table('clubs').select('count', count='exact').limit(1).execute()
+                test_query = user_client.table('clubs').select('count', count='exact').limit(1).execute()
                 logger.info(f"Clubs table test query successful. Count: {test_query.count}")
             except Exception as table_error:
                 logger.error(f"Clubs table does not exist or is inaccessible: {table_error}")
                 return {'error': 'Clubs table not found'}, 500
             
             # Base query - simplified to avoid complex joins
-            query = admin_client.table('clubs').select("""
+            query = user_client.table('clubs').select("""
                 *,
-                admin_user:admin_user_id(id, first_name, last_name)
+                users!admin_user_id(id, first_name, last_name)
             """)
             logger.info("Created base query")
             
@@ -63,7 +64,7 @@ class ClubListResource(Resource):
             if user_clubs_only:
                 logger.info("Applying user clubs only filter")
                 # Get user's clubs only
-                user_memberships = admin_client.table('club_memberships').select('club_id').eq('user_id', current_user_id).eq('status', 'approved').execute()
+                user_memberships = user_client.table('club_memberships').select('club_id').eq('user_id', current_user_id).eq('status', 'approved').execute()
                 if user_memberships.data:
                     club_ids = [membership['club_id'] for membership in user_memberships.data]
                     query = query.in_('id', club_ids)
@@ -83,7 +84,7 @@ class ClubListResource(Resource):
                 
                 # Get member count
                 try:
-                    member_count_result = admin_client.table('club_memberships').select('id', count='exact').eq('club_id', club['id']).eq('status', 'approved').execute()
+                    member_count_result = user_client.table('club_memberships').select('id', count='exact').eq('club_id', club['id']).eq('status', 'approved').execute()
                     member_count = member_count_result.count
                     logger.info(f"Club {club['id']} has {member_count} members")
                 except Exception as member_error:
@@ -92,7 +93,7 @@ class ClubListResource(Resource):
                 
                 # Check if current user is member/admin
                 try:
-                    user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club['id']).eq('user_id', current_user_id).execute()
+                    user_membership = user_client.table('club_memberships').select('role, status').eq('club_id', club['id']).eq('user_id', current_user_id).execute()
                     user_role = user_membership.data[0]['role'] if user_membership.data else None
                     user_status = user_membership.data[0]['status'] if user_membership.data else None
                     logger.info(f"User membership for club {club['id']}: role={user_role}, status={user_status}")
@@ -109,7 +110,7 @@ class ClubListResource(Resource):
                     'is_public': club['is_public'],
                     'max_members': club['max_members'],
                     'member_count': member_count,
-                    'admin_user': club['admin_user'],
+                    'admin_user': club.get('users'),
                     'user_role': user_role,
                     'user_status': user_status,
                     'created_at': club['created_at'],
@@ -193,7 +194,7 @@ class ClubResource(Resource):
             # Get club with admin details
             club_result = admin_client.table('clubs').select("""
                 *,
-                admin_user:admin_user_id(id, first_name, last_name)
+                users!admin_user_id(id, first_name, last_name)
             """).eq('id', club_id).execute()
             
             if not club_result.data:
@@ -204,7 +205,7 @@ class ClubResource(Resource):
             # Get club members
             members_result = admin_client.table('club_memberships').select("""
                 *,
-                user:user_id(id, first_name, last_name)
+                users:user_id(id, first_name, last_name)
             """).eq('club_id', club_id).eq('status', 'approved').execute()
             
             # Check user's membership status
@@ -217,7 +218,7 @@ class ClubResource(Resource):
             if user_role == 'admin':
                 pending_result = admin_client.table('club_memberships').select("""
                     *,
-                    user:user_id(id, first_name, last_name)
+                    users:user_id(id, first_name, last_name)
                 """).eq('club_id', club_id).eq('status', 'pending').execute()
                 pending_requests = pending_result.data
             
