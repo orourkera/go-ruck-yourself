@@ -150,7 +150,7 @@ Future<void> setupServiceLocator() async {
   
   // Events repository
   getIt.registerSingleton<EventsRepository>(
-    EventsRepositoryImpl(getIt<ApiClient>())
+    EventsRepositoryImpl(getIt<ApiClient>(), getIt<AvatarService>())
   );
   
   // Session repository for operations like delete

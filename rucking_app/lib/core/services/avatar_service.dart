@@ -130,4 +130,55 @@ class AvatarService {
       throw Exception('Failed to upload club logo: $e');
     }
   }
+
+  /// Upload an event banner image to Supabase Storage
+  /// 
+  /// [imageFile] - The image file to upload
+  /// Returns the public URL of the uploaded banner
+  /// Note: This does NOT update event data - that's handled separately
+  Future<String> uploadEventBanner(File imageFile) async {
+    try {
+      // Get authenticated user from AuthService
+      final user = await _authService.getCurrentUser();
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final userId = user.userId;
+      AppLogger.info('Uploading event banner by user $userId');
+
+      // Read image file
+      final bytes = await imageFile.readAsBytes();
+      AppLogger.info('Image size: ${bytes.length} bytes');
+
+      // Create unique filename for event banner with timestamp and user ID
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'event_banner_${userId}_${timestamp}.jpg';
+      final storagePath = 'event_banners/$fileName';
+
+      // Upload directly to Supabase Storage using efficient multipart
+      final supabase = Supabase.instance.client;
+      final storageResponse = await supabase.storage
+          .from('event_banners')
+          .uploadBinary(storagePath, bytes);
+
+      if (storageResponse.isEmpty) {
+        throw Exception('Failed to upload to storage');
+      }
+
+      // Get public URL
+      final bannerUrl = supabase.storage
+          .from('event_banners')
+          .getPublicUrl(storagePath);
+
+      AppLogger.info('Event banner uploaded successfully: $bannerUrl');
+      
+      // Return URL without updating event data - that's handled by the events service
+      return bannerUrl;
+      
+    } catch (e) {
+      AppLogger.error('Event banner upload failed: $e');
+      throw Exception('Failed to upload event banner: $e');
+    }
+  }
 }

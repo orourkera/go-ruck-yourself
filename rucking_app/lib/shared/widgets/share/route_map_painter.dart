@@ -101,18 +101,13 @@ class RouteMapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    print('🎨 RouteMapPainter.paint called - Size: $size, Points: ${locationPoints.length}');
-    
     if (locationPoints.isEmpty) {
-      print('🎨 No location points to paint');
       return;
     }
-    
-    // Apply route simplification if needed
+
     List<LocationPoint> pointsToUse;
     if (simplifyRoute && locationPoints.length > 50) {
       pointsToUse = _simplifyRoute(locationPoints, epsilon);
-      print('🎨 Route simplified from ${locationPoints.length} to ${pointsToUse.length} points');
     } else {
       pointsToUse = locationPoints;
     }

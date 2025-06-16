@@ -85,7 +85,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
         approvalRequired: event.approvalRequired,
         difficultyLevel: event.difficultyLevel,
         ruckWeightKg: event.ruckWeightKg,
-        bannerImageUrl: event.bannerImageUrl,
+        bannerImageFile: event.bannerImageFile,
       );
       
       emit(EventActionSuccess(
@@ -129,7 +129,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
         approvalRequired: event.approvalRequired,
         difficultyLevel: event.difficultyLevel,
         ruckWeightKg: event.ruckWeightKg,
-        bannerImageUrl: event.bannerImageUrl,
+        bannerImageFile: event.bannerImageFile,
       );
       
       emit(EventActionSuccess(

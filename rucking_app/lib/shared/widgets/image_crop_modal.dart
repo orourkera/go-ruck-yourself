@@ -9,8 +9,9 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Enum to define crop shape options
 enum CropShape {
-  circle,   // For profile pictures
-  square,   // For event banners and other square crops
+  circle,     // For profile pictures
+  square,     // For square crops
+  rectangle,  // For banner images and rectangular crops
 }
 
 /// A modal that allows users to crop, pan, and zoom images
@@ -133,12 +134,16 @@ class _ImageCropModalState extends State<ImageCropModal> {
                 border: Border.all(color: Colors.white, width: 2),
                 borderRadius: widget.cropShape == CropShape.circle 
                     ? BorderRadius.circular(cropSize / 2) 
-                    : BorderRadius.circular(8),
+                    : widget.cropShape == CropShape.rectangle
+                        ? BorderRadius.circular(0)
+                        : BorderRadius.circular(8),
               ),
               child: ClipRRect(
                 borderRadius: widget.cropShape == CropShape.circle 
                     ? BorderRadius.circular(cropSize / 2) 
-                    : BorderRadius.circular(6),
+                    : widget.cropShape == CropShape.rectangle
+                        ? BorderRadius.circular(0)
+                        : BorderRadius.circular(6),
                 child: RepaintBoundary(
                   key: _cropKey,
                   child: InteractiveViewer(

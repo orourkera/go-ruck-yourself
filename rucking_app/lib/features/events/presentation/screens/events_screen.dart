@@ -14,6 +14,7 @@ import 'package:rucking_app/shared/widgets/empty_state.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({Key? key}) : super(key: key);
@@ -123,17 +124,15 @@ class _EventsScreenState extends State<EventsScreen> {
                 child: BlocConsumer<EventsBloc, EventsState>(
                   listener: (context, state) {
                     if (state is EventsError) {
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          SnackBar(content: Text(state.message)),
-                        );
+                      StyledSnackBar.showError(
+                        context: context,
+                        message: state.message,
+                      );
                     } else if (state is EventActionSuccess) {
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          SnackBar(content: Text(state.message)),
-                        );
+                      StyledSnackBar.showSuccess(
+                        context: context,
+                        message: state.message,
+                      );
                       
                       if (state.shouldRefresh) {
                         _eventsBloc.add(RefreshEvents());

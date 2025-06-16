@@ -810,7 +810,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         difficultyLevel: eventData['difficulty_level'] as int?,
         ruckWeightKg: eventData['ruck_weight_kg'] as double?,
         durationMinutes: eventData['duration_minutes'] as int,
-        bannerImageUrl: _bannerImage?.path,
+        bannerImageFile: _bannerImage, 
       ));
     } else {
       _eventsBloc.add(CreateEvent(
@@ -827,7 +827,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         difficultyLevel: eventData['difficulty_level'] as int?,
         ruckWeightKg: eventData['ruck_weight_kg'] as double?,
         durationMinutes: eventData['duration_minutes'] as int,
-        bannerImageUrl: _bannerImage?.path,
+        bannerImageFile: _bannerImage, 
       ));
     }
   }

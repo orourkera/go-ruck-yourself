@@ -141,12 +141,10 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
         type: ShareBackgroundType.map,
         displayName: 'Map',
       ));
-      print('📍 Added map background option - Location points: ${widget.session.locationPoints!.length}');
     } else {
-      print('📍 No map background - Location points null: ${widget.session.locationPoints == null}, empty: ${widget.session.locationPoints?.isEmpty}');
-      print('📍 Session locationPoints type: ${widget.session.locationPoints.runtimeType}');
+      // No map background option - insufficient location data
       if (widget.session.locationPoints != null) {
-        print('📍 First few location points: ${widget.session.locationPoints!.take(2).toList()}');
+        // Removed verbose location points debugging
       }
     }
 

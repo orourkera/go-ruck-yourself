@@ -1,6 +1,7 @@
 import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/features/events/domain/models/event_comment.dart';
 import 'package:rucking_app/features/events/domain/models/event_progress.dart';
+import 'dart:io';
 
 abstract class EventsRepository {
   // Event CRUD operations
@@ -27,7 +28,7 @@ abstract class EventsRepository {
     bool? approvalRequired,
     int? difficultyLevel,
     double? ruckWeightKg,
-    String? bannerImageUrl,
+    File? bannerImageFile,
   });
   
   Future<EventDetails> getEventDetails(String eventId);
@@ -46,7 +47,7 @@ abstract class EventsRepository {
     bool? approvalRequired,
     int? difficultyLevel,
     double? ruckWeightKg,
-    String? bannerImageUrl,
+    File? bannerImageFile,
   });
   
   Future<void> cancelEvent(String eventId);

@@ -34,11 +34,6 @@ class ShareCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Debug print for session location points
-    if (backgroundOption?.type == ShareBackgroundType.map && session.locationPoints != null) {
-      print('🗺️ ShareCardWidget build - Location points count: ${session.locationPoints!.length}');
-    }
-    
     // For map backgrounds, we need to handle image loading properly
     if (backgroundOption?.type == ShareBackgroundType.map && session.locationPoints?.isNotEmpty == true) {
       return _buildShareCardWithMap();
@@ -191,9 +186,6 @@ class ShareCardWidget extends StatelessWidget {
       final latSpan = maxLat - minLat;
       final lngSpan = maxLng - minLng;
       
-      print('🗺️ [DEBUG] Bounds: lat($minLat, $maxLat), lng($minLng, $maxLng)');
-      print('🗺️ [DEBUG] Spans: lat=$latSpan, lng=$lngSpan');
-      
       // Calculate center point
       final centerLat = (minLat + maxLat) / 2;
       final centerLng = (minLng + maxLng) / 2;
@@ -213,11 +205,8 @@ class ShareCardWidget extends StatelessWidget {
         zoom = 16; // Very small area
       }
       
-      print('🗺️ [DEBUG] Center: $centerLat,$centerLng, Zoom: $zoom, MaxSpan: $maxSpan');
-      
       // Build request body using center/zoom approach
       final encodedPolyline = _encodePolyline(simplifiedCoordinates);
-      print('🗺️ [DEBUG] Encoded polyline length: ${encodedPolyline.length}');
       
       final requestBody = {
         'center': '$centerLat,$centerLng',
@@ -311,12 +300,9 @@ class ShareCardWidget extends StatelessWidget {
   
   String? _generateMapUrl() {
     if (session.locationPoints == null || session.locationPoints!.isEmpty) {
-      print('❌ No location points available for map background');
       return null;
     }
     
-    print('🗺️ Generating map URL with ${session.locationPoints!.length} location points');
-
     // Calculate route bounds for map centering
     final points = session.locationPoints!
         .where((point) => (point['lat'] != null || point['latitude'] != null) && 
@@ -328,7 +314,6 @@ class ShareCardWidget extends StatelessWidget {
         .toList();
 
     if (points.isEmpty) {
-      print('❌ No valid lat/lng points found');
       return null;
     }
 
@@ -355,7 +340,6 @@ class ShareCardWidget extends StatelessWidget {
     
     // Calculate zoom level dynamically based on the bounding box
     double zoom = _calculateZoomLevel(minLat, maxLat, minLng, maxLng, 800, 800);
-    print('🔎 Calculated zoom level: $zoom for lat diff: ${maxLat - minLat}, lng diff: ${maxLng - minLng}');
     
     // Build the path parameter for route drawing
     final pathPoints = <String>[];
@@ -378,7 +362,6 @@ class ShareCardWidget extends StatelessWidget {
     if (apiKey.isEmpty) {
       // If no API key is found, the map request might fail or use a default.
       // Consider logging this or handling it gracefully.
-      print('⚠️ STADIA_MAPS_API_KEY is not set. Map generation may fail.');
     }
 
     const style = 'stamen_terrain';
@@ -393,7 +376,6 @@ class ShareCardWidget extends StatelessWidget {
         'size=$size&' +
         'path=$pathStyle|${pathPoints.join('|')}&' +
         'api_key=$apiKey';
-    print('🗺️ Stadia static map URL → length: ${stadiaMapsUrl.length}');
     return stadiaMapsUrl;
   }
   
@@ -434,45 +416,8 @@ class ShareCardWidget extends StatelessWidget {
   Widget _buildShareCardContent() {
     return Stack(
       children: [
-        // Debug background type and points to help troubleshoot
-        Builder(
-          builder: (context) {
-            AppLogger.debug('ShareCardWidget build - Background type: ${backgroundOption?.type}');
-            AppLogger.debug('ShareCardWidget build - Location points count: ${session.locationPoints?.length}');
-            return const SizedBox.shrink();
-          },
-        ),
-        
         // Only draw route map overlay when we have a map background
         if (backgroundOption?.type == ShareBackgroundType.map && session.locationPoints?.isNotEmpty == true) ...[  
-          // Debug: Print location points info
-          Builder(
-            builder: (context) {
-              AppLogger.debug('Map background rendering with ${session.locationPoints?.length} points');
-              if (session.locationPoints?.isNotEmpty == true) {
-                AppLogger.debug('First point: ${session.locationPoints!.first}');
-                AppLogger.debug('Last point: ${session.locationPoints!.last}');
-                
-                // Test conversion
-                final converted = session.locationPoints!
-                    .where((point) => (point['lat'] != null || point['latitude'] != null) && 
-                                    (point['lng'] != null || point['longitude'] != null))
-                    .map((point) => LocationPoint(
-                      latitude: (point['lat'] ?? point['latitude'] as num).toDouble(),
-                      longitude: (point['lng'] ?? point['longitude'] as num).toDouble(),
-                      elevation: 0.0,
-                      timestamp: DateTime.now(),
-                      accuracy: 0.0,
-                    ))
-                    .toList();
-                AppLogger.debug('Converted points: ${converted.length}');
-                if (converted.isNotEmpty) {
-                  AppLogger.debug('First converted: lat=${converted.first.latitude}, lng=${converted.first.longitude}');
-                }
-              }
-              return const SizedBox.shrink();
-            },
-          ),
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
@@ -503,7 +448,6 @@ class ShareCardWidget extends StatelessWidget {
                     );
                   }
                   
-                  print('🎨 RouteMapPainter.paint called - Size: Size(800.0, 800.0), Points: ${locationPoints.length}');
                   return CustomPaint(
                     size: Size(800, 800),
                     painter: RouteMapPainter(

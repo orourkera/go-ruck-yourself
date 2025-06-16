@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:equatable/equatable.dart';
 
 abstract class EventsEvent extends Equatable {
@@ -44,7 +45,7 @@ class CreateEvent extends EventsEvent {
   final bool? approvalRequired;
   final int? difficultyLevel;
   final double? ruckWeightKg;
-  final String? bannerImageUrl;
+  final File? bannerImageFile;
 
   const CreateEvent({
     required this.title,
@@ -60,7 +61,7 @@ class CreateEvent extends EventsEvent {
     this.approvalRequired,
     this.difficultyLevel,
     this.ruckWeightKg,
-    this.bannerImageUrl,
+    this.bannerImageFile,
   });
 
   @override
@@ -78,7 +79,7 @@ class CreateEvent extends EventsEvent {
         approvalRequired,
         difficultyLevel,
         ruckWeightKg,
-        bannerImageUrl,
+        bannerImageFile,
       ];
 }
 
@@ -105,7 +106,7 @@ class UpdateEvent extends EventsEvent {
   final bool? approvalRequired;
   final int? difficultyLevel;
   final double? ruckWeightKg;
-  final String? bannerImageUrl;
+  final File? bannerImageFile;
 
   const UpdateEvent({
     required this.eventId,
@@ -121,7 +122,7 @@ class UpdateEvent extends EventsEvent {
     this.approvalRequired,
     this.difficultyLevel,
     this.ruckWeightKg,
-    this.bannerImageUrl,
+    this.bannerImageFile,
   });
 
   @override
@@ -139,7 +140,7 @@ class UpdateEvent extends EventsEvent {
         approvalRequired,
         difficultyLevel,
         ruckWeightKg,
-        bannerImageUrl,
+        bannerImageFile,
       ];
 }
 

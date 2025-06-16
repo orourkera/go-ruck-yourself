@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/shared/widgets/image_crop_modal.dart' show ImageCropModal, CropShape;
 
 /// Utility class for handling image selection and processing
@@ -87,79 +88,37 @@ class ImagePickerUtils {
     return pickImage(context, showCropModal: true);
   }
 
-  /// Pick image for event banner (always shows crop modal with square aspect ratio)
+  /// Pick image for event banner (always shows crop modal with 3:1 aspect ratio)
   static Future<File?> pickEventBannerImage(BuildContext context) async {
-    final result = await showDialog<String?>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Select Banner Image'),
-          content: const Text('Choose how you\'d like to select your event banner:'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, 'camera'),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.camera_alt),
-                  SizedBox(width: 8),
-                  Text('Camera'),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, 'gallery'),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.photo_library),
-                  SizedBox(width: 8),
-                  Text('Gallery'),
-                ],
-              ),
-            ),
-            // Cancel button moved to bottom left
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => Navigator.pop(dialogContext, null),
-                child: const Text('Cancel'),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result == null) return null;
-    
-    File? selectedFile;
-    if (result == 'camera') {
-      selectedFile = await _pickImageFromCamera();
-    } else if (result == 'gallery') {
-      selectedFile = await _pickImageFromGallery();
-    }
-    
-    if (selectedFile == null) return null;
-    
-    // Show crop modal for banner with square aspect ratio
-    if (context.mounted) {
-      final croppedFile = await Navigator.of(context).push<File>(
-        MaterialPageRoute(
-          builder: (context) => ImageCropModal(
-            imageFile: selectedFile!,
-            title: 'Crop Event Banner',
-            aspectRatio: 1.0, // Square aspect ratio for event banners
-            cropShape: CropShape.square,
-          ),
-          fullscreenDialog: true,
-        ),
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
       );
-      
-      return croppedFile ?? selectedFile;
+
+      if (image == null) return null;
+
+      if (context.mounted) {
+        final croppedFile = await showModalBottomSheet<File?>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => ImageCropModal(
+            imageFile: File(image.path),
+            title: 'Crop Event Banner',
+            aspectRatio: 3.0, // 3:1 aspect ratio for wide banner
+            cropShape: CropShape.rectangle, // Use rectangle crop shape for banner
+          ),
+        );
+        return croppedFile;
+      }
+    } catch (e) {
+      AppLogger.error('Error picking event banner image: $e');
     }
-    
-    return selectedFile;
+    return null;
   }
 
   /// Pick image from camera

@@ -36,7 +36,7 @@ class Club extends Equatable {
       isPublic: json['is_public'] as bool,
       maxMembers: json['max_members'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String? ?? json['created_at'] as String),
       memberCount: json['member_count'] as int,
       userRole: json['user_role'] as String?,
       userStatus: json['user_status'] as String?,

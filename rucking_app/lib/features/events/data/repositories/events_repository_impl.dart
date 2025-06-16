@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/events_cache_service.dart';
+import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/features/events/domain/models/event_comment.dart';
 import 'package:rucking_app/features/events/domain/models/event_progress.dart';
@@ -9,9 +11,10 @@ import 'package:rucking_app/features/events/domain/repositories/events_repositor
 
 class EventsRepositoryImpl implements EventsRepository {
   final ApiClient _apiClient;
+  final AvatarService _avatarService;
   final EventsCacheService _cacheService = getIt<EventsCacheService>();
 
-  EventsRepositoryImpl(this._apiClient);
+  EventsRepositoryImpl(this._apiClient, this._avatarService);
 
   @override
   Future<List<Event>> getEvents({
@@ -96,8 +99,14 @@ class EventsRepositoryImpl implements EventsRepository {
     bool? approvalRequired,
     int? difficultyLevel,
     double? ruckWeightKg,
-    String? bannerImageUrl,
+    File? bannerImageFile,
   }) async {
+    // Upload banner image if provided
+    String? bannerImageUrl;
+    if (bannerImageFile != null) {
+      bannerImageUrl = await _avatarService.uploadEventBanner(bannerImageFile);
+    }
+
     final body = {
       'title': title,
       'scheduled_start_time': scheduledStartTime.toIso8601String(),
@@ -158,8 +167,14 @@ class EventsRepositoryImpl implements EventsRepository {
     bool? approvalRequired,
     int? difficultyLevel,
     double? ruckWeightKg,
-    String? bannerImageUrl,
+    File? bannerImageFile,
   }) async {
+    // Upload banner image if provided
+    String? bannerImageUrl;
+    if (bannerImageFile != null) {
+      bannerImageUrl = await _avatarService.uploadEventBanner(bannerImageFile);
+    }
+
     final body = <String, dynamic>{};
     
     if (title != null) body['title'] = title;
