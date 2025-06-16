@@ -232,13 +232,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             ),
             _buildStatItem(
               'Admin',
-              clubDetails.members.firstWhere((member) => member.role == 'admin', orElse: () => ClubMember(
-                userId: '',
-                username: 'Unknown',
-                role: 'admin',
-                status: 'approved',
-                joinedAt: DateTime.now(),
-              )).username ?? 'Unknown',
+              _getAdminName(clubDetails),
               Icons.admin_panel_settings,
             ),
             _buildStatItem(
@@ -250,6 +244,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         ),
       ),
     );
+  }
+
+  String _getAdminName(ClubDetails clubDetails) {
+    return clubDetails.adminUser.username ?? 'Unknown';
   }
 
   Widget _buildStatItem(String label, String value, IconData icon) {

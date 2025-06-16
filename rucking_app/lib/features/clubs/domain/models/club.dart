@@ -128,16 +128,48 @@ class ClubDetails extends Equatable {
   final Club club;
   final List<ClubMember> members;
   final List<ClubMember> pendingRequests;
+  final ClubMember adminUser;
 
   const ClubDetails({
     required this.club,
     required this.members,
     required this.pendingRequests,
+    required this.adminUser,
   });
 
   factory ClubDetails.fromJson(Map<String, dynamic> json) {
     // Support both old and new API formats
     final clubJson = json.containsKey('club') ? json['club'] as Map<String, dynamic> : json;
+
+    // Get admin user data
+    ClubMember adminUser;
+    if (clubJson['admin_user'] != null) {
+      // Create a ClubMember from admin_user data
+      final adminData = clubJson['admin_user'] as Map<String, dynamic>;
+      adminUser = ClubMember(
+        userId: adminData['id'] as String,
+        username: adminData['username'] as String?,
+        avatarUrl: adminData['avatar_url'] as String?,
+        role: 'admin',
+        status: 'approved',
+        joinedAt: DateTime.parse(clubJson['created_at'] as String),
+      );
+    } else {
+      // Fallback: try to find admin in members list
+      final members = (clubJson['members'] as List<dynamic>? ?? [])
+          .map((member) => ClubMember.fromJson(member as Map<String, dynamic>))
+          .toList();
+      adminUser = members.firstWhere(
+        (member) => member.role == 'admin',
+        orElse: () => ClubMember(
+          userId: clubJson['admin_user_id'] as String? ?? '',
+          username: 'Unknown',
+          role: 'admin',
+          status: 'approved',
+          joinedAt: DateTime.parse(clubJson['created_at'] as String),
+        ),
+      );
+    }
 
     return ClubDetails(
       club: Club.fromJson(clubJson),
@@ -147,9 +179,10 @@ class ClubDetails extends Equatable {
       pendingRequests: (clubJson['pending_requests'] as List<dynamic>? ?? [])
           .map((request) => ClubMember.fromJson(request as Map<String, dynamic>))
           .toList(),
+      adminUser: adminUser,
     );
   }
 
   @override
-  List<Object?> get props => [club, members, pendingRequests];
+  List<Object?> get props => [club, members, pendingRequests, adminUser];
 }
