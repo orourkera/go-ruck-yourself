@@ -29,86 +29,90 @@ class RuckSessionListResource(Resource):
             sessions = response.data
             if sessions is None:
                 sessions = []
-            # Attach route (list of lat/lng) to each session
-            for session in sessions:
-                locations_resp = supabase.table('location_point') \
-                    .select('latitude,longitude') \
-                    .eq('session_id', session['id']) \
-                    .order('timestamp') \
-                    .execute()
-                
-                logger.debug(f"Location response data for session {session['id']}: {len(locations_resp.data) if locations_resp.data else 0} points")
-                
-                if locations_resp.data:
-                    # Process and verify location data is valid
-                    valid_location_points = []
-                    for loc in locations_resp.data:
-                        # Ensure the location data contains latitude and longitude
-                        if 'latitude' in loc and 'longitude' in loc:
-                            try:
-                                # Convert numeric values if needed
-                                lat = float(loc['latitude']) if loc['latitude'] is not None else None
-                                lng = float(loc['longitude']) if loc['longitude'] is not None else None
-                                
-                                if lat is not None and lng is not None:
-                                    valid_location_points.append({'lat': lat, 'lng': lng})
-                            except (ValueError, TypeError) as e:
-                                logger.warning(f"Invalid location data for session {session['id']}: {e}")
-                    
-                    logger.debug(f"Processed {len(valid_location_points)} valid location points for session {session['id']}")
-                    
-                    # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
-                    session['route'] = valid_location_points
-                    session['location_points'] = valid_location_points
-                else:
-                    session['route'] = []
-                    session['location_points'] = []
-                
-                # Fetch splits data for each session
-                splits_resp = supabase.table('session_splits') \
-                    .select('split_number,split_distance_km,split_duration_seconds') \
-                    .eq('session_id', session['id']) \
-                    .order('split_number') \
-                    .execute()
-                
-                if splits_resp.data:
-                    # Convert splits to the format expected by frontend
-                    session['splits'] = []
-                    for split in splits_resp.data:
-                        distance_km = split['split_distance_km']
-                        duration_seconds = split['split_duration_seconds']
-                        
-                        # Calculate pace (seconds per km)
-                        pace_seconds_per_km = duration_seconds / distance_km if distance_km > 0 else 0
-                        
-                        session['splits'].append({
-                            'splitNumber': split['split_number'],
-                            'distance': distance_km * 1000, # Convert km to meters
-                            'duration': duration_seconds,
-                            'paceSecondsPerKm': pace_seconds_per_km
-                        })
-                else:
-                    session['splits'] = []
             
-            # Log the sessions data before returning to client
+            # Get all session IDs for batch queries
+            session_ids = [session['id'] for session in sessions]
+            
+            if not session_ids:
+                return sessions, 200
+            
+            # Batch fetch all location points for all sessions
+            all_locations_resp = supabase.table('location_point') \
+                .select('session_id,latitude,longitude') \
+                .in_('session_id', session_ids) \
+                .order('session_id,timestamp') \
+                .execute()
+            
+            # Batch fetch all splits for all sessions  
+            all_splits_resp = supabase.table('session_splits') \
+                .select('session_id,split_number,split_distance_km,split_duration_seconds') \
+                .in_('session_id', session_ids) \
+                .order('session_id,split_number') \
+                .execute()
+            
+            # Group location points by session_id
+            locations_by_session = {}
+            if all_locations_resp.data:
+                for loc in all_locations_resp.data:
+                    session_id = loc['session_id']
+                    if session_id not in locations_by_session:
+                        locations_by_session[session_id] = []
+                    
+                    # Ensure the location data contains latitude and longitude
+                    if 'latitude' in loc and 'longitude' in loc:
+                        try:
+                            # Convert numeric values if needed
+                            lat = float(loc['latitude']) if loc['latitude'] is not None else None
+                            lng = float(loc['longitude']) if loc['longitude'] is not None else None
+                            
+                            if lat is not None and lng is not None:
+                                locations_by_session[session_id].append({'lat': lat, 'lng': lng})
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Invalid location data for session {session_id}: {e}")
+            
+            # Group splits by session_id
+            splits_by_session = {}
+            if all_splits_resp.data:
+                for split in all_splits_resp.data:
+                    session_id = split['session_id']
+                    if session_id not in splits_by_session:
+                        splits_by_session[session_id] = []
+                    
+                    distance_km = split['split_distance_km']
+                    duration_seconds = split['split_duration_seconds']
+                    
+                    # Calculate pace (seconds per km)
+                    pace_per_km = duration_seconds / distance_km if distance_km > 0 else 0
+                    
+                    splits_by_session[session_id].append({
+                        'split_number': split['split_number'],
+                        'distance_km': distance_km,
+                        'duration_seconds': duration_seconds,
+                        'pace_per_km': pace_per_km
+                    })
+            
+            # Attach route and splits data to each session
+            for session in sessions:
+                session_id = session['id']
+                
+                # Attach location points
+                location_points = locations_by_session.get(session_id, [])
+                session['route'] = location_points  # legacy
+                session['location_points'] = location_points
+                
+                # Attach splits
+                session['splits'] = splits_by_session.get(session_id, [])
+            
             logger.info(f"Session data being returned to client (sample of up to 3 sessions):")
-            for i, session_data in enumerate(sessions[:3]): # Log first 3 sessions as sample
-                log_output = {
-                    'id': session_data.get('id'),
-                    'start_time': session_data.get('start_time'),
-                    'created_at': session_data.get('created_at'),
-                    'completed_at': session_data.get('completed_at'),
-                    'end_time': session_data.get('end_time'),
-                    'status': session_data.get('status')
-                }
-                logger.info(f"Session sample {i+1}: {log_output}")
+            for i, session in enumerate(sessions[:3]):
+                logger.info(f"Session sample {i+1}: {{'id': {session['id']}, 'start_time': {session.get('start_time')}, 'created_at': {session.get('created_at')}, 'completed_at': {session.get('completed_at')}, 'end_time': {session.get('end_time')}, 'status': {session.get('status')}}}")
             if len(sessions) > 3:
                 logger.info(f"...(and {len(sessions) - 3} more sessions)")
-
-            return {'sessions': sessions}, 200
+            
+            return sessions, 200
         except Exception as e:
-            logger.error(f"Error fetching ruck sessions: {e}")
-            return {'message': f"Error fetching ruck sessions: {str(e)}"}, 500
+            logger.error(f"Error getting ruck sessions: {e}")
+            return {'message': f"Error getting ruck sessions: {str(e)}"}, 500
 
     def post(self):
         """Create a new ruck session for the current user"""
