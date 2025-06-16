@@ -1427,11 +1427,8 @@ class _SessionRouteMap extends StatelessWidget {
     // Try locationPoints (preferred in model)
     if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
       for (final p in session.locationPoints!) {
-        if ((p.containsKey('lat') && p.containsKey('lng')) ||
-            (p.containsKey('latitude') && p.containsKey('longitude'))) {
-          final lat = (p['lat'] ?? p['latitude'] as num).toDouble();
-          final lng = (p['lng'] ?? p['longitude'] as num).toDouble();
-          points.add(LatLng(lat, lng));
+        if (p.containsKey('lat') && p.containsKey('lng')) {
+          points.add(LatLng((p['lat'] as num).toDouble(), (p['lng'] as num).toDouble()));
         }
       }
     }

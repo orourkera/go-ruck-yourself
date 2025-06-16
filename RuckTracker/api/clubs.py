@@ -127,18 +127,8 @@ class ClubListResource(Resource):
                 
                 # Only include admin_user if the join data exists and is valid
                 admin_user_data = club.get('user')
-                logger.info(f"Admin user data from join: {admin_user_data}")
                 if admin_user_data and isinstance(admin_user_data, dict):
                     club_data['admin_user'] = admin_user_data
-                    logger.info(f"Added admin_user to response: {admin_user_data}")
-                
-                # Get members
-                members_result = admin_client.table('club_memberships').select("""
-                    *,
-                    user:user_id(id, username, avatar_url)
-                """).eq('club_id', club['id']).eq('status', 'approved').execute()
-                logger.info(f"Members for club {club['id']}: {members_result.data}")
-                club_data['members'] = members_result.data
                 
                 clubs.append(club_data)
             
@@ -224,14 +214,12 @@ class ClubResource(Resource):
                 return {'error': 'Club not found'}, 404
             
             club = club_result.data[0]
-            logger.info(f"Raw club data: {club}")
             
             # Get club members
             members_result = admin_client.table('club_memberships').select("""
                 *,
                 user:user_id(id, username, avatar_url)
             """).eq('club_id', club_id).eq('status', 'approved').execute()
-            logger.info(f"Members for club {club_id}: {members_result.data}")
             
             # Check user's membership status
             user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club_id).eq('user_id', current_user_id).execute()
@@ -267,12 +255,9 @@ class ClubResource(Resource):
             
             # Only include admin_user if the join data exists and is valid
             admin_user_data = club.get('user')
-            logger.info(f"Admin user data from join: {admin_user_data}")
             if admin_user_data and isinstance(admin_user_data, dict):
                 club_data['admin_user'] = admin_user_data
-                logger.info(f"Added admin_user to response: {admin_user_data}")
             
-            logger.info(f"Final club_data: {club_data}")
             return {'club': club_data}, 200
             
         except Exception as e:
