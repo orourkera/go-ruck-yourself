@@ -83,7 +83,7 @@ class Club extends Equatable {
 
 class ClubMember extends Equatable {
   final String userId;
-  final String username;
+  final String? username;
   final String? avatarUrl;
   final String role; // 'admin' or 'member'
   final String status; // 'pending', 'approved', 'rejected'
@@ -91,7 +91,7 @@ class ClubMember extends Equatable {
 
   const ClubMember({
     required this.userId,
-    required this.username,
+    this.username,
     this.avatarUrl,
     required this.role,
     required this.status,
@@ -101,7 +101,7 @@ class ClubMember extends Equatable {
   factory ClubMember.fromJson(Map<String, dynamic> json) {
     return ClubMember(
       userId: json['user_id'] as String,
-      username: json['username'] as String,
+      username: json['username'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       role: json['role'] as String,
       status: json['status'] as String,
@@ -136,12 +136,15 @@ class ClubDetails extends Equatable {
   });
 
   factory ClubDetails.fromJson(Map<String, dynamic> json) {
+    // Support both old and new API formats
+    final clubJson = json.containsKey('club') ? json['club'] as Map<String, dynamic> : json;
+
     return ClubDetails(
-      club: Club.fromJson(json['club'] as Map<String, dynamic>),
-      members: (json['members'] as List<dynamic>)
+      club: Club.fromJson(clubJson),
+      members: (clubJson['members'] as List<dynamic>? ?? [])
           .map((member) => ClubMember.fromJson(member as Map<String, dynamic>))
           .toList(),
-      pendingRequests: (json['pending_requests'] as List<dynamic>? ?? [])
+      pendingRequests: (clubJson['pending_requests'] as List<dynamic>? ?? [])
           .map((request) => ClubMember.fromJson(request as Map<String, dynamic>))
           .toList(),
     );

@@ -238,7 +238,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 role: 'admin',
                 status: 'approved',
                 joinedAt: DateTime.now(),
-              )).username,
+              )).username ?? 'Unknown',
               Icons.admin_panel_settings,
             ),
             _buildStatItem(
@@ -308,12 +308,12 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       leading: CircleAvatar(
         backgroundColor: Theme.of(context).primaryColor,
         child: Text(
-          member.username.isNotEmpty ? member.username[0].toUpperCase() : 'U',
+          (member.username ?? '').isNotEmpty ? (member.username![0].toUpperCase()) : 'U',
           style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
         ),
       ),
       title: Text(
-        member.username,
+        member.username ?? 'Unknown',
         style: AppTextStyles.bodyMedium,
       ),
       subtitle: Text(
@@ -396,11 +396,11 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       leading: CircleAvatar(
         backgroundColor: Theme.of(context).primaryColor,
         child: Text(
-          request.username.isNotEmpty ? request.username[0].toUpperCase() : 'U',
+          (request.username ?? '').isNotEmpty ? request.username![0].toUpperCase() : 'U',
           style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
         ),
       ),
-      title: Text('${request.username}'),
+      title: Text(request.username ?? 'Unknown'),
       subtitle: Text(
         'Requested ${_formatDate(request.joinedAt)}',
         style: AppTextStyles.bodySmall.copyWith(

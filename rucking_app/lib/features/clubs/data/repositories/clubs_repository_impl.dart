@@ -101,10 +101,10 @@ class ClubsRepositoryImpl implements ClubsRepository {
     // No cache, fetch from API
     final response = await _apiClient.get('/clubs/$clubId');
     
-    final clubDetails = ClubDetails.fromJson(response['club'] as Map<String, dynamic>);
+    final clubDetails = ClubDetails.fromJson(response as Map<String, dynamic>);
     
     // Cache the club details
-    await _cacheService.cacheClubDetails(clubId, response['club'] as Map<String, dynamic>);
+    await _cacheService.cacheClubDetails(clubId, response as Map<String, dynamic>);
     
     return clubDetails;
   }
