@@ -203,6 +203,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         isPremium = premiumState.isPremium;
       }
       
+      // COMMENTED OUT: Paywall/upsell logic disabled per user request
+      /*
       if (!isPremium) {
         // Free user - navigate to post-session upsell screen
         double avgPace = 0.0;
@@ -275,7 +277,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         // Premium user - navigate directly to home
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       }
+      */
       
+      // SIMPLIFIED: Always navigate to home (no paywall for any user)
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+
       // Clear session history cache so new session appears in history
       SessionRepository.clearSessionHistoryCache();
 
@@ -476,6 +482,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     setState(() {
       _isAchievementDialogShowing = false;
     });
+    // COMMENTED OUT: Paywall/upsell logic disabled per user request
+    /*
     if (_pendingUpsellNavigation) {
       setState(() {
         _pendingUpsellNavigation = false;
@@ -486,6 +494,16 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         (route) => false,
         arguments: _pendingSessionData,
       );
+      _pendingSessionData = null;
+    }
+    */
+    
+    // SIMPLIFIED: Always navigate to home after achievements dismissed
+    if (_pendingUpsellNavigation) {
+      setState(() {
+        _pendingUpsellNavigation = false;
+      });
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       _pendingSessionData = null;
     }
   }

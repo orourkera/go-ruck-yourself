@@ -66,7 +66,7 @@ class ShareCardWidget extends StatelessWidget {
             );
           } else if (snapshot.hasError) {
             // Log the error
-            print('❌ Error loading map image: ${snapshot.error}');
+            AppLogger.error('Error loading map image: ${snapshot.error}');
             
             // Try fallback to URL-based approach
             final mapUrl = _generateMapUrl();
@@ -81,7 +81,7 @@ class ShareCardWidget extends StatelessWidget {
                       height: 800,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        print('❌ Fallback map image failed: $error');
+                        AppLogger.error('Fallback map image failed: $error');
                         return Container(
                           width: 800,
                           height: 800,
@@ -113,7 +113,7 @@ class ShareCardWidget extends StatelessWidget {
                     height: 800,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      print('❌ Memory image failed: $error');
+                      AppLogger.error('Memory image failed: $error');
                       return Container(
                         width: 800,
                         height: 800,
@@ -468,19 +468,6 @@ class ShareCardWidget extends StatelessWidget {
             ),
           ),
         ] else ... [
-        // Debug: More accurate background info
-        Builder(
-          builder: (context) {
-            if (backgroundOption?.type == ShareBackgroundType.map) {
-              AppLogger.debug('Map background selected but missing data to display');
-              AppLogger.debug('Location points null: ${session.locationPoints == null}');
-              AppLogger.debug('Location points empty: ${session.locationPoints?.isEmpty}');
-            } else {
-              AppLogger.debug('Non-map background type: ${backgroundOption?.type}');
-            }
-            return const SizedBox.shrink();
-          },
-        ),
         ],
         
         // Overlay for text readability
