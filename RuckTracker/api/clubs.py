@@ -117,7 +117,8 @@ class ClubListResource(Resource):
                     'is_public': club['is_public'],
                     'max_members': club['max_members'],
                     'member_count': member_count,
-                    'admin_user': club.get('users'),
+                    'admin_user_id': club['admin_user_id'],  # Add direct admin_user_id field
+                    'admin_user': club.get('users'),  # Keep joined admin user data
                     'user_role': user_role,
                     'user_status': user_status,
                     'created_at': club['created_at'],
@@ -236,7 +237,8 @@ class ClubResource(Resource):
                 'logo_url': club['logo_url'],
                 'is_public': club['is_public'],
                 'max_members': club['max_members'],
-                'admin_user': club['admin_user'],
+                'admin_user_id': club['admin_user_id'],  # Add direct admin_user_id field
+                'admin_user': club.get('users'),  # Keep joined admin user data
                 'members': members_result.data,
                 'member_count': len(members_result.data),
                 'pending_requests': pending_requests,
