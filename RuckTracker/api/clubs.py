@@ -27,9 +27,9 @@ class ClubListResource(Resource):
             current_user_id = get_user_id()
             logger.info(f"Fetching clubs for user: {current_user_id}")
             
-            # Use user client for RLS policy compliance
-            user_client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            logger.info("Got Supabase user client")
+            # Use admin client to avoid RLS infinite recursion issues
+            admin_client = get_supabase_admin_client()
+            logger.info("Got Supabase admin client")
             
             # Get query parameters
             search = request.args.get('search', '')
@@ -39,14 +39,14 @@ class ClubListResource(Resource):
             
             # First, check if clubs table exists
             try:
-                test_query = user_client.table('clubs').select('count', count='exact').limit(1).execute()
+                test_query = admin_client.table('clubs').select('count', count='exact').limit(1).execute()
                 logger.info(f"Clubs table test query successful. Count: {test_query.count}")
             except Exception as table_error:
                 logger.error(f"Clubs table does not exist or is inaccessible: {table_error}")
                 return {'error': 'Clubs table not found'}, 500
             
             # Base query - simplified to avoid complex joins
-            query = user_client.table('clubs').select("""
+            query = admin_client.table('clubs').select("""
                 *,
                 users!admin_user_id(id, first_name, last_name)
             """)
@@ -61,30 +61,37 @@ class ClubListResource(Resource):
                 query = query.eq('is_public', is_public.lower() == 'true')
                 logger.info(f"Applied public filter: {is_public}")
             
-            if user_clubs_only:
-                logger.info("Applying user clubs only filter")
-                # Get user's clubs only
-                user_memberships = user_client.table('club_memberships').select('club_id').eq('user_id', current_user_id).eq('status', 'approved').execute()
-                if user_memberships.data:
-                    club_ids = [membership['club_id'] for membership in user_memberships.data]
-                    query = query.in_('id', club_ids)
-                    logger.info(f"Found user memberships for {len(club_ids)} clubs")
-                else:
-                    logger.info("No user memberships found, returning empty list")
-                    return {'clubs': [], 'total': 0}, 200
-            
             # Execute query
             logger.info("Executing main clubs query")
             result = query.order('created_at', desc=True).execute()
             logger.info(f"Main query returned {len(result.data)} clubs")
             
+            # Get user's club memberships for filtering
+            user_memberships = admin_client.table('club_memberships').select('club_id').eq('user_id', current_user_id).eq('status', 'approved').execute()
+            user_club_ids = {membership['club_id'] for membership in user_memberships.data} if user_memberships.data else set()
+            logger.info(f"User is member of {len(user_club_ids)} clubs")
+            
             clubs = []
             for i, club in enumerate(result.data):
                 logger.info(f"Processing club {i+1}/{len(result.data)}: {club.get('name', 'Unknown')}")
                 
+                # Apply RLS policy manually: show only public clubs OR clubs user is member of
+                is_public_club = club.get('is_public', False)
+                is_user_member = club['id'] in user_club_ids
+                
+                # If user_clubs_only is true, only show clubs the user is a member of
+                if user_clubs_only and not is_user_member:
+                    logger.info(f"Skipping club {club['id']} - user_clubs_only=true and user not member")
+                    continue
+                
+                # Apply RLS policy: show only public clubs OR clubs user is member of
+                if not (is_public_club or is_user_member):
+                    logger.info(f"Skipping club {club['id']} - not public and user not member")
+                    continue
+                
                 # Get member count
                 try:
-                    member_count_result = user_client.table('club_memberships').select('id', count='exact').eq('club_id', club['id']).eq('status', 'approved').execute()
+                    member_count_result = admin_client.table('club_memberships').select('id', count='exact').eq('club_id', club['id']).eq('status', 'approved').execute()
                     member_count = member_count_result.count
                     logger.info(f"Club {club['id']} has {member_count} members")
                 except Exception as member_error:
@@ -93,7 +100,7 @@ class ClubListResource(Resource):
                 
                 # Check if current user is member/admin
                 try:
-                    user_membership = user_client.table('club_memberships').select('role, status').eq('club_id', club['id']).eq('user_id', current_user_id).execute()
+                    user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club['id']).eq('user_id', current_user_id).execute()
                     user_role = user_membership.data[0]['role'] if user_membership.data else None
                     user_status = user_membership.data[0]['status'] if user_membership.data else None
                     logger.info(f"User membership for club {club['id']}: role={user_role}, status={user_status}")
