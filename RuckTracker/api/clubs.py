@@ -48,7 +48,7 @@ class ClubListResource(Resource):
             # Base query - simplified to avoid complex joins
             query = admin_client.table('clubs').select("""
                 *,
-                users!admin_user_id(id, username, avatar_url)
+                user!admin_user_id(id, username, avatar_url)
             """)
             logger.info("Created base query")
             
@@ -126,7 +126,7 @@ class ClubListResource(Resource):
                 }
                 
                 # Only include admin_user if the join data exists and is valid
-                admin_user_data = club.get('users')
+                admin_user_data = club.get('user')
                 if admin_user_data and isinstance(admin_user_data, dict):
                     club_data['admin_user'] = admin_user_data
                 
@@ -207,7 +207,7 @@ class ClubResource(Resource):
             # Get club with admin details
             club_result = admin_client.table('clubs').select("""
                 *,
-                users!admin_user_id(id, username, avatar_url)
+                user!admin_user_id(id, username, avatar_url)
             """).eq('id', club_id).execute()
             
             if not club_result.data:
@@ -218,7 +218,7 @@ class ClubResource(Resource):
             # Get club members
             members_result = admin_client.table('club_memberships').select("""
                 *,
-                users:user_id(id, username, avatar_url)
+                user:user_id(id, username, avatar_url)
             """).eq('club_id', club_id).eq('status', 'approved').execute()
             
             # Check user's membership status
@@ -231,9 +231,9 @@ class ClubResource(Resource):
             if user_role == 'admin':
                 pending_result = admin_client.table('club_memberships').select("""
                     *,
-                    users:user_id(id, username, avatar_url)
+                    user:user_id(id, username, avatar_url)
                 """).eq('club_id', club_id).eq('status', 'pending').execute()
-                pending_requests = [self._flatten_member(m) for m in pending_result.data]
+                pending_requests = pending_result.data
             
             club_data = {
                 'id': club['id'],
@@ -243,7 +243,7 @@ class ClubResource(Resource):
                 'is_public': club['is_public'],
                 'max_members': club['max_members'],
                 'admin_user_id': club['admin_user_id'],  # Add direct admin_user_id field
-                'members': [self._flatten_member(m) for m in members_result.data],
+                'members': members_result.data,
                 'member_count': len(members_result.data),
                 'pending_requests': pending_requests,
                 'user_role': user_role,
@@ -254,7 +254,7 @@ class ClubResource(Resource):
             }
             
             # Only include admin_user if the join data exists and is valid
-            admin_user_data = club.get('users')
+            admin_user_data = club.get('user')
             if admin_user_data and isinstance(admin_user_data, dict):
                 club_data['admin_user'] = admin_user_data
             
