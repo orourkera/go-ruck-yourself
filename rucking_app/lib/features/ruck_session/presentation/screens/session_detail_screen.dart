@@ -1422,14 +1422,35 @@ class _SessionRouteMap extends StatelessWidget {
   
   const _SessionRouteMap({required this.session});
   
+  double? _parseCoord(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
   List<LatLng> _getRoutePoints() {
     final points = <LatLng>[];
-    // Try locationPoints (preferred in model)
-    if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
-      for (final p in session.locationPoints!) {
-        if (p.containsKey('lat') && p.containsKey('lng')) {
-          points.add(LatLng((p['lat'] as num).toDouble(), (p['lng'] as num).toDouble()));
-        }
+    final lp = session.locationPoints;
+    if (lp == null || lp.isEmpty) return points;
+
+    for (final p in lp) {
+      double? lat;
+      double? lng;
+
+      if (p is Map) {
+        lat = _parseCoord(p['latitude']);
+        lng = _parseCoord(p['longitude']);
+
+        lat ??= _parseCoord(p['lat']);
+        lng ??= _parseCoord(p['lng']) ?? _parseCoord(p['lon']);
+      } else if (p is List && p.length >= 2) {
+        lat = _parseCoord(p[0]);
+        lng = _parseCoord(p[1]);
+      }
+
+      if (lat != null && lng != null) {
+        points.add(LatLng(lat, lng));
       }
     }
     return points;

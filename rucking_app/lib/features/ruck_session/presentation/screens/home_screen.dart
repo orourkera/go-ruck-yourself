@@ -849,44 +849,48 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                             ? '--'
                             : MeasurementUtils.formatElevationCompact(elevationGain, elevationLoss, metric: preferMetric);
                           
-                          // Map route points
+                          // Map route points – handle multiple possible key names gracefully
+                          double? _parseCoord(dynamic v) {
+                            if (v == null) return null;
+                            if (v is num) return v.toDouble();
+                            if (v is String) return double.tryParse(v);
+                            return null;
+                          }
+
                           List<LatLng> routePoints = [];
-                          if (session['route'] is List && (session['route'] as List).isNotEmpty) {
-                            try {
-                              routePoints = (session['route'] as List)
-                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
-                                  .map((p) => LatLng(
-                                    (p['lat'] as num).toDouble(),
-                                    (p['lng'] as num).toDouble(),
-                                  ))
-                                  .toList();
-                            } catch (e) {
-                              // Ignore errors
+                          final dynamic rawRoute =
+                              session['route'] ?? session['location_points'] ?? session['locationPoints'];
+
+                          if (rawRoute is List && rawRoute.isNotEmpty) {
+                            for (final p in rawRoute) {
+                              double? lat;
+                              double? lng;
+
+                              if (p is Map) {
+                                lat = _parseCoord(p['latitude']);
+                                lng = _parseCoord(p['longitude']);
+
+                                lat ??= _parseCoord(p['lat']);
+                                lng ??= _parseCoord(p['lng']) ?? _parseCoord(p['lon']);
+                              } else if (p is List && p.length >= 2) {
+                                lat = _parseCoord(p[0]);
+                                lng = _parseCoord(p[1]);
+                              }
+
+                              if (lat != null && lng != null) {
+                                routePoints.add(LatLng(lat, lng));
+                              }
                             }
-                          } else if (session['location_points'] is List && (session['location_points'] as List).isNotEmpty) {
-                            try {
-                              routePoints = (session['location_points'] as List)
-                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
-                                  .map((p) => LatLng(
-                                    (p['lat'] as num).toDouble(),
-                                    (p['lng'] as num).toDouble(),
-                                  ))
-                                  .toList();
-                            } catch (e) {
-                              // Ignore errors
-                            }
-                          } else if (session['locationPoints'] is List && (session['locationPoints'] as List).isNotEmpty) {
-                            try {
-                              routePoints = (session['locationPoints'] as List)
-                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
-                                  .map((p) => LatLng(
-                                    (p['lat'] as num).toDouble(),
-                                    (p['lng'] as num).toDouble(),
-                                  ))
-                                  .toList();
-                            } catch (e) {
-                              // Ignore errors
-                            }
+                          }
+
+                          if (routePoints.isEmpty) {
+                            // Use default points for visual testing only (should not happen in production)
+                            routePoints = [
+                              LatLng(40.421, -3.678),
+                              LatLng(40.422, -3.678),
+                              LatLng(40.423, -3.677),
+                              LatLng(40.424, -3.676),
+                            ];
                           }
                           if (routePoints.isEmpty) {
                             // Use default points for visual testing
