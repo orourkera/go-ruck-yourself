@@ -474,12 +474,11 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
   bool _canUserStartDuel(Duel duel) {
     // Only the creator can manually start a duel
     // The duel must be in pending status
-    // The duel must have manual start mode
+    // Allow manual start for both auto and manual mode duels (in case auto didn't trigger)
     final bool isCreator = _isUserCreator(duel);
     
     final bool canStart = isCreator && 
-                        duel.status == DuelStatus.pending &&
-                        duel.startMode == DuelStartMode.manual;
+                        duel.status == DuelStatus.pending;
                         
     // Also ensure there are enough participants
     if (canStart) {

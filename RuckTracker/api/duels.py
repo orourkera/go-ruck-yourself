@@ -357,9 +357,8 @@ class DuelResource(Resource):
                 
             # Special handling for manual start
             if data['status'] == 'start' and duel['status'] == 'pending':
-                # Make sure duel is in manual start mode
-                if duel.get('start_mode', 'auto') != 'manual':
-                    return {'error': 'Cannot manually start a duel configured for automatic start'}, 400
+                # Allow manual start for both auto and manual mode duels
+                # (Auto mode might not have triggered due to timing/permission issues)
                     
                 # Count accepted participants
                 participant_count_response = supabase.table('duel_participants')\
@@ -533,6 +532,8 @@ class DuelJoinResource(Resource):
             participant_count_response = supabase.table('duel_participants').select('id', count='exact').eq('duel_id', duel_id).eq('status', 'accepted').execute()
             participant_count = participant_count_response.count
             
+            logging.info(f"Auto-start check - duel_id: {duel_id}, participant_count: {participant_count}")
+            
             # Get duel configuration
             duel_config = supabase.table('duels').select('start_mode', 'min_participants', 'timeframe_hours').eq('id', duel_id).execute()
             
@@ -545,10 +546,13 @@ class DuelJoinResource(Resource):
             min_participants = duel_settings.get('min_participants', 2)
             timeframe = duel_settings.get('timeframe_hours')
             
+            logging.info(f"Duel settings - start_mode: {start_mode}, min_participants: {min_participants}, timeframe: {timeframe}")
+            
             # Only auto-start the duel if:
             # 1. Start mode is auto AND
             # 2. We have at least the minimum required participants
             if start_mode == 'auto' and participant_count >= min_participants:
+                logging.info(f"AUTO-START TRIGGERED! Starting duel {duel_id}")
                 # Activate duel
                 starts_at = now
                 ends_at = starts_at + timedelta(hours=timeframe)

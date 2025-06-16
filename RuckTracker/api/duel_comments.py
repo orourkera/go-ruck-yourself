@@ -34,12 +34,12 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
             
         # Get duel name for notification message
         duel_response = admin_client.table('duels') \
-            .select('name') \
+            .select('title') \
             .eq('id', duel_id) \
             .single() \
             .execute()
             
-        duel_name = duel_response.data.get('name', 'Unknown Duel') if duel_response.data else 'Unknown Duel'
+        duel_name = duel_response.data.get('title', 'Unknown Duel') if duel_response.data else 'Unknown Duel'
         
         # Create notifications for each participant
         notifications = []
@@ -92,7 +92,7 @@ def create_duel_joined_notification(duel_id, joiner_id, joiner_name):
         
         # Get duel creator and name
         duel_response = admin_client.table('duels') \
-            .select('creator_id, name') \
+            .select('creator_id, title') \
             .eq('id', duel_id) \
             .single() \
             .execute()
@@ -102,7 +102,7 @@ def create_duel_joined_notification(duel_id, joiner_id, joiner_name):
             return
             
         creator_id = duel_response.data.get('creator_id')
-        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        duel_name = duel_response.data.get('title', 'Unknown Duel')
         
         # Don't notify if creator joined their own duel (shouldn't happen)
         if creator_id == joiner_id:
@@ -149,7 +149,7 @@ def create_duel_started_notification(duel_id):
         
         # Get duel details and participants
         duel_response = admin_client.table('duels') \
-            .select('name') \
+            .select('title') \
             .eq('id', duel_id) \
             .single() \
             .execute()
@@ -158,7 +158,7 @@ def create_duel_started_notification(duel_id):
             logger.warning(f"Duel {duel_id} not found for started notification")
             return
             
-        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        duel_name = duel_response.data.get('title', 'Unknown Duel')
         
         # Get all participants
         participants_response = admin_client.table('duel_participants') \
@@ -217,7 +217,7 @@ def create_duel_completed_notification(duel_id):
         
         # Get duel details and participants
         duel_response = admin_client.table('duels') \
-            .select('name') \
+            .select('title') \
             .eq('id', duel_id) \
             .single() \
             .execute()
@@ -226,7 +226,7 @@ def create_duel_completed_notification(duel_id):
             logger.warning(f"Duel {duel_id} not found for completed notification")
             return
             
-        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        duel_name = duel_response.data.get('title', 'Unknown Duel')
         
         # Get all participants
         participants_response = admin_client.table('duel_participants') \
@@ -285,7 +285,7 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
         
         # Get duel name
         duel_response = admin_client.table('duels') \
-            .select('name') \
+            .select('title') \
             .eq('id', duel_id) \
             .single() \
             .execute()
@@ -294,7 +294,7 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
             logger.warning(f"Duel {duel_id} not found for progress notification")
             return
             
-        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        duel_name = duel_response.data.get('title', 'Unknown Duel')
         
         # Get all other participants (excluding the one who completed the ruck)
         participants_response = admin_client.table('duel_participants') \
@@ -358,7 +358,7 @@ def create_duel_deleted_notification(duel_id, deleter_id):
         
         # Get duel details before it gets deleted
         duel_response = admin_client.table('duels') \
-            .select('name, creator_id') \
+            .select('title, creator_id') \
             .eq('id', duel_id) \
             .single() \
             .execute()
@@ -367,7 +367,7 @@ def create_duel_deleted_notification(duel_id, deleter_id):
             logger.warning(f"Duel {duel_id} not found for deletion notification")
             return
             
-        duel_name = duel_response.data.get('name', 'Unknown Duel')
+        duel_name = duel_response.data.get('title', 'Unknown Duel')
         creator_id = duel_response.data.get('creator_id')
         
         # Get all participants in the duel except the deleter (who is the creator)
