@@ -854,10 +854,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           if (session['route'] is List && (session['route'] as List).isNotEmpty) {
                             try {
                               routePoints = (session['route'] as List)
-                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
+                                  .where((p) => p is Map && 
+                                    ((p.containsKey('lat') && p.containsKey('lng')) ||
+                                     (p.containsKey('latitude') && p.containsKey('longitude'))))
                                   .map((p) => LatLng(
-                                    (p['lat'] as num).toDouble(),
-                                    (p['lng'] as num).toDouble(),
+                                    ((p['lat'] ?? p['latitude']) as num).toDouble(),
+                                    ((p['lng'] ?? p['longitude']) as num).toDouble(),
                                   ))
                                   .toList();
                             } catch (e) {
@@ -866,10 +868,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           } else if (session['location_points'] is List && (session['location_points'] as List).isNotEmpty) {
                             try {
                               routePoints = (session['location_points'] as List)
-                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
+                                  .where((p) => p is Map && 
+                                    ((p.containsKey('lat') && p.containsKey('lng')) ||
+                                     (p.containsKey('latitude') && p.containsKey('longitude'))))
                                   .map((p) => LatLng(
-                                    (p['lat'] as num).toDouble(),
-                                    (p['lng'] as num).toDouble(),
+                                    ((p['lat'] ?? p['latitude']) as num).toDouble(),
+                                    ((p['lng'] ?? p['longitude']) as num).toDouble(),
                                   ))
                                   .toList();
                             } catch (e) {
@@ -878,10 +882,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                           } else if (session['locationPoints'] is List && (session['locationPoints'] as List).isNotEmpty) {
                             try {
                               routePoints = (session['locationPoints'] as List)
-                                  .where((p) => p is Map && p.containsKey('lat') && p.containsKey('lng'))
+                                  .where((p) => p is Map && 
+                                    ((p.containsKey('lat') && p.containsKey('lng')) ||
+                                     (p.containsKey('latitude') && p.containsKey('longitude'))))
                                   .map((p) => LatLng(
-                                    (p['lat'] as num).toDouble(),
-                                    (p['lng'] as num).toDouble(),
+                                    ((p['lat'] ?? p['latitude']) as num).toDouble(),
+                                    ((p['lng'] ?? p['longitude']) as num).toDouble(),
                                   ))
                                   .toList();
                             } catch (e) {

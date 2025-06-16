@@ -986,14 +986,14 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
       double? lng;
 
       if (p is Map) {
-        lat = _parseCoord(p['latitude']);
-        lng = _parseCoord(p['longitude']);
+        lat = _parseCoord(p['lat']);
+        lng = _parseCoord(p['lng']) ?? _parseCoord(p['lon']);
 
         if (lat == null) {
-          lat = _parseCoord(p['lat']);
+          lat = _parseCoord(p['latitude']);
         }
         if (lng == null) {
-          lng = _parseCoord(p['lng']) ?? _parseCoord(p['lon']);
+          lng = _parseCoord(p['longitude']);
         }
       } else if (p is List && p.length >= 2) {
         lat = _parseCoord(p[0]);
