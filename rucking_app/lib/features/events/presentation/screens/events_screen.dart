@@ -76,23 +76,14 @@ class _EventsScreenState extends State<EventsScreen> {
           title: Text(
             'Events',
             style: AppTextStyles.titleLarge.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? Colors.white 
-                  : AppColors.textDark,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: Colors.transparent,
           elevation: 0,
           automaticallyImplyLeading: false,
           actions: [
             IconButton(
-              icon: Icon(
-                Icons.add,
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.white 
-                    : AppColors.textDark,
-              ),
+              icon: const Icon(Icons.add),
               onPressed: _navigateToCreateEvent,
             ),
           ],

@@ -16,6 +16,7 @@ import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
@@ -577,7 +578,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           AppLogger.info('[SESSION_RECOVERY] Attempting to restore location syncing...');
           try {
             // Test if auth is working now
-            await _apiClient.get('/users/profile');
+            await GetIt.I<AuthService>().isAuthenticated();
             AppLogger.info('[SESSION_RECOVERY] Authentication restored, restarting location updates');
             _startLocationUpdates(currentState.sessionId);
           } catch (authError) {
@@ -1432,7 +1433,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       try {
         // Make a simple API call to test if auth is working
         // Use a lightweight endpoint that doesn't affect session state
-        await _apiClient.get('/users/profile');
+        await GetIt.I<AuthService>().isAuthenticated();
         AppLogger.info('[SESSION_RECOVERY] Authentication verified, resuming full operations...');
         
         // Auth is working, safe to start location updates and API calls

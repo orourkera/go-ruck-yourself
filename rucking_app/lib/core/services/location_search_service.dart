@@ -35,9 +35,42 @@ class LocationSearchService {
     try {
       print('LocationSearchService: Searching for "$query"');
       
-      // Use geocoding package to search for locations
-      List<Location> locations = await locationFromAddress(query);
-      print('LocationSearchService: Found ${locations.length} locations');
+      // Try multiple search strategies for better business name support
+      List<Location> locations = [];
+      
+      // Strategy 1: Direct search for the query
+      try {
+        locations = await locationFromAddress(query);
+        print('LocationSearchService: Direct search found ${locations.length} locations');
+      } catch (e) {
+        print('LocationSearchService: Direct search failed: $e');
+      }
+      
+      // Strategy 2: If no results and query doesn't contain city/state, 
+      // try searching with common location suffixes for businesses
+      if (locations.isEmpty && !query.contains(',') && !query.contains(' ')) {
+        final businessSearchTerms = [
+          '$query restaurant',
+          '$query store',
+          '$query shop',
+          '$query cafe',
+          '$query gym',
+          '$query park',
+        ];
+        
+        for (String searchTerm in businessSearchTerms) {
+          try {
+            final results = await locationFromAddress(searchTerm);
+            if (results.isNotEmpty) {
+              locations.addAll(results);
+              print('LocationSearchService: Business search "$searchTerm" found ${results.length} locations');
+              break; // Use first successful business search
+            }
+          } catch (e) {
+            // Continue to next search term
+          }
+        }
+      }
       
       if (locations.isEmpty) return [];
       
@@ -64,8 +97,8 @@ class LocationSearchService {
           if (placemarks.isNotEmpty) {
             final placemark = placemarks.first;
             
-            // Build display name
-            String displayName = _buildDisplayName(placemark);
+            // Build display name - prioritize business names
+            String displayName = _buildDisplayName(placemark, query);
             String address = _buildAddress(placemark);
             
             print('LocationSearchService: Created result: $displayName');
@@ -129,9 +162,33 @@ class LocationSearchService {
     return coordinate.isFinite && coordinate >= -180 && coordinate <= 180;
   }
   
-  String _buildDisplayName(Placemark placemark) {
+  String _buildDisplayName(Placemark placemark, [String? originalQuery]) {
     List<String> parts = [];
     
+    // If this looks like a business search, prioritize the business name
+    if (originalQuery != null && placemark.name != null && placemark.name!.isNotEmpty) {
+      // Check if the placemark name seems to match the business search intent
+      final name = placemark.name!.toLowerCase();
+      final query = originalQuery.toLowerCase();
+      
+      // If the name contains business-related terms or matches the query, use it prominently
+      if (name.contains(query) || 
+          name.contains('restaurant') || 
+          name.contains('store') || 
+          name.contains('shop') || 
+          name.contains('cafe') || 
+          name.contains('coffee') ||
+          name.contains('gym') || 
+          name.contains('fitness') ||
+          name.contains('park') ||
+          name.contains('hotel') ||
+          name.contains('mall') ||
+          name.contains('center')) {
+        return placemark.name!;
+      }
+    }
+    
+    // Default display name building logic
     // Add landmark/name if available
     if (placemark.name != null && placemark.name!.isNotEmpty) {
       parts.add(placemark.name!);

@@ -371,37 +371,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
           ),
         ),
-        
-        const SizedBox(height: 16),
-        
-        // Duration selector
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Duration: $_duration minutes',
-                style: AppTextStyles.bodyLarge.copyWith(
-                  color: isDarkMode ? Colors.white : AppColors.textDark,
-                ),
-              ),
-            ),
-            SizedBox(
-              width: 120,
-              child: Slider(
-                value: _duration.toDouble(),
-                min: 15,
-                max: 240,
-                divisions: 15,
-                activeColor: Theme.of(context).primaryColor,
-                onChanged: (value) {
-                  setState(() {
-                    _duration = value.round();
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -411,7 +380,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Location',
+          'Meeting Point',
           style: AppTextStyles.titleMedium.copyWith(
             color: isDarkMode ? Colors.white : AppColors.textDark,
             fontWeight: FontWeight.bold,
@@ -422,8 +391,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         TextFormField(
           controller: _locationController,
           decoration: InputDecoration(
-            labelText: 'Location',
-            hintText: 'Search for a location...',
+            labelText: 'Meeting Point',
+            hintText: 'Search for a meeting point, business, or address...',
             prefixIcon: const Icon(Icons.location_on),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -549,6 +518,37 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         
         const SizedBox(height: 16),
         
+        // Duration
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Approximate Duration: $_duration minutes',
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: isDarkMode ? Colors.white : AppColors.textDark,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 120,
+              child: Slider(
+                value: _duration.toDouble(),
+                min: 15,
+                max: 240,
+                divisions: 15,
+                activeColor: Theme.of(context).primaryColor,
+                onChanged: (value) {
+                  setState(() {
+                    _duration = value.round();
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 16),
+        
         // Approval required toggle
         SwitchListTile(
           title: Text(
@@ -662,10 +662,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Future<void> _selectBannerImage() async {
-    final selectedFile = await ImagePickerUtils.pickImage(
-      context,
-      showCropModal: true,
-    );
+    final selectedFile = await ImagePickerUtils.pickEventBannerImage(context);
     if (selectedFile != null) {
       setState(() {
         _bannerImage = selectedFile;
@@ -779,8 +776,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final eventData = {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
-      'scheduled_start_time': _selectedDateTime!.toIso8601String(),
-      'duration_minutes': _duration,
+      'scheduled_start_time': _selectedDateTime!,
       'location_name': _locationController.text.trim(),
       'location_latitude': _selectedLocationResult?.latitude,
       'location_longitude': _selectedLocationResult?.longitude,
@@ -794,6 +790,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       'ruck_weight_kg': _ruckWeightController.text.isNotEmpty 
           ? double.tryParse(_ruckWeightController.text) 
           : null,
+      'duration_minutes': _duration,
       'approval_required': _approvalRequired,
       'hosting_club_id': _isClubEvent ? _selectedClubId : null,
     };
@@ -804,15 +801,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         title: eventData['title'] as String,
         description: eventData['description'] as String?,
         scheduledStartTime: eventData['scheduled_start_time'] as DateTime,
-        durationMinutes: eventData['duration_minutes'] as int,
         locationName: eventData['location_name'] as String?,
-        latitude: eventData['latitude'] as double?,
-        longitude: eventData['longitude'] as double?,
+        latitude: eventData['location_latitude'] as double?,
+        longitude: eventData['location_longitude'] as double?,
         maxParticipants: eventData['max_participants'] as int?,
         minParticipants: eventData['min_participants'] as int?,
         approvalRequired: eventData['approval_required'] as bool,
         difficultyLevel: eventData['difficulty_level'] as int?,
         ruckWeightKg: eventData['ruck_weight_kg'] as double?,
+        durationMinutes: eventData['duration_minutes'] as int,
         bannerImageUrl: _bannerImage?.path,
       ));
     } else {
@@ -821,15 +818,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         description: eventData['description'] as String?,
         clubId: eventData['hosting_club_id'] as String?,
         scheduledStartTime: eventData['scheduled_start_time'] as DateTime,
-        durationMinutes: eventData['duration_minutes'] as int,
         locationName: eventData['location_name'] as String?,
-        latitude: eventData['latitude'] as double?,
-        longitude: eventData['longitude'] as double?,
+        latitude: eventData['location_latitude'] as double?,
+        longitude: eventData['location_longitude'] as double?,
         maxParticipants: eventData['max_participants'] as int?,
         minParticipants: eventData['min_participants'] as int?,
         approvalRequired: eventData['approval_required'] as bool,
         difficultyLevel: eventData['difficulty_level'] as int?,
         ruckWeightKg: eventData['ruck_weight_kg'] as double?,
+        durationMinutes: eventData['duration_minutes'] as int,
         bannerImageUrl: _bannerImage?.path,
       ));
     }

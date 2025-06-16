@@ -37,7 +37,7 @@ class RuckSessionListResource(Resource):
                     .order('timestamp') \
                     .execute()
                 
-                logger.info(f"Location response data for session {session['id']}: {locations_resp.data}")
+                logger.debug(f"Location response data for session {session['id']}: {len(locations_resp.data) if locations_resp.data else 0} points")
                 
                 if locations_resp.data:
                     # Process and verify location data is valid
@@ -55,7 +55,7 @@ class RuckSessionListResource(Resource):
                             except (ValueError, TypeError) as e:
                                 logger.warning(f"Invalid location data for session {session['id']}: {e}")
                     
-                    logger.info(f"Processed {len(valid_location_points)} valid location points for session {session['id']}")
+                    logger.debug(f"Processed {len(valid_location_points)} valid location points for session {session['id']}")
                     
                     # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
                     session['route'] = valid_location_points
@@ -175,7 +175,7 @@ class RuckSessionResource(Resource):
                 .eq('session_id', ruck_id) \
                 .order('timestamp', desc=True) \
                 .execute()
-            logger.info(f"Location response data for session {ruck_id}: {locations_resp.data}")
+            logger.debug(f"Location response data for session {ruck_id}: {len(locations_resp.data) if locations_resp.data else 0} points")
             if locations_resp.data:
                 # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
                 session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]

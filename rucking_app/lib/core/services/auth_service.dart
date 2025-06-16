@@ -101,6 +101,11 @@ class AuthServiceImpl implements AuthService {
   static int _consecutiveRefreshFailures = 0;
   static const int _maxRefreshFailures = 3;
 
+  // Profile request cache to avoid rapid successive calls
+  static Future<User>? _profileRequestCache;
+  static DateTime? _lastProfileRequest;
+  static const Duration _profileCacheDuration = Duration(seconds: 5);
+
   AuthServiceImpl(this._apiClient, this._storageService) {
     _googleSignIn = GoogleSignIn(
       scopes: ['email', 'profile'],
@@ -214,8 +219,7 @@ class AuthServiceImpl implements AuthService {
       try {
         // Try to get existing user profile from your backend
         AppLogger.info('Fetching user profile after Google authentication');
-        final profileResponse = await _apiClient.get('/users/profile');
-        final user = User.fromJson(profileResponse);
+        final user = await _fetchUserProfileWithRetry();
         
         AppLogger.info('Google Sign-In successful for existing user: ${user.email}');
         return user;
@@ -230,7 +234,7 @@ class AuthServiceImpl implements AuthService {
         };
         
         try {
-          final createResponse = await _apiClient.post('/users/profile', newUserData);
+          final createResponse = await _apiClient.put('/users/profile', newUserData);
           final newUser = User.fromJson(createResponse);
           
           AppLogger.info('Google Sign-In successful for new user: ${newUser.email}');
@@ -383,24 +387,16 @@ class AuthServiceImpl implements AuthService {
     
     try {
       // Try to fetch the latest user profile first - if this succeeds, the user is authenticated
-      final profileResponse = await _apiClient.get('/users/profile');
-      
-      final userFromProfile = User.fromJson(profileResponse);
-      // Update stored user data 
-      await _storageService.setObject(AppConfig.userProfileKey, userFromProfile.toJson());
-      // Also store the user ID to avoid this issue in the future
-      await _storageService.setString(AppConfig.userIdKey, userFromProfile.userId);
-      userToReturn = userFromProfile;
+      final user = await _fetchUserProfileWithRetry();
+      userToReturn = user;
       
     } catch (e) {
       if (e is UnauthorizedException) {
         // Attempt a token refresh once before giving up
         try {
           await refreshToken();
-          final profileResponse = await _apiClient.get('/users/profile');
-          userToReturn = User.fromJson(profileResponse);
-          await _storageService.setObject(AppConfig.userProfileKey, userToReturn!.toJson());
-          await _storageService.setString(AppConfig.userIdKey, userToReturn!.userId);
+          final user = await _fetchUserProfileWithRetry();
+          userToReturn = user;
         } catch (_) {
           // If still failing, fall back to stored data (do not force sign-out)
         }
@@ -432,7 +428,7 @@ class AuthServiceImpl implements AuthService {
     
     try {
       // Try to get the user profile
-      final response = await _apiClient.get('/users/profile');
+      final response = await _fetchUserProfileWithRetry();
       AppLogger.info('[AUTH] Profile fetch successful - user is authenticated');
       return response != null;
     } catch (e) {
@@ -498,7 +494,7 @@ class AuthServiceImpl implements AuthService {
       
       // Test the new token immediately by making a profile request
       try {
-        await _apiClient.get('/users/profile');
+        await _fetchUserProfileWithRetry();
         // If profile request succeeds, reset failure counter
         _consecutiveRefreshFailures = 0;
         AppLogger.info('[AUTH] Token refresh successful and verified');
@@ -517,6 +513,71 @@ class AuthServiceImpl implements AuthService {
     }
   }
   
+  /// Fetches user profile with caching and retry logic to handle rate limiting
+  Future<User> _fetchUserProfileWithRetry({bool forceRefresh = false}) async {
+    // Check if we can use cached request
+    if (!forceRefresh && 
+        _profileRequestCache != null && 
+        _lastProfileRequest != null &&
+        DateTime.now().difference(_lastProfileRequest!) < _profileCacheDuration) {
+      AppLogger.info('Using cached profile request');
+      return await _profileRequestCache!;
+    }
+
+    // Clear old cache
+    _profileRequestCache = null;
+    _lastProfileRequest = DateTime.now();
+
+    // Create new cached request with retry logic
+    _profileRequestCache = _performProfileRequestWithRetry();
+    
+    return await _profileRequestCache!;
+  }
+
+  /// Performs the actual profile request with exponential backoff retry
+  Future<User> _performProfileRequestWithRetry() async {
+    const maxRetries = 3;
+    const baseDelay = Duration(seconds: 1);
+    
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        AppLogger.info('Fetching user profile (attempt ${attempt + 1}/$maxRetries)');
+        final response = await _apiClient.get('/users/profile');
+        final user = User.fromJson(response);
+        
+        // Store the fetched profile data
+        await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
+        await _storageService.setString(AppConfig.userIdKey, user.userId);
+        
+        AppLogger.info('Profile fetch and storage successful');
+        return user;
+        
+      } catch (e) {
+        final isRateLimited = e is DioException && e.response?.statusCode == 429;
+        final isLastAttempt = attempt == maxRetries - 1;
+        
+        if (isRateLimited && !isLastAttempt) {
+          // Exponential backoff for rate limiting
+          final delaySeconds = baseDelay.inSeconds * (attempt + 1) * 2;
+          final delay = Duration(seconds: delaySeconds);
+          
+          AppLogger.warning('Rate limited (429), retrying in ${delay.inSeconds}s (attempt ${attempt + 1}/$maxRetries)');
+          await Future.delayed(delay);
+          continue;
+        }
+        
+        // Clear cache on error
+        _profileRequestCache = null;
+        _lastProfileRequest = null;
+        
+        AppLogger.error('Profile fetch failed after ${attempt + 1} attempts', exception: e);
+        throw e;
+      }
+    }
+    
+    throw ApiException('Profile fetch failed after $maxRetries attempts');
+  }
+
   /// Handle refresh failure and logout if too many consecutive failures
   Future<void> _handleRefreshFailure() async {
     if (_consecutiveRefreshFailures >= _maxRefreshFailures) {

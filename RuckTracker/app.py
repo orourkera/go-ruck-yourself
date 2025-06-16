@@ -163,14 +163,6 @@ app.register_blueprint(achievements_bp, url_prefix='/api')
 from RuckTracker.api.clubs import clubs_bp
 app.register_blueprint(clubs_bp, url_prefix='/api')
 
-# Import and register events blueprints
-from RuckTracker.api.events import events_bp
-from RuckTracker.api.event_comments import event_comments_bp
-from RuckTracker.api.event_progress import event_progress_bp
-app.register_blueprint(events_bp, url_prefix='/api')
-app.register_blueprint(event_comments_bp, url_prefix='/api')
-app.register_blueprint(event_progress_bp, url_prefix='/api')
-
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (
     RuckSessionListResource, 

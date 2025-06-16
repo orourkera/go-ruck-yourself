@@ -7,17 +7,25 @@ import 'package:path_provider/path_provider.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
+/// Enum to define crop shape options
+enum CropShape {
+  circle,   // For profile pictures
+  square,   // For event banners and other square crops
+}
+
 /// A modal that allows users to crop, pan, and zoom images
 class ImageCropModal extends StatefulWidget {
   final File imageFile;
   final String title;
   final double aspectRatio;
+  final CropShape cropShape; // New parameter to control crop shape
   
   const ImageCropModal({
     super.key,
     required this.imageFile,
     this.title = 'Crop Image',
     this.aspectRatio = 1.0, // 1.0 for square (profile pictures)
+    this.cropShape = CropShape.circle, // Default to circular for backwards compatibility
   });
 
   @override
@@ -123,12 +131,12 @@ class _ImageCropModalState extends State<ImageCropModal> {
               height: cropSize / widget.aspectRatio,
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.white, width: 2),
-                borderRadius: widget.aspectRatio == 1.0 
+                borderRadius: widget.cropShape == CropShape.circle 
                     ? BorderRadius.circular(cropSize / 2) 
                     : BorderRadius.circular(8),
               ),
               child: ClipRRect(
-                borderRadius: widget.aspectRatio == 1.0 
+                borderRadius: widget.cropShape == CropShape.circle 
                     ? BorderRadius.circular(cropSize / 2) 
                     : BorderRadius.circular(6),
                 child: RepaintBoundary(
