@@ -118,13 +118,18 @@ class ClubListResource(Resource):
                     'max_members': club['max_members'],
                     'member_count': member_count,
                     'admin_user_id': club['admin_user_id'],  # Add direct admin_user_id field
-                    'admin_user': club.get('users'),  # Keep joined admin user data
                     'user_role': user_role,
                     'user_status': user_status,
                     'created_at': club['created_at'],
                     'latitude': club.get('latitude'),
                     'longitude': club.get('longitude')
                 }
+                
+                # Only include admin_user if the join data exists and is valid
+                admin_user_data = club.get('users')
+                if admin_user_data and isinstance(admin_user_data, dict):
+                    club_data['admin_user'] = admin_user_data
+                
                 clubs.append(club_data)
             
             logger.info(f"Successfully processed {len(clubs)} clubs")
@@ -238,7 +243,6 @@ class ClubResource(Resource):
                 'is_public': club['is_public'],
                 'max_members': club['max_members'],
                 'admin_user_id': club['admin_user_id'],  # Add direct admin_user_id field
-                'admin_user': club.get('users'),  # Keep joined admin user data
                 'members': members_result.data,
                 'member_count': len(members_result.data),
                 'pending_requests': pending_requests,
@@ -248,6 +252,11 @@ class ClubResource(Resource):
                 'latitude': club.get('latitude'),
                 'longitude': club.get('longitude')
             }
+            
+            # Only include admin_user if the join data exists and is valid
+            admin_user_data = club.get('users')
+            if admin_user_data and isinstance(admin_user_data, dict):
+                club_data['admin_user'] = admin_user_data
             
             return {'club': club_data}, 200
             
