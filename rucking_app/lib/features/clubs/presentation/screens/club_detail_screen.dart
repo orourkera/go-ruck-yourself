@@ -53,7 +53,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             ),
           ),
           centerTitle: true,
-          backgroundColor: AppColors.primary,
+          backgroundColor: Theme.of(context).primaryColor,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
           actions: _buildAppBarActions(),
@@ -145,6 +145,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             _buildClubHeader(clubDetails),
             const SizedBox(height: 24),
             _buildClubStats(clubDetails),
+            const SizedBox(height: 24),
+            _buildActionButtons(clubDetails),
             const SizedBox(height: 24),
             _buildMembersSection(clubDetails),
             if (clubDetails.club.userRole == 'admin' && clubDetails.pendingRequests.isNotEmpty) ...[
@@ -275,6 +277,81 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildActionButtons(ClubDetails clubDetails) {
+    final club = clubDetails.club;
+    
+    // Don't show any buttons if user is admin (they have edit/delete in app bar)
+    if (club.userRole == 'admin') {
+      return const SizedBox.shrink();
+    }
+    
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            if (club.canJoin) ...[
+              // User can join the club
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _requestMembership(),
+                  icon: const Icon(Icons.group_add),
+                  label: const Text('Join Club'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ] else if (club.isUserPending) ...[
+              // User has pending request
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  border: Border.all(color: Colors.orange),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.hourglass_empty, color: Colors.orange),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Membership Request Pending',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (club.isUserMember) ...[
+              // User is a member, show leave option
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showLeaveClubDialog(),
+                  icon: const Icon(Icons.exit_to_app),
+                  label: const Text('Leave Club'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -518,7 +595,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   }
 
   void _requestMembership() {
-    _clubsBloc.add(RequestMembership(widget.clubId));
+    if (_clubDetails != null) {
+      _clubsBloc.add(RequestMembership(_clubDetails!.club.id));
+    }
   }
 
   void _approveRequest(ClubMember request) {
@@ -599,30 +678,28 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   }
 
   void _showLeaveClubDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Leave Club'),
-        content: Text(
-          'Are you sure you want to leave ${_clubDetails!.club.name}?',
+    if (_clubDetails != null) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Leave Club'),
+          content: Text('Are you sure you want to leave ${_clubDetails!.club.name}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _clubsBloc.add(LeaveClub(_clubDetails!.club.id));
+              },
+              child: const Text('Leave'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _clubsBloc.add(LeaveClub(widget.clubId));
-              Navigator.of(context).pop(); // Go back to clubs list
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Leave'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
   void _showDeleteConfirmation() {
@@ -635,14 +712,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop();
+              Navigator.pop(context);
               _clubsBloc.add(DeleteClub(widget.clubId));
-              Navigator.of(context).pop(); // Go back to clubs list
+              Navigator.pop(context); // Go back to clubs list
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
@@ -705,6 +782,17 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                     SkeletonLine(width: 60, height: 16),
                   ],
                 ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Action buttons section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                SkeletonLine(width: 100, height: 40),
+                SkeletonLine(width: 100, height: 40),
               ],
             ),
             

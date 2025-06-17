@@ -58,6 +58,10 @@ class _ClubsScreenState extends State<ClubsScreen> {
     Navigator.of(context).pushNamed('/club_detail', arguments: clubId);
   }
 
+  void _joinClub(String clubId) {
+    _clubsBloc.add(RequestMembership(clubId));
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
@@ -72,7 +76,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
             ),
           ),
           centerTitle: true,
-          backgroundColor: AppColors.primary,
+          backgroundColor: Theme.of(context).primaryColor,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
           leading: IconButton(
@@ -375,6 +379,24 @@ class _ClubsScreenState extends State<ClubsScreen> {
                         style: AppTextStyles.bodySmall.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ] else if (club.canJoin) ...[
+                    GestureDetector(
+                      onTap: () => _joinClub(club.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Join Club',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),

@@ -188,7 +188,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
             ),
           ),
           centerTitle: true,
-          backgroundColor: AppColors.primary,
+          backgroundColor: Theme.of(context).primaryColor,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
           leading: IconButton(
