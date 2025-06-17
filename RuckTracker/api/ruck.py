@@ -39,31 +39,36 @@ class RuckSessionListResource(Resource):
             # Batch fetch all location points for all sessions with pagination
             try:
                 all_location_points = []
-                page_size = 5000
+                page_size = 1000  # Use Supabase's actual limit
                 offset = 0
                 
                 while True:
+                    logger.info(f"DEBUG: Fetching location points page: offset={offset}, limit={page_size}")
                     locations_page = supabase.table('location_point') \
                         .select('session_id,latitude,longitude') \
                         .in_('session_id', session_ids) \
-                        .order('session_id.desc,timestamp') \
+                        .order('session_id,timestamp') \
                         .range(offset, offset + page_size - 1) \
                         .execute()
                     
                     if not locations_page.data:
+                        logger.info(f"DEBUG: No more location points, stopping pagination")
                         break
                     
+                    points_in_page = len(locations_page.data)
                     all_location_points.extend(locations_page.data)
+                    logger.info(f"DEBUG: Got {points_in_page} points, total so far: {len(all_location_points)}")
                     
                     # If we got less than page_size, we're done
-                    if len(locations_page.data) < page_size:
+                    if points_in_page < page_size:
+                        logger.info(f"DEBUG: Got partial page ({points_in_page} < {page_size}), stopping pagination")
                         break
                     
                     offset += page_size
                     
                     # Safety check to prevent infinite loops
-                    if offset > 100000:
-                        logger.warning(f"Location points query exceeded 100k limit, stopping pagination")
+                    if offset > 50000:
+                        logger.warning(f"Location points query exceeded 50k limit, stopping pagination")
                         break
                 
                 # Create a mock response object for compatibility
