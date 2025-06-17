@@ -43,6 +43,17 @@ class RuckSessionListResource(Resource):
                 .order('session_id,timestamp') \
                 .execute()
             
+            logger.info(f"DEBUG: Fetching location points for session IDs: {session_ids}")
+            logger.info(f"DEBUG: Location points query returned {len(all_locations_resp.data) if all_locations_resp.data else 0} total points")
+            
+            # Debug: Log which sessions have location data
+            sessions_with_locations = set()
+            if all_locations_resp.data:
+                for loc in all_locations_resp.data:
+                    sessions_with_locations.add(loc['session_id'])
+            logger.info(f"DEBUG: Sessions with location data: {sessions_with_locations}")
+            logger.info(f"DEBUG: Sessions without location data: {set(session_ids) - sessions_with_locations}")
+            
             # Batch fetch all splits for all sessions  
             all_splits_resp = supabase.table('session_splits') \
                 .select('session_id,split_number,split_distance_km,split_duration_seconds') \
@@ -99,6 +110,9 @@ class RuckSessionListResource(Resource):
                 location_points = locations_by_session.get(session_id, [])
                 session['route'] = location_points  # legacy
                 session['location_points'] = location_points
+                
+                # Debug: Log which sessions get empty location points
+                logger.info(f"DEBUG: Session {session_id} gets {len(location_points)} location points")
                 
                 # Attach splits
                 session['splits'] = splits_by_session.get(session_id, [])

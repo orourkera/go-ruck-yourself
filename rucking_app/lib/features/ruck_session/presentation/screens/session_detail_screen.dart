@@ -89,15 +89,18 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     if (widget.session.id != null) {
       AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState: Loading session ${widget.session.id}');
       
-      // 1. Load the full session data (only if heart rate data is missing)
-      if (widget.session.heartRateSamples == null || widget.session.heartRateSamples!.isEmpty) {
-        AppLogger.debug('[SESSION DETAIL] Loading full session data - heart rate missing');
+      // 1. Load the full session data (if heart rate data OR location points are missing)
+      bool needsHeartRate = widget.session.heartRateSamples == null || widget.session.heartRateSamples!.isEmpty;
+      bool needsLocationPoints = widget.session.locationPoints == null || widget.session.locationPoints!.isEmpty;
+      
+      if (needsHeartRate || needsLocationPoints) {
+        AppLogger.debug('[SESSION DETAIL] Loading full session data - heart rate missing: $needsHeartRate, location points missing: $needsLocationPoints');
         GetIt.instance<ActiveSessionBloc>().add(LoadSessionForViewing(
           sessionId: widget.session.id!, 
           session: widget.session
         ));
       } else {
-        AppLogger.debug('[SESSION DETAIL] Using provided session data - heart rate already available');
+        AppLogger.debug('[SESSION DETAIL] Using provided session data - heart rate and location points already available');
       }
       
       // 2. Load photos - use standard loading instead of force loading to leverage cache
@@ -1431,34 +1434,31 @@ class _SessionRouteMap extends StatelessWidget {
   }
 
   List<LatLng> _getRoutePoints() {
-    return parseRoutePoints(session.locationPoints);
-  }
-// (removed legacy parsing block)
-    if (lp == null || lp.isEmpty) return points;
+    print('[ROUTE_DEBUG] Session ${session.id} - Starting _getRoutePoints()');
+    print('[ROUTE_DEBUG] Session ${session.id} - locationPoints type: ${session.locationPoints.runtimeType}');
+    print('[ROUTE_DEBUG] Session ${session.id} - locationPoints length: ${session.locationPoints?.length ?? 0}');
+    
+    if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
+      print('[ROUTE_DEBUG] Session ${session.id} - First point: ${session.locationPoints!.first}');
+      print('[ROUTE_DEBUG] Session ${session.id} - Last point: ${session.locationPoints!.last}');
+    }
 
-    for (final p in lp) {
-      double? lat;
-      double? lng;
-
-      if (p is Map) {
-        lat = _parseCoord(p['latitude']);
-        lng = _parseCoord(p['longitude']);
-
-        lat ??= _parseCoord(p['lat']);
-        lng ??= _parseCoord(p['lng']) ?? _parseCoord(p['lon']);
-      } else if (p is List && p.length >= 2) {
-        lat = _parseCoord(p[0]);
-        lng = _parseCoord(p[1]);
-      }
-
-      if (lat != null && lng != null) {
-        points.add(LatLng(lat, lng));
-      }
+    final result = parseRoutePoints(session.locationPoints);
+    print('[ROUTE_DEBUG] Session ${session.id} - parseRoutePoints returned ${result.length} points');
+    
+    if (result.isNotEmpty) {
+      print('[ROUTE_DEBUG] Session ${session.id} - First parsed point: ${result.first}');
+      print('[ROUTE_DEBUG] Session ${session.id} - Last parsed point: ${result.last}');
     }
     
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
+    print('[ROUTE_DEBUG] Session ${session.id} - Building map widget');
     final points = _getRoutePoints();
+    print('[ROUTE_DEBUG] Session ${session.id} - Map will render with ${points.length} points');
     final center = points.isNotEmpty
         ? LatLng(
             points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length,
