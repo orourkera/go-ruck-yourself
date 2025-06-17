@@ -312,6 +312,8 @@ class ClubResource(Resource):
                 """).eq('club_id', club_id).eq('status', 'pending').execute()
                 pending_requests = pending_result.data
             
+            logger.info(f"FINAL VALUES: user_role={user_role}, user_status={user_status} for user {current_user_id} in club {club_id}")
+            
             club_data = {
                 'id': club['id'],
                 'name': club['name'],
