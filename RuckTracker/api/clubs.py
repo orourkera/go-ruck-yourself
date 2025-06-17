@@ -103,6 +103,14 @@ class ClubListResource(Resource):
                     user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club['id']).eq('user_id', current_user_id).execute()
                     user_role = user_membership.data[0]['role'] if user_membership.data else None
                     user_status = user_membership.data[0]['status'] if user_membership.data else None
+
+                    # Ensure only designated club admin is treated as 'admin'
+                    if user_role == 'admin' and club['admin_user_id'] != current_user_id:
+                        logger.warning(
+                            f"User {current_user_id} has admin role in memberships table for club {club['id']} "
+                            f"but is NOT the designated admin_user_id ({club['admin_user_id']}). Downgrading role to 'member'."
+                        )
+                        user_role = 'member'
                     logger.info(f"User membership for club {club['id']}: role={user_role}, status={user_status}")
                 except Exception as membership_error:
                     logger.error(f"Error getting user membership for club {club['id']}: {membership_error}")
@@ -277,7 +285,15 @@ class ClubResource(Resource):
             user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club_id).eq('user_id', current_user_id).execute()
             user_role = user_membership.data[0]['role'] if user_membership.data else None
             user_status = user_membership.data[0]['status'] if user_membership.data else None
-            
+
+            # Ensure only the designated club admin is treated as 'admin'
+            if user_role == 'admin' and club['admin_user_id'] != current_user_id:
+                logger.warning(
+                    f"User {current_user_id} has admin role in memberships table for club {club_id} "
+                    f"but is NOT the designated admin_user_id ({club['admin_user_id']}). Downgrading role to 'member'."
+                )
+                user_role = 'member'
+                        
             # Get pending membership requests (if user is admin)
             pending_requests = []
             if user_role == 'admin':
