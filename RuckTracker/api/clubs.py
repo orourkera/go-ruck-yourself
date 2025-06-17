@@ -182,7 +182,26 @@ class ClubListResource(Resource):
             
             if result.data:
                 club = result.data[0]
-                logger.info(f"Club created: {club['id']} by user {current_user_id}")
+                club_id = club['id']
+                logger.info(f"Club created: {club_id} by user {current_user_id}")
+                
+                # Automatically add the club admin as a member
+                try:
+                    membership_data = {
+                        'club_id': club_id,
+                        'user_id': current_user_id,
+                        'role': 'admin',
+                        'status': 'approved'
+                    }
+                    membership_result = admin_client.table('club_memberships').insert(membership_data).execute()
+                    if membership_result.data:
+                        logger.info(f"Admin user {current_user_id} added as member to club {club_id}")
+                    else:
+                        logger.warning(f"Failed to add admin user as member to club {club_id}")
+                except Exception as membership_error:
+                    logger.error(f"Error adding admin as member: {membership_error}")
+                    # Don't fail the club creation if membership fails
+                
                 return {
                     'message': 'Club created successfully',
                     'club': club

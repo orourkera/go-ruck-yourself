@@ -169,10 +169,15 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Theme.of(context).primaryColor,
-                  child: Text(
-                    clubDetails.club.name.isNotEmpty ? clubDetails.club.name[0].toUpperCase() : 'C',
-                    style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
-                  ),
+                  backgroundImage: clubDetails.club.logoUrl != null && clubDetails.club.logoUrl!.isNotEmpty
+                      ? NetworkImage(clubDetails.club.logoUrl!)
+                      : null,
+                  child: clubDetails.club.logoUrl == null || clubDetails.club.logoUrl!.isEmpty
+                      ? Text(
+                          clubDetails.club.name.isNotEmpty ? clubDetails.club.name[0].toUpperCase() : 'C',
+                          style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(

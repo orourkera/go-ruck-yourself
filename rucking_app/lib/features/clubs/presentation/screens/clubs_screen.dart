@@ -10,6 +10,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 /// Clubs screen with full functionality
 class ClubsScreen extends StatefulWidget {
@@ -85,20 +86,16 @@ class _ClubsScreenState extends State<ClubsScreen> {
         body: BlocListener<ClubsBloc, ClubsState>(
           listener: (context, state) {
             if (state is ClubActionSuccess) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Theme.of(context).primaryColor,
-                  behavior: SnackBarBehavior.floating,
-                ),
+              StyledSnackBar.showSuccess(
+                context: context,
+                message: state.message,
+                animationStyle: SnackBarAnimationStyle.slideUpBounce,
               );
             } else if (state is ClubActionError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                ),
+              StyledSnackBar.showError(
+                context: context,
+                message: state.message,
+                animationStyle: SnackBarAnimationStyle.slideUpBounce,
               );
             }
           },
@@ -276,6 +273,24 @@ class _ClubsScreenState extends State<ClubsScreen> {
             children: [
               Row(
                 children: [
+                  // Club logo/avatar
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Theme.of(context).primaryColor,
+                    backgroundImage: club.logoUrl != null && club.logoUrl!.isNotEmpty
+                        ? NetworkImage(club.logoUrl!)
+                        : null,
+                    child: club.logoUrl == null || club.logoUrl!.isEmpty
+                        ? Text(
+                            club.name.isNotEmpty ? club.name[0].toUpperCase() : 'C',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,6 +406,12 @@ class _ClubsScreenState extends State<ClubsScreen> {
           children: [
             Row(
               children: [
+                // Club logo/avatar
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Theme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
