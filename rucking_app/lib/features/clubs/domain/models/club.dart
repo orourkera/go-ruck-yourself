@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 class Club extends Equatable {
   final String id;
@@ -75,7 +77,9 @@ class Club extends Equatable {
     };
   }
 
-  bool get isUserAdmin => userRole == 'admin';
+  bool get isUserAdmin {
+    return userRole == 'admin';
+  }
   bool get isUserMember => userRole == 'member' || userRole == 'admin';
   bool get isUserPending => userStatus == 'pending';
   bool get canJoin => userRole == null && userStatus == null;

@@ -314,286 +314,292 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
           final brightness = MediaQuery.platformBrightnessOf(context);
           final isDarkMode = brightness == Brightness.dark;
           
-          return MaterialApp(
-            title: 'GRY',
-            debugShowCheckedModeBanner: false,
-            theme: DynamicTheme.getThemeData(user, false),
-            darkTheme: DynamicTheme.getThemeData(user, true),
-            themeMode: ThemeMode.system,
-            home: const SplashScreen(),
-            navigatorKey: _navigatorKey,
-            onGenerateRoute: (settings) {
-              switch (settings.name) {
-                case '/home':
-                  return MaterialPageRoute(builder: (_) => const HomeScreen());
-                case '/login':
-                  return MaterialPageRoute(builder: (_) => LoginScreen());
-                case '/auth_callback':
-                  final uri = settings.arguments as Uri?;
-                  if (uri != null) {
+          return BlocListener<AuthBloc, AuthState>(
+            listener: (context, state) {
+              if (state is Unauthenticated) {
+                _navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+              }
+            },
+            child: MaterialApp(
+              title: 'GRY',
+              debugShowCheckedModeBanner: false,
+              theme: DynamicTheme.getThemeData(user, false),
+              darkTheme: DynamicTheme.getThemeData(user, true),
+              themeMode: ThemeMode.system,
+              home: const SplashScreen(),
+              navigatorKey: _navigatorKey,
+              onGenerateRoute: (settings) {
+                switch (settings.name) {
+                  case '/home':
+                    return MaterialPageRoute(builder: (_) => const HomeScreen());
+                  case '/login':
+                    return MaterialPageRoute(builder: (_) => LoginScreen());
+                  case '/auth_callback':
+                    final uri = settings.arguments as Uri?;
+                    if (uri != null) {
+                      return MaterialPageRoute(
+                        builder: (_) => AuthCallbackScreen(uri: uri),
+                      );
+                    }
+                    return MaterialPageRoute(builder: (_) => LoginScreen());
+                  case '/password_reset':
+                    final args = settings.arguments;
+                    String? token;
+                    String? accessToken;
+                    String? refreshToken;
+                    
+                    if (args is Map<String, dynamic>) {
+                      // New format with both tokens
+                      accessToken = args['access_token'] as String?;
+                      refreshToken = args['refresh_token'] as String?;
+                      token = accessToken; // For backward compatibility
+                    } else if (args is String) {
+                      // Legacy format with just token
+                      token = args;
+                      accessToken = args;
+                    }
+                    
                     return MaterialPageRoute(
-                      builder: (_) => AuthCallbackScreen(uri: uri),
-                    );
-                  }
-                  return MaterialPageRoute(builder: (_) => LoginScreen());
-                case '/password_reset':
-                  final args = settings.arguments;
-                  String? token;
-                  String? accessToken;
-                  String? refreshToken;
-                  
-                  if (args is Map<String, dynamic>) {
-                    // New format with both tokens
-                    accessToken = args['access_token'] as String?;
-                    refreshToken = args['refresh_token'] as String?;
-                    token = accessToken; // For backward compatibility
-                  } else if (args is String) {
-                    // Legacy format with just token
-                    token = args;
-                    accessToken = args;
-                  }
-                  
-                  return MaterialPageRoute(
-                    builder: (_) => PasswordResetScreen(
-                      token: token,
-                      accessToken: accessToken,
-                      refreshToken: refreshToken,
-                    ),
-                  );
-                case '/paywall':
-                  return MaterialPageRoute(builder: (_) => const PaywallScreen());
-                case '/ruck_buddies':
-                  return MaterialPageRoute(builder: (_) => const RuckBuddiesScreen());
-                case '/achievements':
-                  return MaterialPageRoute(
-                    builder: (_) => const AchievementsHubScreen(),
-                  );
-                case '/profile':
-                  return MaterialPageRoute(
-                    builder: (_) => const ProfileScreen(),
-                  );
-                case '/post_session_upsell':
-                  final args = settings.arguments;
-                  if (args is RuckSession) {
-                    return MaterialPageRoute(
-                      builder: (_) => PostSessionUpsellScreen(session: args),
-                    );
-                  }
-                  return MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Error')),
-                      body: const Center(child: Text('Missing session data for upsell.')),
-                    ),
-                  );
-                case '/session_complete':
-                  final args = settings.arguments as Map<String, dynamic>?;
-                  if (args != null) {
-                    return MaterialPageRoute(
-                      builder: (context) => BlocProvider<HealthBloc>(
-                        create: (context) => HealthBloc(
-                          healthService: getIt<HealthService>(),
-                          userId: context.read<AuthBloc>().state is Authenticated
-                            ? (context.read<AuthBloc>().state as Authenticated).user.userId
-                            : null,
-                        ),
-                        child: SessionCompleteScreen(
-                          completedAt: args['completedAt'] as DateTime,
-                          ruckId: args['ruckId'] as String,
-                          duration: args['duration'] as Duration,
-                          distance: args['distance'] as double,
-                          caloriesBurned: args['caloriesBurned'] as int,
-                          elevationGain: args['elevationGain'] as double,
-                          elevationLoss: args['elevationLoss'] as double,
-                          ruckWeight: args['ruckWeight'] as double,
-                          initialNotes: args['initialNotes'] as String?,
-                          heartRateSamples: args['heartRateSamples'] as List<HeartRateSample>?,
-                          splits: args['splits'] as List<SessionSplit>?,
-                          terrainSegments: args['terrainSegments'] as List<TerrainSegment>?,
-                        ),
+                      builder: (_) => PasswordResetScreen(
+                        token: token,
+                        accessToken: accessToken,
+                        refreshToken: refreshToken,
                       ),
                     );
-                  } else {
-                    // Handle error: arguments are required for this route
+                  case '/paywall':
+                    return MaterialPageRoute(builder: (_) => const PaywallScreen());
+                  case '/ruck_buddies':
+                    return MaterialPageRoute(builder: (_) => const RuckBuddiesScreen());
+                  case '/achievements':
+                    return MaterialPageRoute(
+                      builder: (_) => const AchievementsHubScreen(),
+                    );
+                  case '/profile':
+                    return MaterialPageRoute(
+                      builder: (_) => const ProfileScreen(),
+                    );
+                  case '/post_session_upsell':
+                    final args = settings.arguments;
+                    if (args is RuckSession) {
+                      return MaterialPageRoute(
+                        builder: (_) => PostSessionUpsellScreen(session: args),
+                      );
+                    }
                     return MaterialPageRoute(
                       builder: (_) => Scaffold(
                         appBar: AppBar(title: const Text('Error')),
-                        body: const Center(child: Text('Missing session data.')),
+                        body: const Center(child: Text('Missing session data for upsell.')),
                       ),
                     );
-                  }
-                case '/active_session':
-                  final args = settings.arguments;
-                  // --- BEGIN EXTRA DIAGNOSTIC LOGGING (remove after bug fixed) ---
-                  debugPrint('[Route] /active_session args runtimeType: ${args.runtimeType}');
-                  // If this is not ActiveSessionArgs, log its content for inspection
-                  if (args is Map) {
-                    (args as Map).forEach((k, v) => debugPrint('  $k => $v (type: ${v.runtimeType})'));
-                  }
-                  // --- END EXTRA DIAGNOSTIC LOGGING ---
-                  if (args is ActiveSessionArgs) {
+                  case '/session_complete':
+                    final args = settings.arguments as Map<String, dynamic>?;
+                    if (args != null) {
+                      return MaterialPageRoute(
+                        builder: (context) => BlocProvider<HealthBloc>(
+                          create: (context) => HealthBloc(
+                            healthService: getIt<HealthService>(),
+                            userId: context.read<AuthBloc>().state is Authenticated
+                              ? (context.read<AuthBloc>().state as Authenticated).user.userId
+                              : null,
+                          ),
+                          child: SessionCompleteScreen(
+                            completedAt: args['completedAt'] as DateTime,
+                            ruckId: args['ruckId'] as String,
+                            duration: args['duration'] as Duration,
+                            distance: args['distance'] as double,
+                            caloriesBurned: args['caloriesBurned'] as int,
+                            elevationGain: args['elevationGain'] as double,
+                            elevationLoss: args['elevationLoss'] as double,
+                            ruckWeight: args['ruckWeight'] as double,
+                            initialNotes: args['initialNotes'] as String?,
+                            heartRateSamples: args['heartRateSamples'] as List<HeartRateSample>?,
+                            splits: args['splits'] as List<SessionSplit>?,
+                            terrainSegments: args['terrainSegments'] as List<TerrainSegment>?,
+                          ),
+                        ),
+                      );
+                    } else {
+                      // Handle error: arguments are required for this route
+                      return MaterialPageRoute(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('Error')),
+                          body: const Center(child: Text('Missing session data.')),
+                        ),
+                      );
+                    }
+                  case '/active_session':
+                    final args = settings.arguments;
+                    // --- BEGIN EXTRA DIAGNOSTIC LOGGING (remove after bug fixed) ---
+                    debugPrint('[Route] /active_session args runtimeType: ${args.runtimeType}');
+                    // If this is not ActiveSessionArgs, log its content for inspection
+                    if (args is Map) {
+                      (args as Map).forEach((k, v) => debugPrint('  $k => $v (type: ${v.runtimeType})'));
+                    }
+                    // --- END EXTRA DIAGNOSTIC LOGGING ---
+                    if (args is ActiveSessionArgs) {
+                      return MaterialPageRoute(
+                        builder: (_) => ActiveSessionPage(args: args),
+                      );
+                    }
                     return MaterialPageRoute(
-                      builder: (_) => ActiveSessionPage(args: args),
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: const Text('Error')),
+                        body: const Center(child: Text('Invalid arguments for active session')),
+                      ),
                     );
-                  }
-                  return MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Error')),
-                      body: const Center(child: Text('Invalid arguments for active session')),
-                    ),
-                  );
-                
-                // Duels feature routes
-                case '/duels':
-                  return MaterialPageRoute(
-                    builder: (_) => const DuelsListScreen(),
-                  );
-                case '/duels/create':
-                  return MaterialPageRoute(
-                    builder: (_) => const CreateDuelScreen(),
-                  );
-                case '/duel_detail':
-                  final args = settings.arguments;
-                  if (args is String) {
+                  
+                  // Duels feature routes
+                  case '/duels':
                     return MaterialPageRoute(
-                      builder: (_) => DuelDetailScreen(duelId: args),
+                      builder: (_) => const DuelsListScreen(),
                     );
-                  }
-                  return MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Error')),
-                      body: const Center(child: Text('Missing duel ID')),
-                    ),
-                  );
-                case '/duel_invitations':
-                  return MaterialPageRoute(
-                    builder: (_) => const DuelInvitationsScreen(),
-                  );
-                case '/duel_stats':
-                  return MaterialPageRoute(
-                    builder: (_) => const DuelStatsScreen(),
-                  );
-                case '/auth/callback':
-                  // Parse the full URI from the route settings
-                  final uri = Uri.parse('https://getrucky.com${settings.name}?${settings.arguments ?? ''}');
-                  return MaterialPageRoute(
-                    builder: (_) => AuthCallbackScreen(uri: uri),
-                  );
-                case '/callback':
-                  // Debug logging to see what we're receiving
-                  print('🔍 /callback route - settings.name: ${settings.name}');
-                  print('🔍 /callback route - settings.arguments: ${settings.arguments}');
-                  
-                  String fullUrl = settings.name ?? '/callback';
-                  if (settings.arguments != null) {
-                    fullUrl += '?${settings.arguments}';
-                  }
-                  
-                  print('🔍 /callback route - fullUrl: $fullUrl');
-                  
-                  // Handle Supabase redirects that come to /callback instead of /auth/callback
-                  // Parse the URL properly, including fragment parameters
-                  Uri uri;
-                  try {
-                    // If this is a fragment-based URL, we need to parse it manually
-                    if (fullUrl.contains('#')) {
-                      final parts = fullUrl.split('#');
-                      if (parts.length > 1) {
-                        // Convert fragment to query parameters
-                        uri = Uri(
-                          scheme: 'https',
-                          host: 'getrucky.com',
-                          path: '/auth/callback',
-                          query: parts[1], // Use fragment as query
-                        );
+                  case '/duels/create':
+                    return MaterialPageRoute(
+                      builder: (_) => const CreateDuelScreen(),
+                    );
+                  case '/duel_detail':
+                    final args = settings.arguments;
+                    if (args is String) {
+                      return MaterialPageRoute(
+                        builder: (_) => DuelDetailScreen(duelId: args),
+                      );
+                    }
+                    return MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: const Text('Error')),
+                        body: const Center(child: Text('Missing duel ID')),
+                      ),
+                    );
+                  case '/duel_invitations':
+                    return MaterialPageRoute(
+                      builder: (_) => const DuelInvitationsScreen(),
+                    );
+                  case '/duel_stats':
+                    return MaterialPageRoute(
+                      builder: (_) => const DuelStatsScreen(),
+                    );
+                  case '/auth/callback':
+                    // Parse the full URI from the route settings
+                    final uri = Uri.parse('https://getrucky.com${settings.name}?${settings.arguments ?? ''}');
+                    return MaterialPageRoute(
+                      builder: (_) => AuthCallbackScreen(uri: uri),
+                    );
+                  case '/callback':
+                    // Debug logging to see what we're receiving
+                    print('🔍 /callback route - settings.name: ${settings.name}');
+                    print('🔍 /callback route - settings.arguments: ${settings.arguments}');
+                    
+                    String fullUrl = settings.name ?? '/callback';
+                    if (settings.arguments != null) {
+                      fullUrl += '?${settings.arguments}';
+                    }
+                    
+                    print('🔍 /callback route - fullUrl: $fullUrl');
+                    
+                    // Handle Supabase redirects that come to /callback instead of /auth/callback
+                    // Parse the URL properly, including fragment parameters
+                    Uri uri;
+                    try {
+                      // If this is a fragment-based URL, we need to parse it manually
+                      if (fullUrl.contains('#')) {
+                        final parts = fullUrl.split('#');
+                        if (parts.length > 1) {
+                          // Convert fragment to query parameters
+                          uri = Uri(
+                            scheme: 'https',
+                            host: 'getrucky.com',
+                            path: '/auth/callback',
+                            query: parts[1], // Use fragment as query
+                          );
+                        } else {
+                          uri = Uri.parse('https://getrucky.com$fullUrl');
+                        }
                       } else {
                         uri = Uri.parse('https://getrucky.com$fullUrl');
                       }
-                    } else {
-                      uri = Uri.parse('https://getrucky.com$fullUrl');
+                    } catch (e) {
+                      // Fallback if parsing fails
+                      uri = Uri.parse('https://getrucky.com/auth/callback');
                     }
-                  } catch (e) {
-                    // Fallback if parsing fails
-                    uri = Uri.parse('https://getrucky.com/auth/callback');
-                  }
+                    
+                    return MaterialPageRoute(
+                      builder: (_) => AuthCallbackScreen(uri: uri),
+                    );
+                  case '/clubs':
+                    return MaterialPageRoute(builder: (_) => const ClubsScreen());
+                  case '/club_detail':
+                    final clubId = settings.arguments as String?;
+                    if (clubId != null) {
+                      return MaterialPageRoute(
+                        builder: (_) => ClubDetailScreen(clubId: clubId),
+                      );
+                    }
+                    return MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: const Text('Error')),
+                        body: const Center(child: Text('Missing club ID')),
+                      ),
+                    );
+                  case '/create_club':
+                    return MaterialPageRoute(builder: (_) => const CreateClubScreen());
+                  case '/edit_club':
+                    final clubDetails = settings.arguments as ClubDetails?;
+                    if (clubDetails != null) {
+                      return MaterialPageRoute(
+                        builder: (_) => CreateClubScreen(clubToEdit: clubDetails),
+                      );
+                    }
+                    return MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: const Text('Error')),
+                        body: const Center(child: Text('Missing club details')),
+                      ),
+                    );
                   
-                  return MaterialPageRoute(
-                    builder: (_) => AuthCallbackScreen(uri: uri),
-                  );
-                case '/clubs':
-                  return MaterialPageRoute(builder: (_) => const ClubsScreen());
-                case '/club_detail':
-                  final clubId = settings.arguments as String?;
-                  if (clubId != null) {
+                  // Events feature routes
+                  case '/event_detail':
+                    final eventId = settings.arguments as String?;
+                    if (eventId != null) {
+                      return MaterialPageRoute(
+                        builder: (_) => EventDetailScreen(eventId: eventId),
+                      );
+                    }
                     return MaterialPageRoute(
-                      builder: (_) => ClubDetailScreen(clubId: clubId),
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: const Text('Error')),
+                        body: const Center(child: Text('Missing event ID')),
+                      ),
                     );
-                  }
-                  return MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Error')),
-                      body: const Center(child: Text('Missing club ID')),
-                    ),
-                  );
-                case '/create_club':
-                  return MaterialPageRoute(builder: (_) => const CreateClubScreen());
-                case '/edit_club':
-                  final clubDetails = settings.arguments as ClubDetails?;
-                  if (clubDetails != null) {
+                  case '/create_event':
                     return MaterialPageRoute(
-                      builder: (_) => CreateClubScreen(clubToEdit: clubDetails),
+                      builder: (_) => const CreateEventScreen(),
                     );
-                  }
-                  return MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Error')),
-                      body: const Center(child: Text('Missing club details')),
-                    ),
-                  );
-                
-                // Events feature routes
-                case '/event_detail':
-                  final eventId = settings.arguments as String?;
-                  if (eventId != null) {
+                  case '/edit_event':
+                    final eventId = settings.arguments as String?;
+                    if (eventId != null) {
+                      return MaterialPageRoute(
+                        builder: (_) => CreateEventScreen(eventId: eventId),
+                      );
+                    }
                     return MaterialPageRoute(
-                      builder: (_) => EventDetailScreen(eventId: eventId),
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: const Text('Error')),
+                        body: const Center(child: Text('Missing event ID')),
+                      ),
                     );
-                  }
-                  return MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Error')),
-                      body: const Center(child: Text('Missing event ID')),
-                    ),
-                  );
-                case '/create_event':
-                  return MaterialPageRoute(
-                    builder: (_) => const CreateEventScreen(),
-                  );
-                case '/edit_event':
-                  final eventId = settings.arguments as String?;
-                  if (eventId != null) {
+                  default:
                     return MaterialPageRoute(
-                      builder: (_) => CreateEventScreen(eventId: eventId),
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: Text('Error')),
+                        body: Center(child: Text('Route not found: ${settings.name}')),
+                      ),
                     );
-                  }
-                  return MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Error')),
-                      body: const Center(child: Text('Missing event ID')),
-                    ),
-                  );
-                default:
-                  // Optionally handle unknown routes
-                  return MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: Text('Error')),
-                      body: Center(child: Text('Route not found: ${settings.name}')),
-                    ),
-                  );
-              }
-            },
-          );
-        },
-      ),
-    );
+                }
+              },
+            ), // closes MaterialApp
+          ); // closes BlocListener
+          },          // ← closes BlocBuilder's builder function
+        ),           // ← closes BlocBuilder widget
+      );             // ← closes MultiBlocProvider
   }
 }

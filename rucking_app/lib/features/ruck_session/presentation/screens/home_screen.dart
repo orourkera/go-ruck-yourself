@@ -15,6 +15,7 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
 import 'package:rucking_app/features/notifications/presentation/widgets/notification_bell.dart';
+import 'package:rucking_app/features/notifications/presentation/pages/notifications_screen.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
@@ -524,9 +525,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Unauthenticated) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => LoginScreen()),
-          );
+          Navigator.of(context).pushNamedAndRemoveUntil(
+              '/login',
+              (route) => false,
+            );
         }
       },
       child: Scaffold(
@@ -571,7 +573,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                     UserAvatar(
                                       avatarUrl: state.user.avatarUrl,
                                       username: userName,
-                                      size: 50,
+                                      size: 40,
                                       onTap: () {
                                         // Navigate to profile page
                                         Navigator.pushNamed(context, '/profile');
@@ -580,47 +582,60 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                     const SizedBox(width: 12),
                                   ],
                                   // User name only (no welcome text)
-                                  Text(
-                                    userName,
-                                    style: AppTextStyles.displayLarge.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Welcome back,',
+                                        style: AppTextStyles.bodySmall.copyWith(
+                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : AppColors.textDarkSecondary,
+                                        ),
+                                      ),
+                                      Text(
+                                        userName,
+                                        style: AppTextStyles.displayLarge.copyWith(
+                                          fontSize: 24,
+                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                               // Top bar action icons - more compact and right-aligned
-                              Container(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Clubs icon
-                                    Container(
-                                      margin: EdgeInsets.zero,
-                                      child: IconButton(
-                                        icon: Image.asset(
-                                          'assets/images/clubs.png',
-                                          width: 56,
-                                          height: 56,
-                                        ),
-                                        onPressed: () {
-                                          Navigator.pushNamed(context, '/clubs');
-                                        },
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(
-                                          minWidth: 56,
-                                          minHeight: 56,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8), // Small fixed spacing
-                                    // Notification bell with unread count
-                                    Container(
-                                      margin: EdgeInsets.zero,
-                                      child: NotificationBell(useLadyMode: isLadyMode),
-                                    ),
-                                  ],
-                                ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Notifications
+                                  _buildHeaderAction(
+                                    icon: Image.asset('assets/images/notifications.png', width: 27, height: 27),
+                                    onTap: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                                      );
+                                      if (!mounted) return;
+                                      context.read<NotificationBloc>().add(const NotificationsRequested());
+                                    },
+                                  ),
+                                  const SizedBox(width: 6),
+                                  // Clubs
+                                  _buildHeaderAction(
+                                    icon: Image.asset('assets/images/clubs.png', width: 30, height: 30),
+                                    onTap: () {
+                                      Navigator.pushNamed(context, '/clubs');
+                                    },
+                                  ),
+                                  const SizedBox(width: 6),
+                                  // Profile
+                                  _buildHeaderAction(
+                                    icon: _buildProfileHeaderIcon(),
+                                    onTap: () {
+                                      Navigator.pushNamed(context, '/profile');
+                                    },
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -1129,6 +1144,48 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     );
   }
   
+  /// Builds a small circular header action icon
+  Widget _buildHeaderAction({required Widget icon, required VoidCallback onTap}) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(child: icon),
+      ),
+    );
+  }
+
+  /// Returns profile icon widget for header based on user gender (lady mode)
+  Widget _buildProfileHeaderIcon() {
+    String? gender;
+    try {
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        gender = (authBloc.state as Authenticated).user.gender;
+      }
+    } catch (_) {
+      // If AuthBloc not available, fall back to default icon
+    }
+
+    final String iconPath = (gender == 'female')
+        ? 'assets/images/lady rucker profile.png'
+        : 'assets/images/profile.png';
+    return Image.asset(iconPath, width: 30, height: 30);
+  }
+
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));

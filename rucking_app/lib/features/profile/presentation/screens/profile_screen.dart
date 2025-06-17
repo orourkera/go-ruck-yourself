@@ -58,9 +58,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             );
           } else if (state is Unauthenticated) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => LoginScreen()),
-            );
+            Navigator.of(context).pushNamedAndRemoveUntil(
+                '/login',
+                (route) => false,
+              );
           }
         },
         child: BlocBuilder<AuthBloc, AuthState>(
@@ -101,32 +102,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final bool isDark = Theme.of(context).brightness == Brightness.dark;
               
               return Scaffold(
-                backgroundColor: isDark 
-                    ? Theme.of(context).scaffoldBackgroundColor
-                    : (isLadyMode ? primaryColor.withOpacity(0.05) : Colors.white),
                 appBar: AppBar(
-                  backgroundColor: isDark
-                      ? Theme.of(context).appBarTheme.backgroundColor
-                      : (isLadyMode ? primaryColor : Colors.white),
+                  title: const Text('Profile'),
                   elevation: 0,
-                  title: Text(
-                    'Profile',
-                    style: TextStyle(
-                      color: isDark
-                          ? Theme.of(context).appBarTheme.foregroundColor
-                          : (isLadyMode ? Colors.white : Colors.black),
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                   actions: [
                     IconButton(
-                      icon: Icon(
-                        Icons.edit, 
-                        color: isDark
-                            ? Theme.of(context).appBarTheme.foregroundColor
-                            : (isLadyMode ? Colors.white : Colors.black)
-                      ),
+                      icon: const Icon(Icons.edit),
                       onPressed: () {
                         Navigator.push(
                           context,

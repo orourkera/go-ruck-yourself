@@ -95,6 +95,14 @@ class _ClubsScreenState extends State<ClubsScreen> {
                 message: state.message,
                 animationStyle: SnackBarAnimationStyle.slideUpBounce,
               );
+
+              if (state.message.toLowerCase().contains('membership request')) {
+                setState(() {
+                  _membershipFilter = 'member';
+                  _isPublicFilter = null;
+                });
+                _performSearch();
+              }
             } else if (state is ClubActionError) {
               StyledSnackBar.showError(
                 context: context,
