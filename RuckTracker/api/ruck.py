@@ -36,17 +36,45 @@ class RuckSessionListResource(Resource):
             if not session_ids:
                 return sessions, 200
             
-            # Batch fetch all location points for all sessions
+            # Batch fetch all location points for all sessions with pagination
             try:
-                all_locations_resp = supabase.table('location_point') \
-                    .select('session_id,latitude,longitude') \
-                    .in_('session_id', session_ids) \
-                    .order('session_id,timestamp') \
-                    .limit(50000) \
-                    .execute()
+                all_location_points = []
+                page_size = 5000
+                offset = 0
+                
+                while True:
+                    locations_page = supabase.table('location_point') \
+                        .select('session_id,latitude,longitude') \
+                        .in_('session_id', session_ids) \
+                        .order('session_id.desc,timestamp') \
+                        .range(offset, offset + page_size - 1) \
+                        .execute()
+                    
+                    if not locations_page.data:
+                        break
+                    
+                    all_location_points.extend(locations_page.data)
+                    
+                    # If we got less than page_size, we're done
+                    if len(locations_page.data) < page_size:
+                        break
+                    
+                    offset += page_size
+                    
+                    # Safety check to prevent infinite loops
+                    if offset > 100000:
+                        logger.warning(f"Location points query exceeded 100k limit, stopping pagination")
+                        break
+                
+                # Create a mock response object for compatibility
+                class MockResponse:
+                    def __init__(self, data):
+                        self.data = data
+                
+                all_locations_resp = MockResponse(all_location_points)
                 
                 logger.info(f"DEBUG: Fetching location points for session IDs: {session_ids}")
-                logger.info(f"DEBUG: Location points query returned {len(all_locations_resp.data) if all_locations_resp.data else 0} total points")
+                logger.info(f"DEBUG: Location points query returned {len(all_location_points)} total points via pagination")
                 
                 if hasattr(all_locations_resp, 'count') and all_locations_resp.count:
                     logger.info(f"DEBUG: Query count metadata: {all_locations_resp.count}")
