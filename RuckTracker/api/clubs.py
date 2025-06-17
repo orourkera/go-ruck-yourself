@@ -339,10 +339,28 @@ class ClubResource(Resource):
                 
                 if result.data:
                     logger.info(f"Club {club_id} updated by user {current_user_id}")
-                    return {
-                        'message': 'Club updated successfully',
-                        'club': result.data[0]
-                    }, 200
+                    
+                    # Fetch updated club with member count
+                    updated_club_result = admin_client.table('clubs').select('''
+                        *,
+                        member_count:club_memberships!club_memberships_club_id_fkey(count)
+                    ''').eq('id', club_id).single().execute()
+                    
+                    if updated_club_result.data:
+                        # Process member count
+                        club_data = updated_club_result.data
+                        club_data['member_count'] = club_data.get('member_count', [{}])[0].get('count', 0)
+                        
+                        return {
+                            'message': 'Club updated successfully',
+                            'club': club_data
+                        }, 200
+                    else:
+                        # Fallback to basic club data if member count query fails
+                        return {
+                            'message': 'Club updated successfully',
+                            'club': result.data[0]
+                        }, 200
                 else:
                     return {'error': 'Failed to update club'}, 500
             else:

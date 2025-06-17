@@ -55,11 +55,12 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
       if (club.latitude != null && club.longitude != null) {
         // Create a location result from the existing club data
         _selectedLocationResult = LocationSearchResult(
-          displayName: 'Club Location', // Generic name since we don't have the original
+          displayName: club.location ?? 'Club Location',
+          address: club.location ?? 'Club Location', // Use location field as address
           latitude: club.latitude!,
           longitude: club.longitude!,
         );
-        _locationController.text = 'Club Location';
+        _locationController.text = club.location ?? 'Club Location';
       }
     }
   }

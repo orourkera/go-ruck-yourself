@@ -1,13 +1,16 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/clubs_cache_service.dart';
+import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/domain/repositories/clubs_repository.dart';
 
 class ClubsRepositoryImpl implements ClubsRepository {
   final ApiClient _apiClient;
   final ClubsCacheService _cacheService = getIt<ClubsCacheService>();
+  final AvatarService _avatarService = getIt<AvatarService>();
 
   ClubsRepositoryImpl(this._apiClient);
 
@@ -134,7 +137,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     // Handle logo upload
     if (logo != null) {
       try {
-        final logoUrl = await _avatarService.uploadFile(logo, 'club-logos');
+        final logoUrl = await _avatarService.uploadClubLogo(logo);
         body['logo_url'] = logoUrl;
       } catch (e) {
         throw Exception('Failed to upload club logo: $e');

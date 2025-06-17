@@ -41,7 +41,6 @@ import 'package:rucking_app/features/clubs/presentation/screens/clubs_screen.dar
 import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/create_club_screen.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
-import 'package:rucking_app/features/clubs/domain/models/club_details.dart';
 import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/create_event_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';

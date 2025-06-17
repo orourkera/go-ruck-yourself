@@ -12,6 +12,10 @@ class Club extends Equatable {
   final int memberCount;
   final String? userRole; // 'admin', 'member', or null if not a member
   final String? userStatus; // 'pending', 'approved', 'rejected', or null
+  final String? logoUrl;
+  final String? location;
+  final double? latitude;
+  final double? longitude;
 
   const Club({
     required this.id,
@@ -25,6 +29,10 @@ class Club extends Equatable {
     required this.memberCount,
     this.userRole,
     this.userStatus,
+    this.logoUrl,
+    this.location,
+    this.latitude,
+    this.longitude,
   });
 
   factory Club.fromJson(Map<String, dynamic> json) {
@@ -37,9 +45,13 @@ class Club extends Equatable {
       maxMembers: json['max_members'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String? ?? json['created_at'] as String),
-      memberCount: json['member_count'] as int,
+      memberCount: json['member_count'] as int? ?? 0, // Default to 0 if null
       userRole: json['user_role'] as String?,
       userStatus: json['user_status'] as String?,
+      logoUrl: json['logo_url'] as String?,
+      location: json['location'] as String?,
+      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
+      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
     );
   }
 
@@ -56,6 +68,10 @@ class Club extends Equatable {
       'member_count': memberCount,
       'user_role': userRole,
       'user_status': userStatus,
+      'logo_url': logoUrl,
+      'location': location,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 
@@ -78,6 +94,10 @@ class Club extends Equatable {
         memberCount,
         userRole,
         userStatus,
+        logoUrl,
+        location,
+        latitude,
+        longitude,
       ];
 }
 
