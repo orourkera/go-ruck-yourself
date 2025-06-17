@@ -41,6 +41,7 @@ class RuckSessionListResource(Resource):
                 .select('session_id,latitude,longitude') \
                 .in_('session_id', session_ids) \
                 .order('session_id,timestamp') \
+                .limit(100000) \
                 .execute()
             
             logger.info(f"DEBUG: Fetching location points for session IDs: {session_ids}")
