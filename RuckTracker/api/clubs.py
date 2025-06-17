@@ -48,7 +48,7 @@ class ClubListResource(Resource):
             # Base query - simplified to avoid complex joins
             query = admin_client.table('clubs').select("""
                 *,
-                user!admin_user_id(id, username, avatar_url)
+                admin_user:admin_user_id(id, username, avatar_url)
             """)
             logger.info("Created base query")
             
@@ -126,7 +126,7 @@ class ClubListResource(Resource):
                 }
                 
                 # Only include admin_user if the join data exists and is valid
-                admin_user_data = club.get('user')
+                admin_user_data = club.get('admin_user')
                 if admin_user_data and isinstance(admin_user_data, dict):
                     club_data['admin_user'] = admin_user_data
                 
@@ -209,10 +209,10 @@ class ClubResource(Resource):
             
             # Try multiple join syntaxes since Supabase can be finicky
             try:
-                # First try the standard join syntax
+                # First try the standard join syntax (matching club_memberships pattern)
                 club_result = admin_client.table('clubs').select("""
                     *,
-                    admin_user:user!admin_user_id(id, username, avatar_url)
+                    admin_user:admin_user_id(id, username, avatar_url)
                 """).eq('id', club_id).execute()
                 
                 if club_result.data and club_result.data[0].get('admin_user'):
@@ -222,7 +222,7 @@ class ClubResource(Resource):
                     logger.info("Standard join failed, trying alternative syntax")
                     club_result = admin_client.table('clubs').select("""
                         *,
-                        user!admin_user_id(id, username, avatar_url)
+                        user:admin_user_id(id, username, avatar_url)
                     """).eq('id', club_id).execute()
                     
                     if club_result.data and club_result.data[0].get('user'):

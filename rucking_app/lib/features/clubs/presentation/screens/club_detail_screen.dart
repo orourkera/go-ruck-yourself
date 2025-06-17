@@ -48,12 +48,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           title: Text(
             _clubDetails?.club.name ?? 'Club Details',
             style: AppTextStyles.titleLarge.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
+              color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: Colors.transparent,
+          centerTitle: true,
+          backgroundColor: AppColors.primary,
           elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
           actions: _buildAppBarActions(),
         ),
         body: BlocConsumer<ClubsBloc, ClubsState>(

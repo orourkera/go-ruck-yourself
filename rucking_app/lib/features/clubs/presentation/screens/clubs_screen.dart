@@ -66,16 +66,18 @@ class _ClubsScreenState extends State<ClubsScreen> {
           title: Text(
             'Clubs',
             style: AppTextStyles.titleLarge.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
+              color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: Colors.transparent,
+          centerTitle: true,
+          backgroundColor: AppColors.primary,
           elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
           leading: IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.arrow_back,
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
+              color: Colors.white,
             ),
             onPressed: () => Navigator.pop(context),
           ),
