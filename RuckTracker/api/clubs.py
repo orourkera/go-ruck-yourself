@@ -328,7 +328,7 @@ class ClubResource(Resource):
             
             # Update club
             update_data = {}
-            allowed_fields = ['name', 'description', 'logo_url', 'is_public', 'max_members', 'latitude', 'longitude']
+            allowed_fields = ['name', 'description', 'logo_url', 'is_public', 'max_members', 'location', 'latitude', 'longitude']
             
             for field in allowed_fields:
                 if field in data:

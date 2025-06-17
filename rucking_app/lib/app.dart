@@ -40,6 +40,8 @@ import 'package:rucking_app/features/duels/presentation/screens/duel_stats_scree
 import 'package:rucking_app/features/clubs/presentation/screens/clubs_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/create_club_screen.dart';
+import 'package:rucking_app/features/clubs/domain/models/club.dart';
+import 'package:rucking_app/features/clubs/domain/models/club_details.dart';
 import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/create_event_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
@@ -535,6 +537,19 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   );
                 case '/create_club':
                   return MaterialPageRoute(builder: (_) => const CreateClubScreen());
+                case '/edit_club':
+                  final clubDetails = settings.arguments as ClubDetails?;
+                  if (clubDetails != null) {
+                    return MaterialPageRoute(
+                      builder: (_) => CreateClubScreen(clubToEdit: clubDetails),
+                    );
+                  }
+                  return MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('Error')),
+                      body: const Center(child: Text('Missing club details')),
+                    ),
+                  );
                 
                 // Events feature routes
                 case '/event_detail':

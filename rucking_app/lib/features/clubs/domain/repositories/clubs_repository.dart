@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 
 abstract class ClubsRepository {
@@ -25,6 +26,10 @@ abstract class ClubsRepository {
     String? description,
     bool? isPublic,
     int? maxMembers,
+    File? logo,
+    String? location,
+    double? latitude,
+    double? longitude,
   });
   
   Future<void> deleteClub(String clubId);

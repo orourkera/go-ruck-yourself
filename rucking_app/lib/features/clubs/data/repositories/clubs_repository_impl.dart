@@ -116,6 +116,10 @@ class ClubsRepositoryImpl implements ClubsRepository {
     String? description,
     bool? isPublic,
     int? maxMembers,
+    File? logo,
+    String? location,
+    double? latitude,
+    double? longitude,
   }) async {
     final body = <String, dynamic>{};
     
@@ -123,6 +127,19 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (description != null) body['description'] = description;
     if (isPublic != null) body['is_public'] = isPublic;
     if (maxMembers != null) body['max_members'] = maxMembers;
+    if (location != null) body['location'] = location;
+    if (latitude != null) body['latitude'] = latitude;
+    if (longitude != null) body['longitude'] = longitude;
+    
+    // Handle logo upload
+    if (logo != null) {
+      try {
+        final logoUrl = await _avatarService.uploadFile(logo, 'club-logos');
+        body['logo_url'] = logoUrl;
+      } catch (e) {
+        throw Exception('Failed to upload club logo: $e');
+      }
+    }
 
     final response = await _apiClient.put('/clubs/$clubId', body);
     

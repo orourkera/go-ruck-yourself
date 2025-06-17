@@ -144,6 +144,10 @@ class ClubsBloc extends Bloc<ClubsEvent, ClubsState> {
         description: event.description,
         isPublic: event.isPublic,
         maxMembers: event.maxMembers,
+        logo: event.logo,
+        location: event.location,
+        latitude: event.latitude,
+        longitude: event.longitude,
       );
       
       emit(const ClubActionSuccess('Club updated successfully!'));

@@ -65,6 +65,10 @@ class UpdateClub extends ClubsEvent {
   final String? description;
   final bool? isPublic;
   final int? maxMembers;
+  final File? logo;
+  final String? location;
+  final double? latitude;
+  final double? longitude;
 
   const UpdateClub({
     required this.clubId,
@@ -72,10 +76,14 @@ class UpdateClub extends ClubsEvent {
     this.description,
     this.isPublic,
     this.maxMembers,
+    this.logo,
+    this.location,
+    this.latitude,
+    this.longitude,
   });
 
   @override
-  List<Object?> get props => [clubId, name, description, isPublic, maxMembers];
+  List<Object?> get props => [clubId, name, description, isPublic, maxMembers, logo, location, latitude, longitude];
 }
 
 class DeleteClub extends ClubsEvent {

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/core/services/location_search_service.dart';
+import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
@@ -14,7 +15,9 @@ import 'package:rucking_app/shared/utils/image_picker_utils.dart';
 
 /// Screen for creating a new club
 class CreateClubScreen extends StatefulWidget {
-  const CreateClubScreen({Key? key}) : super(key: key);
+  final ClubDetails? clubToEdit;
+  
+  const CreateClubScreen({Key? key, this.clubToEdit}) : super(key: key);
 
   @override
   State<CreateClubScreen> createState() => _CreateClubScreenState();
@@ -40,6 +43,25 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   void initState() {
     super.initState();
     _clubsBloc = getIt<ClubsBloc>();
+    
+    // Pre-fill form if editing existing club
+    if (widget.clubToEdit != null) {
+      final club = widget.clubToEdit!.club;
+      _nameController.text = club.name;
+      _descriptionController.text = club.description ?? '';
+      _maxMembersController.text = club.maxMembers?.toString() ?? '';
+      
+      // Set location if available
+      if (club.latitude != null && club.longitude != null) {
+        // Create a location result from the existing club data
+        _selectedLocationResult = LocationSearchResult(
+          displayName: 'Club Location', // Generic name since we don't have the original
+          latitude: club.latitude!,
+          longitude: club.longitude!,
+        );
+        _locationController.text = 'Club Location';
+      }
+    }
   }
 
   @override
@@ -122,16 +144,32 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
           ? null 
           : int.tryParse(_maxMembersController.text);
       
-      _clubsBloc.add(CreateClub(
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        isPublic: true,
-        maxMembers: maxMembers,
-        logo: _clubLogo,
-        location: _selectedLocationResult?.displayName,
-        latitude: _selectedLocationResult?.latitude,
-        longitude: _selectedLocationResult?.longitude,
-      ));
+      if (widget.clubToEdit != null) {
+        // Update existing club
+        _clubsBloc.add(UpdateClub(
+          clubId: widget.clubToEdit!.club.id,
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          isPublic: true, // Keep existing setting for now
+          maxMembers: maxMembers,
+          logo: _clubLogo,
+          location: _selectedLocationResult?.displayName,
+          latitude: _selectedLocationResult?.latitude,
+          longitude: _selectedLocationResult?.longitude,
+        ));
+      } else {
+        // Create new club
+        _clubsBloc.add(CreateClub(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          isPublic: true,
+          maxMembers: maxMembers,
+          logo: _clubLogo,
+          location: _selectedLocationResult?.displayName,
+          latitude: _selectedLocationResult?.latitude,
+          longitude: _selectedLocationResult?.longitude,
+        ));
+      }
     }
   }
 
@@ -142,19 +180,18 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'Create Club',
+            widget.clubToEdit != null ? 'Edit Club' : 'Create Club',
             style: AppTextStyles.titleLarge.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
+              color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: Colors.transparent,
+          centerTitle: true,
+          backgroundColor: AppColors.primary,
           elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
           leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back,
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textDark,
-            ),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
@@ -452,9 +489,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   
                   const SizedBox(height: 32),
                   
-                  // Create Button
+                  // Create/Update Button
                   CustomButton(
-                    text: 'Create Club',
+                    text: widget.clubToEdit != null ? 'Update Club' : 'Create Club',
                     onPressed: _isLoading ? null : _createClub,
                     isLoading: _isLoading,
                     color: Theme.of(context).primaryColor,
