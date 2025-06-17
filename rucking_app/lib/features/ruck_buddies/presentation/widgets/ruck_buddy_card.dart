@@ -1066,7 +1066,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor,
+                    color: AppColors.secondary,
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Text(
@@ -1108,7 +1108,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
               polylines: [
                 Polyline(
                   points: routePoints,
-                  color: Theme.of(context).primaryColor,
+                  color: AppColors.secondary,
                   strokeWidth: 4,
                 )
               ],
@@ -1137,7 +1137,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor,
+                  color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Text(

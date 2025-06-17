@@ -953,7 +953,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                             polylines: [
                                               Polyline(
                                                 points: routePoints,
-                                                color: Theme.of(context).primaryColor,
+                                                color: AppColors.secondary,
                                                 strokeWidth: 4,
                                               ),
                                             ],

@@ -1533,7 +1533,7 @@ class _SessionRouteMap extends StatelessWidget {
               polylines: [
                 Polyline(
                   points: points,
-                  color: Theme.of(context).primaryColor,
+                  color: AppColors.secondary,
                   strokeWidth: 4,
                 ),
               ],

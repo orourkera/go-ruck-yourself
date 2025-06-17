@@ -205,15 +205,48 @@ class ClubResource(Resource):
             admin_client = get_supabase_admin_client()
             
             # Get club with admin details
-            club_result = admin_client.table('clubs').select("""
-                *,
-                user!admin_user_id(id, username, avatar_url)
-            """).eq('id', club_id).execute()
+            logger.info(f"Fetching club details for club_id: {club_id}")
+            
+            # Try multiple join syntaxes since Supabase can be finicky
+            try:
+                # First try the standard join syntax
+                club_result = admin_client.table('clubs').select("""
+                    *,
+                    admin_user:user!admin_user_id(id, username, avatar_url)
+                """).eq('id', club_id).execute()
+                
+                if club_result.data and club_result.data[0].get('admin_user'):
+                    logger.info("Standard join syntax worked")
+                else:
+                    # Try alternative syntax
+                    logger.info("Standard join failed, trying alternative syntax")
+                    club_result = admin_client.table('clubs').select("""
+                        *,
+                        user!admin_user_id(id, username, avatar_url)
+                    """).eq('id', club_id).execute()
+                    
+                    if club_result.data and club_result.data[0].get('user'):
+                        logger.info("Alternative join syntax worked")
+                        # Rename the field for consistency
+                        club_result.data[0]['admin_user'] = club_result.data[0].pop('user')
+                    else:
+                        # Join failed, fetch basic club data
+                        logger.info("All join syntaxes failed, fetching basic club data")
+                        club_result = admin_client.table('clubs').select('*').eq('id', club_id).execute()
+                        
+            except Exception as join_error:
+                logger.warning(f"Join query failed: {join_error}")
+                # Fall back to basic club query
+                club_result = admin_client.table('clubs').select('*').eq('id', club_id).execute()
+            
+            logger.info(f"Club query result: {club_result.data}")
             
             if not club_result.data:
                 return {'error': 'Club not found'}, 404
             
             club = club_result.data[0]
+            logger.info(f"Club data: {club}")
+            logger.info(f"Admin user join data: {club.get('admin_user') or club.get('user')}")
             
             # Get club members
             members_result = admin_client.table('club_memberships').select("""
@@ -254,10 +287,23 @@ class ClubResource(Resource):
             }
             
             # Only include admin_user if the join data exists and is valid
-            admin_user_data = club.get('user')
+            admin_user_data = club.get('admin_user')
             if admin_user_data and isinstance(admin_user_data, dict):
+                logger.info(f"Found admin user data: {admin_user_data}")
                 club_data['admin_user'] = admin_user_data
+            else:
+                logger.warning(f"No admin user data found in join. Raw club data: {club}")
+                # Try to fetch admin user separately
+                if club.get('admin_user_id'):
+                    logger.info(f"Fetching admin user separately for admin_user_id: {club['admin_user_id']}")
+                    admin_user_result = admin_client.table('user').select('id, username, avatar_url').eq('id', club['admin_user_id']).execute()
+                    if admin_user_result.data:
+                        logger.info(f"Found admin user: {admin_user_result.data[0]}")
+                        club_data['admin_user'] = admin_user_result.data[0]
+                    else:
+                        logger.warning(f"Admin user not found for ID: {club['admin_user_id']}")
             
+            logger.info(f"Final club_data: {club_data}")
             return {'club': club_data}, 200
             
         except Exception as e:
@@ -397,7 +443,7 @@ class ClubMembershipResource(Resource):
                 # Notify club admin
                 admin_tokens = get_user_device_tokens([club['admin_user_id']])
                 if admin_tokens:
-                    user_result = admin_client.table('profiles').select('username').eq('id', current_user_id).execute()
+                    user_result = admin_client.table('user').select('username').eq('id', current_user_id).execute()
                     user_name = user_result.data[0]['username'] if user_result.data else "A user"
                     
                     push_service.send_club_join_request_notification(
