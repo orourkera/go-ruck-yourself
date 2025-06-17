@@ -286,6 +286,15 @@ class ClubResource(Resource):
             user_role = user_membership.data[0]['role'] if user_membership.data else None
             user_status = user_membership.data[0]['status'] if user_membership.data else None
 
+            # Guarantee that the designated club admin is always recognised as admin even
+            # if their membership row is missing or has been tampered with.
+            if club['admin_user_id'] == current_user_id:
+                logger.info(f"ADMIN OVERRIDE: User {current_user_id} is the designated admin for club {club_id}. Setting role=admin, status=approved")
+                user_role = 'admin'
+                user_status = user_status or 'approved'
+            else:
+                logger.info(f"ADMIN CHECK: User {current_user_id} is NOT the designated admin (admin_user_id={club['admin_user_id']}) for club {club_id}")
+            
             # Ensure only the designated club admin is treated as 'admin'
             if user_role == 'admin' and club['admin_user_id'] != current_user_id:
                 logger.warning(
