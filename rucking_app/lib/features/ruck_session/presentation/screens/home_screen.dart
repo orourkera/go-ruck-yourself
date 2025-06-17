@@ -305,11 +305,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       _loadData();
       _checkForPhotoUploadError();
       _checkForSessionRecovery();
-      
-      // Start polling for notifications
-      final notificationBloc = GetIt.instance<NotificationBloc>();
-      notificationBloc.add(const NotificationsRequested());
-      notificationBloc.startPolling();
     });
   }
   

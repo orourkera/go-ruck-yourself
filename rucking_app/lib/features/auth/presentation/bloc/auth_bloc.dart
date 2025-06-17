@@ -1,9 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
+import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -183,6 +185,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     
     try {
+      // Stop all background services before logout to prevent widget disposal errors
+      final lifecycleService = GetIt.I<AppLifecycleService>();
+      lifecycleService.stopAllServices();
+      
+      // Small delay to ensure all services have stopped cleanly
+      await Future.delayed(const Duration(milliseconds: 100));
+      
       await _authRepository.logout();
       emit(Unauthenticated());
     } catch (e) {

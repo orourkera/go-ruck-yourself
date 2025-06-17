@@ -58,6 +58,27 @@ class AppLifecycleService with WidgetsBindingObserver {
     AppLogger.info('Lifecycle service bloc references set');
   }
   
+  /// Stop all background services and polling before logout
+  void stopAllServices() {
+    AppLogger.info('Stopping all background services for logout');
+    
+    // Stop notification polling to prevent timer issues during logout
+    if (_notificationBloc != null) {
+      _notificationBloc!.stopPolling();
+      AppLogger.info('Stopped notification polling');
+    }
+    
+    // Stop active session polling if running
+    if (_activeSessionBloc != null) {
+      // Note: ActiveSessionBloc doesn't have polling but we could add cleanup here if needed
+    }
+    
+    // Pause any other background services
+    _locationService?.stopLocationTracking();
+    
+    AppLogger.info('All background services stopped');
+  }
+  
   /// Clean up resources
   void dispose() {
     if (_isInitialized) {

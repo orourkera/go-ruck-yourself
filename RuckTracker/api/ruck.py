@@ -37,23 +37,21 @@ class RuckSessionListResource(Resource):
                 return sessions, 200
             
             # Batch fetch all location points for all sessions
-            all_locations_resp = supabase.table('location_point') \
-                .select('session_id,latitude,longitude') \
-                .in_('session_id', session_ids) \
-                .order('session_id,timestamp') \
-                .limit(100000) \
-                .execute()
-            
-            logger.info(f"DEBUG: Fetching location points for session IDs: {session_ids}")
-            logger.info(f"DEBUG: Location points query returned {len(all_locations_resp.data) if all_locations_resp.data else 0} total points")
-            
-            # Debug: Log which sessions have location data
-            sessions_with_locations = set()
-            if all_locations_resp.data:
-                for loc in all_locations_resp.data:
-                    sessions_with_locations.add(loc['session_id'])
-            logger.info(f"DEBUG: Sessions with location data: {sessions_with_locations}")
-            logger.info(f"DEBUG: Sessions without location data: {set(session_ids) - sessions_with_locations}")
+            try:
+                all_locations_resp = supabase.table('location_point') \
+                    .select('session_id,latitude,longitude') \
+                    .in_('session_id', session_ids) \
+                    .order('session_id,timestamp') \
+                    .execute()
+                
+                logger.info(f"DEBUG: Fetching location points for session IDs: {session_ids}")
+                logger.info(f"DEBUG: Location points query returned {len(all_locations_resp.data) if all_locations_resp.data else 0} total points")
+                
+                if hasattr(all_locations_resp, 'count') and all_locations_resp.count:
+                    logger.info(f"DEBUG: Query count metadata: {all_locations_resp.count}")
+            except Exception as e:
+                logger.error(f"ERROR: Failed to fetch location points: {e}")
+                all_locations_resp = None
             
             # Batch fetch all splits for all sessions  
             all_splits_resp = supabase.table('session_splits') \
@@ -64,7 +62,7 @@ class RuckSessionListResource(Resource):
             
             # Group location points by session_id
             locations_by_session = {}
-            if all_locations_resp.data:
+            if all_locations_resp and all_locations_resp.data:
                 for loc in all_locations_resp.data:
                     session_id = loc['session_id']
                     if session_id not in locations_by_session:
@@ -81,6 +79,11 @@ class RuckSessionListResource(Resource):
                                 locations_by_session[session_id].append({'lat': lat, 'lng': lng})
                         except (ValueError, TypeError) as e:
                             logger.warning(f"Invalid location data for session {session_id}: {e}")
+            
+            # Debug: Log which sessions have location data
+            sessions_with_locations = set(locations_by_session.keys())
+            logger.info(f"DEBUG: Sessions with location data: {sessions_with_locations}")
+            logger.info(f"DEBUG: Sessions without location data: {set(session_ids) - sessions_with_locations}")
             
             # Group splits by session_id
             splits_by_session = {}

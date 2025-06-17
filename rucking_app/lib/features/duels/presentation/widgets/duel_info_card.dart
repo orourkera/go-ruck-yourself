@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
 import '../../../../shared/theme/app_colors.dart';
 
-class DuelInfoCard extends StatelessWidget {
+class DuelInfoCard extends StatefulWidget {
   final Duel duel;
   final List<DuelParticipant> participants;
   final String currentUserId;
@@ -27,6 +28,34 @@ class DuelInfoCard extends StatelessWidget {
     this.showJoinButton = false,
     this.showStartButton = false,
   });
+
+  @override
+  State<DuelInfoCard> createState() => _DuelInfoCardState();
+}
+
+class _DuelInfoCardState extends State<DuelInfoCard> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start timer only for active duels to update countdown
+    if (widget.duel.isActive) {
+      _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
+        if (mounted) {
+          setState(() {
+            // This will trigger a rebuild to update the countdown
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,11 +89,11 @@ class DuelInfoCard extends StatelessWidget {
               _buildChallengeDetails(),
               const SizedBox(height: 16),
               _buildStats(),
-              if (onStartDuel != null && showStartButton) ...[                
+              if (widget.onStartDuel != null && widget.showStartButton) ...[
                 const SizedBox(height: 16),
                 _buildStartButton(),
               ],
-              if (onJoin != null && showJoinButton) ...[
+              if (widget.onJoin != null && widget.showJoinButton) ...[
                 const SizedBox(height: 16),
                 _buildJoinButton(),
               ],
@@ -94,7 +123,7 @@ class DuelInfoCard extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        if (!duel.isPublic)
+        if (!widget.duel.isPublic)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -116,7 +145,7 @@ class DuelInfoCard extends StatelessWidget {
 
   Widget _buildTitle() {
     return Text(
-      duel.title,
+      widget.duel.title,
       style: const TextStyle(
         color: Colors.white,
         fontSize: 24,
@@ -203,7 +232,7 @@ class DuelInfoCard extends StatelessWidget {
         Expanded(
           child: _buildStatItem(
             'Participants',
-            '${participants.length}/${duel.maxParticipants}',
+            '${widget.participants.length}/${widget.duel.maxParticipants}',
             Icons.people,
           ),
         ),
@@ -219,7 +248,7 @@ class DuelInfoCard extends StatelessWidget {
             Icons.trending_up,
           ),
         ),
-        if (duel.winnerId != null) ...[
+        if (widget.duel.winnerId != null) ...[
           Container(
             width: 1,
             height: 40,
@@ -269,9 +298,9 @@ class DuelInfoCard extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: isJoining ? null : () {
+        onPressed: widget.isJoining ? null : () {
           HapticFeedback.vibrate();
-          onJoin?.call();
+          widget.onJoin?.call();
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
@@ -281,7 +310,7 @@ class DuelInfoCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: isJoining
+        child: widget.isJoining
             ? const SizedBox(
                 height: 20,
                 width: 20,
@@ -300,12 +329,12 @@ class DuelInfoCard extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildStartButton() {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: isStarting ? null : onStartDuel,
+        onPressed: widget.isStarting ? null : widget.onStartDuel,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
@@ -314,7 +343,7 @@ class DuelInfoCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: isStarting
+        child: widget.isStarting
             ? const SizedBox(
                 height: 20,
                 width: 20,
@@ -335,7 +364,7 @@ class DuelInfoCard extends StatelessWidget {
   }
 
   String _getStatusText() {
-    switch (duel.status) {
+    switch (widget.duel.status) {
       case DuelStatus.pending:
         return 'Starting Soon';
       case DuelStatus.active:
@@ -346,13 +375,13 @@ class DuelInfoCard extends StatelessWidget {
         return 'Cancelled';
       default:
         // Debug log to understand what status value we're getting
-        print('DEBUG: Unknown duel status: ${duel.status}');
+        print('DEBUG: Unknown duel status: ${widget.duel.status}');
         return 'Pending';
     }
   }
 
   IconData _getChallengeIcon() {
-    switch (duel.challengeType) {
+    switch (widget.duel.challengeType) {
       case DuelChallengeType.distance:
         return Icons.straighten;
       case DuelChallengeType.time:
@@ -368,11 +397,11 @@ class DuelInfoCard extends StatelessWidget {
 
   String _getChallengeDescription() {
     final unit = _getUnit();
-    return 'Reach ${duel.targetValue.toStringAsFixed(duel.targetValue % 1 == 0 ? 0 : 1)} $unit';
+    return 'Reach ${widget.duel.targetValue.toStringAsFixed(widget.duel.targetValue % 1 == 0 ? 0 : 1)} $unit';
   }
 
   String _getUnit() {
-    switch (duel.challengeType) {
+    switch (widget.duel.challengeType) {
       case DuelChallengeType.distance:
         return 'km';
       case DuelChallengeType.time:
@@ -387,11 +416,40 @@ class DuelInfoCard extends StatelessWidget {
   }
 
   String _getTimeframeText() {
-    if (duel.timeframeHours < 24) {
-      return '${duel.timeframeHours} hours';
+    // If duel is active, show time remaining
+    if (widget.duel.isActive) {
+      final timeRemaining = widget.duel.timeRemaining;
+      if (timeRemaining == null || timeRemaining.isNegative || timeRemaining == Duration.zero) {
+        return 'Time expired';
+      }
+
+      final days = timeRemaining.inDays;
+      final hours = timeRemaining.inHours % 24;
+      final minutes = timeRemaining.inMinutes % 60;
+
+      if (days > 0) {
+        if (hours > 0) {
+          return '$days days, $hours hours left';
+        } else {
+          return '$days days left';
+        }
+      } else if (hours > 0) {
+        if (minutes > 0) {
+          return '$hours hours, $minutes minutes left';
+        } else {
+          return '$hours hours left';
+        }
+      } else {
+        return '$minutes minutes left';
+      }
+    }
+
+    // For pending duels, show the original timeframe
+    if (widget.duel.timeframeHours < 24) {
+      return '${widget.duel.timeframeHours} hours';
     } else {
-      final days = duel.timeframeHours ~/ 24;
-      final hours = duel.timeframeHours % 24;
+      final days = widget.duel.timeframeHours ~/ 24;
+      final hours = widget.duel.timeframeHours % 24;
       if (hours == 0) {
         return '$days days';
       } else {
@@ -402,22 +460,22 @@ class DuelInfoCard extends StatelessWidget {
 
   String _getLocationText() {
     final parts = <String>[];
-    if (duel.creatorCity != null && duel.creatorCity != 'Unknown') parts.add(duel.creatorCity!);
-    if (duel.creatorState != null && duel.creatorState != 'Unknown') parts.add(duel.creatorState!);
+    if (widget.duel.creatorCity != null && widget.duel.creatorCity != 'Unknown') parts.add(widget.duel.creatorCity!);
+    if (widget.duel.creatorState != null && widget.duel.creatorState != 'Unknown') parts.add(widget.duel.creatorState!);
     return parts.join(', ');
   }
 
   bool _shouldShowLocation() {
-    return (duel.creatorCity != null && duel.creatorCity != 'Unknown') || (duel.creatorState != null && duel.creatorState != 'Unknown');
+    return (widget.duel.creatorCity != null && widget.duel.creatorCity != 'Unknown') || (widget.duel.creatorState != null && widget.duel.creatorState != 'Unknown');
   }
 
   double _calculateTopProgress() {
-    if (participants.isEmpty) return 0.0;
-    
-    final maxProgress = participants
-        .map((DuelParticipant p) => p.currentValue / duel.targetValue)
+    if (widget.participants.isEmpty) return 0.0;
+
+    final maxProgress = widget.participants
+        .map((DuelParticipant p) => p.currentValue / widget.duel.targetValue)
         .reduce((a, b) => a > b ? a : b);
-    
+
     return maxProgress.clamp(0.0, 1.0);
   }
 }
