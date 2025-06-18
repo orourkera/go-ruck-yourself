@@ -579,6 +579,17 @@ class ClubMemberManagementResource(Resource):
             
             # Update membership
             update_data = {}
+            
+            # Handle 'action' field from frontend (convert to status)
+            if 'action' in data:
+                if data['action'] == 'approve':
+                    update_data['status'] = 'approved'
+                elif data['action'] == 'reject':
+                    update_data['status'] = 'rejected'
+                elif data['action'] == 'deny':
+                    update_data['status'] = 'rejected'
+            
+            # Direct status/role updates
             if 'status' in data:
                 update_data['status'] = data['status']
             if 'role' in data:
