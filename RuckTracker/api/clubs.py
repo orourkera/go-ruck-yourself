@@ -276,10 +276,23 @@ class ClubResource(Resource):
             logger.info(f"Admin user join data: {club.get('admin_user') or club.get('user')}")
             
             # Get club members
-            members_result = admin_client.table('club_memberships').select("""
-                *,
-                user:user_id(id, username, avatar_url)
-            """).eq('club_id', club_id).eq('status', 'approved').execute()
+            members_result = admin_client.table('club_memberships').select('*').eq('club_id', club_id).eq('status', 'approved').execute()
+            
+            # Fetch user data for members manually
+            members_with_user_data = []
+            if members_result.data:
+                user_ids = [member['user_id'] for member in members_result.data]
+                if user_ids:
+                    users_result = admin_client.table('user').select('id, username, avatar_url').in_('id', user_ids).execute()
+                    users_dict = {user['id']: user for user in users_result.data} if users_result.data else {}
+                    
+                    for member in members_result.data:
+                        member_with_user = member.copy()
+                        if member['user_id'] in users_dict:
+                            member_with_user['user'] = users_dict[member['user_id']]
+                        members_with_user_data.append(member_with_user)
+            
+            logger.info(f"Members with user data: {members_with_user_data}")
             
             # Check user's membership status
             user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club_id).eq('user_id', current_user_id).execute()
@@ -306,11 +319,22 @@ class ClubResource(Resource):
             # Get pending membership requests (if user is admin)
             pending_requests = []
             if user_role == 'admin':
-                pending_result = admin_client.table('club_memberships').select("""
-                    *,
-                    user:user_id(id, username, avatar_url)
-                """).eq('club_id', club_id).eq('status', 'pending').execute()
-                pending_requests = pending_result.data
+                pending_result = admin_client.table('club_memberships').select('*').eq('club_id', club_id).eq('status', 'pending').execute()
+                
+                # Fetch user data for pending requests manually
+                if pending_result.data:
+                    pending_user_ids = [req['user_id'] for req in pending_result.data]
+                    if pending_user_ids:
+                        pending_users_result = admin_client.table('user').select('id, username, avatar_url').in_('id', pending_user_ids).execute()
+                        pending_users_dict = {user['id']: user for user in pending_users_result.data} if pending_users_result.data else {}
+                        
+                        for request in pending_result.data:
+                            request_with_user = request.copy()
+                            if request['user_id'] in pending_users_dict:
+                                request_with_user['user'] = pending_users_dict[request['user_id']]
+                            pending_requests.append(request_with_user)
+            
+            logger.info(f"Pending requests with user data: {pending_requests}")
             
             logger.info(f"FINAL VALUES: user_role={user_role}, user_status={user_status} for user {current_user_id} in club {club_id}")
             
@@ -322,8 +346,8 @@ class ClubResource(Resource):
                 'is_public': club['is_public'],
                 'max_members': club['max_members'],
                 'admin_user_id': club['admin_user_id'],  # Add direct admin_user_id field
-                'members': members_result.data,
-                'member_count': len(members_result.data),
+                'members': members_with_user_data,
+                'member_count': len(members_with_user_data),
                 'pending_requests': pending_requests,
                 'user_role': user_role,
                 'user_status': user_status,
