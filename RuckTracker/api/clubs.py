@@ -603,14 +603,14 @@ class ClubMemberManagementResource(Resource):
                     
                     # Send notification to user
                     user_tokens = get_user_device_tokens([user_id])
-                    if user_tokens and 'status' in data:
-                        if data['status'] == 'approved':
+                    if user_tokens and 'status' in update_data:
+                        if update_data['status'] == 'approved':
                             push_service.send_club_membership_approved_notification(
                                 device_tokens=user_tokens,
                                 club_name=club['name'],
                                 club_id=club_id
                             )
-                        elif data['status'] == 'rejected':
+                        elif update_data['status'] == 'rejected':
                             push_service.send_club_membership_rejected_notification(
                                 device_tokens=user_tokens,
                                 club_name=club['name']
