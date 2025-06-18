@@ -94,12 +94,8 @@ class ClubsRepositoryImpl implements ClubsRepository {
 
   @override
   Future<ClubDetails> getClubDetails(String clubId) async {
-    // Try to get cached club details first
-    final cachedDetails = await _cacheService.getCachedClubDetails(clubId);
-    
-    if (cachedDetails != null) {
-      return ClubDetails.fromJson(cachedDetails);
-    }
+    // FORCE CLEAR CACHE TO DEBUG ADMIN ISSUE
+    await _cacheService.invalidateClubDetails(clubId);
     
     // No cache, fetch from API
     final response = await _apiClient.get('/clubs/$clubId');

@@ -4,6 +4,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
@@ -65,20 +66,16 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 _clubDetails = state.clubDetails;
               });
             } else if (state is ClubActionSuccess) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.green,
-                ),
+              StyledSnackBar.showSuccess(
+                context: context,
+                message: state.message,
               );
               // Refresh club details after successful action
               _clubsBloc.add(LoadClubDetails(widget.clubId));
             } else if (state is ClubActionError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.red,
-                ),
+              StyledSnackBar.showError(
+                context: context,
+                message: state.message,
               );
             }
           },
@@ -100,34 +97,67 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   }
 
   List<Widget> _buildAppBarActions() {
+    // Show different menu options based on user role
+    final List<PopupMenuEntry<String>> menuItems = [];
+    
     if (_clubDetails?.club.userRole == 'admin') {
-      return [
-        IconButton(
-          icon: const Icon(Icons.edit),
-          onPressed: () => _navigateToEditClub(),
-          tooltip: 'Edit Club',
+      // Admin menu items
+      menuItems.addAll([
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.edit, color: Theme.of(context).primaryColor),
+              SizedBox(width: 8),
+              Text('Edit Club', style: AppTextStyles.bodyMedium),
+            ],
+          ),
         ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Delete Club', style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
+            ],
+          ),
+        ),
+      ]);
+    } else if (_clubDetails?.club.isUserMember == true) {
+      // Member menu items
+      menuItems.add(
+        PopupMenuItem(
+          value: 'leave',
+          child: Row(
+            children: [
+              Icon(Icons.exit_to_app, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Leave Club', style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Always show the three-dot menu if there are items
+    if (menuItems.isNotEmpty) {
+      return [
         PopupMenuButton<String>(
           onSelected: (value) {
-            if (value == 'delete') {
+            if (value == 'edit') {
+              _navigateToEditClub();
+            } else if (value == 'delete') {
               _showDeleteConfirmation();
+            } else if (value == 'leave') {
+              _showLeaveClubDialog();
             }
           },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Delete Club', style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
-                ],
-              ),
-            ),
-          ],
+          itemBuilder: (context) => menuItems,
         ),
       ];
     }
+    
     return [];
   }
 
@@ -145,8 +175,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             _buildClubHeader(clubDetails),
             const SizedBox(height: 24),
             _buildClubStats(clubDetails),
-            const SizedBox(height: 24),
-            _buildActionButtons(clubDetails),
             const SizedBox(height: 24),
             _buildMembersSection(clubDetails),
             if (clubDetails.club.userRole == 'admin' && clubDetails.pendingRequests.isNotEmpty) ...[
@@ -277,81 +305,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildActionButtons(ClubDetails clubDetails) {
-    final club = clubDetails.club;
-    
-    // Don't show any buttons if user is admin (they have edit/delete in app bar)
-    if (club.userRole == 'admin') {
-      return const SizedBox.shrink();
-    }
-    
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            if (club.canJoin) ...[
-              // User can join the club
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _requestMembership(),
-                  icon: const Icon(Icons.group_add),
-                  label: const Text('Join Club'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ] else if (club.isUserPending) ...[
-              // User has pending request
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  border: Border.all(color: Colors.orange),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.hourglass_empty, color: Colors.orange),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Membership Request Pending',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else if (club.isUserMember) ...[
-              // User is a member, show leave option
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _showLeaveClubDialog(),
-                  icon: const Icon(Icons.exit_to_app),
-                  label: const Text('Leave Club'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 
@@ -521,21 +474,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
     } else if (_clubDetails!.club.isUserPending) {
       // User has pending request
       return FloatingActionButton.extended(
-        onPressed: null,
+        onPressed: null, // Disabled
         icon: const Icon(Icons.hourglass_empty),
         label: const Text('Request Pending'),
         backgroundColor: Colors.grey,
       );
-    } else if (_clubDetails!.club.isUserMember && !_clubDetails!.club.isUserAdmin) {
-      // User is a member but not admin - show leave button
-      return FloatingActionButton.extended(
-        onPressed: () => _showLeaveClubDialog(),
-        icon: const Icon(Icons.exit_to_app),
-        label: const Text('Leave Club'),
-        backgroundColor: Colors.red,
-      );
     }
 
+    // No floating action button for members or admins (they use header menu)
     return const SizedBox.shrink();
   }
 

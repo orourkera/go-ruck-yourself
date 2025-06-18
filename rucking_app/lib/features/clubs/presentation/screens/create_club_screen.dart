@@ -11,6 +11,7 @@ import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/utils/image_picker_utils.dart';
 
 /// Screen for creating a new club
@@ -206,19 +207,15 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
             
             if (state is ClubActionSuccess) {
               // Club created successfully, navigate back
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: AppColors.success,
-                ),
+              StyledSnackBar.showSuccess(
+                context: context,
+                message: state.message,
               );
               Navigator.of(context).pop();
             } else if (state is ClubActionError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: AppColors.error,
-                ),
+              StyledSnackBar.showError(
+                context: context,
+                message: state.message,
               );
             }
           },
