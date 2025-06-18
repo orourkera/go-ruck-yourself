@@ -277,22 +277,34 @@ class ClubResource(Resource):
             
             # Get club members
             members_result = admin_client.table('club_memberships').select('*').eq('club_id', club_id).eq('status', 'approved').execute()
+            logger.info(f"Raw members result: {members_result.data}")
             
             # Fetch user data for members manually
             members_with_user_data = []
             if members_result.data:
                 user_ids = [member['user_id'] for member in members_result.data]
+                logger.info(f"User IDs to fetch: {user_ids}")
                 if user_ids:
-                    users_result = admin_client.table('user').select('id, username, avatar_url').in_('id', user_ids).execute()
-                    users_dict = {user['id']: user for user in users_result.data} if users_result.data else {}
-                    
-                    for member in members_result.data:
-                        member_with_user = member.copy()
-                        if member['user_id'] in users_dict:
-                            member_with_user['user'] = users_dict[member['user_id']]
-                        members_with_user_data.append(member_with_user)
-            
-            logger.info(f"Members with user data: {members_with_user_data}")
+                    try:
+                        users_result = admin_client.table('user').select('id, username, avatar_url').in_('id', user_ids).execute()
+                        logger.info(f"Users query result: {users_result.data}")
+                        logger.info(f"Users query error: {getattr(users_result, 'error', None)}")
+                        users_dict = {user['id']: user for user in users_result.data} if users_result.data else {}
+                        logger.info(f"Users dict: {users_dict}")
+                        
+                        for member in members_result.data:
+                            member_with_user = member.copy()
+                            if member['user_id'] in users_dict:
+                                member_with_user['user'] = users_dict[member['user_id']]
+                                logger.info(f"Added user data for member {member['user_id']}: {users_dict[member['user_id']]}")
+                            else:
+                                logger.warning(f"No user data found for member {member['user_id']}")
+                            members_with_user_data.append(member_with_user)
+                    except Exception as e:
+                        logger.error(f"Error fetching user data: {e}")
+                        members_with_user_data = members_result.data  # Fallback to original data
+        
+            logger.info(f"Final members with user data: {members_with_user_data}")
             
             # Check user's membership status
             user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club_id).eq('user_id', current_user_id).execute()
@@ -321,20 +333,33 @@ class ClubResource(Resource):
             if user_role == 'admin':
                 pending_result = admin_client.table('club_memberships').select('*').eq('club_id', club_id).eq('status', 'pending').execute()
                 
+                logger.info(f"Raw pending requests result: {pending_result.data}")
+                
                 # Fetch user data for pending requests manually
                 if pending_result.data:
                     pending_user_ids = [req['user_id'] for req in pending_result.data]
+                    logger.info(f"Pending user IDs to fetch: {pending_user_ids}")
                     if pending_user_ids:
-                        pending_users_result = admin_client.table('user').select('id, username, avatar_url').in_('id', pending_user_ids).execute()
-                        pending_users_dict = {user['id']: user for user in pending_users_result.data} if pending_users_result.data else {}
-                        
-                        for request in pending_result.data:
-                            request_with_user = request.copy()
-                            if request['user_id'] in pending_users_dict:
-                                request_with_user['user'] = pending_users_dict[request['user_id']]
-                            pending_requests.append(request_with_user)
+                        try:
+                            pending_users_result = admin_client.table('user').select('id, username, avatar_url').in_('id', pending_user_ids).execute()
+                            logger.info(f"Pending users query result: {pending_users_result.data}")
+                            logger.info(f"Pending users query error: {getattr(pending_users_result, 'error', None)}")
+                            pending_users_dict = {user['id']: user for user in pending_users_result.data} if pending_users_result.data else {}
+                            logger.info(f"Pending users dict: {pending_users_dict}")
+                            
+                            for request in pending_result.data:
+                                request_with_user = request.copy()
+                                if request['user_id'] in pending_users_dict:
+                                    request_with_user['user'] = pending_users_dict[request['user_id']]
+                                    logger.info(f"Added user data for pending request {request['user_id']}: {pending_users_dict[request['user_id']]}")
+                                else:
+                                    logger.warning(f"No user data found for pending request {request['user_id']}")
+                                pending_requests.append(request_with_user)
+                        except Exception as e:
+                            logger.error(f"Error fetching pending users data: {e}")
+                            pending_requests = pending_result.data  # Fallback to original data
             
-            logger.info(f"Pending requests with user data: {pending_requests}")
+                logger.info(f"Final pending requests with user data: {pending_requests}")
             
             logger.info(f"FINAL VALUES: user_role={user_role}, user_status={user_status} for user {current_user_id} in club {club_id}")
             
@@ -520,6 +545,7 @@ class ClubMembershipResource(Resource):
             membership_data = {
                 'club_id': club_id,
                 'user_id': current_user_id,
+                'role': 'member',  
                 'status': 'pending'
             }
             
@@ -584,6 +610,9 @@ class ClubMemberManagementResource(Resource):
             if 'action' in data:
                 if data['action'] == 'approve':
                     update_data['status'] = 'approved'
+                    # Explicitly set role to 'member' when approving (unless explicitly specified otherwise)
+                    if 'role' not in data:
+                        update_data['role'] = 'member'
                 elif data['action'] == 'reject':
                     update_data['status'] = 'rejected'
                 elif data['action'] == 'deny':
