@@ -123,10 +123,11 @@ class ClubMember extends Equatable {
   });
 
   factory ClubMember.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] as Map<String, dynamic>?;
     return ClubMember(
       userId: json['user_id'] as String,
-      username: json['username'] as String?,
-      avatarUrl: json['avatar_url'] as String?,
+      username: user?['username'] as String?,
+      avatarUrl: user?['avatar_url'] as String?,
       role: json['role'] as String,
       status: json['status'] as String,
       joinedAt: DateTime.parse(json['joined_at'] as String),

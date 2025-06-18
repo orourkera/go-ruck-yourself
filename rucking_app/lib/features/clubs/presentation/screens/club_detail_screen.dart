@@ -5,6 +5,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/user_avatar.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
@@ -196,18 +197,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Theme.of(context).primaryColor,
-                  backgroundImage: clubDetails.club.logoUrl != null && clubDetails.club.logoUrl!.isNotEmpty
-                      ? NetworkImage(clubDetails.club.logoUrl!)
-                      : null,
-                  child: clubDetails.club.logoUrl == null || clubDetails.club.logoUrl!.isEmpty
-                      ? Text(
-                          clubDetails.club.name.isNotEmpty ? clubDetails.club.name[0].toUpperCase() : 'C',
-                          style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
-                        )
-                      : null,
+                UserAvatar(
+                  size: 60,
+                  avatarUrl: clubDetails.club.logoUrl,
+                  username: clubDetails.club.name,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -340,12 +333,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                            member.role != 'admin';
 
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Theme.of(context).primaryColor,
-        child: Text(
-          (member.username ?? '').isNotEmpty ? (member.username![0].toUpperCase()) : 'U',
-          style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
-        ),
+      leading: UserAvatar(
+        size: 40,
+        avatarUrl: member.avatarUrl,
+        username: member.username ?? 'Unknown',
       ),
       title: Text(
         member.username ?? 'Unknown',
@@ -428,32 +419,29 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
 
   Widget _buildPendingRequestTile(ClubMember request) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Theme.of(context).primaryColor,
-        child: Text(
-          (request.username ?? '').isNotEmpty ? request.username![0].toUpperCase() : 'U',
-          style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
-        ),
+      leading: UserAvatar(
+        size: 40,
+        avatarUrl: request.avatarUrl,
+        username: request.username ?? 'Unknown',
       ),
       title: Text(request.username ?? 'Unknown'),
       subtitle: Text(
-        'Requested ${_formatDate(request.joinedAt)}',
+        'Pending',
         style: AppTextStyles.bodySmall.copyWith(
-          color: AppColors.textDarkSecondary,
+          color: AppColors.warning,
+          fontWeight: FontWeight.bold,
         ),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            icon: const Icon(Icons.check_circle, color: Colors.green),
-            onPressed: () => _approveRequest(request),
-            tooltip: 'Approve',
+            icon: Icon(Icons.check, color: AppColors.success),
+            onPressed: () => _approveRequest(request.userId),
           ),
           IconButton(
-            icon: const Icon(Icons.cancel, color: Colors.red),
-            onPressed: () => _rejectRequest(request),
-            tooltip: 'Reject',
+            icon: Icon(Icons.close, color: AppColors.error),
+            onPressed: () => _rejectRequest(request.userId),
           ),
         ],
       ),
@@ -546,18 +534,18 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
     }
   }
 
-  void _approveRequest(ClubMember request) {
+  void _approveRequest(String userId) {
     _clubsBloc.add(ManageMembership(
       clubId: widget.clubId,
-      userId: request.userId,
+      userId: userId,
       action: 'approve',
     ));
   }
 
-  void _rejectRequest(ClubMember request) {
+  void _rejectRequest(String userId) {
     _clubsBloc.add(ManageMembership(
       clubId: widget.clubId,
-      userId: request.userId,
+      userId: userId,
       action: 'reject',
     ));
   }

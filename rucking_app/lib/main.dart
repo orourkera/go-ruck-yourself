@@ -116,11 +116,13 @@ void main() async {
   // Initialize Firebase
   await Firebase.initializeApp();
   
-  // Initialize Firebase Messaging
+  // Initialize Firebase Messaging background handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   
-  // Initialize Firebase Messaging Service
-  await FirebaseMessagingService().initialize();
+  // Initialize Firebase Messaging Service (non-blocking)
+  FirebaseMessagingService().initialize().catchError((error) {
+    print('❌ Firebase Messaging initialization failed: $error');
+  });
   
   // Supabase already initialized earlier
   

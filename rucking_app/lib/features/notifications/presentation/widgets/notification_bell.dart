@@ -64,7 +64,24 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
   
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<NotificationBloc, NotificationState>(
+    return BlocConsumer<NotificationBloc, NotificationState>(
+      // Listen for state changes to trigger animations
+      listener: (context, state) {
+        if (state is NotificationsLoaded) {
+          final unreadCount = state.unreadCount;
+          print('🔔 NotificationBell: Unread count changed to $unreadCount');
+          
+          // Force animation update when unread count changes
+          if (unreadCount > 0 && !_animationController.isAnimating) {
+            print('🔔 Starting notification bell animation');
+            _animationController.repeat();
+          } else if (unreadCount <= 0 && _animationController.isAnimating) {
+            print('🔔 Stopping notification bell animation');
+            _animationController.stop();
+            _animationController.reset();
+          }
+        }
+      },
       builder: (context, state) {
         int unreadCount = 0;
         
@@ -72,7 +89,7 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
           unreadCount = state.unreadCount;
         }
         
-        // Stop animation if no unread notifications
+        // Legacy animation control (keeping as backup)
         if (unreadCount <= 0 && _animationController.isAnimating) {
           _animationController.stop();
           _animationController.reset();

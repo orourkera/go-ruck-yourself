@@ -31,9 +31,10 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       final unreadCount = notifications.where((n) => !n.isRead).length;
       
       // Vibrate if there are new notifications (unread count increased)
-      if (unreadCount > _previousUnreadCount && _previousUnreadCount > 0) {
+      // Fixed: Remove the _previousUnreadCount > 0 condition to handle first notification
+      if (unreadCount > _previousUnreadCount) {
         _vibrateForNewNotification();
-        AppLogger.info('New notification(s) received - vibrating phone');
+        AppLogger.info('New notification(s) received - vibrating phone (unread: $unreadCount, previous: $_previousUnreadCount)');
       }
       
       _previousUnreadCount = unreadCount;
@@ -141,8 +142,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
   void _vibrateForNewNotification() async {
     if (await Vibration.hasVibrator()) {
-      // Fast, intense vibration pattern: 3 quick bursts
-      await Vibration.vibrate(pattern: [50, 50, 50, 50, 50]);
+      // Improved vibration pattern: 2 strong bursts with better spacing
+      await Vibration.vibrate(pattern: [0, 200, 100, 200], amplitude: 255);
+      AppLogger.info('Vibration triggered for new notification');
+    } else {
+      AppLogger.info('Device does not have vibrator');
     }
   }
 

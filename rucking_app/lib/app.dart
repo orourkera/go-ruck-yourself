@@ -56,7 +56,8 @@ class RuckingApp extends StatefulWidget {
 class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
   late AppLifecycleService _lifecycleService;
   late AppLinks _appLinks;
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  // Create a unique key with explicit identifier
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>(debugLabel: 'main_navigator');
 
   @override
   void initState() {
@@ -295,7 +296,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
           create: (context) {
             final bloc = getIt<NotificationBloc>()
               ..add(const NotificationsRequested())
-              ..startPolling();
+              ..startPolling(interval: const Duration(seconds: 30)); // More frequent polling
             // Set bloc reference in lifecycle service
             _lifecycleService.setBlocReferences(notificationBloc: bloc);
             return bloc;
@@ -317,7 +318,13 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
           return BlocListener<AuthBloc, AuthState>(
             listener: (context, state) {
               if (state is Unauthenticated) {
-                _navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+                // Use WidgetsBinding.instance.addPostFrameCallback to avoid conflicts during rebuild
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final navigator = _navigatorKey.currentState;
+                  if (navigator != null && navigator.mounted) {
+                    navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+                  }
+                });
               }
             },
             child: MaterialApp(

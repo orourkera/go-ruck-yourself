@@ -44,20 +44,23 @@ The Achievements System will provide users with recognition and motivation throu
 - **Ultra Heavy**: Complete a ruck with 50lbs+ (22.7kg+) weight
 
 #### 2.1.4. Power & Performance
-- **Power Pioneer**: Achieve 50+ power points (weight × distance × elevation gain)
-- **Power Warrior**: Achieve 200+ power points  
-- **Power Legend**: Achieve 500+ power points
+- **Power Pioneer**: Achieve 10,000+ power points (weight × distance × elevation gain)
+- **Power Warrior**: Achieve 50,000+ power points  
+- **Power Beast**: Achieve 100,000+ power points
+- **Power Legend**: Achieve 250,000+ power points
+- **Power Elite**: Achieve 500,000+ power points
 - **Hill Crusher**: Complete 500m+ elevation gain in single session
 - **Mountain Mover**: Complete 1000m+ elevation gain in single session
 - **Elevation Elite**: Complete 2000m+ elevation gain in single session
 
 **Power Points Examples:**
-- **Flat Road Ruck**: 60lbs (27kg) × 4km × 0.05km elevation = **5.4 points**
-- **Hill Training**: 35lbs (16kg) × 8km × 0.3km elevation = **38.4 points**  
-- **Mountain Ruck**: 25lbs (11kg) × 15km × 1.2km elevation = **198 points**
-- **Epic Adventure**: 40lbs (18kg) × 25km × 2km elevation = **900 points**
+- **Your Recent Hike**: 1kg × 1.99km × 15.47m = **30.8 points**
+- **Flat Road Ruck**: 27kg × 4km × 50m elevation = **5,400 points**
+- **Hill Training**: 16kg × 8km × 300m elevation = **38,400 points**  
+- **Mountain Ruck**: 11kg × 15km × 1,200m elevation = **198,000 points**
+- **Epic Adventure**: 18kg × 25km × 2,000m elevation = **900,000 points**
 
-*Note: Formula is weight(kg) × distance(km) × elevation_gain(km). Power thresholds may need adjustment based on real-world testing.*
+*Note: Formula is weight(kg) × distance(km) × elevation_gain(m). Hikes with 0kg weight are treated as 1kg minimum. Flat routes with 0m elevation are treated as 1m minimum.*
 
 #### 2.1.5. Pace & Speed Achievements
 - **Steady Walker**: Complete a ruck with 8+ minute/km average pace

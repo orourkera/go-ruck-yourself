@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -26,25 +27,96 @@ class FirebaseMessagingService {
     if (_isInitialized) return;
 
     try {
-      // Request permission for notifications
-      await _requestNotificationPermissions();
+      print('🔔 Starting Firebase Messaging initialization...');
+      
+      // Request permission for notifications (non-blocking)
+      _requestNotificationPermissions().catchError((e) {
+        print('⚠️ Permission request failed: $e');
+      });
       
       // Initialize local notifications
       await _initializeLocalNotifications();
       
-      // Get FCM token
-      _deviceToken = await _firebaseMessaging.getToken();
-      print('FCM Token: $_deviceToken');
+      // Get FCM token with timeout and retry logic
+      print('🔔 Requesting FCM token...');
       
-      // Send token to backend
-      if (_deviceToken != null) {
-        await _registerDeviceToken(_deviceToken!);
+      // On iOS, we need to ensure APNS token is available first
+      if (Platform.isIOS) {
+        print('🔔 iOS detected - checking APNS token...');
+        try {
+          // Wait for APNS token to be available
+          String? apnsToken;
+          int attempts = 0;
+          while (apnsToken == null && attempts < 10) {
+            apnsToken = await _firebaseMessaging.getAPNSToken();
+            if (apnsToken == null) {
+              print('🔔 APNS token not ready, waiting... (attempt ${attempts + 1}/10)');
+              await Future.delayed(const Duration(seconds: 1));
+              attempts++;
+            } else {
+              print('🔔 APNS token obtained: ${apnsToken.substring(0, 32)}...');
+            }
+          }
+          
+          if (apnsToken == null) {
+            print('⚠️ APNS token still not available after waiting');
+          }
+        } catch (e) {
+          print('⚠️ APNS token check failed: $e');
+        }
       }
+      
+      _deviceToken = await _firebaseMessaging.getToken().timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          print('⚠️ FCM token request timed out, attempting to retry...');
+          return null;
+        },
+      );
+      
+      // If token is null, try to get it again with a different approach
+      if (_deviceToken == null) {
+        print('🔔 Retrying FCM token request...');
+        try {
+          await Future.delayed(const Duration(seconds: 2));
+          _deviceToken = await _firebaseMessaging.getToken(vapidKey: null);
+        } catch (e) {
+          print('⚠️ Second token attempt failed: $e');
+        }
+      }
+      
+      print('🔔 FCM Token result: ${_deviceToken ?? "STILL NULL"}');
+      
+      if (_deviceToken == null) {
+        print('⚠️ Warning: FCM token is null - checking Firebase configuration...');
+        
+        // Check if Firebase is properly configured
+        try {
+          final notificationSettings = await _firebaseMessaging.getNotificationSettings();
+          print('🔔 Notification permission status: ${notificationSettings.authorizationStatus}');
+          print('🔔 Alert setting: ${notificationSettings.alert}');
+          print('🔔 Badge setting: ${notificationSettings.badge}');
+          print('🔔 Sound setting: ${notificationSettings.sound}');
+        } catch (e) {
+          print('❌ Failed to get notification settings: $e');
+        }
+        
+        _isInitialized = true; // Still mark as initialized to prevent retries
+        return;
+      }
+      
+      // Send token to backend (non-blocking)
+      _registerDeviceToken(_deviceToken!).catchError((e) {
+        print('⚠️ Device token registration failed: $e');
+      });
       
       // Listen for token refresh
       _firebaseMessaging.onTokenRefresh.listen((newToken) async {
+        print('🔔 FCM Token refreshed: $newToken');
         _deviceToken = newToken;
-        await _registerDeviceToken(newToken);
+        _registerDeviceToken(newToken).catchError((e) {
+          print('⚠️ Token refresh registration failed: $e');
+        });
       });
       
       // Handle foreground messages
@@ -56,14 +128,17 @@ class FirebaseMessagingService {
       // Handle app launch from terminated state
       final initialMessage = await _firebaseMessaging.getInitialMessage();
       if (initialMessage != null) {
+        print('🔔 App launched from notification: ${initialMessage.messageId}');
         _handleBackgroundMessageTap(initialMessage);
       }
       
       _isInitialized = true;
-      print('Firebase Messaging initialized successfully');
+      print('✅ Firebase Messaging initialized successfully');
       
     } catch (e) {
-      print('Error initializing Firebase Messaging: $e');
+      print('❌ Error initializing Firebase Messaging: $e');
+      _isInitialized = true; // Mark as initialized to prevent blocking retries
+      // Don't rethrow - let app continue without push notifications
     }
   }
 
@@ -132,18 +207,20 @@ class FirebaseMessagingService {
   /// Register device token with backend
   Future<void> _registerDeviceToken(String token) async {
     try {
+      print('🔔 Registering device token with backend...');
       final apiClient = GetIt.I<ApiClient>();
       
-      await apiClient.post('/device-token', {
+      final response = await apiClient.post('/device-token', {
         'fcm_token': token,
         'device_type': Platform.isIOS ? 'ios' : 'android',
         'device_id': await _getDeviceId(),
         'app_version': '1.0.0', // TODO: Get actual app version
       });
       
-      print('Device token registered successfully');
+      print('✅ Device token registered successfully: $response');
     } catch (e) {
-      print('Error registering device token: $e');
+      print('❌ Error registering device token: $e');
+      rethrow;
     }
   }
 
@@ -156,7 +233,10 @@ class FirebaseMessagingService {
 
   /// Handle foreground messages (when app is open)
   void _handleForegroundMessage(RemoteMessage message) {
-    print('Received foreground message: ${message.messageId}');
+    print('🔔 Received foreground message: ${message.messageId}');
+    print('🔔 Title: ${message.notification?.title}');
+    print('🔔 Body: ${message.notification?.body}');
+    print('🔔 Data: ${message.data}');
     
     // Show local notification
     _showLocalNotification(message);
@@ -240,6 +320,112 @@ class FirebaseMessagingService {
 
   /// Get current FCM token
   String? get deviceToken => _deviceToken;
+
+  /// Get initialization status for debugging
+  bool get isInitialized => _isInitialized;
+
+  /// Force refresh and register token (for debugging)
+  Future<void> testNotificationSetup() async {
+    print('🔔 Testing notification setup...');
+    print('🔔 Initialized: $_isInitialized');
+    print('🔔 Current token: ${_deviceToken ?? "NULL"}');
+    
+    if (!_isInitialized) {
+      print('🔔 Firebase messaging not initialized, initializing now...');
+      await initialize();
+    }
+    
+    // Always try to force token refresh for testing
+    print('🔔 Forcing token refresh...');
+    try {
+      // Delete existing token first
+      await _firebaseMessaging.deleteToken();
+      print('🔔 Previous token deleted');
+      
+      // On iOS, wait for APNS token before requesting FCM token
+      if (Platform.isIOS) {
+        print('🔔 iOS detected - waiting for APNS token...');
+        String? apnsToken;
+        int attempts = 0;
+        while (apnsToken == null && attempts < 10) {
+          apnsToken = await _firebaseMessaging.getAPNSToken();
+          if (apnsToken == null) {
+            print('🔔 APNS token not ready, waiting... (attempt ${attempts + 1}/10)');
+            await Future.delayed(const Duration(seconds: 1));
+            attempts++;
+          } else {
+            print('🔔 APNS token obtained: ${apnsToken.substring(0, 32)}...');
+          }
+        }
+        
+        if (apnsToken == null) {
+          print('⚠️ APNS token still not available after waiting');
+        }
+      }
+      
+      // Request new token
+      print('🔔 Requesting new FCM token...');
+      final newToken = await _firebaseMessaging.getToken().timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          print('⚠️ Token refresh timed out');
+          return null;
+        },
+      );
+      
+      _deviceToken = newToken;
+      print('🔔 Force refresh result: ${_deviceToken ?? "STILL NULL"}');
+      
+      if (_deviceToken != null) {
+        print('🔔 Token successfully generated! Length: ${_deviceToken!.length}');
+      } else {
+        print('❌ Token generation failed - checking Firebase app state...');
+        
+        // Check if Firebase app is properly initialized
+        try {
+          final app = Firebase.app();
+          print('🔔 Firebase app name: ${app.name}');
+          print('🔔 Firebase project ID: ${app.options.projectId}');
+          
+          // Try getting APNS token (iOS only)
+          try {
+            final apnsToken = await _firebaseMessaging.getAPNSToken();
+            print('🔔 APNS Token: ${apnsToken ?? "NULL"}');
+          } catch (e) {
+            print('🔔 APNS Token check failed (normal on Android): $e');
+          }
+          
+        } catch (e) {
+          print('❌ Firebase app check failed: $e');
+        }
+      }
+      
+    } catch (e) {
+      print('❌ Force token refresh failed: $e');
+    }
+    
+    if (_deviceToken != null) {
+      print('🔔 Re-registering device token for testing...');
+      try {
+        await _registerDeviceToken(_deviceToken!);
+      } catch (e) {
+        print('❌ Device token registration failed: $e');
+      }
+    }
+    
+    // Test notification permissions
+    try {
+      final settings = await _firebaseMessaging.getNotificationSettings();
+      print('🔔 Notification settings: ${settings.authorizationStatus}');
+      print('🔔 Alert: ${settings.alert}');
+      print('🔔 Badge: ${settings.badge}');
+      print('🔔 Sound: ${settings.sound}');
+    } catch (e) {
+      print('❌ Failed to get notification settings: $e');
+    }
+    
+    print('🔔 Notification setup test complete');
+  }
 
   /// Refresh FCM token
   Future<String?> refreshToken() async {

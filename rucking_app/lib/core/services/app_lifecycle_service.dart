@@ -146,8 +146,11 @@ class AppLifecycleService with WidgetsBindingObserver {
     AppLogger.info('App resumed - resuming background services');
     
     try {
-      // Resume notification polling
-      _notificationBloc?.resumePolling();
+      // Immediately check for new notifications and resume polling
+      if (_notificationBloc != null) {
+        _notificationBloc!.add(const NotificationsRequested());
+        _notificationBloc!.resumePolling(interval: const Duration(seconds: 30)); // More frequent polling
+      }
       
       // Check if we need to recover any services
       final activeState = _activeSessionBloc?.state;

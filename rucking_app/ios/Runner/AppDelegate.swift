@@ -1,6 +1,7 @@
 import UIKit
 import Flutter
 import WatchConnectivity
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, WCSessionDelegate {
@@ -140,6 +141,27 @@ import WatchConnectivity
         eventChannel.setStreamHandler(HeartRateStreamHandler())
         
         GeneratedPluginRegistrant.register(with: self)
+        
+        // Register for push notifications and get APNS token
+        if #available(iOS 10.0, *) {
+            let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
+            UNUserNotificationCenter.current().requestAuthorization(
+                options: authOptions,
+                completionHandler: { granted, error in
+                    print("Push notification permission granted: \(granted)")
+                    if let error = error {
+                        print("Push notification permission error: \(error)")
+                    }
+                }
+            )
+        } else {
+            let settings: UIUserNotificationSettings =
+                UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
+            application.registerUserNotificationSettings(settings)
+        }
+        
+        // Register for remote notifications to get APNS token
+        application.registerForRemoteNotifications()
         
         // Re-assert our AppDelegate as the WCSession delegate AFTER all plugins
         // (including Firebase via GeneratedPluginRegistrant) have initialized.
@@ -355,6 +377,18 @@ import WatchConnectivity
             print("[WATCH] Processing application context on main thread: \(applicationContext)")
             self.processWatchMessage(message: applicationContext, replyHandler: nil) // No reply handler for context updates
         }
+    }
+    
+    // MARK: - APNS Token Handling
+    
+    override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        print("APNS token received: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
+        super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+    }
+    
+    override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("Failed to register for remote notifications: \(error)")
+        super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
     }
 }
 
