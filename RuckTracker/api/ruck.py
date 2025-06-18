@@ -619,6 +619,115 @@ class RuckSessionCompleteResource(Resource):
                     logger.error(f"Error updating event progress for session {ruck_id}: {event_error}")
                     # Don't fail the session completion if event progress update fails
         
+            # Check if this user is in any active duels and update progress automatically
+            try:
+                logger.info(f"Checking for active duels for user {g.user.id} after completing session {ruck_id}")
+                
+                # Find active duel participants for this user
+                duel_participants_resp = supabase.table('duel_participants') \
+                    .select('id, duel_id, current_value') \
+                    .eq('user_id', g.user.id) \
+                    .eq('status', 'accepted') \
+                    .execute()
+                
+                if duel_participants_resp.data:
+                    # For each active duel participation, check if the duel is still active
+                    for participant in duel_participants_resp.data:
+                        participant_id = participant['id']
+                        duel_id = participant['duel_id']
+                        
+                        # Get duel details
+                        duel_resp = supabase.table('duels') \
+                            .select('id, status, challenge_type, target_value, ends_at') \
+                            .eq('id', duel_id) \
+                            .single() \
+                            .execute()
+                        
+                        if not duel_resp.data or duel_resp.data['status'] != 'active':
+                            continue
+                            
+                        duel = duel_resp.data
+                        
+                        # Check if duel has ended
+                        if duel['ends_at'] and datetime.utcnow() > datetime.fromisoformat(duel['ends_at']):
+                            continue
+                            
+                        # Check if session was already counted for this duel
+                        existing_session_resp = supabase.table('duel_sessions') \
+                            .select('id') \
+                            .eq('duel_id', duel_id) \
+                            .eq('participant_id', participant_id) \
+                            .eq('session_id', ruck_id) \
+                            .execute()
+                        
+                        if existing_session_resp.data:
+                            logger.info(f"Session {ruck_id} already counted for duel {duel_id}")
+                            continue
+                            
+                        # Calculate contribution based on challenge type
+                        contribution = 0
+                        if duel['challenge_type'] == 'distance':
+                            contribution = completed_session.get('distance_km', 0)
+                        elif duel['challenge_type'] == 'duration':
+                            contribution = int(duration_seconds / 60) if duration_seconds else 0
+                        elif duel['challenge_type'] == 'time':  # Handle 'time' alias for duration
+                            contribution = int(duration_seconds / 60) if duration_seconds else 0
+                        elif duel['challenge_type'] == 'elevation':
+                            contribution = completed_session.get('elevation_gain_m', 0)
+                        elif duel['challenge_type'] == 'power_points':
+                            # Power points are automatically calculated by the database computed column
+                            # We need to re-fetch the session to get the computed power_points value
+                            session_with_power_points = supabase.table('ruck_session') \
+                                .select('power_points') \
+                                .eq('id', ruck_id) \
+                                .single() \
+                                .execute()
+                            if session_with_power_points.data and session_with_power_points.data.get('power_points'):
+                                contribution = float(session_with_power_points.data['power_points'])
+                            else:
+                                contribution = 0
+                        
+                        if contribution > 0:
+                            # Update participant progress
+                            new_value = participant['current_value'] + contribution
+                            now = datetime.utcnow()
+                            
+                            supabase.table('duel_participants').update({
+                                'current_value': new_value,
+                                'updated_at': now.isoformat()
+                            }).eq('id', participant_id).execute()
+                            
+                            # Record the session contribution
+                            supabase.table('duel_sessions').insert([{
+                                'duel_id': duel_id,
+                                'participant_id': participant_id,
+                                'session_id': ruck_id,
+                                'contribution_value': contribution,
+                                'created_at': now.isoformat()
+                            }]).execute()
+                            
+                            # Create duel progress notification
+                            try:
+                                from api.duel_comments import create_duel_progress_notification
+                                user_resp = supabase.table('users').select('username').eq('id', g.user.id).single().execute()
+                                user_name = user_resp.data.get('username', 'Unknown User') if user_resp.data else 'Unknown User'
+                                create_duel_progress_notification(duel_id, g.user.id, user_name, ruck_id)
+                            except Exception as notif_error:
+                                logger.error(f"Failed to create duel progress notification: {notif_error}")
+                            
+                            logger.info(f"Updated duel {duel_id} progress for user {g.user.id}: +{contribution} ({duel['challenge_type']}) = {new_value}")
+                            
+                            # Check if participant reached target
+                            if new_value >= duel['target_value']:
+                                supabase.table('duel_participants').update({
+                                    'target_reached_at': now.isoformat()
+                                }).eq('id', participant_id).execute()
+                                logger.info(f"User {g.user.id} reached target in duel {duel_id}")
+                        
+            except Exception as duel_error:
+                logger.error(f"Error updating duel progress for session {ruck_id}: {duel_error}")
+                # Don't fail the session completion if duel progress update fails
+        
             return completed_session, 200
         except Exception as e:
             logger.error(f"Error ending ruck session {ruck_id}: {e}")
