@@ -34,32 +34,39 @@ class PushNotificationService:
             if not firebase_admin._apps:
                 cred = None
                 
-                # Prioritize JSON over path for Heroku deployment
+                # Prioritize JSON over path, and only use path if file actually exists
                 if self.service_account_json:
                     logger.info("Using Firebase service account JSON from environment variable")
                     cred = credentials.Certificate(json.loads(self.service_account_json))
-                elif self.service_account_path and os.path.exists(self.service_account_path):
+                elif self.service_account_path and os.path.isfile(self.service_account_path):
                     logger.info(f"Using Firebase service account file: {self.service_account_path}")
                     cred = credentials.Certificate(self.service_account_path)
-                else:
-                    logger.warning("No Firebase service account credentials found, trying default application credentials")
+                elif self.service_account_path:
+                    logger.warning(f"Firebase service account path specified but file does not exist: {self.service_account_path}")
+                
+                if not cred:
+                    logger.warning("No valid Firebase service account credentials found, trying default application credentials")
 
                 if cred:
                     firebase_admin.initialize_app(cred, {
                         'projectId': self.project_id,
                     })
+                    logger.info("Firebase Admin SDK initialised successfully for project %s", self.project_id)
                 else:
                     # If no explicit credentials, try default application creds
                     firebase_admin.initialize_app()
-                logger.info("Firebase Admin SDK initialised for project %s", self.project_id)
+                    logger.info("Firebase Admin SDK initialised with default credentials for project %s", self.project_id)
+                    
         except Exception as e:
             logger.error("Failed to initialise Firebase Admin SDK: %s", e)
+            # Don't raise exception - allow service to continue without push notifications
+            logger.warning("Push notifications will be disabled due to Firebase initialization failure")
 
         
         if not self.project_id:
             logger.error("FIREBASE_PROJECT_ID environment variable not set")
-        if not self.service_account_path and not self.service_account_json:
-            logger.error("Either FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON environment variable must be set")
+        if not self.service_account_json and not (self.service_account_path and os.path.isfile(self.service_account_path)):
+            logger.error("No valid Firebase credentials found. Either FIREBASE_SERVICE_ACCOUNT_JSON must be set or FIREBASE_SERVICE_ACCOUNT_PATH must point to an existing file")
     
     def _get_access_token(self) -> str:
         """Get OAuth2 access token for Firebase V1 API"""
@@ -68,19 +75,21 @@ class PushNotificationService:
             return self._access_token
             
         try:
-            # Load service account credentials - prioritize JSON over path
+            # Load service account credentials - prioritize JSON over path, check file existence
             if self.service_account_json:
                 credentials = service_account.Credentials.from_service_account_info(
                     json.loads(self.service_account_json),
                     scopes=['https://www.googleapis.com/auth/firebase.messaging']
                 )
-            elif self.service_account_path and os.path.exists(self.service_account_path):
+            elif self.service_account_path and os.path.isfile(self.service_account_path):
                 credentials = service_account.Credentials.from_service_account_file(
                     self.service_account_path,
                     scopes=['https://www.googleapis.com/auth/firebase.messaging']
                 )
             else:
-                logger.error("No Firebase service account credentials configured")
+                if self.service_account_path:
+                    logger.error(f"Firebase service account file does not exist: {self.service_account_path}")
+                logger.error("No valid Firebase service account credentials configured for access token")
                 return None
             
             # Refresh the token
