@@ -988,7 +988,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
 
   double _getFitZoom(List<LatLng> points) {
     if (points.isEmpty) return 16.0;
-    if (points.length == 1) return 17.0;
+    if (points.length == 1) return 17.5;
 
     double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
     double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
@@ -1004,11 +1004,9 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
     minLng -= lngPadding;
     maxLng += lngPadding;
 
-    // Calculate zoom levels based on the bounding box
-    // These calculations are based on a map container that's approximately 200px tall
     double latDiff = maxLat - minLat;
     double lngDiff = maxLng - minLng;
-    
+
     double zoom;
     if (latDiff < 0.0005 && lngDiff < 0.0005) {
       zoom = 17.0; // Very close zoom for tiny routes

@@ -110,6 +110,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   /// Start polling for new notifications
   /// Default interval is 90 seconds to stay under the 50/hour rate limit
   void startPolling({Duration interval = const Duration(seconds: 90)}) {
+    // Immediately fetch notifications so UI badge is up-to-date on app launch
+    add(const NotificationsRequested());
     // Cancel any existing timer
     _pollingTimer?.cancel();
     

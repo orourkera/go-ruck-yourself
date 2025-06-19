@@ -43,6 +43,7 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
         
         # Create notifications for each participant
         notifications = []
+        message_text = f"{commenter_name} commented on the duel '{duel_name}'"
         for participant in participants_response.data:
             notification = {
                 'recipient_id': participant['user_id'],
@@ -50,8 +51,9 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
                 'type': 'duel_comment',
                 'duel_id': duel_id,
                 'duel_comment_id': comment_id,
+                'message': message_text,
                 'data': {
-                    'message': f"{commenter_name} commented on the duel '{duel_name}'",
+                    'message': message_text,
                     'duel_name': duel_name,
                     'commenter_name': commenter_name,
                     'created_at': 'NOW()'
@@ -108,11 +110,14 @@ def create_duel_joined_notification(duel_id, joiner_id, joiner_name):
         if creator_id == joiner_id:
             return
             
+        # Prepare notification message
+        message_text = f"{joiner_name} joined your duel '{duel_name}'"
         # Create notification for creator
         notification = {
             'recipient_id': creator_id,
             'sender_id': joiner_id,
             'type': 'duel_joined',
+            'message': message_text,
             'duel_id': duel_id,
             'data': {
                 'message': f"{joiner_name} joined your duel '{duel_name}'",
@@ -181,6 +186,7 @@ def create_duel_started_notification(duel_id):
                 'recipient_id': user_id,
                 'sender_id': None,  # System notification
                 'type': 'duel_started',
+                    'message': message_text,
                 'duel_id': duel_id,
                 'data': {
                     'message': f"'{duel_name}' has started! Begin your challenge",
@@ -249,6 +255,7 @@ def create_duel_completed_notification(duel_id):
                 'recipient_id': user_id,
                 'sender_id': None,  # System notification
                 'type': 'duel_completed',
+                    'message': message_text,
                 'duel_id': duel_id,
                 'data': {
                     'message': f"'{duel_name}' has completed! Check the results",
@@ -318,6 +325,7 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
                 'recipient_id': user_id,
                 'sender_id': participant_id,
                 'type': 'duel_progress',
+                    'message': message_text,
                 'duel_id': duel_id,
                 'ruck_id': ruck_id,
                 'data': {
@@ -399,6 +407,7 @@ def create_duel_deleted_notification(duel_id, deleter_id):
                 'recipient_id': participant['user_id'],
                 'sender_id': deleter_id,
                 'type': 'duel_deleted',
+                    'message': message_text,
                 'duel_id': duel_id,
                 'data': {
                     'message': f"The duel '{duel_name}' has been deleted by {deleter_name}",

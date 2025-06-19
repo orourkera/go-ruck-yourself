@@ -145,6 +145,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
     if (menuItems.isNotEmpty) {
       return [
         PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
           onSelected: (value) {
             if (value == 'edit') {
               _navigateToEditClub();

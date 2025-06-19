@@ -346,7 +346,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : const Icon(Icons.send, color: Colors.white),
+                    : const Icon(Icons.arrow_right_alt, color: Colors.white),
                 onPressed: _isSubmitting || _commentController.text.trim().isEmpty
                     ? null
                     : _submitComment,
@@ -417,33 +417,39 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
   }
 
   void _showDeleteCommentDialog(EventComment comment) {
+    // Obtain the bloc from the current page context
+    final bloc = context.read<EventCommentsBloc>();
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Comment'),
-        content: const Text('Are you sure you want to delete this comment?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              context.read<EventCommentsBloc>().add(
-                DeleteEventComment(
-                  eventId: widget.eventId,
-                  commentId: comment.id,
-                ),
-              );
-              Navigator.of(context).pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+      builder: (dialogContext) => BlocProvider.value(
+        value: bloc,
+        child: AlertDialog(
+          title: const Text('Delete Comment'),
+          content: const Text('Are you sure you want to delete this comment?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
             ),
-            child: const Text('Delete'),
-          ),
-        ],
+            ElevatedButton(
+              onPressed: () {
+                bloc.add(
+                  DeleteEventComment(
+                    eventId: widget.eventId,
+                    commentId: comment.id,
+                  ),
+                );
+                Navigator.of(dialogContext).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
       ),
     );
   }

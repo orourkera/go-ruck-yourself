@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -901,7 +902,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.comment, color: _getLadyModeColor(context)),
+                          Icon(Icons.chat_bubble, color: _getLadyModeColor(context)),
                           const SizedBox(width: 8),
                           Text(
                             'Comments',
@@ -1422,6 +1423,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
 // Route map preview widget for session details
 class _SessionRouteMap extends StatelessWidget {
+  static const double _defaultZoom = 16.0;
+  static const double _singlePointZoom = 17.5;
   final RuckSession session;
   
   const _SessionRouteMap({required this.session});
@@ -1454,6 +1457,38 @@ class _SessionRouteMap extends StatelessWidget {
     return result;
   }
 
+  double _calculateFitZoom(List<LatLng> points) {
+    if (points.isEmpty) return 16.0;
+    if (points.length == 1) return 17.5;
+
+    double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+    double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+    double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+    double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+
+    // Add 20% padding around bounds
+    const paddingFactor = 1.20;
+    double latDiff = (maxLat - minLat) * paddingFactor;
+    double lngDiff = (maxLng - minLng) * paddingFactor;
+
+    // Protect against zero diff
+    if (latDiff == 0) latDiff = 0.00001;
+    if (lngDiff == 0) lngDiff = 0.00001;
+
+    // Use widget dimensions for calculation (approximate full-width map)
+    const double mapWidth = 375.0;  // Typical mobile width
+    const double mapHeight = 175.0; // Height from widget
+    const tileSize = 256.0;
+    const ln2 = 0.6931471805599453;
+
+    // Calculate zoom to fit bounds
+    double latZoom = (math.log(mapHeight * 360 / (latDiff * tileSize)) / ln2);
+    double lngZoom = (math.log(mapWidth * 360 / (lngDiff * tileSize)) / ln2);
+
+    double zoom = latZoom < lngZoom ? latZoom : lngZoom;
+    return zoom.clamp(4.0, 18.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     print('[ROUTE_DEBUG] Session ${session.id} - Building map widget');
@@ -1465,49 +1500,7 @@ class _SessionRouteMap extends StatelessWidget {
             points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
           )
         : LatLng(40.421, -3.678); // Default center
-    final zoom = points.isEmpty
-        ? 16.0
-        : (points.length == 1
-            ? 17.5
-            : (() {
-                double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-                double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-                double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
-                double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
-                
-                double latDiff = (maxLat - minLat).abs();
-                double lngDiff = (maxLng - minLng).abs();
-                double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
-                
-                // Add 40% padding to ensure route fits comfortably
-                maxDiff *= 1.4;
-                
-                // More granular zoom levels for better fitting
-                if (maxDiff < 0.0005) return 18.0;  // Very small route
-                if (maxDiff < 0.001) return 17.0;   // Small route
-                if (maxDiff < 0.003) return 16.0;   // Small-medium route
-                if (maxDiff < 0.008) return 15.0;   // Medium route
-                if (maxDiff < 0.02) return 14.0;    // Medium-large route
-                if (maxDiff < 0.05) return 13.0;    // Large route
-                if (maxDiff < 0.1) return 12.0;     // Very large route
-                if (maxDiff < 0.2) return 11.0;     // Extra large route
-                if (maxDiff < 0.5) return 10.0;     // Huge route
-                return 9.0;                         // Massive route
-              })()
-          );
-
-    if (points.isEmpty) {
-      return Container(
-        height: 180,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        alignment: Alignment.center,
-        child: Text('No route data available', style: AppTextStyles.bodyMedium),
-      );
-    }
-
+    final zoom = _calculateFitZoom(points);
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(

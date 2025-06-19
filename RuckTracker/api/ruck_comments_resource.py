@@ -35,17 +35,21 @@ class RuckCommentsResource(Resource):
 
         # Get comments for the ruck
         try:
-            query_result = supabase.table('ruck_comments') \
-                                 .select('id, ruck_id, user_id, user_display_name, user_avatar_url, content, created_at, updated_at') \
-                                 .eq('ruck_id', ruck_id) \
-                                 .order('created_at', desc=True) \
-                                 .execute()
+            query_result = supabase.from_('ruck_comments').select('id, ruck_id, user_id, user_display_name, content, created_at, updated_at').eq('ruck_id', ruck_id).order('created_at', desc=True).execute()
+            query_result_users = supabase.from_('user').select('id, avatar_url').execute()
             
             if hasattr(query_result, 'error') and query_result.error:
                 logger.error(f"RuckCommentsResource: Supabase query error: {query_result.error}")
                 return build_api_response(success=False, error="Failed to fetch comments from database.", status_code=500)
 
-            return build_api_response(data=query_result.data, status_code=200)
+            comments = query_result.data
+            users = query_result_users.data
+            
+            for comment in comments:
+                user = next((user for user in users if user['id'] == comment['user_id']), None)
+                comment['user_avatar_url'] = user.get('avatar_url') if user else None
+
+            return build_api_response(data=comments, status_code=200)
             
         except Exception as e:
             logger.error(f"RuckCommentsResource: Error fetching ruck comments: {e}", exc_info=True)
@@ -97,17 +101,18 @@ class RuckCommentsResource(Resource):
             logger.info("RuckCommentsResource: Content too long.")
             return build_api_response(success=False, error="Comment content exceeds maximum length (500 characters)", status_code=400)
             
-        # Fetch user profile information (username)
+        # Fetch user profile information (username and avatar_url)
         # Fallback to a default if the profile doesn't exist or an error occurs
         user_profile = {'username': 'Unknown User', 'avatar_url': None} 
         try:
             profile_response = supabase.table('user') \
-                .select('username') \
+                .select('username, avatar_url') \
                 .eq('id', user_id) \
                 .execute()
             
             if profile_response.data and len(profile_response.data) > 0:
                 user_profile['username'] = profile_response.data[0].get('username', 'Unknown User')
+                user_profile['avatar_url'] = profile_response.data[0].get('avatar_url')
             else:
                 logger.warning(f"RuckCommentsResource: User profile not found for user_id: {user_id}")
 

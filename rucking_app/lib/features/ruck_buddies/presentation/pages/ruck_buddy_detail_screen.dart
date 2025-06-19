@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Import for HapticFeedback
 import 'package:cached_network_image/cached_network_image.dart';
@@ -688,7 +689,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           displayBuddy.distanceKm,
                           metric: context.read<AuthBloc>().state is Authenticated
                             ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
-                            : true,
+                            : false,
                         ),
                         style: AppTextStyles.displayMedium.copyWith(
                           color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
@@ -912,39 +913,31 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       
                       const SizedBox(height: 16),
                       
-                      // Comment input - only show when not in edit mode
-                      if (!_isEditingComment)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _commentController,
-                                focusNode: _commentFocusNode,
-                                decoration: const InputDecoration(
-                                  hintText: 'Add a comment...',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.all(Radius.circular(20.0)),
-                                  ),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                                  isDense: true,
-                                ),
-                                textInputAction: TextInputAction.send,
-                                onSubmitted: (_) => _submitComment(),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: const Icon(Icons.send),
-                              onPressed: _submitComment,
-                            ),
-                          ],
-                        ),
-                      
-                      const SizedBox(height: 16),
-                      
                       // Comments section
                       Column(
                         children: [
+                          // Comments title with icon
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.comment,
+                                  color: Colors.grey[600],
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Comments',
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
                           // Comments section
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -965,6 +958,44 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                               },
                             ),
                           ),
+                          
+                          // Comment input - only show when not in edit mode
+                          if (!_isEditingComment)
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _commentController,
+                                      focusNode: _commentFocusNode,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Add a comment...',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                                        ),
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                                        isDense: true,
+                                      ),
+                                      textInputAction: TextInputAction.send,
+                                      onSubmitted: (_) => _submitComment(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: _submitComment,
+                                    style: ElevatedButton.styleFrom(
+                                      primary: AppColors.primary,
+                                      shape: const CircleBorder(),
+                                    ),
+                                    child: Icon(
+                                      Icons.arrow_right_alt,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           
                           // Custom comment edit input when in edit mode
                           if (_isEditingComment)
@@ -1194,19 +1225,33 @@ class _RouteMapState extends State<_RouteMap> {
   double _getFitZoom(List<LatLng> points) {
     if (points.isEmpty) return 16.0;
     if (points.length == 1) return 17.5;
+
     double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
     double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
     double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
     double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
-    double latDiff = (maxLat - minLat).abs();
-    double lngDiff = (maxLng - minLng).abs();
-    double maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
-    maxDiff *= 1.05;
-    if (maxDiff < 0.001) return 17.5;
-    if (maxDiff < 0.01) return 16.0;
-    if (maxDiff < 0.1) return 14.0;
-    if (maxDiff < 1.0) return 11.0;
-    return 8.0;
+
+    // Add 20% padding around bounds
+    const paddingFactor = 1.20;
+    double latDiff = (maxLat - minLat) * paddingFactor;
+    double lngDiff = (maxLng - minLng) * paddingFactor;
+
+    // Protect against zero diff
+    if (latDiff == 0) latDiff = 0.00001;
+    if (lngDiff == 0) lngDiff = 0.00001;
+
+    // Use widget dimensions for calculation (approximate full-width map)
+    const double mapWidth = 375.0;  // Typical mobile width
+    const double mapHeight = 175.0; // Height from widget
+    const tileSize = 256.0;
+    const ln2 = 0.6931471805599453;
+
+    // Calculate zoom to fit bounds
+    double latZoom = (math.log(mapHeight * 360 / (latDiff * tileSize)) / ln2);
+    double lngZoom = (math.log(mapWidth * 360 / (lngDiff * tileSize)) / ln2);
+
+    double zoom = latZoom < lngZoom ? latZoom : lngZoom;
+    return zoom.clamp(4.0, 18.0);
   }
 
   @override

@@ -472,47 +472,50 @@ class _CommentsSectionState extends State<CommentsSection> {
       }
     }
     
+    // Debug the avatar URL
+    print('[AVATAR_DEBUG] Comment ID: ${comment.id}, UserAvatarUrl: "${comment.userAvatarUrl}", UserDisplayName: "${comment.userDisplayName}"');
+    
+    // If avatar URL is null/empty, we need to handle this gracefully
+    // The UserAvatar widget should fall back to initials automatically
+    String? avatarUrl = comment.userAvatarUrl;
+    if (avatarUrl != null && avatarUrl.isEmpty) {
+      avatarUrl = null; // Convert empty string to null for UserAvatar widget
+    }
+    
     // Safely create UI elements with defensive error handling
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      padding: const EdgeInsets.all(12.0),
-      decoration: BoxDecoration(
-        // Use safe color access with fallbacks
-        color: isCurrentUserComment ? 
-            Colors.blue.shade50 : 
-            Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(
-          // Safely handle colors and widths with defaults to prevent NaN
-          color: isEditing ? AppColors.primary : Colors.grey.shade200,
-          width: isEditing ? 2.0 : 1.0,
-        ),
-      ),
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // User info
-              Row(
+              UserAvatar(
+                avatarUrl: avatarUrl,
+                username: comment.userDisplayName,
+                size: 32,
+              ),
+              const SizedBox(width: 8.0),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  UserAvatar(
-                    avatarUrl: comment.userAvatarUrl,
-                    username: comment.userDisplayName,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 8.0),
                   Text(
                     comment.userDisplayName.isNotEmpty ? comment.userDisplayName : 'User',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  Text(
+                    formattedDate,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
                 ],
               ),
-              
-              // Action buttons - show different buttons based on edit state
+              const Spacer(),
               if (isCurrentUserComment)
                 isEditing
                   ? Row(
@@ -572,22 +575,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                     ),
             ],
           ),
-          
-          // Date
-          Padding(
-            padding: const EdgeInsets.only(left: 40.0, top: 4.0),
-            child: Text(
-              formattedDate,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 8),
-          
-          // Comment content - either show text or editing field
+          const SizedBox(height: 8.0),
           Padding(
             padding: const EdgeInsets.only(left: 40.0),
             child: isEditing
@@ -605,8 +593,6 @@ class _CommentsSectionState extends State<CommentsSection> {
                 )
               : Text(comment.content),
           ),
-          
-          // Edited indicator
           if (comment.isEdited && !isEditing)
             Padding(
               padding: const EdgeInsets.only(top: 4.0, left: 40.0),
