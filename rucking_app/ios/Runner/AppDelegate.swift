@@ -2,6 +2,7 @@ import UIKit
 import Flutter
 import WatchConnectivity
 import UserNotifications
+import FirebaseCore
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, WCSessionDelegate {
@@ -24,6 +25,9 @@ import UserNotifications
                 session?.activate()
             }
         }
+        
+        // Setup Firebase
+        FirebaseApp.configure()
         
         // Setup Flutter Method Channels for communication with Dart
         let controller : FlutterViewController = window?.rootViewController as! FlutterViewController

@@ -1651,27 +1651,72 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   void _startConnectivityMonitoring(String sessionId) {
     _connectivitySubscription?.cancel();
     _connectivitySubscription = GetIt.I<ConnectivityService>().connectivityStream.listen((isConnected) {
+      // Only handle connectivity changes if we're in a valid session state
+      if (state is! ActiveSessionRunning) {
+        AppLogger.debug('Ignoring connectivity change - session not running');
+        return;
+      }
+      
+      final currentState = state as ActiveSessionRunning;
+      
       if (isConnected) {
-        AppLogger.info('Connectivity restored, resuming API operations...');
-        _attemptOfflineSessionSync(sessionId);
-        _startLocationUpdates(sessionId);
+        AppLogger.info('Connectivity restored, resuming operations for session: ${currentState.sessionId}');
+        
+        // Add slight delay to prevent race conditions with UI rebuilds
+        Timer(const Duration(milliseconds: 100), () async {
+          if (state is ActiveSessionRunning) {
+            final latestState = state as ActiveSessionRunning;
+            
+            // Only attempt sync if session is still offline
+            if (latestState.sessionId.startsWith('offline_')) {
+              await _attemptOfflineSessionSync(latestState.sessionId);
+            } else {
+              // For online sessions, just ensure location tracking is active
+              _ensureLocationTrackingActive(latestState.sessionId);
+            }
+          }
+        });
       } else {
-        AppLogger.warning('Connectivity lost, switching to offline mode...');
-        _locationService.stopLocationTracking();
+        AppLogger.warning('Connectivity lost for session: ${currentState.sessionId}, switching to offline mode...');
+        
+        // Only stop location if we're not already in offline mode
+        if (!currentState.sessionId.startsWith('offline_')) {
+          _locationService.stopLocationTracking();
+          
+          // Emit validation message to inform user
+          emit(currentState.copyWith(
+            validationMessage: 'No network connection - session continues in offline mode',
+            clearValidationMessage: false,
+          ));
+          
+          // Clear the message after 3 seconds
+          Timer(const Duration(seconds: 3), () {
+            if (state is ActiveSessionRunning && !isClosed) {
+              final latestState = state as ActiveSessionRunning;
+              emit(latestState.copyWith(clearValidationMessage: true));
+            }
+          });
+        }
       }
     });
   }
 
-  Future<void> _attemptOfflineSessionSync(String currentSessionId) async {
-    if (currentSessionId.startsWith('offline_')) {
+  void _ensureLocationTrackingActive(String sessionId) {
+    if (_locationSubscription == null) {
+      _startLocationUpdates(sessionId);
+    }
+  }
+
+  Future<void> _attemptOfflineSessionSync(String sessionId) async {
+    if (sessionId.startsWith('offline_')) {
       try {
         AppLogger.info('Attempting to sync offline session to backend...');
         
-        final state = this.state;
-        if (state is ActiveSessionRunning) {
+        final currentState = state;
+        if (currentState is ActiveSessionRunning) {
           // Create session with current session data using the same format as normal session creation
           final createResponse = await _apiClient.post('/rucks', {
-            'ruck_weight_kg': state.ruckWeightKg,
+            'ruck_weight_kg': currentState.ruckWeightKg,
             'notes': '', // Empty notes for now
           }).timeout(Duration(seconds: 5));
           
@@ -1679,20 +1724,58 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           if (newSessionId != null && newSessionId.isNotEmpty) {
             AppLogger.info('Successfully synced offline session. New session ID: $newSessionId');
             
-            // Only update state if session is still running
+            // Check if session is still running and update state atomically
             if (state is ActiveSessionRunning) {
-              final currentState = state as ActiveSessionRunning;
-              emit(currentState.copyWith(sessionId: newSessionId));
+              final latestState = state as ActiveSessionRunning;
               
-              // Start fresh location tracking with new session ID
-              _startLocationUpdates(newSessionId);
+              // Only update if we're still dealing with the same offline session
+              if (latestState.sessionId == sessionId) {
+                // Emit state update first
+                emit(latestState.copyWith(
+                  sessionId: newSessionId,
+                  validationMessage: 'Connected - session synced to server',
+                  clearValidationMessage: false,
+                ));
+                
+                // Clear validation message after 2 seconds
+                Timer(const Duration(seconds: 2), () {
+                  if (state is ActiveSessionRunning && !isClosed) {
+                    final finalState = state as ActiveSessionRunning;
+                    if (finalState.sessionId == newSessionId) {
+                      emit(finalState.copyWith(clearValidationMessage: true));
+                    }
+                  }
+                });
+                
+                // Ensure location tracking is active for the new session
+                // But don't call _startLocationUpdates directly to avoid double subscription
+                _ensureLocationTrackingActive(newSessionId);
+              } else {
+                AppLogger.warning('Session ID changed during sync, skipping state update');
+              }
             } else {
-              AppLogger.info('Session already completed, not updating state');
+              AppLogger.info('Session no longer running, skipping state update');
             }
           }
         }
       } catch (e) {
         AppLogger.warning('Failed to sync offline session: $e. Will retry on next connectivity event.');
+        
+        // Emit error state if session is still running
+        if (state is ActiveSessionRunning) {
+          final currentState = state as ActiveSessionRunning;
+          emit(currentState.copyWith(
+            validationMessage: 'Sync failed - continuing in offline mode',
+            clearValidationMessage: false,
+          ));
+          
+          Timer(const Duration(seconds: 3), () {
+            if (state is ActiveSessionRunning && !isClosed) {
+              final latestState = state as ActiveSessionRunning;
+              emit(latestState.copyWith(clearValidationMessage: true));
+            }
+          });
+        }
       }
     }
   }

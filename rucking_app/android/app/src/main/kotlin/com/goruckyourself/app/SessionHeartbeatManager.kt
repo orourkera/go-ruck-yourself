@@ -30,24 +30,56 @@ object SessionHeartbeatManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        // Schedule repeating alarm
-        val triggerTime = System.currentTimeMillis() + HEARTBEAT_INTERVAL_MS
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                triggerTime,
-                pendingIntent
-            )
+        // Check if we can schedule exact alarms (Android 12+)
+        val canScheduleExactAlarms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            alarmManager.canScheduleExactAlarms()
         } else {
-            alarmManager.setExact(
-                AlarmManager.RTC_WAKEUP,
-                triggerTime,
-                pendingIntent
-            )
+            true // Pre-Android 12 doesn't need permission
         }
         
-        Log.d("SessionHeartbeat", "Scheduled heartbeat alarm for ${HEARTBEAT_INTERVAL_MS/1000/60} minutes")
+        val triggerTime = System.currentTimeMillis() + HEARTBEAT_INTERVAL_MS
+        
+        try {
+            if (canScheduleExactAlarms) {
+                // Use exact alarm if permission is granted
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                }
+                Log.d("SessionHeartbeat", "Scheduled exact heartbeat alarm for ${HEARTBEAT_INTERVAL_MS/1000/60} minutes")
+            } else {
+                // Fallback to inexact alarm (still works but less precise)
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+                Log.d("SessionHeartbeat", "Scheduled inexact heartbeat alarm (no exact alarm permission)")
+            }
+        } catch (e: SecurityException) {
+            Log.w("SessionHeartbeat", "Failed to schedule alarm due to permission: ${e.message}")
+            // Fallback to inexact alarm
+            try {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+                Log.d("SessionHeartbeat", "Scheduled fallback inexact alarm")
+            } catch (e2: Exception) {
+                Log.e("SessionHeartbeat", "Failed to schedule any alarm: ${e2.message}")
+                // Session tracking will still work, just without periodic heartbeat
+            }
+        }
     }
     
     fun cancelHeartbeat(context: Context) {

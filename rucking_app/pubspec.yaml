@@ -92,6 +92,7 @@ dependencies:
   share_plus: ^10.1.2
   path_provider: ^2.1.5
   screenshot: ^3.0.0
+  package_info_plus: ^8.0.0
   # carousel_slider removed due to conflicts with Flutter's Material package
   
 dev_dependencies:
@@ -119,6 +120,7 @@ flutter:
     - assets/images/
     - assets/images/paywall/
     - assets/screenshots/
+    - .env
   
   fonts:
     - family: Roboto

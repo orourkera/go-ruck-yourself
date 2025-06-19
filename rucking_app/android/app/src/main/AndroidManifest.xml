@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Schedule exact alarms for heartbeat monitoring -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- For Android 13+ (API 33+) - automatically granted for fitness apps -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- Needed for requesting exclusion from Doze / battery optimisation -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Camera permission -->

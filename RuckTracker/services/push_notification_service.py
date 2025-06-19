@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import requests
+import firebase_admin
+from firebase_admin import credentials, messaging
 from typing import List, Dict, Any
 import time
 from google.auth.transport.requests import Request
@@ -22,9 +24,32 @@ class PushNotificationService:
         self.project_id = os.getenv('FIREBASE_PROJECT_ID')
         self.service_account_path = os.getenv('FIREBASE_SERVICE_ACCOUNT_PATH')
         self.service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
+        # Firebase Admin SDK uses projectId implicitly; keep REST URL for fallback but prefer SDK
         self.fcm_url = f"https://fcm.googleapis.com/v1/projects/{self.project_id}/messages:send"
         self._access_token = None
         self._token_expiry = 0
+
+        # Initialize Firebase Admin SDK once globally
+        try:
+            if not firebase_admin._apps:
+                if self.service_account_path:
+                    cred = credentials.Certificate(self.service_account_path)
+                elif self.service_account_json:
+                    cred = credentials.Certificate(json.loads(self.service_account_json))
+                else:
+                    cred = None
+
+                if cred:
+                    firebase_admin.initialize_app(cred, {
+                        'projectId': self.project_id,
+                    })
+                else:
+                    # If no explicit credentials, try default application creds
+                    firebase_admin.initialize_app()
+                logger.info("Firebase Admin SDK initialised for project %s", self.project_id)
+        except Exception as e:
+            logger.error("Failed to initialise Firebase Admin SDK: %s", e)
+
         
         if not self.project_id:
             logger.error("FIREBASE_PROJECT_ID environment variable not set")
@@ -98,6 +123,23 @@ class PushNotificationService:
             logger.error("Failed to get Firebase access token")
             return False
             
+        # Prefer Firebase Admin SDK which automatically handles auth & tokens
+        try:
+            # Build notification
+            notification = messaging.Notification(title=title, body=body)
+            message = messaging.MulticastMessage(
+                tokens=device_tokens,
+                notification=notification,
+                data={k: str(v) for k, v in (notification_data or {}).items()}
+            )
+            response = messaging.send_multicast(message)
+            logger.info("Firebase Admin SDK send_multicast success: %s successes, %s failures", response.success_count, response.failure_count)
+            if response.failure_count > 0:
+                logger.warning("Some tokens failed: %s", [response.responses[i].exception for i in range(len(response.responses)) if not response.responses[i].success])
+            return response.failure_count == 0
+        except Exception as sdk_err:
+            logger.error("Firebase Admin SDK failed, falling back to raw HTTP: %s", sdk_err)
+
         headers = {
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json'

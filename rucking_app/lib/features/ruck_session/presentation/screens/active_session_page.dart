@@ -410,8 +410,52 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       if (state is ActiveSessionInitial || state is ActiveSessionLoading) {
                         return const Center(child: CircularProgressIndicator());
                       }
+                      
+                      if (state is ActiveSessionFailure) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline, size: 64, color: Colors.red),
+                              SizedBox(height: 16),
+                              Text(
+                                'Session Error',
+                                style: AppTextStyles.headlineMedium,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                state.errorMessage,
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.bodyMedium,
+                              ),
+                              SizedBox(height: 24),
+                              ElevatedButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: Text('Go Back'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
                       if (state is ActiveSessionRunning) {
+                        // Validate state before rendering to prevent white pages
+                        if (state.sessionId.isEmpty) {
+                          AppLogger.warning('ActiveSessionRunning state has empty sessionId');
+                          return const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(height: 16),
+                                Text('Initializing session...'),
+                              ],
+                            ),
+                          );
+                        }
+                        
                         print('[ACTIVE_SESSION_PAGE] ActiveSessionRunning - building UI');
+                        print('[ACTIVE_SESSION_PAGE] Session ID: ${state.sessionId}');
                         print('[ACTIVE_SESSION_PAGE] Terrain segments count: ${state.terrainSegments.length}');
                         if (state.terrainSegments.isEmpty) {
                           print('[ACTIVE_SESSION_PAGE] No terrain segments available yet');
@@ -583,103 +627,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           child: Text(
                             'Session Completed — Distance: ${state.session.distance.toStringAsFixed(2)} km',
                             style: AppTextStyles.titleMedium,
-                          ),
-                        );
-                      }
-                      if (state is ActiveSessionFailure) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.error_outline,
-                                  size: 64,
-                                  color: Colors.red,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Session Save Failed',
-                                  style: AppTextStyles.headlineMedium.copyWith(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  state.errorMessage,
-                                  style: AppTextStyles.bodyLarge,
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 24),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    // Try to recreate the session summary from the failure state
-                                    if (state.sessionDetails != null) {
-                                      final sessionDetails = state.sessionDetails!;
-                                      
-                                      // Create a mock session from the current state data
-                                      final mockSession = RuckSession(
-                                        id: sessionDetails.sessionId,
-                                        duration: Duration(seconds: sessionDetails.elapsedSeconds),
-                                        distance: sessionDetails.distanceKm,
-                                        caloriesBurned: sessionDetails.calories.round(),
-                                        startTime: sessionDetails.originalSessionStartTimeUtc,
-                                        endTime: DateTime.now().toUtc(),
-                                        ruckWeightKg: sessionDetails.ruckWeightKg,
-                                        elevationGain: sessionDetails.elevationGain,
-                                        elevationLoss: sessionDetails.elevationLoss,
-                                        averagePace: sessionDetails.pace ?? (sessionDetails.distanceKm > 0 ? sessionDetails.elapsedSeconds / sessionDetails.distanceKm : 0.0),
-                                        status: RuckStatus.completed,
-                                        avgHeartRate: null, // Will be filled from samples if available
-                                        heartRateSamples: [],
-                                        splits: sessionDetails.splits.map((splitData) => SessionSplit.fromJson(splitData as Map<String, dynamic>)).toList(),
-                                      );
-                                      
-                                      Navigator.of(context).pushReplacementNamed(
-                                        '/session_complete',
-                                        arguments: {
-                                          'completedAt': DateTime.now().toUtc(),
-                                          'ruckId': sessionDetails.sessionId ?? '',
-                                          'duration': Duration(seconds: sessionDetails.elapsedSeconds),
-                                          'distance': sessionDetails.distanceKm,
-                                          'caloriesBurned': sessionDetails.calories.round(),
-                                          'elevationGain': sessionDetails.elevationGain,
-                                          'elevationLoss': sessionDetails.elevationLoss,
-                                          'ruckWeight': sessionDetails.ruckWeightKg, // Changed back to ruckWeight
-                                          'notes': null,
-                                          'session': mockSession,
-                                          'splits': sessionDetails.splits.map((splitData) => SessionSplit.fromJson(splitData as Map<String, dynamic>)).toList(),
-                                        },
-                                      );
-                                    } else {
-                                      // If no session details available, go back to home
-                                      Navigator.of(context).pushNamedAndRemoveUntil(
-                                        '/home',
-                                        (route) => false,
-                                      );
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: Text('Continue to Summary'),
-                                ),
-                                const SizedBox(height: 12),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pushNamedAndRemoveUntil(
-                                      '/home',
-                                      (route) => false,
-                                    );
-                                  },
-                                  child: Text('Return to Home'),
-                                ),
-                              ],
-                            ),
                           ),
                         );
                       }

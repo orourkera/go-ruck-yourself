@@ -20,6 +20,7 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -260,29 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.info_outline,
                               label: 'About App',
                               onTap: () {
-                                showAboutDialog(
-                                  context: context,
-                                  applicationName: 'Go Rucky Yourself App',
-                                  applicationVersion: '1.0.0',
-                                  applicationIcon: Image.asset(
-                                    'assets/images/app_icon.png',
-                                    width: 48,
-                                    height: 48,
-                                  ),
-                                  applicationLegalese: ' 2025 Get Rucky',
-                                  children: [
-                                    const SizedBox(height: 16),
-                                    const Text(
-                                      'Track your rucking sessions, monitor your progress, and have a great rucking time',
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'Made by the Get Rucky team.',
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                );
+                                _showCustomAboutDialog(context);
                               },
                             ),
                             const Divider(),
@@ -381,6 +360,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onPressed: () => _showLogoutConfirmationDialog(context),
                         ),
                         const SizedBox(height: 32),
+                        FutureBuilder<PackageInfo>(
+                          future: PackageInfo.fromPlatform(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData) {
+                              return Text(
+                                'Version ${snapshot.data!.version} (${snapshot.data!.buildNumber})',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
+                                ),
+                              );
+                            } else {
+                              return const Text('');
+                            }
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -805,6 +799,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
       
       print('❌ Notification test failed: $e');
     }
+  }
+
+  void _showCustomAboutDialog(BuildContext context) async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    
+    if (!context.mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('About App'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Go Rucky Yourself App',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Track your rucking sessions, monitor your progress, and have a great rucking time',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Made by the Get Rucky team.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Version ${packageInfo.version} (${packageInfo.buildNumber})',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              ' 2025 Get Rucky',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Gets the initials from a name
