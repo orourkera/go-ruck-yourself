@@ -265,6 +265,24 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
           
           const SizedBox(width: 12),
           
+          // User avatar
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.grey[300],
+            backgroundImage: entry.user?.avatar != null && entry.user!.avatar!.isNotEmpty
+                ? NetworkImage(entry.user!.avatar!)
+                : null,
+            child: entry.user?.avatar == null || entry.user!.avatar!.isEmpty
+                ? Icon(
+                    Icons.person,
+                    color: Colors.grey[600],
+                    size: 20,
+                  )
+                : null,
+          ),
+          
+          const SizedBox(width: 12),
+          
           // User info
           Expanded(
             child: Column(

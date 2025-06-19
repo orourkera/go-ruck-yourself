@@ -106,12 +106,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           title: Text(
             isEditing ? 'Edit Event' : 'Create Event',
             style: AppTextStyles.titleLarge.copyWith(
-              color: isDarkMode ? Colors.white : AppColors.textDark,
+              color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: Colors.transparent,
+          backgroundColor: _getLadyModeColor(context),
           elevation: 0,
+          centerTitle: true,
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
         body: MultiBlocListener(
           listeners: [
@@ -159,6 +161,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ),
       ),
     );
+  }
+
+  Color _getLadyModeColor(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    return authState is Authenticated && authState.user.gender == 'female'
+        ? AppColors.ladyPrimary
+        : AppColors.primary;
   }
 
   Widget _buildForm(bool isDarkMode) {

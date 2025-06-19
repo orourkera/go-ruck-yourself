@@ -25,14 +25,14 @@ class EventProgress extends Equatable {
 
   factory EventProgress.fromJson(Map<String, dynamic> json) {
     return EventProgress(
-      id: json['id'] as String,
-      eventId: json['event_id'] as String,
-      userId: json['user_id'] as String,
+      id: json['id'] as String? ?? '',
+      eventId: json['event_id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
       ruckSessionId: json['ruck_session_id'] as int?,
-      totalDistance: (json['total_distance'] as num).toDouble(),
-      totalTime: json['total_time'] as int,
-      sessionCount: json['session_count'] as int,
-      lastUpdated: DateTime.parse(json['last_updated'] as String),
+      totalDistance: (json['total_distance'] as num?)?.toDouble() ?? 0.0,
+      totalTime: json['total_time'] as int? ?? 0,
+      sessionCount: json['session_count'] as int? ?? 0,
+      lastUpdated: DateTime.tryParse(json['last_updated'] as String? ?? '') ?? DateTime.now(),
       user: json['user'] != null 
           ? EventProgressUser.fromJson(json['user'] as Map<String, dynamic>)
           : null,
@@ -96,35 +96,35 @@ class EventProgress extends Equatable {
 
 class EventProgressUser extends Equatable {
   final String id;
-  final String firstName;
-  final String lastName;
+  final String username;
+  final String? avatar;
 
   const EventProgressUser({
     required this.id,
-    required this.firstName,
-    required this.lastName,
+    required this.username,
+    this.avatar,
   });
 
   factory EventProgressUser.fromJson(Map<String, dynamic> json) {
     return EventProgressUser(
-      id: json['id'] as String,
-      firstName: json['first_name'] as String,
-      lastName: json['last_name'] as String,
+      id: json['id'] as String? ?? '',
+      username: json['username'] as String? ?? 'Unknown User',
+      avatar: json['avatar_url'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'first_name': firstName,
-      'last_name': lastName,
+      'username': username,
+      'avatar': avatar,
     };
   }
 
-  String get fullName => '$firstName $lastName';
+  String get fullName => username.isNotEmpty ? username : 'Unknown User';
 
   @override
-  List<Object?> get props => [id, firstName, lastName];
+  List<Object?> get props => [id, username, avatar];
 }
 
 class EventLeaderboard extends Equatable {
@@ -140,11 +140,11 @@ class EventLeaderboard extends Equatable {
 
   factory EventLeaderboard.fromJson(Map<String, dynamic> json) {
     return EventLeaderboard(
-      eventId: json['event_id'] as String,
-      entries: (json['entries'] as List<dynamic>)
-          .map((entry) => EventProgress.fromJson(entry as Map<String, dynamic>))
-          .toList(),
-      lastUpdated: DateTime.parse(json['last_updated'] as String),
+      eventId: json['event_id'] as String? ?? '',
+      entries: (json['entries'] as List<dynamic>?)
+          ?.map((entry) => EventProgress.fromJson(entry as Map<String, dynamic>))
+          .toList() ?? [],
+      lastUpdated: DateTime.tryParse(json['last_updated'] as String? ?? '') ?? DateTime.now(),
     );
   }
 

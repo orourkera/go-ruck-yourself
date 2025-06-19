@@ -223,19 +223,29 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           SliverAppBar(
             pinned: true,
             expandedHeight: 60,
-            backgroundColor: isDarkMode 
-                ? AppColors.darkAppBarBackground 
-                : AppColors.lightAppBarBackground,
+            backgroundColor: _getLadyModeColor(context),
             title: Text(
               event.title,
               textAlign: TextAlign.center,
               style: AppTextStyles.titleLarge.copyWith(
-                color: isDarkMode ? Colors.white : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
             centerTitle: true,
-            actions: _buildAppBarActions(),
+            iconTheme: const IconThemeData(color: Colors.white),
+            actions: _buildAppBarActions().map((action) {
+              // Ensure action icons are white
+              if (action is IconButton) {
+                return IconButton(
+                  onPressed: action.onPressed,
+                  icon: action.icon,
+                  iconSize: action.iconSize,
+                  color: Colors.white,
+                );
+              }
+              return action;
+            }).toList(),
           ),
         ];
       },
@@ -277,6 +287,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       ),
     );
+  }
+
+  Color _getLadyModeColor(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    return authState is Authenticated && authState.user.gender == 'female'
+        ? AppColors.ladyPrimary
+        : AppColors.primary;
   }
 
   Widget _buildEventHeader(Event event, bool isDarkMode, bool isLadyMode) {
