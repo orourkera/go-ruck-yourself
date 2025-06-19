@@ -689,7 +689,8 @@ class DuelCommentsResource(Resource):
                 return build_api_response(success=False, error="Failed to add comment", status_code=500)
             
             new_comment = insert_response.data[0]
-            create_duel_comment_notification(duel_id, new_comment['id'], user_id, user_display_name)
+            # Create notification for duel participants (disabled - handled by database trigger)
+            # create_duel_comment_notification(duel_id, new_comment['id'], user_id, user_display_name)
             
             return build_api_response(data=new_comment, status_code=201)
             
