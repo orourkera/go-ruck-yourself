@@ -228,12 +228,12 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     try {
       emit(const EventActionLoading('Starting ruck session...'));
       
-      final sessionId = await _eventsRepository.startRuckFromEvent(event.eventId);
+      final eventContext = await _eventsRepository.startRuckFromEvent(event.eventId);
       
       emit(EventActionSuccess(
-        'Ruck session started!',
-        eventId: event.eventId,
-        sessionId: sessionId,
+        'Ready to start ruck session!',
+        eventId: eventContext['event_id'],
+        eventTitle: eventContext['event_title'],
         shouldRefresh: false, // Don't refresh events list for this action
       ));
     } catch (e) {

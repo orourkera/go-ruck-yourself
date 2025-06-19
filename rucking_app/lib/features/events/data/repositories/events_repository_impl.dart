@@ -376,12 +376,16 @@ class EventsRepositoryImpl implements EventsRepository {
   }
 
   @override
-  Future<String> startRuckFromEvent(String eventId) async {
+  Future<Map<String, dynamic>> startRuckFromEvent(String eventId) async {
     final response = await _apiClient.post('/events/$eventId/start-ruck', {});
     
     // Invalidate leaderboard cache since progress may change
     await _cacheService.invalidateEventLeaderboard(eventId);
     
-    return response['session_id'] as String;
+    return {
+      'event_id': response['event_id'] as String,
+      'event_title': response['event_title'] as String,
+      'status': response['status'] as String,
+    };
   }
 }

@@ -97,6 +97,17 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   arguments: state.sessionId,
                 );
               }
+              
+              // Handle navigation to create session with event context
+              if (state.eventId != null) {
+                Navigator.of(context).pushNamed(
+                  '/create_session',
+                  arguments: {
+                    'event_id': state.eventId,
+                    'event_title': state.eventTitle,
+                  },
+                );
+              }
             } else if (state is EventActionError) {
               StyledSnackBar.showError(
                 context: context,

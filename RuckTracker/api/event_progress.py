@@ -133,7 +133,7 @@ class EventStartRuckResource(Resource):
     
     @auth_required
     def post(self, event_id):
-        """Start a ruck session for this event"""
+        """Prepare to start a ruck session for this event"""
         try:
             current_user_id = get_user_id()
             admin_client = get_supabase_admin_client()
@@ -153,40 +153,22 @@ class EventStartRuckResource(Resource):
                 return {'error': 'Event is not active'}, 400
             
             # Check if user already has an active session
-            active_session_check = admin_client.table('ruck_session').select('id').eq('user_id', current_user_id).eq('is_active', True).execute()
+            active_session_check = admin_client.table('ruck_session').select('id').eq('user_id', current_user_id).eq('status', 'in_progress').execute()
             if active_session_check.data:
                 return {'error': 'User already has an active ruck session'}, 400
             
-            # Create the actual ruck session
-            session_data = {
-                'user_id': current_user_id,
-                'event_id': event_id,  # Link to event
-                'status': 'in_progress',
-                'is_active': True,
-                'started_at': datetime.utcnow().isoformat(),
-                'session_type': 'event_ruck'  # Mark as event-based session
-            }
-            
-            session_result = admin_client.table('ruck_session').insert(session_data).execute()
-            if not session_result.data:
-                return {'error': 'Failed to create ruck session'}, 500
-            
-            session_id = session_result.data[0]['id']
-            
-            # Update event participant progress status
-            admin_client.table('event_participant_progress').upsert({
+            # Return event context for create session screen
+            logger.info(f"User {current_user_id} is ready to start ruck session for event {event_id}")
+            return {
+                'status': 'ready',
                 'event_id': event_id,
-                'user_id': current_user_id,
-                'status': 'in_progress',
-                'started_at': datetime.utcnow().isoformat()
-            }).execute()
-            
-            logger.info(f"Created ruck session {session_id} for user {current_user_id} in event {event_id}")
-            return {'session_id': session_id, 'message': 'Ruck session started successfully'}, 200
+                'event_title': event['title'],
+                'message': 'Ready to start ruck session for event'
+            }, 200
             
         except Exception as e:
-            logger.error(f"Error starting ruck session for event {event_id}: {e}", exc_info=True)
-            return {'error': f'Failed to start ruck session: {str(e)}'}, 500
+            logger.error(f"Error preparing ruck session for event {event_id}: {e}", exc_info=True)
+            return {'error': f'Failed to prepare ruck session: {str(e)}'}, 500
 
 
 class EventParticipantsResource(Resource):

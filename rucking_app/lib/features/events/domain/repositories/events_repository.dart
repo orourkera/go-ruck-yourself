@@ -92,5 +92,5 @@ abstract class EventsRepository {
     required String userId,
   });
   
-  Future<String> startRuckFromEvent(String eventId);
+  Future<Map<String, dynamic>> startRuckFromEvent(String eventId);
 }

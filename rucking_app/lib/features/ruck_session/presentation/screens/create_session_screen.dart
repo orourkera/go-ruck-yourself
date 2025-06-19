@@ -23,7 +23,14 @@ import 'package:flutter/services.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
-  const CreateSessionScreen({Key? key}) : super(key: key);
+  final String? eventId;
+  final String? eventTitle;
+  
+  const CreateSessionScreen({
+    Key? key,
+    this.eventId,
+    this.eventTitle,
+  }) : super(key: key);
 
   @override
   _CreateSessionScreenState createState() => _CreateSessionScreenState();
@@ -50,6 +57,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   bool _isCreating = false;
   bool _isLoading = true;
   double _selectedRuckWeight = 0.0;
+  
+  // Event context state variables
+  String? _eventId;
+  String? _eventTitle;
 
   late final VoidCallback _durationListener;
 
@@ -170,6 +181,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           'ruck_weight_kg': weightForApiKg,
         };
         
+        // Add event context if creating session for an event
+        if (_eventId != null) {
+          createRequestData['event_id'] = _eventId;
+          createRequestData['session_type'] = 'event_ruck';
+        }
+        
         // Add user's weight (required)
         final userWeightRaw = _userWeightController.text;
         if (userWeightRaw.isEmpty) {
@@ -185,7 +202,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           createRequestData['planned_duration_minutes'] = _plannedDuration;
         }
         // --- End planned duration addition ---
-
+        
         // --- Add user_id for Supabase RLS ---
         createRequestData['user_id'] = authState.user.userId;
         // --- End user_id ---
@@ -291,6 +308,23 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     
     _loadDefaults();
     _selectedRuckWeight = _ruckWeight; // initialize with default selected weight
+    
+    // Extract event context from route arguments if provided
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map<String, dynamic>) {
+        final eventId = args['event_id'] as String?;
+        final eventTitle = args['event_title'] as String?;
+        if (eventId != null && eventTitle != null) {
+          // Store event context for session creation
+          setState(() {
+            _eventId = eventId;
+            _eventTitle = eventTitle;
+          });
+        }
+      }
+    });
+    
     // Load metric preference and **body weight** from AuthBloc state
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
@@ -537,7 +571,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Ruck Session'),
+        title: Text(_eventTitle != null ? 'Start Event Ruck' : 'New Ruck Session'),
         centerTitle: true,
       ),
       body: KeyboardActions(
@@ -549,6 +583,51 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Event banner if creating session for an event
+                if (_eventTitle != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.event,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Event Ruck Session',
+                                style: AppTextStyles.titleSmall.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _eventTitle!,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textDarkPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
                 // Section title
                 Text(
                   'Session Details',

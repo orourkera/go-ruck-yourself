@@ -125,17 +125,19 @@ class EventActionSuccess extends EventsState {
   final String message;
   final bool shouldRefresh;
   final String? eventId;
+  final String? eventTitle; // For event context navigation
   final String? sessionId; // For StartRuckFromEvent
 
   const EventActionSuccess(
     this.message, {
     this.shouldRefresh = true,
     this.eventId,
+    this.eventTitle,
     this.sessionId,
   });
 
   @override
-  List<Object?> get props => [message, shouldRefresh, eventId, sessionId];
+  List<Object?> get props => [message, shouldRefresh, eventId, eventTitle, sessionId];
 }
 
 class EventActionError extends EventsState {

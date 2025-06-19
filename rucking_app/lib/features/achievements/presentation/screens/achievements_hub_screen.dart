@@ -27,7 +27,9 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final GlobalKey _achievementsListKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
   String? _targetAchievementId;
+  bool _hasScrolledToTarget = false;
 
   @override
   void initState() {
@@ -53,6 +55,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -412,6 +415,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     
     if (achievements.isEmpty) {
       return SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,6 +485,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
             child: AchievementProgressCard(
+              key: achievement.id == _targetAchievementId ? GlobalKey() : null,
               achievement: achievement,
               isEarned: isEarned,
               progress: progress,
@@ -494,8 +499,16 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
       }
     });
     
+    // Schedule scroll to target achievement after build
+    if (_targetAchievementId != null && !_hasScrolledToTarget && categoryWidgets.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToTargetAchievement(achievements);
+      });
+    }
+    
     return SingleChildScrollView(
       key: _achievementsListKey,
+      controller: _scrollController,
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,6 +553,75 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         ),
       ),
     );
+  }
+
+  void _scrollToTargetAchievement(List<Achievement> achievements) {
+    if (_targetAchievementId == null || _hasScrolledToTarget) return;
+    
+    // Find the index of the target achievement in the flattened list
+    int targetIndex = -1;
+    int currentIndex = 0;
+    
+    // Group achievements by category and find target
+    Map<String, List<Achievement>> achievementsByCategory = {};
+    for (var achievement in achievements) {
+      if (!achievementsByCategory.containsKey(achievement.category)) {
+        achievementsByCategory[achievement.category] = [];
+      }
+      achievementsByCategory[achievement.category]!.add(achievement);
+    }
+    
+    // Sort categories and achievements, then find target index
+    final sortedCategories = achievementsByCategory.keys.toList()..sort();
+    
+    for (String category in sortedCategories) {
+      // Add 1 for category header
+      currentIndex += 1;
+      
+      final categoryAchievements = achievementsByCategory[category]!;
+      categoryAchievements.sort((a, b) {
+        final tierOrder = {'bronze': 0, 'silver': 1, 'gold': 2, 'platinum': 3};
+        return (tierOrder[a.tier.toLowerCase()] ?? 0)
+            .compareTo(tierOrder[b.tier.toLowerCase()] ?? 0);
+      });
+      
+      for (var achievement in categoryAchievements) {
+        if (achievement.id == _targetAchievementId) {
+          targetIndex = currentIndex;
+          break;
+        }
+        currentIndex += 1;
+      }
+      
+      if (targetIndex != -1) break;
+    }
+    
+    if (targetIndex != -1) {
+      // Calculate scroll position
+      final double itemHeight = 150; // Approximate height of each item (header + card)
+      final double offset = targetIndex * itemHeight;
+      
+      _scrollController.animateTo(
+        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeInOut,
+      );
+      
+      _hasScrolledToTarget = true;
+    }
+  }
+
+  void _scrollToAchievement(int index) {
+    if (_scrollController.hasClients) {
+      final double itemHeight = 150; // Approximate height of each card
+      final double offset = index * itemHeight;
+      
+      _scrollController.animateTo(
+        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   // Helper methods for category and tier styling
@@ -593,29 +675,6 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         return const Color(0xFFE5E4E2);
       default:
         return Colors.grey;
-    }
-  }
-  
-  // Helper method to scroll to a specific achievement in the list
-  void _scrollToAchievement(int index) {
-    // Find the render object for the list
-    final RenderObject? renderObject = _achievementsListKey.currentContext?.findRenderObject();
-    if (renderObject != null) {
-      // Calculate position of item and scroll to it
-      final RenderBox box = renderObject as RenderBox;
-      final position = box.localToGlobal(Offset.zero);
-      final scrollPosition = position.dy;
-      
-      // Determine amount to scroll
-      final double itemHeight = 150; // Approximate height of each card
-      final double offset = index * itemHeight;
-      
-      // Scroll to the position
-      Scrollable.ensureVisible(
-        _achievementsListKey.currentContext!,
-        alignment: 0.0,
-        duration: const Duration(milliseconds: 400),
-      );
     }
   }
 }
