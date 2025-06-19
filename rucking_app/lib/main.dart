@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/app.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
@@ -57,18 +58,28 @@ void main() async {
   // Attach Bloc observer for detailed logging of state changes & errors
   Bloc.observer = AppBlocObserver();
   
-  // Load environment variables from .env
-  await dotenv.load();
+  // Load environment variables from .env (optional)
+  String? supabaseUrl;
+  String? supabaseKey;
+  
+  try {
+    await dotenv.load();
+    AppLogger.info('.env file loaded successfully');
+    supabaseUrl = dotenv.env['SUPABASE_URL'];
+    supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
+  } catch (e) {
+    AppLogger.warning('.env file not found, using environment variables: $e');
+    // Fall back to system environment variables
+    supabaseUrl = Platform.environment['SUPABASE_URL'];
+    supabaseKey = Platform.environment['SUPABASE_ANON_KEY'];
+  }
   
   // --------------------------
   // Initialize Supabase FIRST (with network error handling)
   // --------------------------
-  final supabaseUrl = dotenv.env['SUPABASE_URL'];
-  final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
-
   if (supabaseUrl == null || supabaseKey == null || supabaseUrl.isEmpty || supabaseKey.isEmpty) {
-    AppLogger.error('Supabase configuration missing from .env file');
-    throw Exception('SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env file');
+    AppLogger.error('Supabase configuration missing from .env file or environment variables');
+    throw Exception('SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env file or environment variables');
   }
 
   try {
@@ -128,7 +139,15 @@ void main() async {
   FirebaseCrashlytics.instance.setUserIdentifier('user_startup');
   
   // 🔥 Log that app is starting (will help track startup crashes)
-  FirebaseCrashlytics.instance.log('App starting up - version 2.5.0+20');
+  FirebaseCrashlytics.instance.log('App starting up - version 2.5.0+22');
+  
+  // Enable debug mode for better crash detection in development
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+  
+  // Log additional context for debugging
+  FirebaseCrashlytics.instance.setCustomKey('build_number', '22');
+  FirebaseCrashlytics.instance.setCustomKey('app_name', 'RuckingApp');
+  FirebaseCrashlytics.instance.log('Crashlytics initialized with debug collection enabled');
   
   // Initialize Firebase Messaging Service (non-blocking)
   FirebaseMessagingService().initialize().catchError((error) {
