@@ -238,11 +238,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(11),
-                      child: Image.file(
-                        _bannerImage!,
-                        height: 160,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                      child: InteractiveViewer(
+                        minScale: 1.0,
+                        maxScale: 3.0,
+                        child: Image.file(
+                          _bannerImage!,
+                          height: 160,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                     Positioned(
