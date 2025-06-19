@@ -265,6 +265,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           userWeightKg: userWeightKg, // Pass the calculated userWeightKg (double)
           notes: null, // Set to null, assuming no dedicated notes input for session args here. Adjust if a notes field exists.
           plannedDuration: plannedDuration,
+          eventId: widget.eventId, // Pass event ID if creating session from event
         );
         
         // Navigate to CountdownPage which will handle the countdown and transition
@@ -312,16 +313,21 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     // Extract event context from route arguments if provided
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments;
+      print('📋 Create session screen received args: $args');
       if (args is Map<String, dynamic>) {
         final eventId = args['event_id'] as String?;
         final eventTitle = args['event_title'] as String?;
+        print('📋 Extracted event_id: $eventId, event_title: $eventTitle');
+        
         if (eventId != null && eventTitle != null) {
-          // Store event context for session creation
           setState(() {
             _eventId = eventId;
             _eventTitle = eventTitle;
           });
+          print('📋 Set event context: _eventId = $_eventId, _eventTitle = $_eventTitle');
         }
+      } else {
+        print('📋 No event arguments provided');
       }
     });
     
@@ -617,7 +623,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                               Text(
                                 _eventTitle!,
                                 style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.textDarkPrimary,
+                                  color: AppColors.textDark,
                                 ),
                               ),
                             ],

@@ -40,7 +40,7 @@ class EventCommentsResource(Resource):
             # Get comments with user info
             result = admin_client.table('event_comments').select("""
                 *,
-                user:user_id(id, first_name, last_name)
+                user:user_id(id, username, avatar_url)
             """).eq('event_id', event_id).order('created_at', desc=False).execute()
             
             comments = result.data
@@ -98,7 +98,7 @@ class EventCommentsResource(Resource):
                 comment = result.data[0]
                 
                 # Get user info for the response
-                user_result = admin_client.table('auth.users').select('id, first_name, last_name').eq('id', current_user_id).execute()
+                user_result = admin_client.table('user').select('id, username, avatar_url').eq('id', current_user_id).execute()
                 if user_result.data:
                     comment['user'] = user_result.data[0]
                 
@@ -117,7 +117,7 @@ class EventCommentsResource(Resource):
                         
                         if participant_tokens:
                             # Get commenter name
-                            commenter_name = f"{user_result.data[0]['first_name']} {user_result.data[0]['last_name']}" if user_result.data else "Someone"
+                            commenter_name = f"{user_result.data[0]['username']}" if user_result.data else "Someone"
                             
                             push_service.send_event_comment_notification(
                                 device_tokens=participant_tokens,

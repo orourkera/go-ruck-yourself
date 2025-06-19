@@ -348,10 +348,17 @@ class EventsRepositoryImpl implements EventsRepository {
     // No cache, fetch from API
     final response = await _apiClient.get('/events/$eventId/progress');
     
-    final leaderboard = EventLeaderboard.fromJson(response);
+    // Transform API response to match EventLeaderboard model
+    final transformedResponse = {
+      'event_id': eventId,
+      'entries': response['progress'] ?? [], // Map 'progress' to 'entries'
+      'last_updated': DateTime.now().toIso8601String(),
+    };
     
-    // Cache the leaderboard
-    await _cacheService.cacheEventLeaderboard(eventId, response);
+    final leaderboard = EventLeaderboard.fromJson(transformedResponse);
+    
+    // Cache the transformed response
+    await _cacheService.cacheEventLeaderboard(eventId, transformedResponse);
     
     return leaderboard;
   }

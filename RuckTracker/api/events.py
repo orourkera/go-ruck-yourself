@@ -34,11 +34,12 @@ class EventsListResource(Resource):
             club_id = request.args.get('club_id')
             joined_only = request.args.get('joined_only', 'false').lower() == 'true'
             upcoming_only = request.args.get('upcoming_only', 'true').lower() == 'true'
+            end_before = request.args.get('end_before')  # Filter for completed events
             latitude = request.args.get('latitude')
             longitude = request.args.get('longitude')
             radius_km = request.args.get('radius_km', '50')
             
-            logger.info(f"Query params - search: {search}, club_id: {club_id}, joined_only: {joined_only}, upcoming_only: {upcoming_only}")
+            logger.info(f"Query params - search: {search}, club_id: {club_id}, joined_only: {joined_only}, upcoming_only: {upcoming_only}, end_before: {end_before}")
             
             # Base query
             query = admin_client.table('events').select("""
@@ -54,7 +55,11 @@ class EventsListResource(Resource):
             if club_id:
                 query = query.eq('club_id', club_id)
             
-            if upcoming_only:
+            if end_before:
+                # Filter for events that ended before the specified time (completed events)
+                query = query.lt('scheduled_start_time', end_before)
+            elif upcoming_only:
+                # Only show upcoming/active events if not looking for completed ones
                 now = datetime.utcnow().isoformat()
                 query = query.gte('scheduled_start_time', now)
             

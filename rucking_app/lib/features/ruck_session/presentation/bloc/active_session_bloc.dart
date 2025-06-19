@@ -201,6 +201,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final createResponse = await _apiClient.post('/rucks', {
           'ruck_weight_kg': event.ruckWeightKg,
           'notes': event.notes,
+          'event_id': event.eventId, // Pass event ID if creating session from event
         }).timeout(Duration(seconds: 1)); // Reduced from 3 to 1 second for faster offline detection
         
         sessionId = createResponse['id']?.toString();

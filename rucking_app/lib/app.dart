@@ -21,6 +21,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/session_split.da
 import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
@@ -572,6 +573,24 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           builder: (_) => Scaffold(
                             appBar: AppBar(title: const Text('Error')),
                             body: const Center(child: Text('Missing club details')),
+                          ),
+                        );
+                      
+                      // Ruck Session routes
+                      case '/create_session':
+                        final args = settings.arguments as Map<String, dynamic>?;
+                        String? eventId;
+                        String? eventTitle;
+                        
+                        if (args != null) {
+                          eventId = args['event_id'] as String?;
+                          eventTitle = args['event_title'] as String?;
+                        }
+                        
+                        return MaterialPageRoute(
+                          builder: (_) => CreateSessionScreen(
+                            eventId: eventId,
+                            eventTitle: eventTitle,
                           ),
                         );
                       

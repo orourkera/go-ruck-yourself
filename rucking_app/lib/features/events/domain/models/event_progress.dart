@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 class EventProgress extends Equatable {
   final String id;
@@ -29,10 +30,13 @@ class EventProgress extends Equatable {
       eventId: json['event_id'] as String? ?? '',
       userId: json['user_id'] as String? ?? '',
       ruckSessionId: json['ruck_session_id'] as int?,
-      totalDistance: (json['total_distance'] as num?)?.toDouble() ?? 0.0,
-      totalTime: json['total_time'] as int? ?? 0,
-      sessionCount: json['session_count'] as int? ?? 0,
-      lastUpdated: DateTime.tryParse(json['last_updated'] as String? ?? '') ?? DateTime.now(),
+      totalDistance: (json['distance_km'] as num?)?.toDouble() ?? 
+                     (json['total_distance'] as num?)?.toDouble() ?? 0.0,
+      totalTime: json['duration_minutes'] as int? ?? 
+                 json['total_time'] as int? ?? 0,
+      sessionCount: json['session_count'] as int? ?? 1,
+      lastUpdated: DateTime.tryParse(json['completed_at'] as String? ?? 
+                                    json['last_updated'] as String? ?? '') ?? DateTime.now(),
       user: json['user'] != null 
           ? EventProgressUser.fromJson(json['user'] as Map<String, dynamic>)
           : null,
@@ -72,12 +76,9 @@ class EventProgress extends Equatable {
     }
   }
 
-  String get formattedTotalDistance {
-    if (totalDistance >= 1000) {
-      return '${(totalDistance / 1000).toStringAsFixed(1)} km';
-    } else {
-      return '${totalDistance.toStringAsFixed(0)} m';
-    }
+  String formattedTotalDistance({bool metric = true}) {
+    // Backend stores distance in km, so use it directly with MeasurementUtils
+    return MeasurementUtils.formatDistance(totalDistance, metric: metric);
   }
 
   @override

@@ -8,16 +8,12 @@ class EventCard extends StatelessWidget {
   final Event event;
   final VoidCallback? onTap;
   final VoidCallback? onJoinTap;
-  final VoidCallback? onLeaveTap;
-  final VoidCallback? onStartRuckTap;
 
   const EventCard({
     Key? key,
     required this.event,
     this.onTap,
     this.onJoinTap,
-    this.onLeaveTap,
-    this.onStartRuckTap,
   }) : super(key: key);
 
   @override
@@ -297,25 +293,9 @@ class EventCard extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context) {
     final isUpcoming = event.isUpcoming;
     final canJoin = event.canJoin;
-    final canLeave = event.canLeave;
-    final isUserApproved = event.isUserApproved;
     
     if (event.isPast || event.isCancelled) {
       return const SizedBox.shrink();
-    }
-    
-    if (isUserApproved && isUpcoming && onStartRuckTap != null) {
-      return ElevatedButton(
-        onPressed: onStartRuckTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        child: const Text('Start Ruck'),
-      );
     }
     
     if (canJoin && onJoinTap != null) {
@@ -329,20 +309,6 @@ class EventCard extends StatelessWidget {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
         child: Text(event.isFull ? 'Full' : 'Join'),
-      );
-    }
-    
-    if (canLeave && onLeaveTap != null) {
-      return OutlinedButton(
-        onPressed: onLeaveTap,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.red),
-          foregroundColor: Colors.red,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        child: const Text('Leave'),
       );
     }
     

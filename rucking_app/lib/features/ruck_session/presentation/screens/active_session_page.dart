@@ -43,6 +43,7 @@ class ActiveSessionArgs {
   final int? plannedDuration; // in seconds
   final latlong.LatLng? initialCenter; // Optional initial map center
   final double userWeightKg; // Added user's body weight in kg
+  final String? eventId; // Add event ID for event-linked sessions
 
   ActiveSessionArgs({
     required this.ruckWeight,
@@ -50,6 +51,7 @@ class ActiveSessionArgs {
     this.notes,
     this.plannedDuration,
     this.initialCenter,
+    this.eventId, // Add eventId parameter
   });
 }
 
@@ -350,6 +352,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                 userWeightKg: widget.args.userWeightKg, // Added missing parameter
                                 notes: widget.args.notes,
                                 plannedDuration: widget.args.plannedDuration,
+                                eventId: widget.args.eventId, // Pass event ID if creating session from event
                                 initialLocation: widget.args.initialCenter == null 
                                     ? null 
                                     : LocationPoint(
@@ -376,6 +379,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   userWeightKg: widget.args.userWeightKg,
                                   notes: widget.args.notes,
                                   plannedDuration: widget.args.plannedDuration,
+                                  eventId: widget.args.eventId, // Pass event ID if creating session from event
                                   initialLocation: widget.args.initialCenter == null 
                                     ? null 
                                     : LocationPoint(

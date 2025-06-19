@@ -75,11 +75,15 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       child: Scaffold(
         body: BlocConsumer<EventsBloc, EventsState>(
           listener: (context, state) {
+            print('🎯 EventDetail BlocListener triggered with state: ${state.runtimeType}');
+            
             if (state is EventDetailsLoaded) {
               setState(() {
                 _eventDetails = state.eventDetails;
               });
             } else if (state is EventActionSuccess) {
+              print('✅ EventActionSuccess received: sessionId=${state.sessionId}, eventId=${state.eventId}');
+              
               StyledSnackBar.showSuccess(
                 context: context,
                 message: state.message,
@@ -100,6 +104,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               
               // Handle navigation to create session with event context
               if (state.eventId != null) {
+                print('🚀 Navigating to create session with event_id: ${state.eventId}, event_title: ${state.eventTitle}');
                 Navigator.of(context).pushNamed(
                   '/create_session',
                   arguments: {
@@ -138,35 +143,89 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   }
 
   List<Widget> _buildAppBarActions() {
-    if (_eventDetails?.event.isCreator == true) {
-      return [
-        IconButton(
-          icon: const Icon(Icons.edit),
-          onPressed: () {
-            Navigator.of(context).pushNamed(
-              '/edit_event',
-              arguments: widget.eventId,
-            ).then((_) {
-              _eventsBloc.add(LoadEventDetails(widget.eventId));
-            });
-          },
+    final event = _eventDetails?.event;
+    if (event == null) return [];
+    
+    List<PopupMenuEntry<String>> menuItems = [];
+    
+    // Add Edit option for event creators
+    if (event.isCreator) {
+      menuItems.add(
+        const PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.edit, size: 20),
+              SizedBox(width: 8),
+              Text('Edit Event'),
+            ],
+          ),
         ),
-        PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'cancel') {
-              _showCancelConfirmation();
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'cancel',
-              child: Text('Cancel Event'),
-            ),
-          ],
-        ),
-      ];
+      );
     }
-    return [];
+    
+    // Add Leave option for participants who can leave
+    if (event.canLeave) {
+      menuItems.add(
+        const PopupMenuItem(
+          value: 'leave',
+          child: Row(
+            children: [
+              Icon(Icons.exit_to_app, size: 20, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Leave Event', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Add Cancel option for event creators
+    if (event.isCreator) {
+      if (menuItems.isNotEmpty) {
+        menuItems.add(const PopupMenuDivider());
+      }
+      menuItems.add(
+        const PopupMenuItem(
+          value: 'cancel',
+          child: Row(
+            children: [
+              Icon(Icons.cancel, size: 20, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Cancel Event', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Only show menu if there are items
+    if (menuItems.isEmpty) return [];
+    
+    return [
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert), // Vertical dots
+        onSelected: (value) {
+          switch (value) {
+            case 'edit':
+              Navigator.of(context).pushNamed(
+                '/edit_event',
+                arguments: widget.eventId,
+              ).then((_) {
+                _eventsBloc.add(LoadEventDetails(widget.eventId));
+              });
+              break;
+            case 'leave':
+              _eventsBloc.add(LeaveEvent(event.id));
+              break;
+            case 'cancel':
+              _showCancelConfirmation();
+              break;
+          }
+        },
+        itemBuilder: (context) => menuItems,
+      ),
+    ];
   }
 
   Widget _buildLoadingSkeleton() {

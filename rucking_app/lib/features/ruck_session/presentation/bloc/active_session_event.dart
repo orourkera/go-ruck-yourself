@@ -22,6 +22,7 @@ class SessionStarted extends ActiveSessionEvent {
   final String? notes;
   final LocationPoint? initialLocation;
   final double userWeightKg;
+  final String? eventId; // Add event ID for event-linked sessions
   
   const SessionStarted({
     required this.ruckWeightKg,
@@ -29,10 +30,11 @@ class SessionStarted extends ActiveSessionEvent {
     this.notes,
     this.plannedDuration,
     this.initialLocation,
+    this.eventId, // Add eventId parameter
   });
   
   @override
-  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg];
+  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg, eventId];
 }
 
 class SessionRecoveryRequested extends ActiveSessionEvent {

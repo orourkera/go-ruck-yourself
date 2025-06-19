@@ -8,6 +8,8 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 class EventLeaderboardWidget extends StatefulWidget {
   final String eventId;
@@ -241,6 +243,10 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
   }
 
   Widget _buildLeaderboardEntry(EventProgress entry, int rank, bool isDarkMode) {
+    // Get user's metric preference from auth bloc
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -311,7 +317,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                entry.formattedTotalDistance,
+                entry.formattedTotalDistance(metric: preferMetric),
                 style: AppTextStyles.bodyLarge.copyWith(
                   color: Theme.of(context).primaryColor,
                   fontWeight: FontWeight.bold,
@@ -327,7 +333,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
               if (entry.averagePaceMinutesPerKm > 0) ...[
                 const SizedBox(height: 2),
                 Text(
-                  '${entry.averagePaceMinutesPerKm.toStringAsFixed(1)} min/km',
+                  MeasurementUtils.formatPaceSeconds(entry.averagePaceMinutesPerKm * 60, metric: preferMetric),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
                   ),

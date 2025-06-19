@@ -192,12 +192,6 @@ class _EventsScreenState extends State<EventsScreen> {
                               onJoinTap: () {
                                 _eventsBloc.add(JoinEvent(event.id));
                               },
-                              onLeaveTap: () {
-                                _eventsBloc.add(LeaveEvent(event.id));
-                              },
-                              onStartRuckTap: () {
-                                _eventsBloc.add(StartRuckFromEvent(event.id));
-                              },
                             );
                           },
                         ),

@@ -27,27 +27,42 @@ class EventProgressResource(Resource):
             current_user_id = get_user_id()
             admin_client = get_supabase_admin_client()
             
+            logger.info(f"Getting progress for event {event_id}, user {current_user_id}")
+            
             # Check if user can view progress (must be participant or creator)
             participant_check = admin_client.table('event_participants').select('status').eq('event_id', event_id).eq('user_id', current_user_id).execute()
             event_check = admin_client.table('events').select('creator_user_id').eq('id', event_id).execute()
             
             if not event_check.data:
+                logger.warning(f"Event {event_id} not found")
                 return {'error': 'Event not found'}, 404
             
             is_participant = participant_check.data and participant_check.data[0]['status'] == 'approved'
             is_creator = event_check.data[0]['creator_user_id'] == current_user_id
             
+            logger.info(f"User {current_user_id}: is_participant={is_participant}, is_creator={is_creator}")
+            logger.info(f"Participant check result: {participant_check.data}")
+            
             if not (is_participant or is_creator):
+                logger.warning(f"User {current_user_id} not authorized to view progress for event {event_id}")
                 return {'error': 'Only event participants can view progress'}, 403
             
             # Get progress for all participants
+            logger.info(f"Querying event_participant_progress for event {event_id}")
             result = admin_client.table('event_participant_progress').select("""
                 *,
-                user:user_id(id, username, avatar_url),
-                ruck_session:ruck_session_id(*)
+                user!user_id(id, username, avatar_url)
             """).eq('event_id', event_id).execute()
             
             progress_data = result.data
+            logger.info(f"Raw progress query returned {len(progress_data)} entries")
+            
+            if progress_data:
+                for entry in progress_data:
+                    logger.info(f"Progress entry: user_id={entry.get('user_id')}, distance_km={entry.get('distance_km')}, completed_at={entry.get('completed_at')}")
+                    logger.info(f"User data: {entry.get('user')}")
+            else:
+                logger.warning(f"No progress entries found for event {event_id}")
             
             # Sort by distance completed (descending), then by completion time
             progress_data.sort(key=lambda x: (
@@ -60,7 +75,7 @@ class EventProgressResource(Resource):
                 progress['rank'] = i + 1
                 progress['is_current_user'] = progress['user_id'] == current_user_id
             
-            logger.info(f"Found progress for {len(progress_data)} participants in event {event_id}")
+            logger.info(f"Returning progress for {len(progress_data)} participants in event {event_id}")
             return {'progress': progress_data}, 200
             
         except Exception as e:

@@ -120,7 +120,7 @@ class Event extends Equatable {
   // Computed properties
   bool get isActive => status == 'active';
   bool get isCancelled => status == 'cancelled';
-  bool get isCompleted => status == 'completed';
+  bool get isCompleted => DateTime.now().isAfter(scheduledStartTime.add(Duration(hours: 24)));
   bool get isPast => DateTime.now().isAfter(scheduledStartTime);
   bool get isUpcoming => DateTime.now().isBefore(scheduledStartTime);
   bool get isFull => maxParticipants != null && participantCount >= maxParticipants!;

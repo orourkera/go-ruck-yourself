@@ -97,6 +97,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
             userWeightKg: widget.args.userWeightKg,
             notes: widget.args.notes ?? '',
             plannedDuration: widget.args.plannedDuration,
+            eventId: widget.args.eventId, // Pass event ID if creating session from event
           ));
           
           // Listen for session state changes
