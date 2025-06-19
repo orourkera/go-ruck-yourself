@@ -51,7 +51,7 @@ class EventProgressResource(Resource):
             logger.info(f"Querying event_participant_progress for event {event_id}")
             result = admin_client.table('event_participant_progress').select("""
                 *,
-                user!user_id(id, username, avatar_url)
+                user:user_id(id, username, avatar_url)
             """).eq('event_id', event_id).execute()
             
             progress_data = result.data
