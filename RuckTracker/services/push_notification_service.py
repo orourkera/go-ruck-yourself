@@ -37,7 +37,12 @@ class PushNotificationService:
                 # Prioritize JSON over path, and only use path if file actually exists
                 if self.service_account_json:
                     logger.info("Using Firebase service account JSON from environment variable")
-                    cred = credentials.Certificate(json.loads(self.service_account_json))
+                    # Handle double-escaped newlines in private key that can occur with Heroku config
+                    service_account_data = json.loads(self.service_account_json)
+                    if 'private_key' in service_account_data:
+                        # Fix double-escaped newlines in private key
+                        service_account_data['private_key'] = service_account_data['private_key'].replace('\\n', '\n')
+                    cred = credentials.Certificate(service_account_data)
                 elif self.service_account_path and os.path.isfile(self.service_account_path):
                     logger.info(f"Using Firebase service account file: {self.service_account_path}")
                     cred = credentials.Certificate(self.service_account_path)
@@ -77,8 +82,13 @@ class PushNotificationService:
         try:
             # Load service account credentials - prioritize JSON over path, check file existence
             if self.service_account_json:
+                # Handle double-escaped newlines in private key that can occur with Heroku config
+                service_account_data = json.loads(self.service_account_json)
+                if 'private_key' in service_account_data:
+                    # Fix double-escaped newlines in private key
+                    service_account_data['private_key'] = service_account_data['private_key'].replace('\\n', '\n')
                 credentials = service_account.Credentials.from_service_account_info(
-                    json.loads(self.service_account_json),
+                    service_account_data,
                     scopes=['https://www.googleapis.com/auth/firebase.messaging']
                 )
             elif self.service_account_path and os.path.isfile(self.service_account_path):
