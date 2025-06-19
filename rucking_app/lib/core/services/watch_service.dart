@@ -621,7 +621,15 @@ class WatchService {
 
   void dispose() {
     _heartRateWatchdogTimer?.cancel();
-    _nativeHeartRateSubscription?.cancel();
+    
+    // Cancel heart rate subscription with error handling
+    try {
+      _nativeHeartRateSubscription?.cancel();
+    } catch (e) {
+      // Ignore cancellation errors for streams that may not be active
+      AppLogger.debug('[WATCH_SERVICE] Heart rate subscription dispose cancellation (safe to ignore): $e');
+    }
+    
     _sessionEventController.close();
     _healthDataController.close();
     _heartRateController.close();
@@ -648,7 +656,12 @@ class WatchService {
 
   void _setupNativeHeartRateListener() {
     // Cancel any existing subscription first
-    _nativeHeartRateSubscription?.cancel();
+    try {
+      _nativeHeartRateSubscription?.cancel();
+    } catch (e) {
+      // Ignore cancellation errors for streams that may not be active
+      AppLogger.debug('[WATCH_SERVICE] Heart rate subscription cancellation (safe to ignore): $e');
+    }
     _nativeHeartRateSubscription = null;
     
     // Setup heart rate listener

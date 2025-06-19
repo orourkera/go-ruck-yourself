@@ -917,25 +917,23 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                       Column(
                         children: [
                           // Comments title with icon
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.comment,
-                                  color: Colors.grey[600],
-                                  size: 20,
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.comment,
+                                color: Colors.grey[600],
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Comments',
+                                style: const TextStyle(
+                                  fontFamily: 'Bangers',
+                                  fontSize: 18,
+                                  color: Colors.black87,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Comments',
-                                  style: AppTextStyles.bodyLarge.copyWith(
-                                    color: Colors.black87,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                           
                           // Comments section
@@ -985,7 +983,7 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                   ElevatedButton(
                                     onPressed: _submitComment,
                                     style: ElevatedButton.styleFrom(
-                                      primary: AppColors.primary,
+                                      backgroundColor: AppColors.primary,
                                       shape: const CircleBorder(),
                                     ),
                                     child: Icon(

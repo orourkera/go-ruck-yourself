@@ -591,7 +591,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';
                   }).toList();
                   return Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -902,11 +902,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.chat_bubble, color: _getLadyModeColor(context)),
+                          Icon(Icons.comment, color: Colors.grey[600], size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'Comments',
-                            style: AppTextStyles.titleLarge,
+                            style: const TextStyle(
+                              fontFamily: 'Bangers',
+                              fontSize: 18,
+                              color: Colors.black87,
+                            ),
                           ),
                         ],
                       ),

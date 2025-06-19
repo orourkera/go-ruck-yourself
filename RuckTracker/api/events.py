@@ -186,7 +186,7 @@ class EventsListResource(Resource):
                                     event_title=event['title'],
                                     club_name=club_name,
                                     event_id=event['id'],
-                                    event_date=event['scheduled_start_time']
+                                    club_id=event_data['club_id']
                                 )
                                 logger.info(f"Sent club event notifications to {len(member_tokens)} members")
                     except Exception as notification_error:

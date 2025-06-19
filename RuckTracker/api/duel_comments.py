@@ -19,6 +19,11 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
     Create notifications for all duel participants except the commenter
     """
     try:
+        # Validate input parameters
+        if not commenter_name or not str(commenter_name).strip():
+            logger.error(f"Invalid commenter_name: {commenter_name} for comment {comment_id}")
+            return
+            
         admin_client = get_supabase_admin_client()
         
         # Get all participants in the duel except the commenter
@@ -38,12 +43,21 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
             .eq('id', duel_id) \
             .single() \
             .execute()
-            
-        duel_name = duel_response.data.get('title', 'Unknown Duel') if duel_response.data else 'Unknown Duel'
+        
+        duel_name = duel_response.data.get('title') if duel_response.data else None
+        if not duel_name or not str(duel_name).strip():
+            logger.warning(f"No valid duel title found for duel {duel_id}, using fallback")
+            duel_name = 'a duel'
         
         # Create notifications for each participant
         notifications = []
         message_text = f"{commenter_name} commented on the duel '{duel_name}'"
+        
+        # Ensure message_text is not null or empty
+        if not message_text or not message_text.strip():
+            logger.error(f"Invalid message_text generated for duel {duel_id}, comment {comment_id}")
+            return
+            
         for participant in participants_response.data:
             notification = {
                 'recipient_id': participant['user_id'],
@@ -106,12 +120,23 @@ def create_duel_joined_notification(duel_id, joiner_id, joiner_name):
         creator_id = duel_response.data.get('creator_id')
         duel_name = duel_response.data.get('title', 'Unknown Duel')
         
+        # Validate duel_name
+        if not duel_name or not str(duel_name).strip():
+            logger.warning(f"No valid duel title found for duel {duel_id}, using fallback")
+            duel_name = 'a duel'
+        
         # Don't notify if creator joined their own duel (shouldn't happen)
         if creator_id == joiner_id:
             return
             
         # Prepare notification message
         message_text = f"{joiner_name} joined your duel '{duel_name}'"
+        
+        # Ensure message_text is not null or empty
+        if not message_text or not message_text.strip():
+            logger.error(f"Invalid message_text generated for duel {duel_id}")
+            return
+            
         # Create notification for creator
         notification = {
             'recipient_id': creator_id,
@@ -165,6 +190,11 @@ def create_duel_started_notification(duel_id):
             
         duel_name = duel_response.data.get('title', 'Unknown Duel')
         
+        # Validate duel_name
+        if not duel_name or not str(duel_name).strip():
+            logger.warning(f"No valid duel title found for duel {duel_id}, using fallback")
+            duel_name = 'a duel'
+        
         # Get all participants
         participants_response = admin_client.table('duel_participants') \
             .select('user_id') \
@@ -178,18 +208,17 @@ def create_duel_started_notification(duel_id):
             
         # Create notifications for each participant
         notifications = []
-        participant_ids = []
-        for participant in participants_response.data:
-            user_id = participant['user_id']
-            participant_ids.append(user_id)
+        message_text = f"'{duel_name}' has started! Begin your challenge"
+        participant_ids = [p['user_id'] for p in participants_response.data]
+        for user_id in participant_ids:
             notification = {
                 'recipient_id': user_id,
                 'sender_id': None,  # System notification
                 'type': 'duel_started',
-                    'message': message_text,
+                'message': message_text,
                 'duel_id': duel_id,
                 'data': {
-                    'message': f"'{duel_name}' has started! Begin your challenge",
+                    'message': message_text,
                     'duel_name': duel_name,
                     'created_at': 'NOW()'
                 }
@@ -234,6 +263,11 @@ def create_duel_completed_notification(duel_id):
             
         duel_name = duel_response.data.get('title', 'Unknown Duel')
         
+        # Validate duel_name
+        if not duel_name or not str(duel_name).strip():
+            logger.warning(f"No valid duel title found for duel {duel_id}, using fallback")
+            duel_name = 'a duel'
+        
         # Get all participants
         participants_response = admin_client.table('duel_participants') \
             .select('user_id') \
@@ -247,6 +281,7 @@ def create_duel_completed_notification(duel_id):
             
         # Create notifications for each participant
         notifications = []
+        message_text = f"'{duel_name}' has completed! Check the results"
         participant_ids = []
         for participant in participants_response.data:
             user_id = participant['user_id']
@@ -255,10 +290,10 @@ def create_duel_completed_notification(duel_id):
                 'recipient_id': user_id,
                 'sender_id': None,  # System notification
                 'type': 'duel_completed',
-                    'message': message_text,
+                'message': message_text,
                 'duel_id': duel_id,
                 'data': {
-                    'message': f"'{duel_name}' has completed! Check the results",
+                    'message': message_text,
                     'duel_name': duel_name,
                     'created_at': 'NOW()'
                 }
@@ -303,6 +338,11 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
             
         duel_name = duel_response.data.get('title', 'Unknown Duel')
         
+        # Validate duel_name
+        if not duel_name or not str(duel_name).strip():
+            logger.warning(f"No valid duel title found for duel {duel_id}, using fallback")
+            duel_name = 'a duel'
+        
         # Get all other participants (excluding the one who completed the ruck)
         participants_response = admin_client.table('duel_participants') \
             .select('user_id') \
@@ -315,23 +355,23 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
             logger.info(f"No other participants to notify for duel progress {duel_id}")
             return
             
-        # Create notifications for each other participant
+        # Create notifications for other participants
         notifications = []
-        participant_ids = []
-        for participant in participants_response.data:
-            user_id = participant['user_id']
-            participant_ids.append(user_id)
+        message_text = f"{participant_name} completed a ruck for '{duel_name}'"
+        other_participant_ids = [p['user_id'] for p in participants_response.data]
+        for user_id in other_participant_ids:
             notification = {
                 'recipient_id': user_id,
                 'sender_id': participant_id,
                 'type': 'duel_progress',
-                    'message': message_text,
+                'message': message_text,
                 'duel_id': duel_id,
                 'ruck_id': ruck_id,
                 'data': {
-                    'message': f"{participant_name} completed a ruck for '{duel_name}'",
+                    'message': message_text,
                     'duel_name': duel_name,
                     'participant_name': participant_name,
+                    'ruck_id': ruck_id,
                     'created_at': 'NOW()'
                 }
             }
@@ -343,7 +383,7 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
             
             # Send push notifications
             push_notification_service = PushNotificationService()
-            device_tokens = get_user_device_tokens(participant_ids)
+            device_tokens = get_user_device_tokens(other_participant_ids)
             if device_tokens:
                 push_notification_service.send_duel_progress_notification(
                     device_tokens=device_tokens,
@@ -376,6 +416,12 @@ def create_duel_deleted_notification(duel_id, deleter_id):
             return
             
         duel_name = duel_response.data.get('title', 'Unknown Duel')
+        
+        # Validate duel_name
+        if not duel_name or not str(duel_name).strip():
+            logger.warning(f"No valid duel title found for duel {duel_id}, using fallback")
+            duel_name = 'a duel'
+        
         creator_id = duel_response.data.get('creator_id')
         
         # Get all participants in the duel except the deleter (who is the creator)
@@ -402,15 +448,16 @@ def create_duel_deleted_notification(duel_id, deleter_id):
         
         # Create notifications for each participant
         notifications = []
+        message_text = f"The duel '{duel_name}' has been deleted by {deleter_name}"
         for participant in participants_response.data:
             notification = {
                 'recipient_id': participant['user_id'],
                 'sender_id': deleter_id,
                 'type': 'duel_deleted',
-                    'message': message_text,
+                'message': message_text,
                 'duel_id': duel_id,
                 'data': {
-                    'message': f"The duel '{duel_name}' has been deleted by {deleter_name}",
+                    'message': message_text,
                     'duel_name': duel_name,
                     'deleter_name': deleter_name,
                     'created_at': 'NOW()'
@@ -557,17 +604,44 @@ class DuelCommentsResource(Resource):
                                  .eq('id', user_id) \
                                  .execute()
             
-            if user_profile.data:
-                user_display_name = user_profile.data[0].get('username') or user_email
+            if user_profile.data and user_profile.data[0].get('username'):
+                user_display_name = user_profile.data[0]['username']
                 user_avatar_url = user_profile.data[0].get('avatar_url')
             else:
-                user_display_name = user_email or 'Anonymous'
-                user_avatar_url = None
+                # Fallback: try to get username with admin client if user client fails
+                logger.warning(f"DuelCommentsResource: Could not fetch username for user {user_id} with user client, trying admin client")
+                admin_client = get_supabase_admin_client()
+                admin_profile = admin_client.table('user') \
+                                          .select('username, avatar_url') \
+                                          .eq('id', user_id) \
+                                          .execute()
                 
+                if admin_profile.data and admin_profile.data[0].get('username'):
+                    user_display_name = admin_profile.data[0]['username']
+                    user_avatar_url = admin_profile.data[0].get('avatar_url')
+                else:
+                    logger.error(f"DuelCommentsResource: No username found for user {user_id} in user table")
+                    return build_api_response(success=False, error="User profile not found", status_code=500)
+            
         except Exception as e:
-            logger.warning(f"DuelCommentsResource: Error fetching user profile: {e}")
-            user_display_name = user_email or 'Anonymous'
-            user_avatar_url = None
+            logger.error(f"DuelCommentsResource: Error fetching user profile: {e}")
+            # Try with admin client as fallback
+            try:
+                admin_client = get_supabase_admin_client()
+                admin_profile = admin_client.table('user') \
+                                          .select('username, avatar_url') \
+                                          .eq('id', user_id) \
+                                          .execute()
+                
+                if admin_profile.data and admin_profile.data[0].get('username'):
+                    user_display_name = admin_profile.data[0]['username']
+                    user_avatar_url = admin_profile.data[0].get('avatar_url')
+                else:
+                    logger.error(f"DuelCommentsResource: No username found for user {user_id} even with admin client")
+                    return build_api_response(success=False, error="User profile not found", status_code=500)
+            except Exception as admin_e:
+                logger.error(f"DuelCommentsResource: Admin client also failed to fetch user profile: {admin_e}")
+                return build_api_response(success=False, error="User profile lookup failed", status_code=500)
 
         # Get content from request
         try:

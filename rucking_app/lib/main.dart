@@ -63,15 +63,25 @@ void main() async {
   String? supabaseKey;
   
   try {
-    await dotenv.load();
+    await dotenv.load(fileName: ".env");
     AppLogger.info('.env file loaded successfully');
     supabaseUrl = dotenv.env['SUPABASE_URL'];
     supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
   } catch (e) {
-    AppLogger.warning('.env file not found, using environment variables: $e');
+    AppLogger.warning('.env file not found or could not be loaded, using environment variables: $e');
     // Fall back to system environment variables
     supabaseUrl = Platform.environment['SUPABASE_URL'];
     supabaseKey = Platform.environment['SUPABASE_ANON_KEY'];
+    
+    // If still no values, try hardcoded fallback for production
+    if ((supabaseUrl == null || supabaseUrl.isEmpty) && 
+        (supabaseKey == null || supabaseKey.isEmpty)) {
+      AppLogger.warning('No environment variables found, checking for embedded values');
+      // Add production fallback values here if needed
+      supabaseUrl = 'https://zmxapklvrbafuwhkefhf.supabase.co';
+      supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpteGFwa2x2cmJhZnV3aGtlZmhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjY0MzUyNTEsImV4cCI6MjA0MjAxMTI1MX0.A1ErhbQIYOhLSDgdDVk9sE1Hcb0YAfzjhxmOHM9CHGo';
+      AppLogger.info('Using embedded production values');
+    }
   }
   
   // --------------------------

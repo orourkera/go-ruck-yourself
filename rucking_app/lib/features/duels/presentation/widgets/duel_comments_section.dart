@@ -213,71 +213,77 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Comments list (only show if can view comments and there are comments)
-              if (canViewComments && comments.isNotEmpty) ...[
+              // Comments header (only show if can view comments)
+              if (canViewComments) ...[
+                const SizedBox(height: 24),
+                // Comments header aligned with leaderboard cards
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.comment,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Comments',
+                        style: const TextStyle(
+                          fontFamily: 'Bangers',
+                          fontSize: 18,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
-                _buildCommentsList(comments),
+                if (comments.isNotEmpty) _buildCommentsList(comments),
               ],
               
               // Comment input field (if not hidden and can view comments)
               if (!widget.hideInput && canViewComments) ...[
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
+                  padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0, bottom: 16.0),
+                  child: Row(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      Expanded(
                         child: TextField(
                           controller: _commentController,
                           focusNode: _commentFocusNode,
-                          decoration: InputDecoration(
-                            hintText: _editingCommentId != null 
-                                ? 'Update your comment...' 
-                                : 'Add a comment...',
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.all(16),
+                          decoration: const InputDecoration(
+                            hintText: 'Add a comment...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                            isDense: true,
                           ),
-                          maxLines: null,
-                          textInputAction: TextInputAction.newline,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _handleAddComment(),
                         ),
                       ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // Action buttons
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (_editingCommentId != null) ...[
-                            TextButton(
-                              onPressed: _cancelEditing,
-                              child: const Text('Cancel'),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _isAddingComment ? null : _handleAddComment,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: const CircleBorder(),
+                        ),
+                        child: _isAddingComment
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.arrow_right_alt,
+                              color: Colors.white,
                             ),
-                            const SizedBox(width: 8),
-                          ],
-                          ElevatedButton(
-                            onPressed: _isAddingComment ? null : _handleAddComment,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              minimumSize: Size.zero,
-                            ),
-                            child: _isAddingComment
-                                ? const SizedBox(
-                                    height: 16,
-                                    width: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  )
-                                : Text(_editingCommentId != null ? 'Update' : 'Post'),
-                          ),
-                        ],
                       ),
                     ],
                   ),
@@ -331,7 +337,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0),
       child: Column(
         children: [
           ...displayedComments.map((comment) => _buildCommentItem(comment)),

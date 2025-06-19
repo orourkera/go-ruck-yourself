@@ -278,7 +278,7 @@ class _CommentsSectionState extends State<CommentsSection> {
               _buildCommentsList(_currentComments)
             else if (state is CommentsError)
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.only(top: 16.0, right: 16.0, bottom: 16.0),
                 child: Text(
                   'Error loading comments: ${state.message}',
                   style: TextStyle(color: Colors.red[700]),
@@ -302,7 +302,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                 // If not authenticated, show login prompt instead of comment field
                 if (!isAuthenticated) {
                   return Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.only(top: 16.0, right: 16.0, bottom: 16.0),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
                       decoration: BoxDecoration(
@@ -330,7 +330,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                 
                 // Show normal comment input if authenticated
                 return Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.only(top: 16.0, right: 16.0, bottom: 16.0),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -372,7 +372,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                             child: CircularProgressIndicator(strokeWidth: 2.0),
                           )
                         : IconButton(
-                            icon: const Icon(Icons.send),
+                            icon: const Icon(Icons.arrow_right_alt),
                             color: AppColors.primary,
                             onPressed: _handleAddComment,
                           ),
@@ -485,7 +485,7 @@ class _CommentsSectionState extends State<CommentsSection> {
     // Safely create UI elements with defensive error handling
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.only(right: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

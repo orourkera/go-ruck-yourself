@@ -61,33 +61,31 @@ class EventComment extends Equatable {
 
 class EventCommentUser extends Equatable {
   final String id;
-  final String firstName;
-  final String lastName;
+  final String username;
+  final String avatarUrl;
 
   const EventCommentUser({
     required this.id,
-    required this.firstName,
-    required this.lastName,
+    required this.username,
+    required this.avatarUrl,
   });
 
   factory EventCommentUser.fromJson(Map<String, dynamic> json) {
     return EventCommentUser(
       id: json['id'] as String,
-      firstName: json['first_name'] as String,
-      lastName: json['last_name'] as String,
+      username: json['username'] as String,
+      avatarUrl: json['avatar_url'] as String,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'first_name': firstName,
-      'last_name': lastName,
+      'username': username,
+      'avatar_url': avatarUrl,
     };
   }
 
-  String get fullName => '$firstName $lastName';
-
   @override
-  List<Object?> get props => [id, firstName, lastName];
+  List<Object?> get props => [id, username, avatarUrl];
 }

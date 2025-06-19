@@ -11,6 +11,7 @@ import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/user_avatar.dart';
 
 class EventCommentsSection extends StatefulWidget {
   final String eventId;
@@ -184,18 +185,10 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // User avatar
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-            child: Text(
-              (comment.user?.firstName.isNotEmpty == true 
-                  ? comment.user!.firstName[0].toUpperCase()
-                  : '?'),
-              style: AppTextStyles.bodySmall.copyWith(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          UserAvatar(
+            avatarUrl: comment.user?.avatarUrl,
+            username: comment.user?.username ?? 'Unknown User',
+            size: 16,
           ),
           
           const SizedBox(width: 12),
@@ -209,7 +202,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                 Row(
                   children: [
                     Text(
-                      comment.user?.fullName ?? 'Unknown User',
+                      comment.user?.username ?? 'Unknown User',
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: isDarkMode ? Colors.white : Colors.black,
                         fontWeight: FontWeight.w600,
