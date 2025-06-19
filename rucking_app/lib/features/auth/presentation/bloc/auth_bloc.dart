@@ -6,6 +6,7 @@ import 'package:rucking_app/features/auth/domain/repositories/auth_repository.da
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -41,6 +42,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         try {
           final user = await _authRepository.getCurrentUser();
           if (user != null) {
+            // 🔥 Set user info in Crashlytics for better crash reports
+            FirebaseCrashlytics.instance.setUserIdentifier(user.userId);
+            FirebaseCrashlytics.instance.setCustomKey('user_email', user.email);
+            FirebaseCrashlytics.instance.setCustomKey('user_username', user.username ?? 'unknown');
+            FirebaseCrashlytics.instance.log('User authenticated: ${user.email}');
+            
             emit(Authenticated(user));
           } else {
             // If we can't get a user despite being "authenticated", stay authenticated
@@ -107,6 +114,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     
     try {
       final user = await _authRepository.googleLogin();
+      // 🔥 Set user info in Crashlytics after Google login
+      FirebaseCrashlytics.instance.setUserIdentifier(user.userId);
+      FirebaseCrashlytics.instance.setCustomKey('user_email', user.email);
+      FirebaseCrashlytics.instance.setCustomKey('user_username', user.username ?? 'unknown');
+      FirebaseCrashlytics.instance.log('User logged in via Google: ${user.email}');
+      
       emit(Authenticated(user));
     } catch (e) {
       AppLogger.error('Google login failed', exception: e);
@@ -171,7 +184,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         gender: event.gender,
       );
       
-      emit(Authenticated(user));
+      emit(Authenticated(user)); // Fix typo here
     } catch (e) {
       emit(AuthError('Google registration failed: $e'));
     }
@@ -193,6 +206,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await Future.delayed(const Duration(milliseconds: 100));
       
       await _authRepository.logout();
+      
+      // 🔥 Clear user info from Crashlytics on logout
+      FirebaseCrashlytics.instance.setUserIdentifier('');
+      FirebaseCrashlytics.instance.log('User logged out');
+      
       emit(Unauthenticated());
     } catch (e) {
       emit(AuthError('Logout failed: $e'));

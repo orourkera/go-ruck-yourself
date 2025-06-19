@@ -49,10 +49,23 @@ class EventsRepositoryImpl implements EventsRepository {
       queryParams['search'] = search;
     }
     if (clubId != null) {
-      queryParams['club_id'] = clubId;
+      if (clubId == 'club_events') {
+        // Special case: filter for events that have any club association
+        queryParams['has_club'] = 'true';
+      } else {
+        // Specific club ID filter
+        queryParams['club_id'] = clubId;
+      }
     }
     if (status != null) {
-      queryParams['status'] = status;
+      if (status == 'completed') {
+        // Special case: filter for events that ended at least a day ago
+        final dayAgo = DateTime.now().subtract(const Duration(days: 1));
+        queryParams['end_before'] = dayAgo.toIso8601String();
+      } else {
+        // Regular status filter
+        queryParams['status'] = status;
+      }
     }
     if (includeParticipating != null) {
       queryParams['participating'] = includeParticipating.toString();

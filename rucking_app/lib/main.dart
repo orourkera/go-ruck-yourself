@@ -20,7 +20,9 @@ import 'package:rucking_app/features/duels/presentation/bloc/duel_stats/duel_sta
 import 'package:rucking_app/features/duels/presentation/bloc/duel_invitations/duel_invitations_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
+import 'package:rucking_app/core/services/session_recovery_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,21 +31,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  FlutterError.onError = (details) {
-    // Print errors during development to help debug white screen
-    FlutterError.presentError(details);
-    // Optionally log with AppLogger if desired
-    AppLogger.error('Flutter Error: ${details.exceptionAsString()}');
-    if (details.stack != null) {
-      AppLogger.error('Stack trace: ${details.stack}');
+  // Initialize Firebase first
+  await Firebase.initializeApp();
+  
+  // 🔥 CRITICAL: Initialize Firebase Crashlytics for crash reporting
+  FlutterError.onError = (errorDetails) {
+    // Send Flutter framework errors to Crashlytics
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+    // Also print for development
+    FlutterError.presentError(errorDetails);
+    AppLogger.error('Flutter Error: ${errorDetails.exceptionAsString()}');
+    if (errorDetails.stack != null) {
+      AppLogger.error('Stack trace: ${errorDetails.stack}');
     }
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    // Log platform errors and DO NOT swallow them (return false) so Flutter prints them.
+    // Send platform errors to Crashlytics
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     AppLogger.error('Platform Error: $error');
     AppLogger.error('Stack trace: $stack');
-    return false;
+    return true; // Mark as handled
   };
 
   // Attach Bloc observer for detailed logging of state changes & errors
@@ -113,15 +121,23 @@ void main() async {
   Purchases.setDebugLogsEnabled(false);
   // Removed Purchases.configure from main.dart. Now handled in RevenueCatService.
   
-  // Initialize Firebase
-  await Firebase.initializeApp();
-  
   // Initialize Firebase Messaging background handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  
+  // 🔥 Set user identifier in Crashlytics for better debugging
+  FirebaseCrashlytics.instance.setUserIdentifier('user_startup');
+  
+  // 🔥 Log that app is starting (will help track startup crashes)
+  FirebaseCrashlytics.instance.log('App starting up - version 2.5.0+20');
   
   // Initialize Firebase Messaging Service (non-blocking)
   FirebaseMessagingService().initialize().catchError((error) {
     print('❌ Firebase Messaging initialization failed: $error');
+  });
+  
+  // 🔄 CRITICAL: Recover any locally saved sessions from previous app crashes/network failures
+  SessionRecoveryService.recoverSavedSessions().catchError((error) {
+    AppLogger.error('Session recovery failed: $error');
   });
   
   // Supabase already initialized earlier
@@ -195,11 +211,26 @@ class AppBlocObserver extends BlocObserver {
     }
     
     AppLogger.info('${bloc.runtimeType} $change');
+    
+    // 🔥 Log important state changes to Crashlytics
+    if (bloc.runtimeType.toString() == 'AuthBloc' || 
+        bloc.runtimeType.toString() == 'SessionBloc') {
+      FirebaseCrashlytics.instance.log('${bloc.runtimeType} state: ${change.nextState.runtimeType}');
+    }
   }
 
   @override
   void onError(BlocBase bloc, Object error, StackTrace stackTrace) {
     AppLogger.error('${bloc.runtimeType} $error');
+    
+    // 🔥 CRITICAL: Send all bloc errors to Crashlytics
+    FirebaseCrashlytics.instance.recordError(
+      error, 
+      stackTrace, 
+      reason: '${bloc.runtimeType} error',
+      fatal: false,
+    );
+    
     super.onError(bloc, error, stackTrace);
   }
 }

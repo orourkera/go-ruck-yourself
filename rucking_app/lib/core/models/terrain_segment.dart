@@ -65,6 +65,26 @@ class TerrainSegment {
     };
   }
   
+  /// Convert to JSON for serialization
+  Map<String, dynamic> toJson() {
+    return {
+      'distanceKm': distanceKm,
+      'surfaceType': surfaceType,
+      'energyMultiplier': energyMultiplier,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
+  
+  /// Create from JSON for deserialization
+  factory TerrainSegment.fromJson(Map<String, dynamic> json) {
+    return TerrainSegment(
+      distanceKm: (json['distanceKm'] as num).toDouble(),
+      surfaceType: json['surfaceType'] as String,
+      energyMultiplier: (json['energyMultiplier'] as num).toDouble(),
+      timestamp: DateTime.parse(json['timestamp'] as String),
+    );
+  }
+  
   @override
   String toString() => 'TerrainSegment(distance: ${distanceKm}km, surface: $surfaceType, multiplier: $energyMultiplier)';
 }

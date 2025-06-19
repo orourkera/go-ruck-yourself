@@ -42,6 +42,10 @@ class AppColors {
   static final Color backgroundLight = Color(0xFFF4F1EA); // Light beige
   static final Color backgroundDark = Color(0xFF2C2418); // Dark brown
   
+  // AppBar colors
+  static final Color lightAppBarBackground = Color(0xFFFAF7F2); // Light beige for AppBar
+  static final Color darkAppBarBackground = Color(0xFF352D1F); // Dark brown for AppBar
+  
   // Surface colors
   static final Color surfaceLight = Color(0xFFFAF7F2); // Lighter beige
   static final Color surfaceDark = Color(0xFF352D1F); // Dark brown

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_bloc.dart';
@@ -15,9 +16,12 @@ import 'package:rucking_app/features/events/presentation/bloc/event_progress_sta
 import 'package:rucking_app/features/events/presentation/widgets/event_leaderboard_widget.dart';
 import 'package:rucking_app/features/events/presentation/widgets/event_comments_section.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final String eventId;
@@ -69,20 +73,6 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         BlocProvider.value(value: _progressBloc),
       ],
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            _eventDetails?.event.title ?? 'Event Details',
-            style: AppTextStyles.titleLarge.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? Colors.white 
-                  : Theme.of(context).primaryColor,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: _buildAppBarActions(),
-        ),
         body: BlocConsumer<EventsBloc, EventsState>(
           listener: (context, state) {
             if (state is EventDetailsLoaded) {
@@ -90,11 +80,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 _eventDetails = state.eventDetails;
               });
             } else if (state is EventActionSuccess) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.green,
-                ),
+              StyledSnackBar.showSuccess(
+                context: context,
+                message: state.message,
               );
               
               if (state.shouldRefresh) {
@@ -110,11 +98,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 );
               }
             } else if (state is EventActionError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.red,
-                ),
+              StyledSnackBar.showError(
+                context: context,
+                message: state.message,
               );
             }
           },
@@ -211,40 +197,78 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     final event = eventDetails.event;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
-    return Column(
-      children: [
-        // Event header
-        _buildEventHeader(event, isDarkMode),
-        
-        // Tab bar for content sections
-        TabBar(
-          controller: _tabController,
-          labelColor: Theme.of(context).primaryColor,
-          unselectedLabelColor: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-          indicatorColor: Theme.of(context).primaryColor,
-          tabs: const [
-            Tab(text: 'Details'),
-            Tab(text: 'Leaderboard'),
-            Tab(text: 'Comments'),
+    // Get lady mode status
+    bool isLadyMode = false;
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      isLadyMode = authState.user.gender == 'female';
+    }
+    
+    final primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+    
+    return NestedScrollView(
+      headerSliverBuilder: (context, innerBoxIsScrolled) {
+        return [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 60,
+            backgroundColor: isDarkMode 
+                ? AppColors.darkAppBarBackground 
+                : AppColors.lightAppBarBackground,
+            title: Text(
+              event.title,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.titleLarge.copyWith(
+                color: isDarkMode ? Colors.white : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            centerTitle: true,
+            actions: _buildAppBarActions(),
+          ),
+        ];
+      },
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Event header
+            _buildEventHeader(event, isDarkMode, isLadyMode),
+            
+            // Tab bar for content sections
+            Container(
+              color: isDarkMode ? AppColors.darkAppBarBackground : AppColors.lightAppBarBackground,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: primaryColor,
+                unselectedLabelColor: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                indicatorColor: primaryColor,
+                tabs: const [
+                  Tab(text: 'Details'),
+                  Tab(text: 'Leaderboard'),
+                  Tab(text: 'Comments'),
+                ],
+              ),
+            ),
+            
+            // Tab content - Fixed height container
+            Container(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildDetailsTab(event, eventDetails.participants),
+                  EventLeaderboardWidget(eventId: widget.eventId),
+                  EventCommentsSection(eventId: widget.eventId),
+                ],
+              ),
+            ),
           ],
         ),
-        
-        // Tab content
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildDetailsTab(event, eventDetails.participants),
-              EventLeaderboardWidget(eventId: widget.eventId),
-              EventCommentsSection(eventId: widget.eventId),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildEventHeader(Event event, bool isDarkMode) {
+  Widget _buildEventHeader(Event event, bool isDarkMode, bool isLadyMode) {
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -306,7 +330,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     Text(
                       event.title,
                       style: AppTextStyles.headlineMedium.copyWith(
-                        color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
+                        color: isDarkMode ? Colors.white : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -315,7 +339,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                       Text(
                         event.hostingClub!.name,
                         style: AppTextStyles.bodyLarge.copyWith(
-                          color: Theme.of(context).primaryColor,
+                          color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
                           fontWeight: FontWeight.w500,
                         ),
                       )
@@ -359,23 +383,37 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           
           // Location if available
           if (event.locationName != null)
-            Row(
-              children: [
-                Icon(
-                  Icons.location_on,
-                  size: 20,
-                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    event.locationName!,
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+            InkWell(
+              onTap: () => _openLocation(event.locationName!, event.latitude, event.longitude),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      size: 20,
+                      color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        event.locationName!,
+                        style: AppTextStyles.bodyLarge.copyWith(
+                          color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.open_in_new,
+                      size: 16,
+                      color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           
           const SizedBox(height: 16),
@@ -386,13 +424,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               Icon(
                 Icons.people,
                 size: 20,
-                color: Theme.of(context).primaryColor,
+                color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
               ),
               const SizedBox(width: 8),
               Text(
                 '${event.participantCount} participant${event.participantCount != 1 ? 's' : ''}',
                 style: AppTextStyles.bodyLarge.copyWith(
-                  color: Theme.of(context).primaryColor,
+                  color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -412,6 +450,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
   Widget _buildDetailsTab(Event event, List<EventParticipant> participants) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    bool isLadyMode = false;
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      isLadyMode = authState.user.gender == 'female';
+    }
     
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -423,7 +466,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             Text(
               'Description',
               style: AppTextStyles.titleMedium.copyWith(
-                color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
+                color: isDarkMode ? Colors.white : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -438,7 +481,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           ],
           
           // Event details
-          _buildEventDetailsSection(event, isDarkMode),
+          _buildEventDetailsSection(event, isDarkMode, isLadyMode),
           
           const SizedBox(height: 24),
           
@@ -449,14 +492,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     );
   }
 
-  Widget _buildEventDetailsSection(Event event, bool isDarkMode) {
+  Widget _buildEventDetailsSection(Event event, bool isDarkMode, bool isLadyMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Event Details',
           style: AppTextStyles.titleMedium.copyWith(
-            color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
+            color: isDarkMode ? Colors.white : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -759,6 +802,60 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       return 'Today ${DateFormat('h:mm a').format(startTime)} - ${DateFormat('h:mm a').format(endTime)}';
     } else {
       return '${DateFormat('MMM d, y').format(startTime)} ${DateFormat('h:mm a').format(startTime)} - ${DateFormat('h:mm a').format(endTime)}';
+    }
+  }
+
+  void _openLocation(String locationName, double? latitude, double? longitude) async {
+    try {
+      final encodedLocation = Uri.encodeComponent(locationName);
+      String url;
+      
+      // If we have coordinates, use them for more precise location
+      if (latitude != null && longitude != null) {
+        // Google Maps with coordinates
+        url = 'https://www.google.com/maps/search/?api=1&query=$encodedLocation&center=$latitude,$longitude';
+      } else {
+        // Fallback to search by name only
+        url = 'https://www.google.com/maps/search/?api=1&query=$encodedLocation';
+      }
+      
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback to platform-specific maps
+        String fallbackUrl;
+        if (Theme.of(context).platform == TargetPlatform.iOS) {
+          // Apple Maps
+          if (latitude != null && longitude != null) {
+            fallbackUrl = 'http://maps.apple.com/?q=$encodedLocation&ll=$latitude,$longitude';
+          } else {
+            fallbackUrl = 'http://maps.apple.com/?q=$encodedLocation';
+          }
+        } else {
+          // Generic maps URL for Android
+          fallbackUrl = 'geo:0,0?q=$encodedLocation';
+        }
+        
+        if (await canLaunchUrl(Uri.parse(fallbackUrl))) {
+          await launchUrl(Uri.parse(fallbackUrl), mode: LaunchMode.externalApplication);
+        } else {
+          // Show error to user
+          if (mounted) {
+            StyledSnackBar.showError(
+              context: context,
+              message: 'Unable to open maps. Please check your location manually.',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // Show error to user
+      if (mounted) {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Unable to open maps. Please check your location manually.',
+        );
+      }
     }
   }
 }

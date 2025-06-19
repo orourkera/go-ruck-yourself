@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
@@ -68,33 +69,57 @@ class _ImageCropModalState extends State<ImageCropModal> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : Colors.grey[900],
-      appBar: AppBar(
-        backgroundColor: isDark ? Colors.black : Colors.grey[900],
-        foregroundColor: Colors.white,
-        title: Text(
-          widget.title,
-          style: AppTextStyles.titleLarge.copyWith(color: Colors.white),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _imageLoaded ? _cropAndSave : null,
-            child: Text(
-              'Done',
-              style: TextStyle(
-                color: _imageLoaded ? AppColors.accent : Colors.grey,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom app bar with much more padding for status bar
+            Container(
+              padding: const EdgeInsets.only(
+                left: 16, 
+                right: 16, 
+                top: 40, // Much more padding to clear status bar
+                bottom: 16
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.title.toUpperCase(),
+                      style: AppTextStyles.titleLarge.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _imageLoaded ? _cropAndSave : null,
+                    child: Text(
+                      'Done',
+                      style: TextStyle(
+                        color: _imageLoaded ? AppColors.accent : Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            
+            // Main content
+            Expanded(
+              child: _imageLoaded ? _buildCropInterface() : _buildLoadingIndicator(),
+            ),
+          ],
+        ),
       ),
-      body: _imageLoaded ? _buildCropInterface() : _buildLoadingIndicator(),
     );
   }
 
@@ -108,58 +133,156 @@ class _ImageCropModalState extends State<ImageCropModal> {
 
   Widget _buildCropInterface() {
     final screenSize = MediaQuery.of(context).size;
-    final cropSize = screenSize.width * 0.8;
+    final safeHeight = screenSize.height - MediaQuery.of(context).padding.top - 220;
+    
+    // Calculate crop dimensions
+    final cropWidth = screenSize.width * 0.85;
+    final cropHeight = math.min(cropWidth / widget.aspectRatio, safeHeight * 0.6);
     
     return Column(
       children: [
-        // Instructions
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            'Move and pinch to adjust your image',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: Colors.white70,
+        // Instructions and dimensions info
+        Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Move and pinch to adjust your image',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
+            
+            // Dimension and aspect ratio info
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.crop,
+                    color: AppColors.accent,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _getDimensionText(),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (_imageLoaded) ...[
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 1,
+                      height: 12,
+                      color: Colors.white.withOpacity(0.3),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.photo,
+                      color: Colors.white70,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_image.width}×${_image.height}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
         
-        // Crop area
+        // Main crop area with direct InteractiveViewer
         Expanded(
-          child: Center(
-            child: Container(
-              width: cropSize,
-              height: cropSize / widget.aspectRatio,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 2),
-                borderRadius: widget.cropShape == CropShape.circle 
-                    ? BorderRadius.circular(cropSize / 2) 
-                    : widget.cropShape == CropShape.rectangle
-                        ? BorderRadius.circular(0)
-                        : BorderRadius.circular(8),
-              ),
-              child: ClipRRect(
-                borderRadius: widget.cropShape == CropShape.circle 
-                    ? BorderRadius.circular(cropSize / 2) 
-                    : widget.cropShape == CropShape.rectangle
-                        ? BorderRadius.circular(0)
-                        : BorderRadius.circular(6),
-                child: RepaintBoundary(
-                  key: _cropKey,
-                  child: InteractiveViewer(
-                    transformationController: _transformationController,
-                    minScale: 0.5,
-                    maxScale: 3.0,
-                    constrained: false,
-                    child: Image.file(
-                      widget.imageFile,
-                      fit: BoxFit.cover,
-                      width: cropSize * 2, // Give more room for panning
-                      height: (cropSize / widget.aspectRatio) * 2,
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Background image (blurred and darkened)
+                Image.file(
+                  widget.imageFile,
+                  fit: BoxFit.cover,
+                  color: Colors.black.withOpacity(0.7),
+                  colorBlendMode: BlendMode.darken,
+                ),
+                
+                // Interactive crop area - DIRECT InteractiveViewer (MUST BE ON TOP)
+                Center(
+                  child: SizedBox(
+                    width: cropWidth,
+                    height: cropHeight,
+                    child: RepaintBoundary(
+                      key: _cropKey,
+                      child: InteractiveViewer(
+                        transformationController: _transformationController,
+                        minScale: 0.3,
+                        maxScale: 5.0,
+                        boundaryMargin: EdgeInsets.zero,
+                        panEnabled: true,
+                        scaleEnabled: true,
+                        constrained: false,
+                        child: Container(
+                          width: cropWidth * 3,
+                          height: cropHeight * 3,
+                          child: ClipRRect(
+                            borderRadius: widget.cropShape == CropShape.circle 
+                                ? BorderRadius.circular(cropWidth * 3 / 2) 
+                                : widget.cropShape == CropShape.square
+                                    ? BorderRadius.circular(12)
+                                    : BorderRadius.circular(16),
+                            child: Image.file(
+                              widget.imageFile,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                
+                // Crop overlay - POINTER EVENTS DISABLED
+                IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      width: cropWidth,
+                      height: cropHeight,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.accent, width: 3),
+                        borderRadius: widget.cropShape == CropShape.circle 
+                            ? BorderRadius.circular(cropWidth / 2) 
+                            : widget.cropShape == CropShape.square
+                                ? BorderRadius.circular(8)
+                                : BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -170,9 +293,52 @@ class _ImageCropModalState extends State<ImageCropModal> {
     );
   }
 
+  String _getDimensionText() {
+    final screenSize = MediaQuery.of(context).size;
+    final safeHeight = screenSize.height - MediaQuery.of(context).padding.top - 220; // More space for header
+    
+    // Calculate crop dimensions
+    final cropWidth = screenSize.width * 0.85;
+    final cropHeight = math.min(cropWidth / widget.aspectRatio, safeHeight * 0.6);
+    
+    // Format aspect ratio in a user-friendly way
+    String aspectRatioText;
+    if (widget.aspectRatio == 1.0) {
+      aspectRatioText = '1:1 Square';
+    } else if (widget.aspectRatio == 3.0) {
+      aspectRatioText = '3:1 Banner';
+    } else if (widget.aspectRatio == 16.0 / 9.0) {
+      aspectRatioText = '16:9 Widescreen';
+    } else if (widget.aspectRatio == 4.0 / 3.0) {
+      aspectRatioText = '4:3 Standard';
+    } else if (widget.aspectRatio == 2.0) {
+      aspectRatioText = '2:1 Wide';
+    } else {
+      // For custom ratios, calculate simplified fraction
+      final ratio = widget.aspectRatio;
+      if (ratio > 1) {
+        aspectRatioText = '${ratio.toStringAsFixed(1)}:1';
+      } else {
+        aspectRatioText = '1:${(1/ratio).toStringAsFixed(1)}';
+      }
+    }
+    
+    return '${cropWidth.toInt()}×${cropHeight.toInt()} • $aspectRatioText';
+  }
+
   Widget _buildControls() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            Colors.black.withOpacity(0.8),
+          ],
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -206,25 +372,38 @@ class _ImageCropModalState extends State<ImageCropModal> {
     required String label,
     required VoidCallback onPressed,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          onPressed: onPressed,
-          icon: Icon(icon, color: Colors.white),
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.white.withValues(alpha: 0.1),
-            padding: const EdgeInsets.all(12),
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+            width: 1,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: Colors.white70,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon, 
+              color: Colors.white,
+              size: 24,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -233,16 +412,42 @@ class _ImageCropModalState extends State<ImageCropModal> {
   }
 
   void _centerImage() {
-    // Calculate center position
+    // Reset to identity first, then apply any centering adjustments
     final matrix = Matrix4.identity();
-    matrix.translate(0.0, 0.0);
+    
+    // Center the image within the crop area
+    final screenSize = MediaQuery.of(context).size;
+    final cropWidth = screenSize.width * 0.85;
+    final cropHeight = math.min(cropWidth / widget.aspectRatio, (screenSize.height - MediaQuery.of(context).padding.top - 220) * 0.6);
+    
+    if (_image.width > 0 && _image.height > 0) {
+      // Calculate scale to fit image nicely in crop area
+      final imageAspectRatio = _image.width / _image.height;
+      final cropAspectRatio = widget.aspectRatio;
+      
+      double scale = 1.0;
+      if (imageAspectRatio > cropAspectRatio) {
+        // Image is wider than crop area, scale to fit height
+        scale = (cropHeight * 3) / _image.height;
+      } else {
+        // Image is taller than crop area, scale to fit width  
+        scale = (cropWidth * 3) / _image.width;
+      }
+      
+      // Ensure minimum scale for visibility
+      scale = math.max(scale, 0.5);
+      
+      // Apply scale
+      matrix.scale(scale, scale);
+    }
     
     _transformationController.value = matrix;
   }
 
   void _fitImage() {
     final screenSize = MediaQuery.of(context).size;
-    final cropSize = screenSize.width * 0.8;
+    final cropWidth = screenSize.width * 0.85;
+    final cropHeight = math.min(cropWidth / widget.aspectRatio, (screenSize.height - MediaQuery.of(context).padding.top - 220) * 0.6);
     
     if (_image.width > 0 && _image.height > 0) {
       final imageAspectRatio = _image.width / _image.height;
@@ -251,14 +456,17 @@ class _ImageCropModalState extends State<ImageCropModal> {
       double scale;
       if (imageAspectRatio > containerAspectRatio) {
         // Image is wider, fit to height
-        scale = (cropSize / widget.aspectRatio) / _image.height;
+        scale = (cropHeight * 3) / _image.height;
       } else {
         // Image is taller, fit to width
-        scale = cropSize / _image.width;
+        scale = (cropWidth * 3) / _image.width;
       }
       
+      // Ensure scale fills the crop area properly
+      scale = math.max(scale, 1.0);
+      
       final matrix = Matrix4.identity();
-      matrix.scale(scale);
+      matrix.scale(scale, scale);
       
       _transformationController.value = matrix;
     }

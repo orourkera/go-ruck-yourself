@@ -48,7 +48,7 @@ class EventFilterChips extends StatelessWidget {
             context,
             label: 'Club Events',
             isSelected: selectedClubId != null,
-            onTap: () => onFilterChanged(null, 'any', null),
+            onTap: () => onFilterChanged(null, 'club_events', null),
           ),
           const SizedBox(width: 8),
           _buildFilterChip(

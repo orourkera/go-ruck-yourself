@@ -230,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           BottomNavigationBarItem(
             icon: Image.asset(
               'assets/images/events.png',
-              width: 48,
+              width: 42,
               height: 48,
             ),
             activeIcon: Image.asset(

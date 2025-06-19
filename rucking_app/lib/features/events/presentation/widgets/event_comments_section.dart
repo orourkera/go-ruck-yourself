@@ -10,6 +10,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 class EventCommentsSection extends StatefulWidget {
   final String eventId;
@@ -54,22 +55,18 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                   _isSubmitting = false;
                 });
                 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Comment added successfully'),
-                    backgroundColor: Colors.green,
-                  ),
+                StyledSnackBar.showSuccess(
+                  context: context,
+                  message: 'Comment added successfully',
                 );
               } else if (state is EventCommentsError) {
                 setState(() {
                   _isSubmitting = false;
                 });
                 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(state.message),
-                    backgroundColor: Colors.red,
-                  ),
+                StyledSnackBar.showError(
+                  context: context,
+                  message: state.message,
                 );
               }
             },

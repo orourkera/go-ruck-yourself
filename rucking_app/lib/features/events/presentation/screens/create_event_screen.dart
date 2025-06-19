@@ -7,12 +7,15 @@ import 'package:rucking_app/core/services/location_search_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
+import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
+import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_state.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/utils/image_picker_utils.dart';
 
 class CreateEventScreen extends StatefulWidget {
@@ -72,11 +75,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   void _loadUserClubs() {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
-      // This would need to be implemented in ClubsBloc
-      // For now, we'll assume empty list
-      setState(() {
-        _userClubs = [];
-      });
+      // Load clubs where user is admin or member
+      _clubsBloc.add(LoadClubs(membershipFilter: 'admin'));
     }
   }
 
@@ -96,8 +96,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isEditing = widget.eventId != null;
     
-    return BlocProvider.value(
-      value: _eventsBloc,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: _eventsBloc),
+        BlocProvider.value(value: _clubsBloc),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -110,32 +113,49 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
-        body: BlocConsumer<EventsBloc, EventsState>(
-          listener: (context, state) {
-            if (state is EventActionSuccess) {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            } else if (state is EventActionError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-          builder: (context, state) {
-            if (state is EventDetailsLoaded && isEditing) {
-              _populateFormWithEventData(state.eventDetails.event);
-            }
-            
-            return _buildForm(isDarkMode);
-          },
+        body: MultiBlocListener(
+          listeners: [
+            BlocListener<EventsBloc, EventsState>(
+              listener: (context, state) {
+                if (state is EventActionSuccess) {
+                  Navigator.of(context).pop();
+                  StyledSnackBar.showSuccess(
+                    context: context,
+                    message: state.message,
+                  );
+                } else if (state is EventActionError) {
+                  StyledSnackBar.showError(
+                    context: context,
+                    message: state.message,
+                  );
+                }
+              },
+            ),
+            BlocListener<ClubsBloc, ClubsState>(
+              listener: (context, state) {
+                if (state is ClubsLoaded) {
+                  setState(() {
+                    _userClubs = state.clubs.where((club) => club.userRole == 'admin').toList();
+                    
+                    // If user is admin of any clubs, default to true and select first club
+                    if (_userClubs.isNotEmpty && widget.eventId == null) {
+                      _isClubEvent = true;
+                      _selectedClubId = _userClubs.first.id;
+                    }
+                  });
+                }
+              },
+            ),
+          ],
+          child: BlocBuilder<EventsBloc, EventsState>(
+            builder: (context, state) {
+              if (state is EventDetailsLoaded && isEditing) {
+                _populateFormWithEventData(state.eventDetails.event);
+              }
+              
+              return _buildForm(isDarkMode);
+            },
+          ),
         ),
       ),
     );
@@ -576,6 +596,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Widget _buildClubEventSection(bool isDarkMode) {
+    if (_userClubs.isEmpty) {
+      return const SizedBox.shrink(); // Don't show section if user has no admin clubs
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -588,32 +612,47 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ),
         const SizedBox(height: 12),
         
-        SwitchListTile(
-          title: Text(
-            'Host as Club Event',
-            style: AppTextStyles.bodyLarge.copyWith(
-              color: isDarkMode ? Colors.white : AppColors.textDark,
+        Container(
+          decoration: BoxDecoration(
+            color: _isClubEvent ? AppColors.accent.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _isClubEvent ? AppColors.accent : Colors.grey.withOpacity(0.3),
+              width: 1,
             ),
           ),
-          subtitle: Text(
-            'Event will be associated with one of your clubs',
-            style: AppTextStyles.bodySmall.copyWith(
-              color: Colors.grey[600],
+          child: SwitchListTile(
+            title: Text(
+              _getClubEventTitle(),
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: isDarkMode ? Colors.white : AppColors.textDark,
+                fontWeight: _isClubEvent ? FontWeight.w600 : FontWeight.normal,
+              ),
             ),
+            subtitle: Text(
+              _isClubEvent 
+                  ? 'Event will appear in club calendar and member feeds'
+                  : 'Event will be personal only',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: _isClubEvent ? AppColors.accent : Colors.grey[600],
+              ),
+            ),
+            value: _isClubEvent,
+            onChanged: (value) {
+              setState(() {
+                _isClubEvent = value;
+                if (!value) {
+                  _selectedClubId = null;
+                } else if (_selectedClubId == null && _userClubs.isNotEmpty) {
+                  _selectedClubId = _userClubs.first.id;
+                }
+              });
+            },
+            activeColor: AppColors.accent,
           ),
-          value: _isClubEvent,
-          onChanged: (value) {
-            setState(() {
-              _isClubEvent = value;
-              if (!value) {
-                _selectedClubId = null;
-              }
-            });
-          },
-          activeColor: Theme.of(context).primaryColor,
         ),
         
-        if (_isClubEvent) ...[
+        if (_isClubEvent && _userClubs.length > 1) ...[
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             decoration: InputDecoration(
@@ -644,6 +683,19 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ],
       ],
     );
+  }
+  
+  String _getClubEventTitle() {
+    if (!_isClubEvent || _selectedClubId == null || _userClubs.isEmpty) {
+      return 'Host as Club Event';
+    }
+    
+    try {
+      final selectedClub = _userClubs.firstWhere((club) => club.id == _selectedClubId);
+      return 'This is a ${selectedClub.name} Event';
+    } catch (e) {
+      return 'Host as Club Event';
+    }
   }
 
   Widget _buildSubmitButton(bool isDarkMode) {
@@ -760,11 +812,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
     
     if (_selectedDateTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a date and time'),
-          backgroundColor: Colors.red,
-        ),
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Please select a date and time',
       );
       return;
     }

@@ -649,8 +649,11 @@ class RuckSessionCompleteResource(Resource):
                         duel = duel_resp.data
                         
                         # Check if duel has ended
-                        if duel['ends_at'] and datetime.utcnow() > datetime.fromisoformat(duel['ends_at']):
-                            continue
+                        if duel['ends_at']:
+                            duel_end_time = datetime.fromisoformat(duel['ends_at'])
+                            current_time = datetime.now(duel_end_time.tzinfo) if duel_end_time.tzinfo else datetime.utcnow()
+                            if current_time > duel_end_time:
+                                continue
                             
                         # Check if session was already counted for this duel
                         existing_session_resp = supabase.table('duel_sessions') \
