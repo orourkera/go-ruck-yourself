@@ -390,11 +390,7 @@ class FirebaseMessagingService {
       
       // 5. Test local notifications
       try {
-        await _showLocalNotification(
-          'Test Notification',
-          'This is a test notification from RuckingApp',
-          payload: 'test_notification',
-        );
+        await _testLocalNotification();
         results['local_notification'] = 'sent';
         print('✅ Local test notification sent');
       } catch (e) {
@@ -424,6 +420,37 @@ class FirebaseMessagingService {
     }
     
     return results;
+  }
+
+  /// Test local notification
+  Future<void> _testLocalNotification() async {
+    const androidDetails = AndroidNotificationDetails(
+      'rucking_app_notifications',
+      'Rucking App Notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+      showWhen: true,
+      playSound: true,
+    );
+    
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+    
+    await _localNotifications.show(
+      12345,
+      'Test Notification',
+      'This is a test notification from RuckingApp',
+      details,
+      payload: 'test_notification',
+    );
   }
 
   /// Force refresh and register token (for debugging)
