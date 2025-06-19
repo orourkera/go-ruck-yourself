@@ -20,8 +20,10 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
     """
     try:
         # Validate input parameters
+        logger.info(f"create_duel_comment_notification called with: duel_id={duel_id}, comment_id={comment_id}, commenter_id={commenter_id}, commenter_name='{commenter_name}'")
+        
         if not commenter_name or not str(commenter_name).strip():
-            logger.error(f"Invalid commenter_name: {commenter_name} for comment {comment_id}")
+            logger.error(f"Invalid commenter_name: '{commenter_name}' for comment {comment_id}")
             return
             
         admin_client = get_supabase_admin_client()
@@ -37,6 +39,8 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
             logger.info(f"No other participants to notify for duel {duel_id}")
             return
             
+        logger.info(f"Found {len(participants_response.data)} participants to notify")
+            
         # Get duel name for notification message
         duel_response = admin_client.table('duels') \
             .select('title') \
@@ -49,14 +53,18 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
             logger.warning(f"No valid duel title found for duel {duel_id}, using fallback")
             duel_name = 'a duel'
         
+        logger.info(f"Duel name: '{duel_name}'")
+        
         # Create notifications for each participant
         notifications = []
         message_text = f"{commenter_name} commented on the duel '{duel_name}'"
         
         # Ensure message_text is not null or empty
         if not message_text or not message_text.strip():
-            logger.error(f"Invalid message_text generated for duel {duel_id}, comment {comment_id}")
+            logger.error(f"Invalid message_text generated: '{message_text}' for duel {duel_id}, comment {comment_id}")
             return
+            
+        logger.info(f"Generated message_text: '{message_text}'")
             
         for participant in participants_response.data:
             notification = {
@@ -74,10 +82,15 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
                 }
             }
             notifications.append(notification)
+            logger.info(f"Created notification for participant {participant['user_id']}: message='{notification['message']}'")
         
         if notifications:
+            logger.info(f"Inserting {len(notifications)} notifications into database...")
+            for i, notif in enumerate(notifications):
+                logger.info(f"Notification {i}: message='{notif['message']}', recipient_id={notif['recipient_id']}")
+            
             admin_client.table('notifications').insert(notifications).execute()
-            logger.info(f"Created {len(notifications)} notifications for duel comment {comment_id}")
+            logger.info(f"Successfully created {len(notifications)} notifications for duel comment {comment_id}")
             
             # Send push notifications
             push_notification_service = PushNotificationService()

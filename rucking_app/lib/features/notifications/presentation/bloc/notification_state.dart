@@ -1,45 +1,58 @@
 import 'package:equatable/equatable.dart';
 import 'package:rucking_app/features/notifications/domain/entities/app_notification.dart';
 
-abstract class NotificationState extends Equatable {
-  const NotificationState();
-  
-  @override
-  List<Object> get props => [];
-}
-
-class NotificationsInitial extends NotificationState {}
-
-class NotificationsLoading extends NotificationState {}
-
-class NotificationsLoaded extends NotificationState {
+class NotificationState extends Equatable {
   final List<AppNotification> notifications;
   final int unreadCount;
+  final bool isLoading;
+  final bool hasError;
+  final String error;
   
-  const NotificationsLoaded({
-    required this.notifications,
-    required this.unreadCount,
+  const NotificationState({
+    this.notifications = const [],
+    this.unreadCount = 0,
+    this.isLoading = false,
+    this.hasError = false,
+    this.error = '',
   });
   
   @override
-  List<Object> get props => [notifications, unreadCount];
+  List<Object> get props => [notifications, unreadCount, isLoading, hasError, error];
   
-  NotificationsLoaded copyWith({
+  NotificationState copyWith({
     List<AppNotification>? notifications,
     int? unreadCount,
+    bool? isLoading,
+    bool? hasError,
+    String? error,
   }) {
-    return NotificationsLoaded(
+    return NotificationState(
       notifications: notifications ?? this.notifications,
       unreadCount: unreadCount ?? this.unreadCount,
+      isLoading: isLoading ?? this.isLoading,
+      hasError: hasError ?? this.hasError,
+      error: error ?? this.error,
     );
   }
 }
 
+// Keep these for backward compatibility if needed
+class NotificationsInitial extends NotificationState {
+  const NotificationsInitial() : super();
+}
+
+class NotificationsLoading extends NotificationState {
+  const NotificationsLoading() : super(isLoading: true);
+}
+
+class NotificationsLoaded extends NotificationState {
+  const NotificationsLoaded({
+    required List<AppNotification> notifications,
+    required int unreadCount,
+  }) : super(notifications: notifications, unreadCount: unreadCount);
+}
+
 class NotificationsError extends NotificationState {
-  final String message;
-  
-  const NotificationsError({required this.message});
-  
-  @override
-  List<Object> get props => [message];
+  const NotificationsError({required String message}) 
+    : super(hasError: true, error: message);
 }

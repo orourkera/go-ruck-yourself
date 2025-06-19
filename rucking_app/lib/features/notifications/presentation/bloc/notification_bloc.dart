@@ -12,10 +12,12 @@ export 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final NotificationRepository repository;
+  int _previousUnreadCount = -1; // -1 means uninitialized
   Timer? _pollingTimer;
-  int _previousUnreadCount = 0;
-
-  NotificationBloc({required this.repository}) : super(NotificationsInitial()) {
+  
+  NotificationBloc({
+    required this.repository,
+  }) : super(const NotificationState()) {
     on<NotificationsRequested>(_onNotificationsRequested);
     on<NotificationRead>(_onNotificationRead);
     on<AllNotificationsRead>(_onAllNotificationsRead);
@@ -25,27 +27,42 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     NotificationsRequested event,
     Emitter<NotificationState> emit,
   ) async {
-    emit(NotificationsLoading());
     try {
+      AppLogger.info('Loading notifications...');
+      emit(state.copyWith(isLoading: true));
+      
       final notifications = await repository.getNotifications();
       final unreadCount = notifications.where((n) => !n.isRead).length;
       
-      // Vibrate if there are new notifications (unread count increased)
-      // Fixed: Remove the _previousUnreadCount > 0 condition to handle first notification
-      if (unreadCount > _previousUnreadCount) {
-        _vibrateForNewNotification();
-        AppLogger.info('New notification(s) received - vibrating phone (unread: $unreadCount, previous: $_previousUnreadCount)');
+      AppLogger.info('Loaded ${notifications.length} notifications, ${unreadCount} unread');
+      AppLogger.info('Previous unread count: $_previousUnreadCount, Current: $unreadCount');
+      
+      // Check if we have new notifications and should vibrate
+      if (unreadCount > _previousUnreadCount && _previousUnreadCount >= 0) {
+        AppLogger.info('New notifications detected! Triggering vibration...');
+        await _vibrateForNewNotification();
+      } else {
+        AppLogger.info('No new notifications detected');
       }
       
       _previousUnreadCount = unreadCount;
       
-      emit(NotificationsLoaded(
+      emit(state.copyWith(
+        isLoading: false,
         notifications: notifications,
         unreadCount: unreadCount,
+        hasError: false,
+        error: '',
       ));
+      
+      AppLogger.info('Notification state updated successfully');
     } catch (e) {
-      AppLogger.error('Failed to load notifications: $e');
-      emit(NotificationsError(message: 'Failed to load notifications'));
+      AppLogger.error('Error loading notifications: $e');
+      emit(state.copyWith(
+        isLoading: false,
+        hasError: true,
+        error: e.toString(),
+      ));
     }
   }
 
@@ -142,13 +159,31 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     startPolling(interval: interval);
   }
 
-  void _vibrateForNewNotification() async {
-    if (await Vibration.hasVibrator()) {
-      // Improved vibration pattern: 2 strong bursts with better spacing
-      await Vibration.vibrate(pattern: [0, 200, 100, 200], amplitude: 255);
-      AppLogger.info('Vibration triggered for new notification');
-    } else {
-      AppLogger.info('Device does not have vibrator');
+  Future<void> _vibrateForNewNotification() async {
+    try {
+      AppLogger.info('🔔 Attempting to vibrate for new notification...');
+      
+      // Check if vibration is available
+      bool? hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator != true) {
+        AppLogger.warning('Device does not support vibration');
+        return;
+      }
+      
+      // Check custom vibration support
+      bool? hasCustomVibrations = await Vibration.hasCustomVibrationsSupport();
+      
+      if (hasCustomVibrations == true) {
+        // Use pattern vibration: short-pause-short-pause-long
+        await Vibration.vibrate(pattern: [0, 200, 100, 200, 100, 500]);
+        AppLogger.info('✅ Custom pattern vibration triggered');
+      } else {
+        // Use simple vibration
+        await Vibration.vibrate(duration: 300);
+        AppLogger.info('✅ Simple vibration triggered');
+      }
+    } catch (e) {
+      AppLogger.error('❌ Failed to vibrate: $e');
     }
   }
 

@@ -23,21 +23,31 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   @override
   Future<List<NotificationModel>> getNotifications() async {
     try {
+      AppLogger.info('Fetching notifications from /notifications endpoint...');
       final response = await apiClient.get('/notifications');
+      AppLogger.info('Notifications API response received: ${response.runtimeType}');
       
       List<dynamic> notificationsData;
       if (response is Map<String, dynamic> && response.containsKey('notifications')) {
         notificationsData = response['notifications'] as List<dynamic>;
+        AppLogger.info('Found ${notificationsData.length} notifications in response');
       } else if (response is List) {
         notificationsData = response;
+        AppLogger.info('Response is direct list with ${notificationsData.length} notifications');
       } else {
         AppLogger.warning('Unexpected notifications response format: ${response.runtimeType}');
+        AppLogger.warning('Response content: $response');
         return [];
       }
       
-      return notificationsData
+      final notifications = notificationsData
           .map((json) => NotificationModel.fromJson(json as Map<String, dynamic>))
           .toList();
+      
+      final unreadCount = notifications.where((n) => !n.isRead).length;
+      AppLogger.info('Successfully parsed ${notifications.length} notifications (${unreadCount} unread)');
+      
+      return notifications;
     } catch (e) {
       AppLogger.error('Failed to fetch notifications: $e');
       throw ServerException(message: 'Failed to fetch notifications: $e');

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:math';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -210,17 +212,21 @@ class FirebaseMessagingService {
       print('🔔 Registering device token with backend...');
       final apiClient = GetIt.I<ApiClient>();
       
+      final deviceId = await _getDeviceId();
+      final deviceType = Platform.isIOS ? 'ios' : 'android';
+      
       final response = await apiClient.post('/device-token', {
         'fcm_token': token,
-        'device_type': Platform.isIOS ? 'ios' : 'android',
-        'device_id': await _getDeviceId(),
-        'app_version': '1.0.0', // TODO: Get actual app version
+        'device_id': deviceId,
+        'device_type': deviceType,
+        'app_version': '1.0.0', // You might want to get this from package_info
       });
       
-      print('✅ Device token registered successfully: $response');
+      print('🔔 Device token registration response: $response');
+      print('🔔 Device token registered successfully with backend');
     } catch (e) {
-      print('❌ Error registering device token: $e');
-      rethrow;
+      print('❌ Failed to register device token: $e');
+      // Don't throw - we want Firebase to still work even if backend registration fails
     }
   }
 
@@ -324,8 +330,104 @@ class FirebaseMessagingService {
   /// Get initialization status for debugging
   bool get isInitialized => _isInitialized;
 
+  /// Test notification setup and provide diagnostic information
+  Future<Map<String, dynamic>> testNotificationSetup() async {
+    final results = <String, dynamic>{};
+    
+    try {
+      print('🧪 Starting notification system diagnostics...');
+      
+      // 1. Check Firebase initialization
+      results['firebase_initialized'] = Firebase.apps.isNotEmpty;
+      print('✅ Firebase apps: ${Firebase.apps.length}');
+      
+      // 2. Check FCM token
+      try {
+        final token = await _firebaseMessaging.getToken().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => null,
+        );
+        results['fcm_token_available'] = token != null;
+        results['fcm_token_length'] = token?.length ?? 0;
+        results['fcm_token_preview'] = token?.substring(0, min(20, token.length ?? 0));
+        print('✅ FCM Token available: ${token != null}');
+        if (token != null) {
+          print('🔑 Token preview: ${token.substring(0, min(20, token.length))}...');
+        }
+      } catch (e) {
+        results['fcm_token_error'] = e.toString();
+        print('❌ FCM Token error: $e');
+      }
+      
+      // 3. Check notification permissions
+      try {
+        final settings = await _firebaseMessaging.getNotificationSettings();
+        results['permission_status'] = settings.authorizationStatus.toString();
+        results['alert_enabled'] = settings.alert == AppleNotificationSetting.enabled;
+        results['badge_enabled'] = settings.badge == AppleNotificationSetting.enabled;
+        results['sound_enabled'] = settings.sound == AppleNotificationSetting.enabled;
+        print('✅ Permission status: ${settings.authorizationStatus}');
+        print('✅ Alert: ${settings.alert}, Badge: ${settings.badge}, Sound: ${settings.sound}');
+      } catch (e) {
+        results['permission_error'] = e.toString();
+        print('❌ Permission check error: $e');
+      }
+      
+      // 4. Test device token registration with backend
+      try {
+        if (_deviceToken != null) {
+          await _registerDeviceToken(_deviceToken!);
+          results['backend_registration'] = 'success';
+          print('✅ Backend registration successful');
+        } else {
+          results['backend_registration'] = 'no_token';
+          print('⚠️ No device token for backend registration');
+        }
+      } catch (e) {
+        results['backend_registration_error'] = e.toString();
+        print('❌ Backend registration error: $e');
+      }
+      
+      // 5. Test local notifications
+      try {
+        await _showLocalNotification(
+          'Test Notification',
+          'This is a test notification from RuckingApp',
+          payload: 'test_notification',
+        );
+        results['local_notification'] = 'sent';
+        print('✅ Local test notification sent');
+      } catch (e) {
+        results['local_notification_error'] = e.toString();
+        print('❌ Local notification error: $e');
+      }
+      
+      // 6. Check API connectivity
+      try {
+        final apiClient = GetIt.I<ApiClient>();
+        await apiClient.get('/notifications').timeout(const Duration(seconds: 10));
+        results['api_connectivity'] = 'success';
+        print('✅ API connectivity successful');
+      } catch (e) {
+        results['api_connectivity_error'] = e.toString();
+        print('❌ API connectivity error: $e');
+      }
+      
+      results['test_completed'] = true;
+      results['test_timestamp'] = DateTime.now().toIso8601String();
+      
+      print('🧪 Notification diagnostics completed');
+      
+    } catch (e) {
+      results['test_error'] = e.toString();
+      print('❌ Test setup error: $e');
+    }
+    
+    return results;
+  }
+
   /// Force refresh and register token (for debugging)
-  Future<void> testNotificationSetup() async {
+  Future<void> testNotificationSetupDiagnostic() async {
     print('🔔 Testing notification setup...');
     print('🔔 Initialized: $_isInitialized');
     print('🔔 Current token: ${_deviceToken ?? "NULL"}');

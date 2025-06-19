@@ -67,42 +67,29 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
     return BlocConsumer<NotificationBloc, NotificationState>(
       // Listen for state changes to trigger animations
       listener: (context, state) {
-        if (state is NotificationsLoaded) {
-          final unreadCount = state.unreadCount;
-          print('🔔 NotificationBell: Unread count changed to $unreadCount');
-          
-          // Force animation update when unread count changes
-          if (unreadCount > 0 && !_animationController.isAnimating) {
-            print('🔔 Starting notification bell animation');
-            _animationController.repeat();
-          } else if (unreadCount <= 0 && _animationController.isAnimating) {
-            print('🔔 Stopping notification bell animation');
-            _animationController.stop();
-            _animationController.reset();
-          }
+        final unreadCount = state.unreadCount;
+        print('🔔 NotificationBell: Unread count changed to $unreadCount');
+        
+        // Force animation update when unread count changes
+        if (unreadCount > 0 && !_animationController.isAnimating) {
+          print('🔔 Starting notification bell animation');
+          _animationController.repeat();
+        } else if (unreadCount <= 0 && _animationController.isAnimating) {
+          print('🔔 Stopping notification bell animation');
+          _animationController.stop();
+          _animationController.reset();
         }
       },
       builder: (context, state) {
-        int unreadCount = 0;
-        
-        if (state is NotificationsLoaded) {
-          unreadCount = state.unreadCount;
-        }
-        
-        // Legacy animation control (keeping as backup)
-        if (unreadCount <= 0 && _animationController.isAnimating) {
-          _animationController.stop();
-          _animationController.reset();
-        } else if (unreadCount > 0 && !_animationController.isAnimating) {
-          _animationController.repeat();
-        }
+        final unreadCount = state.unreadCount;
+        final isLoading = state.isLoading;
         
         return Stack(
           clipBehavior: Clip.none,
           children: [
             SizedBox(
-              width: 70, // Increased 25% from 56px
-              height: 70, // Increased 25% from 56px
+              width: 70, 
+              height: 70, 
               child: AnimatedBuilder(
                 animation: _rotationAnimation,
                 builder: (context, child) {
@@ -110,14 +97,14 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                   final rotation = unreadCount > 0 ? _rotationAnimation.value : 0.0;
                   
                   return Transform.rotate(
-                    angle: rotation, // rotation in radians
+                    angle: rotation, 
                     child: child,
                   );
                 },
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(35), // Adjusted for larger size
+                    borderRadius: BorderRadius.circular(35), 
                     onTap: () async {
                       // Navigate to notifications screen
                       await Navigator.push(
@@ -128,45 +115,75 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                       );
                       
                       // When returning from the notifications screen, explicitly request
-                      // notification state refresh to update the counter
-                      if (context.mounted) {
-                        context.read<NotificationBloc>().add(const NotificationsRequested());
-                      }
+                      // to reload notifications to ensure the count is updated
+                      context.read<NotificationBloc>().add(const NotificationsRequested());
                     },
                     child: Container(
-                      width: 70, // Increased 25% from 56px
-                      height: 70, // Increased 25% from 56px
-                      alignment: Alignment.center, // Center the icon within tap target
-                      child: Image.asset(
-                        'assets/images/notifications.png',
-                        width: 50, // Increased 25% from 40px
-                        height: 50, // Increased 25% from 40px
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          // Bell icon
+                          Center(
+                            child: Icon(
+                              Icons.notifications,
+                              size: 32, 
+                              color: unreadCount > 0 
+                                  ? Theme.of(context).primaryColor
+                                  : Colors.grey[600],
+                            ),
+                          ),
+                          // Loading indicator
+                          if (isLoading)
+                            const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
             ),
+            // Notification count badge
             if (unreadCount > 0)
               Positioned(
-                right: 8, // Adjusted positioning for smaller icon
+                right: 8,
                 top: 8,
                 child: Container(
-                  padding: const EdgeInsets.all(4), // Slightly smaller badge
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: AppColors.error,
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   constraints: const BoxConstraints(
                     minWidth: 20,
                     minHeight: 20,
                   ),
                   child: Text(
-                    unreadCount > 99 ? '99+' : '$unreadCount',
-                    style: AppTextStyles.bodySmall.copyWith( // Smaller text for smaller badge
+                    unreadCount > 99 ? '99+' : unreadCount.toString(),
+                    style: const TextStyle(
                       color: Colors.white,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      fontSize: 10,
                     ),
                     textAlign: TextAlign.center,
                   ),
