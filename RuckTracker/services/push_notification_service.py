@@ -32,12 +32,17 @@ class PushNotificationService:
         # Initialize Firebase Admin SDK once globally
         try:
             if not firebase_admin._apps:
-                if self.service_account_path:
-                    cred = credentials.Certificate(self.service_account_path)
-                elif self.service_account_json:
+                cred = None
+                
+                # Prioritize JSON over path for Heroku deployment
+                if self.service_account_json:
+                    logger.info("Using Firebase service account JSON from environment variable")
                     cred = credentials.Certificate(json.loads(self.service_account_json))
+                elif self.service_account_path and os.path.exists(self.service_account_path):
+                    logger.info(f"Using Firebase service account file: {self.service_account_path}")
+                    cred = credentials.Certificate(self.service_account_path)
                 else:
-                    cred = None
+                    logger.warning("No Firebase service account credentials found, trying default application credentials")
 
                 if cred:
                     firebase_admin.initialize_app(cred, {
@@ -63,15 +68,15 @@ class PushNotificationService:
             return self._access_token
             
         try:
-            # Load service account credentials
-            if self.service_account_path:
-                credentials = service_account.Credentials.from_service_account_file(
-                    self.service_account_path,
-                    scopes=['https://www.googleapis.com/auth/firebase.messaging']
-                )
-            elif self.service_account_json:
+            # Load service account credentials - prioritize JSON over path
+            if self.service_account_json:
                 credentials = service_account.Credentials.from_service_account_info(
                     json.loads(self.service_account_json),
+                    scopes=['https://www.googleapis.com/auth/firebase.messaging']
+                )
+            elif self.service_account_path and os.path.exists(self.service_account_path):
+                credentials = service_account.Credentials.from_service_account_file(
+                    self.service_account_path,
                     scopes=['https://www.googleapis.com/auth/firebase.messaging']
                 )
             else:
