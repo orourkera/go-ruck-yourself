@@ -227,7 +227,7 @@ class EventResource(Resource):
             participants_result = admin_client.table('event_participants').select("""
                 *,
                 user!user_id(id, username, avatar_url)
-            """).eq('event_id', event_id).eq('status', 'approved').execute()
+            """).eq('event_id', event_id).execute()
             participants = participants_result.data or []
 
             # Fallback enrichment if some participants are missing nested user data
