@@ -57,12 +57,14 @@ class Event extends Equatable {
 
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
-      id: json['id'] as String,
-      title: json['title'] as String,
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? 'Untitled Event',
       description: json['description'] as String?,
-      creatorUserId: json['creator_user_id'] as String,
+      creatorUserId: json['creator_user_id'] as String? ?? '',
       clubId: json['club_id'] as String?,
-      scheduledStartTime: DateTime.parse(json['scheduled_start_time'] as String),
+      scheduledStartTime: json['scheduled_start_time'] != null 
+          ? DateTime.parse(json['scheduled_start_time'] as String)
+          : DateTime.now(),
       durationMinutes: json['duration_minutes'] as int,
       locationName: json['location_name'] as String?,
       latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
@@ -74,8 +76,12 @@ class Event extends Equatable {
       ruckWeightKg: json['ruck_weight_kg'] != null ? (json['ruck_weight_kg'] as num).toDouble() : null,
       bannerImageUrl: json['banner_image_url'] as String?,
       status: json['status'] as String? ?? 'active',
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.now(),
       participantCount: json['participant_count'] as int? ?? 0,
       userParticipationStatus: json['user_participation_status'] as String?,
       isCreator: json['is_creator'] as bool? ?? false,
@@ -271,11 +277,15 @@ class EventParticipant extends Equatable {
     }
     
     return EventParticipant(
-      id: json['id'] as String,
-      eventId: json['event_id'] as String,
-      userId: json['user_id'] as String,
-      status: json['status'] as String,
-      joinedAt: DateTime.parse(json['joined_at'] as String),
+      id: json['id'] as String? ?? '',
+      eventId: json['event_id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
+      status: json['status'] as String? ?? 'pending',
+      joinedAt: json['registered_at'] != null 
+          ? DateTime.parse(json['registered_at'] as String)
+          : (json['joined_at'] != null 
+              ? DateTime.parse(json['joined_at'] as String)
+              : DateTime.now()),
       user: userData != null 
           ? EventUser.fromJson(userData)
           : null,

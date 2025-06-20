@@ -700,15 +700,20 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           CircleAvatar(
             radius: 16,
             backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-            child: Text(
-              (participant.user?.username.isNotEmpty == true 
-                  ? participant.user!.username[0].toUpperCase()
-                  : '?'),
-              style: AppTextStyles.bodySmall.copyWith(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            backgroundImage: participant.user?.avatarUrl != null && participant.user!.avatarUrl!.isNotEmpty
+                ? NetworkImage(participant.user!.avatarUrl!)
+                : null,
+            child: participant.user?.avatarUrl == null || participant.user!.avatarUrl!.isEmpty
+                ? Text(
+                    (participant.user?.username.isNotEmpty == true 
+                        ? participant.user!.username[0].toUpperCase()
+                        : '?'),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
