@@ -108,7 +108,7 @@ class EventCard extends StatelessWidget {
                                 )
                               else if (event.creator != null)
                                 Text(
-                                  'by ${event.creator!.fullName}',
+                                  'by ${event.creator!.username}',
                                   style: AppTextStyles.bodySmall.copyWith(
                                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                   ),

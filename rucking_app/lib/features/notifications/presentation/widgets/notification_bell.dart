@@ -164,8 +164,8 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                 ),
               ),
             ),
-            // Notification count badge
-            if (unreadCount > 0)
+            // Notification count badge - always create it but conditionally show it
+            if (unreadCount > 0) ...[
               Positioned(
                 right: 8,
                 top: 8,
@@ -190,6 +190,7 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
                   ),
                 ),
               ),
+            ],
           ],
         );
       },

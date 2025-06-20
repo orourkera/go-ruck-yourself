@@ -489,6 +489,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 fontWeight: FontWeight.bold,
                 color: isSelected ? Colors.white : null,
                 fontFamily: isSelected ? 'Bangers' : null,
+                inherit: false, // Fix TextStyle interpolation issue
               ),
             ),
             Column(
@@ -503,6 +504,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     fontWeight: FontWeight.w500,
                     color: isSelected ? Colors.white : null,
                     fontFamily: isSelected ? 'Bangers' : null,
+                    inherit: false, // Fix TextStyle interpolation issue
                   ),
                 ),
                 SizedBox(height: 2),

@@ -432,7 +432,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                       )
                     else if (event.creator != null)
                       Text(
-                        'Organized by ${event.creator!.fullName}',
+                        'Organized by ${event.creator!.username}',
                         style: AppTextStyles.bodyLarge.copyWith(
                           color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                         ),
@@ -701,8 +701,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             radius: 16,
             backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
             child: Text(
-              (participant.user?.firstName.isNotEmpty == true 
-                  ? participant.user!.firstName[0].toUpperCase()
+              (participant.user?.username.isNotEmpty == true 
+                  ? participant.user!.username[0].toUpperCase()
                   : '?'),
               style: AppTextStyles.bodySmall.copyWith(
                 color: Theme.of(context).primaryColor,
@@ -713,7 +713,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              participant.user?.fullName ?? 'Unknown User',
+              participant.user?.username ?? 'Unknown User',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
               ),

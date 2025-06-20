@@ -92,19 +92,41 @@ class MainActivity : FlutterActivity() {
         val fineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarseLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         
-        // For Android 14+ (API 34+), also check for FOREGROUND_SERVICE_LOCATION
-        var foregroundServiceLocation = true
+        // Location permission is required (either fine or coarse)
+        val hasLocationPermission = fineLocation || coarseLocation
+        
+        // Log the permission status for debugging
+        android.util.Log.d("MainActivity", "Permission check - Fine Location: $fineLocation, Coarse Location: $coarseLocation")
+        
+        // For Android 14+ (API 34+), FOREGROUND_SERVICE_LOCATION should be automatically granted
+        // if declared in manifest and app has valid use case (fitness apps automatically qualify)
         if (Build.VERSION.SDK_INT >= 34) {
-            foregroundServiceLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val foregroundServiceLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            android.util.Log.d("MainActivity", "FOREGROUND_SERVICE_LOCATION permission: $foregroundServiceLocation")
+            
+            // Only require location permissions - FOREGROUND_SERVICE_LOCATION should be auto-granted
+            return hasLocationPermission
         }
         
-        return (fineLocation || coarseLocation) && foregroundServiceLocation
+        return hasLocationPermission
     }
     
     private fun startLocationService() {
-        val intent = Intent(this, LocationTrackingService::class.java)
-        intent.action = LocationTrackingService.ACTION_START_TRACKING
-        startForegroundService(intent)
+        try {
+            val intent = Intent(this, LocationTrackingService::class.java)
+            intent.action = LocationTrackingService.ACTION_START_TRACKING
+            
+            android.util.Log.d("MainActivity", "Starting foreground location service")
+            startForegroundService(intent)
+            android.util.Log.d("MainActivity", "Foreground location service started successfully")
+        } catch (e: SecurityException) {
+            android.util.Log.e("MainActivity", "SecurityException starting location service: ${e.message}", e)
+            // Could be permission issue or app not in eligible state
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Unexpected error starting location service: ${e.message}", e)
+            throw e
+        }
     }
     
     private fun stopLocationService() {
