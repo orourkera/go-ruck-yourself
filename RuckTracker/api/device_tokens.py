@@ -63,46 +63,46 @@ class DeviceTokenResource(Resource):
                 if existing_result.data and len(existing_result.data) > 0:
                     # Update existing token
                     token_id = existing_result.data[0]['id']
-                    update_result = supabase.table('user_device_tokens').update({
-                        'fcm_token': fcm_token,
-                        'device_id': device_id,
-                        'device_type': device_type,
-                        'app_version': app_version,
-                        'is_active': True,
-                        'updated_at': 'now()'
-                    }).eq('id', token_id).execute()
-                    
-                    if update_result.error:
-                        logger.error(f"Error updating device token: {update_result.error}")
+                    try:
+                        supabase.table('user_device_tokens').update({
+                            'fcm_token': fcm_token,
+                            'device_id': device_id,
+                            'device_type': device_type,
+                            'app_version': app_version,
+                            'is_active': True,
+                            'updated_at': 'now()'
+                        }).eq('id', token_id).execute()
+                        
+                        logger.info(f"Device token updated for user {user_id}")
+                        result_data = {'token_id': str(token_id)}
+                    except Exception as e:
+                        logger.error(f"Error updating device token: {e}")
                         return build_api_response(
                             success=False, 
                             error="Failed to update device token", 
                             status_code=500
                         )
-                    
-                    logger.info(f"Device token updated for user {user_id}")
-                    result_data = {'token_id': str(token_id)}
                 else:
                     # Insert new token
-                    insert_result = supabase.table('user_device_tokens').insert({
-                        'user_id': user_id,
-                        'fcm_token': fcm_token,
-                        'device_id': device_id,
-                        'device_type': device_type,
-                        'app_version': app_version,
-                        'is_active': True
-                    }).execute()
-                    
-                    if insert_result.error:
-                        logger.error(f"Error inserting device token: {insert_result.error}")
+                    try:
+                        insert_result = supabase.table('user_device_tokens').insert({
+                            'user_id': user_id,
+                            'fcm_token': fcm_token,
+                            'device_id': device_id,
+                            'device_type': device_type,
+                            'app_version': app_version,
+                            'is_active': True
+                        }).execute()
+                        
+                        logger.info(f"New device token registered for user {user_id}")
+                        result_data = {'token_id': str(insert_result.data[0]['id']) if insert_result.data else None}
+                    except Exception as e:
+                        logger.error(f"Error inserting device token: {e}")
                         return build_api_response(
                             success=False, 
                             error="Failed to register device token", 
                             status_code=500
                         )
-                    
-                    logger.info(f"New device token registered for user {user_id}")
-                    result_data = {'token_id': str(insert_result.data[0]['id']) if insert_result.data else None}
                 
                 return build_api_response(
                     success=True,
@@ -148,10 +148,10 @@ class DeviceTokenResource(Resource):
             elif device_id:
                 query = query.eq('device_id', device_id)
             
-            result = query.execute()
-            
-            if result.error:
-                logger.error(f"Error deactivating device token: {result.error}")
+            try:
+                query.execute()
+            except Exception as e:
+                logger.error(f"Error deactivating device token: {e}")
                 return build_api_response(
                     success=False, 
                     error="Failed to deactivate device token", 

@@ -230,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           BottomNavigationBarItem(
             icon: Image.asset(
               'assets/images/events.png',
-              width: 42,
+              width: 48,
               height: 48,
             ),
             activeIcon: Image.asset(
@@ -1310,4 +1310,4 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       developer.log('[HOME_DEBUG] Error preloading images: $e');
     }
   }
-} // Closes _HomeTabState classhere it is i
+} // Closes _HomeTabState class
