@@ -709,14 +709,14 @@ class RuckSessionCompleteResource(Resource):
                                 'created_at': now.isoformat()
                             }]).execute()
                             
-                            # Create duel progress notification
-                            try:
-                                from api.duel_comments import create_duel_progress_notification
-                                user_resp = supabase.table('users').select('username').eq('id', g.user.id).single().execute()
-                                user_name = user_resp.data.get('username', 'Unknown User') if user_resp.data else 'Unknown User'
-                                create_duel_progress_notification(duel_id, g.user.id, user_name, ruck_id)
-                            except Exception as notif_error:
-                                logger.error(f"Failed to create duel progress notification: {notif_error}")
+                            # Notification handled by database trigger
+                            # try:
+                            #     from api.duel_comments import create_duel_progress_notification
+                            #     user_resp = supabase.table('users').select('username').eq('id', g.user.id).single().execute()
+                            #     user_name = user_resp.data.get('username', 'Unknown User') if user_resp.data else 'Unknown User'
+                            #     create_duel_progress_notification(duel_id, g.user.id, user_name, ruck_id)
+                            # except Exception as notif_error:
+                            #     logger.error(f"Failed to create duel progress notification: {notif_error}")
                             
                             logger.info(f"Updated duel {duel_id} progress for user {g.user.id}: +{contribution} ({duel['challenge_type']}) = {new_value}")
                             

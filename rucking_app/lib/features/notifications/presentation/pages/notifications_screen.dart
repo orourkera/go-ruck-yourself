@@ -185,8 +185,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _handleNotificationTap(AppNotification notification) {
-    print('🔔 Debug: Notification tapped - type: ${notification.type}, data: ${notification.data}');
-    
     // Mark as read first
     _notificationBloc.add(NotificationRead(notification.id));
     
@@ -221,16 +219,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           final duelId = notification.data?['duel_id']?.toString();
           final commentId = notification.data?['duel_comment_id']?.toString();
           
-          print('🎯 Debug: Duel notification tapped');
-          print('🎯 Debug: notification.data = ${notification.data}');
-          print('🎯 Debug: duelId = $duelId');
-          print('🎯 Debug: commentId = $commentId');
-          
           if (duelId != null) {
             // Close loading dialog first
             Navigator.of(context, rootNavigator: true).pop();
-            
-            print('🎯 Debug: Navigating to DuelDetailScreen with duelId: $duelId');
             
             // Navigate to duel detail screen
             Navigator.push(
@@ -242,7 +233,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
             );
           } else {
-            print('🎯 Debug: duelId is null, not navigating');
             Navigator.of(context, rootNavigator: true).pop();
           }
           break;

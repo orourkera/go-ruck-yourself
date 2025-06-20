@@ -434,9 +434,9 @@ class DuelResource(Resource):
                 'updated_at': datetime.utcnow().isoformat()
             }).eq('id', duel_id).execute()
             
-            # Send notification about duel deletion
-            from api.duel_comments import create_duel_deleted_notification
-            create_duel_deleted_notification(duel_id, user_id)
+            # Notification handled by database trigger
+            # from api.duel_comments import create_duel_deleted_notification
+            # create_duel_deleted_notification(duel_id, user_id)
             
             return {'message': 'Duel deleted successfully'}
             
@@ -497,9 +497,9 @@ class DuelJoinResource(Resource):
             user_response = supabase.table('user').select('username').eq('id', user_id).single().execute()
             user_name = user_response.data.get('username', 'Unknown User') if user_response.data else 'Unknown User'
             
-            # Create duel joined notification for creator
-            from api.duel_comments import create_duel_joined_notification
-            create_duel_joined_notification(duel_id, user_id, user_name)
+            # Notification handled by database trigger
+            # from api.duel_comments import create_duel_joined_notification
+            # create_duel_joined_notification(duel_id, user_id, user_name)
             
             # Update user stats (optional - don't fail duel join if this fails)
             try:
@@ -565,8 +565,8 @@ class DuelJoinResource(Resource):
                 }).eq('id', duel_id).execute()
                 
                 # Create duel started notifications for all participants
-                from api.duel_comments import create_duel_started_notification
-                create_duel_started_notification(duel_id)
+                # from api.duel_comments import create_duel_started_notification
+                # create_duel_started_notification(duel_id)
             
             return {'message': 'Successfully joined duel'}
             
