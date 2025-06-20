@@ -51,32 +51,30 @@ class EventShareService {
 📅 $formattedDate at $formattedTime''';
 
     // Add location if available
-    if (event.locationName.isNotEmpty) {
+    if (event.locationName != null && event.locationName!.isNotEmpty) {
       shareText += '\n📍 ${event.locationName}';
     }
     
-    // Add distance if available
-    if (event.targetDistanceKm > 0) {
-      shareText += '\n🏃‍♂️ ${event.targetDistanceKm.toStringAsFixed(1)} km';
+    // Add ruck weight if available
+    if (event.ruckWeightKg != null && event.ruckWeightKg! > 0) {
+      shareText += '\n🎒 ${event.ruckWeightKg!.toStringAsFixed(1)} kg ruck weight';
     }
     
-    // Add duration if available
-    if (event.estimatedDurationMinutes > 0) {
-      final hours = event.estimatedDurationMinutes ~/ 60;
-      final minutes = event.estimatedDurationMinutes % 60;
-      if (hours > 0) {
-        shareText += '\n⏱️ ${hours}h ${minutes}m';
-      } else {
-        shareText += '\n⏱️ ${minutes}m';
-      }
+    // Add duration
+    final hours = event.durationMinutes ~/ 60;
+    final minutes = event.durationMinutes % 60;
+    if (hours > 0) {
+      shareText += '\n⏱️ ${hours}h ${minutes}m duration';
+    } else {
+      shareText += '\n⏱️ ${minutes}m duration';
     }
     
     // Add participant info
-    final spotsLeft = event.maxParticipants - event.currentParticipants;
-    if (event.maxParticipants > 0) {
-      shareText += '\n👥 $spotsLeft spots left (${event.currentParticipants}/${event.maxParticipants})';
+    if (event.maxParticipants != null && event.maxParticipants! > 0) {
+      final spotsLeft = event.maxParticipants! - event.participantCount;
+      shareText += '\n👥 $spotsLeft spots left (${event.participantCount}/${event.maxParticipants})';
     } else {
-      shareText += '\n👥 ${event.currentParticipants} people joining';
+      shareText += '\n👥 ${event.participantCount} people joining';
     }
     
     shareText += '''
@@ -100,7 +98,7 @@ Get the Ruck app and start your rucking journey!
 
 📅 $formattedDate at $formattedTime''';
 
-      if (event.locationName.isNotEmpty) {
+      if (event.locationName != null && event.locationName!.isNotEmpty) {
         shareText += '\n📍 ${event.locationName}';
       }
       

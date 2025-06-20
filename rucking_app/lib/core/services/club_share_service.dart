@@ -31,7 +31,7 @@ class ClubShareService {
     // Base share text with club details
     String shareText = '''🏃‍♂️ Join ${club.name} on Ruck!
 
-${club.description.isNotEmpty ? '${club.description}\n\n' : ''}📍 ${club.location}
+${club.description != null && club.description!.isNotEmpty ? '${club.description}\n\n' : ''}📍 ${club.location}
 👥 ${club.memberCount} members
 📅 Created ${_formatDate(club.createdAt)}
 
@@ -49,7 +49,7 @@ https://getrucky.com/clubs/${club.id}
     try {
       final String shareText = '''🏃‍♂️ Join ${clubDetails.club.name} on Ruck!
 
-${clubDetails.club.description.isNotEmpty ? '${clubDetails.club.description}\n\n' : ''}📍 ${clubDetails.club.location}
+${clubDetails.club.description != null && clubDetails.club.description!.isNotEmpty ? '${clubDetails.club.description}\n\n' : ''}📍 ${clubDetails.club.location}
 👥 ${clubDetails.club.memberCount} members
 
 Download the Ruck app to join this amazing rucking community!
