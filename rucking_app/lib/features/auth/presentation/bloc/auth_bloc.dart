@@ -6,6 +6,7 @@ import 'package:rucking_app/features/auth/domain/repositories/auth_repository.da
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
+import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 part 'auth_event.dart';
@@ -49,6 +50,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             FirebaseCrashlytics.instance.log('User authenticated: ${user.email}');
             
             emit(Authenticated(user));
+            _registerFirebaseTokenAfterAuth();
           } else {
             // If we can't get a user despite being "authenticated", stay authenticated
             // but log the issue - don't force logout
@@ -92,11 +94,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       if (fullUser != null) {
          emit(Authenticated(fullUser));
+         _registerFirebaseTokenAfterAuth();
       } else {
          // Should not happen if login succeeded, but handle defensively
          // Maybe emit Authenticated with just loginUser? Or an error?
          // For now, emit Authenticated with potentially incomplete loginUser data
          emit(Authenticated(loginUser)); 
+         _registerFirebaseTokenAfterAuth();
          emit(AuthError('Login succeeded but failed to fetch full user profile afterward.'));
       }
 
@@ -121,6 +125,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       FirebaseCrashlytics.instance.log('User logged in via Google: ${user.email}');
       
       emit(Authenticated(user));
+      
+      // Register Firebase token after successful authentication
+      _registerFirebaseTokenAfterAuth();
     } catch (e) {
       AppLogger.error('Google login failed', exception: e);
       
@@ -156,6 +163,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       
       emit(Authenticated(user));
+      _registerFirebaseTokenAfterAuth();
     } catch (e) {
       if (e.toString().contains('ConflictException') || e.toString().contains('already exists')) {
         emit(AuthUserAlreadyExists('An account with this email already exists. Please sign in instead.'));
@@ -184,7 +192,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         gender: event.gender,
       );
       
-      emit(Authenticated(user)); // Fix typo here
+      emit(Authenticated(user)); 
+      _registerFirebaseTokenAfterAuth();
     } catch (e) {
       emit(AuthError('Google registration failed: $e'));
     }
@@ -315,7 +324,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // After successful password reset, emit success state
       emit(const PasswordResetSuccess());
     } catch (e) {
-      emit(AuthError('Password reset failed: $e'));
+      emit(AuthError('Password reset confirmation failed: $e'));
+    }
+  }
+
+  /// Register Firebase messaging token after successful authentication
+  void _registerFirebaseTokenAfterAuth() {
+    try {
+      final firebaseMessaging = GetIt.I<FirebaseMessagingService>();
+      firebaseMessaging.registerTokenAfterAuth().catchError((e) {
+        AppLogger.warning('Failed to register Firebase token after auth: $e');
+      });
+    } catch (e) {
+      AppLogger.warning('Error accessing Firebase messaging service: $e');
     }
   }
 }

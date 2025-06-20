@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
 import '../../features/notifications/util/notification_navigation.dart';
 import '../../features/notifications/domain/entities/app_notification.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../services/api_client.dart';
 
 /// Service for handling Firebase Cloud Messaging (FCM) push notifications
@@ -211,6 +212,14 @@ class FirebaseMessagingService {
     try {
       print('🔔 Registering device token with backend...');
       final apiClient = GetIt.I<ApiClient>();
+      
+      // Check if user is authenticated before registering token
+      final authBloc = GetIt.I<AuthBloc>();
+      final authState = authBloc.state;
+      if (authState is! Authenticated) {
+        print('🔔 User not authenticated, skipping device token registration');
+        return;
+      }
       
       final deviceId = await _getDeviceId();
       final deviceType = Platform.isIOS ? 'ios' : 'android';
@@ -597,11 +606,19 @@ class FirebaseMessagingService {
     // Background message handling logic here
     // Note: Background handlers must be top-level functions or static methods
   }
-}
 
-/// Background message handler (must be top-level function)
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('Background message received: ${message.messageId}');
-  // Handle background message processing here if needed
+  /// Manually register device token after authentication
+  Future<void> registerTokenAfterAuth() async {
+    if (_deviceToken != null) {
+      print('🔔 Registering token after authentication...');
+      await _registerDeviceToken(_deviceToken!);
+    }
+  }
+
+  /// Background message handler (must be top-level function)
+  @pragma('vm:entry-point')
+  Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+    print('Background message received: ${message.messageId}');
+    // Handle background message processing here if needed
+  }
 }

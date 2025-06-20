@@ -70,30 +70,27 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     NotificationRead event,
     Emitter<NotificationState> emit,
   ) async {
-    final currentState = state;
-    if (currentState is NotificationsLoaded) {
-      try {
-        final success = await repository.markNotificationAsRead(event.notificationId);
-        if (success) {
-          final updatedNotifications = currentState.notifications.map((notification) {
-            if (notification.id == event.notificationId) {
-              return notification.copyWith(isRead: true);
-            }
-            return notification;
-          }).toList();
-          
-          final newUnreadCount = updatedNotifications.where((n) => !n.isRead).length;
-          _previousUnreadCount = newUnreadCount; // Update tracked count
-          
-          emit(currentState.copyWith(
-            notifications: updatedNotifications,
-            unreadCount: newUnreadCount,
-          ));
-        }
-      } catch (e) {
-        AppLogger.error('Failed to mark notification as read: $e');
-        // We don't emit an error state here to preserve the current notifications list
+    try {
+      final success = await repository.markNotificationAsRead(event.notificationId);
+      if (success) {
+        final updatedNotifications = state.notifications.map((notification) {
+          if (notification.id == event.notificationId) {
+            return notification.copyWith(isRead: true);
+          }
+          return notification;
+        }).toList();
+        
+        final newUnreadCount = updatedNotifications.where((n) => !n.isRead).length;
+        _previousUnreadCount = newUnreadCount; // Update tracked count
+        
+        emit(state.copyWith(
+          notifications: updatedNotifications,
+          unreadCount: newUnreadCount,
+        ));
       }
+    } catch (e) {
+      AppLogger.error('Failed to mark notification as read: $e');
+      // We don't emit an error state here to preserve the current notifications list
     }
   }
 
@@ -101,26 +98,23 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     AllNotificationsRead event,
     Emitter<NotificationState> emit,
   ) async {
-    final currentState = state;
-    if (currentState is NotificationsLoaded) {
-      try {
-        final success = await repository.markAllNotificationsAsRead();
-        if (success) {
-          final updatedNotifications = currentState.notifications
-              .map((notification) => notification.copyWith(isRead: true))
-              .toList();
-          
-          _previousUnreadCount = 0; // Update tracked count
-          
-          emit(currentState.copyWith(
-            notifications: updatedNotifications,
-            unreadCount: 0,
-          ));
-        }
-      } catch (e) {
-        AppLogger.error('Failed to mark all notifications as read: $e');
-        // We don't emit an error state here to preserve the current notifications list
+    try {
+      final success = await repository.markAllNotificationsAsRead();
+      if (success) {
+        final updatedNotifications = state.notifications
+            .map((notification) => notification.copyWith(isRead: true))
+            .toList();
+        
+        _previousUnreadCount = 0; // Update tracked count
+        
+        emit(state.copyWith(
+          notifications: updatedNotifications,
+          unreadCount: 0,
+        ));
       }
+    } catch (e) {
+      AppLogger.error('Failed to mark all notifications as read: $e');
+      // We don't emit an error state here to preserve the current notifications list
     }
   }
 

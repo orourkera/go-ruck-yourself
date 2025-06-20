@@ -78,6 +78,8 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
                     'message': message_text,
                     'duel_name': duel_name,
                     'commenter_name': commenter_name,
+                    'duel_id': duel_id,
+                    'duel_comment_id': comment_id,
                     'created_at': 'NOW()'
                 }
             }

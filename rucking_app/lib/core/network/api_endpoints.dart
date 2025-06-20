@@ -22,9 +22,9 @@ class ApiEndpoints {
   static const String ruckPhotos = '$baseApi/ruck-photos';
   
   // Notifications
-  static const String notifications = '$baseApi/notifications/';
-  static const String notificationRead = '$baseApi/notifications/{id}/read'; // Replace {id} with notification ID
-  static const String readAllNotifications = '$baseApi/notifications/read-all';
+  static const String notifications = '$baseApi/notifications';
+  static const String notificationRead = '/notifications/{id}/read'; // Replace {id} with notification ID
+  static const String readAllNotifications = '/notifications/read-all';
   
   // Achievements
   static const String achievements = '/achievements';
@@ -43,6 +43,7 @@ class ApiEndpoints {
       deleteComment.replaceAll('{id}', ruckId).replaceAll('{comment_id}', commentId);
   static String getNotificationReadEndpoint(String notificationId) => 
       notificationRead.replaceAll('{id}', notificationId);
+  static String getMarkAllNotificationsAsReadEndpoint() => readAllNotifications;
   static String getUserAchievementsEndpoint(String userId) => 
       userAchievements.replaceAll('{user_id}', userId);
   static String getUserAchievementsProgressEndpoint(String userId) => 

@@ -288,7 +288,7 @@ class _HomeTab extends StatefulWidget {
   _HomeTabState createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<_HomeTab> with RouteAware {
+class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderStateMixin {
   List<dynamic> _recentSessions = [];
   Map<String, dynamic> _monthlySummaryStats = {};
   bool _isLoading = true;
@@ -296,17 +296,52 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   ApiClient? _apiClient;
   final SessionCacheService _cacheService = SessionCacheService();
   final RouteObserver<ModalRoute> _routeObserver = RouteObserver<ModalRoute>();
+  late AnimationController _notificationAnimationController;
+  late Animation<double> _notificationShakeAnimation;
   
   @override
   void initState() {
     super.initState();
     _apiClient = GetIt.instance<ApiClient>();
     
+    // Initialize notification shake animation
+    _notificationAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    
+    _notificationShakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: 0.05)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.05, end: -0.05)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.05, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 25,
+      ),
+    ]).animate(CurvedAnimation(
+      parent: _notificationAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
       _checkForPhotoUploadError();
       _checkForSessionRecovery();
     });
+  }
+  
+  @override
+  void dispose() {
+    _notificationAnimationController.dispose();
+    super.dispose();
   }
   
   /// Checks route arguments for photo upload error flags and shows appropriate message
@@ -496,23 +531,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   }
 
   @override
-  void dispose() {
-    // Only attempt to unsubscribe if mounted
-    if (mounted) {
-      try {
-        final route = ModalRoute.of(context);
-        if (route is PageRoute) {
-          final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
-          routeObserver?.unsubscribe(this);
-        }
-      } catch (e) {
-        
-      }
-    }
-    super.dispose();
-  }
-
-  @override
   void didPopNext() {
     super.didPopNext();
     
@@ -609,7 +627,62 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                                 children: [
                                   // Notifications
                                   _buildHeaderAction(
-                                    icon: Image.asset('assets/images/notifications.png', width: 27, height: 27),
+                                    icon: BlocConsumer<NotificationBloc, NotificationState>(
+                                      listener: (context, state) {
+                                        final unreadCount = state.unreadCount;
+                                        
+                                        // Start shake animation when there are unread notifications
+                                        if (unreadCount > 0 && !_notificationAnimationController.isAnimating) {
+                                          _notificationAnimationController.repeat();
+                                        } else if (unreadCount <= 0 && _notificationAnimationController.isAnimating) {
+                                          _notificationAnimationController.stop();
+                                          _notificationAnimationController.reset();
+                                        }
+                                      },
+                                      builder: (context, state) {
+                                        final unreadCount = state.unreadCount;
+                                        print('🔔 Home Notification Icon: unreadCount=$unreadCount, totalNotifications=${state.notifications.length}');
+                                        
+                                        return AnimatedBuilder(
+                                          animation: _notificationShakeAnimation,
+                                          builder: (context, child) {
+                                            return Transform.rotate(
+                                              angle: _notificationShakeAnimation.value,
+                                              child: Stack(
+                                                children: [
+                                                  Image.asset('assets/images/notifications.png', width: 27, height: 27),
+                                                  if (unreadCount > 0)
+                                                    Positioned(
+                                                      right: 0,
+                                                      top: 0,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(2),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.red,
+                                                          borderRadius: BorderRadius.circular(10),
+                                                        ),
+                                                        constraints: const BoxConstraints(
+                                                          minWidth: 16,
+                                                          minHeight: 16,
+                                                        ),
+                                                        child: Text(
+                                                          unreadCount > 99 ? '99+' : unreadCount.toString(),
+                                                          style: const TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                          textAlign: TextAlign.center,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
                                     onTap: () async {
                                       await Navigator.push(
                                         context,
@@ -1237,4 +1310,4 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       developer.log('[HOME_DEBUG] Error preloading images: $e');
     }
   }
-} // Closes _HomeTabState class
+} // Closes _HomeTabState classhere it is i

@@ -68,14 +68,11 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
       // Listen for state changes to trigger animations
       listener: (context, state) {
         final unreadCount = state.unreadCount;
-        print('🔔 NotificationBell: Unread count changed to $unreadCount');
         
         // Force animation update when unread count changes
         if (unreadCount > 0 && !_animationController.isAnimating) {
-          print('🔔 Starting notification bell animation');
           _animationController.repeat();
         } else if (unreadCount <= 0 && _animationController.isAnimating) {
-          print('🔔 Stopping notification bell animation');
           _animationController.stop();
           _animationController.reset();
         }
@@ -83,6 +80,10 @@ class _NotificationBellState extends State<NotificationBell> with SingleTickerPr
       builder: (context, state) {
         final unreadCount = state.unreadCount;
         final isLoading = state.isLoading;
+        final totalNotifications = state.notifications.length;
+        
+        // Debug logging
+        print('🔔 NotificationBell: unreadCount=$unreadCount, totalNotifications=$totalNotifications');
         
         return Stack(
           clipBehavior: Clip.none,

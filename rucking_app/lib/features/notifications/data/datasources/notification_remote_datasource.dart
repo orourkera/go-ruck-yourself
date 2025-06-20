@@ -59,7 +59,6 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     try {
       final endpoint = ApiEndpoints.getNotificationReadEndpoint(notificationId);
       AppLogger.info('Marking notification as read: $notificationId at endpoint: $endpoint');
-      // Changed from PUT to POST to match the backend API implementation
       final response = await apiClient.post(endpoint, {});
       AppLogger.info('Mark notification read response: $response');
       return true;
@@ -72,10 +71,8 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   @override
   Future<bool> markAllNotificationsAsRead() async {
     try {
-      // Ensure we're not using a duplicated /api prefix like we saw with user profiles
-      final endpoint = '/notifications/read-all';
+      final endpoint = ApiEndpoints.getMarkAllNotificationsAsReadEndpoint();
       AppLogger.info('Marking all notifications as read at endpoint: $endpoint');
-      // Changed from PUT to POST to match the backend API implementation
       final response = await apiClient.post(endpoint, {});
       AppLogger.info('Mark all notifications read response: $response');
       return true;

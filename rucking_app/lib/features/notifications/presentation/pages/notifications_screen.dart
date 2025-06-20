@@ -15,6 +15,7 @@ import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dar
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/features/duels/presentation/screens/duel_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -40,7 +41,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void dispose() {
     // When leaving screen, restart polling with a delay to ensure our reads are processed
     Future.delayed(const Duration(seconds: 3), () {
-      if (_notificationBloc.state is NotificationsLoaded) {
+      if (_notificationBloc.state is NotificationState) {
         _notificationBloc.startPolling();
       }
     });
@@ -60,7 +61,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           actions: [
             BlocBuilder<NotificationBloc, NotificationState>(
               builder: (context, state) {
-                if (state is NotificationsLoaded && state.unreadCount > 0) {
+                if (state.unreadCount > 0) {
                   return TextButton(
                     onPressed: () {
                       _notificationBloc.add(const AllNotificationsRead());
@@ -80,11 +81,44 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         body: BlocBuilder<NotificationBloc, NotificationState>(
           builder: (context, state) {
-            if (state is NotificationsLoading) {
-              return Center(
+            if (state.isLoading) {
+              return const Center(
                 child: CircularProgressIndicator(),
               );
-            } else if (state is NotificationsLoaded) {
+            } else if (state.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading notifications',
+                      style: AppTextStyles.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      state.error,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        _notificationBloc.add(const NotificationsRequested());
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
+            } else {
               // Mark all notifications as read when screen is displayed and there are unread ones
               if (state.unreadCount > 0) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -99,52 +133,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               return RefreshIndicator(
                 onRefresh: () async {
                   _notificationBloc.add(const NotificationsRequested());
-                  // Wait for the refresh to complete
-                  await Future.delayed(const Duration(milliseconds: 500));
                 },
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(16),
                   itemCount: state.notifications.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final notification = state.notifications[index];
                     return NotificationCard(
                       notification: notification,
                       onTap: () => _handleNotificationTap(notification),
-                      onDismiss: () {
-                        _notificationBloc.add(NotificationRead(notification.id));
-                      },
                     );
                   },
                 ),
               );
-            } else if (state is NotificationsError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      color: AppColors.error,
-                      size: 48,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Failed to load notifications',
-                      style: AppTextStyles.bodyLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        _notificationBloc.add(const NotificationsRequested());
-                      },
-                      child: const Text('Try Again'),
-                    ),
-                  ],
-                ),
-              );
             }
-            
-            return const SizedBox.shrink();
           },
         ),
       ),
@@ -182,6 +185,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _handleNotificationTap(AppNotification notification) {
+    print('🔔 Debug: Notification tapped - type: ${notification.type}, data: ${notification.data}');
+    
     // Mark as read first
     _notificationBloc.add(NotificationRead(notification.id));
     
@@ -207,9 +212,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // Then navigate based on notification type and data
     if (notification.data != null) {
       switch (notification.type) {
+        case 'duel_comment':
+          final duelId = notification.data?['duel_id']?.toString();
+          final commentId = notification.data?['duel_comment_id']?.toString();
+          
+          print('🎯 Debug: Duel notification tapped');
+          print('🎯 Debug: notification.data = ${notification.data}');
+          print('🎯 Debug: duelId = $duelId');
+          print('🎯 Debug: commentId = $commentId');
+          
+          if (duelId != null) {
+            // Close loading dialog first
+            Navigator.of(context, rootNavigator: true).pop();
+            
+            print('🎯 Debug: Navigating to DuelDetailScreen with duelId: $duelId');
+            
+            // Navigate to duel detail screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DuelDetailScreen(
+                  duelId: duelId,
+                ),
+              ),
+            );
+          } else {
+            print('🎯 Debug: duelId is null, not navigating');
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+          break;
+          
         case NotificationType.like:
         case NotificationType.comment:
-          final ruckId = notification.data!['ruck_id']?.toString();
+          final ruckId = notification.data?['ruck_id']?.toString();
           if (ruckId != null) {
             // Create the session repository with the API client
             final sessionRepo = SessionRepository(apiClient: GetIt.I<ApiClient>());
@@ -218,7 +253,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Navigator.of(context, rootNavigator: true).pop();
 
             // Extract the user_id from the notification data if available
-            final userId = notification.data!['user_id']?.toString() ?? '';
+            final userId = notification.data?['user_id']?.toString() ?? '';
             
             // Create a minimal RuckBuddy with just the ID and userId
             // The detail screen will fetch the full data including the proper user profile
