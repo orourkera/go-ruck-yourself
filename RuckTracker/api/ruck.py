@@ -29,13 +29,21 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     r = 6371000
     return c * r
 
-def clip_route_for_privacy(location_points, clip_distance_m=400):
+def clip_route_for_privacy(location_points):
     """
-    Remove the first and last ~400m of a route for privacy.
-    Returns the clipped location points.
+    Clips the first and last ~200m (1/8 mile) of a route for privacy
+    
+    Args:
+        location_points: List of dictionaries with 'lat' and 'lng' keys
+    
+    Returns:
+        List of clipped location points
     """
     if not location_points or len(location_points) < 3:
         return location_points
+    
+    # Privacy clipping distance (200m or ~1/8 mile)
+    PRIVACY_DISTANCE_METERS = 200.0
     
     # Convert location points to uniform format with timestamp
     normalized_points = []
@@ -56,7 +64,7 @@ def clip_route_for_privacy(location_points, clip_distance_m=400):
     # Sort points by timestamp to ensure correct order (empty timestamps go first)
     sorted_points = sorted(normalized_points, key=lambda p: p.get('timestamp', ''))
     
-    # Find the start clipping index (skip first ~400m)
+    # Find the start clipping index (skip first ~200m)
     start_idx = 0
     cumulative_distance = 0
     for i in range(1, len(sorted_points)):
@@ -71,11 +79,11 @@ def clip_route_for_privacy(location_points, clip_distance_m=400):
             )
             cumulative_distance += distance
             
-            if cumulative_distance >= clip_distance_m:
+            if cumulative_distance >= PRIVACY_DISTANCE_METERS:
                 start_idx = i
                 break
     
-    # Find the end clipping index (skip last ~400m)
+    # Find the end clipping index (skip last ~200m)
     end_idx = len(sorted_points) - 1
     cumulative_distance = 0
     for i in range(len(sorted_points) - 2, -1, -1):
@@ -90,7 +98,7 @@ def clip_route_for_privacy(location_points, clip_distance_m=400):
             )
             cumulative_distance += distance
             
-            if cumulative_distance >= clip_distance_m:
+            if cumulative_distance >= PRIVACY_DISTANCE_METERS:
                 end_idx = i
                 break
     
@@ -382,7 +390,11 @@ class RuckSessionResource(Resource):
                 
                 # Apply privacy clipping if this is not the user's own session
                 if not is_own_session:
+                    original_count = len(location_points)
                     location_points = clip_route_for_privacy(location_points)
+                    logger.debug(f"[PRIVACY_DEBUG] Session {ruck_id} viewed by user {g.user.id}: Original points: {original_count}, Clipped points: {len(location_points)}")
+                else:
+                    logger.debug(f"[PRIVACY_DEBUG] Session {ruck_id} viewed by owner {g.user.id}: No clipping applied")
                 
                 # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
                 session['route'] = location_points

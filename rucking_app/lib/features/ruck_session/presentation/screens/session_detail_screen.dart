@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:rucking_app/shared/utils/route_parser.dart';
+import 'package:rucking_app/shared/utils/route_privacy_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -519,6 +520,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: _SessionRouteMap(session: widget.session),
               ),
+              _RoutePrivacyLegend(preferMetric: preferMetric),
 
               // Location Display - only show if location data is available and valid
               if (widget.session.locationPoints != null && widget.session.locationPoints!.isNotEmpty)
@@ -1527,17 +1529,114 @@ class _SessionRouteMap extends StatelessWidget {
               retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
             ),
             PolylineLayer(
-              polylines: [
-                Polyline(
-                  points: points,
-                  color: AppColors.secondary,
-                  strokeWidth: 4,
-                ),
-              ],
+              polylines: () {
+                // Get user's metric preference for privacy calculations
+                bool preferMetric = true;
+                try {
+                  final authState = context.read<AuthBloc>().state;
+                  if (authState is Authenticated) {
+                    preferMetric = authState.user.preferMetric;
+                  }
+                } catch (e) {
+                  // Default to metric if can't get preference
+                }
+
+                // Split route into privacy segments for visual indication
+                final privacySegments = RoutePrivacyUtils.splitRouteForPrivacy(
+                  points,
+                  preferMetric: preferMetric,
+                );
+
+                List<Polyline> polylines = [];
+
+                // Add private start segment (dashed gray with black outline)
+                if (privacySegments.privateStartSegment.isNotEmpty) {
+                  polylines.add(Polyline(
+                    points: privacySegments.privateStartSegment,
+                    color: Colors.grey.shade500,
+                    strokeWidth: 4,
+                    pattern: [8, 4], // Dashed pattern: 8px dash, 4px gap
+                    borderColor: Colors.black,
+                    borderStrokeWidth: 1,
+                  ));
+                }
+
+                // Add visible middle segment (normal color)
+                if (privacySegments.visibleMiddleSegment.isNotEmpty) {
+                  polylines.add(Polyline(
+                    points: privacySegments.visibleMiddleSegment,
+                    color: AppColors.secondary,
+                    strokeWidth: 4,
+                  ));
+                }
+
+                // Add private end segment (dashed gray with black outline)
+                if (privacySegments.privateEndSegment.isNotEmpty) {
+                  polylines.add(Polyline(
+                    points: privacySegments.privateEndSegment,
+                    color: Colors.grey.shade500,
+                    strokeWidth: 4,
+                    pattern: [8, 4], // Dashed pattern: 8px dash, 4px gap
+                    borderColor: Colors.black,
+                    borderStrokeWidth: 1,
+                  ));
+                }
+
+                // Fallback: if no segments were created, show the full route
+                if (polylines.isEmpty) {
+                  polylines.add(Polyline(
+                    points: points,
+                    color: AppColors.secondary,
+                    strokeWidth: 4,
+                  ));
+                }
+
+                return polylines;
+              }(),
 
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RoutePrivacyLegend extends StatelessWidget {
+  final bool preferMetric;
+
+  const _RoutePrivacyLegend({required this.preferMetric});
+
+  @override
+  Widget build(BuildContext context) {
+    final String distanceText = preferMetric ? '200m' : '1/8 mile';
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 16,
+            color: Colors.grey.shade600,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Dashed segments (first/last $distanceText) are hidden from other users',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: Colors.grey.shade600,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

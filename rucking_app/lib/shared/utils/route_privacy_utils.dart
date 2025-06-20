@@ -34,19 +34,15 @@ class RoutePrivacyUtils {
   /// Splits a route into privacy segments: start (private), middle (visible), end (private)
   /// 
   /// [routePoints] - The complete route points
-  /// [clipDistanceMeters] - Distance to clip from start/end (default 400m)
   /// [preferMetric] - User's unit preference for consistent distance calculation
   /// 
   /// Returns [RoutePrivacySegments] with the three segments
   static RoutePrivacySegments splitRouteForPrivacy(
     List<LatLng> routePoints, {
-    double clipDistanceMeters = 400.0,
     bool preferMetric = true,
   }) {
-    // Adjust distance based on user preference
-    final double actualClipDistance = preferMetric 
-        ? clipDistanceMeters  // 400m for metric users
-        : clipDistanceMeters * 1.609; // ~644m (1/4 mile) for imperial users
+    // Privacy clipping distances
+    final double privacyDistanceMeters = preferMetric ? 200.0 : 201.0; // 200m or ~1/8 mile
 
     if (routePoints.length < 3) {
       // Not enough points to clip, return as visible middle segment
@@ -64,7 +60,7 @@ class RoutePrivacyUtils {
       final distance = haversineDistance(routePoints[i - 1], routePoints[i]);
       cumulativeDistance += distance;
       
-      if (cumulativeDistance >= actualClipDistance) {
+      if (cumulativeDistance >= privacyDistanceMeters) {
         startIndex = i;
         break;
       }
@@ -77,7 +73,7 @@ class RoutePrivacyUtils {
       final distance = haversineDistance(routePoints[i], routePoints[i + 1]);
       cumulativeDistance += distance;
       
-      if (cumulativeDistance >= actualClipDistance) {
+      if (cumulativeDistance >= privacyDistanceMeters) {
         endIndex = i;
         break;
       }
@@ -117,6 +113,6 @@ class RoutePrivacyUtils {
   /// Helper method to check if user prefers metric units
   /// This should be called with the actual user preference from AuthBloc
   static double getClipDistance({required bool preferMetric}) {
-    return preferMetric ? 400.0 : 402.336; // 400m vs 1/4 mile (402.336m)
+    return preferMetric ? 200.0 : 201.0; // 200m vs ~1/8 mile (201m)
   }
 }

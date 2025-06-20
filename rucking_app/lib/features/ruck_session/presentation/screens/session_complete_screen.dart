@@ -978,8 +978,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             const SizedBox(height: 12),
             Text(
               preferMetric
-                  ? 'The first and last 400m of the ruck will be only visible to you and not shown publicly.'
-                  : 'The first and last 1/4 mile of the ruck will be only visible to you and not shown publicly.',
+                  ? 'The first and last 200m of the ruck will be only visible to you and not shown publicly.'
+                  : 'The first and last 1/8 mile of the ruck will be only visible to you and not shown publicly.',
               style: AppTextStyles.bodySmall.copyWith(color: Colors.grey.shade600),
             ),
           ],

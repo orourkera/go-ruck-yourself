@@ -42,6 +42,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/events_screen.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duels_list_screen.dart';
+import 'package:rucking_app/shared/utils/route_privacy_utils.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -1038,13 +1039,70 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                             retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
                                           ),
                                           PolylineLayer(
-                                            polylines: [
-                                              Polyline(
-                                                points: routePoints,
-                                                color: AppColors.secondary,
-                                                strokeWidth: 4,
-                                              ),
-                                            ],
+                                            polylines: () {
+                                              // Get user's metric preference for privacy calculations
+                                              bool preferMetric = true;
+                                              try {
+                                                final authState = context.read<AuthBloc>().state;
+                                                if (authState is Authenticated) {
+                                                  preferMetric = authState.user.preferMetric;
+                                                }
+                                              } catch (e) {
+                                                // Default to metric if can't get preference
+                                              }
+
+                                              // Split route into privacy segments for visual indication
+                                              final privacySegments = RoutePrivacyUtils.splitRouteForPrivacy(
+                                                routePoints,
+                                                preferMetric: preferMetric,
+                                              );
+
+                                              List<Polyline> polylines = [];
+
+                                              // Add private start segment (dashed gray with black outline)
+                                              if (privacySegments.privateStartSegment.isNotEmpty) {
+                                                polylines.add(Polyline(
+                                                  points: privacySegments.privateStartSegment,
+                                                  color: Colors.grey.shade500,
+                                                  strokeWidth: 4,
+                                                  pattern: [8, 4],
+                                                  borderColor: Colors.black,
+                                                  borderStrokeWidth: 1,
+                                                ));
+                                              }
+
+                                              // Add visible middle segment (normal color)
+                                              if (privacySegments.visibleMiddleSegment.isNotEmpty) {
+                                                polylines.add(Polyline(
+                                                  points: privacySegments.visibleMiddleSegment,
+                                                  color: AppColors.secondary,
+                                                  strokeWidth: 4,
+                                                ));
+                                              }
+
+                                              // Add private end segment (dashed gray with black outline)
+                                              if (privacySegments.privateEndSegment.isNotEmpty) {
+                                                polylines.add(Polyline(
+                                                  points: privacySegments.privateEndSegment,
+                                                  color: Colors.grey.shade500,
+                                                  strokeWidth: 4,
+                                                  pattern: [8, 4],
+                                                  borderColor: Colors.black,
+                                                  borderStrokeWidth: 1,
+                                                ));
+                                              }
+
+                                              // Fallback: if no segments were created, show the full route
+                                              if (polylines.isEmpty) {
+                                                polylines.add(Polyline(
+                                                  points: routePoints,
+                                                  color: AppColors.secondary,
+                                                  strokeWidth: 4,
+                                                ));
+                                              }
+
+                                              return polylines;
+                                            }(),
                                           ),
                                           
                                         ],
