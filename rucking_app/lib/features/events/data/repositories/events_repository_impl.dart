@@ -340,9 +340,15 @@ class EventsRepositoryImpl implements EventsRepository {
   Future<EventLeaderboard> getEventLeaderboard(String eventId) async {
     // Try to get cached leaderboard first
     final cachedLeaderboard = await _cacheService.getCachedEventLeaderboard(eventId);
-    
+
     if (cachedLeaderboard != null) {
-      return EventLeaderboard.fromJson(cachedLeaderboard);
+      final parsed = EventLeaderboard.fromJson(cachedLeaderboard);
+      // If any entry is missing user data, treat cache as stale and refetch
+      final hasMissingUser = parsed.entries.any((entry) => entry.user == null);
+      if (!hasMissingUser) {
+        return parsed;
+      }
+      // Otherwise fall through to fetch fresh data
     }
     
     // No cache, fetch from API

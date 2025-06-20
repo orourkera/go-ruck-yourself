@@ -25,21 +25,36 @@ class EventProgress extends Equatable {
   });
 
   factory EventProgress.fromJson(Map<String, dynamic> json) {
+    // Support both nested user object (`user`) and flat fields (`username`, `avatar_url`, `avatar`).
+    Map<String, dynamic>? userData;
+    if (json['user'] != null) {
+      userData = json['user'] as Map<String, dynamic>;
+    } else if (json['username'] != null) {
+      userData = {
+        'id': json['user_id'],
+        'username': json['username'],
+        // Prefer `avatar_url` if provided, otherwise fall back to `avatar` key used in some responses.
+        'avatar_url': json['avatar_url'] ?? json['avatar'],
+      };
+    }
+
     return EventProgress(
       id: json['id'] as String? ?? '',
       eventId: json['event_id'] as String? ?? '',
       userId: json['user_id'] as String? ?? '',
       ruckSessionId: json['ruck_session_id'] as int?,
-      totalDistance: (json['distance_km'] as num?)?.toDouble() ?? 
-                     (json['total_distance'] as num?)?.toDouble() ?? 0.0,
-      totalTime: json['duration_minutes'] as int? ?? 
-                 json['total_time'] as int? ?? 0,
+      totalDistance: (json['distance_km'] as num?)?.toDouble() ??
+          (json['total_distance'] as num?)?.toDouble() ??
+          0.0,
+      totalTime: json['duration_minutes'] as int? ??
+          json['total_time'] as int? ??
+          0,
       sessionCount: json['session_count'] as int? ?? 1,
-      lastUpdated: DateTime.tryParse(json['completed_at'] as String? ?? 
-                                    json['last_updated'] as String? ?? '') ?? DateTime.now(),
-      user: json['user'] != null 
-          ? EventProgressUser.fromJson(json['user'] as Map<String, dynamic>)
-          : null,
+      lastUpdated: DateTime.tryParse(
+            json['completed_at'] as String? ??
+                json['last_updated'] as String? ?? '') ??
+          DateTime.now(),
+      user: userData != null ? EventProgressUser.fromJson(userData) : null,
     );
   }
 
@@ -110,7 +125,8 @@ class EventProgressUser extends Equatable {
     return EventProgressUser(
       id: json['id'] as String? ?? '',
       username: json['username'] as String? ?? 'Unknown User',
-      avatar: json['avatar_url'] as String?,
+      // Fallback to `avatar` key if `avatar_url` is not present.
+      avatar: (json['avatar_url'] ?? json['avatar']) as String?,
     );
   }
 

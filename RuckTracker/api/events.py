@@ -44,7 +44,7 @@ class EventsListResource(Resource):
             # Base query
             query = admin_client.table('events').select("""
                 *,
-                creator:creator_user_id(id, first_name, last_name),
+                creator:creator_user_id(id, username, avatar_url),
                 hosting_club:club_id(id, name, logo_url)
             """)
             
@@ -214,7 +214,7 @@ class EventResource(Resource):
             # Get event details
             result = admin_client.table('events').select("""
                 *,
-                creator:creator_user_id(id, first_name, last_name),
+                creator:creator_user_id(id, username, avatar_url),
                 hosting_club:club_id(id, name, logo_url)
             """).eq('id', event_id).execute()
             
@@ -226,7 +226,7 @@ class EventResource(Resource):
             # Get participants
             participants_result = admin_client.table('event_participants').select("""
                 *,
-                user:user_id(id, username, avatar_url)
+                user(id, username, avatar_url)
             """).eq('event_id', event_id).eq('status', 'approved').execute()
             
             participants = participants_result.data
