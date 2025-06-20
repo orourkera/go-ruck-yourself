@@ -16,6 +16,8 @@ import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duel_detail_screen.dart';
+import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
+import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -286,6 +288,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         case NotificationType.follow:
           Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
           // Navigate to user profile in the future
+          break;
+          
+        case NotificationType.clubEventCreated:
+          print('🎯 DEBUG: Club event notification tapped');
+          print('🎯 DEBUG: Notification data: ${notification.data}');
+          final clubId = notification.data?['club_id']?.toString();
+          final eventId = notification.data?['event_id']?.toString();
+          print('🎯 DEBUG: Extracted clubId: $clubId');
+          print('🎯 DEBUG: Extracted eventId: $eventId');
+          if (eventId != null) {
+            Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
+            
+            print('🎯 DEBUG: Navigating to EventDetailScreen with eventId: $eventId');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EventDetailScreen(eventId: eventId),
+              ),
+            );
+          } else if (clubId != null) {
+            Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
+            
+            print('🎯 DEBUG: Fallback - Navigating to ClubDetailScreen with clubId: $clubId');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ClubDetailScreen(clubId: clubId),
+              ),
+            );
+          } else {
+            print('🎯 DEBUG: No eventId or clubId found in notification data');
+            Navigator.of(context, rootNavigator: true).pop();
+          }
           break;
           
         case NotificationType.system:

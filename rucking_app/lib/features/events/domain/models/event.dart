@@ -178,35 +178,33 @@ class Event extends Equatable {
 
 class EventCreator extends Equatable {
   final String id;
-  final String firstName;
-  final String lastName;
+  final String username;
+  final String? avatarUrl;
 
   const EventCreator({
     required this.id,
-    required this.firstName,
-    required this.lastName,
+    required this.username,
+    this.avatarUrl,
   });
 
   factory EventCreator.fromJson(Map<String, dynamic> json) {
     return EventCreator(
       id: json['id'] as String,
-      firstName: json['first_name'] as String,
-      lastName: json['last_name'] as String,
+      username: json['username'] as String,
+      avatarUrl: json['avatar_url'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'first_name': firstName,
-      'last_name': lastName,
+      'username': username,
+      'avatar_url': avatarUrl,
     };
   }
 
-  String get fullName => '$firstName $lastName';
-
   @override
-  List<Object?> get props => [id, firstName, lastName];
+  List<Object?> get props => [id, username, avatarUrl];
 }
 
 class EventHostingClub extends Equatable {
@@ -258,14 +256,28 @@ class EventParticipant extends Equatable {
   });
 
   factory EventParticipant.fromJson(Map<String, dynamic> json) {
+    // Handle both nested and flat user data structures
+    Map<String, dynamic>? userData;
+    if (json['user'] != null) {
+      // Nested structure from joined query
+      userData = json['user'] as Map<String, dynamic>;
+    } else if (json['username'] != null) {
+      // Flat structure - user data at top level
+      userData = {
+        'id': json['user_id'],
+        'username': json['username'],
+        'avatar_url': json['avatar_url'],
+      };
+    }
+    
     return EventParticipant(
       id: json['id'] as String,
       eventId: json['event_id'] as String,
       userId: json['user_id'] as String,
       status: json['status'] as String,
       joinedAt: DateTime.parse(json['joined_at'] as String),
-      user: json['user'] != null 
-          ? EventUser.fromJson(json['user'] as Map<String, dynamic>)
+      user: userData != null 
+          ? EventUser.fromJson(userData)
           : null,
     );
   }
@@ -291,35 +303,33 @@ class EventParticipant extends Equatable {
 
 class EventUser extends Equatable {
   final String id;
-  final String firstName;
-  final String lastName;
+  final String username;
+  final String? avatarUrl;
 
   const EventUser({
     required this.id,
-    required this.firstName,
-    required this.lastName,
+    required this.username,
+    this.avatarUrl,
   });
 
   factory EventUser.fromJson(Map<String, dynamic> json) {
     return EventUser(
       id: json['id'] as String,
-      firstName: json['first_name'] as String,
-      lastName: json['last_name'] as String,
+      username: json['username'] as String,
+      avatarUrl: json['avatar_url'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'first_name': firstName,
-      'last_name': lastName,
+      'username': username,
+      'avatar_url': avatarUrl,
     };
   }
 
-  String get fullName => '$firstName $lastName';
-
   @override
-  List<Object?> get props => [id, firstName, lastName];
+  List<Object?> get props => [id, username, avatarUrl];
 }
 
 class EventDetails extends Equatable {

@@ -613,6 +613,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       return const SizedBox.shrink(); // Don't show section if user has no admin clubs
     }
     
+    final primaryColor = _getLadyModeColor(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -627,10 +629,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         
         Container(
           decoration: BoxDecoration(
-            color: _isClubEvent ? AppColors.accent.withOpacity(0.1) : Colors.transparent,
+            color: _isClubEvent ? primaryColor.withOpacity(0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _isClubEvent ? AppColors.accent : Colors.grey.withOpacity(0.3),
+              color: _isClubEvent ? primaryColor : Colors.grey.withOpacity(0.3),
               width: 1,
             ),
           ),
@@ -647,7 +649,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   ? 'Event will appear in club calendar and member feeds'
                   : 'Event will be personal only',
               style: AppTextStyles.bodySmall.copyWith(
-                color: _isClubEvent ? AppColors.accent : Colors.grey[600],
+                color: _isClubEvent ? primaryColor : Colors.grey[600],
               ),
             ),
             value: _isClubEvent,
@@ -661,7 +663,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 }
               });
             },
-            activeColor: AppColors.accent,
+            activeColor: primaryColor,
           ),
         ),
         

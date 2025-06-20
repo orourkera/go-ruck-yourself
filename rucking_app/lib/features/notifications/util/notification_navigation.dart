@@ -5,6 +5,8 @@ import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duel_detail_screen.dart';
+import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
+import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
 
 /// Helper class for handling notification-related navigation
 class NotificationNavigation {
@@ -63,6 +65,27 @@ class NotificationNavigation {
             context,
             MaterialPageRoute(
               builder: (context) => DuelDetailScreen(duelId: duelId),
+            ),
+          );
+        }
+        break;
+      case NotificationType.clubEventCreated:
+        final clubId = notification.data!['club_id']?.toString();
+        final eventId = notification.data!['event_id']?.toString();
+        if (eventId != null) {
+          // Navigate to specific event detail screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EventDetailScreen(eventId: eventId),
+            ),
+          );
+        } else if (clubId != null) {
+          // Fallback to club detail if no event ID
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ClubDetailScreen(clubId: clubId),
             ),
           );
         }

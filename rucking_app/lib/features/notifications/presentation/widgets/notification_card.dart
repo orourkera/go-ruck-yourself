@@ -108,6 +108,10 @@ class NotificationCard extends StatelessWidget {
         iconData = Icons.notifications;
         iconColor = Colors.orange;
         break;
+      case NotificationType.clubEventCreated:
+        iconData = Icons.event;
+        iconColor = AppColors.primary;
+        break;
       default:
         iconData = Icons.notifications;
         iconColor = AppColors.primary;

@@ -26,4 +26,7 @@ class NotificationType {
 
   /// Duel progress notification (when participant completes a ruck)
   static const String duelProgress = 'duel_progress';
+
+  /// Club event created notification
+  static const String clubEventCreated = 'club_event_created';
 }
