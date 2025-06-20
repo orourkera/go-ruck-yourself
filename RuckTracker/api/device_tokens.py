@@ -5,7 +5,7 @@ import logging
 from flask import request, g
 from flask_restful import Resource
 
-from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_admin_client
 from RuckTracker.api.auth import auth_required
 from RuckTracker.utils.api_response import build_api_response
 
@@ -44,33 +44,80 @@ class DeviceTokenResource(Resource):
             
             # Get user from token
             user_id = g.user_id
-            supabase = get_supabase_client()
-            
-            # Use the upsert function to insert or update the token
-            result = supabase.rpc('upsert_device_token', {
-                'p_user_id': user_id,
-                'p_fcm_token': fcm_token,
-                'p_device_id': device_id,
-                'p_device_type': device_type,
-                'p_app_version': app_version
-            }).execute()
-            
-            if result.error:
-                logger.error(f"Error upserting device token: {result.error}")
+            supabase = get_supabase_admin_client()
+
+            # First, try to find and update existing token
+            try:
+                # Look for existing token for this user
+                existing_query = supabase.table('user_device_tokens').select('id')
+                
+                if device_id:
+                    # Try to find by device_id first
+                    existing_query = existing_query.eq('user_id', user_id).eq('device_id', device_id)
+                else:
+                    # Fallback to FCM token
+                    existing_query = existing_query.eq('user_id', user_id).eq('fcm_token', fcm_token)
+                
+                existing_result = existing_query.execute()
+                
+                if existing_result.data and len(existing_result.data) > 0:
+                    # Update existing token
+                    token_id = existing_result.data[0]['id']
+                    update_result = supabase.table('user_device_tokens').update({
+                        'fcm_token': fcm_token,
+                        'device_id': device_id,
+                        'device_type': device_type,
+                        'app_version': app_version,
+                        'is_active': True,
+                        'updated_at': 'now()'
+                    }).eq('id', token_id).execute()
+                    
+                    if update_result.error:
+                        logger.error(f"Error updating device token: {update_result.error}")
+                        return build_api_response(
+                            success=False, 
+                            error="Failed to update device token", 
+                            status_code=500
+                        )
+                    
+                    logger.info(f"Device token updated for user {user_id}")
+                    result_data = {'token_id': str(token_id)}
+                else:
+                    # Insert new token
+                    insert_result = supabase.table('user_device_tokens').insert({
+                        'user_id': user_id,
+                        'fcm_token': fcm_token,
+                        'device_id': device_id,
+                        'device_type': device_type,
+                        'app_version': app_version,
+                        'is_active': True
+                    }).execute()
+                    
+                    if insert_result.error:
+                        logger.error(f"Error inserting device token: {insert_result.error}")
+                        return build_api_response(
+                            success=False, 
+                            error="Failed to register device token", 
+                            status_code=500
+                        )
+                    
+                    logger.info(f"New device token registered for user {user_id}")
+                    result_data = {'token_id': str(insert_result.data[0]['id']) if insert_result.data else None}
+                
+                return build_api_response(
+                    success=True,
+                    message="Device token registered successfully",
+                    data=result_data,
+                    status_code=200
+                )
+                
+            except Exception as db_error:
+                logger.error(f"Database error in device token registration: {db_error}")
                 return build_api_response(
                     success=False, 
                     error="Failed to register device token", 
                     status_code=500
                 )
-            
-            logger.info(f"Device token registered for user {user_id}")
-            
-            return build_api_response(
-                success=True,
-                message="Device token registered successfully",
-                data={'token_id': str(result.data) if result.data else None},
-                status_code=200
-            )
             
         except Exception as e:
             logger.error(f"Error in DeviceTokenResource POST: {e}", exc_info=True)
@@ -86,7 +133,7 @@ class DeviceTokenResource(Resource):
         try:
             data = request.get_json() or {}
             user_id = g.user_id
-            supabase = get_supabase_client()
+            supabase = get_supabase_admin_client()
             
             # If specific token or device_id provided, deactivate only that
             fcm_token = data.get('fcm_token')

@@ -111,7 +111,6 @@ class AuthServiceImpl implements AuthService {
       scopes: ['email', 'profile'],
       serverClientId: '966278977337-730qujnni7h9ukafh5brafjd06j1skqu.apps.googleusercontent.com', // Exact Web client ID from Google Cloud Console
       clientId: '966278977337-l132nm2pas6ifl0kc3oh9977icfja6au.apps.googleusercontent.com', // iOS client ID
-      hostedDomain: 'getrucky.com',
     );
     
     // Set up the API client to use our refresh token method (with circuit breaker)
