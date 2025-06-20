@@ -9,6 +9,10 @@
             "comment": "Event deeplinks"
           },
           {
+            "/": "/clubs/*",
+            "comment": "Club deeplinks"
+          },
+          {
             "/": "/auth/callback",
             "comment": "Auth callback"
           }

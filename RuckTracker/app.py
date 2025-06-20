@@ -377,7 +377,8 @@ api.add_resource(DuelCommentsResource, '/api/duels/<string:duel_id>/comments')
 api.add_resource(DeviceTokenResource, '/api/device-token')
 
 # Event Deeplink Endpoints
-from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource
+from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource
+api.add_resource(ClubDeeplinkResource, '/clubs/<string:club_id>')
 api.add_resource(EventDeeplinkResource, '/events/<string:event_id>')
 api.add_resource(WellKnownResource, '/.well-known/<string:filename>')
 

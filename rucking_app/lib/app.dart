@@ -226,6 +226,27 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       return;
     }
     
+    // Check if this is a club deeplink
+    bool isClubDeeplink = false;
+    String? clubId;
+    
+    // Handle club deeplinks: https://getrucky.com/clubs/123 or com.getrucky.app://club/123
+    if ((uri.scheme == 'https' && uri.host == 'getrucky.com' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'clubs') ||
+        (uri.scheme == 'com.getrucky.app' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'club')) {
+      isClubDeeplink = true;
+      clubId = uri.pathSegments[1];
+    }
+    
+    if (isClubDeeplink && clubId != null) {
+      print('🔗 Processing club deeplink for club ID: $clubId');
+      // Navigate to club detail screen
+      _navigatorKey.currentState?.pushNamed(
+        '/club_detail',
+        arguments: clubId,
+      );
+      return;
+    }
+    
     // If we get here, it's an unknown deeplink format
     print('❌ Unknown deeplink format:');
     print('  URI: $uri');

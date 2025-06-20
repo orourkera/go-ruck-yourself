@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
@@ -11,6 +12,7 @@ import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/services/club_share_service.dart';
 
 class ClubDetailScreen extends StatefulWidget {
   final String clubId;
@@ -98,6 +100,19 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   }
 
   List<Widget> _buildAppBarActions() {
+    // Always include share button if club details are loaded
+    List<Widget> actions = [];
+    
+    if (_clubDetails != null) {
+      actions.add(
+        IconButton(
+          icon: const Icon(Icons.share, color: Colors.white),
+          tooltip: 'Share Club',
+          onPressed: () => _shareClub(),
+        ),
+      );
+    }
+    
     // Show different menu options based on user role
     final List<PopupMenuEntry<String>> menuItems = [];
     
@@ -141,9 +156,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       );
     }
     
-    // Always show the three-dot menu if there are items
+    // Add the three-dot menu if there are items
     if (menuItems.isNotEmpty) {
-      return [
+      actions.add(
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
           onSelected: (value) {
@@ -157,10 +172,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
           },
           itemBuilder: (context) => menuItems,
         ),
-      ];
+      );
     }
     
-    return [];
+    return actions;
   }
 
   Widget _buildClubContent(ClubDetails clubDetails) {
@@ -662,6 +677,12 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         ],
       ),
     );
+  }
+
+  void _shareClub() {
+    if (_clubDetails != null) {
+      ClubShareService.shareClub(_clubDetails!);
+    }
   }
 
   Widget _buildClubDetailSkeleton() {
