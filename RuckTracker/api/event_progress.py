@@ -54,9 +54,22 @@ class EventProgressResource(Resource):
                 user!user_id(id, username, avatar_url)
             """).eq('event_id', event_id).execute()
             
-            progress_data = result.data
+            progress_data = result.data or []
             logger.info(f"Raw progress query returned {len(progress_data)} entries")
-            
+
+            # --- Ensure user data is populated (fallback to separate query like duels API) ---
+            missing_user_ids = [p['user_id'] for p in progress_data if not p.get('user')]
+            if missing_user_ids:
+                logger.info(
+                    f"User join returned null for {len(missing_user_ids)} users – performing fallback lookup"
+                )
+                # Fetch required users in a single IN query to avoid N+1 calls
+                users_response = admin_client.table('user').select('id, username, avatar_url').in_('id', missing_user_ids).execute()
+                user_map = {u['id']: u for u in (users_response.data or [])}
+                for entry in progress_data:
+                    if not entry.get('user'):
+                        entry['user'] = user_map.get(entry['user_id'])
+
             if progress_data:
                 for entry in progress_data:
                     logger.info(f"Progress entry: user_id={entry.get('user_id')}, distance_km={entry.get('distance_km')}, completed_at={entry.get('completed_at')}")
@@ -216,8 +229,20 @@ class EventParticipantsResource(Resource):
                 user!user_id(id, username, avatar_url)
             """).eq('event_id', event_id).order('joined_at', desc=False).execute()
             
-            participants = result.data
-            
+            participants = result.data or []
+
+            # --- Ensure user data is populated (fallback lookup) ---
+            missing_user_ids = [p['user_id'] for p in participants if not p.get('user')]
+            if missing_user_ids:
+                logger.info(
+                    f"Participant join returned null for {len(missing_user_ids)} users – performing fallback lookup"
+                )
+                users_response = admin_client.table('user').select('id, username, avatar_url').in_('id', missing_user_ids).execute()
+                user_map = {u['id']: u for u in (users_response.data or [])}
+                for participant in participants:
+                    if not participant.get('user'):
+                        participant['user'] = user_map.get(participant['user_id'])
+
             # Add user flags
             for participant in participants:
                 participant['is_current_user'] = participant['user_id'] == current_user_id
