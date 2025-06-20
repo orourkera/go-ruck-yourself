@@ -228,8 +228,19 @@ class EventResource(Resource):
                 *,
                 user!user_id(id, username, avatar_url)
             """).eq('event_id', event_id).eq('status', 'approved').execute()
-            
-            participants = participants_result.data
+            participants = participants_result.data or []
+
+            # Fallback enrichment if some participants are missing nested user data
+            missing_user_ids = [p['user_id'] for p in participants if not p.get('user')]
+            if missing_user_ids:
+                try:
+                    users_result = admin_client.table('user').select('id, username, avatar_url').in_('id', missing_user_ids).execute()
+                    users_dict = {u['id']: u for u in users_result.data} if users_result.data else {}
+                    for p in participants:
+                        if not p.get('user') and p['user_id'] in users_dict:
+                            p['user'] = users_dict[p['user_id']]
+                except Exception as user_fetch_error:
+                    logger.error(f"Error fetching user data for participants fallback: {user_fetch_error}")
             
             # Check user's participation status
             user_participation = None
