@@ -147,6 +147,9 @@ class EventsRepositoryImpl implements EventsRepository {
 
   @override
   Future<EventDetails> getEventDetails(String eventId) async {
+    // Invalidate cache first to ensure fresh data
+    await _cacheService.invalidateEventDetails(eventId);
+    
     // Try to get cached event details first
     final cachedDetails = await _cacheService.getCachedEventDetails(eventId);
     

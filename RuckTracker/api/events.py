@@ -259,13 +259,15 @@ class EventResource(Resource):
             
             event_details = {
                 **event,
-                'participants': participants,
                 'participant_count': len(participants),
                 'user_participation_status': user_participation,
                 'is_creator': event['creator_user_id'] == current_user_id
             }
             
-            return {'event': event_details}, 200
+            return {
+                'event': event_details,
+                'participants': participants
+            }, 200
             
         except Exception as e:
             logger.error(f"Error fetching event {event_id}: {e}", exc_info=True)
