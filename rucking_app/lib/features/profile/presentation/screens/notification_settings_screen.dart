@@ -67,10 +67,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
 
     // Show confirmation
     StyledSnackBar.show(
-      context,
-      message: enabled 
-        ? '${_getNotificationTypeName(type)} notifications enabled'
-        : '${_getNotificationTypeName(type)} notifications disabled',
+      context: context,
+      message: enabled
+          ? '${_getNotificationTypeName(type)} notifications enabled'
+          : '${_getNotificationTypeName(type)} notifications disabled',
       type: SnackBarType.success,
     );
   }
@@ -109,7 +109,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         backgroundColor: ladyModeColor,
         title: Text(
           'Notification Settings',
-          style: AppTextStyles.headlineSmall.copyWith(
+          style: AppTextStyles.headlineMedium.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),

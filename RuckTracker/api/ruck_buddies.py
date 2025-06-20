@@ -1,12 +1,93 @@
 from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import jwt_required
 import os
+import math
 from datetime import datetime, timedelta
 
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.api.auth import auth_required, get_user_id
 
 ruck_buddies_bp = Blueprint('ruck_buddies', __name__)
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees).
+    Returns distance in meters.
+    """
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    
+    # Radius of earth in meters
+    r = 6371000
+    return c * r
+
+def clip_route_for_privacy(location_points, clip_distance_m=400):
+    """
+    Remove the first and last ~400m of a route for privacy.
+    Returns the clipped location points.
+    """
+    if not location_points or len(location_points) < 3:
+        return location_points
+    
+    # Sort points by timestamp to ensure correct order
+    sorted_points = sorted(location_points, key=lambda p: p.get('timestamp', ''))
+    
+    if len(sorted_points) < 3:
+        return sorted_points
+    
+    # Find the start clipping index (skip first ~400m)
+    start_idx = 0
+    cumulative_distance = 0
+    for i in range(1, len(sorted_points)):
+        prev_point = sorted_points[i-1]
+        curr_point = sorted_points[i]
+        
+        if prev_point.get('latitude') and prev_point.get('longitude') and \
+           curr_point.get('latitude') and curr_point.get('longitude'):
+            distance = haversine_distance(
+                prev_point['latitude'], prev_point['longitude'],
+                curr_point['latitude'], curr_point['longitude']
+            )
+            cumulative_distance += distance
+            
+            if cumulative_distance >= clip_distance_m:
+                start_idx = i
+                break
+    
+    # Find the end clipping index (skip last ~400m)
+    end_idx = len(sorted_points) - 1
+    cumulative_distance = 0
+    for i in range(len(sorted_points) - 2, -1, -1):
+        curr_point = sorted_points[i]
+        next_point = sorted_points[i+1]
+        
+        if curr_point.get('latitude') and curr_point.get('longitude') and \
+           next_point.get('latitude') and next_point.get('longitude'):
+            distance = haversine_distance(
+                curr_point['latitude'], curr_point['longitude'],
+                next_point['latitude'], next_point['longitude']
+            )
+            cumulative_distance += distance
+            
+            if cumulative_distance >= clip_distance_m:
+                end_idx = i
+                break
+    
+    # Ensure we have at least some points left
+    if start_idx >= end_idx:
+        # If clipping would remove everything, return a minimal route (middle section)
+        middle_start = max(0, len(sorted_points) // 4)
+        middle_end = min(len(sorted_points), 3 * len(sorted_points) // 4)
+        return sorted_points[middle_start:middle_end] if middle_end > middle_start else sorted_points[1:-1]
+    
+    return sorted_points[start_idx:end_idx + 1]
 
 @ruck_buddies_bp.route('/api/ruck-buddies', methods=['GET'])
 @auth_required
@@ -100,10 +181,15 @@ def get_ruck_buddies():
         comments = session.get('comments', [])
         comment_count = len(comments)
         
+        # Clip route for privacy
+        location_points = session.get('location_points', [])
+        clipped_location_points = clip_route_for_privacy(location_points)
+        
         # Add computed fields to session data
         session['like_count'] = like_count
         session['is_liked_by_current_user'] = is_liked_by_current_user
         session['comment_count'] = comment_count
+        session['location_points'] = clipped_location_points
         
         # Remove the raw likes/comments arrays to keep response clean
         session.pop('likes', None)

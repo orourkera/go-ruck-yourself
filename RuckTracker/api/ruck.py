@@ -3,11 +3,115 @@ from flask_restful import Resource
 from datetime import datetime, timedelta
 import uuid
 import logging
+import math
 from dateutil import tz
 
 from RuckTracker.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees).
+    Returns distance in meters.
+    """
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    
+    # Radius of earth in meters
+    r = 6371000
+    return c * r
+
+def clip_route_for_privacy(location_points, clip_distance_m=400):
+    """
+    Remove the first and last ~400m of a route for privacy.
+    Returns the clipped location points.
+    """
+    if not location_points or len(location_points) < 3:
+        return location_points
+    
+    # Convert location points to uniform format with timestamp
+    normalized_points = []
+    for point in location_points:
+        if isinstance(point, dict):
+            if 'lat' in point and 'lng' in point:
+                normalized_points.append({
+                    'latitude': point['lat'],
+                    'longitude': point['lng'],
+                    'timestamp': point.get('timestamp', '')
+                })
+            elif 'latitude' in point and 'longitude' in point:
+                normalized_points.append(point)
+    
+    if len(normalized_points) < 3:
+        return location_points
+    
+    # Sort points by timestamp to ensure correct order (empty timestamps go first)
+    sorted_points = sorted(normalized_points, key=lambda p: p.get('timestamp', ''))
+    
+    # Find the start clipping index (skip first ~400m)
+    start_idx = 0
+    cumulative_distance = 0
+    for i in range(1, len(sorted_points)):
+        prev_point = sorted_points[i-1]
+        curr_point = sorted_points[i]
+        
+        if prev_point.get('latitude') and prev_point.get('longitude') and \
+           curr_point.get('latitude') and curr_point.get('longitude'):
+            distance = haversine_distance(
+                prev_point['latitude'], prev_point['longitude'],
+                curr_point['latitude'], curr_point['longitude']
+            )
+            cumulative_distance += distance
+            
+            if cumulative_distance >= clip_distance_m:
+                start_idx = i
+                break
+    
+    # Find the end clipping index (skip last ~400m)
+    end_idx = len(sorted_points) - 1
+    cumulative_distance = 0
+    for i in range(len(sorted_points) - 2, -1, -1):
+        curr_point = sorted_points[i]
+        next_point = sorted_points[i+1]
+        
+        if curr_point.get('latitude') and curr_point.get('longitude') and \
+           next_point.get('latitude') and next_point.get('longitude'):
+            distance = haversine_distance(
+                curr_point['latitude'], curr_point['longitude'],
+                next_point['latitude'], next_point['longitude']
+            )
+            cumulative_distance += distance
+            
+            if cumulative_distance >= clip_distance_m:
+                end_idx = i
+                break
+    
+    # Ensure we have at least some points left
+    if start_idx >= end_idx:
+        # If clipping would remove everything, return a minimal route (middle section)
+        middle_start = max(0, len(sorted_points) // 4)
+        middle_end = min(len(sorted_points), 3 * len(sorted_points) // 4)
+        clipped_points = sorted_points[middle_start:middle_end] if middle_end > middle_start else sorted_points[1:-1]
+    else:
+        clipped_points = sorted_points[start_idx:end_idx + 1]
+    
+    # Convert back to original format
+    result = []
+    for point in clipped_points:
+        result.append({
+            'lat': point['latitude'],
+            'lng': point['longitude']
+        })
+    
+    return result
 
 class RuckSessionListResource(Resource):
     def get(self):
@@ -232,53 +336,93 @@ class RuckSessionResource(Resource):
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # First try to get the session for the current user (full access)
             response = supabase.table('ruck_session') \
                 .select('*') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .execute()
-            if not response.data or len(response.data) == 0:
-                return {'message': 'Session not found'}, 404
-            session = response.data[0]
+            
+            is_own_session = bool(response.data and len(response.data) > 0)
+            
+            if not is_own_session:
+                # If not the user's own session, check if it's a public session
+                response = supabase.table('ruck_session') \
+                    .select('*, user:user_id(allow_ruck_sharing)') \
+                    .eq('id', ruck_id) \
+                    .eq('is_public', True) \
+                    .execute()
+                
+                if not response.data or len(response.data) == 0:
+                    return {'message': 'Session not found'}, 404
+                    
+                session = response.data[0]
+                
+                # Check if the session owner allows sharing
+                user_data = session.get('user')
+                if not user_data or not user_data.get('allow_ruck_sharing', False):
+                    return {'message': 'Session not found'}, 404
+            else:
+                session = response.data[0]
+            
+            # Fetch location points
             locations_resp = supabase.table('location_point') \
-                .select('latitude,longitude') \
+                .select('latitude,longitude,timestamp') \
                 .eq('session_id', ruck_id) \
-                .order('timestamp', desc=True) \
+                .order('timestamp') \
                 .execute()
+            
             logger.debug(f"Location response data for session {ruck_id}: {len(locations_resp.data) if locations_resp.data else 0} points")
+            
             if locations_resp.data:
+                # Convert location points to the expected format
+                location_points = [{'lat': loc['latitude'], 'lng': loc['longitude'], 'timestamp': loc.get('timestamp', '')} 
+                                 for loc in locations_resp.data]
+                
+                # Apply privacy clipping if this is not the user's own session
+                if not is_own_session:
+                    location_points = clip_route_for_privacy(location_points)
+                
                 # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
-                session['route'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
-                session['location_points'] = [{'lat': loc['latitude'], 'lng': loc['longitude']} for loc in locations_resp.data]
+                session['route'] = location_points
+                session['location_points'] = location_points
             else:
                 session['route'] = []
                 session['location_points'] = []
             
-            # Fetch splits data
-            splits_resp = supabase.table('session_splits') \
-                .select('split_number,split_distance_km,split_duration_seconds') \
-                .eq('session_id', ruck_id) \
-                .order('split_number') \
-                .execute()
-            
-            if splits_resp.data:
-                # Convert splits to the format expected by frontend
-                session['splits'] = []
-                for split in splits_resp.data:
-                    distance_km = split['split_distance_km']
-                    duration_seconds = split['split_duration_seconds']
-                    
-                    # Calculate pace (seconds per km)
-                    pace_seconds_per_km = duration_seconds / distance_km if distance_km > 0 else 0
-                    
-                    session['splits'].append({
-                        'splitNumber': split['split_number'],
-                        'distance': distance_km * 1000, # Convert km to meters
-                        'duration': duration_seconds,
-                        'paceSecondsPerKm': pace_seconds_per_km
-                    })
+            # Fetch splits data (only for the session owner for now)
+            if is_own_session:
+                splits_resp = supabase.table('session_splits') \
+                    .select('split_number,split_distance_km,split_duration_seconds') \
+                    .eq('session_id', ruck_id) \
+                    .order('split_number') \
+                    .execute()
+                
+                if splits_resp.data:
+                    # Convert splits to the format expected by frontend
+                    session['splits'] = []
+                    for split in splits_resp.data:
+                        distance_km = split['split_distance_km']
+                        duration_seconds = split['split_duration_seconds']
+                        
+                        # Calculate pace (seconds per km)
+                        pace_seconds_per_km = duration_seconds / distance_km if distance_km > 0 else 0
+                        
+                        session['splits'].append({
+                            'splitNumber': split['split_number'],
+                            'distance': distance_km * 1000, # Convert km to meters
+                            'duration': duration_seconds,
+                            'paceSecondsPerKm': pace_seconds_per_km
+                        })
+                else:
+                    session['splits'] = []
             else:
                 session['splits'] = []
+            
+            # Clean up user data before returning
+            if 'user' in session:
+                del session['user']
             
             return session, 200
         except Exception as e:
