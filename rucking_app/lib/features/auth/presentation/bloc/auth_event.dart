@@ -107,6 +107,16 @@ class AuthUpdateProfileRequested extends AuthEvent {
   List<Object?> get props => [username, weightKg, heightCm, preferMetric, allowRuckSharing, gender, avatarUrl];
 }
 
+/// Event to update user notification preferences
+class AuthUpdateNotificationPreferences extends AuthEvent {
+  final Map<String, bool> preferences;
+
+  const AuthUpdateNotificationPreferences(this.preferences);
+
+  @override
+  List<Object> get props => [preferences];
+}
+
 /// Event triggered when the user requests to delete their account
 class AuthDeleteAccountRequested extends AuthEvent {
   const AuthDeleteAccountRequested();

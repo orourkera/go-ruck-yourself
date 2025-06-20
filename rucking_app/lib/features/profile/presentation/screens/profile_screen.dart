@@ -251,6 +251,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     .toList(),
                               ),
                             ),
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.notifications_outlined,
+                              label: 'Notification Settings',
+                              onTap: () {
+                                Navigator.pushNamed(context, '/notification_settings');
+                              },
+                            ),
                           ],
                         ),
                         const SizedBox(height: 24),

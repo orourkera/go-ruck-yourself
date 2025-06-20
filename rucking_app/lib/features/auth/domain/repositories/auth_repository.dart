@@ -56,6 +56,10 @@ abstract class AuthRepository {
     bool? allowRuckSharing,
     String? gender,
     String? avatarUrl,
+    bool? notificationClubs,
+    bool? notificationBuddies,
+    bool? notificationEvents,
+    bool? notificationDuels,
   });
 
   /// Delete the current user's account

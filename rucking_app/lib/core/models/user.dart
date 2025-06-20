@@ -36,6 +36,12 @@ class User extends Equatable {
   /// User's avatar image URL
   final String? avatarUrl;
   
+  /// User's notification preferences
+  final bool? notificationClubs;
+  final bool? notificationBuddies;
+  final bool? notificationEvents;
+  final bool? notificationDuels;
+  
   /// User stats information
   final UserStats? stats;
 
@@ -52,6 +58,10 @@ class User extends Equatable {
     this.allowRuckSharing = true,
     this.gender,
     this.avatarUrl,
+    this.notificationClubs,
+    this.notificationBuddies,
+    this.notificationEvents,
+    this.notificationDuels,
     this.stats,
   });
   
@@ -68,6 +78,10 @@ class User extends Equatable {
     bool? allowRuckSharing,
     String? gender,
     String? avatarUrl,
+    bool? notificationClubs,
+    bool? notificationBuddies,
+    bool? notificationEvents,
+    bool? notificationDuels,
     UserStats? stats,
   }) {
     return User(
@@ -82,6 +96,10 @@ class User extends Equatable {
       allowRuckSharing: allowRuckSharing ?? this.allowRuckSharing,
       gender: gender ?? this.gender,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      notificationClubs: notificationClubs ?? this.notificationClubs,
+      notificationBuddies: notificationBuddies ?? this.notificationBuddies,
+      notificationEvents: notificationEvents ?? this.notificationEvents,
+      notificationDuels: notificationDuels ?? this.notificationDuels,
       stats: stats ?? this.stats,
     );
   }
@@ -123,6 +141,10 @@ class User extends Equatable {
       allowRuckSharing: json['allow_ruck_sharing'] as bool? ?? true,
       gender: json['gender'] as String?,
       avatarUrl: json['avatar_url'] as String?,
+      notificationClubs: json['notification_clubs'] as bool?,
+      notificationBuddies: json['notification_buddies'] as bool?,
+      notificationEvents: json['notification_events'] as bool?,
+      notificationDuels: json['notification_duels'] as bool?,
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
@@ -149,13 +171,17 @@ class User extends Equatable {
     if (createdAt != null) data['created_at'] = createdAt;
     if (gender != null) data['gender'] = gender;
     if (avatarUrl != null) data['avatar_url'] = avatarUrl;
+    if (notificationClubs != null) data['notification_clubs'] = notificationClubs;
+    if (notificationBuddies != null) data['notification_buddies'] = notificationBuddies;
+    if (notificationEvents != null) data['notification_events'] = notificationEvents;
+    if (notificationDuels != null) data['notification_duels'] = notificationDuels;
     if (stats != null) data['stats'] = stats!.toJson();
     return data;
   }
   
   @override
   List<Object?> get props => [
-    userId, email, username, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, stats
+    userId, email, username, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, notificationClubs, notificationBuddies, notificationEvents, notificationDuels, stats
   ];
 }
 

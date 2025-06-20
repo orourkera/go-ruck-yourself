@@ -59,6 +59,10 @@ abstract class AuthService {
     bool? allowRuckSharing,
     String? gender,
     String? avatarUrl,
+    bool? notificationClubs,
+    bool? notificationBuddies,
+    bool? notificationEvents,
+    bool? notificationDuels,
   });
 
   /// Delete the current user's account
@@ -623,6 +627,10 @@ class AuthServiceImpl implements AuthService {
     bool? allowRuckSharing,
     String? gender,
     String? avatarUrl,
+    bool? notificationClubs,
+    bool? notificationBuddies,
+    bool? notificationEvents,
+    bool? notificationDuels,
   }) async {
     try {
       final data = <String, dynamic>{};
@@ -633,6 +641,10 @@ class AuthServiceImpl implements AuthService {
       if (allowRuckSharing != null) data['allow_ruck_sharing'] = allowRuckSharing;
       if (gender != null) data['gender'] = gender;
       if (avatarUrl != null) data['avatar_url'] = avatarUrl;
+      if (notificationClubs != null) data['notification_clubs'] = notificationClubs;
+      if (notificationBuddies != null) data['notification_buddies'] = notificationBuddies;
+      if (notificationEvents != null) data['notification_events'] = notificationEvents;
+      if (notificationDuels != null) data['notification_duels'] = notificationDuels;
       
       // Only send request if there is data to update
       if (data.isEmpty) {

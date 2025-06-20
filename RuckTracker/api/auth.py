@@ -317,7 +317,7 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing', 'gender', 'date_of_birth', 'avatar_url']
+            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing', 'gender', 'date_of_birth', 'avatar_url', 'notification_clubs', 'notification_buddies', 'notification_events', 'notification_duels']
             for field in allowed_fields:
                 if field == 'prefer_metric': # Check for snake_case field name
                     # Expect camelCase 'preferMetric' in the incoming JSON data for updates too
@@ -342,6 +342,10 @@ class UserProfileResource(Resource):
                         update_data['allow_ruck_sharing'] = data['allowRuckSharing']
                     elif 'allow_ruck_sharing' in data:  # Also check for snake_case
                         update_data['allow_ruck_sharing'] = data['allow_ruck_sharing']
+                # Handle notification preferences (all expect snake_case keys)
+                elif field in ['notification_clubs', 'notification_buddies', 'notification_events', 'notification_duels']:
+                    if field in data:
+                        update_data[field] = data[field]
                 elif field in data:
                     update_data[field] = data[field]
                  

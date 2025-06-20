@@ -24,6 +24,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthGoogleRegisterRequested>(_onAuthGoogleRegisterRequested);
     on<AuthLogoutRequested>(_onAuthLogoutRequested);
     on<AuthUpdateProfileRequested>(_onAuthUpdateProfileRequested);
+    on<AuthUpdateNotificationPreferences>(_onAuthUpdateNotificationPreferences);
     on<AuthDeleteAccountRequested>(_onAuthDeleteAccountRequested);
     on<AuthPasswordResetRequested>(_onAuthPasswordResetRequested);
     on<AuthPasswordResetConfirmed>(_onAuthPasswordResetConfirmed);
@@ -256,6 +257,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } else {
       // Cannot update profile if not authenticated
       emit(AuthError('Cannot update profile: User not authenticated.'));
+    }
+  }
+
+  /// Handle notification preferences update request
+  Future<void> _onAuthUpdateNotificationPreferences(
+    AuthUpdateNotificationPreferences event,
+    Emitter<AuthState> emit,
+  ) async {
+    // Get current state to maintain user ID if needed
+    final currentState = state;
+    if (currentState is Authenticated) {
+      emit(AuthLoading()); // Indicate loading state
+      try {
+        // Call updateProfile with the notification preference fields from the event
+        final updatedUser = await _authRepository.updateProfile(
+          notificationClubs: event.preferences['clubs'],
+          notificationBuddies: event.preferences['buddies'],
+          notificationEvents: event.preferences['events'],  
+          notificationDuels: event.preferences['duels'],
+        );
+        emit(Authenticated(updatedUser)); // Emit new state with updated user
+      } catch (e) {
+        emit(AuthError('Notification preferences update failed: $e'));
+        // Re-emit the previous Authenticated state on error
+        // to avoid losing the user's session in the UI
+        emit(currentState); 
+      }
+    } else {
+      // Cannot update notification preferences if not authenticated
+      emit(AuthError('Cannot update notification preferences: User not authenticated.'));
     }
   }
 

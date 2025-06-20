@@ -90,6 +90,10 @@ class AuthRepositoryImpl implements AuthRepository {
     bool? allowRuckSharing,
     String? gender,
     String? avatarUrl,
+    bool? notificationClubs,
+    bool? notificationBuddies,
+    bool? notificationEvents,
+    bool? notificationDuels,
   }) async {
     return await _authService.updateProfile(
       username: username,
@@ -99,6 +103,10 @@ class AuthRepositoryImpl implements AuthRepository {
       allowRuckSharing: allowRuckSharing,
       gender: gender,
       avatarUrl: avatarUrl,
+      notificationClubs: notificationClubs,
+      notificationBuddies: notificationBuddies,
+      notificationEvents: notificationEvents,
+      notificationDuels: notificationDuels,
     );
   }
 
