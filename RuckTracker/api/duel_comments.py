@@ -163,6 +163,7 @@ def create_duel_joined_notification(duel_id, joiner_id, joiner_name):
                 'message': f"{joiner_name} joined your duel '{duel_name}'",
                 'duel_name': duel_name,
                 'joiner_name': joiner_name,
+                'duel_id': duel_id,
                 'created_at': 'NOW()'
             }
         }
@@ -235,6 +236,7 @@ def create_duel_started_notification(duel_id):
                 'data': {
                     'message': message_text,
                     'duel_name': duel_name,
+                    'duel_id': duel_id,
                     'created_at': 'NOW()'
                 }
             }
@@ -310,6 +312,7 @@ def create_duel_completed_notification(duel_id):
                 'data': {
                     'message': message_text,
                     'duel_name': duel_name,
+                    'duel_id': duel_id,
                     'created_at': 'NOW()'
                 }
             }
@@ -387,6 +390,7 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
                     'duel_name': duel_name,
                     'participant_name': participant_name,
                     'ruck_id': ruck_id,
+                    'duel_id': duel_id,
                     'created_at': 'NOW()'
                 }
             }
@@ -475,6 +479,7 @@ def create_duel_deleted_notification(duel_id, deleter_id):
                     'message': message_text,
                     'duel_name': duel_name,
                     'deleter_name': deleter_name,
+                    'duel_id': duel_id,
                     'created_at': 'NOW()'
                 }
             }

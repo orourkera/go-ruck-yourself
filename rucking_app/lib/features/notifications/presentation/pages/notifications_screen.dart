@@ -213,6 +213,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (notification.data != null) {
       switch (notification.type) {
         case 'duel_comment':
+        case 'duel_joined':
+        case 'duel_started':
+        case 'duel_completed':
+        case 'duel_progress':
+        case 'duel_deleted':
           final duelId = notification.data?['duel_id']?.toString();
           final commentId = notification.data?['duel_comment_id']?.toString();
           
