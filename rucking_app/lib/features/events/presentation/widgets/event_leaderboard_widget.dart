@@ -246,6 +246,13 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
     // Get user's metric preference from auth bloc
     final authState = context.read<AuthBloc>().state;
     final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    // Display dashes instead of 0 values when the user has no completed rucks
+    final String distanceText = entry.totalDistance > 0
+        ? entry.formattedTotalDistance(metric: preferMetric)
+        : '--';
+    final String timeText = entry.totalTime > 0
+        ? entry.formattedTotalTime
+        : '--';
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -317,7 +324,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                entry.formattedTotalDistance(metric: preferMetric),
+                distanceText,
                 style: AppTextStyles.bodyLarge.copyWith(
                   color: Theme.of(context).primaryColor,
                   fontWeight: FontWeight.bold,
@@ -325,7 +332,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
               ),
               const SizedBox(height: 2),
               Text(
-                entry.formattedTotalTime,
+                timeText,
                 style: AppTextStyles.bodySmall.copyWith(
                   color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                 ),

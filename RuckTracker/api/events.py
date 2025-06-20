@@ -229,18 +229,27 @@ class EventResource(Resource):
                 user!user_id(id, username, avatar_url)
             """).eq('event_id', event_id).execute()
             participants = participants_result.data or []
+            
+            logger.info(f"Event {event_id} participants query returned {len(participants)} entries")
+            for p in participants:
+                logger.info(f"Participant: user_id={p.get('user_id')}, status={p.get('status')}, user_data={p.get('user')}")
 
             # Fallback enrichment if some participants are missing nested user data
             missing_user_ids = [p['user_id'] for p in participants if not p.get('user')]
             if missing_user_ids:
+                logger.info(f"Found {len(missing_user_ids)} participants missing user data, performing fallback enrichment")
                 try:
                     users_result = admin_client.table('user').select('id, username, avatar_url').in_('id', missing_user_ids).execute()
                     users_dict = {u['id']: u for u in users_result.data} if users_result.data else {}
+                    logger.info(f"Fallback enrichment fetched {len(users_dict)} users")
                     for p in participants:
                         if not p.get('user') and p['user_id'] in users_dict:
                             p['user'] = users_dict[p['user_id']]
+                            logger.info(f"Enriched participant {p['user_id']} with user data")
                 except Exception as user_fetch_error:
                     logger.error(f"Error fetching user data for participants fallback: {user_fetch_error}")
+            else:
+                logger.info("All participants already have user data from join query")
             
             # Check user's participation status
             user_participation = None
