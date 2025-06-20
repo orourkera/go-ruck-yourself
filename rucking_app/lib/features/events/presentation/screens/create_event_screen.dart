@@ -39,6 +39,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _minParticipantsController = TextEditingController();
   final _ruckWeightController = TextEditingController();
   
+  // Focus nodes for keyboard navigation
+  final _titleFocusNode = FocusNode();
+  final _descriptionFocusNode = FocusNode();
+  final _locationFocusNode = FocusNode();
+  final _minParticipantsFocusNode = FocusNode();
+  final _maxParticipantsFocusNode = FocusNode();
+  final _ruckWeightFocusNode = FocusNode();
+  
   bool _isLoading = false;
   File? _bannerImage;
   DateTime? _selectedDateTime;
@@ -88,6 +96,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _maxParticipantsController.dispose();
     _minParticipantsController.dispose();
     _ruckWeightController.dispose();
+    _titleFocusNode.dispose();
+    _descriptionFocusNode.dispose();
+    _locationFocusNode.dispose();
+    _minParticipantsFocusNode.dispose();
+    _maxParticipantsFocusNode.dispose();
+    _ruckWeightFocusNode.dispose();
     super.dispose();
   }
 
@@ -320,9 +334,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         
         TextFormField(
           controller: _titleController,
+          focusNode: _titleFocusNode,
+          textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _descriptionFocusNode.requestFocus(),
           decoration: InputDecoration(
             labelText: 'Event Title *',
             hintText: 'Enter event title',
+            hintStyle: TextStyle(color: Colors.grey[400]),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -339,9 +357,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         
         TextFormField(
           controller: _descriptionController,
+          focusNode: _descriptionFocusNode,
+          textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _locationFocusNode.requestFocus(),
           decoration: InputDecoration(
             labelText: 'Description',
             hintText: 'Describe your event...',
+            hintStyle: TextStyle(color: Colors.grey[400]),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -423,9 +445,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         
         TextFormField(
           controller: _locationController,
+          focusNode: _locationFocusNode,
+          textInputAction: TextInputAction.next,
+          onFieldSubmitted: (_) => _minParticipantsFocusNode.requestFocus(),
           decoration: InputDecoration(
             labelText: 'Meeting Point',
             hintText: 'Search for a meeting point, business, or address...',
+            hintStyle: TextStyle(color: Colors.grey[400]),
             prefixIcon: const Icon(Icons.location_on),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -510,8 +536,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             Expanded(
               child: TextFormField(
                 controller: _minParticipantsController,
+                focusNode: _minParticipantsFocusNode,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _maxParticipantsFocusNode.requestFocus(),
                 decoration: InputDecoration(
                   labelText: 'Min Participants',
+                  hintText: 'e.g. 1',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -523,8 +554,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             Expanded(
               child: TextFormField(
                 controller: _maxParticipantsController,
+                focusNode: _maxParticipantsFocusNode,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _ruckWeightFocusNode.requestFocus(),
                 decoration: InputDecoration(
                   labelText: 'Max Participants',
+                  hintText: 'e.g. 20',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -540,8 +576,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         // Recommended ruck weight
         TextFormField(
           controller: _ruckWeightController,
+          focusNode: _ruckWeightFocusNode,
+          textInputAction: TextInputAction.done,
           decoration: InputDecoration(
             labelText: 'Recommended Ruck Weight (kg)',
+            hintText: 'e.g. 10',
+            hintStyle: TextStyle(color: Colors.grey[400]),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
             ),
