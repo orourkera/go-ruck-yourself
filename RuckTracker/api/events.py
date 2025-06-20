@@ -226,7 +226,7 @@ class EventResource(Resource):
             # Get participants
             participants_result = admin_client.table('event_participants').select("""
                 *,
-                user(id, username, avatar_url)
+                user!user_id(id, username, avatar_url)
             """).eq('event_id', event_id).eq('status', 'approved').execute()
             
             participants = participants_result.data

@@ -51,7 +51,7 @@ class EventProgressResource(Resource):
             logger.info(f"Querying event_participant_progress for event {event_id}")
             result = admin_client.table('event_participant_progress').select("""
                 *,
-                user(id, username, avatar_url)
+                user!user_id(id, username, avatar_url)
             """).eq('event_id', event_id).execute()
             
             progress_data = result.data
@@ -66,8 +66,8 @@ class EventProgressResource(Resource):
             
             # Sort by distance completed (descending), then by completion time
             progress_data.sort(key=lambda x: (
-                -x['distance_km'] if x['distance_km'] else 0,  # Distance descending
-                x['completed_at'] if x['completed_at'] else datetime.max.isoformat()  # Completion time ascending (faster wins)
+                -x.get('distance_km', 0),
+                x.get('duration_minutes', float('inf'))
             ))
             
             # Add ranking
@@ -203,16 +203,17 @@ class EventParticipantsResource(Resource):
             if not event_check.data:
                 return {'error': 'Event not found'}, 404
             
-            is_participant = participant_check.data and participant_check.data[0]['status'] == 'approved'
+            is_participant = bool(participant_check.data)
             is_creator = event_check.data[0]['creator_user_id'] == current_user_id
             
             if not (is_participant or is_creator):
+                logger.warning(f"User {current_user_id} not authorized to view participants for event {event_id}")
                 return {'error': 'Only event participants can view participant list'}, 403
             
             # Get participants with user info
             result = admin_client.table('event_participants').select("""
                 *,
-                user(id, username, avatar_url)
+                user!user_id(id, username, avatar_url)
             """).eq('event_id', event_id).order('joined_at', desc=False).execute()
             
             participants = result.data
