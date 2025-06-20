@@ -1549,15 +1549,12 @@ class _SessionRouteMap extends StatelessWidget {
 
                 List<Polyline> polylines = [];
 
-                // Add private start segment (dashed gray with black outline)
+                // Add private start segment (black)
                 if (privacySegments.privateStartSegment.isNotEmpty) {
                   polylines.add(Polyline(
                     points: privacySegments.privateStartSegment,
-                    color: Colors.grey.shade500,
+                    color: Colors.black,
                     strokeWidth: 4,
-                    pattern: [8, 4], // Dashed pattern: 8px dash, 4px gap
-                    borderColor: Colors.black,
-                    borderStrokeWidth: 1,
                   ));
                 }
 
@@ -1570,15 +1567,12 @@ class _SessionRouteMap extends StatelessWidget {
                   ));
                 }
 
-                // Add private end segment (dashed gray with black outline)
+                // Add private end segment (black)
                 if (privacySegments.privateEndSegment.isNotEmpty) {
                   polylines.add(Polyline(
                     points: privacySegments.privateEndSegment,
-                    color: Colors.grey.shade500,
+                    color: Colors.black,
                     strokeWidth: 4,
-                    pattern: [8, 4], // Dashed pattern: 8px dash, 4px gap
-                    borderColor: Colors.black,
-                    borderStrokeWidth: 1,
                   ));
                 }
 
@@ -1593,7 +1587,6 @@ class _SessionRouteMap extends StatelessWidget {
 
                 return polylines;
               }(),
-
             ),
           ],
         ),
@@ -1629,7 +1622,7 @@ class _RoutePrivacyLegend extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              'Dashed segments (first/last $distanceText) are hidden from other users',
+              'Black segments (first/last $distanceText) are hidden from other users',
               style: AppTextStyles.bodySmall.copyWith(
                 color: Colors.grey.shade600,
                 fontSize: 11,

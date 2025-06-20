@@ -182,48 +182,6 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       }
     }
     
-    // Determine if this is an auth callback (login, signup, password recovery)
-    bool isAuthCallback = false;
-    if ((uri.scheme == 'com.getrucky.app' &&
-            (uri.path == '/auth/callback' || uri.path == '/callback')) ||
-        (uri.scheme == 'https' &&
-            uri.host == 'getrucky.com' &&
-            uri.path == '/auth/callback')) {
-      isAuthCallback = true;
-    }
-
-    // Supabase may send parameters in the URI fragment (after '#').
-    // Convert fragment to query parameters so they can be read by Uri.queryParameters.
-    if (isAuthCallback && uri.fragment.isNotEmpty && uri.query.isEmpty) {
-      try {
-        // Parse fragment manually to avoid type/token_type conflicts
-        String fragmentQuery = uri.fragment;
-        
-        // Fix potential type/token_type conflict by ensuring type=recovery is preserved
-        if (fragmentQuery.contains('type=recovery') && fragmentQuery.contains('token_type=bearer')) {
-          // Replace any 'type=bearer' with 'token_type=bearer' to preserve type=recovery
-          fragmentQuery = fragmentQuery.replaceAll(RegExp(r'(?<!token_)type=bearer'), 'token_type=bearer');
-        }
-        
-        final rebuilt = Uri(
-          scheme: uri.scheme,
-          host: uri.host,
-          path: uri.path,
-          query: fragmentQuery, // treat fragment as query
-        );
-        uri = rebuilt;
-        print('🔄 Converted fragment to query: $uri');
-      } catch (e) {
-        print('❌ Failed to convert fragment to query: $e');
-      }
-    }
-
-    if (isAuthCallback) {
-      print('🔗 Processing auth callback with URI: $uri');
-      _navigatorKey.currentState?.pushNamed('/auth_callback', arguments: uri);
-      return;
-    }
-    
     // Check if this is an auth callback (custom scheme OR universal link)
     bool isAuthCallbackOld = false;
     
@@ -244,11 +202,37 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         '/auth_callback',
         arguments: uri,
       );
-    } else {
-      print('❌ Not an auth callback:');
-      print('  Expected scheme: com.getrucky.app, got: ${uri.scheme}');
-      print('  Expected path: /auth/callback, got: ${uri.path}');
+      return; // Exit early after handling auth callback
     }
+    
+    // Check if this is an event deeplink
+    bool isEventDeeplink = false;
+    String? eventId;
+    
+    // Handle event deeplinks: https://getrucky.com/events/123 or com.getrucky.app://event/123
+    if ((uri.scheme == 'https' && uri.host == 'getrucky.com' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'events') ||
+        (uri.scheme == 'com.getrucky.app' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'event')) {
+      isEventDeeplink = true;
+      eventId = uri.pathSegments[1];
+    }
+    
+    if (isEventDeeplink && eventId != null) {
+      print('🎯 Processing event deeplink for event ID: $eventId');
+      // Navigate to event detail screen
+      _navigatorKey.currentState?.pushNamed(
+        '/event_detail',
+        arguments: eventId,
+      );
+      return;
+    }
+    
+    // If we get here, it's an unknown deeplink format
+    print('❌ Unknown deeplink format:');
+    print('  URI: $uri');
+    print('  Scheme: ${uri.scheme}');
+    print('  Host: ${uri.host}');
+    print('  Path: ${uri.path}');
+    print('  Path segments: ${uri.pathSegments}');
   }
 
   @override

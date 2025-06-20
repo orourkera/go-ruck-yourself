@@ -1,0 +1,22 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["73323J2N3Y.com.getrucky.app"],
+        "components": [
+          {
+            "/": "/events/*",
+            "comment": "Event deeplinks"
+          },
+          {
+            "/": "/auth/callback",
+            "comment": "Auth callback"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["73323J2N3Y.com.getrucky.app"]
+  }
+}

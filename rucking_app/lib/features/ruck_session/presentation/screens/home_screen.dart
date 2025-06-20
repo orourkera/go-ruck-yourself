@@ -1059,15 +1059,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
 
                                               List<Polyline> polylines = [];
 
-                                              // Add private start segment (dashed gray with black outline)
+                                              // Add private start segment (black)
                                               if (privacySegments.privateStartSegment.isNotEmpty) {
                                                 polylines.add(Polyline(
                                                   points: privacySegments.privateStartSegment,
-                                                  color: Colors.grey.shade500,
+                                                  color: Colors.black,
                                                   strokeWidth: 4,
-                                                  pattern: [8, 4],
-                                                  borderColor: Colors.black,
-                                                  borderStrokeWidth: 1,
                                                 ));
                                               }
 
@@ -1080,15 +1077,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                                 ));
                                               }
 
-                                              // Add private end segment (dashed gray with black outline)
+                                              // Add private end segment (black)
                                               if (privacySegments.privateEndSegment.isNotEmpty) {
                                                 polylines.add(Polyline(
                                                   points: privacySegments.privateEndSegment,
-                                                  color: Colors.grey.shade500,
+                                                  color: Colors.black,
                                                   strokeWidth: 4,
-                                                  pattern: [8, 4],
-                                                  borderColor: Colors.black,
-                                                  borderStrokeWidth: 1,
                                                 ));
                                               }
 

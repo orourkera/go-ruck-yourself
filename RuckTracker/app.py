@@ -376,6 +376,11 @@ api.add_resource(DuelCommentsResource, '/api/duels/<string:duel_id>/comments')
 # Device Token Endpoints
 api.add_resource(DeviceTokenResource, '/api/device-token')
 
+# Event Deeplink Endpoints
+from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource
+api.add_resource(EventDeeplinkResource, '/events/<string:event_id>')
+api.add_resource(WellKnownResource, '/.well-known/<string:filename>')
+
 # Add route for homepage (remains unprefixed)
 @app.route('/')
 def landing():

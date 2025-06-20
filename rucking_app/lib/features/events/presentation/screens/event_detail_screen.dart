@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/services/event_share_service.dart';
 import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_event.dart';
@@ -146,6 +148,17 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     final event = _eventDetails?.event;
     if (event == null) return [];
     
+    List<Widget> actions = [];
+    
+    // Add share button (always visible for all users)
+    actions.add(
+      IconButton(
+        icon: const Icon(Icons.share),
+        tooltip: 'Share Event',
+        onPressed: () => _shareEvent(event),
+      ),
+    );
+    
     List<PopupMenuEntry<String>> menuItems = [];
     
     // Add Edit option for event creators
@@ -200,32 +213,34 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
     
     // Only show menu if there are items
-    if (menuItems.isEmpty) return [];
+    if (menuItems.isNotEmpty) {
+      actions.add(
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert), // Vertical dots
+          onSelected: (value) {
+            switch (value) {
+              case 'edit':
+                Navigator.of(context).pushNamed(
+                  '/edit_event',
+                  arguments: widget.eventId,
+                ).then((_) {
+                  _eventsBloc.add(LoadEventDetails(widget.eventId));
+                });
+                break;
+              case 'leave':
+                _eventsBloc.add(LeaveEvent(event.id));
+                break;
+              case 'cancel':
+                _showCancelConfirmation();
+                break;
+            }
+          },
+          itemBuilder: (context) => menuItems,
+        ),
+      );
+    }
     
-    return [
-      PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert), // Vertical dots
-        onSelected: (value) {
-          switch (value) {
-            case 'edit':
-              Navigator.of(context).pushNamed(
-                '/edit_event',
-                arguments: widget.eventId,
-              ).then((_) {
-                _eventsBloc.add(LoadEventDetails(widget.eventId));
-              });
-              break;
-            case 'leave':
-              _eventsBloc.add(LeaveEvent(event.id));
-              break;
-            case 'cancel':
-              _showCancelConfirmation();
-              break;
-          }
-        },
-        itemBuilder: (context) => menuItems,
-      ),
-    ];
+    return actions;
   }
 
   Widget _buildLoadingSkeleton() {
@@ -949,5 +964,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         );
       }
     }
+  }
+
+  void _shareEvent(Event event) async {
+    await EventShareService.shareEvent(event);
   }
 }
