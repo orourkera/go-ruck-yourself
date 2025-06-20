@@ -1,5 +1,5 @@
 # /Users/rory/RuckingApp/RuckTracker/api/event_deeplinks.py
-from flask import Flask, jsonify, request, render_template_string
+from flask import Flask, jsonify, request, render_template_string, make_response
 from flask_restful import Api, Resource
 import os
 
@@ -58,7 +58,9 @@ class ClubDeeplinkResource(Resource):
 </html>
         """
         
-        return render_template_string(html_template, club_id=club_id)
+        response = make_response(render_template_string(html_template, club_id=club_id))
+        response.headers['Content-Type'] = 'text/html'
+        return response
 
 class EventDeeplinkResource(Resource):
     def get(self, event_id):
@@ -115,7 +117,9 @@ class EventDeeplinkResource(Resource):
 </html>
         """
         
-        return render_template_string(html_template, event_id=event_id)
+        response = make_response(render_template_string(html_template, event_id=event_id))
+        response.headers['Content-Type'] = 'text/html'
+        return response
 
 class WellKnownResource(Resource):
     def get(self, filename):
