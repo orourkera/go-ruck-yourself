@@ -1554,11 +1554,11 @@ class _SessionRouteMap extends StatelessWidget {
 
                 List<Polyline> polylines = [];
 
-                // Add private start segment (black)
+                // Add private start segment (super dark gray)
                 if (privacySegments.privateStartSegment.isNotEmpty) {
                   polylines.add(Polyline(
                     points: privacySegments.privateStartSegment,
-                    color: Colors.black,
+                    color: const Color(0xFF1A1A1A),
                     strokeWidth: 4,
                   ));
                 }
@@ -1572,11 +1572,11 @@ class _SessionRouteMap extends StatelessWidget {
                   ));
                 }
 
-                // Add private end segment (black)
+                // Add private end segment (super dark gray)
                 if (privacySegments.privateEndSegment.isNotEmpty) {
                   polylines.add(Polyline(
                     points: privacySegments.privateEndSegment,
-                    color: Colors.black,
+                    color: const Color(0xFF1A1A1A),
                     strokeWidth: 4,
                   ));
                 }

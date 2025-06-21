@@ -1285,12 +1285,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
         decoration: BoxDecoration(
           color: isDarkMode ? Colors.black : Theme.of(context).cardColor,
           shape: BoxShape.circle,
-          boxShadow: [
+          border: isDarkMode 
+            ? Border.all(color: AppColors.primaryOrange, width: 1)
+            : null,
+          boxShadow: isDarkMode ? null : [
             BoxShadow(
-              color: isDarkMode 
-                ? AppColors.secondary.withOpacity(0.6)
-                : Colors.black.withOpacity(0.15),
-              blurRadius: isDarkMode ? 6 : 4,
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 4,
               offset: const Offset(0, 2),
             ),
           ],
