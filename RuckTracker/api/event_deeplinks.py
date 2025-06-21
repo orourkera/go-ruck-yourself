@@ -19,27 +19,85 @@ class ClubDeeplinkResource(Resource):
     <title>Ruck Club</title>
     <meta name="apple-itunes-app" content="app-id=6744974620">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 40px; }
-        .container { max-width: 400px; margin: 0 auto; }
-        .logo { font-size: 24px; margin-bottom: 20px; }
-        .message { margin: 20px 0; }
-        .app-buttons { margin-top: 30px; }
-        .app-button { display: inline-block; margin: 10px; padding: 12px 24px; 
-                     background: #007AFF; color: white; text-decoration: none; 
-                     border-radius: 8px; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            text-align: center; 
+            padding: 40px 20px; 
+            margin: 0;
+            background: linear-gradient(135deg, #728C69 0%, #546A4A 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container { 
+            max-width: 400px; 
+            margin: 0 auto; 
+        }
+        .logo { 
+            font-family: 'Bangers', cursive;
+            font-size: 48px; 
+            margin-bottom: 20px; 
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .message { 
+            margin: 30px 0; 
+        }
+        .message h2 { 
+            font-family: 'Bangers', cursive;
+            font-size: 36px; 
+            margin-bottom: 16px; 
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .message p { 
+            font-size: 18px; 
+            margin: 16px 0; 
+            color: rgba(255,255,255,0.9);
+            line-height: 1.5;
+        }
+        .app-buttons { 
+            margin-top: 40px; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        .app-button { 
+            display: block;
+            width: 200px;
+            height: auto;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .app-button:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+        .runner-emoji {
+            font-size: 40px;
+            margin-bottom: 16px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo">🏃‍♂️ Ruck Club</div>
+        <div class="runner-emoji">🏃‍♂️</div>
+        <div class="logo">Ruck Club</div>
         <div class="message">
             <h2>Opening Club...</h2>
             <p>If the Ruck app doesn't open automatically, download it to join this club!</p>
         </div>
         <div class="app-buttons">
-            <a href="https://apps.apple.com/app/id6744974620" class="app-button">Download for iOS</a>
-            <a href="https://play.google.com/store/apps/details?id=com.getrucky.app" class="app-button">Download for Android</a>
+            <a href="https://apps.apple.com/app/id6744974620">
+                <img src="/static/images/app-store-badge.png" alt="Download on the App Store" class="app-button">
+            </a>
+            <a href="https://play.google.com/store/apps/details?id=com.getrucky.app">
+                <img src="/static/images/google-play-badge.png" alt="Get it on Google Play" class="app-button">
+            </a>
         </div>
     </div>
     
@@ -78,27 +136,85 @@ class EventDeeplinkResource(Resource):
     <title>Ruck Event</title>
     <meta name="apple-itunes-app" content="app-id=6744974620">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 40px; }
-        .container { max-width: 400px; margin: 0 auto; }
-        .logo { font-size: 24px; margin-bottom: 20px; }
-        .message { margin: 20px 0; }
-        .app-buttons { margin-top: 30px; }
-        .app-button { display: inline-block; margin: 10px; padding: 12px 24px; 
-                     background: #007AFF; color: white; text-decoration: none; 
-                     border-radius: 8px; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            text-align: center; 
+            padding: 40px 20px; 
+            margin: 0;
+            background: linear-gradient(135deg, #728C69 0%, #546A4A 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container { 
+            max-width: 400px; 
+            margin: 0 auto; 
+        }
+        .logo { 
+            font-family: 'Bangers', cursive;
+            font-size: 48px; 
+            margin-bottom: 20px; 
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .message { 
+            margin: 30px 0; 
+        }
+        .message h2 { 
+            font-family: 'Bangers', cursive;
+            font-size: 36px; 
+            margin-bottom: 16px; 
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .message p { 
+            font-size: 18px; 
+            margin: 16px 0; 
+            color: rgba(255,255,255,0.9);
+            line-height: 1.5;
+        }
+        .app-buttons { 
+            margin-top: 40px; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        .app-button { 
+            display: block;
+            width: 200px;
+            height: auto;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .app-button:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+        .target-emoji {
+            font-size: 40px;
+            margin-bottom: 16px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo">🎯 Ruck Event</div>
+        <div class="target-emoji">🎯</div>
+        <div class="logo">Ruck Event</div>
         <div class="message">
             <h2>Opening Event...</h2>
             <p>If the Ruck app doesn't open automatically, download it to join this event!</p>
         </div>
         <div class="app-buttons">
-            <a href="https://apps.apple.com/app/id6744974620" class="app-button">Download for iOS</a>
-            <a href="https://play.google.com/store/apps/details?id=com.getrucky.app" class="app-button">Download for Android</a>
+            <a href="https://apps.apple.com/app/id6744974620">
+                <img src="/static/images/app-store-badge.png" alt="Download on the App Store" class="app-button">
+            </a>
+            <a href="https://play.google.com/store/apps/details?id=com.getrucky.app">
+                <img src="/static/images/google-play-badge.png" alt="Get it on Google Play" class="app-button">
+            </a>
         </div>
     </div>
     
@@ -131,20 +247,12 @@ class WellKnownResource(Resource):
                 "applinks": {
                     "details": [
                         {
-                            "appIDs": ["73323J2N3Y.com.getrucky.app"],
-                            "components": [
-                                {
-                                    "/": "/events/*",
-                                    "comment": "Event deeplinks"
-                                },
-                                {
-                                    "/": "/clubs/*",
-                                    "comment": "Club deeplinks"
-                                },
-                                {
-                                    "/": "/auth/callback", 
-                                    "comment": "Auth callback"
-                                }
+                            "appID": "73323J2N3Y.com.getrucky.app",
+                            "paths": [
+                                "/events/*",
+                                "/clubs/*",
+                                "/auth/callback",
+                                "*"
                             ]
                         }
                     ]
