@@ -22,7 +22,12 @@ class RedisCacheService:
     def _initialize_redis(self):
         """Initialize Redis connection with proper SSL configuration for Heroku"""
         try:
-            redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+            # Prefer REDIS_URL, fallback to REDIS_TLS_URL (Heroku names this when SSL required)
+            redis_url = os.environ.get('REDIS_URL') or os.environ.get('REDIS_TLS_URL')
+            if not redis_url:
+                logger.warning('REDIS_URL/REDIS_TLS_URL environment variables not found; Redis cache will be disabled.')
+                self.redis_client = None
+                return
             
             # For Heroku Redis, handle SSL configuration
             if redis_url.startswith('rediss://'):  # Heroku Redis uses rediss:// for SSL
