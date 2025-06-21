@@ -4,6 +4,7 @@ from flask_restful import Resource
 from datetime import datetime, timedelta, timezone
 
 from ..supabase_client import get_supabase_client
+from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,11 @@ class WeeklyStatsResource(Resource):
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
 
+            cache_key = f"weekly_stats:{g.user.id}:{start_iso}:{end_iso}"
+            cached_response = cache_get(cache_key)
+            if cached_response:
+                return {'data': cached_response}, 200
+
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('ruck_session') \
@@ -135,6 +141,7 @@ class WeeklyStatsResource(Resource):
             stats['date_range'] = date_range_str
             stats['daily_breakdown'] = get_daily_breakdown(sessions, start_dt, end_dt, date_field='completed_at')
 
+            cache_set(cache_key, stats)
             return {'data': stats}, 200
 
         except Exception as e:
@@ -153,6 +160,11 @@ class MonthlyStatsResource(Resource):
             date_range_str = today.strftime('%B %Y')
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
+
+            cache_key = f"monthly_stats:{g.user.id}:{start_iso}:{end_iso}"
+            cached_response = cache_get(cache_key)
+            if cached_response:
+                return {'data': cached_response}, 200
 
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
@@ -174,6 +186,7 @@ class MonthlyStatsResource(Resource):
             stats = calculate_aggregates(response.data)
             stats['date_range'] = date_range_str
 
+            cache_set(cache_key, stats)
             return {'data': stats}, 200
 
         except Exception as e:
@@ -193,6 +206,11 @@ class YearlyStatsResource(Resource):
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
             
+            cache_key = f"yearly_stats:{g.user.id}:{start_iso}:{end_iso}"
+            cached_response = cache_get(cache_key)
+            if cached_response:
+                return {'data': cached_response}, 200
+
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('ruck_session') \
@@ -213,6 +231,7 @@ class YearlyStatsResource(Resource):
             stats = calculate_aggregates(response.data)
             stats['date_range'] = date_range_str
 
+            cache_set(cache_key, stats)
             return {'data': stats}, 200
 
         except Exception as e:

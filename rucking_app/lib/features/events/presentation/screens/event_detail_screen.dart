@@ -495,14 +495,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     Icon(
                       Icons.location_on,
                       size: 20,
-                      color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                      color: AppColors.getLocationTextColor(context, isLadyMode: isLadyMode),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         event.locationName!,
                         style: AppTextStyles.bodyLarge.copyWith(
-                          color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                          color: AppColors.getLocationTextColor(context, isLadyMode: isLadyMode),
                           decoration: TextDecoration.underline,
                         ),
                       ),
@@ -511,7 +511,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     Icon(
                       Icons.open_in_new,
                       size: 16,
-                      color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                      color: AppColors.getLocationTextColor(context, isLadyMode: isLadyMode),
                     ),
                   ],
                 ),

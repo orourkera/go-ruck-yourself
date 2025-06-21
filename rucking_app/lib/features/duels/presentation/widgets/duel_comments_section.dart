@@ -198,6 +198,12 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
               _isAddingComment = false;
             });
           }
+        } else if (state is DuelCommentDeleted) {
+          // Show success message for comment deletion
+          StyledSnackBar.showSuccess(
+            context: context,
+            message: state.message,
+          );
         }
       },
       child: BlocBuilder<DuelDetailBloc, DuelDetailState>(
@@ -223,16 +229,16 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                     children: [
                       Icon(
                         Icons.comment,
-                        color: Colors.grey[600],
+                        color: AppColors.secondary,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Comments',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Bangers',
                           fontSize: 18,
-                          color: Colors.black87,
+                          color: AppColors.secondary,
                         ),
                       ),
                     ],
@@ -469,7 +475,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                       children: [
                         // Edit button
                         IconButton(
-                          icon: const Icon(Icons.edit, size: 18),
+                          icon: Icon(Icons.edit, size: 18, color: Colors.green),
                           onPressed: () => _handleEditComment(comment),
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.all(4.0),
@@ -477,7 +483,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                         ),
                         // Delete button
                         IconButton(
-                          icon: const Icon(Icons.delete, size: 18),
+                          icon: Icon(Icons.delete, size: 18, color: Colors.green),
                           onPressed: () => _handleDeleteComment(comment),
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.all(4.0),
@@ -494,17 +500,24 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
           Padding(
             padding: const EdgeInsets.only(left: 40.0),
             child: isEditing
-              ? TextField(
-                  controller: _commentController,
-                  focusNode: _commentFocusNode,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        focusNode: _commentFocusNode,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          isDense: true,
+                        ),
+                        maxLines: null,
+                        textInputAction: TextInputAction.done,
+                      ),
                     ),
-                  ),
-                  maxLines: null,
-                  textInputAction: TextInputAction.done,
+                  ],
                 )
               : Text(comment.content),
           ),

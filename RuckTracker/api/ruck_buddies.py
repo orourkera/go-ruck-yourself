@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.api.auth import auth_required, get_user_id
+from RuckTracker.services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
 
 ruck_buddies_bp = Blueprint('ruck_buddies', __name__)
 
@@ -126,6 +127,18 @@ def get_ruck_buddies():
     latitude = request.args.get('latitude', type=float)
     longitude = request.args.get('longitude', type=float)
     
+    # Build cache key based on query parameters (excluding current user for privacy)
+    lat_lon_str = f"{latitude:.3f}_{longitude:.3f}" if latitude and longitude else "no_location"
+    cache_key = f"ruck_buddies:{sort_by}:{page}:{per_page}:{lat_lon_str}"
+    
+    # Try to get cached response first
+    cached_response = cache_get(cache_key)
+    if cached_response:
+        print(f"[CACHE HIT] Returning cached ruck buddies for key: {cache_key}")
+        return jsonify(cached_response)
+    
+    print(f"[CACHE MISS] Fetching ruck buddies from database for key: {cache_key}")
+    
     # Define ordering based on sort_by parameter
     if sort_by == 'calories_desc':
         order_by = "calories_burned.desc"
@@ -148,7 +161,6 @@ def get_ruck_buddies():
     # Get supabase client
     supabase = get_supabase_client(g.access_token if hasattr(g, 'access_token') else None)
 
-    
     # Base query getting public ruck sessions that aren't from the current user
     # Also join with users table to get user display info and check allow_ruck_sharing
     # Include social data (likes, comments) to avoid separate API calls
@@ -207,6 +219,17 @@ def get_ruck_buddies():
         session.pop('comments', None)
         
         processed_sessions.append(session)
+    
+    # Cache the response for future requests
+    cache_set(cache_key, {
+        'ruck_sessions': processed_sessions,
+        'meta': {
+            'count': len(response.data),
+            'per_page': per_page,
+            'page': page,
+            'sort_by': sort_by
+        }
+    })
     
     # Return the processed data
     return jsonify({

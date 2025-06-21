@@ -264,7 +264,11 @@ class _ClubsScreenState extends State<ClubsScreen> {
         child: Text(
           label,
           style: AppTextStyles.bodySmall.copyWith(
-            color: isSelected ? Colors.white : AppColors.textDark,
+            color: isSelected
+              ? Colors.white
+              : Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : AppColors.textDark,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),

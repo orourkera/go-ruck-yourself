@@ -240,7 +240,9 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
 
   void _onUpdateDuelComment(UpdateDuelComment event, Emitter<DuelDetailState> emit) async {
     if (state is DuelDetailLoaded) {
+      final currentState = state as DuelDetailLoaded;
       final result = await updateDuelComment(update_comment_usecase.UpdateDuelCommentParams(
+        duelId: currentState.duel.id,
         commentId: event.commentId,
         content: event.content,
       ));
@@ -249,7 +251,6 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
         (failure) => emit(DuelDetailError(message: failure.message)),
         (_) {
           // Need duelId to refresh comments - get it from current state
-          final currentState = state as DuelDetailLoaded;
           add(LoadDuelComments(duelId: currentState.duel.id));
         },
       );
@@ -258,15 +259,20 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
 
   void _onDeleteDuelComment(DeleteDuelComment event, Emitter<DuelDetailState> emit) async {
     if (state is DuelDetailLoaded) {
+      final currentState = state as DuelDetailLoaded;
+      
       final result = await deleteDuelComment(delete_comment_usecase.DeleteDuelCommentParams(
+        duelId: currentState.duel.id,
         commentId: event.commentId,
       ));
 
       result.fold(
         (failure) => emit(DuelDetailError(message: failure.message)),
         (_) {
-          // Need duelId to refresh comments - get it from current state
-          final currentState = state as DuelDetailLoaded;
+          // Emit success state for user feedback
+          emit(DuelCommentDeleted(commentId: event.commentId));
+          
+          // Refresh comments to sync with server
           add(LoadDuelComments(duelId: currentState.duel.id));
         },
       );

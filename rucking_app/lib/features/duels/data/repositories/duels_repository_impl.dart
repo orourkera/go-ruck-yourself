@@ -329,19 +329,18 @@ class DuelsRepositoryImpl implements DuelsRepository {
 
   @override
   Future<Either<Failure, DuelComment>> updateDuelComment({
+    required String duelId,
     required String commentId,
     required String content,
   }) async {
     try {
-      // Note: We need to get the duelId somehow - this may need to be passed differently
-      // For now, we'll assume the commentId contains enough info or modify the interface later
-      await remoteDataSource.updateDuelComment('', commentId, content);
+      await remoteDataSource.updateDuelComment(duelId, commentId, content);
       
       // Since the remote data source returns void, we need to return a placeholder comment
       // In a real implementation, you'd want to fetch the updated comment or modify the data source
       final updatedComment = DuelCommentModel(
         id: commentId,
-        duelId: '', // Placeholder - in real implementation would need actual duel ID
+        duelId: duelId,
         userId: '',
         content: content,
         createdAt: DateTime.now(),
@@ -359,11 +358,11 @@ class DuelsRepositoryImpl implements DuelsRepository {
 
   @override
   Future<Either<Failure, void>> deleteDuelComment({
+    required String duelId,
     required String commentId,
   }) async {
     try {
-      // Note: We need to get the duelId somehow - this may need to be passed differently
-      await remoteDataSource.deleteDuelComment('', commentId);
+      await remoteDataSource.deleteDuelComment(duelId, commentId);
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));

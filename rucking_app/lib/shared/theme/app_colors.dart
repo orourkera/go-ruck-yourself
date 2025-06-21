@@ -67,6 +67,39 @@ class AppColors {
   static final Color dividerLight = Color(0xFFE0DAD0);
   static final Color dividerDark = Color(0xFF4B3621);
   
+  // Dark mode text color helpers
+  static Color getTextColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark 
+      ? textLight 
+      : textDark;
+  }
+  
+  static Color getSecondaryTextColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark 
+      ? textLightSecondary 
+      : textDarkSecondary;
+  }
+  
+  static Color getSubtleTextColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark 
+      ? Colors.grey.shade400 
+      : Colors.grey.shade600;
+  }
+  
+  static Color getPrimaryTextColor(BuildContext context, {bool isLadyMode = false}) {
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return textLight;
+    }
+    return isLadyMode ? ladyPrimary : primary;
+  }
+  
+  static Color getLocationTextColor(BuildContext context, {bool isLadyMode = false}) {
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return Colors.grey.shade400;
+    }
+    return isLadyMode ? ladyPrimary : primary;
+  }
+  
   // Gradient colors
   static final List<Color> primaryGradient = [
     Color(0xFF728C69), // Olive green

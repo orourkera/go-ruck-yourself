@@ -66,8 +66,11 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
       return widget.child;
     }
 
-    final baseColor = widget.baseColor ?? Colors.grey[300]!;
-    final highlightColor = widget.highlightColor ?? Colors.grey[100]!;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final baseColor = widget.baseColor ?? 
+        (isDarkMode ? Colors.grey[700]! : Colors.grey[300]!);
+    final highlightColor = widget.highlightColor ?? 
+        (isDarkMode ? Colors.grey[600]! : Colors.grey[100]!);
 
     return AnimatedBuilder(
       animation: _animation,
@@ -111,11 +114,13 @@ class SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.grey[300],
+        color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
         borderRadius: borderRadius ?? BorderRadius.circular(4),
       ),
     );
@@ -132,11 +137,13 @@ class SkeletonCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.grey[300],
+        color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
         shape: BoxShape.circle,
       ),
     );

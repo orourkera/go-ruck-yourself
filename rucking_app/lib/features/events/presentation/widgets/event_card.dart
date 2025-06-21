@@ -27,6 +27,10 @@ class EventCard extends StatelessWidget {
         child: Card(
           elevation: 2,
           shape: RoundedRectangleBorder(
+            side: BorderSide(
+              color: isDarkMode ? AppColors.primary : Colors.grey.shade300,
+              width: 1,
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           color: isDarkMode ? Colors.black : null,

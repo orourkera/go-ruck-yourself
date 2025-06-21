@@ -610,6 +610,10 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         child: Scaffold(
           backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
           appBar: AppBar(
+            iconTheme: IconThemeData(
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            ),
+            foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
             title: const Text('Ruck Details'),
             actions: [
               // IconButton(
@@ -874,7 +878,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                   Text(
                                     '$_likeCount',
                                     style: AppTextStyles.statValue.copyWith(
-                                      color: Colors.grey[800],
+                                      color: Theme.of(context).brightness == Brightness.dark 
+                                          ? Colors.white 
+                                          : Colors.grey[800],
                                     ),
                                   ),
                                 ],
@@ -902,7 +908,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                                 Text(
                                   '$_commentCount',
                                   style: AppTextStyles.statValue.copyWith(
-                                    color: Colors.grey[800],
+                                    color: Theme.of(context).brightness == Brightness.dark 
+                                        ? Colors.white 
+                                        : Colors.grey[800],
                                   ),
                                 ),
                               ],
@@ -921,16 +929,16 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             children: [
                               Icon(
                                 Icons.comment,
-                                color: Colors.grey[600],
+                                color: AppColors.secondary,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Comments',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'Bangers',
                                   fontSize: 18,
-                                  color: Colors.black87,
+                                  color: AppColors.secondary,
                                 ),
                               ),
                             ],

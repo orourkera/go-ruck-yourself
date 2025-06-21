@@ -1007,9 +1007,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                             child: Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             elevation: 1,
-                            color: Theme.of(context).cardColor, // Use theme card color (tan in dark mode)
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Theme.of(context).cardColor,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
+                              side: Theme.of(context).brightness == Brightness.dark 
+                                  ? BorderSide(color: Theme.of(context).primaryColor, width: 1)
+                                  : BorderSide.none,
                             ),
                             child: Container(
                               padding: const EdgeInsets.all(16.0),
@@ -1271,6 +1274,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
   
   /// Builds a small circular header action icon
   Widget _buildHeaderAction({required Widget icon, required VoidCallback onTap}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
@@ -1278,12 +1283,14 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: isDarkMode ? Colors.black : Theme.of(context).cardColor,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
+              color: isDarkMode 
+                ? AppColors.secondary.withOpacity(0.6)
+                : Colors.black.withOpacity(0.15),
+              blurRadius: isDarkMode ? 6 : 4,
               offset: const Offset(0, 2),
             ),
           ],

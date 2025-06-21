@@ -356,8 +356,8 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   @override
   Future<void> updateDuelComment(String duelId, String commentId, String content) async {
     try {
-      final body = {'content': content};
-      await apiClient.put('/duels/$duelId/comments/$commentId', body);
+      final body = {'comment_id': commentId, 'content': content};
+      await apiClient.put('/duels/$duelId/comments', body);
       return;
     } catch (e) {
       rethrow;
@@ -366,12 +366,18 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
 
   @override
   Future<void> deleteDuelComment(String duelId, String commentId) async {
-    final response = await apiClient.delete('/duels/$duelId/comments/$commentId');
+    final response = await apiClient.delete('/duels/$duelId/comments?comment_id=$commentId');
     
-    if (response.statusCode != 200) {
-      final errorData = json.decode(response.body);
-      throw ServerException(message: errorData['error'] ?? 'Failed to delete comment');
+    if (response.statusCode != 200 && response.statusCode != 404) {
+      try {
+        final errorData = json.decode(response.body);
+        throw ServerException(message: errorData['error'] ?? 'Failed to delete comment');
+      } catch (e) {
+        // If JSON parsing fails, use a generic error message
+        throw ServerException(message: 'Failed to delete comment: ${response.statusCode}');
+      }
     }
+    // 404 is treated as success since comment already doesn't exist
   }
 
   @override

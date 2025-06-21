@@ -82,6 +82,9 @@ class _EventsScreenState extends State<EventsScreen> {
           ),
           elevation: 0,
           automaticallyImplyLeading: false,
+          iconTheme: IconThemeData(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+          ),
           actions: [
             IconButton(
               icon: const Icon(Icons.add),

@@ -28,6 +28,26 @@ class SocialRepository {
   int? getCachedLikeCount(int ruckId) => _likeCountCache[ruckId];
   List<RuckComment>? getCachedComments(String ruckId) => _commentsCache[ruckId];
 
+  /// Clear cached comments for a specific ruck to force refresh
+  void clearCommentsCache(String ruckId) {
+    _commentsCache.remove(ruckId);
+  }
+
+  /// Clear all comments cache
+  void clearAllCommentsCache() {
+    _commentsCache.clear();
+  }
+
+  /// Clear all cached data for a specific ruck
+  void clearRuckCache(String ruckId) {
+    final ruckIdInt = int.tryParse(ruckId);
+    if (ruckIdInt != null) {
+      _likeStatusCache.remove(ruckIdInt);
+      _likeCountCache.remove(ruckIdInt);
+    }
+    _commentsCache.remove(ruckId);
+  }
+
   /// Constructor
   SocialRepository({
     required http.Client httpClient,
@@ -73,6 +93,9 @@ class SocialRepository {
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
+      } else if (response.statusCode == 404) {
+        clearRuckCache(ruckId.toString());
+        return []; // Return empty list for 404
       } else {
         throw ServerException(
             message: 'Failed to get likes: ${response.statusCode} - ${response.body}');
@@ -117,6 +140,9 @@ class SocialRepository {
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
+      } else if (response.statusCode == 404) {
+        clearRuckCache(ruckId.toString());
+        throw ServerException(message: 'Ruck session not found');
       } else {
         throw ServerException(
             message: 'Failed to add like: ${response.statusCode} - ${response.body}');
@@ -160,6 +186,9 @@ class SocialRepository {
         return success;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
+      } else if (response.statusCode == 404) {
+        clearRuckCache(ruckId.toString());
+        return true; // Return true since like already doesn't exist
       } else {
         throw ServerException(
             message: 'Failed to remove like: ${response.statusCode} - ${response.body}');
@@ -237,6 +266,8 @@ class SocialRepository {
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 429) {
         return null; // Return null on rate limit to allow retry later
+      } else if (response.statusCode == 404) {
+        clearRuckCache(ruckId.toString());
       } else {
         throw ServerException(
             message: 'Failed to check like status: ${response.statusCode} - ${response.body}');
@@ -273,6 +304,8 @@ class SocialRepository {
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 429) {
         return null; // Return null on rate limit
+      } else if (response.statusCode == 404) {
+        clearRuckCache(ruckId.toString());
       } else {
         throw ServerException(
             message: 'Failed to get like count: ${response.statusCode} - ${response.body}');
@@ -302,14 +335,29 @@ class SocialRepository {
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
-          return (data['data'] as List)
+          final commentsList = (data['data'] as List)
               .map((json) => RuckComment.fromJson(json))
               .toList();
+        
+          // Deduplicate comments by ID to prevent sync issues
+          final deduplicatedComments = <String, RuckComment>{};
+          for (final comment in commentsList) {
+            deduplicatedComments[comment.id] = comment;
+          }
+        
+          // Sort by creation date (newest first)
+          final sortedComments = deduplicatedComments.values.toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+          return sortedComments;
         } else {
           return [];
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
+      } else if (response.statusCode == 404) {
+        clearCommentsCache(ruckId);
+        return []; // Return empty list for 404
       } else {
         throw ServerException(
             message: 'Failed to get comments: ${response.statusCode} - ${response.body}');
@@ -352,6 +400,9 @@ class SocialRepository {
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
+      } else if (response.statusCode == 404) {
+        clearCommentsCache(ruckId);
+        throw ServerException(message: 'Ruck session not found');
       } else {
         throw ServerException(
             message: 'Failed to add comment: ${response.statusCode} - ${response.body}');
@@ -390,6 +441,9 @@ class SocialRepository {
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
+      } else if (response.statusCode == 404) {
+        clearAllCommentsCache();
+        throw ServerException(message: 'Comment not found');
       } else {
         throw ServerException(
             message: 'Failed to update comment: ${response.statusCode} - ${response.body}');
@@ -401,24 +455,40 @@ class SocialRepository {
   }
 
   /// Delete a comment
-  Future<bool> deleteRuckComment(String commentId) async {
+  Future<bool> deleteRuckComment(String ruckId, String commentId) async {
     try {
       final token = await _authToken;
       if (token == null) {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
+      debugPrint('[COMMENT DELETE] Attempting to delete comment: $commentId for ruck: $ruckId');
+      
+      // Use the correct backend endpoint format: DELETE /rucks/{ruck_id}/comments?comment_id={comment_id}
+      final correctUrl = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments?comment_id=$commentId';
+      debugPrint('[COMMENT DELETE] Using correct API URL: $correctUrl');
+
       final response = await _httpClient.delete(
-        Uri.parse('${AppConfig.apiBaseUrl}/comments/$commentId'),
+        Uri.parse(correctUrl),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
       
+      debugPrint('[COMMENT DELETE] Response status: ${response.statusCode}');
+      debugPrint('[COMMENT DELETE] Response body: ${response.body}');
+      
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        return data['success'] == true;
+        final success = data['success'] == true;
+        debugPrint('[COMMENT DELETE] Deletion successful: $success');
+        return success;
+      } else if (response.statusCode == 404) {
+        // Comment already doesn't exist, treat as successful deletion
+        debugPrint('[COMMENT DELETE] Comment not found (404), treating as successful deletion');
+        clearAllCommentsCache();
+        return true;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
       } else {
@@ -426,6 +496,7 @@ class SocialRepository {
             message: 'Failed to delete comment: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
+      debugPrint('[COMMENT DELETE] Error: $e');
       if (e is UnauthorizedException) rethrow;
       throw ServerException(message: 'Failed to delete comment: $e');
     }

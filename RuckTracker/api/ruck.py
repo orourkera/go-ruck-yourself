@@ -7,6 +7,7 @@ import math
 from dateutil import tz
 
 from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.services.redis_cache_service import cache_delete_pattern, cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
@@ -127,9 +128,21 @@ class RuckSessionListResource(Resource):
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+                
             limit = request.args.get('limit', type=int)
-        # If limit is None, do not apply limit
+            
+            # Build cache key based on user and limit
+            cache_key = f"ruck_session:{g.user.id}:list:{limit if limit else 'all'}"
+            
+            # Try to get cached response first
+            cached_response = cache_get(cache_key)
+            if cached_response:
+                logger.info(f"[CACHE HIT] Returning cached session list for user {g.user.id}")
+                return cached_response, 200
+            
+            logger.info(f"[CACHE MISS] Fetching session list from database for user {g.user.id}")
+            
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response_query = supabase.table('ruck_session') \
                 .select('*') \
                 .eq('user_id', g.user.id) \
@@ -287,6 +300,9 @@ class RuckSessionListResource(Resource):
             if len(sessions) > 3:
                 logger.info(f"...(and {len(sessions) - 3} more sessions)")
             
+            # Cache the response for future requests
+            cache_set(cache_key, sessions)
+            
             return sessions, 200
         except Exception as e:
             logger.error(f"Error getting ruck sessions: {e}")
@@ -333,6 +349,9 @@ class RuckSessionListResource(Resource):
             if not insert_resp.data:
                 logger.error(f"Failed to create session: {insert_resp.error}")
                 return {'message': 'Failed to create session'}, 500
+            # Invalidate user's session cache and ruck buddies cache (new session may appear in feed)
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            cache_delete_pattern("ruck_buddies:*")
             return insert_resp.data[0], 201
         except Exception as e:
             logger.error(f"Error creating ruck session: {e}")
@@ -526,6 +545,7 @@ class RuckSessionResource(Resource):
                 .execute()
             if not session_del_resp.data or len(session_del_resp.data) == 0:
                 return {'message': 'Session not found or failed to delete'}, 404
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return {'message': 'Session deleted successfully'}, 200
         except Exception as e:
             logger.error(f"Error deleting ruck session {ruck_id}: {e}")
@@ -557,6 +577,7 @@ class RuckSessionStartResource(Resource):
             if not update_resp.data or len(update_resp.data) == 0:
                 logger.error(f"Failed to start session {ruck_id}: {update_resp.error}")
                 return {'message': 'Failed to start session'}, 500
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return update_resp.data[0], 200
         except Exception as e:
             logger.error(f"Error starting ruck session {ruck_id}: {e}")
@@ -587,6 +608,7 @@ class RuckSessionPauseResource(Resource):
             if not update_resp.data or len(update_resp.data) == 0:
                 logger.error(f"Failed to pause session {ruck_id}: {update_resp.error}")
                 return {'message': 'Failed to pause session'}, 500
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return update_resp.data[0], 200
         except Exception as e:
             logger.error(f"Error pausing ruck session {ruck_id}: {e}")
@@ -617,6 +639,7 @@ class RuckSessionResumeResource(Resource):
             if not update_resp.data or len(update_resp.data) == 0:
                 logger.error(f"Failed to resume session {ruck_id}: {update_resp.error}")
                 return {'message': 'Failed to resume session'}, 500
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return update_resp.data[0], 200
         except Exception as e:
             logger.error(f"Error resuming ruck session {ruck_id}: {e}")
@@ -887,6 +910,11 @@ class RuckSessionCompleteResource(Resource):
                 logger.error(f"Error updating duel progress for session {ruck_id}: {duel_error}")
                 # Don't fail the session completion if duel progress update fails
         
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            cache_delete_pattern("ruck_buddies:*")
+            cache_delete_pattern(f"weekly_stats:{g.user.id}:*")
+            cache_delete_pattern(f"monthly_stats:{g.user.id}:*")
+            cache_delete_pattern(f"yearly_stats:{g.user.id}:*")
             return completed_session, 200
         except Exception as e:
             logger.error(f"Error ending ruck session {ruck_id}: {e}")
@@ -925,6 +953,7 @@ class RuckSessionLocationResource(Resource):
             if not insert_resp.data or len(insert_resp.data) == 0:
                 logger.error(f"Failed to add location point for session {ruck_id}: {insert_resp.error}")
                 return {'message': 'Failed to add location point'}, 500
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return insert_resp.data[0], 201
         except Exception as e:
             logger.error(f"Error adding location point for ruck session {ruck_id}: {e}")
@@ -1002,6 +1031,7 @@ class HeartRateSampleUploadResource(Resource):
             insert_resp = supabase.table('heart_rate_sample').insert(heart_rate_rows).execute()
             if not insert_resp.data:
                 return {'message': 'Failed to insert heart rate samples'}, 500
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
         except Exception as e:
             return {'message': f'Error uploading heart rate samples: {str(e)}'}, 500

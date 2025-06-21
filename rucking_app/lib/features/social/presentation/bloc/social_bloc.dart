@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_event.dart';
@@ -375,11 +376,21 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     
     try {
       final result = await _socialRepository.deleteRuckComment(
+        event.ruckId,
         event.commentId,
       );
       
+      // Always fetch updated comments list after deletion (successful or 404)
+      final comments = await _socialRepository.getRuckComments(event.ruckId);
+      
+      // Update comments list
+      emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
+      
+      // Also update comment count for all screens
+      _updateCommentCount(event.ruckId, comments.length, emit);
+      
       if (result) {
-        // Create a placeholder comment to indicate deletion
+        // Create a placeholder comment to indicate successful deletion
         final deletedComment = RuckComment(
           id: event.commentId,
           ruckId: int.parse(event.ruckId), // Convert String to int
@@ -390,19 +401,20 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         );
         
         emit(CommentActionCompleted(comment: deletedComment, actionType: 'delete'));
-        
-        // Fetch updated comments list to get the correct count
-        final comments = await _socialRepository.getRuckComments(event.ruckId);
-        
-        // Update comments list
-        emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
-        
-        // Also update comment count for all screens
-        _updateCommentCount(event.ruckId, comments.length, emit);
       } else {
         emit(CommentActionError('Failed to delete comment'));
       }
     } catch (e) {
+      // Even on error, try to refresh comments to sync with server state
+      try {
+        final comments = await _socialRepository.getRuckComments(event.ruckId);
+        emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
+        _updateCommentCount(event.ruckId, comments.length, emit);
+      } catch (refreshError) {
+        // If refresh also fails, log it but don't override the original error
+        debugPrint('Failed to refresh comments after delete error: $refreshError');
+      }
+      
       emit(CommentActionError('Error deleting comment: $e'));
     }
   }

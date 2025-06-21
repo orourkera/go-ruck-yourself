@@ -13,6 +13,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from .supabase_client import get_supabase_client, get_supabase_admin_client # Relative import for supabase_client within RuckTracker package
+from .services.redis_cache_service import get_cache_service # Add Redis cache service
 
 # Load environment variables from .env file
 load_dotenv()
@@ -99,6 +100,17 @@ limiter.init_app(app)
 # Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
 from RuckTracker.api.ruck import HeartRateSampleUploadResource
 
+# Initialize Redis cache service and check connection
+try:
+    cache_service = get_cache_service()
+    if cache_service.is_connected():
+        memory_stats = cache_service.get_memory_usage()
+        app.logger.info(f"Redis cache service connected successfully - Memory usage: {memory_stats.get('used_memory_human', 'Unknown')}")
+    else:
+        app.logger.error("Redis cache service failed to connect - using memory caching fallback")
+except Exception as e:
+    app.logger.error(f"Error initializing Redis cache service: {e}")
+
 # Apply rate limit to specific HTTP methods
 app.logger.info("Setting HeartRateSampleUploadResource rate limit to: 3600 per hour")
 HeartRateSampleUploadResource.get = limiter.limit("3600 per hour", override_defaults=True)(HeartRateSampleUploadResource.get)
@@ -170,6 +182,10 @@ from RuckTracker.api.event_progress import event_progress_bp
 app.register_blueprint(events_bp, url_prefix='/api')
 app.register_blueprint(event_comments_bp, url_prefix='/api')
 app.register_blueprint(event_progress_bp, url_prefix='/api')
+
+# Import and register cache monitor blueprint
+from RuckTracker.api.cache_monitor import cache_monitor_bp
+app.register_blueprint(cache_monitor_bp)
 
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (

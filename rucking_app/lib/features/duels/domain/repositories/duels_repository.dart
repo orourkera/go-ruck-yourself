@@ -103,11 +103,13 @@ abstract class DuelsRepository {
   });
 
   Future<Either<Failure, DuelComment>> updateDuelComment({
+    required String duelId,
     required String commentId,
     required String content,
   });
 
   Future<Either<Failure, void>> deleteDuelComment({
+    required String duelId,
     required String commentId,
   });
   

@@ -49,6 +49,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.home),
           onPressed: () {

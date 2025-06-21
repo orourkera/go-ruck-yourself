@@ -12,6 +12,7 @@ class UpdateDuelComment implements UseCase<DuelComment, UpdateDuelCommentParams>
   @override
   Future<Either<Failure, DuelComment>> call(UpdateDuelCommentParams params) async {
     return await repository.updateDuelComment(
+      duelId: params.duelId,
       commentId: params.commentId,
       content: params.content
     );
@@ -19,10 +20,12 @@ class UpdateDuelComment implements UseCase<DuelComment, UpdateDuelCommentParams>
 }
 
 class UpdateDuelCommentParams {
+  final String duelId;
   final String commentId;
   final String content;
 
   UpdateDuelCommentParams({
+    required this.duelId,
     required this.commentId,
     required this.content,
   });

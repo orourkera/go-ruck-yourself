@@ -53,25 +53,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             emit(Authenticated(user));
             _registerFirebaseTokenAfterAuth();
           } else {
-            // If we can't get a user despite being "authenticated", stay authenticated
-            // but log the issue - don't force logout
-            AppLogger.warning('[AuthBloc] Could not get user data but staying authenticated');
-            emit(AuthLoading()); // Keep in loading state rather than logout
+            // Could not fetch user data even though token exists – treating as unauthenticated
+            AppLogger.warning('[AuthBloc] Could not get user data, emitting Unauthenticated.');
+            emit(Unauthenticated());
           }
         } catch (e) {
-          // If we get an error while trying to get the current user,
-          // stay authenticated but log the issue - don't force logout
-          AppLogger.warning('[AuthBloc] Error getting current user but staying authenticated: $e');
-          emit(AuthLoading()); // Keep in loading state rather than logout
+          // Error while trying to fetch current user – assume session invalid
+          AppLogger.warning('[AuthBloc] Error getting current user – emitting Unauthenticated: $e');
+          emit(Unauthenticated());
         }
       } else {
         emit(Unauthenticated());
       }
     } catch (e) {
       AppLogger.error('[AuthBloc] Auth check error: $e');
-      // Stay authenticated on auth check errors - don't force logout
-      AppLogger.warning('[AuthBloc] Auth check failed but staying authenticated');
-      emit(AuthLoading()); // Keep in loading state rather than logout
+      // Could not verify authentication – treat as unauthenticated so user can login
+      emit(Unauthenticated());
     }
   }
 

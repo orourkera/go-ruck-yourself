@@ -557,7 +557,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                       children: [
                         // Edit button
                         IconButton(
-                          icon: const Icon(Icons.edit, size: 18),
+                          icon: Icon(Icons.edit, size: 18, color: Colors.green),
                           onPressed: () => _handleEditComment(comment),
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.all(4.0),
@@ -565,7 +565,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                         ),
                         // Delete button
                         IconButton(
-                          icon: const Icon(Icons.delete, size: 18),
+                          icon: Icon(Icons.delete, size: 18, color: Colors.green),
                           onPressed: () => _handleDeleteComment(comment),
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.all(4.0),
@@ -579,17 +579,24 @@ class _CommentsSectionState extends State<CommentsSection> {
           Padding(
             padding: const EdgeInsets.only(left: 40.0),
             child: isEditing
-              ? TextField(
-                  controller: _commentController,
-                  focusNode: _commentFocusNode,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        focusNode: _commentFocusNode,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          isDense: true,
+                        ),
+                        maxLines: null,
+                        textInputAction: TextInputAction.done,
+                      ),
                     ),
-                  ),
-                  maxLines: null,
-                  textInputAction: TextInputAction.done,
+                  ],
                 )
               : Text(comment.content),
           ),

@@ -350,6 +350,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           title: const Text('Session Details'),
           backgroundColor: _getLadyModeColor(context),
           elevation: 0,
+          iconTheme: IconThemeData(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : null,
+          ),
+          foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : null,
           actions: [
             // Share session button
             IconButton(
@@ -520,7 +524,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: _SessionRouteMap(session: widget.session),
               ),
-              _RoutePrivacyLegend(preferMetric: preferMetric),
 
               // Location Display - only show if location data is available and valid
               if (widget.session.locationPoints != null && widget.session.locationPoints!.isNotEmpty)
@@ -767,7 +770,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             Text(
                               'HEART RATE',
                               style: AppTextStyles.displaySmall.copyWith(
-                                color: const Color(0xFF3E2723),
+                                color: Theme.of(context).brightness == Brightness.dark 
+                                  ? Colors.red
+                                  : const Color(0xFF3E2723),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -904,14 +909,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.comment, color: Colors.grey[600], size: 20),
+                          Icon(Icons.comment, color: AppColors.secondary, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'Comments',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Bangers',
                               fontSize: 18,
-                              color: Colors.black87,
+                              color: AppColors.secondary,
                             ),
                           ),
                         ],
@@ -1590,46 +1595,6 @@ class _SessionRouteMap extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _RoutePrivacyLegend extends StatelessWidget {
-  final bool preferMetric;
-
-  const _RoutePrivacyLegend({required this.preferMetric});
-
-  @override
-  Widget build(BuildContext context) {
-    final String distanceText = preferMetric ? '200m' : '1/8 mile';
-    
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 16,
-            color: Colors.grey.shade600,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'Black segments (first/last $distanceText) are hidden from other users',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: Colors.grey.shade600,
-                fontSize: 11,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -37,13 +37,6 @@ class ClubDeeplinkResource(Resource):
             max-width: 400px; 
             margin: 0 auto; 
         }
-        .logo { 
-            font-family: 'Bangers', cursive;
-            font-size: 48px; 
-            margin-bottom: 20px; 
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
         .message { 
             margin: 30px 0; 
         }
@@ -77,16 +70,16 @@ class ClubDeeplinkResource(Resource):
             transform: scale(1.05);
             opacity: 0.9;
         }
-        .runner-emoji {
-            font-size: 40px;
+        .mascot-image {
+            width: 80px;
+            height: auto;
             margin-bottom: 16px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="runner-emoji">🏃‍♂️</div>
-        <div class="logo">Ruck Club</div>
+        <img src="/static/images/go ruck yourself.png" alt="Go Ruck Yourself" class="mascot-image">
         <div class="message">
             <h2>Opening Club...</h2>
             <p>If the Ruck app doesn't open automatically, download it to join this club!</p>

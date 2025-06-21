@@ -245,3 +245,16 @@ class DuelDeleteError extends DuelDetailState {
   @override
   List<Object> get props => [duelId, message];
 }
+
+class DuelCommentDeleted extends DuelDetailState {
+  final String commentId;
+  final String message;
+
+  const DuelCommentDeleted({
+    required this.commentId,
+    this.message = 'Comment deleted successfully!',
+  });
+
+  @override
+  List<Object> get props => [commentId, message];
+}

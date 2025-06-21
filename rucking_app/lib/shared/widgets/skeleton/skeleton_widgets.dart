@@ -7,10 +7,13 @@ class SessionCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return SkeletonLoader(
       isLoading: true,
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        color: isDarkMode ? Colors.black : null,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -90,10 +93,13 @@ class RuckBuddyCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return SkeletonLoader(
       isLoading: true,
       child: Card(
         margin: const EdgeInsets.all(8),
+        color: isDarkMode ? Colors.black : null,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -314,6 +320,8 @@ class AchievementSummarySkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return SkeletonLoader(
       isLoading: true,
       child: Card(
@@ -321,6 +329,7 @@ class AchievementSummarySkeleton extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+        color: isDarkMode ? Colors.black : null,
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -398,12 +407,16 @@ class RecentAchievementSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return SkeletonLoader(
       isLoading: true,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: isDarkMode 
+              ? Colors.grey[800]!.withOpacity(0.3)
+              : Colors.white.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(

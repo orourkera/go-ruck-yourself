@@ -67,6 +67,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),

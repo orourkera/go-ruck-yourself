@@ -38,6 +38,7 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
         elevation: 0,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

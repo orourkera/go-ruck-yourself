@@ -349,7 +349,13 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
             elevation: 3,
             margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
             color: isDarkMode ? Colors.black : null, // Use black in dark mode
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              side: BorderSide(
+                color: isDarkMode ? AppColors.primary : Colors.grey.shade300,
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: InkWell(
               onTap: widget.onTap ?? () async {
                 // Use await to wait for navigation to complete

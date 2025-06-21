@@ -63,8 +63,12 @@ class SessionCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
+      color: Theme.of(context).brightness == Brightness.dark ? Colors.black : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
+        side: Theme.of(context).brightness == Brightness.dark 
+            ? BorderSide(color: Theme.of(context).primaryColor, width: 1)
+            : BorderSide.none,
       ),
       child: InkWell(
         onTap: onTap,
