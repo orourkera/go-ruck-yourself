@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/duel_completion_service.dart';
 
 /// Service to handle app startup logic including session recovery
 class AppStartupService {
   final ActiveSessionStorage _activeSessionStorage;
+  final GetIt getIt = GetIt.instance;
 
   AppStartupService(this._activeSessionStorage);
 
@@ -110,5 +113,15 @@ class AppStartupService {
     );
     
     return result ?? false;
+  }
+
+  Future<void> _initializeDuelCompletionService() async {
+    try {
+      final duelCompletionService = getIt<DuelCompletionService>();
+      duelCompletionService.startCompletionChecking();
+      AppLogger.info('Duel completion service started');
+    } catch (e) {
+      AppLogger.error('Failed to start duel completion service: $e');
+    }
   }
 }

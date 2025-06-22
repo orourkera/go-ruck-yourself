@@ -1,1 +1,2 @@
 web: gunicorn RuckTracker.app:app
+worker: python background_scheduler.py

@@ -565,8 +565,8 @@ class DuelJoinResource(Resource):
                 }).eq('id', duel_id).execute()
                 
                 # Create duel started notifications for all participants
-                # from api.duel_comments import create_duel_started_notification
-                # create_duel_started_notification(duel_id)
+                from api.duel_comments import create_duel_started_notification
+                create_duel_started_notification(duel_id)
             
             return {'message': 'Successfully joined duel'}
             
@@ -642,3 +642,131 @@ class DuelWithdrawResource(Resource):
         except Exception as e:
             logging.error(f"Error in DuelWithdrawResource.post: {str(e)}", exc_info=True)
             return {'error': str(e)}, 500
+
+
+class DuelCompletionCheckResource(Resource):
+    def post(self):
+        """Check and complete expired duels - for system use (no auth required)"""
+        try:
+            now = datetime.utcnow()
+            supabase = get_supabase_admin_client()
+            
+            # Get all active duels that have expired
+            expired_duels_response = supabase.table('duels').select('*').eq('status', 'active').lt('ends_at', now.isoformat()).execute()
+            
+            completed_duels = []
+            
+            for duel in expired_duels_response.data:
+                try:
+                    result = self._complete_expired_duel(duel, now, supabase)
+                    completed_duels.append(result)
+                except Exception as e:
+                    logging.error(f"Error completing duel {duel['id']}: {str(e)}")
+                    continue
+            
+            return {
+                'message': f'Completed {len(completed_duels)} expired duels',
+                'completed_duels': completed_duels
+            }
+            
+        except Exception as e:
+            logging.error(f"Error in DuelCompletionCheckResource.post: {str(e)}", exc_info=True)
+            return {'error': str(e)}, 500
+    
+    def _complete_expired_duel(self, duel, now, supabase):
+        """Complete a single expired duel and determine winner"""
+        duel_id = duel['id']
+        
+        # Get all active participants with their progress
+        participants_response = supabase.table('duel_participants').select('*').eq('duel_id', duel_id).eq('status', 'accepted').order('current_value', desc=True).execute()
+        
+        participants = participants_response.data
+        
+        if not participants:
+            # No participants, just mark as completed
+            supabase.table('duels').update({
+                'status': 'completed',
+                'completed_at': now.isoformat(),
+                'updated_at': now.isoformat()
+            }).eq('id', duel_id).execute()
+            
+            return {
+                'duel_id': duel_id,
+                'title': duel['title'],
+                'result': 'no_participants',
+                'winner_id': None
+            }
+        
+        # Check if anyone made progress
+        max_value = max((p['current_value'] for p in participants), default=0)
+        
+        if max_value == 0:
+            # No one made any progress
+            supabase.table('duels').update({
+                'status': 'completed',
+                'completed_at': now.isoformat(),
+                'updated_at': now.isoformat()
+            }).eq('id', duel_id).execute()
+            
+            # Send no-winner notification
+            from api.duel_comments import create_duel_completed_notification
+            create_duel_completed_notification(duel_id)
+            
+            return {
+                'duel_id': duel_id,
+                'title': duel['title'],
+                'result': 'no_progress',
+                'winner_id': None
+            }
+        
+        # Find participants with highest progress
+        winners = [p for p in participants if p['current_value'] == max_value]
+        
+        if len(winners) == 1:
+            # Clear winner
+            winner = winners[0]
+            winner_id = winner['user_id']
+            
+            supabase.table('duels').update({
+                'status': 'completed',
+                'winner_id': winner_id,
+                'completed_at': now.isoformat(),
+                'updated_at': now.isoformat()
+            }).eq('id', duel_id).execute()
+            
+            # Update winner stats
+            supabase.table('user_duel_stats').upsert([{
+                'user_id': winner_id,
+                'duels_won': 1,
+                'updated_at': now.isoformat()
+            }], on_conflict='user_id').execute()
+            
+            # Send completion notification
+            from api.duel_comments import create_duel_completed_notification
+            create_duel_completed_notification(duel_id)
+            
+            return {
+                'duel_id': duel_id,
+                'title': duel['title'],
+                'result': 'winner',
+                'winner_id': winner_id
+            }
+        else:
+            # Tie between multiple participants
+            supabase.table('duels').update({
+                'status': 'completed',
+                'completed_at': now.isoformat(),
+                'updated_at': now.isoformat()
+            }).eq('id', duel_id).execute()
+            
+            # Send completion notification
+            from api.duel_comments import create_duel_completed_notification
+            create_duel_completed_notification(duel_id)
+            
+            return {
+                'duel_id': duel_id,
+                'title': duel['title'],
+                'result': 'tie',
+                'winner_id': None,
+                'tied_participants': len(winners)
+            }

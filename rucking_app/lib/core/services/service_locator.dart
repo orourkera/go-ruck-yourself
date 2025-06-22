@@ -11,6 +11,7 @@ import 'package:rucking_app/core/services/app_startup_service.dart';
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/core/services/duel_completion_service.dart';
 import 'package:rucking_app/core/security/ssl_pinning.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
@@ -197,6 +198,11 @@ Future<void> setupServiceLocator() async {
     authBloc: getIt<AuthBloc>(),
   ));
   
+  // Register duel completion service for automatic duel ending
+  getIt.registerLazySingleton<DuelCompletionService>(() => DuelCompletionService(
+    getIt<ApiClient>(),
+  ));
+
   // Clubs bloc
   getIt.registerFactory<ClubsBloc>(() => ClubsBloc(getIt<ClubsRepository>()));
 

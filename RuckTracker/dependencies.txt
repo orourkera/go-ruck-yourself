@@ -14,3 +14,4 @@ Flask-Migrate>=4.0.0
 psycopg2-binary>=2.9.9 # Added PostgreSQL driver
 python-dotenv>=1.0.0 # Added to load .env files
 psutil>=5.8.0 # Added for memory monitoring
+APScheduler>=3.10.0 # Added for background scheduled tasks (duel completion)

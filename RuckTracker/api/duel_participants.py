@@ -131,8 +131,8 @@ class DuelParticipantProgressResource(Resource):
                     }], on_conflict='user_id').execute()
                     
                     # Create duel completed notification for all participants
-                    # from api.duel_comments import create_duel_completed_notification
-                    # create_duel_completed_notification(duel_id)
+                    from api.duel_comments import create_duel_completed_notification
+                    create_duel_completed_notification(duel_id)
                 else:
                     # Tie
                     supabase.table('duels').update({
@@ -141,9 +141,9 @@ class DuelParticipantProgressResource(Resource):
                         'updated_at': now.isoformat()
                     }).eq('id', duel_id).execute()
                     
-                    # Notification handled by database trigger
-                    # from api.duel_comments import create_duel_completed_notification
-                    # create_duel_completed_notification(duel_id)
+                    # Create duel completed notification for all participants
+                    from api.duel_comments import create_duel_completed_notification
+                    create_duel_completed_notification(duel_id)
             
             return {
                 'message': 'Progress updated successfully',
