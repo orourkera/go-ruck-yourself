@@ -161,6 +161,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _paceTickCounter = 0;
 
     AppLogger.debug('SessionStarted event. Weight: ${event.ruckWeightKg}kg, Notes: ${event.notes}');
+    AppLogger.sessionCompletion('SessionStarted - Event ID tracking', context: {
+      'event_id': event.eventId,
+      'has_event_id': event.eventId != null,
+      'event_id_type': event.eventId.runtimeType.toString(),
+    });
     emit(ActiveSessionLoading());
     String? sessionId;
 
@@ -221,11 +226,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         }
         
         // Use a very short timeout for session creation to fail fast into offline mode
-        final createResponse = await _apiClient.post('/rucks', {
+        final sessionCreatePayload = {
           'ruck_weight_kg': event.ruckWeightKg,
           'notes': event.notes,
           'event_id': event.eventId, // Pass event ID if creating session from event
-        }).timeout(Duration(seconds: 1)); // Reduced from 3 to 1 second for faster offline detection
+        };
+        
+        AppLogger.sessionCompletion('Creating session with payload', context: {
+          'payload': sessionCreatePayload,
+          'endpoint': '/rucks',
+          'event_id_in_payload': sessionCreatePayload['event_id'],
+        });
+        
+        final createResponse = await _apiClient.post('/rucks', sessionCreatePayload).timeout(Duration(seconds: 1)); // Reduced from 3 to 1 second for faster offline detection
         
         sessionId = createResponse['id']?.toString();
         if (sessionId == null || sessionId.isEmpty) throw Exception('Failed to create session: No ID.');

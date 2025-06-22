@@ -317,22 +317,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     _loadDefaults();
     _selectedRuckWeight = _ruckWeight; // initialize with default selected weight
     
-    // Extract event context from route arguments if provided
+    // Extract event context from constructor parameters
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = ModalRoute.of(context)?.settings.arguments;
-      print('📋 Create session screen received args: $args');
-      if (args is Map<String, dynamic>) {
-        final eventId = args['event_id'] as String?;
-        final eventTitle = args['event_title'] as String?;
-        print('📋 Extracted event_id: $eventId, event_title: $eventTitle');
-        
-        if (eventId != null && eventTitle != null) {
-          setState(() {
-            _eventId = eventId;
-            _eventTitle = eventTitle;
-          });
-          print('📋 Set event context: _eventId = $_eventId, _eventTitle = $_eventTitle');
-        }
+      // Use constructor parameters instead of route arguments
+      final eventId = widget.eventId;
+      final eventTitle = widget.eventTitle;
+      
+      print('📋 Create session screen received constructor args: eventId=$eventId, eventTitle=$eventTitle');
+      
+      if (eventId != null && eventTitle != null) {
+        setState(() {
+          _eventId = eventId;
+          _eventTitle = eventTitle;
+        });
+        print('📋 Set event context: _eventId = $_eventId, _eventTitle = $_eventTitle');
       } else {
         print('📋 No event arguments provided');
       }
