@@ -112,6 +112,21 @@ class EventProgressResource(Resource):
                 
                 progress_data.append(progress_entry)
             
+            # User enrichment fallback - fix missing user data
+            missing_user_ids = [entry['user_id'] for entry in progress_data if not entry.get('user')]
+            if missing_user_ids:
+                logger.info(f"Enriching {len(missing_user_ids)} missing users: {missing_user_ids}")
+                try:
+                    missing_users = admin_client.table('user').select('id, username, avatar_url').in_('id', missing_user_ids).execute()
+                    user_lookup = {user['id']: user for user in missing_users.data or []}
+                    
+                    for entry in progress_data:
+                        if not entry.get('user') and entry['user_id'] in user_lookup:
+                            entry['user'] = user_lookup[entry['user_id']]
+                            logger.info(f"Enriched user {entry['user_id']} with username: {entry['user']['username']}")
+                except Exception as e:
+                    logger.error(f"Failed to enrich missing users: {e}")
+            
             # Sort by distance completed (descending), then by completion time (ascending for ties)
             progress_data.sort(key=lambda x: (-x['distance_km'], x['completed_at'] or '9999-12-31'))
             
