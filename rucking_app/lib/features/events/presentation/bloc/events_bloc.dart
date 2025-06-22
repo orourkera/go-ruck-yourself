@@ -1,13 +1,17 @@
 import 'package:bloc/bloc.dart';
 import 'package:flutter/foundation.dart';
+import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/core/services/location_service.dart';
+import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/features/events/domain/repositories/events_repository.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_state.dart';
 
 class EventsBloc extends Bloc<EventsEvent, EventsState> {
   final EventsRepository _eventsRepository;
+  final LocationService _locationService;
 
-  EventsBloc(this._eventsRepository) : super(EventsInitial()) {
+  EventsBloc(this._eventsRepository, this._locationService) : super(EventsInitial()) {
     on<LoadEvents>(_onLoadEvents);
     on<RefreshEvents>(_onRefreshEvents);
     on<CreateEvent>(_onCreateEvent);
@@ -34,14 +38,68 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
         endDate: event.endDate,
       );
       
+      List<Event> sortedEvents = events;
+      
+      // If "Near Me" sorting is requested, sort by distance from user location
+      if (event.sortByDistance == true) {
+        try {
+          final userLocation = await _locationService.getCurrentLocation();
+          if (userLocation != null) {
+            // Separate events with and without location
+            final eventsWithLocation = <Event>[];
+            final eventsWithoutLocation = <Event>[];
+            
+            for (final eventItem in events) {
+              if (eventItem.latitude != null && eventItem.longitude != null) {
+                eventsWithLocation.add(eventItem);
+              } else {
+                eventsWithoutLocation.add(eventItem);
+              }
+            }
+            
+            // Sort events with location by distance from user
+            eventsWithLocation.sort((a, b) {
+              final distanceA = _locationService.calculateDistance(
+                userLocation,
+                LocationPoint(
+                  latitude: a.latitude!,
+                  longitude: a.longitude!,
+                  elevation: 0.0, // Use default elevation for event locations
+                  timestamp: DateTime.now(),
+                  accuracy: 0.0, // Use default accuracy for event locations
+                ),
+              );
+              final distanceB = _locationService.calculateDistance(
+                userLocation,
+                LocationPoint(
+                  latitude: b.latitude!,
+                  longitude: b.longitude!,
+                  elevation: 0.0, // Use default elevation for event locations
+                  timestamp: DateTime.now(),
+                  accuracy: 0.0, // Use default accuracy for event locations
+                ),
+              );
+              return distanceA.compareTo(distanceB);
+            });
+            
+            // Combine: nearest events first, then events without location
+            sortedEvents = [...eventsWithLocation, ...eventsWithoutLocation];
+          }
+        } catch (e) {
+          debugPrint('Error getting user location for distance sorting: $e');
+          // If location fails, keep original event order
+        }
+      }
+      
       emit(EventsLoaded(
-        events: events,
+        events: sortedEvents,
         searchQuery: event.search,
         clubId: event.clubId,
         status: event.status,
         includeParticipating: event.includeParticipating,
         startDate: event.startDate,
         endDate: event.endDate,
+        sortByDistance: event.sortByDistance,
       ));
     } catch (e) {
       debugPrint('Error loading events: $e');
@@ -60,6 +118,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
         includeParticipating: currentState.includeParticipating,
         startDate: currentState.startDate,
         endDate: currentState.endDate,
+        sortByDistance: currentState.sortByDistance,
       ));
     } else {
       // Otherwise just load events with no filters

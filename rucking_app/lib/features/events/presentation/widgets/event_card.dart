@@ -36,26 +36,132 @@ class EventCard extends StatelessWidget {
           color: isDarkMode ? Colors.black : null,
           child: Column(
             children: [
-              // Banner image if available
+              // Club info and location above image
+              if (event.hostingClub != null || event.locationName != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Club info row
+                      if (event.hostingClub != null)
+                        Row(
+                          children: [
+                            // Club logo
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: event.hostingClub!.logoUrl != null && event.hostingClub!.logoUrl!.isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        event.hostingClub!.logoUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).primaryColor,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                event.hostingClub!.name.isNotEmpty 
+                                                    ? event.hostingClub!.name[0].toUpperCase() 
+                                                    : 'C',
+                                                style: AppTextStyles.bodySmall.copyWith(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    )
+                                  : Center(
+                                      child: Text(
+                                        event.hostingClub!.name.isNotEmpty 
+                                            ? event.hostingClub!.name[0].toUpperCase() 
+                                            : 'C',
+                                        style: AppTextStyles.bodySmall.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Club name
+                            Expanded(
+                              child: Text(
+                                event.hostingClub!.name,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: isDarkMode ? Colors.white : AppColors.textDark,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      
+                      // Location below club info
+                      if (event.locationName != null && event.locationName!.isNotEmpty) ...[
+                        if (event.hostingClub != null) const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 16,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                event.locationName!,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: Colors.grey[600],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+              // Banner image (taller like ruck buddy card)
               if (event.bannerImageUrl != null)
                 ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
+                  borderRadius: event.hostingClub != null || event.locationName != null
+                      ? BorderRadius.zero // No top radius if content above
+                      : const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                        ),
                   child: Image.network(
                     event.bannerImageUrl!,
-                    height: 120,
+                    height: 200, // Same height as ruck buddy card
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        height: 120,
+                        height: 200,
                         width: double.infinity,
                         color: Theme.of(context).primaryColor.withOpacity(0.1),
                         child: Icon(
                           Icons.event,
-                          size: 40,
+                          size: 60,
                           color: Theme.of(context).primaryColor,
                         ),
                       );
@@ -63,152 +169,69 @@ class EventCard extends StatelessWidget {
                   ),
                 ),
               
+              // Event details below image (no location repetition)
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header with title and club info
-                    Row(
-                      children: [
-                        // Club logo or event icon
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: event.isClubEvent 
-                                ? Theme.of(context).primaryColor.withOpacity(0.1) 
-                                : Colors.grey.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            event.isClubEvent ? Icons.groups : Icons.event,
-                            size: 20,
-                            color: event.isClubEvent ? Theme.of(context).primaryColor : Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                event.title,
-                                style: AppTextStyles.titleMedium.copyWith(
-                                  color: isDarkMode ? Colors.white : AppColors.textDark,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              if (event.hostingClub != null)
-                                Text(
-                                  event.hostingClub!.name,
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                )
-                              else if (event.creator != null)
-                                Text(
-                                  'by ${event.creator!.username}',
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        
-                        // Event status badge
-                        _buildStatusBadge(context),
-                      ],
+                    // Event title (no icon)
+                    Text(
+                      event.title,
+                      style: AppTextStyles.titleMedium.copyWith(
+                        color: isDarkMode ? Colors.white : AppColors.textDark,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     
-                    // Description if available
-                    if (event.description != null && event.description!.isNotEmpty)
-                      Column(
-                        children: [
-                          Text(
-                            event.description!,
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ),
-                    
-                    // Event details row
+                    // Date and time
                     Row(
                       children: [
                         Icon(
                           Icons.schedule,
                           size: 16,
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          color: Colors.grey[600],
                         ),
                         const SizedBox(width: 4),
                         Text(
                           _formatDateTime(event.scheduledStartTime),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: Colors.grey[600],
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        
-                        Icon(
-                          Icons.timer,
-                          size: 16,
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${event.durationMinutes}min',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                          ),
-                        ),
-                        
-                        if (event.locationName != null) ...[
-                          const SizedBox(width: 16),
-                          Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              event.locationName!,
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                     
+                    // Description if available
+                    if (event.description != null && event.description!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        event.description!,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    
                     const SizedBox(height: 12),
                     
-                    // Participants and action buttons
+                    // Bottom row with participants and action
                     Row(
                       children: [
-                        // Participant count
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        // Status badge
+                        _buildStatusBadge(context),
+                        
+                        const SizedBox(width: 12),
+                        
+                        // Participants count
+                        if (event.participantCount > 0 || event.maxParticipants != null)
+                          Row(
                             children: [
                               Icon(
                                 Icons.people,
@@ -233,7 +256,6 @@ class EventCard extends StatelessWidget {
                                 ),
                             ],
                           ),
-                        ),
                         
                         const Spacer(),
                         

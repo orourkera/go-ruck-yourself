@@ -46,11 +46,12 @@ class _EventsScreenState extends State<EventsScreen> {
     super.dispose();
   }
 
-  void _onFilterChanged(String? status, String? clubId, bool? includeParticipating) {
+  void _onFilterChanged(String? status, String? clubId, bool? includeParticipating, bool? sortByDistance) {
     _eventsBloc.add(LoadEvents(
       status: status,
       clubId: clubId,
       includeParticipating: includeParticipating,
+      sortByDistance: sortByDistance,
     ));
   }
 
@@ -103,18 +104,21 @@ class _EventsScreenState extends State<EventsScreen> {
                   String? currentStatus;
                   String? currentClubId;
                   bool? currentIncludeParticipating;
+                  bool? currentSortByDistance;
                   
                   // Extract current filters from state if available
                   if (state is EventsLoaded) {
                     currentStatus = state.status;
                     currentClubId = state.clubId;
                     currentIncludeParticipating = state.includeParticipating;
+                    currentSortByDistance = state.sortByDistance;
                   }
                   
                   return EventFilterChips(
                     selectedStatus: currentStatus,
                     selectedClubId: currentClubId,
                     includeParticipating: currentIncludeParticipating,
+                    sortByDistance: currentSortByDistance,
                     onFilterChanged: _onFilterChanged,
                   );
                 },

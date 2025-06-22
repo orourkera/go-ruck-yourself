@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
-import 'package:rucking_app/core/services/location_search_service.dart';
+import 'package:rucking_app/core/services/google_places_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_state.dart';
+import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_event.dart';
 import 'package:rucking_app/features/events/presentation/bloc/events_state.dart';
@@ -49,6 +50,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   
   bool _isLoading = false;
   File? _bannerImage;
+  bool _removeExistingBanner = false; // Flag to track if user wants to remove existing banner
   DateTime? _selectedDateTime;
   int _duration = 60; // minutes
   int _difficultyLevel = 1;
@@ -58,12 +60,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   
   late EventsBloc _eventsBloc;
   late ClubsBloc _clubsBloc;
-  final _locationSearchService = getIt<LocationSearchService>();
+  final _locationSearchService = getIt<GooglePlacesService>();
   LocationSearchResult? _selectedLocationResult;
   List<LocationSearchResult> _locationSuggestions = [];
   bool _showLocationSuggestions = false;
   
   List<Club> _userClubs = [];
+  Event? _eventToEdit; // Store the event being edited
 
   @override
   void initState() {
@@ -247,7 +250,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         const SizedBox(height: 8),
         
         Container(
-          height: 160,
+          height: 200, // Updated to match event card banner height
           width: double.infinity,
           decoration: BoxDecoration(
             color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
@@ -266,7 +269,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         maxScale: 3.0,
                         child: Image.file(
                           _bannerImage!,
-                          height: 160,
+                          height: 200, // Updated to match container height
                           width: double.infinity,
                           fit: BoxFit.cover,
                         ),
@@ -293,27 +296,123 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     ),
                   ],
                 )
-              : InkWell(
-                  onTap: _selectBannerImage,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.add_photo_alternate,
-                        size: 40,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Add Event Banner',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: Colors.grey[600],
+              : _eventToEdit != null && 
+                _eventToEdit!.bannerImageUrl != null && 
+                _eventToEdit!.bannerImageUrl!.isNotEmpty && 
+                !_removeExistingBanner
+                  ? Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(11),
+                          child: InteractiveViewer(
+                            minScale: 1.0,
+                            maxScale: 3.0,
+                            child: Image.network(
+                              _eventToEdit!.bannerImageUrl!,
+                              height: 200, // Updated to match container height
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  height: 200, // Updated to match container height
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 200, // Updated to match container height
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      color: Colors.grey,
+                                      size: 40,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ),
+                        // Remove existing banner button
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _removeExistingBanner = true;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Edit existing banner button
+                        Positioned(
+                          top: 8,
+                          right: 42,
+                          child: GestureDetector(
+                            onTap: _selectBannerImage,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.orange,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : InkWell(
+                      onTap: _selectBannerImage,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate,
+                            size: 40,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add Event Banner',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
         ),
       ],
     );
@@ -773,6 +872,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (selectedFile != null) {
       setState(() {
         _bannerImage = selectedFile;
+        _removeExistingBanner = true; // Mark existing banner for removal when selecting new one
       });
     }
   }
@@ -780,6 +880,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   void _removeBannerImage() {
     setState(() {
       _bannerImage = null;
+      _removeExistingBanner = false; // Reset flag when removing new banner
     });
   }
 
@@ -851,14 +952,40 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   void _populateFormWithEventData(dynamic event) {
-    // This would populate the form fields with existing event data for editing
-    // Implementation depends on the Event model structure
+    // Store the event being edited
+    _eventToEdit = event as Event;
+    
+    // Populate form fields with existing event data
     _titleController.text = event.title ?? '';
     _descriptionController.text = event.description ?? '';
     _locationController.text = event.locationName ?? '';
     _selectedDateTime = event.scheduledStartTime;
     _duration = event.durationMinutes ?? 60;
-    // ... populate other fields
+    _difficultyLevel = event.difficultyLevel ?? 1;
+    _approvalRequired = event.approvalRequired;
+    _selectedClubId = event.clubId;
+    _isClubEvent = event.clubId != null;
+    
+    // Set controllers for other fields
+    if (event.maxParticipants != null) {
+      _maxParticipantsController.text = event.maxParticipants.toString();
+    }
+    if (event.minParticipants != null) {
+      _minParticipantsController.text = event.minParticipants.toString();
+    }
+    if (event.ruckWeightKg != null) {
+      _ruckWeightController.text = event.ruckWeightKg.toString();
+    }
+    
+    // Set location result if available
+    if (event.locationName != null && event.latitude != null && event.longitude != null) {
+      _selectedLocationResult = LocationSearchResult(
+        displayName: event.locationName!,
+        address: event.locationName!,
+        latitude: event.latitude!,
+        longitude: event.longitude!,
+      );
+    }
   }
 
   void _submitForm() {
@@ -915,7 +1042,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         difficultyLevel: eventData['difficulty_level'] as int?,
         ruckWeightKg: eventData['ruck_weight_kg'] as double?,
         durationMinutes: eventData['duration_minutes'] as int,
-        bannerImageFile: _bannerImage, 
+        bannerImageFile: _bannerImage,
       ));
     } else {
       _eventsBloc.add(CreateEvent(
@@ -932,7 +1059,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         difficultyLevel: eventData['difficulty_level'] as int?,
         ruckWeightKg: eventData['ruck_weight_kg'] as double?,
         durationMinutes: eventData['duration_minutes'] as int,
-        bannerImageFile: _bannerImage, 
+        bannerImageFile: _bannerImage,
       ));
     }
   }

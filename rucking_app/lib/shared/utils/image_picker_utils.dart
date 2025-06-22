@@ -109,7 +109,7 @@ class ImagePickerUtils {
           builder: (context) => ImageCropModal(
             imageFile: File(image.path),
             title: 'Crop Event Banner',
-            aspectRatio: 3.0, // 3:1 aspect ratio for wide banner
+            aspectRatio: 16/9, // Changed from 3.0 to 16:9 for taller banner (200px height)
             cropShape: CropShape.rectangle, // Use rectangle crop shape for banner
           ),
         );

@@ -246,6 +246,29 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                           ),
                         ],
                       ),
+                      if (clubDetails.club.location != null && clubDetails.club.location!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 16,
+                              color: AppColors.textDarkSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                clubDetails.club.location!,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textDarkSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

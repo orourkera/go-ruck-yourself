@@ -1,9 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:rucking_app/core/services/google_places_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/avatar_service.dart';
-import 'package:rucking_app/core/services/location_search_service.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_event.dart';
@@ -36,7 +37,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   bool _removeExistingLogo = false; // Flag to track if user wants to remove existing logo
   
   late ClubsBloc _clubsBloc;
-  final _locationSearchService = getIt<LocationSearchService>();
+  final _locationSearchService = getIt<GooglePlacesService>();
   LocationSearchResult? _selectedLocationResult;
   List<LocationSearchResult> _locationSuggestions = [];
   bool _showLocationSuggestions = false;
@@ -321,8 +322,8 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                             ],
                           )
                         : widget.clubToEdit != null && 
-                          widget.clubToEdit!.club.logo != null && 
-                          widget.clubToEdit!.club.logo!.isNotEmpty && 
+                          widget.clubToEdit!.club.logoUrl != null && 
+                          widget.clubToEdit!.club.logoUrl!.isNotEmpty && 
                           !_removeExistingLogo
                             ? Stack(
                                 children: [
@@ -330,7 +331,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(60), // Half of 120 for perfect circle
                                     child: Image.network(
-                                      widget.clubToEdit!.club.logo!,
+                                      widget.clubToEdit!.club.logoUrl!,
                                       width: 116,
                                       height: 116,
                                       fit: BoxFit.cover,
@@ -591,47 +592,48 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   
                   const SizedBox(height: 16),
                   
-                  // Info Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.info.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.info.withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: AppColors.info,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Club Guidelines',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                fontWeight: FontWeight.bold,
+                  // Info Card - only show when creating new club
+                  if (widget.clubToEdit == null)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
                                 color: AppColors.info,
+                                size: 20,
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '• You will be the club admin and can manage members\n'
-                          '• Club names must be unique and appropriate\n'
-                          '• You can change these settings later in club management',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.info,
-                            height: 1.4,
+                              const SizedBox(width: 8),
+                              Text(
+                                'Club Guidelines',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.info,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            '• You will be the club admin and can manage members\n'
+                            '• Club names must be unique and appropriate\n'
+                            '• You can change these settings later in club management',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.info,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

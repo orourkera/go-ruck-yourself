@@ -6,13 +6,15 @@ class EventFilterChips extends StatelessWidget {
   final String? selectedStatus;
   final String? selectedClubId;
   final bool? includeParticipating;
-  final Function(String? status, String? clubId, bool? includeParticipating) onFilterChanged;
+  final bool? sortByDistance;
+  final Function(String? status, String? clubId, bool? includeParticipating, bool? sortByDistance) onFilterChanged;
 
   const EventFilterChips({
     Key? key,
     this.selectedStatus,
     this.selectedClubId,
     this.includeParticipating,
+    this.sortByDistance,
     required this.onFilterChanged,
   }) : super(key: key);
 
@@ -26,36 +28,43 @@ class EventFilterChips extends StatelessWidget {
           _buildFilterChip(
             context,
             label: 'All',
-            isSelected: selectedStatus == null && includeParticipating == null,
-            onTap: () => onFilterChanged(null, null, null),
+            isSelected: selectedStatus == null && includeParticipating == null && sortByDistance != true,
+            onTap: () => onFilterChanged(null, null, null, null),
+          ),
+          const SizedBox(width: 8),
+          _buildFilterChip(
+            context,
+            label: 'Near Me',
+            isSelected: sortByDistance == true,
+            onTap: () => onFilterChanged(null, null, null, true),
           ),
           const SizedBox(width: 8),
           _buildFilterChip(
             context,
             label: 'Upcoming',
             isSelected: selectedStatus == 'active',
-            onTap: () => onFilterChanged('active', null, null),
+            onTap: () => onFilterChanged('active', null, null, null),
           ),
           const SizedBox(width: 8),
           _buildFilterChip(
             context,
             label: 'My Events',
             isSelected: includeParticipating == true,
-            onTap: () => onFilterChanged(null, null, true),
+            onTap: () => onFilterChanged(null, null, true, null),
           ),
           const SizedBox(width: 8),
           _buildFilterChip(
             context,
             label: 'Club Events',
             isSelected: selectedClubId != null,
-            onTap: () => onFilterChanged(null, 'club_events', null),
+            onTap: () => onFilterChanged(null, 'club_events', null, null),
           ),
           const SizedBox(width: 8),
           _buildFilterChip(
             context,
             label: 'Completed',
             isSelected: selectedStatus == 'completed',
-            onTap: () => onFilterChanged('completed', null, null),
+            onTap: () => onFilterChanged('completed', null, null, null),
           ),
         ],
       ),

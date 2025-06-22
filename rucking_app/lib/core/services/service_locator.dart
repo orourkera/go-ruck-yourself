@@ -40,7 +40,7 @@ import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
-import 'package:rucking_app/core/services/location_search_service.dart';
+import 'package:rucking_app/core/services/google_places_service.dart';
 import 'package:rucking_app/core/services/clubs_cache_service.dart';
 import 'package:rucking_app/core/services/events_cache_service.dart';
 import 'package:rucking_app/features/events/data/repositories/events_repository_impl.dart';
@@ -129,8 +129,8 @@ Future<void> setupServiceLocator() async {
   // Register ConnectivityService
   getIt.registerSingleton<ConnectivityService>(ConnectivityServiceImpl());
   
-  // Register LocationSearchService
-  getIt.registerSingleton<LocationSearchService>(LocationSearchService());
+  // Register GooglePlacesService
+  getIt.registerSingleton<GooglePlacesService>(GooglePlacesService());
   
   // Register ClubsCacheService
   getIt.registerSingleton<ClubsCacheService>(ClubsCacheService());
@@ -201,7 +201,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<ClubsBloc>(() => ClubsBloc(getIt<ClubsRepository>()));
 
   // Events blocs
-  getIt.registerFactory<EventsBloc>(() => EventsBloc(getIt<EventsRepository>()));
+  getIt.registerFactory<EventsBloc>(() => EventsBloc(getIt<EventsRepository>(), getIt<LocationService>()));
   getIt.registerFactory<EventCommentsBloc>(() => EventCommentsBloc(getIt<EventsRepository>()));
   getIt.registerFactory<EventProgressBloc>(() => EventProgressBloc(getIt<EventsRepository>()));
 

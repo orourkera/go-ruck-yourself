@@ -15,6 +15,7 @@ class LoadEvents extends EventsEvent {
   final bool? includeParticipating;
   final DateTime? startDate;
   final DateTime? endDate;
+  final bool? sortByDistance;
 
   const LoadEvents({
     this.search,
@@ -23,10 +24,11 @@ class LoadEvents extends EventsEvent {
     this.includeParticipating,
     this.startDate,
     this.endDate,
+    this.sortByDistance,
   });
 
   @override
-  List<Object?> get props => [search, clubId, status, includeParticipating, startDate, endDate];
+  List<Object?> get props => [search, clubId, status, includeParticipating, startDate, endDate, sortByDistance];
 }
 
 class RefreshEvents extends EventsEvent {}

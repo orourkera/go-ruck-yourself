@@ -328,6 +328,30 @@ class _ClubsScreenState extends State<ClubsScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
+                        if (club.location != null && club.location!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 14,
+                                color: AppColors.textDarkSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  club.location!,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.textDarkSecondary,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -20,6 +20,7 @@ class EventsLoaded extends EventsState {
   final bool? includeParticipating;
   final DateTime? startDate;
   final DateTime? endDate;
+  final bool? sortByDistance;
 
   const EventsLoaded({
     required this.events,
@@ -29,6 +30,7 @@ class EventsLoaded extends EventsState {
     this.includeParticipating,
     this.startDate,
     this.endDate,
+    this.sortByDistance,
   });
 
   @override
@@ -40,6 +42,7 @@ class EventsLoaded extends EventsState {
         includeParticipating,
         startDate,
         endDate,
+        sortByDistance,
       ];
 }
 
