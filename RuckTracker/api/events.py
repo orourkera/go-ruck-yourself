@@ -45,7 +45,7 @@ class EventsListResource(Resource):
             query = admin_client.table('events').select("""
                 *,
                 creator:creator_user_id(id, username, avatar_url),
-                hosting_club:club_id(id, name, logo_url)
+                clubs!club_id(id, name, logo_url)
             """)
             
             # Apply filters
@@ -91,7 +91,8 @@ class EventsListResource(Resource):
                     **event,
                     'participant_count': participant_count,
                     'user_participation_status': user_participation,
-                    'is_creator': event['creator_user_id'] == current_user_id
+                    'is_creator': event['creator_user_id'] == current_user_id,
+                    'hosting_club': event.get('clubs')  # Map clubs field to hosting_club for frontend
                 }
                 events.append(event_data)
             
@@ -215,7 +216,7 @@ class EventResource(Resource):
             result = admin_client.table('events').select("""
                 *,
                 creator:creator_user_id(id, username, avatar_url),
-                hosting_club:club_id(id, name, logo_url)
+                clubs!club_id(id, name, logo_url)
             """).eq('id', event_id).execute()
             
             if not result.data:
@@ -261,7 +262,8 @@ class EventResource(Resource):
                 **event,
                 'participant_count': len(participants),
                 'user_participation_status': user_participation,
-                'is_creator': event['creator_user_id'] == current_user_id
+                'is_creator': event['creator_user_id'] == current_user_id,
+                'hosting_club': event.get('clubs')  # Map clubs field to hosting_club for frontend
             }
             
             response_data = {
