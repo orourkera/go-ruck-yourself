@@ -153,25 +153,55 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
-      print('[DEBUG] AchievementBloc: Checking achievements for session ${event.sessionId}');
+      AppLogger.sessionCompletion('Checking achievements for session', context: {
+        'session_id': event.sessionId,
+        'current_state_type': state.runtimeType.toString(),
+      });
+      
       final newAchievements = await _achievementRepository.checkSessionAchievements(event.sessionId);
-           if (newAchievements.isNotEmpty) {
-        print('[DEBUG] AchievementBloc: ${newAchievements.length} new achievements earned!');
+      
+      AppLogger.sessionCompletion('Achievement check completed', context: {
+        'session_id': event.sessionId,
+        'new_achievements_count': newAchievements.length,
+        'achievements_earned': newAchievements.map((a) => {
+          'id': a.id,
+          'title': a.title,
+          'description': a.description,
+        }).toList(),
+      });
+      
+      if (newAchievements.isNotEmpty) {
+        AppLogger.sessionCompletion('New achievements earned!', context: {
+          'session_id': event.sessionId,
+          'achievements_count': newAchievements.length,
+          'achievement_titles': newAchievements.map((a) => a.title).toList(),
+        });
         
         // Clear cache when new achievements are found so data will be refreshed
         await _achievementRepository.clearCache();
-        print('[DEBUG] AchievementBloc: Cleared achievement cache due to new achievements');
+        AppLogger.sessionCompletion('Achievement cache cleared due to new achievements', context: {
+          'session_id': event.sessionId,
+        });
         
         if (state is AchievementsLoaded) {
           final currentState = state as AchievementsLoaded;
           
-          print('[DEBUG] AchievementBloc: Emitting AchievementsSessionChecked with new achievements');
+          AppLogger.sessionCompletion('Emitting AchievementsSessionChecked state', context: {
+            'session_id': event.sessionId,
+            'previous_state_type': currentState.runtimeType.toString(),
+          });
+          
           // Update the newly earned list and emit session checked state
           emit(AchievementsSessionChecked(
             newAchievements: newAchievements,
             previousState: currentState.copyWith(newlyEarned: newAchievements),
           ));
         } else {
+          AppLogger.sessionCompletion('Creating new AchievementsLoaded state for achievements', context: {
+            'session_id': event.sessionId,
+            'previous_state_type': state.runtimeType.toString(),
+          });
+          
           emit(AchievementsSessionChecked(
             newAchievements: newAchievements,
             previousState: AchievementsLoaded(
@@ -185,10 +215,16 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
           ));
         }
       } else {
-        print('[DEBUG] AchievementBloc: No new achievements earned');
+        AppLogger.sessionCompletion('No new achievements earned for session', context: {
+          'session_id': event.sessionId,
+        });
       }
     } catch (e) {
-      print('[DEBUG] AchievementBloc: Error checking session achievements: $e');
+      AppLogger.sessionCompletion('Error checking session achievements', context: {
+        'session_id': event.sessionId,
+        'error': e.toString(),
+        'error_type': e.runtimeType.toString(),
+      });
       AppLogger.error('Failed to check session achievements', exception: e);
       emit(AchievementsError(message: 'Failed to check session achievements: ${e.toString()}'));
     }

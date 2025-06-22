@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GooglePlacesConfig {
-  // TODO: Add your Google Places API key here
-  // Get one from: https://console.cloud.google.com/apis/library/places-backend.googleapis.com
-  static const String apiKey = 'AIzaSyCbw1D1u6zv_P-he9mqsHEzwLElthPpdxY';
+  // Get API key from environment variables
+  // Add your key to .env file as: GOOGLE_PLACES_API_KEY=your_actual_key_here
+  static String get apiKey => dotenv.env['GOOGLE_PLACES_API_KEY'] ?? '';
   
   // Validate that API key is configured
-  static bool get isConfigured => apiKey != 'YOUR_GOOGLE_PLACES_API_KEY' && apiKey.isNotEmpty;
+  static bool get isConfigured => apiKey.isNotEmpty;
 }
 
 class LocationSearchResult {

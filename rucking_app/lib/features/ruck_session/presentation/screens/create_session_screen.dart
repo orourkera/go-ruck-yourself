@@ -265,8 +265,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           userWeightKg: userWeightKg, // Pass the calculated userWeightKg (double)
           notes: null, // Set to null, assuming no dedicated notes input for session args here. Adjust if a notes field exists.
           plannedDuration: plannedDuration,
-          eventId: widget.eventId, // Pass event ID if creating session from event
+          eventId: _eventId, // Use _eventId from route arguments, not widget.eventId
         );
+        
+        AppLogger.sessionCompletion('Creating session with event context', context: {
+          'event_id': _eventId,
+          'event_title': _eventTitle,
+          'ruck_weight_kg': _ruckWeight,
+          'planned_duration_seconds': plannedDuration,
+        });
         
         // Navigate to CountdownPage which will handle the countdown and transition
         Navigator.of(context).pushReplacement(

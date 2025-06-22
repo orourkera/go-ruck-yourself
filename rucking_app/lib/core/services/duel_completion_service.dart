@@ -6,16 +6,20 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 class DuelCompletionService {
   final ApiClient _apiClient;
   Timer? _completionCheckTimer;
+  bool _isStarted = false;
   
   DuelCompletionService(this._apiClient);
 
   /// Start periodic checking for duel completion (every 2 minutes)
   void startCompletionChecking() {
+    if (_isStarted) return; // Prevent multiple starts
+    
     _completionCheckTimer?.cancel();
     _completionCheckTimer = Timer.periodic(
       const Duration(minutes: 2),
       (_) => _triggerBackendCompletionCheck(),
     );
+    _isStarted = true;
     AppLogger.info('Duel completion checking started');
   }
 
@@ -23,6 +27,7 @@ class DuelCompletionService {
   void stopCompletionChecking() {
     _completionCheckTimer?.cancel();
     _completionCheckTimer = null;
+    _isStarted = false;
     AppLogger.info('Duel completion checking stopped');
   }
 

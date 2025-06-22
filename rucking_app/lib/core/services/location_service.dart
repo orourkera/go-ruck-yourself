@@ -158,7 +158,7 @@ class LocationServiceImpl implements LocationService {
       );
     } else if (Platform.isIOS) {
       locationSettings = AppleSettings(
-        accuracy: LocationAccuracy.bestForNavigation, // Upgraded for better tracking
+        accuracy: LocationAccuracy.bestForNavigation, // Critical for elevation
         distanceFilter: _minDistanceFilter.toInt(),
         pauseLocationUpdatesAutomatically: false, // Critical: Keep GPS active in background
         activityType: ActivityType.fitness, // Optimize for fitness tracking
@@ -190,6 +190,9 @@ class LocationServiceImpl implements LocationService {
           accuracy: position.accuracy,
           timestamp: DateTime.now(),
         );
+        
+        // Log elevation data for debugging iOS vs Android differences
+        AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
         
         // Validate location quality
         if (position.accuracy > 50) {
@@ -315,6 +318,9 @@ class LocationServiceImpl implements LocationService {
             timestamp: DateTime.now(),
           );
           
+          // Log elevation data for debugging iOS vs Android differences
+          AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
+          
           _locationBatch.add(locationPoint);
           _batchedLocationController.add(locationPoint);
           _lastLocationUpdate = DateTime.now();
@@ -348,6 +354,9 @@ class LocationServiceImpl implements LocationService {
           accuracy: position.accuracy,
           timestamp: DateTime.now(),
         );
+        
+        // Log elevation data for debugging iOS vs Android differences
+        AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
         
         _locationBatch.add(locationPoint);
         _batchedLocationController.add(locationPoint);

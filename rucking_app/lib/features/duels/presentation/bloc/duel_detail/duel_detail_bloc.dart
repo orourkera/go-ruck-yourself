@@ -15,8 +15,6 @@ import '../../../domain/entities/duel_participant.dart';
 import '../../../data/models/duel_model.dart';
 import 'duel_detail_event.dart';
 import 'duel_detail_state.dart';
-import 'package:rucking_app/core/services/duel_completion_service.dart';
-import 'package:rucking_app/core/services/service_locator.dart';
 
 class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
   final GetDuelDetails getDuelDetails;
@@ -190,15 +188,6 @@ class DuelDetailBloc extends Bloc<DuelDetailEvent, DuelDetailState> {
         emit(DuelProgressUpdated(duelId: event.duelId));
         // Refresh the duel details and leaderboard to show updated progress
         add(RefreshDuelDetail(duelId: event.duelId));
-        
-        // Check if this progress update should trigger duel completion
-        try {
-          final duelCompletionService = getIt<DuelCompletionService>();
-          duelCompletionService.checkDuelCompletion(event.duelId);
-        } catch (e) {
-          // Log error but don't fail the progress update
-          print('Failed to check duel completion: $e');
-        }
       },
     );
   }

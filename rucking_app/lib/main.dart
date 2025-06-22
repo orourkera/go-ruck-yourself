@@ -28,11 +28,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:rucking_app/core/services/duel_completion_service.dart';
-import 'package:get_it/get_it.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
   
   // Initialize Firebase first
   await Firebase.initializeApp();
@@ -65,7 +66,6 @@ void main() async {
   String? supabaseKey;
   
   try {
-    await dotenv.load(fileName: ".env");
     AppLogger.info('.env file loaded successfully');
     supabaseUrl = dotenv.env['SUPABASE_URL'];
     supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
@@ -109,16 +109,6 @@ void main() async {
   try {
     await setupServiceLocator();
     AppLogger.info('Service locator initialized successfully');
-    
-    // Start duel completion service for automatic duel ending
-    try {
-      final duelCompletionService = getIt<DuelCompletionService>();
-      duelCompletionService.startCompletionChecking();
-      AppLogger.info('Duel completion service started successfully');
-    } catch (e) {
-      AppLogger.error('Failed to start duel completion service: $e');
-      // Continue anyway - this is not critical for app startup
-    }
   } catch (e) {
     AppLogger.error('Failed to initialize some services (network issue): $e');
     // Continue anyway - essential services should still work

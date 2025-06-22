@@ -55,11 +55,25 @@ class SplitTrackingService {
       final int currentMilestoneIndex = (currentDistanceKm / splitDistanceKm).floor();
       final double nextMilestoneDistanceKm = (currentMilestoneIndex + 1) * splitDistanceKm;
       
+      // Debug logging for split detection
+      AppLogger.sessionCompletion('Split milestone check', context: {
+        'current_distance_km': currentDistanceKm,
+        'split_distance_km': splitDistanceKm,
+        'current_milestone_index': currentMilestoneIndex,
+        'last_split_distance_km': _lastSplitDistanceKm,
+        'milestone_threshold': currentMilestoneIndex * splitDistanceKm,
+        'splits_count': _splits.length,
+      });
+      
       // Check if we've passed a new milestone
       if (currentMilestoneIndex > 0 && 
           _lastSplitDistanceKm < (currentMilestoneIndex * splitDistanceKm)) {
         
-        AppLogger.info('[SPLITS] Distance milestone reached! ${currentMilestoneIndex * splitDistanceKm} ${preferMetric ? 'km' : 'mi'} completed');
+        AppLogger.sessionCompletion('Distance milestone reached!', context: {
+          'milestone_km': currentMilestoneIndex * splitDistanceKm,
+          'unit': preferMetric ? 'km' : 'mi',
+          'splits_before': _splits.length,
+        });
         
         // Calculate split duration (time since last split)
         final DateTime splitEndTime = DateTime.now();
@@ -77,6 +91,11 @@ class SplitTrackingService {
         };
         _splits.add(splitInfo);
         
+        AppLogger.sessionCompletion('Split recorded', context: {
+          'split_info': splitInfo,
+          'total_splits': _splits.length,
+        });
+        
         // Update last split info for next calculation
         _lastSplitDistanceKm = currentMilestoneIndex * splitDistanceKm;
         _lastSplitTime = splitEndTime;
@@ -90,10 +109,15 @@ class SplitTrackingService {
           isMetric: preferMetric,
         );
         
-        AppLogger.info('[SPLITS] Split notification sent to watch');
+        AppLogger.sessionCompletion('Split notification sent to watch', context: {
+          'split_number': currentMilestoneIndex,
+        });
       }
     } catch (e) {
-      AppLogger.error('[SPLITS] Error checking for distance milestone: $e');
+      AppLogger.sessionCompletion('Error checking for distance milestone', context: {
+        'error': e.toString(),
+        'current_distance_km': currentDistanceKm,
+      });
     }
   }
 }

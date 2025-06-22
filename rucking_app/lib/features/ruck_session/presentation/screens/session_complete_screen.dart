@@ -194,7 +194,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       
       // Check for new achievements after saving the session
       context.read<AchievementBloc>().add(CheckSessionAchievements(int.parse(widget.ruckId)));
-      print('[DEBUG] SessionComplete: Dispatched CheckSessionAchievements for session ${widget.ruckId}');
+      AppLogger.sessionCompletion('Dispatched CheckSessionAchievements event', context: {
+        'session_id': widget.ruckId,
+        'completion_screen': 'session_complete',
+      });
       
       // Check premium status and navigate accordingly
       final premiumState = context.read<PremiumBloc>().state;

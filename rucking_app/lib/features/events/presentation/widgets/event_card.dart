@@ -36,110 +36,110 @@ class EventCard extends StatelessWidget {
           color: isDarkMode ? Colors.black : null,
           child: Column(
             children: [
-              // Club info and location above image
-              if (event.hostingClub != null || event.locationName != null)
+              // Club info and location above image - always show if club exists
+              if (event.hostingClub != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Club info row
-                      if (event.hostingClub != null)
-                        Row(
-                          children: [
-                            // Club logo
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).primaryColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: event.hostingClub!.logoUrl != null && event.hostingClub!.logoUrl!.isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        event.hostingClub!.logoUrl!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            decoration: BoxDecoration(
-                                              color: Theme.of(context).primaryColor,
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                event.hostingClub!.name.isNotEmpty 
-                                                    ? event.hostingClub!.name[0].toUpperCase() 
-                                                    : 'C',
-                                                style: AppTextStyles.bodySmall.copyWith(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
-                                                ),
+                      Row(
+                        children: [
+                          // Club logo
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: event.hostingClub!.logoUrl != null && event.hostingClub!.logoUrl!.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      event.hostingClub!.logoUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).primaryColor,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              event.hostingClub!.name.isNotEmpty 
+                                                  ? event.hostingClub!.name[0].toUpperCase() 
+                                                  : 'C',
+                                              style: AppTextStyles.bodySmall.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
                                               ),
                                             ),
-                                          );
-                                        },
-                                      ),
-                                    )
-                                  : Center(
-                                      child: Text(
-                                        event.hostingClub!.name.isNotEmpty 
-                                            ? event.hostingClub!.name[0].toUpperCase() 
-                                            : 'C',
-                                        style: AppTextStyles.bodySmall.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      event.hostingClub!.name.isNotEmpty 
+                                          ? event.hostingClub!.name[0].toUpperCase() 
+                                          : 'C',
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
                                       ),
                                     ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Club name
-                            Expanded(
-                              child: Text(
-                                event.hostingClub!.name,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: isDarkMode ? Colors.white : AppColors.textDark,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                  ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Club name
+                          Expanded(
+                            child: Text(
+                              event.hostingClub!.name,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: isDarkMode ? Colors.white : AppColors.textDark,
+                                fontWeight: FontWeight.w600,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                      
-                      // Location below club info
-                      if (event.locationName != null && event.locationName!.isNotEmpty) ...[
-                        if (event.hostingClub != null) const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on_outlined,
-                              size: 16,
-                              color: Colors.grey[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                event.locationName!,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: Colors.grey[600],
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-
+              
+              // Location above image if exists
+              if (event.locationName != null && event.locationName!.isNotEmpty)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, event.hostingClub != null ? 0 : 16, 16, 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          event.locationName!,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
               // Banner image (taller like ruck buddy card)
               if (event.bannerImageUrl != null)
                 ClipRRect(
@@ -175,28 +175,20 @@ class EventCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Event title (no icon)
-                    Text(
-                      event.title,
-                      style: AppTextStyles.titleMedium.copyWith(
-                        color: isDarkMode ? Colors.white : AppColors.textDark,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Date and time
+                    // Event title and time
                     Row(
                       children: [
-                        Icon(
-                          Icons.schedule,
-                          size: 16,
-                          color: Colors.grey[600],
+                        Expanded(
+                          child: Text(
+                            event.title,
+                            style: AppTextStyles.titleMedium.copyWith(
+                              color: isDarkMode ? Colors.white : AppColors.textDark,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        const SizedBox(width: 4),
                         Text(
                           _formatDateTime(event.scheduledStartTime),
                           style: AppTextStyles.bodyMedium.copyWith(

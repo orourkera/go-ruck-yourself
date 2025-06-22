@@ -198,11 +198,6 @@ Future<void> setupServiceLocator() async {
     authBloc: getIt<AuthBloc>(),
   ));
   
-  // Register duel completion service for automatic duel ending
-  getIt.registerLazySingleton<DuelCompletionService>(() => DuelCompletionService(
-    getIt<ApiClient>(),
-  ));
-
   // Clubs bloc
   getIt.registerFactory<ClubsBloc>(() => ClubsBloc(getIt<ClubsRepository>()));
 

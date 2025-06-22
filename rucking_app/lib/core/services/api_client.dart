@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Client for handling API requests to the backend
 class ApiClient {
@@ -302,8 +305,10 @@ class ApiClient {
       
       // Debug logging for /auth/refresh request
       if (endpoint == '/auth/refresh') {
-        // print('[API] Sending refresh token request to $endpoint');
-        // print('[API] Request body: $body');
+        AppLogger.sessionCompletion('Sending refresh token request to $endpoint', context: {
+          'request_body': body,
+        });
+        AppLogger.sessionCompletion('Request body: $body', context: {});
       }
       
       // Set timeout to prevent hanging requests
@@ -328,8 +333,8 @@ class ApiClient {
       
       // Debug logging for /auth/refresh response
       if (endpoint == '/auth/refresh') {
-        // print('[API] Refresh token response status: ${response.statusCode}');
-        // print('[API] Refresh token response body: ${response.data}');
+        AppLogger.sessionCompletion('Refresh token response status: ${response.statusCode}', context: {});
+        AppLogger.sessionCompletion('Refresh token response body: ${response.data}', context: {});
       }
       
       return response.data;
@@ -454,7 +459,9 @@ class ApiClient {
       return UserInfo.fromJson(response as Map<String, dynamic>);
     } catch (e) {
       // Log or handle the error appropriately
-      debugPrint('[API] Error fetching current user profile: $e');
+      AppLogger.sessionCompletion('Error fetching current user profile', context: {
+        'error': e.toString(),
+      });
       // Re-throw or return a default/error UserInfo object if needed
       throw _handleError(e); 
     }
@@ -467,7 +474,9 @@ class ApiClient {
       final response = await get('/users/$userId');
       return UserInfo.fromJson(response as Map<String, dynamic>);
     } catch (e) {
-      debugPrint('[API] Error fetching user profile ($userId): $e');
+      AppLogger.sessionCompletion('Error fetching user profile ($userId)', context: {
+        'error': e.toString(),
+      });
       throw _handleError(e);
     }
   }
@@ -549,5 +558,170 @@ class ApiClient {
   /// Sets the token refresh callback
   void setTokenRefreshCallback(Function() callback) {
     _tokenRefreshCallback = callback;
+  }
+  
+  /// Special POST method for session completion with chunked upload support
+  /// Handles large payloads by optionally splitting them into smaller chunks
+  Future<dynamic> postSessionCompletion(String path, Map<String, dynamic> data) async {
+    try {
+      await _ensureAuthToken();
+      
+      // Check payload size and chunk if necessary
+      final payloadSize = data.toString().length;
+      AppLogger.sessionCompletion('Session completion payload size check', context: {
+        'payload_size_bytes': payloadSize,
+        'path': path,
+      });
+      
+      // If payload is large (>1MB), use chunked upload approach
+      if (payloadSize > 1048576) { // 1MB threshold
+        return await _chunkedSessionCompletion(path, data);
+      }
+      
+      // For smaller payloads, use enhanced single request with longer timeouts
+      return await _singleRequestSessionCompletion(path, data);
+      
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+  
+  /// Single request completion with enhanced timeouts for session completion
+  Future<dynamic> _singleRequestSessionCompletion(String path, Map<String, dynamic> data) async {
+    AppLogger.sessionCompletion('Using single request completion', context: {
+      'path': path,
+      'payload_size_bytes': data.toString().length,
+    });
+    
+    final options = Options(
+      headers: await _getHeaders(),
+      // Extended timeouts for session completion
+      sendTimeout: const Duration(minutes: 3), // 3 minutes for large uploads
+      receiveTimeout: const Duration(minutes: 2), // 2 minutes for response
+    );
+    
+    final response = await _dio.post(path, data: data, options: options);
+    AppLogger.sessionCompletion('Single request completion response', context: {
+      'response_status': response.statusCode,
+      'response_data': response.data,
+    });
+    return response.data;
+  }
+  
+  /// Chunked upload for very large session completion payloads
+  Future<dynamic> _chunkedSessionCompletion(String path, Map<String, dynamic> data) async {
+    AppLogger.sessionCompletion('Using chunked upload completion', context: {
+      'path': path,
+      'original_payload_size_bytes': data.toString().length,
+    });
+    
+    // Split large arrays into chunks
+    final Map<String, dynamic> baseData = Map.from(data);
+    final List<dynamic> route = baseData.remove('route') ?? [];
+    final List<dynamic> heartRateSamples = baseData.remove('heart_rate_samples') ?? [];
+    
+    // First, send base session data
+    AppLogger.sessionCompletion('Sending base session data', context: {
+      'base_data_size_bytes': baseData.toString().length,
+    });
+    
+    final response = await _dio.post(
+      path, 
+      data: baseData,
+      options: Options(
+        headers: await _getHeaders(),
+        sendTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+      ),
+    );
+    AppLogger.sessionCompletion('Base session data response', context: {
+      'response_status': response.statusCode,
+      'response_data': response.data,
+    });
+    final sessionId = _extractSessionIdFromPath(path);
+    
+    // Then upload route data in chunks if it exists
+    if (route.isNotEmpty) {
+      await _uploadRouteDataInChunks(sessionId, route);
+    }
+    
+    // Upload heart rate data in chunks if it exists  
+    if (heartRateSamples.isNotEmpty) {
+      await _uploadHeartRateDataInChunks(sessionId, heartRateSamples);
+    }
+    
+    AppLogger.sessionCompletion('Chunked upload completed successfully', context: {
+      'session_id': sessionId,
+      'route_points': route.length,
+      'heart_rate_samples': heartRateSamples.length,
+    });
+    
+    return response.data;
+  }
+  
+  /// Upload route data in manageable chunks
+  Future<void> _uploadRouteDataInChunks(String sessionId, List<dynamic> route) async {
+    const chunkSize = 100; // 100 location points per chunk
+    
+    for (int i = 0; i < route.length; i += chunkSize) {
+      final chunk = route.skip(i).take(chunkSize).toList();
+      
+      AppLogger.sessionCompletion('Uploading route chunk', context: {
+        'session_id': sessionId,
+        'chunk_start': i,
+        'chunk_size': chunk.length,
+      });
+      
+      await _dio.post(
+        '/rucks/$sessionId/route-chunk',
+        data: {'route_points': chunk, 'chunk_index': i ~/ chunkSize},
+        options: Options(
+          headers: await _getHeaders(),
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
+      AppLogger.sessionCompletion('Route chunk uploaded', context: {
+        'session_id': sessionId,
+        'chunk_start': i,
+        'chunk_size': chunk.length,
+      });
+    }
+  }
+  
+  /// Upload heart rate data in manageable chunks
+  Future<void> _uploadHeartRateDataInChunks(String sessionId, List<dynamic> heartRateSamples) async {
+    const chunkSize = 50; // 50 heart rate samples per chunk
+    
+    for (int i = 0; i < heartRateSamples.length; i += chunkSize) {
+      final chunk = heartRateSamples.skip(i).take(chunkSize).toList();
+      
+      AppLogger.sessionCompletion('Uploading heart rate chunk', context: {
+        'session_id': sessionId,
+        'chunk_start': i,
+        'chunk_size': chunk.length,
+      });
+      
+      await _dio.post(
+        '/rucks/$sessionId/heart-rate-chunk',
+        data: {'heart_rate_samples': chunk, 'chunk_index': i ~/ chunkSize},
+        options: Options(
+          headers: await _getHeaders(),
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
+      AppLogger.sessionCompletion('Heart rate chunk uploaded', context: {
+        'session_id': sessionId,
+        'chunk_start': i,
+        'chunk_size': chunk.length,
+      });
+    }
+  }
+  
+  /// Extract session ID from completion path
+  String _extractSessionIdFromPath(String path) {
+    final match = RegExp(r'/rucks/([^/]+)/complete').firstMatch(path);
+    return match?.group(1) ?? 'unknown';
   }
 }

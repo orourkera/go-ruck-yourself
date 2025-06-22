@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/error_messages.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Provides validation logic for ruck sessions
 class SessionValidationService {
@@ -171,17 +173,104 @@ class SessionValidationService {
   Map<String, double> validateElevationChange(
     LocationPoint previousPoint,
     LocationPoint newPoint,
-    {double minChangeMeters = 1.0}
+    {double? minChangeMeters}
   ) {
+    // Platform-specific elevation thresholds
+    final double threshold = minChangeMeters ?? _getPlatformElevationThreshold();
+    
     final elevationDifference = newPoint.elevation - previousPoint.elevation;
     double gain = 0.0;
     double loss = 0.0;
-    if (elevationDifference > minChangeMeters) {
-      gain = elevationDifference;
-    } else if (elevationDifference < -minChangeMeters) {
-      loss = elevationDifference.abs();
+    
+    // Apply platform-specific elevation processing
+    final processedElevationDiff = _processElevationDifference(
+      elevationDifference, 
+      previousPoint, 
+      newPoint
+    );
+    
+    AppLogger.debug('Elevation validation - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, RawDiff: ${elevationDifference}m, ProcessedDiff: ${processedElevationDiff}m, Threshold: ${threshold}m, PrevElev: ${previousPoint.elevation}m, NewElev: ${newPoint.elevation}m, Accuracy: ${newPoint.accuracy}m');
+    
+    if (processedElevationDiff > threshold) {
+      gain = processedElevationDiff;
+    } else if (processedElevationDiff < -threshold) {
+      loss = processedElevationDiff.abs();
     }
+    
     return {'gain': gain, 'loss': loss};
+  }
+  
+  /// Get platform-specific elevation change threshold
+  double _getPlatformElevationThreshold() {
+    if (Platform.isIOS) {
+      // iOS uses barometric + GPS - more conservative but accurate
+      // Lower threshold to catch smaller but legitimate changes
+      return 0.5; // 0.5 meters = ~1.6 feet
+    } else {
+      // Android GPS elevation can be noisier
+      // Slightly higher threshold to filter noise
+      return 1.0; // 1 meter = ~3.3 feet  
+    }
+  }
+  
+  /// Process elevation difference with platform-specific logic
+  double _processElevationDifference(
+    double rawDifference,
+    LocationPoint previousPoint,
+    LocationPoint currentPoint,
+  ) {
+    if (Platform.isIOS) {
+      return _processIOSElevation(rawDifference, previousPoint, currentPoint);
+    } else {
+      return _processAndroidElevation(rawDifference, previousPoint, currentPoint);
+    }
+  }
+  
+  /// iOS-specific elevation processing
+  double _processIOSElevation(
+    double rawDifference,
+    LocationPoint previousPoint,
+    LocationPoint currentPoint,
+  ) {
+    // iOS barometric sensor is more accurate but conservative
+    // Check for poor GPS accuracy that might affect elevation
+    if (currentPoint.accuracy > 20) {
+      // Poor horizontal accuracy usually means poor altitude accuracy too
+      AppLogger.debug('iOS elevation: Poor GPS accuracy (${currentPoint.accuracy}m), applying 0.7x smoothing');
+      // Apply more aggressive smoothing for poor accuracy readings
+      return rawDifference * 0.7; // Reduce impact of potentially inaccurate reading
+    }
+    
+    // For good accuracy, trust iOS altitude more
+    // But enhance small changes that iOS might under-report
+    if (rawDifference.abs() < 2.0 && rawDifference.abs() > 0.3) {
+      // Enhance small but significant changes (iOS tends to under-report)
+      AppLogger.debug('iOS elevation: Enhancing small change from ${rawDifference}m to ${rawDifference * 1.3}m');
+      return rawDifference * 1.3;
+    }
+    
+    return rawDifference;
+  }
+  
+  /// Android-specific elevation processing  
+  double _processAndroidElevation(
+    double rawDifference,
+    LocationPoint previousPoint,
+    LocationPoint currentPoint,
+  ) {
+    // Android GPS elevation can be noisier but more responsive
+    // Apply noise filtering for very poor accuracy
+    if (currentPoint.accuracy > 30) {
+      AppLogger.debug('Android elevation: Very poor GPS accuracy (${currentPoint.accuracy}m), applying 0.5x noise filtering');
+      // Strong noise filtering for poor readings
+      return rawDifference * 0.5;
+    } else if (currentPoint.accuracy > 15) {
+      // Moderate filtering for moderate accuracy
+      return rawDifference * 0.8;
+    }
+    
+    // For good accuracy, trust Android GPS elevation
+    return rawDifference;
   }
 
   /// Check if the session is valid before saving it
@@ -200,7 +289,7 @@ class SessionValidationService {
 
     // 3. Calories value can be zero; just warn if negative
     if (caloriesBurned < 0.0) {
-      debugPrint('WARNING: Negative calorie value: $caloriesBurned');
+      //debugPrint('WARNING: Negative calorie value: $caloriesBurned');
     }
 
     // 4. Calories sanity check (warn, but don't block)
@@ -208,7 +297,7 @@ class SessionValidationService {
     if (durationHours > 0) {
       final caloriesPerHour = caloriesBurned / durationHours;
       if (caloriesPerHour < minCaloriesPerHour || caloriesPerHour > maxCaloriesPerHour) {
-        debugPrint('WARNING: Unusual calorie burn rate: $caloriesPerHour calories/hour');
+        //debugPrint('WARNING: Unusual calorie burn rate: $caloriesPerHour calories/hour');
         // We don't invalidate the session, just log a warning
       }
     }

@@ -43,6 +43,7 @@ import 'package:rucking_app/features/statistics/presentation/screens/statistics_
 import 'package:rucking_app/features/events/presentation/screens/events_screen.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duels_list_screen.dart';
 import 'package:rucking_app/shared/utils/route_privacy_utils.dart';
+import 'package:rucking_app/core/services/duel_completion_service.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -122,6 +123,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     // Add lifecycle observer to handle app state changes
     WidgetsBinding.instance.addObserver(this);
+    
+    // Initialize DuelCompletionService
+    try {
+      GetIt.instance<DuelCompletionService>().startCompletionChecking();
+    } catch (e) {
+      // Non-critical, continue without completion service
+      developer.log('Failed to start duel completion service: $e');
+    }
   }
   
   @override

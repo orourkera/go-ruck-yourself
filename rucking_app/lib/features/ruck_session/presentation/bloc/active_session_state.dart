@@ -59,6 +59,7 @@ class ActiveSessionRunning extends ActiveSessionState {
   final int? pausedDurationSeconds;
   final int? plannedDuration; // in seconds
   final String sessionId;
+  final String? eventId; // Event ID for event-linked sessions
   final List<LocationPoint> locationPoints;
   final int elapsedSeconds;
   final double distanceKm;
@@ -123,6 +124,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     required this.originalSessionStartTimeUtc,
     required this.totalPausedDuration,
     required this.heartRateSamples,
+    this.eventId, // Add eventId to constructor
     this.photos = const [],
     this.isPhotosLoading = false,
     this.photosError,
@@ -189,6 +191,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     // Split tracking
     splits,
     terrainSegments, // Add to props
+    eventId, // Add eventId to props
   ];
   
   ActiveSessionRunning copyWith({
@@ -237,6 +240,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool clearCurrentPauseStartTimeUtc = false,
     bool? isGpsReady, // Add to copyWith parameters
     bool? hasGpsAccess, // Add to copyWith parameters
+    String? eventId, // Add eventId to copyWith parameters
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -279,6 +283,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       currentPauseStartTimeUtc: clearCurrentPauseStartTimeUtc ? null : currentPauseStartTimeUtc ?? this.currentPauseStartTimeUtc,
       isGpsReady: isGpsReady ?? this.isGpsReady, // Use in copyWith
       hasGpsAccess: hasGpsAccess ?? this.hasGpsAccess, // Use in copyWith
+      eventId: eventId ?? this.eventId, // Use eventId in copyWith
     );
   }
 }
