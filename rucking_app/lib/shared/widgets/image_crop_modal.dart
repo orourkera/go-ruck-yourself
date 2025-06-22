@@ -62,6 +62,12 @@ class _ImageCropModalState extends State<ImageCropModal> {
       _image = frameInfo.image;
       _imageLoaded = true;
     });
+
+    // Ensure the image is centered and reasonably scaled when first displayed
+    // so users are not forced to tap the Center control manually.
+    if (mounted) {
+      _centerImage();
+    }
   }
 
   @override

@@ -540,12 +540,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16.0),
                             child: Center(
-                              child: Text(
-                                snapshot.data!,
-                                style: AppTextStyles.statValue.copyWith(
-                                  color: Theme.of(context).primaryColor,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  snapshot.data!,
+                                  style: AppTextStyles.statValue.copyWith(
+                                    color: Theme.of(context).primaryColor,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                             ),
                           ),

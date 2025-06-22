@@ -126,7 +126,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (description != null) body['description'] = description;
     if (isPublic != null) body['is_public'] = isPublic;
     if (maxMembers != null) body['max_members'] = maxMembers;
-    if (location != null) body['location'] = location;
+    // Note: location is for display only, not stored in database - only lat/lng are stored
     if (latitude != null) body['latitude'] = latitude;
     if (longitude != null) body['longitude'] = longitude;
     

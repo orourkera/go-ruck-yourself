@@ -724,10 +724,15 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                         return const SizedBox.shrink();
                       }
                       if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty && snapshot.data!.toLowerCase() != 'unknown location') {
-                        return Text(
-                          snapshot.data!,
-                          style: AppTextStyles.displayMedium.copyWith(
-                            color: Theme.of(context).primaryColor,
+                        return FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            snapshot.data!,
+                            style: AppTextStyles.displayMedium.copyWith(
+                              color: Theme.of(context).primaryColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         );
                       } else {

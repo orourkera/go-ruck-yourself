@@ -77,6 +77,8 @@ class LocationSearchService {
       // Get detailed placemark information for the first few results
       List<LocationSearchResult> results = [];
       
+      final Set<String> _addedSignatures = {}; // prevent duplicates
+
       for (int i = 0; i < locations.length && i < 5; i++) {
         final location = locations[i];
         print('LocationSearchService: Processing location ${i + 1}: ${location.latitude}, ${location.longitude}');
@@ -96,22 +98,44 @@ class LocationSearchService {
           
           if (placemarks.isNotEmpty) {
             final placemark = placemarks.first;
+
+            // Helper to add a result if not already present
+            void addResult(String disp, String addr) {
+              final signature = '$disp|${location.latitude}|${location.longitude}';
+              if (_addedSignatures.contains(signature)) return;
+              _addedSignatures.add(signature);
+              results.add(LocationSearchResult(
+                displayName: disp,
+                address: addr,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                city: placemark.locality,
+                state: placemark.administrativeArea,
+                country: placemark.country,
+              ));
+            }
             
-            // Build display name - prioritize business names
-            String displayName = _buildDisplayName(placemark, query);
-            String address = _buildAddress(placemark);
+            // 1. Full address / landmark
+            final fullDisplay = _buildDisplayName(placemark, query);
+            final fullAddress = _buildAddress(placemark);
+            addResult(fullDisplay, fullAddress);
+
+            // 2. City / locality level
+            if (placemark.locality != null && placemark.locality!.isNotEmpty) {
+              addResult(placemark.locality!, placemark.administrativeArea ?? placemark.country ?? '');
+            }
+
+            // 3. Administrative area (state/province) level
+            if (placemark.administrativeArea != null && placemark.administrativeArea!.isNotEmpty) {
+              addResult(placemark.administrativeArea!, placemark.country ?? '');
+            }
+
+            // 4. Country level (only include if query length > 3 to avoid huge list)
+            if (placemark.country != null && placemark.country!.isNotEmpty && query.length > 3) {
+              addResult(placemark.country!, placemark.country!);
+            }
             
-            print('LocationSearchService: Created result: $displayName');
-            
-            results.add(LocationSearchResult(
-              displayName: displayName,
-              address: address,
-              latitude: location.latitude,
-              longitude: location.longitude,
-              city: placemark.locality,
-              state: placemark.administrativeArea,
-              country: placemark.country,
-            ));
+            print('LocationSearchService: Added multi-precision results for ${placemark.locality ?? placemark.name}');
           }
         } catch (e) {
           print('LocationSearchService: Error getting placemark: $e');

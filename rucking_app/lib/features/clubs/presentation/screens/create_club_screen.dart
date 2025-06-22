@@ -33,6 +33,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   
   bool _isLoading = false;
   File? _clubLogo;
+  bool _removeExistingLogo = false; // Flag to track if user wants to remove existing logo
   
   late ClubsBloc _clubsBloc;
   final _locationSearchService = getIt<LocationSearchService>();
@@ -80,6 +81,10 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
     if (selectedFile != null) {
       setState(() {
         _clubLogo = selectedFile;
+        // If we're editing an existing club and selecting a new logo, mark to remove existing one
+        if (widget.clubToEdit != null) {
+          _removeExistingLogo = true;
+        }
       });
     }
   }
@@ -87,6 +92,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   void _removeLogo() {
     setState(() {
       _clubLogo = null;
+      _removeExistingLogo = true;
     });
   }
 
@@ -154,7 +160,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
           description: _descriptionController.text.trim(),
           isPublic: true, // Keep existing setting for now
           maxMembers: maxMembers,
-          logo: _clubLogo,
+          logo: _removeExistingLogo ? _clubLogo : null, // If removing/changing, pass new logo (or null), otherwise don't change
           location: _selectedLocationResult?.displayName,
           latitude: _selectedLocationResult?.latitude,
           longitude: _selectedLocationResult?.longitude,
@@ -282,7 +288,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     child: _clubLogo != null
                         ? Stack(
                             children: [
-                              // Logo preview - circular
+                              // New logo preview - circular (from file picker)
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(60), // Half of 120 for perfect circle
                                 child: Image.file(
@@ -314,26 +320,119 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                               ),
                             ],
                           )
-                        : GestureDetector(
-                            onTap: _selectLogo,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add_photo_alternate_outlined,
-                                  size: 40,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Add Logo',
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    color: Colors.grey[600],
+                        : widget.clubToEdit != null && 
+                          widget.clubToEdit!.club.logo != null && 
+                          widget.clubToEdit!.club.logo!.isNotEmpty && 
+                          !_removeExistingLogo
+                            ? Stack(
+                                children: [
+                                  // Existing logo preview - circular (from network)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(60), // Half of 120 for perfect circle
+                                    child: Image.network(
+                                      widget.clubToEdit!.club.logo!,
+                                      width: 116,
+                                      height: 116,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        // Show placeholder if image fails to load
+                                        return Container(
+                                          width: 116,
+                                          height: 116,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[200],
+                                            borderRadius: BorderRadius.circular(60),
+                                          ),
+                                          child: Icon(
+                                            Icons.error_outline,
+                                            color: Colors.grey[400],
+                                            size: 40,
+                                          ),
+                                        );
+                                      },
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        return Container(
+                                          width: 116,
+                                          height: 116,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[100],
+                                            borderRadius: BorderRadius.circular(60),
+                                          ),
+                                          child: Center(
+                                            child: CircularProgressIndicator(
+                                              value: loadingProgress.expectedTotalBytes != null
+                                                  ? loadingProgress.cumulativeBytesLoaded / 
+                                                    loadingProgress.expectedTotalBytes!
+                                                  : null,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
+                                  // Remove/Replace button
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: _removeLogo,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Edit/Replace button
+                                  Positioned(
+                                    bottom: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: _selectLogo,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).primaryColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.edit,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : GestureDetector(
+                                onTap: _selectLogo,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                      size: 40,
+                                      color: Colors.grey[400],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Add Logo',
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
+                              ),
                   ),
                   
                   const SizedBox(height: 24),
@@ -381,71 +480,65 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Stack(
-                    children: [
-                      TextFormField(
-                        controller: _locationController,
-                        decoration: InputDecoration(
-                          hintText: 'Enter city, state, address, or landmark',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                          suffixIcon: _selectedLocationResult != null
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: _clearLocation,
-                                )
-                              : const Icon(Icons.search),
-                        ),
-                        onChanged: _searchLocation,
+                  TextFormField(
+                    controller: _locationController,
+                    decoration: InputDecoration(
+                      hintText: 'Search for a location, business, or address...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      
-                      // Location suggestions dropdown
-                      if (_showLocationSuggestions && _locationSuggestions.isNotEmpty)
-                        Positioned(
-                          top: 60,
-                          left: 0,
-                          right: 0,
-                          child: Material(
-                            elevation: 4,
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              constraints: const BoxConstraints(maxHeight: 200),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: _locationSuggestions.length,
-                                itemBuilder: (context, index) {
-                                  final suggestion = _locationSuggestions[index];
-                                  return ListTile(
-                                    leading: const Icon(Icons.location_on, size: 20),
-                                    title: Text(
-                                      suggestion.displayName,
-                                      style: AppTextStyles.bodyMedium,
-                                    ),
-                                    subtitle: suggestion.address != suggestion.displayName
-                                        ? Text(
-                                            suggestion.address,
-                                            style: AppTextStyles.bodySmall.copyWith(
-                                              color: Colors.grey[600],
-                                            ),
-                                          )
-                                        : null,
-                                    onTap: () => _selectLocation(suggestion),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                      prefixIcon: const Icon(Icons.location_on),
+                      suffixIcon: _selectedLocationResult != null
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: _clearLocation,
+                            )
+                          : null,
+                    ),
+                    onChanged: _searchLocation,
                   ),
+                  if (_showLocationSuggestions && _locationSuggestions.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                             ? Colors.grey[700] // Slightly lighter for contrast
+                             : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white24 // subtle white border in dark mode
+                                : Colors.grey.withOpacity(0.3),
+                          ),
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _locationSuggestions.length,
+                        itemBuilder: (context, index) {
+                          final suggestion = _locationSuggestions[index];
+                          return ListTile(
+                             title: Text(
+                               suggestion.displayName,
+                               style: TextStyle(
+                                 color: Theme.of(context).brightness == Brightness.dark
+                                     ? Colors.white
+                                     : Colors.black,
+                               ),
+                             ),
+                             subtitle: Text(
+                               suggestion.address,
+                               style: TextStyle(
+                                 color: Theme.of(context).brightness == Brightness.dark
+                                     ? Colors.white70
+                                     : Colors.grey[700],
+                               ),
+                             ),
+                             onTap: () => _selectLocation(suggestion),
+                           );
+                        },
+                      ),
+                    ),
                   
                   const SizedBox(height: 24),
                   

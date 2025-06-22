@@ -23,6 +23,7 @@ import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
+import 'package:rucking_app/core/services/android_optimization_service.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -173,7 +174,29 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Don't fail the session - allow offline mode for indoor rucks, airplanes, etc.
       }
 
-      // Android: Log battery optimization status for debugging
+      // Android: Enhanced optimization checks for reliable background GPS tracking
+      if (Platform.isAndroid) {
+        AppLogger.info('[SESSION_START] Checking Android optimization status...');
+        
+        // Use new comprehensive Android optimization service
+        final androidOptimizationService = AndroidOptimizationService.instance;
+        await androidOptimizationService.logOptimizationStatus();
+        
+        final hasAllPermissions = await androidOptimizationService.hasAllCriticalPermissions();
+        if (!hasAllPermissions) {
+          AppLogger.warning('[SESSION_START] Missing critical Android permissions - GPS may be throttled');
+          
+          // Show OEM-specific tips if on problematic device
+          if (androidOptimizationService.isProblematiOEMDevice()) {
+            AppLogger.warning('[SESSION_START] Problematic OEM device detected');
+            AppLogger.info('[SESSION_START] Tip: ${androidOptimizationService.getOEMSpecificTips()}');
+          }
+        } else {
+          AppLogger.info('[SESSION_START] All critical Android permissions granted');
+        }
+      }
+
+      // Legacy battery optimization check (keep for backward compatibility)
       AppLogger.info('[SESSION_START] Logging battery optimization status...');
       await BatteryOptimizationService.logPowerManagementState();
       
@@ -214,7 +237,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } catch (apiError) {
         // If API calls fail, create offline session with local ID
         sessionId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
-        AppLogger.info('🔄 Creating offline session: $sessionId - all data will be stored locally and synced when connection is restored');
+        AppLogger.info(' Creating offline session: $sessionId - all data will be stored locally and synced when connection is restored');
         AppLogger.warning('API Error: $apiError');
       }
       final initialSessionState = ActiveSessionRunning(
@@ -353,7 +376,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         
         // Track terrain for this segment
         if (_terrainTracker.shouldQueryTerrain(newPoint)) {
-          AppLogger.debug('[TERRAIN] 🌍 Attempting to track terrain segment...');
+          AppLogger.debug('[TERRAIN] Attempting to track terrain segment...');
           try {
             final terrainSegment = await _terrainTracker.trackTerrainSegment(
               startLocation: prevPoint,
@@ -362,16 +385,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             
             if (terrainSegment != null) {
               newTerrainSegments.add(terrainSegment);
-              AppLogger.debug('[TERRAIN] ✅ Added terrain segment: ${terrainSegment.surfaceType} (${terrainSegment.energyMultiplier}x) - Total segments: ${newTerrainSegments.length}');
+              AppLogger.debug('[TERRAIN] Added terrain segment: ${terrainSegment.surfaceType} (${terrainSegment.energyMultiplier}x) - Total segments: ${newTerrainSegments.length}');
             } else {
-              AppLogger.warning('[TERRAIN] ⚠️ Terrain segment was null');
+              AppLogger.warning('[TERRAIN] Terrain segment was null');
             }
           } catch (e) {
-            AppLogger.warning('[TERRAIN] ❌ Failed to track terrain segment: $e');
+            AppLogger.warning('[TERRAIN] Failed to track terrain segment: $e');
             // Continue without terrain data - session continues normally
           }
         } else {
-          AppLogger.debug('[TERRAIN] ⏳ Terrain query skipped (throttled)');
+          AppLogger.debug('[TERRAIN] Terrain query skipped (throttled)');
         }
       }
       

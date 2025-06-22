@@ -300,12 +300,14 @@ class SessionStatisticsResource(Resource):
                 (point.latitude, point.longitude)
             )
             
-            # Calculate elevation change if altitude data available
+            # Resolve altitude for both points – fetch from external service if missing
+            from RuckTracker.utils.elevation_service import get_elevation
+            prev_alt = prev_point.altitude if prev_point.altitude is not None else get_elevation(prev_point.latitude, prev_point.longitude)
+            curr_alt = point.altitude if point.altitude is not None else get_elevation(point.latitude, point.longitude)
+
             elevation_gain, elevation_loss = 0, 0
-            if prev_point.altitude is not None and point.altitude is not None:
-                elevation_gain, elevation_loss = calculate_elevation_change(
-                    prev_point.altitude, point.altitude
-                )
+            if prev_alt is not None and curr_alt is not None:
+                elevation_gain, elevation_loss = calculate_elevation_change(prev_alt, curr_alt)
             
             # Update session statistics
             session.distance_km += distance_increment

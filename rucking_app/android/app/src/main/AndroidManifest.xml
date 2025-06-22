@@ -18,6 +18,8 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- Needed for requesting exclusion from Doze / battery optimisation -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- System alert window permission to help prevent app killing -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Camera permission -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Storage permissions -->
