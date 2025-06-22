@@ -47,53 +47,92 @@ class EventProgressResource(Resource):
                 logger.warning(f"User {current_user_id} not authorized to view progress for event {event_id}")
                 return {'error': 'Only event participants can view progress'}, 403
             
-            # Get progress for all participants
-            logger.info(f"Querying event_participant_progress for event {event_id}")
-            result = admin_client.table('event_participant_progress').select("""
-                *,
+            # Get all approved participants for this event
+            participants_result = admin_client.table('event_participants').select("""
+                user_id,
                 user!user_id(id, username, avatar_url)
-            """).eq('event_id', event_id).execute()
+            """).eq('event_id', event_id).eq('status', 'approved').execute()
             
-            progress_data = result.data or []
-            logger.info(f"Raw progress query returned {len(progress_data)} entries")
-
-            # --- Ensure user data is populated (fallback to separate query like duels API) ---
-            missing_user_ids = [p['user_id'] for p in progress_data if not p.get('user')]
-            if missing_user_ids:
-                logger.info(
-                    f"User join returned null for {len(missing_user_ids)} users – performing fallback lookup"
-                )
-                # Fetch required users in a single IN query to avoid N+1 calls
-                users_response = admin_client.table('user').select('id, username, avatar_url').in_('id', missing_user_ids).execute()
-                user_map = {u['id']: u for u in (users_response.data or [])}
-                for entry in progress_data:
-                    if not entry.get('user'):
-                        entry['user'] = user_map.get(entry['user_id'])
-
-            if progress_data:
-                for entry in progress_data:
-                    logger.info(f"Progress entry: user_id={entry.get('user_id')}, distance_km={entry.get('distance_km')}, completed_at={entry.get('completed_at')}")
-                    logger.info(f"User data: {entry.get('user')}")
-            else:
-                logger.warning(f"No progress entries found for event {event_id}")
+            participants = participants_result.data or []
+            logger.info(f"Found {len(participants)} approved participants")
             
-            # Sort by distance completed (descending), then by completion time
-            progress_data.sort(key=lambda x: (
-                -x.get('distance_km', 0),
-                x.get('duration_minutes', float('inf'))
-            ))
+            # Get completed ruck sessions for this event
+            sessions_result = admin_client.table('ruck_session').select("""
+                id,
+                user_id,
+                distance_km,
+                duration_seconds,
+                completed_at
+            """).eq('event_id', event_id).eq('status', 'completed').execute()
             
-            # Add ranking
-            for i, progress in enumerate(progress_data):
-                progress['rank'] = i + 1
-                progress['is_current_user'] = progress['user_id'] == current_user_id
+            completed_sessions = sessions_result.data or []
+            logger.info(f"Found {len(completed_sessions)} completed ruck sessions for event {event_id}")
             
-            logger.info(f"Returning progress for {len(progress_data)} participants in event {event_id}")
-            return {'progress': progress_data}, 200
+            # Create a map of user sessions
+            user_sessions = {}
+            for session in completed_sessions:
+                user_id = session['user_id']
+                if user_id not in user_sessions or session['distance_km'] > user_sessions[user_id]['distance_km']:
+                    # Keep the best (longest distance) session for each user
+                    user_sessions[user_id] = session
+            
+            # Build progress data for each participant
+            progress_data = []
+            for participant in participants:
+                user_id = participant['user_id']
+                user_data = participant.get('user')
+                
+                if user_id in user_sessions:
+                    # User has completed a ruck session for this event
+                    session = user_sessions[user_id]
+                    progress_entry = {
+                        'id': f"progress_{user_id}_{event_id}",  # Generate a unique ID
+                        'event_id': event_id,
+                        'user_id': user_id,
+                        'session_id': session['id'],
+                        'distance_km': session['distance_km'],
+                        'duration_seconds': session['duration_seconds'],
+                        'rank': 1,  # Will be calculated after sorting
+                        'completed_at': session['completed_at'],
+                        'user': user_data
+                    }
+                else:
+                    # User hasn't completed a ruck session yet
+                    progress_entry = {
+                        'id': f"progress_{user_id}_{event_id}",  # Generate a unique ID
+                        'event_id': event_id,
+                        'user_id': user_id,
+                        'session_id': None,
+                        'distance_km': 0.0,
+                        'duration_seconds': 0,
+                        'rank': 999,  # Will be calculated after sorting
+                        'completed_at': None,
+                        'user': user_data
+                    }
+                
+                progress_data.append(progress_entry)
+            
+            # Sort by distance completed (descending), then by completion time (ascending for ties)
+            progress_data.sort(key=lambda x: (-x['distance_km'], x['completed_at'] or '9999-12-31'))
+            
+            # Assign ranks
+            for i, entry in enumerate(progress_data):
+                if entry['distance_km'] > 0:
+                    entry['rank'] = i + 1
+                else:
+                    entry['rank'] = 999  # No completion rank
+            
+            logger.info(f"Processed leaderboard for event {event_id} with {len(progress_data)} participants")
+            
+            return {
+                'event_id': event_id,
+                'progress': progress_data,
+                'last_updated': datetime.utcnow().isoformat()
+            }, 200
             
         except Exception as e:
-            logger.error(f"Error fetching progress for event {event_id}: {e}", exc_info=True)
-            return {'error': f'Failed to fetch progress: {str(e)}'}, 500
+            logger.error(f"Error getting progress for event {event_id}: {e}", exc_info=True)
+            return {'error': f'Failed to get progress: {str(e)}'}, 500
     
     @auth_required
     def put(self, event_id):
