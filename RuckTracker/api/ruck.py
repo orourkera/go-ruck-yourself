@@ -275,6 +275,13 @@ class RuckSessionListResource(Resource):
             data = request.get_json()
             if not data:
                 return {'message': 'Missing required data for session creation'}, 400
+            
+            # Log incoming request data for debugging
+            logger.info(f"Session creation request data: {data}")
+            logger.info(f"Request contains event_id: {'event_id' in data}")
+            if 'event_id' in data:
+                logger.info(f"Event ID value: {data.get('event_id')} (type: {type(data.get('event_id'))})")
+                
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
 
             # Deduplication: Check for any active (in_progress) session for the current user
@@ -301,7 +308,11 @@ class RuckSessionListResource(Resource):
             if 'event_id' in data and data.get('event_id') is not None:
                 session_data['event_id'] = data.get('event_id')
                 logger.info(f"Creating session for event {data.get('event_id')}")
-                
+            else:
+                logger.info("No event_id provided - creating regular session")
+            
+            logger.info(f"Final session_data before insert: {session_data}")
+            
             insert_resp = supabase.table('ruck_session') \
                 .insert(session_data) \
                 .execute()
