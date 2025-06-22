@@ -60,51 +60,46 @@ class LocationServiceImpl implements LocationService {
     try {
       AppLogger.info('Requesting location permissions...');
       
-      // First request basic location permission
-      final whenInUseStatus = await Permission.locationWhenInUse.request();
-      AppLogger.info('When-in-use permission: $whenInUseStatus');
+      // Check current permission status first
+      final currentPermission = await Geolocator.checkPermission();
+      if (currentPermission == LocationPermission.always || 
+          currentPermission == LocationPermission.whileInUse) {
+        AppLogger.info('Location permission already granted: $currentPermission');
+        return true;
+      }
       
-      if (whenInUseStatus.isGranted) {
-        // For long workout sessions, also request always permission for background tracking
-        if (Platform.isIOS) {
-          AppLogger.info('Requesting background location permission for iOS...');
-          final alwaysStatus = await Permission.locationAlways.request();
-          AppLogger.info('Always permission: $alwaysStatus');
+      // Request basic location permission using Geolocator (single dialog)
+      final permission = await Geolocator.requestPermission();
+      AppLogger.info('Location permission result: $permission');
+      
+      final hasBasicPermission = permission == LocationPermission.always || 
+                                permission == LocationPermission.whileInUse;
+      
+      if (hasBasicPermission) {
+        // Only request additional Android permissions if basic permission is granted
+        if (Platform.isAndroid) {
+          AppLogger.info('Requesting additional Android permissions...');
           
-          // iOS background location requires always permission
-          return alwaysStatus.isGranted;
-        } else {
-          // Android: Request critical permissions for background location tracking
-          AppLogger.info('Requesting Android background location permissions...');
+          // Request background location permission separately (may show another dialog)
+          if (permission != LocationPermission.always) {
+            AppLogger.info('Requesting background location permission...');
+            final backgroundStatus = await Permission.locationAlways.request();
+            AppLogger.info('Background location permission: $backgroundStatus');
+          }
           
-          // Request background location permission (Android 10+)
-          final backgroundStatus = await Permission.locationAlways.request();
-          AppLogger.info('Background location permission: $backgroundStatus');
-          
-          // Request exclusion from battery optimizations (critical for background GPS)
+          // Request battery optimization exemption (non-location permission)
           if (await Permission.ignoreBatteryOptimizations.isDenied) {
             AppLogger.info('Requesting ignore battery optimizations...');
             final batteryStatus = await Permission.ignoreBatteryOptimizations.request();
             AppLogger.info('Battery optimization exemption: $batteryStatus');
           }
-          
-          // Request system alert window permission (helps prevent killing)
-          if (await Permission.systemAlertWindow.isDenied) {
-            AppLogger.info('Requesting system alert window permission...');
-            await Permission.systemAlertWindow.request();
-          }
-          
-          return true; // Android can work with when-in-use + foreground service
         }
+        
+        return true;
       }
       
-      // Fall back to Geolocator's permission request if needed
-      AppLogger.info('Falling back to Geolocator permission request...');
-      final permission = await Geolocator.requestPermission();
-      AppLogger.info('Geolocator permission result: $permission');
-      
-      return permission == LocationPermission.always || 
-             permission == LocationPermission.whileInUse;
+      AppLogger.info('Location permission denied: $permission');
+      return false;
     } catch (e) {
       AppLogger.error('Error requesting location permissions', exception: e);
       return false;

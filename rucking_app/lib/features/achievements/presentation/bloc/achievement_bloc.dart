@@ -165,7 +165,7 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
         'new_achievements_count': newAchievements.length,
         'achievements_earned': newAchievements.map((a) => {
           'id': a.id,
-          'title': a.title,
+          'name': a.name,
           'description': a.description,
         }).toList(),
       });
@@ -174,7 +174,7 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
         AppLogger.sessionCompletion('New achievements earned!', context: {
           'session_id': event.sessionId,
           'achievements_count': newAchievements.length,
-          'achievement_titles': newAchievements.map((a) => a.title).toList(),
+          'achievement_names': newAchievements.map((a) => a.name).toList(),
         });
         
         // Clear cache when new achievements are found so data will be refreshed
