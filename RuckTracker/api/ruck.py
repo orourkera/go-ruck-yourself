@@ -130,10 +130,9 @@ class RuckSessionListResource(Resource):
                 return {'message': 'User not authenticated'}, 401
                 
             limit = request.args.get('limit', 50, type=int)  # Default to 50 sessions max
-            include_route = request.args.get('include_route', 'false').lower() == 'true'
             
-            # Build cache key based on user, limit, and route inclusion
-            cache_key = f"ruck_session:{g.user.id}:list:{limit}:route:{include_route}"
+            # Build cache key based on user and limit
+            cache_key = f"ruck_session:{g.user.id}:list:{limit}"
             
             # Try to get cached response first
             cached_response = cache_get(cache_key)
@@ -163,53 +162,52 @@ class RuckSessionListResource(Resource):
                 cache_set(cache_key, sessions, 300)  # Cache for 5 minutes
                 return sessions, 200
             
-            # Only fetch route data if specifically requested and limit to recent sessions
+            # Fetch route data with memory optimization (limit points per session)
             locations_by_session = {}
-            if include_route and len(session_ids) <= 10:  # Only for small batches
-                try:
-                    # Limit location points per session to prevent memory issues
-                    MAX_POINTS_PER_SESSION = 100
-                    all_location_points = []
+            MAX_POINTS_PER_SESSION = 200  # Increased from 100 to 200 for better map quality
+            
+            try:
+                all_location_points = []
+                
+                for session_id in session_ids:
+                    # Get limited location points for this session
+                    session_locations = supabase.table('location_point') \
+                        .select('session_id,latitude,longitude') \
+                        .eq('session_id', session_id) \
+                        .order('timestamp') \
+                        .limit(MAX_POINTS_PER_SESSION) \
+                        .execute()
                     
-                    for session_id in session_ids:
-                        # Get limited location points for this session
-                        session_locations = supabase.table('location_point') \
-                            .select('session_id,latitude,longitude') \
-                            .eq('session_id', session_id) \
-                            .order('timestamp') \
-                            .limit(MAX_POINTS_PER_SESSION) \
-                            .execute()
-                        
-                        if session_locations.data:
-                            all_location_points.extend(session_locations.data)
-                    
-                    logger.info(f"Fetched {len(all_location_points)} location points for {len(session_ids)} sessions")
-                    
-                    # Group location points by session_id
-                    for loc in all_location_points:
-                        session_id = loc['session_id']
-                        if session_id not in locations_by_session:
-                            locations_by_session[session_id] = []
-                    
-                        # Ensure the location data contains latitude and longitude
-                        if 'latitude' in loc and 'longitude' in loc:
-                            try:
-                                # Convert numeric values if needed
-                                lat = float(loc['latitude']) if loc['latitude'] is not None else None
-                                lng = float(loc['longitude']) if loc['longitude'] is not None else None
-                                
-                                if lat is not None and lng is not None:
-                                    locations_by_session[session_id].append({
-                                        'lat': lat,
-                                        'lng': lng
-                                    })
-                            except (ValueError, TypeError):
-                                logger.warning(f"Invalid lat/lng in location point: {loc}")
-                                continue
-                    
-                except Exception as e:
-                    logger.error(f"ERROR: Failed to fetch location points: {e}")
-                    locations_by_session = {}
+                    if session_locations.data:
+                        all_location_points.extend(session_locations.data)
+                
+                logger.info(f"Fetched {len(all_location_points)} location points for {len(session_ids)} sessions")
+                
+                # Group location points by session_id
+                for loc in all_location_points:
+                    session_id = loc['session_id']
+                    if session_id not in locations_by_session:
+                        locations_by_session[session_id] = []
+                
+                    # Ensure the location data contains latitude and longitude
+                    if 'latitude' in loc and 'longitude' in loc:
+                        try:
+                            # Convert numeric values if needed
+                            lat = float(loc['latitude']) if loc['latitude'] is not None else None
+                            lng = float(loc['longitude']) if loc['longitude'] is not None else None
+                            
+                            if lat is not None and lng is not None:
+                                locations_by_session[session_id].append({
+                                    'lat': lat,
+                                    'lng': lng
+                                })
+                        except (ValueError, TypeError):
+                            logger.warning(f"Invalid lat/lng in location point: {loc}")
+                            continue
+                
+            except Exception as e:
+                logger.error(f"ERROR: Failed to fetch location points: {e}")
+                locations_by_session = {}
             
             # Batch fetch splits for all sessions (splits are small, safe to fetch)
             splits_by_session = {}
@@ -238,17 +236,20 @@ class RuckSessionListResource(Resource):
             for session in sessions:
                 session_id = session['id']
                 
-                # Add location points if available
+                # Add location points
                 if session_id in locations_by_session:
                     route_data = locations_by_session[session_id]
                     # Apply privacy clipping to route data
                     if route_data:
                         clipped_route = clip_route_for_privacy(route_data)
                         session['route'] = clipped_route
+                        session['location_points'] = clipped_route  # For compatibility
                     else:
                         session['route'] = []
+                        session['location_points'] = []
                 else:
                     session['route'] = []
+                    session['location_points'] = []
                 
                 # Add splits if available
                 if session_id in splits_by_session:
