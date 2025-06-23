@@ -201,29 +201,39 @@ class RuckSessionListResource(Resource):
                         if not session_locations.data:
                             logger.warning(f"RPC sampling failed for session {session_id}, using fallback sampling")
                             
-                            # Get points at regular intervals using LIMIT and OFFSET
-                            # This ensures we get evenly distributed points across the route
-                            sampled_points = []
-                            points_collected = 0
+                            # More efficient approach: Get all points and sample in Python
+                            # This ensures we get evenly distributed points across the entire route
+                            all_points_resp = supabase.table('location_point') \
+                                .select('session_id,latitude,longitude,timestamp') \
+                                .eq('session_id', int(session_id)) \
+                                .order('timestamp') \
+                                .execute()
                             
-                            for offset in range(0, total_points, interval):
-                                if points_collected >= MAX_POINTS_PER_SESSION:
-                                    break
-                                    
-                                point_resp = supabase.table('location_point') \
-                                    .select('session_id,latitude,longitude,timestamp') \
-                                    .eq('session_id', int(session_id)) \
-                                    .order('timestamp') \
-                                    .limit(1) \
-                                    .range(offset, offset) \
-                                    .execute()
+                            if all_points_resp.data and len(all_points_resp.data) > 0:
+                                all_points = all_points_resp.data
                                 
-                                if point_resp.data:
-                                    sampled_points.extend(point_resp.data)
-                                    points_collected += len(point_resp.data)
-                            
-                            session_locations.data = sampled_points
-                            logger.info(f"Fallback sampling collected {len(sampled_points)} points for session {session_id}")
+                                # Sample every Nth point to get approximately MAX_POINTS_PER_SESSION points
+                                # This ensures even distribution across the entire route
+                                step = max(1, len(all_points) // MAX_POINTS_PER_SESSION)
+                                sampled_points = []
+                                
+                                # Always include first point
+                                sampled_points.append(all_points[0])
+                                
+                                # Sample middle points at regular intervals
+                                for i in range(step, len(all_points) - step, step):
+                                    sampled_points.append(all_points[i])
+                                    if len(sampled_points) >= MAX_POINTS_PER_SESSION - 1:
+                                        break
+                                
+                                # Always include last point
+                                if len(all_points) > 1:
+                                    sampled_points.append(all_points[-1])
+                                
+                                session_locations.data = sampled_points
+                                logger.info(f"Fallback sampling: {len(all_points)} -> {len(sampled_points)} points for session {session_id}")
+                            else:
+                                session_locations.data = []
                     
                     if session_locations.data:
                         all_location_points.extend(session_locations.data)
