@@ -110,14 +110,40 @@ class EventCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      
+                      // Location row (right below club info)
+                      if (event.locationName != null && event.locationName!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 32), // Align with club name
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  event.locationName!,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: Colors.grey[600],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
               
-              // Location above image if exists
-              if (event.locationName != null && event.locationName!.isNotEmpty)
+              // If no club, show location at top instead
+              if (event.hostingClub == null && event.locationName != null && event.locationName!.isNotEmpty)
                 Padding(
-                  padding: EdgeInsets.fromLTRB(16, event.hostingClub != null ? 0 : 16, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: Row(
                     children: [
                       Icon(

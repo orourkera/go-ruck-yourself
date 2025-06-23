@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
@@ -184,7 +185,31 @@ class _EventsScreenState extends State<EventsScreen> {
                       
                       return RefreshIndicator(
                         onRefresh: () async {
+                          print('🔄 Pull to refresh triggered');
+                          final completer = Completer<void>();
+                          
+                          // Listen for state changes to complete the refresh
+                          late StreamSubscription subscription;
+                          subscription = _eventsBloc.stream.listen((state) {
+                            if (state is EventsLoaded || state is EventsError) {
+                              print('🔄 Refresh completed');
+                              subscription.cancel();
+                              if (!completer.isCompleted) {
+                                completer.complete();
+                              }
+                            }
+                          });
+                          
                           _eventsBloc.add(RefreshEvents());
+                          
+                          // Timeout after 10 seconds
+                          return completer.future.timeout(
+                            const Duration(seconds: 10),
+                            onTimeout: () {
+                              subscription.cancel();
+                              print('🔄 Refresh timed out');
+                            },
+                          );
                         },
                         child: ListView.builder(
                           controller: _scrollController,

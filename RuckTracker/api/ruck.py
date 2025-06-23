@@ -200,25 +200,30 @@ class RuckSessionListResource(Resource):
                         # Fallback if RPC function doesn't exist: use offset-based sampling
                         if not session_locations.data:
                             logger.warning(f"RPC sampling failed for session {session_id}, using fallback sampling")
-                            sampled_points = []
                             
-                            # Get points at regular intervals across the entire route
-                            for i in range(0, total_points, interval):
+                            # Get points at regular intervals using LIMIT and OFFSET
+                            # This ensures we get evenly distributed points across the route
+                            sampled_points = []
+                            points_collected = 0
+                            
+                            for offset in range(0, total_points, interval):
+                                if points_collected >= MAX_POINTS_PER_SESSION:
+                                    break
+                                    
                                 point_resp = supabase.table('location_point') \
                                     .select('session_id,latitude,longitude,timestamp') \
                                     .eq('session_id', int(session_id)) \
                                     .order('timestamp') \
-                                    .range(i, i) \
+                                    .limit(1) \
+                                    .range(offset, offset) \
                                     .execute()
                                 
                                 if point_resp.data:
                                     sampled_points.extend(point_resp.data)
-                                
-                                # Stop if we have enough points
-                                if len(sampled_points) >= MAX_POINTS_PER_SESSION:
-                                    break
+                                    points_collected += len(point_resp.data)
                             
                             session_locations.data = sampled_points
+                            logger.info(f"Fallback sampling collected {len(sampled_points)} points for session {session_id}")
                     
                     if session_locations.data:
                         all_location_points.extend(session_locations.data)

@@ -1558,16 +1558,16 @@ class _SessionRouteMap extends StatelessWidget {
 
                 List<Polyline> polylines = [];
 
-                // Add private start segment (super dark gray)
+                // Add private start segment (dark gray)
                 if (privacySegments.privateStartSegment.isNotEmpty) {
                   polylines.add(Polyline(
                     points: privacySegments.privateStartSegment,
-                    color: const Color(0xFF1A1A1A),
-                    strokeWidth: 4,
+                    color: Colors.grey.shade800,
+                    strokeWidth: 3,
                   ));
                 }
 
-                // Add visible middle segment (normal color)
+                // Add visible middle segment (orange)
                 if (privacySegments.visibleMiddleSegment.isNotEmpty) {
                   polylines.add(Polyline(
                     points: privacySegments.visibleMiddleSegment,
@@ -1576,12 +1576,12 @@ class _SessionRouteMap extends StatelessWidget {
                   ));
                 }
 
-                // Add private end segment (super dark gray)
+                // Add private end segment (dark gray)
                 if (privacySegments.privateEndSegment.isNotEmpty) {
                   polylines.add(Polyline(
                     points: privacySegments.privateEndSegment,
-                    color: const Color(0xFF1A1A1A),
-                    strokeWidth: 4,
+                    color: Colors.grey.shade800,
+                    strokeWidth: 3,
                   ));
                 }
 

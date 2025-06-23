@@ -1071,16 +1071,16 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
 
                                               List<Polyline> polylines = [];
 
-                                              // Add private start segment (black)
+                                              // Add private start segment (dark gray)
                                               if (privacySegments.privateStartSegment.isNotEmpty) {
                                                 polylines.add(Polyline(
                                                   points: privacySegments.privateStartSegment,
-                                                  color: Colors.black,
-                                                  strokeWidth: 4,
+                                                  color: Colors.grey.shade800,
+                                                  strokeWidth: 3,
                                                 ));
                                               }
 
-                                              // Add visible middle segment (normal color)
+                                              // Add visible middle segment (orange)
                                               if (privacySegments.visibleMiddleSegment.isNotEmpty) {
                                                 polylines.add(Polyline(
                                                   points: privacySegments.visibleMiddleSegment,
@@ -1089,12 +1089,12 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                                 ));
                                               }
 
-                                              // Add private end segment (black)
+                                              // Add private end segment (dark gray)
                                               if (privacySegments.privateEndSegment.isNotEmpty) {
                                                 polylines.add(Polyline(
                                                   points: privacySegments.privateEndSegment,
-                                                  color: Colors.black,
-                                                  strokeWidth: 4,
+                                                  color: Colors.grey.shade800,
+                                                  strokeWidth: 3,
                                                 ));
                                               }
 
