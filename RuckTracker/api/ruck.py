@@ -176,7 +176,7 @@ class RuckSessionListResource(Resource):
                     
                     # Intelligent sampling using Postgres RPC to keep route quality while capping memory
                     count_resp = supabase.table('location_point') \
-                        .select('id', count='exact', head=True) \
+                        .select('id', count='exact') \
                         .eq('session_id', int(session_id)) \
                         .execute()
 
@@ -414,7 +414,7 @@ class RuckSessionResource(Resource):
             # Fetch location points with intelligent sampling
             MAX_POINTS_FOR_DETAIL = 500
             count_resp = supabase.table('location_point') \
-                .select('id', count='exact', head=True) \
+                .select('id', count='exact') \
                 .eq('session_id', ruck_id) \
                 .execute()
 
