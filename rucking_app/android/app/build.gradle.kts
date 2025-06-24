@@ -50,8 +50,6 @@ android {
             keyAlias = "upload"
             keyPassword = envKeyPassword ?: "getruckypassword123" // The password you used in create-keystore.sh
         }
-        create("debug") {
-        }
     }
 
     buildTypes {

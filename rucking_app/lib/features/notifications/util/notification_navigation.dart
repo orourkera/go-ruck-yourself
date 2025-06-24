@@ -90,6 +90,19 @@ class NotificationNavigation {
           );
         }
         break;
+      case NotificationType.clubMembershipRequest:
+      case NotificationType.clubMembershipApproved:
+      case NotificationType.clubMembershipRejected:
+        final clubId = notification.data!['club_id']?.toString();
+        if (clubId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ClubDetailScreen(clubId: clubId),
+            ),
+          );
+        }
+        break;
       case NotificationType.follow:
         // Handle follow notifications when user profiles are implemented
         break;
@@ -97,7 +110,16 @@ class NotificationNavigation {
         // Handle system notifications
         break;
       default:
-        // No specific handling for unknown types
+        // For unknown notification types, try to navigate to club details if club_id is present
+        final clubId = notification.data!['club_id']?.toString();
+        if (clubId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ClubDetailScreen(clubId: clubId),
+            ),
+          );
+        }
         break;
     }
   }

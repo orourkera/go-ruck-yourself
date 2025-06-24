@@ -162,8 +162,9 @@ class ClubsRepositoryImpl implements ClubsRepository {
   Future<void> requestMembership(String clubId) async {
     await _apiClient.post('/clubs/$clubId/join', {});
     
-    // Invalidate club details cache since membership changed
+    // Invalidate both club details and clubs list cache since membership status changed
     await _cacheService.invalidateClubDetails(clubId);
+    await _cacheService.invalidateAllClubsCache(); // Clear clubs list cache too
   }
 
   @override
@@ -178,26 +179,28 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (action != null) body['action'] = action;
     if (role != null) body['role'] = role;
 
-    await _apiClient.put('/clubs/$clubId/members/$userId', body);
+    await _apiClient.post('/clubs/$clubId/members/$userId', body);
     
-    // Invalidate club details cache since membership changed
+    // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
+    await _cacheService.invalidateAllClubsCache(); // Clear clubs list cache too
   }
 
   @override
   Future<void> removeMembership(String clubId, String userId) async {
     await _apiClient.delete('/clubs/$clubId/members/$userId');
     
-    // Invalidate club details cache since membership changed
+    // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
+    await _cacheService.invalidateAllClubsCache(); // Clear clubs list cache too
   }
 
   @override
   Future<void> leaveClub(String clubId) async {
-    // For leaving, we use the current user's ID - this will be handled by the backend
-    await _apiClient.delete('/clubs/$clubId/members/me');
+    await _apiClient.post('/clubs/$clubId/leave', {});
     
-    // Invalidate club details cache since membership changed
+    // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
+    await _cacheService.invalidateAllClubsCache(); // Clear clubs list cache too
   }
 }

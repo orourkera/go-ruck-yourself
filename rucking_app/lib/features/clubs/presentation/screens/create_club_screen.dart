@@ -32,6 +32,12 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   final _maxMembersController = TextEditingController();
   final _locationController = TextEditingController();
   
+  // Focus nodes for keyboard navigation
+  final _nameFocusNode = FocusNode();
+  final _descriptionFocusNode = FocusNode();
+  final _locationFocusNode = FocusNode();
+  final _maxMembersFocusNode = FocusNode();
+  
   bool _isLoading = false;
   File? _clubLogo;
   bool _removeExistingLogo = false; // Flag to track if user wants to remove existing logo
@@ -74,6 +80,10 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
     _descriptionController.dispose();
     _maxMembersController.dispose();
     _locationController.dispose();
+    _nameFocusNode.dispose();
+    _descriptionFocusNode.dispose();
+    _locationFocusNode.dispose();
+    _maxMembersFocusNode.dispose();
     super.dispose();
   }
 
@@ -243,6 +253,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _nameController,
+                    focusNode: _nameFocusNode,
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _descriptionFocusNode.requestFocus(),
                     decoration: InputDecoration(
                       hintText: 'Enter club name',
                       border: OutlineInputBorder(
@@ -448,6 +461,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _descriptionController,
+                    focusNode: _descriptionFocusNode,
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _locationFocusNode.requestFocus(),
                     maxLines: 4,
                     decoration: InputDecoration(
                       hintText: 'Describe your club, its purpose, and what members can expect...',
@@ -483,6 +499,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _locationController,
+                    focusNode: _locationFocusNode,
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _maxMembersFocusNode.requestFocus(),
                     decoration: InputDecoration(
                       hintText: 'Search for a location, business, or address...',
                       border: OutlineInputBorder(
@@ -553,6 +572,8 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _maxMembersController,
+                    focusNode: _maxMembersFocusNode,
+                    textInputAction: TextInputAction.done,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       hintText: 'Leave empty for unlimited members',

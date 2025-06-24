@@ -29,4 +29,13 @@ class NotificationType {
 
   /// Club event created notification
   static const String clubEventCreated = 'club_event_created';
+  
+  /// Club membership request notification
+  static const String clubMembershipRequest = 'club_membership_request';
+  
+  /// Club membership approved notification
+  static const String clubMembershipApproved = 'club_membership_approved';
+  
+  /// Club membership rejected notification
+  static const String clubMembershipRejected = 'club_membership_rejected';
 }

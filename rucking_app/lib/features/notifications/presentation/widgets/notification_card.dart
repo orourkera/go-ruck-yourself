@@ -100,6 +100,10 @@ class NotificationCard extends StatelessWidget {
         iconData = Icons.comment;
         iconColor = Colors.blue;
         break;
+      case NotificationType.duelComment:
+        iconData = Icons.comment;
+        iconColor = Colors.green;
+        break;
       case NotificationType.follow:
         iconData = Icons.person_add;
         iconColor = Colors.green;
@@ -111,6 +115,18 @@ class NotificationCard extends StatelessWidget {
       case NotificationType.clubEventCreated:
         iconData = Icons.event;
         iconColor = AppColors.primary;
+        break;
+      case NotificationType.clubMembershipRequest:
+        iconData = Icons.group_add;
+        iconColor = AppColors.primary;
+        break;
+      case NotificationType.clubMembershipApproved:
+        iconData = Icons.group;
+        iconColor = Colors.green;
+        break;
+      case NotificationType.clubMembershipRejected:
+        iconData = Icons.group_remove;
+        iconColor = Colors.red;
         break;
       default:
         iconData = Icons.notifications;

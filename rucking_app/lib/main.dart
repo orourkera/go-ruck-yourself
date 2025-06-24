@@ -125,20 +125,9 @@ void main() async {
     AppLogger.error('Error requesting tracking authorization: $e');
   }
   
-  // Request location permissions early to prevent crashes when starting workouts
-  try {
-    final locationService = getIt<LocationService>();
-    final hasPermission = await locationService.hasLocationPermission();
-    
-    if (!hasPermission) {
-      AppLogger.info('Requesting location permission at app startup...');
-      await locationService.requestLocationPermission();
-    } else {
-      AppLogger.info('Location permission already granted.');
-    }
-  } catch (e) {
-    AppLogger.error('Error requesting location permission: $e');
-  }
+  // REMOVED: Automatic location permission request at startup to prevent conflicts
+  // Location permissions will be requested only when actually needed (e.g., starting a session)
+  // This prevents stuck Android system dialogs
   
   // Disable RevenueCat debug logs for production
   Purchases.setDebugLogsEnabled(false);

@@ -70,24 +70,17 @@ class LocationServiceImpl implements LocationService {
       
       // Request basic location permission using Geolocator (single dialog)
       final permission = await Geolocator.requestPermission();
-      AppLogger.info('Location permission result: $permission');
       
-      final hasBasicPermission = permission == LocationPermission.always || 
-                                permission == LocationPermission.whileInUse;
-      
-      if (hasBasicPermission) {
-        // Only request additional Android permissions if basic permission is granted
+      if (permission == LocationPermission.always || 
+          permission == LocationPermission.whileInUse) {
+        AppLogger.info('Location permission granted: $permission');
+        
+        // Only on Android, also request battery optimization exemption
+        // Do this separately to avoid dialog conflicts
         if (Platform.isAndroid) {
-          AppLogger.info('Requesting additional Android permissions...');
+          // Small delay to avoid dialog conflicts
+          await Future.delayed(const Duration(milliseconds: 500));
           
-          // Request background location permission separately (may show another dialog)
-          if (permission != LocationPermission.always) {
-            AppLogger.info('Requesting background location permission...');
-            final backgroundStatus = await Permission.locationAlways.request();
-            AppLogger.info('Background location permission: $backgroundStatus');
-          }
-          
-          // Request battery optimization exemption (non-location permission)
           if (await Permission.ignoreBatteryOptimizations.isDenied) {
             AppLogger.info('Requesting ignore battery optimizations...');
             final batteryStatus = await Permission.ignoreBatteryOptimizations.request();

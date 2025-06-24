@@ -192,6 +192,9 @@ class ClubsBloc extends Bloc<ClubsEvent, ClubsState> {
       
       emit(const ClubActionSuccess('Membership request sent!'));
       
+      // Refresh clubs list to show updated membership status
+      add(RefreshClubs());
+      
       // Refresh club details to show pending status
       add(LoadClubDetails(event.clubId));
       

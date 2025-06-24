@@ -549,6 +549,7 @@ class ClubMembershipResource(Resource):
                 'status': 'pending'
             }
             
+            logger.info(f"[DEBUG] About to insert club membership data: {membership_data}")
             result = admin_client.table('club_memberships').insert(membership_data).execute()
             
             if result.data:
@@ -630,19 +631,20 @@ class ClubMemberManagementResource(Resource):
                 if result.data:
                     logger.info(f"Membership for user {user_id} in club {club_id} updated by admin {current_user_id}")
                     
-                    # Send notification to user
+                    # Send push notifications (database notifications handled by trigger)
                     user_tokens = get_user_device_tokens([user_id])
-                    if user_tokens and 'status' in update_data:
-                        if update_data['status'] == 'approved':
+                    if user_tokens:
+                        if update_data.get('status') == 'approved':
                             push_service.send_club_membership_approved_notification(
                                 device_tokens=user_tokens,
                                 club_name=club['name'],
                                 club_id=club_id
                             )
-                        elif update_data['status'] == 'rejected':
+                        elif update_data.get('status') == 'rejected':
                             push_service.send_club_membership_rejected_notification(
                                 device_tokens=user_tokens,
-                                club_name=club['name']
+                                club_name=club['name'],
+                                club_id=club_id
                             )
                     
                     return {
