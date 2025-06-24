@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.goruckyourself.app"
+    namespace = "com.ruck.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.goruckyourself.app"
+        applicationId = "com.ruck.app"
         // Setting minSdk to 26 as required by health plugin
         minSdk = 26
         targetSdk = flutter.targetSdkVersion

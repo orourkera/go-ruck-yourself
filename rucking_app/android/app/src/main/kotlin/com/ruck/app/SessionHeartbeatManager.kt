@@ -1,4 +1,4 @@
-package com.goruckyourself.app
+package com.ruck.app
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -15,7 +15,7 @@ import android.util.Log
 object SessionHeartbeatManager {
     
     private const val HEARTBEAT_INTERVAL_MS = 15 * 60 * 1000L // 15 minutes like FitoTrack
-    internal const val HEARTBEAT_ACTION = "com.goruckyourself.app.SESSION_HEARTBEAT"
+    internal const val HEARTBEAT_ACTION = "com.ruck.app.SESSION_HEARTBEAT"
     private const val REQUEST_CODE = 1001
     
     fun scheduleHeartbeat(context: Context) {

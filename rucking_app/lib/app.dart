@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -140,8 +141,13 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         if (errorDescMatch != null) errorDescription = Uri.decodeComponent(errorDescMatch.group(1)!);
         if (errorCodeMatch != null) errorCode = Uri.decodeComponent(errorCodeMatch.group(1)!);
         
-        // Rebuild a clean URL
-        String cleanUrl = 'com.getrucky.app://auth/callback';
+        // Rebuild a clean URL with platform-specific scheme
+        String cleanUrl;
+        if (Platform.isAndroid) {
+          cleanUrl = 'com.ruck.app://auth/callback';
+        } else {
+          cleanUrl = 'com.goruckyourself.app://auth/callback';
+        }
         List<String> params = [];
         
         if (accessToken != null) params.add('access_token=$accessToken');
@@ -165,13 +171,21 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       }
     }
     
-    // Handle various malformed URL patterns
-    if (uriString.contains('com.getrucky.app://auth/callbackcom.getrucky.app://auth/callback') ||
-        uriString.contains('/callbackcom.getrucky.app://auth/callback') ||
-        uriString.contains('callbackcom.getrucky.app://auth/callback')) {
+    // Handle various malformed URL patterns for both Android and iOS schemes
+    if (uriString.contains('com.ruck.app://auth/callbackcom.ruck.app://auth/callback') ||
+        uriString.contains('/callbackcom.ruck.app://auth/callback') ||
+        uriString.contains('callbackcom.ruck.app://auth/callback') ||
+        uriString.contains('com.goruckyourself.app://auth/callbackcom.goruckyourself.app://auth/callback') ||
+        uriString.contains('/callbackcom.goruckyourself.app://auth/callback') ||
+        uriString.contains('callbackcom.goruckyourself.app://auth/callback')) {
       
       // Fix duplicated URL by finding the last valid occurrence
-      const targetScheme = 'com.getrucky.app://auth/callback';
+      String targetScheme = '';
+      if (uriString.contains('com.ruck.app')) {
+        targetScheme = 'com.ruck.app://auth/callback';
+      } else {
+        targetScheme = 'com.goruckyourself.app://auth/callback';
+      }
       final lastIndex = uriString.lastIndexOf(targetScheme);
       
       if (lastIndex >= 0) {
@@ -185,9 +199,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     // Check if this is an auth callback (custom scheme OR universal link)
     bool isAuthCallbackOld = false;
     
-    if (uri.scheme == 'com.getrucky.app' && uri.path == '/auth/callback') {
+    if ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app') && uri.path == '/auth/callback') {
       isAuthCallbackOld = true;
-      print('✅ Custom scheme auth callback detected');
+      print('✅ Custom scheme auth callback detected for ${uri.scheme}');
     } else if (uri.scheme == 'https' && 
                uri.host == 'getrucky.com' && 
                uri.path == '/auth/callback') {
@@ -209,9 +223,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     bool isEventDeeplink = false;
     String? eventId;
     
-    // Handle event deeplinks: https://getrucky.com/events/123 or com.getrucky.app://event/123
+    // Handle event deeplinks: https://getrucky.com/events/123 or com.ruck.app://event/123 or com.goruckyourself.app://event/123
     if ((uri.scheme == 'https' && uri.host == 'getrucky.com' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'events') ||
-        (uri.scheme == 'com.getrucky.app' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'event')) {
+        ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app') && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'event')) {
       isEventDeeplink = true;
       eventId = uri.pathSegments[1];
     }
@@ -230,9 +244,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     bool isClubDeeplink = false;
     String? clubId;
     
-    // Handle club deeplinks: https://getrucky.com/clubs/123 or com.getrucky.app://club/123
+    // Handle club deeplinks: https://getrucky.com/clubs/123 or com.ruck.app://club/123 or com.goruckyourself.app://club/123
     if ((uri.scheme == 'https' && uri.host == 'getrucky.com' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'clubs') ||
-        (uri.scheme == 'com.getrucky.app' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'club')) {
+        ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app') && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'club')) {
       isClubDeeplink = true;
       clubId = uri.pathSegments[1];
     }

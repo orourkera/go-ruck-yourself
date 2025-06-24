@@ -1,10 +1,18 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 
 /// Platform channel for native background location service integration
 /// Provides manual WakeLock control and session resurrection features like FitoTrack
 class BackgroundLocationService {
-  static const MethodChannel _channel = MethodChannel('com.getrucky.app/background_location');
+  // Use different channel names for Android vs iOS
+  static MethodChannel get _channel {
+    if (Platform.isAndroid) {
+      return const MethodChannel('com.ruck.app/background_location');
+    } else {
+      return const MethodChannel('com.goruckyourself.app/background_location');
+    }
+  }
 
   /// Start native background location service with manual WakeLock
   static Future<void> startBackgroundTracking() async {

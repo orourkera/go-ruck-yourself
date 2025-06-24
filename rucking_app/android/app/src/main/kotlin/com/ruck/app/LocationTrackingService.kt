@@ -1,4 +1,4 @@
-package com.goruckyourself.app
+package com.ruck.app
 
 import android.app.Notification
 import android.app.NotificationChannel

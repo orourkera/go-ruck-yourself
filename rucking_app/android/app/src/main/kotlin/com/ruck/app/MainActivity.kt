@@ -1,4 +1,4 @@
-package com.goruckyourself.app
+package com.ruck.app
 
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -12,9 +12,9 @@ import io.flutter.plugin.common.EventChannel
 
 class MainActivity : FlutterActivity() {
     
-    private val CHANNEL = "com.getrucky.app/background_location"
-    private val HEART_RATE_CHANNEL = "com.getrucky.gfy/heartRateStream"
-    private val WATCH_SESSION_CHANNEL = "com.getrucky.gfy/watch_session"
+    private val CHANNEL = "com.ruck.app/background_location"
+    private val HEART_RATE_CHANNEL = "com.ruck.app/heartRateStream"
+    private val WATCH_SESSION_CHANNEL = "com.ruck.app/watch_session"
     
     // Track stream state to prevent cancellation errors
     private var heartRateEventSink: EventChannel.EventSink? = null
