@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
@@ -68,9 +69,15 @@ class WatchService {
   }
 
   void _initPlatformChannels() {
-    // Initialize platform channels
-    _watchSessionChannel = const MethodChannel('com.getrucky.gfy/watch_session');
-    _heartRateEventChannel = const EventChannel('com.getrucky.gfy/heartRateStream');
+    // Initialize platform channels - use different prefixes for iOS vs Android
+    if (Platform.isIOS) {
+      _watchSessionChannel = const MethodChannel('com.getrucky.gfy/watch_session');
+      _heartRateEventChannel = const EventChannel('com.getrucky.gfy/heartRateStream');
+    } else {
+      // Android uses com.ruck.app prefix
+      _watchSessionChannel = const MethodChannel('com.ruck.app/watch_session');
+      _heartRateEventChannel = const EventChannel('com.ruck.app/heartRateStream');
+    }
 
     // Setup method call handlers
     _watchSessionChannel.setMethodCallHandler(_handleWatchSessionMethod);
