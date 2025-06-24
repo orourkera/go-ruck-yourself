@@ -164,85 +164,35 @@ class RuckSessionListResource(Resource):
             
             # Fetch route data with intelligent sampling (preserve full route shape)
             locations_by_session = {}
-            # TEMPORARILY DISABLED: MAX_POINTS_PER_SESSION = 200  # Target points for good map quality vs memory balance
+            MAX_POINTS_PER_SESSION = 200  # Target points for good map quality vs memory balance
             
             try:
                 all_location_points = []
                 
                 for session_id in session_ids:
-                    # TEMPORARILY DISABLED: Get all points instead of sampling
-                    # First, get the total count of points for this session
-                    # count_resp = supabase.table('location_point') \
-                    #     .select('id', count='exact', head=True) \
-                    #     .eq('session_id', int(session_id)) \
-                    #     .execute()
-                    
-                    # total_points = count_resp.count or 0
-                    
-                    # Get all points for this session (no sampling)
-                    session_locations = supabase.table('location_point') \
-                        .select('session_id,latitude,longitude,timestamp') \
+                    # Intelligent sampling using Postgres RPC to keep route quality while capping memory
+                    count_resp = supabase.table('location_point') \
+                        .select('id', count='exact', head=True) \
                         .eq('session_id', int(session_id)) \
-                        .order('timestamp') \
                         .execute()
-                    
-                    # COMMENTED OUT SAMPLING LOGIC:
-                    # if total_points <= MAX_POINTS_PER_SESSION:
-                    #     # If session has fewer points than limit, get all points
-                    #     session_locations = supabase.table('location_point') \
-                    #         .select('session_id,latitude,longitude,timestamp') \
-                    #         .eq('session_id', int(session_id)) \
-                    #         .order('timestamp') \
-                    #         .execute()
-                    # else:
-                    #     # Intelligent sampling: get evenly distributed points across the entire route
-                    #     # Calculate interval to sample approximately MAX_POINTS_PER_SESSION points
-                    #     interval = max(1, total_points // MAX_POINTS_PER_SESSION)
-                    #     
-                    #     # Use row_number with modulo to get evenly distributed samples
-                    #     session_locations = supabase.rpc('get_sampled_route_points', {
-                    #         'p_session_id': int(session_id),
-                    #         'p_interval': interval,
-                    #         'p_max_points': MAX_POINTS_PER_SESSION
-                    #     }).execute()
-                    #     
-                    #     # Fallback if RPC function doesn't exist: use offset-based sampling
-                    #     if not session_locations.data:
-                    #         logger.warning(f"RPC sampling failed for session {session_id}, using fallback sampling")
-                    #         
-                    #         # More efficient approach: Get all points and sample in Python
-                    #         # This ensures we get evenly distributed points across the entire route
-                    #         all_points_resp = supabase.table('location_point') \
-                    #             .select('session_id,latitude,longitude,timestamp') \
-                    #             .eq('session_id', int(session_id)) \
-                    #             .order('timestamp') \
-                    #             .execute()
-                    #         
-                    #         if all_points_resp.data and len(all_points_resp.data) > 0:
-                    #             all_points = all_points_resp.data
-                    #             
-                    #             # Sample every Nth point to get approximately MAX_POINTS_PER_SESSION points
-                    #             # This ensures even distribution across the entire route
-                    #             step = max(1, len(all_points) // MAX_POINTS_PER_SESSION)
-                    #             sampled_points = []
-                    #             
-                    #             # Always include first point
-                    #             sampled_points.append(all_points[0])
-                    #             
-                    #             # Sample middle points at regular intervals
-                    #             for i in range(step, len(all_points) - step, step):
-                    #                 sampled_points.append(all_points[i])
-                    #                 if len(sampled_points) >= MAX_POINTS_PER_SESSION - 1:
-                    #                     break
-                    #             
-                    #             # Always include last point
-                    #             if len(all_points) > 1:
-                    #                 sampled_points.append(all_points[-1])
-                    #             
-                    #             session_locations.data = sampled_points
-                    #             logger.info(f"Python fallback sampling: {len(all_points)} -> {len(sampled_points)} points")
-                    #         else:
-                    #             session_locations.data = []
+
+                    total_points = count_resp.count or 0
+
+                    if total_points <= MAX_POINTS_PER_SESSION:
+                        # Small sessions – return all points
+                        session_locations = supabase.table('location_point') \
+                            .select('session_id,latitude,longitude,timestamp') \
+                            .eq('session_id', int(session_id)) \
+                            .order('timestamp') \
+                            .execute()
+                    else:
+                        # Large sessions – sample via RPC
+                        interval = max(1, total_points // MAX_POINTS_PER_SESSION)
+                        session_locations = supabase.rpc('get_sampled_route_points', {
+                            'p_session_id': int(session_id),
+                            'p_interval': interval,
+                            'p_max_points': MAX_POINTS_PER_SESSION
+                        }).execute()
                     
                     if session_locations.data:
                         all_location_points.extend(session_locations.data)
@@ -429,18 +379,34 @@ class RuckSessionResource(Resource):
             else:
                 session = response.data[0]
             
-            # Fetch location points without sampling
-            locations_resp = supabase.table('location_point') \
-                .select('latitude,longitude,timestamp') \
+            # Fetch location points with intelligent sampling
+            MAX_POINTS_FOR_DETAIL = 500
+            count_resp = supabase.table('location_point') \
+                .select('id', count='exact', head=True) \
                 .eq('session_id', ruck_id) \
-                .order('timestamp') \
                 .execute()
+
+            total_points = count_resp.count or 0
+
+            if total_points <= MAX_POINTS_FOR_DETAIL:
+                locations_resp = supabase.table('location_point') \
+                    .select('latitude,longitude,timestamp') \
+                    .eq('session_id', ruck_id) \
+                    .order('timestamp') \
+                    .execute()
+            else:
+                interval = max(1, total_points // MAX_POINTS_FOR_DETAIL)
+                locations_resp = supabase.rpc('get_sampled_route_points', {
+                    'p_session_id': int(ruck_id),
+                    'p_interval': interval,
+                    'p_max_points': MAX_POINTS_FOR_DETAIL
+                }).execute()
             
             logger.debug(f"Location response data for session {ruck_id}: {len(locations_resp.data) if locations_resp.data else 0} points")
             
             if locations_resp.data:
                 # Convert location points to the expected format
-                location_points = [{'lat': loc['latitude'], 'lng': loc['longitude'], 'timestamp': loc.get('timestamp', '')} 
+                location_points = [{'lat': loc['latitude'], 'lng': loc['longitude'], 'timestamp': loc.get('timestamp', loc.get('point_time', ''))} 
                                  for loc in locations_resp.data]
                 
                 # Apply privacy clipping if this is not the user's own session
