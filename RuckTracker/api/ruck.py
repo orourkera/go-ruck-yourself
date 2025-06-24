@@ -245,7 +245,7 @@ class RuckSessionListResource(Resource):
                     session_id = loc['session_id']
                     if session_id not in locations_by_session:
                         locations_by_session[session_id] = []
-                
+                    
                     # Ensure the location data contains latitude and longitude
                     if 'latitude' in loc and 'longitude' in loc:
                         try:
