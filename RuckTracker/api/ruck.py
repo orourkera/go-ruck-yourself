@@ -32,7 +32,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 
 def clip_route_for_privacy(location_points):
     """
-    Clips the first and last ~200m (1/8 mile) of a route for privacy
+    Clips the first and last ~100m of a route for privacy
     
     Args:
         location_points: List of dictionaries with 'lat' and 'lng' keys
@@ -43,8 +43,8 @@ def clip_route_for_privacy(location_points):
     if not location_points or len(location_points) < 3:
         return location_points
     
-    # Privacy clipping distance (200m or ~1/8 mile)
-    PRIVACY_DISTANCE_METERS = 200.0
+    # Privacy clipping distance (100m or ~1/16 mile)
+    PRIVACY_DISTANCE_METERS = 100.0
     
     # Convert location points to uniform format with timestamp
     normalized_points = []
@@ -65,7 +65,7 @@ def clip_route_for_privacy(location_points):
     # Sort points by timestamp to ensure correct order (empty timestamps go first)
     sorted_points = sorted(normalized_points, key=lambda p: p.get('timestamp', ''))
     
-    # Find the start clipping index (skip first ~200m)
+    # Find the start clipping index (skip first ~100m)
     start_idx = 0
     cumulative_distance = 0
     for i in range(1, len(sorted_points)):
@@ -84,7 +84,7 @@ def clip_route_for_privacy(location_points):
                 start_idx = i
                 break
     
-    # Find the end clipping index (skip last ~200m)
+    # Find the end clipping index (skip last ~100m)
     end_idx = len(sorted_points) - 1
     cumulative_distance = 0
     for i in range(len(sorted_points) - 2, -1, -1):
