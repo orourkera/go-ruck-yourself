@@ -50,6 +50,8 @@ android {
             keyAlias = "upload"
             keyPassword = envKeyPassword ?: "getruckypassword123" // The password you used in create-keystore.sh
         }
+        create("debug") {
+        }
     }
 
     buildTypes {
@@ -57,6 +59,10 @@ android {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            // Enable automatic debug symbol upload to Google Play Console
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
         debug {
             signingConfig = signingConfigs.getByName("debug")

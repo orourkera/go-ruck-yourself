@@ -420,12 +420,71 @@ class RuckSessionResource(Resource):
             else:
                 session = response.data[0]
             
-            # Fetch location points
-            locations_resp = supabase.table('location_point') \
-                .select('latitude,longitude,timestamp') \
+            # Fetch location points with intelligent sampling
+            MAX_POINTS_FOR_DETAIL = 500  # Higher limit for detail view, but still manageable
+            
+            # First, get the total count of points for this session
+            count_resp = supabase.table('location_point') \
+                .select('id', count='exact', head=True) \
                 .eq('session_id', ruck_id) \
-                .order('timestamp') \
                 .execute()
+            
+            total_points = count_resp.count or 0
+            logger.debug(f"Session {ruck_id} has {total_points} total location points")
+            
+            if total_points <= MAX_POINTS_FOR_DETAIL:
+                # If session has fewer points than limit, get all points
+                locations_resp = supabase.table('location_point') \
+                    .select('latitude,longitude,timestamp') \
+                    .eq('session_id', ruck_id) \
+                    .order('timestamp') \
+                    .execute()
+            else:
+                # Apply intelligent sampling for large sessions
+                logger.info(f"Applying sampling to session {ruck_id}: {total_points} -> {MAX_POINTS_FOR_DETAIL} points")
+                
+                # Try RPC function first
+                locations_resp = supabase.rpc('get_sampled_route_points', {
+                    'p_session_id': int(ruck_id),
+                    'p_interval': max(1, total_points // MAX_POINTS_FOR_DETAIL),
+                    'p_max_points': MAX_POINTS_FOR_DETAIL
+                }).execute()
+                
+                # Fallback if RPC function doesn't exist
+                if not locations_resp.data:
+                    logger.warning(f"RPC sampling failed for session {ruck_id}, using Python fallback")
+                    
+                    # Get all points and sample in Python
+                    all_points_resp = supabase.table('location_point') \
+                        .select('latitude,longitude,timestamp') \
+                        .eq('session_id', ruck_id) \
+                        .order('timestamp') \
+                        .execute()
+                    
+                    if all_points_resp.data and len(all_points_resp.data) > 0:
+                        all_points = all_points_resp.data
+                        
+                        # Sample every Nth point to get approximately MAX_POINTS_FOR_DETAIL points
+                        step = max(1, len(all_points) // MAX_POINTS_FOR_DETAIL)
+                        sampled_points = []
+                        
+                        # Always include first point
+                        sampled_points.append(all_points[0])
+                        
+                        # Sample middle points at regular intervals
+                        for i in range(step, len(all_points) - step, step):
+                            sampled_points.append(all_points[i])
+                            if len(sampled_points) >= MAX_POINTS_FOR_DETAIL - 1:
+                                break
+                        
+                        # Always include last point
+                        if len(all_points) > 1:
+                            sampled_points.append(all_points[-1])
+                        
+                        locations_resp.data = sampled_points
+                        logger.info(f"Python fallback sampling: {len(all_points)} -> {len(sampled_points)} points")
+                    else:
+                        locations_resp.data = []
             
             logger.debug(f"Location response data for session {ruck_id}: {len(locations_resp.data) if locations_resp.data else 0} points")
             
