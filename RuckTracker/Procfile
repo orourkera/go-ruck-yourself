@@ -1,2 +1,2 @@
-web: gunicorn RuckTracker.app:app
+web: gunicorn -c gunicorn_config.py RuckTracker.app:app
 worker: python background_scheduler.py

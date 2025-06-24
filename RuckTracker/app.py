@@ -23,11 +23,21 @@ log_level = logging.INFO
 if os.environ.get("FLASK_ENV") == "development":
     log_level = logging.DEBUG
 
+# Configure logging to ensure all errors are captured
 logging.basicConfig(
     level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.StreamHandler(sys.stderr)  # Also log to stderr for errors
+    ]
 )
+
+# Set specific logger levels
+logging.getLogger('werkzeug').setLevel(logging.INFO)  # Ensure werkzeug logs are captured
+logging.getLogger('gunicorn').setLevel(logging.INFO)
+logging.getLogger('flask').setLevel(logging.INFO)
+
 logger = logging.getLogger(__name__)
 logger.info("Starting RuckTracker API server...")
 
@@ -541,6 +551,200 @@ def health():
     })
 
 logger.info("Application initialized successfully! All API endpoints registered.")
+
+# ============================================================================
+# COMPREHENSIVE ERROR HANDLING AND LOGGING
+# ============================================================================
+
+@app.after_request
+def log_request_info(response):
+    """Log all requests for debugging and monitoring"""
+    # Log request details
+    logger.info(f"REQUEST: {request.method} {request.path} - Status: {response.status_code} - "
+               f"IP: {request.remote_addr} - User-Agent: {request.headers.get('User-Agent', 'Unknown')[:100]}")
+    
+    # Log performance for slow requests
+    if hasattr(g, 'start_time'):
+        duration = (datetime.now() - g.start_time).total_seconds()
+        if duration > 2.0:  # Log slow requests (>2 seconds)
+            logger.warning(f"SLOW REQUEST: {request.method} {request.path} took {duration:.2f}s")
+    
+    # Log errors in detail
+    if response.status_code >= 400:
+        logger.error(f"HTTP ERROR {response.status_code}: {request.method} {request.path} - "
+                    f"IP: {request.remote_addr} - Response: {response.get_data(as_text=True)[:500]}")
+    
+    return response
+
+@app.before_request
+def before_request_logging():
+    """Track request start time and log important request details"""
+    g.start_time = datetime.now()
+    
+    # Log authentication attempts
+    if request.headers.get('Authorization'):
+        logger.debug(f"AUTH REQUEST: {request.method} {request.path} - Has auth token")
+    
+    # Log API requests with body size
+    if request.path.startswith('/api/'):
+        body_size = len(request.get_data()) if request.get_data() else 0
+        logger.debug(f"API REQUEST: {request.method} {request.path} - Body size: {body_size} bytes")
+
+# Error Handlers
+@app.errorhandler(400)
+def bad_request(error):
+    """Handle 400 Bad Request errors"""
+    logger.error(f"400 BAD REQUEST: {request.method} {request.path} - "
+                f"IP: {request.remote_addr} - Error: {str(error)}")
+    return jsonify({
+        'error': 'Bad Request',
+        'message': 'The request could not be understood by the server',
+        'status_code': 400
+    }), 400
+
+@app.errorhandler(401)
+def unauthorized(error):
+    """Handle 401 Unauthorized errors"""
+    logger.warning(f"401 UNAUTHORIZED: {request.method} {request.path} - "
+                  f"IP: {request.remote_addr} - Auth header: {bool(request.headers.get('Authorization'))}")
+    return jsonify({
+        'error': 'Unauthorized',
+        'message': 'Authentication required',
+        'status_code': 401
+    }), 401
+
+@app.errorhandler(403)
+def forbidden(error):
+    """Handle 403 Forbidden errors"""
+    logger.warning(f"403 FORBIDDEN: {request.method} {request.path} - "
+                  f"IP: {request.remote_addr} - User: {getattr(g, 'user_id', 'Unknown')}")
+    return jsonify({
+        'error': 'Forbidden',
+        'message': 'Access denied',
+        'status_code': 403
+    }), 403
+
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 Not Found errors"""
+    logger.warning(f"404 NOT FOUND: {request.method} {request.path} - "
+                  f"IP: {request.remote_addr} - Referrer: {request.headers.get('Referer', 'None')}")
+    return jsonify({
+        'error': 'Not Found',
+        'message': 'The requested resource was not found',
+        'status_code': 404
+    }), 404
+
+@app.errorhandler(429)
+def ratelimit_handler(error):
+    """Handle rate limit exceeded errors"""
+    logger.warning(f"429 RATE LIMIT: {request.method} {request.path} - "
+                  f"IP: {request.remote_addr} - Limit: {error.description}")
+    return jsonify({
+        'error': 'Rate Limit Exceeded',
+        'message': 'Too many requests, please try again later',
+        'retry_after': getattr(error, 'retry_after', 60),
+        'status_code': 429
+    }), 429
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 Internal Server Error"""
+    logger.error(f"500 INTERNAL ERROR: {request.method} {request.path} - "
+                f"IP: {request.remote_addr} - Error: {str(error)}", exc_info=True)
+    return jsonify({
+        'error': 'Internal Server Error',
+        'message': 'An unexpected error occurred',
+        'status_code': 500
+    }), 500
+
+@app.errorhandler(502)
+def bad_gateway(error):
+    """Handle 502 Bad Gateway errors"""
+    logger.error(f"502 BAD GATEWAY: {request.method} {request.path} - "
+                f"IP: {request.remote_addr} - Error: {str(error)}")
+    return jsonify({
+        'error': 'Bad Gateway',
+        'message': 'Upstream service error',
+        'status_code': 502
+    }), 502
+
+@app.errorhandler(503)
+def service_unavailable(error):
+    """Handle 503 Service Unavailable errors"""
+    logger.error(f"503 SERVICE UNAVAILABLE: {request.method} {request.path} - "
+                f"IP: {request.remote_addr} - Error: {str(error)}")
+    return jsonify({
+        'error': 'Service Unavailable',
+        'message': 'Service temporarily unavailable',
+        'status_code': 503
+    }), 503
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    """Handle all unhandled exceptions"""
+    logger.error(f"UNHANDLED EXCEPTION: {request.method} {request.path} - "
+                f"IP: {request.remote_addr} - Exception: {str(error)}", exc_info=True)
+    
+    # Return 500 for unhandled exceptions
+    return jsonify({
+        'error': 'Internal Server Error',
+        'message': 'An unexpected error occurred',
+        'status_code': 500
+    }), 500
+
+# Memory and performance monitoring
+@app.route('/api/system/health')
+def system_health():
+    """System health check with memory and performance metrics"""
+    import psutil
+    import sys
+    
+    try:
+        # Get memory usage
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        memory_mb = memory_info.rss / 1024 / 1024
+        
+        # Get system metrics
+        cpu_percent = psutil.cpu_percent()
+        
+        # Check Redis connection
+        redis_status = "connected"
+        try:
+            cache_service = get_cache_service()
+            if not cache_service.is_connected():
+                redis_status = "disconnected"
+        except Exception as e:
+            redis_status = f"error: {str(e)}"
+        
+        health_data = {
+            'status': 'ok',
+            'timestamp': datetime.now().isoformat(),
+            'memory_usage_mb': round(memory_mb, 2),
+            'cpu_percent': cpu_percent,
+            'python_version': sys.version,
+            'redis_status': redis_status,
+            'active_connections': len(psutil.Process().connections()),
+        }
+        
+        # Log memory warning if usage is high
+        if memory_mb > 400:  # 400MB threshold for 512MB dyno
+            logger.warning(f"HIGH MEMORY USAGE: {memory_mb:.2f}MB / 512MB (78%+ usage)")
+        
+        logger.info(f"HEALTH CHECK: Memory: {memory_mb:.2f}MB, CPU: {cpu_percent}%, Redis: {redis_status}")
+        
+        return jsonify(health_data)
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+logger.info("Error handlers and monitoring configured successfully!")
 
 # Trigger redeploy: Cascade forced comment
 

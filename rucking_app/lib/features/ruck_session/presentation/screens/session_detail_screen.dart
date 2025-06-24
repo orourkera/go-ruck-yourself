@@ -350,10 +350,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           title: const Text('Session Details'),
           backgroundColor: _getLadyModeColor(context),
           elevation: 0,
-          iconTheme: IconThemeData(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : null,
+          iconTheme: const IconThemeData(
+            color: Colors.white,
           ),
-          foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : null,
+          foregroundColor: Colors.white,
           actions: [
             // Share session button
             IconButton(
