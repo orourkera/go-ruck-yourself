@@ -29,6 +29,9 @@ import FirebaseCore
         // Setup Firebase
         FirebaseApp.configure()
         
+        // Register plugins first so custom channels bind to the final binary messenger
+        GeneratedPluginRegistrant.register(with: self)
+        
         // Setup Flutter Method Channels for communication with Dart
         let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
         
@@ -143,8 +146,6 @@ import FirebaseCore
         // Setup Flutter Event Channel for streaming heart rate data to Dart
         let eventChannel = FlutterEventChannel(name: eventChannelName, binaryMessenger: controller.binaryMessenger)
         eventChannel.setStreamHandler(HeartRateStreamHandler())
-        
-        GeneratedPluginRegistrant.register(with: self)
         
         // Register for push notifications and get APNS token
         if #available(iOS 10.0, *) {

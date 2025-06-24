@@ -406,8 +406,19 @@ class RuckSessionResource(Resource):
             
             if locations_resp.data:
                 # Convert location points to the expected format
-                location_points = [{'lat': loc['latitude'], 'lng': loc['longitude'], 'timestamp': loc.get('timestamp', loc.get('point_time', ''))} 
-                                 for loc in locations_resp.data]
+                # Accept both latitude/longitude or lat/lng keys (RPC may return either format)
+                location_points = []
+                for loc in locations_resp.data:
+                    lat_val = loc.get('latitude', loc.get('lat'))
+                    lng_val = loc.get('longitude', loc.get('lng'))
+                    if lat_val is None or lng_val is None:
+                        logger.debug(f"[ROUTE_PARSE] Skipping location with missing coords: {loc}")
+                        continue
+                    location_points.append({
+                        'lat': float(lat_val),
+                        'lng': float(lng_val),
+                        'timestamp': loc.get('timestamp', loc.get('point_time', ''))
+                    })
                 
                 # Apply privacy clipping if this is not the user's own session
                 if not is_own_session:
