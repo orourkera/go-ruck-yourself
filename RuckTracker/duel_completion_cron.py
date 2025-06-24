@@ -18,20 +18,27 @@ import os
 from datetime import datetime
 
 # Configure logging
+log_handlers = [logging.StreamHandler(sys.stdout)]
+
+# Try to add file logging if possible (for local development)
+try:
+    log_file = os.environ.get('LOG_FILE', '/tmp/duel_completion.log')
+    log_handlers.append(logging.FileHandler(log_file))
+except (PermissionError, OSError):
+    # File logging not available (common in Heroku), just use stdout
+    pass
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/var/log/duel_completion.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=log_handlers
 )
 
 def check_duel_completion():
     """Call the backend endpoint to check and complete expired duels"""
     try:
         # Get the backend URL from environment or use default
-        backend_url = os.environ.get('BACKEND_URL', 'https://your-backend-url.com')
+        backend_url = os.environ.get('BACKEND_URL', 'https://go-ruck-yourself-0b8e9cb68bd4.herokuapp.com')
         endpoint = f"{backend_url}/api/duels/completion-check"
         
         logging.info(f"Checking duel completion at {endpoint}")
