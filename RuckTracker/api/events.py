@@ -181,28 +181,41 @@ class EventsListResource(Resource):
                 # Send notifications to club members if club event
                 if event_data['club_id']:
                     try:
-                        # Get club members
+                        # Get club members (exclude event creator)
                         club_members = admin_client.table('club_memberships').select('user_id').eq('club_id', event_data['club_id']).eq('status', 'approved').neq('user_id', current_user_id).execute()
+                        
+                        logger.info(f"Found {len(club_members.data) if club_members.data else 0} club members for event notifications")
                         
                         if club_members.data:
                             member_ids = [member['user_id'] for member in club_members.data]
+                            logger.info(f"Getting device tokens for members: {member_ids}")
+                            
                             member_tokens = get_user_device_tokens(member_ids)
+                            logger.info(f"Retrieved {len(member_tokens)} device tokens")
                             
                             if member_tokens:
                                 # Get club info for notification
                                 club_result = admin_client.table('clubs').select('name').eq('id', event_data['club_id']).execute()
                                 club_name = club_result.data[0]['name'] if club_result.data else 'Unknown Club'
                                 
-                                push_service.send_club_event_notification(
+                                logger.info(f"Sending push notifications for event '{event['title']}' in club '{club_name}'")
+                                
+                                success = push_service.send_club_event_notification(
                                     device_tokens=member_tokens,
                                     event_title=event['title'],
                                     club_name=club_name,
                                     event_id=event['id'],
                                     club_id=event_data['club_id']
                                 )
-                                logger.info(f"Sent club event notifications to {len(member_tokens)} members")
+                                
+                                logger.info(f"Push notification result: {success} for {len(member_tokens)} devices")
+                            else:
+                                logger.warning(f"No device tokens found for {len(member_ids)} club members")
+                        else:
+                            logger.info("No club members found to notify (excluding creator)")
+                            
                     except Exception as notification_error:
-                        logger.error(f"Failed to send club event notifications: {notification_error}")
+                        logger.error(f"Failed to send club event notifications: {notification_error}", exc_info=True)
                 
                 return {'event': event, 'message': 'Event created successfully'}, 201
             else:
@@ -438,6 +451,90 @@ class EventParticipationResource(Resource):
                     }
                     admin_client.table('event_participant_progress').insert(progress_data).execute()
                 
+                # Get user info for notification
+                user_result = admin_client.table('profiles').select('username, avatar_url').eq('id', current_user_id).execute()
+                user_info = user_result.data[0] if user_result.data else {}
+                username = user_info.get('username', 'Someone')
+                
+                logger.info(f"🔔 EVENT JOIN NOTIFICATION - User {username} ({current_user_id}) joined event {event_id}")
+                
+                # Get event creator and event info for notification
+                event_info_result = admin_client.table('events').select('creator_user_id, title').eq('id', event_id).execute()
+                if event_info_result.data:
+                    event_creator_id = event_info_result.data[0]['creator_user_id']
+                    event_title = event_info_result.data[0]['title']
+                    
+                    logger.info(f"🔔 Event creator: {event_creator_id}, Event title: '{event_title}'")
+                    
+                    # Only send notification if the person joining is not the creator
+                    if current_user_id != event_creator_id:
+                        logger.info(f"🔔 Sending notification to event creator (different from joiner)")
+                        try:
+                            # Create in-app notification
+                            notification_message = f"{username} joined your event \"{event_title}\""
+                            if participation_status == 'pending':
+                                notification_message = f"{username} requested to join your event \"{event_title}\""
+                            
+                            logger.info(f"🔔 In-app notification message: '{notification_message}'")
+                            
+                            notification_data = {
+                                'recipient_id': event_creator_id,
+                                'type': 'event_participant_joined' if participation_status == 'approved' else 'event_join_request',
+                                'message': notification_message,
+                                'data': {
+                                    'event_id': event_id,
+                                    'event_title': event_title,
+                                    'participant_user_id': current_user_id,
+                                    'participant_username': username,
+                                    'status': participation_status
+                                },
+                                'is_read': False,
+                                'event_id': event_id
+                            }
+                            
+                            logger.info(f"🔔 Creating in-app notification in database...")
+                            admin_client.table('notifications').insert(notification_data).execute()
+                            logger.info(f"✅ In-app notification created successfully")
+                            
+                            # Send push notification
+                            logger.info(f"🔔 Getting device tokens for event creator {event_creator_id}...")
+                            device_tokens = get_user_device_tokens([event_creator_id])
+                            logger.info(f"🔔 Retrieved {len(device_tokens)} device tokens")
+                            
+                            if device_tokens:
+                                push_title = "New Event Participant"
+                                if participation_status == 'pending':
+                                    push_title = "Event Join Request"
+                                
+                                push_body = notification_message
+                                push_data = {
+                                    'type': 'event_participant_joined' if participation_status == 'approved' else 'event_join_request',
+                                    'event_id': event_id
+                                }
+                                
+                                logger.info(f"🔔 Sending push notification: '{push_title}' - '{push_body}'")
+                                
+                                success = push_service.send_notification(
+                                    device_tokens=device_tokens,
+                                    title=push_title,
+                                    body=push_body,
+                                    notification_data=push_data
+                                )
+                                
+                                logger.info(f"🔔 Push notification result: {success}")
+                            else:
+                                logger.warning(f"⚠️ No device tokens found for event creator {event_creator_id}")
+                            
+                            logger.info(f"✅ Event join notification process completed for {current_user_id} -> {event_creator_id}")
+                        
+                        except Exception as notification_error:
+                            logger.error(f"❌ Failed to send event join notification: {notification_error}", exc_info=True)
+                            # Don't fail the join if notification fails
+                    else:
+                        logger.info(f"🔔 Skipping notification - user is joining their own event")
+                else:
+                    logger.error(f"❌ Could not find event info for event {event_id}")
+            
                 logger.info(f"User {current_user_id} joined event {event_id} with status {participation_status}")
                 
                 message = 'Successfully joined event' if participation_status == 'approved' else 'Request to join event submitted for approval'

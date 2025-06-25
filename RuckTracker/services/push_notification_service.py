@@ -21,9 +21,16 @@ class PushNotificationService:
         """
         Initialize FCM service using service account authentication
         """
+        logger.info("🔧 FIREBASE PUSH SERVICE INITIALIZATION START")
+        
         self.project_id = os.getenv('FIREBASE_PROJECT_ID')
         self.service_account_path = os.getenv('FIREBASE_SERVICE_ACCOUNT_PATH')
         self.service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
+        
+        logger.info(f"🔧 Firebase Project ID: {self.project_id}")
+        logger.info(f"🔧 Service Account Path: {self.service_account_path}")
+        logger.info(f"🔧 Service Account JSON: {'✅ Present' if self.service_account_json else '❌ Missing'}")
+        
         # Firebase Admin SDK uses projectId implicitly; keep REST URL for fallback but prefer SDK
         self.fcm_url = f"https://fcm.googleapis.com/v1/projects/{self.project_id}/messages:send"
         self._access_token = None
@@ -32,46 +39,88 @@ class PushNotificationService:
         # Initialize Firebase Admin SDK once globally
         try:
             if not firebase_admin._apps:
+                logger.info("🔧 Firebase Admin SDK not initialized, initializing now...")
                 cred = None
                 
                 # Prioritize JSON over path, and only use path if file actually exists
                 if self.service_account_json:
-                    logger.info("Using Firebase service account JSON from environment variable")
-                    # Handle double-escaped newlines in private key that can occur with Heroku config
-                    service_account_data = json.loads(self.service_account_json)
-                    if 'private_key' in service_account_data:
-                        # Fix double-escaped newlines in private key
-                        service_account_data['private_key'] = service_account_data['private_key'].replace('\\n', '\n')
-                    cred = credentials.Certificate(service_account_data)
+                    logger.info("🔧 Using Firebase service account JSON from environment variable")
+                    try:
+                        # Handle double-escaped newlines in private key that can occur with Heroku config
+                        service_account_data = json.loads(self.service_account_json)
+                        logger.info(f"🔧 Parsed service account data - Project ID: {service_account_data.get('project_id')}")
+                        
+                        if 'private_key' in service_account_data:
+                            # Fix double-escaped newlines in private key
+                            original_key_length = len(service_account_data['private_key'])
+                            service_account_data['private_key'] = service_account_data['private_key'].replace('\\n', '\n')
+                            new_key_length = len(service_account_data['private_key'])
+                            logger.info(f"🔧 Fixed private key newlines: {original_key_length} -> {new_key_length} chars")
+                            
+                        cred = credentials.Certificate(service_account_data)
+                        logger.info("✅ Service account credentials created from JSON")
+                    except json.JSONDecodeError as e:
+                        logger.error(f"❌ Failed to parse service account JSON: {e}")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to create credentials from JSON: {e}")
+                        
                 elif self.service_account_path and os.path.isfile(self.service_account_path):
-                    logger.info(f"Using Firebase service account file: {self.service_account_path}")
-                    cred = credentials.Certificate(self.service_account_path)
+                    logger.info(f"🔧 Using Firebase service account file: {self.service_account_path}")
+                    try:
+                        cred = credentials.Certificate(self.service_account_path)
+                        logger.info("✅ Service account credentials created from file")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to create credentials from file: {e}")
                 elif self.service_account_path:
-                    logger.warning(f"Firebase service account path specified but file does not exist: {self.service_account_path}")
+                    logger.error(f"❌ Firebase service account path specified but file does not exist: {self.service_account_path}")
                 
                 if not cred:
-                    logger.warning("No valid Firebase service account credentials found, trying default application credentials")
+                    logger.warning("⚠️ No valid Firebase service account credentials found, trying default application credentials")
 
                 if cred:
                     firebase_admin.initialize_app(cred, {
                         'projectId': self.project_id,
                     })
-                    logger.info("Firebase Admin SDK initialised successfully for project %s", self.project_id)
+                    logger.info(f"✅ Firebase Admin SDK initialized successfully for project {self.project_id}")
                 else:
                     # If no explicit credentials, try default application creds
                     firebase_admin.initialize_app()
-                    logger.info("Firebase Admin SDK initialised with default credentials for project %s", self.project_id)
+                    logger.info(f"✅ Firebase Admin SDK initialized with default credentials for project {self.project_id}")
+            else:
+                logger.info("✅ Firebase Admin SDK already initialized")
                     
         except Exception as e:
-            logger.error("Failed to initialise Firebase Admin SDK: %s", e)
+            logger.error(f"❌ CRITICAL: Failed to initialize Firebase Admin SDK: {e}", exc_info=True)
             # Don't raise exception - allow service to continue without push notifications
-            logger.warning("Push notifications will be disabled due to Firebase initialization failure")
+            logger.warning("⚠️ Push notifications will be disabled due to Firebase initialization failure")
 
+        # Validate configuration
+        if not self.project_id:
+            logger.error("❌ CRITICAL: FIREBASE_PROJECT_ID environment variable not set")
+        if not self.service_account_json and not (self.service_account_path and os.path.isfile(self.service_account_path)):
+            logger.error("❌ CRITICAL: No valid Firebase credentials found. Either FIREBASE_SERVICE_ACCOUNT_JSON must be set or FIREBASE_SERVICE_ACCOUNT_PATH must point to an existing file")
+        
+        # Test Firebase connectivity
+        try:
+            if firebase_admin._apps:
+                logger.info("🧪 Testing Firebase connectivity...")
+                # Try to create a test message (don't send it)
+                test_message = messaging.Message(
+                    notification=messaging.Notification(title="Test", body="Test"),
+                    token="test_token_for_validation"
+                )
+                logger.info("✅ Firebase message creation test passed")
+            else:
+                logger.error("❌ Firebase Admin SDK not available for testing")
+        except Exception as test_error:
+            logger.error(f"❌ Firebase connectivity test failed: {test_error}")
+            
+        logger.info("🔧 FIREBASE PUSH SERVICE INITIALIZATION COMPLETE")
         
         if not self.project_id:
-            logger.error("FIREBASE_PROJECT_ID environment variable not set")
+            logger.error("❌ FIREBASE_PROJECT_ID environment variable not set")
         if not self.service_account_json and not (self.service_account_path and os.path.isfile(self.service_account_path)):
-            logger.error("No valid Firebase credentials found. Either FIREBASE_SERVICE_ACCOUNT_JSON must be set or FIREBASE_SERVICE_ACCOUNT_PATH must point to an existing file")
+            logger.error("❌ No valid Firebase credentials found. Either FIREBASE_SERVICE_ACCOUNT_JSON must be set or FIREBASE_SERVICE_ACCOUNT_PATH must point to an existing file")
     
     def _get_access_token(self) -> str:
         """Get OAuth2 access token for Firebase V1 API"""
@@ -129,104 +178,89 @@ class PushNotificationService:
             device_tokens: List of FCM device tokens
             title: Notification title
             body: Notification body
-            notification_data: Additional data payload
+            notification_data: Additional data to include
             
         Returns:
             bool: True if all successful, False otherwise
         """
         if not device_tokens:
-            logger.warning("No device tokens provided")
+            logger.warning("❌ send_notification: No device tokens provided")
             return False
-            
-        if not self.project_id:
-            logger.error("FIREBASE_PROJECT_ID environment variable not set")
-            return False
-            
-        access_token = self._get_access_token()
-        if not access_token:
-            logger.error("Failed to get Firebase access token")
-            return False
-            
-        # Prefer Firebase Admin SDK which automatically handles auth & tokens
-        try:
-            # Build notification
-            notification = messaging.Notification(title=title, body=body)
-            message = messaging.MulticastMessage(
-                tokens=device_tokens,
-                notification=notification,
-                data={k: str(v) for k, v in (notification_data or {}).items()}
-            )
-            response = messaging.send_multicast(message)
-            logger.info("Firebase Admin SDK send_multicast success: %s successes, %s failures", response.success_count, response.failure_count)
-            if response.failure_count > 0:
-                logger.warning("Some tokens failed: %s", [response.responses[i].exception for i in range(len(response.responses)) if not response.responses[i].success])
-            return response.failure_count == 0
-        except Exception as sdk_err:
-            logger.error("Firebase Admin SDK failed, falling back to raw HTTP: %s", sdk_err)
-
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
-        }
         
-        # Default data if none provided
-        if notification_data is None:
-            notification_data = {}
+        logger.info(f"🚀 PUSH NOTIFICATION START - Sending to {len(device_tokens)} devices")
+        logger.info(f"📋 Title: '{title}'")
+        logger.info(f"📋 Body: '{body}'") 
+        logger.info(f"📋 Data: {notification_data}")
+        logger.info(f"🎯 Device tokens: {device_tokens[:2]}{'...' if len(device_tokens) > 2 else ''}")
+        
+        if not self.project_id:
+            logger.error("❌ FIREBASE_PROJECT_ID not configured")
+            return False
+            
+        if not firebase_admin._apps:
+            logger.error("❌ Firebase Admin SDK not initialized")
+            return False
         
         success_count = 0
         failure_count = 0
         
-        # V1 API requires individual requests for each token
-        for token in device_tokens:
-            payload = {
-                'message': {
-                    'token': token,
-                    'notification': {
-                        'title': title,
-                        'body': body
-                    },
-                    'data': {k: str(v) for k, v in notification_data.items()},
-                    'apns': {
-                        'headers': {
-                            'apns-priority': '10'
-                        },
-                        'payload': {
-                            'aps': {
-                                'sound': 'default',
-                                'badge': 1
-                            }
-                        }
-                    },
-                    'android': {
-                        'priority': 'high',
-                        'notification': {
-                            'sound': 'default',
-                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
-                        }
-                    }
-                }
-            }
+        for i, token in enumerate(device_tokens):
+            logger.info(f"📱 Sending notification {i+1}/{len(device_tokens)} to token: {token[:20]}...")
             
             try:
-                response = requests.post(
-                    self.fcm_url,
-                    headers=headers,
-                    json=payload,
-                    timeout=10
+                # Create message using Firebase Admin SDK
+                message = messaging.Message(
+                    notification=messaging.Notification(
+                        title=title,
+                        body=body,
+                    ),
+                    data=notification_data or {},
+                    token=token,
+                    android=messaging.AndroidConfig(
+                        notification=messaging.AndroidNotification(
+                            click_action='FLUTTER_NOTIFICATION_CLICK',
+                            channel_id='default',
+                            priority='high'
+                        )
+                    ),
+                    apns=messaging.APNSConfig(
+                        payload=messaging.APNSPayload(
+                            aps=messaging.Aps(
+                                alert=messaging.ApsAlert(
+                                    title=title,
+                                    body=body
+                                ),
+                                category='FLUTTER_NOTIFICATION_CLICK',
+                                sound='default'
+                            )
+                        )
+                    )
                 )
                 
-                if response.status_code == 200:
-                    success_count += 1
-                    logger.debug(f"Successfully sent notification to token: {token[:10]}...")
-                else:
-                    failure_count += 1
-                    logger.error(f"FCM API error for token {token[:10]}...: {response.status_code} - {response.text}")
-                    
-            except Exception as e:
+                logger.info(f"🔄 Attempting to send message via Firebase Admin SDK...")
+                response = messaging.send(message)
+                logger.info(f"✅ Push notification sent successfully! Response: {response}")
+                success_count += 1
+                
+            except messaging.UnregisteredError:
+                logger.warning(f"⚠️ Device token is unregistered (invalid): {token[:20]}...")
                 failure_count += 1
-                logger.error(f"Failed to send FCM notification to token {token[:10]}...: {e}")
+            except messaging.SenderIdMismatchError:
+                logger.error(f"❌ Sender ID mismatch for token: {token[:20]}...")
+                failure_count += 1
+            except messaging.QuotaExceededError:
+                logger.error(f"❌ FCM quota exceeded")
+                failure_count += 1
+            except Exception as e:
+                logger.error(f"❌ Failed to send notification to {token[:20]}...: {str(e)}", exc_info=True)
+                failure_count += 1
         
-        logger.info(f"FCM notification batch complete: {success_count} successful, {failure_count} failed")
+        total_tokens = len(device_tokens)
+        logger.info(f"📊 PUSH NOTIFICATION SUMMARY:")
+        logger.info(f"   ✅ Successful: {success_count}/{total_tokens}")
+        logger.info(f"   ❌ Failed: {failure_count}/{total_tokens}")
+        logger.info(f"   📈 Success rate: {(success_count/total_tokens)*100:.1f}%")
+        
         return success_count > 0
 
     def send_duel_comment_notification(
@@ -665,41 +699,72 @@ def get_user_device_tokens(user_ids: List[str]) -> List[str]:
         List of FCM device tokens
     """
     if not user_ids:
-        logger.warning("get_user_device_tokens called with empty user_ids list")
+        logger.warning("🔍 get_user_device_tokens called with empty user_ids list")
         return []
+    
+    logger.info(f"🔍 DEVICE TOKEN LOOKUP START - Searching for {len(user_ids)} users")
+    logger.info(f"🔍 User IDs: {user_ids}")
     
     try:
         from RuckTracker.supabase_client import get_supabase_admin_client
         
         admin_client = get_supabase_admin_client()
-        
-        logger.info(f"Fetching device tokens for {len(user_ids)} users: {user_ids}")
+        logger.info(f"🔍 Supabase admin client initialized successfully")
         
         # Query user_device_tokens table
+        logger.info(f"🔍 Querying user_device_tokens table...")
         response = admin_client.table('user_device_tokens') \
-            .select('fcm_token, user_id, device_id, is_active') \
+            .select('fcm_token, user_id, device_id, is_active, created_at, updated_at') \
             .in_('user_id', user_ids) \
             .eq('is_active', True) \
             .not_.is_('fcm_token', 'null') \
             .execute()
             
-        logger.info(f"Raw device tokens query result: {response.data}")
+        logger.info(f"🔍 Raw query response: {response}")
+        logger.info(f"🔍 Query returned {len(response.data) if response.data else 0} records")
         
         if response.data:
-            tokens = [item['fcm_token'] for item in response.data if item['fcm_token']]
+            logger.info(f"🔍 Detailed token records:")
+            for i, record in enumerate(response.data):
+                logger.info(f"   {i+1}. User: {record.get('user_id')}, Device: {record.get('device_id')}, Active: {record.get('is_active')}, Token: {record.get('fcm_token', 'null')[:30]}...")
+            
+            # Extract valid tokens
+            tokens = []
+            for item in response.data:
+                token = item.get('fcm_token')
+                if token and token.strip():
+                    tokens.append(token)
+                    logger.info(f"✅ Valid token found for user {item.get('user_id')}: {token[:30]}...")
+                else:
+                    logger.warning(f"⚠️ Invalid/empty token for user {item.get('user_id')}: '{token}'")
+            
             active_tokens = len(tokens)
             total_records = len(response.data)
             
-            logger.info(f"Device tokens summary: {active_tokens} valid tokens from {total_records} records for {len(user_ids)} users")
+            logger.info(f"📊 DEVICE TOKEN SUMMARY:")
+            logger.info(f"   📱 Total records: {total_records}")
+            logger.info(f"   ✅ Valid tokens extracted: {active_tokens}")
+            logger.info(f"   🎯 Users requested: {len(user_ids)}")
+            logger.info(f"   📈 Token success rate: {(active_tokens/len(user_ids))*100:.1f}%")
             
             if active_tokens == 0:
-                logger.warning(f"No valid FCM tokens found for users {user_ids}. All records: {response.data}")
+                logger.error(f"❌ CRITICAL: No valid FCM tokens found for users {user_ids}")
+                logger.error(f"❌ All records returned: {response.data}")
             
             return tokens
         else:
-            logger.warning(f"No device token records found in database for users: {user_ids}")
+            logger.error(f"❌ CRITICAL: No device token records found in database for users: {user_ids}")
+            
+            # Let's check if these users exist at all
+            user_check = admin_client.table('profiles').select('id, username').in_('id', user_ids).execute()
+            if user_check.data:
+                logger.info(f"✅ Users exist in profiles table: {[(u['id'], u.get('username')) for u in user_check.data]}")
+                logger.error(f"❌ But they have no device tokens registered!")
+            else:
+                logger.error(f"❌ Users don't exist in profiles table: {user_ids}")
+            
             return []
             
     except Exception as e:
-        logger.error(f"Failed to get device tokens for users {user_ids}: {e}", exc_info=True)
+        logger.error(f"❌ CRITICAL: Failed to get device tokens for users {user_ids}: {e}", exc_info=True)
         return []
