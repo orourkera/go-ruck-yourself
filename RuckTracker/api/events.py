@@ -59,8 +59,8 @@ class EventsListResource(Resource):
                 query = query.lt('scheduled_start_time', end_before)
             elif upcoming_only:
                 # Only show upcoming/active events if not looking for completed ones
-                now = datetime.utcnow().isoformat()
-                query = query.gte('scheduled_start_time', now)
+                now = datetime.utcnow()
+                query = query.gte('scheduled_start_time', (now - timedelta(hours=24)).isoformat())
             
             if joined_only:
                 # Get user's joined events only
@@ -109,12 +109,26 @@ class EventsListResource(Resource):
             
             # Separate completed and active events
             now = datetime.utcnow()
-            completed_events = [event for event in events if datetime.fromisoformat(event['scheduled_start_time']) < now - timedelta(hours=24)]
-            active_events = [event for event in events if event not in completed_events]
+            completed_events = []
+            active_events = []
+            for event in events:
+                try:
+                    event_time = datetime.strptime(event['scheduled_start_time'], '%Y-%m-%d %H:%M:%S%z')
+                    if event_time < now - timedelta(hours=24):
+                        completed_events.append(event)
+                    else:
+                        active_events.append(event)
+                except ValueError as e:
+                    logger.error(f"Error parsing event time for event {event['id']}: {e}")
+                    # Handle invalid event time by treating it as an active event
+                    active_events.append(event)
+            
+            logger.debug(f"Completed events: {len(completed_events)}")
+            logger.debug(f"Active events: {len(active_events)}")
             
             # Sort each list separately
-            completed_events.sort(key=lambda x: datetime.fromisoformat(x['scheduled_start_time']), reverse=True)
-            active_events.sort(key=lambda x: datetime.fromisoformat(x['scheduled_start_time']))
+            completed_events.sort(key=lambda x: x['scheduled_start_time'], reverse=True)
+            active_events.sort(key=lambda x: x['scheduled_start_time'])
             
             # Combine the lists
             sorted_events = completed_events + active_events
@@ -422,7 +436,7 @@ class EventParticipationResource(Resource):
                 return {'error': 'Event is not active'}, 400
             
             # Check if event is in the past
-            event_time = datetime.fromisoformat(event['scheduled_start_time'].replace('Z', '+00:00'))
+            event_time = datetime.strptime(event['scheduled_start_time'], '%Y-%m-%d %H:%M:%S%z')
             if event_time < datetime.now(event_time.tzinfo):
                 return {'error': 'Cannot join past events'}, 400
             
