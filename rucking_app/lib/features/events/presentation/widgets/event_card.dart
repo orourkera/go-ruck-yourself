@@ -4,6 +4,7 @@ import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -20,14 +21,6 @@ class EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    // Debug logging for club info
-    AppLogger.info('EventCard Debug - Event ID: ${event.id}');
-    AppLogger.info('EventCard Debug - Event Title: ${event.title}');
-    AppLogger.info('EventCard Debug - Club ID: ${event.clubId}');
-    AppLogger.info('EventCard Debug - Hosting Club: ${event.hostingClub?.toString()}');
-    AppLogger.info('EventCard Debug - Hosting Club Name: ${event.hostingClub?.name}');
-    AppLogger.info('EventCard Debug - Hosting Club Logo: ${event.hostingClub?.logoUrl}');
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -125,25 +118,29 @@ class EventCard extends StatelessWidget {
                       if (event.locationName != null && event.locationName!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4, left: 32), // Align with club name
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 14,
-                                color: Colors.grey[600],
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  event.locationName!,
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: Colors.grey[600],
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                          child: GestureDetector(
+                            onTap: () => _launchMaps(event.locationName!, event.latitude, event.longitude),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 14,
+                                  color: Colors.grey[600],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    event.locationName!,
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: Colors.grey[600],
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                     ],
@@ -154,25 +151,29 @@ class EventCard extends StatelessWidget {
               if (event.hostingClub == null && event.locationName != null && event.locationName!.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          event.locationName!,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  child: GestureDetector(
+                    onTap: () => _launchMaps(event.locationName!, event.latitude, event.longitude),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 16,
+                          color: Colors.grey[600],
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            event.locationName!,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: Colors.grey[600],
+                              decoration: TextDecoration.underline,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               
@@ -256,9 +257,9 @@ class EventCard extends StatelessWidget {
                         // Status badge
                         _buildStatusBadge(context),
                         
-                        const SizedBox(width: 12),
+                        const Spacer(),
                         
-                        // Participants count
+                        // Participants count (moved to right)
                         if (event.participantCount > 0 || event.maxParticipants != null)
                           Row(
                             children: [
@@ -286,7 +287,7 @@ class EventCard extends StatelessWidget {
                             ],
                           ),
                         
-                        const Spacer(),
+                        const SizedBox(width: 12),
                         
                         // Action buttons
                         _buildActionButtons(context),
@@ -300,6 +301,19 @@ class EventCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _launchMaps(String locationName, double? latitude, double? longitude) async {
+    try {
+      final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(locationName)}');
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        AppLogger.info('Could not launch maps for: $locationName');
+      }
+    } catch (e) {
+      AppLogger.error('Error launching maps: $e');
+    }
   }
 
   Widget _buildStatusBadge(BuildContext context) {
