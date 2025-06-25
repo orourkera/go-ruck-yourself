@@ -164,7 +164,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     
     // Invalidate both club details and clubs list cache since membership status changed
     await _cacheService.invalidateClubDetails(clubId);
-    await _cacheService.invalidateAllClubsCache(); // Clear clubs list cache too
+    await _cacheService.invalidateCache(); // Clear clubs list cache too
   }
 
   @override
@@ -183,7 +183,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     
     // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
-    await _cacheService.invalidateAllClubsCache(); // Clear clubs list cache too
+    await _cacheService.invalidateCache(); // Clear clubs list cache too
   }
 
   @override
@@ -192,7 +192,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     
     // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
-    await _cacheService.invalidateAllClubsCache(); // Clear clubs list cache too
+    await _cacheService.invalidateCache(); // Clear clubs list cache too
   }
 
   @override
@@ -201,6 +201,6 @@ class ClubsRepositoryImpl implements ClubsRepository {
     
     // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
-    await _cacheService.invalidateAllClubsCache(); // Clear clubs list cache too
+    await _cacheService.invalidateCache(); // Clear clubs list cache too
   }
 }

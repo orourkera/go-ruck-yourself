@@ -1,7 +1,7 @@
 from flask import request, g
 from flask_restful import Resource
 from marshmallow import Schema, fields, ValidationError, validates_schema
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
 from api.auth import auth_required
@@ -648,7 +648,8 @@ class DuelCompletionCheckResource(Resource):
     def post(self):
         """Check and complete expired duels - for system use (no auth required)"""
         try:
-            now = datetime.utcnow()
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
             supabase = get_supabase_admin_client()
             
             # Get all active duels that have expired
