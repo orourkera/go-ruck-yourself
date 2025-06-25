@@ -236,6 +236,7 @@ from .api.duel_stats import UserDuelStatsResource, DuelStatsLeaderboardResource,
 from .api.duel_invitations import DuelInvitationListResource, DuelInvitationResource, SentInvitationsResource
 from .api.duel_comments import DuelCommentsResource
 from .api.device_tokens import DeviceTokenResource
+from .api.test_notification import TestNotificationResource
 
 # Apply rate limiting to SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
@@ -402,6 +403,7 @@ api.add_resource(DuelCommentsResource, '/api/duels/<string:duel_id>/comments')
 
 # Device Token Endpoints
 api.add_resource(DeviceTokenResource, '/api/device-token')
+api.add_resource(TestNotificationResource, '/api/test-notification')
 
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource
