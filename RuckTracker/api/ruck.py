@@ -43,7 +43,7 @@ def clip_route_for_privacy(location_points):
     if not location_points or len(location_points) < 3:
         return location_points
     
-    # Privacy clipping distance (100m or ~1/16 mile)
+    # Privacy clipping distance (100m)
     PRIVACY_DISTANCE_METERS = 100.0
     
     # Convert location points to uniform format with timestamp
@@ -84,7 +84,8 @@ def clip_route_for_privacy(location_points):
                 start_idx = i
                 break
     
-    # Find the end clipping index (skip last ~100m)
+    # Find the end clipping index (skip last ~100m) 
+    # Start from the end and work backwards
     end_idx = len(sorted_points) - 1
     cumulative_distance = 0
     for i in range(len(sorted_points) - 2, -1, -1):
@@ -100,17 +101,25 @@ def clip_route_for_privacy(location_points):
             cumulative_distance += distance
             
             if cumulative_distance >= PRIVACY_DISTANCE_METERS:
-                end_idx = i
+                end_idx = i + 1  # Include this point in the visible route
                 break
     
-    # Ensure we have at least some points left
-    if start_idx >= end_idx:
-        # If clipping would remove everything, return a minimal route (middle section)
-        middle_start = max(0, len(sorted_points) // 4)
-        middle_end = min(len(sorted_points), 3 * len(sorted_points) // 4)
-        clipped_points = sorted_points[middle_start:middle_end] if middle_end > middle_start else sorted_points[1:-1]
-    else:
-        clipped_points = sorted_points[start_idx:end_idx + 1]
+    # Ensure we have valid indices and at least some points left
+    if start_idx >= end_idx or end_idx <= start_idx:
+        # If clipping would remove everything or indices are invalid, 
+        # return middle section (25% to 75% of route)
+        total_points = len(sorted_points)
+        start_idx = max(0, total_points // 4)
+        end_idx = min(total_points, 3 * total_points // 4)
+        
+        # Ensure end_idx is greater than start_idx
+        if end_idx <= start_idx:
+            # Fallback: remove first and last point only
+            start_idx = 1
+            end_idx = total_points - 1
+    
+    # Extract the visible route section
+    clipped_points = sorted_points[start_idx:end_idx]
     
     # Convert back to original format
     result = []
