@@ -75,12 +75,14 @@ class DuelListResource(Resource):
                     
             elif user_participating == 'false':
                 # Discover - get public duels where user is NOT participating
+                # Exclude completed duels since they can't be joined
                 # First get all duel_ids where user is already participating
                 participant_duels_response = supabase.table('duel_participants').select('duel_id').eq('user_id', user_id).execute()
                 participant_duel_ids = [p['duel_id'] for p in participant_duels_response.data]
                 
                 # Get public duels where user is not creator and not participant
-                query = supabase.table('duels').select('*').eq('is_public', True).neq('creator_id', user_id)
+                # Exclude completed duels since they're not joinable
+                query = supabase.table('duels').select('*').eq('is_public', True).neq('creator_id', user_id).neq('status', 'completed')
                 
                 if participant_duel_ids:
                     duel_ids_str = ','.join(participant_duel_ids)
