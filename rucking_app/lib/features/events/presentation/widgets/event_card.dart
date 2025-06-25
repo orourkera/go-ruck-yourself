@@ -49,100 +49,126 @@ class EventCard extends StatelessWidget {
                       Row(
                         children: [
                           // Club logo
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: event.hostingClub!.logoUrl != null && event.hostingClub!.logoUrl!.isNotEmpty
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.network(
-                                      event.hostingClub!.logoUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        AppLogger.info('Error loading club logo: $error');
-                                        return Container(
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).primaryColor,
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              event.hostingClub!.name.isNotEmpty 
-                                                  ? event.hostingClub!.name[0].toUpperCase() 
-                                                  : 'C',
-                                              style: AppTextStyles.bodySmall.copyWith(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12,
+                          GestureDetector(
+                            onTap: () {
+                              if (event.hostingClub?.id != null) {
+                                Navigator.of(context).pushNamed('/club_detail', arguments: event.hostingClub!.id);
+                              }
+                            },
+                            child: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: event.hostingClub!.logoUrl != null && event.hostingClub!.logoUrl!.isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(30),
+                                      child: Image.network(
+                                        event.hostingClub!.logoUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          AppLogger.info('Error loading club logo: $error');
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).primaryColor,
+                                              borderRadius: BorderRadius.circular(30),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                event.hostingClub!.name.isNotEmpty 
+                                                    ? event.hostingClub!.name[0].toUpperCase() 
+                                                    : 'C',
+                                                style: AppTextStyles.bodyMedium.copyWith(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 24,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        );
-                                      },
+                                          );
+                                        },
+                                      ),
+                                    )
+                                  : Center(
+                                      child: Text(
+                                        event.hostingClub!.name.isNotEmpty 
+                                            ? event.hostingClub!.name[0].toUpperCase() 
+                                            : 'C',
+                                        style: AppTextStyles.bodyMedium.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 24,
+                                        ),
+                                      ),
                                     ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      event.hostingClub!.name.isNotEmpty 
-                                          ? event.hostingClub!.name[0].toUpperCase() 
-                                          : 'C',
-                                      style: AppTextStyles.bodySmall.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Club name
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  event.hostingClub!.name,
+                                  style: AppTextStyles.titleMedium.copyWith(
+                                    color: isDarkMode ? Colors.white : AppColors.textDark,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                // Location row (right below club name)
+                                if (event.locationName != null && event.locationName!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: GestureDetector(
+                                      onTap: () => _launchMaps(event.locationName!, event.latitude, event.longitude),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.location_on,
+                                            size: 14,
+                                            color: Colors.grey[600],
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              event.locationName!,
+                                              style: AppTextStyles.bodySmall.copyWith(
+                                                color: Colors.grey[600],
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Club name
-                          Expanded(
-                            child: Text(
-                              event.hostingClub!.name,
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: isDarkMode ? Colors.white : AppColors.textDark,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      // Location row (right below club info)
-                      if (event.locationName != null && event.locationName!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4, left: 32), // Align with club name
-                          child: GestureDetector(
-                            onTap: () => _launchMaps(event.locationName!, event.latitude, event.longitude),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 14,
-                                  color: Colors.grey[600],
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    event.locationName!,
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: Colors.grey[600],
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
                               ],
                             ),
                           ),
-                        ),
+                          // Difficulty level display
+                          if (event.difficultyLevel != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Level ${event.difficultyLevel}',
+                                style: AppTextStyles.statValue.copyWith(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
