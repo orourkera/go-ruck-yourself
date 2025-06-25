@@ -222,6 +222,11 @@ class LocationServiceImpl implements LocationService {
     // Start location staleness monitoring
     _startLocationMonitoring();
     
+    // Start batch timer
+    _batchTimer = Timer.periodic(Duration(seconds: _batchInterval), (timer) {
+      _sendBatchUpdate();
+    });
+    
     return _batchedLocationController.stream;
   }
   
@@ -358,6 +363,37 @@ class LocationServiceImpl implements LocationService {
     }
   }
   
+  /// Send a batch of location updates to the API
+  void _sendBatchUpdate() {
+    if (_locationBatch.isEmpty) return;
+    
+    AppLogger.info('Preparing to send batch of ${_locationBatch.length} location points');
+    
+    // Broadcast batch update event for active session to handle
+    final batchCopy = List<LocationPoint>.from(_locationBatch);
+    _batchedLocationController.add(LocationPoint(
+      latitude: 0, // Special marker for batch update
+      longitude: 0,
+      elevation: 0,
+      accuracy: 0,
+      timestamp: DateTime.now(),
+      // Store batch data in a special way that can be detected
+    ));
+    
+    // For now, store the batch in a static variable that can be accessed
+    _pendingBatch = batchCopy;
+    _locationBatch.clear();
+  }
+  
+  static List<LocationPoint>? _pendingBatch;
+  
+  /// Get and clear the pending batch of location points
+  static List<LocationPoint>? getPendingBatch() {
+    final batch = _pendingBatch;
+    _pendingBatch = null;
+    return batch;
+  }
+  
   @override
   Future<void> stopLocationTracking() async {
     AppLogger.info('Stopping location tracking...');
@@ -374,16 +410,6 @@ class LocationServiceImpl implements LocationService {
     // Clear tracking state
     _lastLocationUpdate = null;
     _lastValidLocation = null;
-  }
-  
-  /// Send a batch of location updates to the API
-  void _sendBatchUpdate() {
-    if (_locationBatch.isEmpty) return;
-    
-    // For now, we're just clearing the batch
-    // In a real implementation, you would send the batch to your API
-    AppLogger.info('Sending batch of ${_locationBatch.length} location points');
-    _locationBatch.clear();
   }
   
   @override

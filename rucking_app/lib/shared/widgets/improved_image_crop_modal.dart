@@ -75,39 +75,62 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
   void _fitImageToCropArea() {
     if (!_imageLoaded) return;
     
+    // Get the actual rendered size of the image
     final imageAspectRatio = _image.width / _image.height;
-    final cropAspectRatio = widget.aspectRatio;
+    final screenAspectRatio = _screenSize.width / _screenSize.height;
     
-    // Calculate scale to fill crop area
-    double scale;
-    if (imageAspectRatio > cropAspectRatio) {
-      // Image is wider - scale to fill height
-      scale = _cropHeight / _image.height;
+    // Calculate the actual image display size when using BoxFit.cover
+    double displayWidth, displayHeight;
+    if (imageAspectRatio > screenAspectRatio) {
+      // Image is wider - height fills screen, width is clipped
+      displayHeight = _screenSize.height;
+      displayWidth = displayHeight * imageAspectRatio;
     } else {
-      // Image is taller - scale to fill width
-      scale = _cropWidth / _image.width;
+      // Image is taller - width fills screen, height is clipped
+      displayWidth = _screenSize.width;
+      displayHeight = displayWidth / imageAspectRatio;
     }
     
-    // Ensure minimum useful scale
-    scale = math.max(scale, 0.5);
+    // Calculate scale to make crop area fill properly
+    final cropAspectRatio = widget.aspectRatio;
+    double scale;
     
-    // Calculate centering offsets
-    final scaledImageWidth = _image.width * scale;
-    final scaledImageHeight = _image.height * scale;
+    if (cropAspectRatio > imageAspectRatio) {
+      // Crop is wider than image - scale to fill crop width
+      scale = _cropWidth / displayWidth;
+    } else {
+      // Crop is taller than image - scale to fill crop height  
+      scale = _cropHeight / displayHeight;
+    }
     
-    final offsetX = (_screenSize.width - scaledImageWidth) / 2;
-    final offsetY = (_screenSize.height - scaledImageHeight) / 2;
+    // Ensure we have a reasonable minimum scale
+    scale = math.max(scale, 0.3);
     
+    // Calculate centering offsets to center the crop area
+    final scaledWidth = displayWidth * scale;
+    final scaledHeight = displayHeight * scale;
+    
+    final offsetX = (_screenSize.width - scaledWidth) / 2;
+    final offsetY = (_screenSize.height - scaledHeight) / 2;
+    
+    // Apply transformation
     final matrix = Matrix4.identity()
       ..translate(offsetX, offsetY)
       ..scale(scale);
     
-    _controller.value = matrix;
+    setState(() {
+      _controller.value = matrix;
+    });
   }
 
   void _resetView() {
-    _controller.value = Matrix4.identity();
-    _fitImageToCropArea();
+    setState(() {
+      _controller.value = Matrix4.identity();
+    });
+    // Auto-fit after reset
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fitImageToCropArea();
+    });
   }
 
   @override
@@ -125,18 +148,19 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
           children: [
             // Full-screen interactive image
             if (_imageLoaded)
-              InteractiveViewer(
-                transformationController: _controller,
-                minScale: 0.1,
-                maxScale: 10.0,
-                panEnabled: true,
-                scaleEnabled: true,
-                child: Container(
-                  width: _screenSize.width,
-                  height: _screenSize.height,
+              RepaintBoundary(
+                key: _cropKey,
+                child: InteractiveViewer(
+                  transformationController: _controller,
+                  minScale: 0.1, // Allow zooming out to 10% of original size
+                  maxScale: 5.0, // Reduced max scale for better performance
+                  panEnabled: true,
+                  scaleEnabled: true,
+                  constrained: false, // Allow the child to be smaller than the viewport
+                  boundaryMargin: EdgeInsets.all(_screenSize.width), // Allow scrolling way beyond screen bounds
                   child: Image.file(
                     widget.imageFile,
-                    fit: BoxFit.contain,
+                    fit: BoxFit.contain, // Changed back to contain for better zoom out behavior  
                   ),
                 ),
               ),
@@ -161,7 +185,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
             
             // Top app bar
             Positioned(
-              top: 0,
+              top: MediaQuery.of(context).padding.top, // Add status bar height
               left: 0,
               right: 0,
               child: Container(
@@ -242,39 +266,6 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
                 ),
               ),
             ),
-            
-            // Crop area preview (for positioning reference)
-            if (_imageLoaded)
-              Positioned.fill(
-                child: RepaintBoundary(
-                  key: _cropKey,
-                  child: ClipPath(
-                    clipper: CropAreaClipper(
-                      cropRect: Rect.fromCenter(
-                        center: Offset(_screenSize.width / 2, _screenSize.height / 2),
-                        width: _cropWidth,
-                        height: _cropHeight,
-                      ),
-                      cropShape: widget.cropShape,
-                    ),
-                    child: InteractiveViewer(
-                      transformationController: _controller,
-                      minScale: 0.1,
-                      maxScale: 10.0,
-                      panEnabled: false,
-                      scaleEnabled: false,
-                      child: Container(
-                        width: _screenSize.width,
-                        height: _screenSize.height,
-                        child: Image.file(
-                          widget.imageFile,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -319,11 +310,51 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
 
   Future<void> _cropAndSave() async {
     try {
+      // Capture the entire transformed image from RepaintBoundary
       final RenderRepaintBoundary boundary = 
           _cropKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       
-      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
-      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      // Get the full screen image with all transformations applied
+      final ui.Image fullScreenImage = await boundary.toImage(pixelRatio: 3.0);
+      
+      // Calculate the exact crop area coordinates on the captured image
+      final double pixelRatio = 3.0; // Same as used above
+      final cropRect = Rect.fromCenter(
+        center: Offset(_screenSize.width / 2 * pixelRatio, _screenSize.height / 2 * pixelRatio),
+        width: _cropWidth * pixelRatio,
+        height: _cropHeight * pixelRatio,
+      );
+      
+      // Ensure crop rect is within image bounds
+      final clampedCropRect = Rect.fromLTRB(
+        math.max(0, cropRect.left),
+        math.max(0, cropRect.top),
+        math.min(fullScreenImage.width.toDouble(), cropRect.right),
+        math.min(fullScreenImage.height.toDouble(), cropRect.bottom),
+      );
+      
+      // Create the final cropped image
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      
+      // Set the destination size to the crop area dimensions
+      final outputWidth = _cropWidth * pixelRatio;
+      final outputHeight = _cropHeight * pixelRatio;
+      
+      // Draw only the crop area from the full image
+      canvas.drawImageRect(
+        fullScreenImage,
+        clampedCropRect, // Source: the crop area from full screen capture
+        Rect.fromLTWH(0, 0, outputWidth, outputHeight), // Destination: output image
+        Paint(),
+      );
+      
+      // Finalize the cropped image
+      final picture = recorder.endRecording();
+      final croppedImage = await picture.toImage(outputWidth.toInt(), outputHeight.toInt());
+      
+      // Convert to bytes and save
+      final ByteData? byteData = await croppedImage.toByteData(format: ui.ImageByteFormat.png);
       
       if (byteData != null) {
         final Uint8List pngBytes = byteData.buffer.asUint8List();

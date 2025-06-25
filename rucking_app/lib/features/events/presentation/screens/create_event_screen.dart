@@ -148,6 +148,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     context: context,
                     message: state.message,
                   );
+                } else if (state is EventDetailsLoaded && isEditing) {
+                  // Populate form data only once when event details are loaded
+                  _populateFormWithEventData(state.eventDetails.event);
                 }
               },
             ),
@@ -169,10 +172,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ],
           child: BlocBuilder<EventsBloc, EventsState>(
             builder: (context, state) {
-              if (state is EventDetailsLoaded && isEditing) {
-                _populateFormWithEventData(state.eventDetails.event);
-              }
-              
               return _buildForm(isDarkMode);
             },
           ),

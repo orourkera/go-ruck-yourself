@@ -102,18 +102,46 @@ class ImagePickerUtils {
       if (image == null) return null;
 
       if (context.mounted) {
-        final croppedFile = await showModalBottomSheet<File?>(
+        // Show loading indicator while preparing crop modal
+        showDialog(
           context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) => ImprovedImageCropModal(
-            imageFile: File(image.path),
-            title: 'Crop Event Banner',
-            aspectRatio: 16/9, // Changed from 3.0 to 16:9 for taller banner (200px height)
-            cropShape: CropShape.rectangle, // Use rectangle crop shape for banner
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
           ),
         );
-        return croppedFile;
+
+        try {
+          // Small delay to ensure loading indicator shows
+          await Future.delayed(const Duration(milliseconds: 100));
+          
+          // Dismiss loading indicator
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+
+          // Show crop modal
+          if (context.mounted) {
+            final croppedFile = await showModalBottomSheet<File?>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => ImprovedImageCropModal(
+                imageFile: File(image.path),
+                title: 'Crop Event Banner',
+                aspectRatio: 16/9, // Changed from 3.0 to 16:9 for taller banner (200px height)
+                cropShape: CropShape.rectangle, // Use rectangle crop shape for banner
+              ),
+            );
+            return croppedFile;
+          }
+        } catch (e) {
+          // Dismiss loading indicator on error
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+          rethrow;
+        }
       }
     } catch (e) {
       AppLogger.error('Error picking event banner image: $e');

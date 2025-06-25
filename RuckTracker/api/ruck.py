@@ -953,42 +953,65 @@ class RuckSessionCompleteResource(Resource):
 
 class RuckSessionLocationResource(Resource):
     def post(self, ruck_id):
+        """Upload location points to an active ruck session (POST /api/rucks/<ruck_id>/location)"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
+            
             data = request.get_json()
-            if not data or 'latitude' not in data or 'longitude' not in data:
-                return {'message': 'Missing location data'}, 400
+            
+            # Support both single point and batch of points (like heart rate)
+            if 'points' in data:
+                # Batch mode - array of location points
+                if not isinstance(data['points'], list):
+                    return {'message': 'Missing or invalid points'}, 400
+                location_points = data['points']
+            else:
+                # Legacy mode - single point (backwards compatibility)
+                if 'latitude' not in data or 'longitude' not in data:
+                    return {'message': 'Missing location data'}, 400
+                location_points = [data]  # Convert to array format
+            
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            # Check if session exists and is in_progress
-            check = supabase.table('ruck_session') \
+            
+            # Check if session exists and belongs to user (like heart rate)
+            session_resp = supabase.table('ruck_session') \
                 .select('id,status') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
+                .single() \
                 .execute()
-            if not check.data or len(check.data) == 0:
+            if not session_resp.data:
                 return {'message': 'Session not found'}, 404
-            if check.data[0]['status'] != 'in_progress':
+            if session_resp.data['status'] != 'in_progress':
                 return {'message': 'Session not in progress'}, 400
-            # Insert location point
-            location_data = {
-                'session_id': ruck_id,
-                'latitude': data['latitude'],
-                'longitude': data['longitude'],
-                'altitude': data.get('elevation') or data.get('elevation_meters'),
-                'timestamp': data.get('timestamp', datetime.now(tz.tzutc()).isoformat())
-            }
-            insert_resp = supabase.table('location_point') \
-                .insert(location_data) \
-                .execute()
-            if not insert_resp.data or len(insert_resp.data) == 0:
-                logger.error(f"Failed to add location point for session {ruck_id}: {insert_resp.error}")
-                return {'message': 'Failed to add location point'}, 500
+            
+            # Insert location points (like heart rate samples)
+            location_rows = []
+            for point in location_points:
+                if 'latitude' not in point or 'longitude' not in point:
+                    continue  # Skip invalid points
+                location_rows.append({
+                    'session_id': ruck_id,
+                    'latitude': float(point['latitude']),
+                    'longitude': float(point['longitude']),
+                    'altitude': point.get('elevation') or point.get('elevation_meters'),
+                    'timestamp': point.get('timestamp', datetime.now(tz.tzutc()).isoformat())
+                })
+            
+            if not location_rows:
+                return {'message': 'No valid location points'}, 400
+                
+            insert_resp = supabase.table('location_point').insert(location_rows).execute()
+            if not insert_resp.data:
+                return {'message': 'Failed to insert location points'}, 500
+                
             cache_delete_pattern(f"ruck_session:{g.user.id}:*")
-            return insert_resp.data[0], 201
+            return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
+            
         except Exception as e:
-            logger.error(f"Error adding location point for ruck session {ruck_id}: {e}")
-            return {'message': f"Error adding location point: {str(e)}"}, 500
+            logger.error(f"Error adding location points for ruck session {ruck_id}: {e}")
+            return {'message': f"Error uploading location points: {str(e)}"}, 500
 
 from flask import request, g
 from flask_restful import Resource

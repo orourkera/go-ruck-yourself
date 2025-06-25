@@ -361,44 +361,67 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final LocationPoint newPoint = event.locationPoint;
       _lastLocationTimestamp = DateTime.now();
       
+      // Check if this is a batch update marker (lat/lng = 0)
+      if (newPoint.latitude == 0 && newPoint.longitude == 0) {
+        // This is a batch update signal - process pending batch
+        final batch = LocationServiceImpl.getPendingBatch();
+        if (batch != null && batch.isNotEmpty && !currentState.sessionId.startsWith('offline_')) {
+          _processBatchLocationUpload(currentState.sessionId, batch);
+        }
+        return; // Don't process this marker as a real location point
+      }
+      
       final validationResult = _validationService.validateLocationPoint(newPoint, _lastValidLocation);
-      if (!(validationResult['isValid'] as bool? ?? false)) { // Safely access 'isValid'
-        final String message = validationResult['message'] as String? ?? 'Validation failed, no specific message';
+      if (!validationResult.isValid) {
+        AppLogger.warning('Invalid location point: ${validationResult.reason}');
         return;
       }
-      _validLocationCount++;
-      _lastValidLocation = newPoint;
 
-      List<LocationPoint> newLocationPoints = List.from(currentState.locationPoints)..add(newPoint);
+      _lastValidLocation = newPoint;
+      _validLocationCount++;
+      
+      final newLocationPoints = [...currentState.locationPoints, newPoint];
+      
+      // Calculate distance
       double newDistanceKm = currentState.distanceKm;
+      if (currentState.locationPoints.isNotEmpty) {
+        final lastPoint = currentState.locationPoints.last;
+        final segmentDistance = _locationService.calculateDistance(lastPoint, newPoint);
+        newDistanceKm += segmentDistance;
+      }
+      
+      // Calculate elevation changes
       double newElevationGain = currentState.elevationGain;
       double newElevationLoss = currentState.elevationLoss;
-      List<TerrainSegment> newTerrainSegments = List.from(currentState.terrainSegments);
-
-      if (newLocationPoints.length > 1) {
-        final prevPoint = newLocationPoints[newLocationPoints.length - 2];
-        newDistanceKm += _locationService.calculateDistance(prevPoint, newPoint);
-
-        // Elevation calculation with noise filtering
-        final elevationResult = _validationService.validateElevationChange(
-          prevPoint, 
-          newPoint,
-          minChangeMeters: 2.0, // Filter out GPS noise smaller than 2m
-        );
-        newElevationGain += elevationResult['gain']!;
-        newElevationLoss += elevationResult['loss']!;
+      
+      if (currentState.locationPoints.isNotEmpty && newPoint.elevation != null) {
+        final lastPoint = currentState.locationPoints.last;
+        if (lastPoint.elevation != null) {
+          final elevationChange = newPoint.elevation! - lastPoint.elevation!;
+          if (elevationChange > 0) {
+            newElevationGain += elevationChange;
+          } else {
+            newElevationLoss += elevationChange.abs();
+          }
+        }
+      }
+      
+      // Update terrain data periodically (throttled)
+      List<TerrainSegment> newTerrainSegments = currentState.terrainSegments;
+      if (currentState.locationPoints.isNotEmpty) {
+        final lastPoint = currentState.locationPoints.last;
         
-        // Track terrain for this segment
+        // Track terrain for this segment using existing terrain tracker
         if (_terrainTracker.shouldQueryTerrain(newPoint)) {
           AppLogger.debug('[TERRAIN] Attempting to track terrain segment...');
           try {
             final terrainSegment = await _terrainTracker.trackTerrainSegment(
-              startLocation: prevPoint,
+              startLocation: lastPoint,
               endLocation: newPoint,
             );
             
             if (terrainSegment != null) {
-              newTerrainSegments.add(terrainSegment);
+              newTerrainSegments = [...newTerrainSegments, terrainSegment];
               AppLogger.debug('[TERRAIN] Added terrain segment: ${terrainSegment.surfaceType} (${terrainSegment.energyMultiplier}x) - Total segments: ${newTerrainSegments.length}');
             } else {
               AppLogger.warning('[TERRAIN] Terrain segment was null');
@@ -419,17 +442,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         isPaused: currentState.isPaused,
       );
 
-      if (!currentState.sessionId.startsWith('offline_')) {
-        _apiClient.post('/rucks/${currentState.sessionId}/location', newPoint.toJson())
-          .catchError((e) {
-            if (e.toString().contains('401') || e.toString().contains('Already Used')) {
-              AppLogger.warning('[SESSION_RECOVERY] Location sync failed due to auth issue, will retry: $e');
-              // Don't kill the session - continue tracking locally
-            } else {
-              AppLogger.warning('Failed to send location to backend: $e');
-            }
-          });
-      }
+      // Note: Individual location points are no longer sent immediately
+      // They are batched and sent via _processBatchLocationUpload
 
       emit(currentState.copyWith(
         locationPoints: newLocationPoints,
@@ -441,6 +455,26 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         terrainSegments: newTerrainSegments,
       ));
     }
+  }
+  
+  /// Process batch upload of location points
+  void _processBatchLocationUpload(String sessionId, List<LocationPoint> locationPoints) {
+    AppLogger.info('Uploading batch of ${locationPoints.length} location points');
+    
+    final locationData = locationPoints.map((point) => point.toJson()).toList();
+    
+    _apiClient.addLocationPoints(sessionId, locationData)
+      .then((_) {
+        AppLogger.info('Successfully uploaded ${locationPoints.length} location points');
+      })
+      .catchError((e) {
+        if (e.toString().contains('401') || e.toString().contains('Already Used')) {
+          AppLogger.warning('[SESSION_RECOVERY] Location batch sync failed due to auth issue, will retry: $e');
+          // Don't kill the session - continue tracking locally
+        } else {
+          AppLogger.warning('Failed to send location batch to backend: $e');
+        }
+      });
   }
   
   Future<void> _onTimerStarted(TimerStarted event, Emitter<ActiveSessionState> emit) async {

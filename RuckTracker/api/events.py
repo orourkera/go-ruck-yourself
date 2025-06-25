@@ -470,33 +470,13 @@ class EventParticipationResource(Resource):
                     if current_user_id != event_creator_id:
                         logger.info(f"🔔 Sending notification to event creator (different from joiner)")
                         try:
-                            # Create in-app notification
-                            notification_message = f"{username} joined your event \"{event_title}\""
-                            if participation_status == 'pending':
-                                notification_message = f"{username} requested to join your event \"{event_title}\""
+                            # Notify event creator about new participant
+                            if participation_status == 'approved':
+                                notification_message = f"{username} has joined your event '{event_title}'"
+                            else:
+                                notification_message = f"{username} has requested to join your event '{event_title}'"
                             
-                            logger.info(f"🔔 In-app notification message: '{notification_message}'")
-                            
-                            notification_data = {
-                                'recipient_id': event_creator_id,
-                                'type': 'event_participant_joined' if participation_status == 'approved' else 'event_join_request',
-                                'message': notification_message,
-                                'data': {
-                                    'event_id': event_id,
-                                    'event_title': event_title,
-                                    'participant_user_id': current_user_id,
-                                    'participant_username': username,
-                                    'status': participation_status
-                                },
-                                'is_read': False,
-                                'event_id': event_id
-                            }
-                            
-                            logger.info(f"🔔 Creating in-app notification in database...")
-                            admin_client.table('notifications').insert(notification_data).execute()
-                            logger.info(f"✅ In-app notification created successfully")
-                            
-                            # Send push notification
+                            # Send push notification only (database trigger will handle notification records)
                             logger.info(f"🔔 Getting device tokens for event creator {event_creator_id}...")
                             device_tokens = get_user_device_tokens([event_creator_id])
                             logger.info(f"🔔 Retrieved {len(device_tokens)} device tokens")

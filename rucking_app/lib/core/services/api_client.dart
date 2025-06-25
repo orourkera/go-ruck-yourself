@@ -441,6 +441,11 @@ class ApiClient {
   Future<dynamic> addLocationPoint(String ruckId, Map<String, dynamic> locationData) async {
     return await post('/rucks/$ruckId/location', locationData);
   }
+  
+  /// Makes a POST request to add multiple location points to a ruck session (batch)
+  Future<dynamic> addLocationPoints(String ruckId, List<Map<String, dynamic>> locationPoints) async {
+    return await post('/rucks/$ruckId/location', {'points': locationPoints});
+  }
 
   /// Makes a POST request to add heart rate samples to a ruck session
   Future<dynamic> addHeartRateSamples(String ruckId, List<Map<String, dynamic>> heartRateSamples) async {
