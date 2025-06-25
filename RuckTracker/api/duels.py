@@ -702,7 +702,6 @@ class DuelCompletionCheckResource(Resource):
             # No participants, just mark as completed
             supabase.table('duels').update({
                 'status': 'completed',
-                'completed_at': now.isoformat(),
                 'updated_at': now.isoformat()
             }).eq('id', duel_id).execute()
             
@@ -720,7 +719,6 @@ class DuelCompletionCheckResource(Resource):
             # No one made any progress
             supabase.table('duels').update({
                 'status': 'completed',
-                'completed_at': now.isoformat(),
                 'updated_at': now.isoformat()
             }).eq('id', duel_id).execute()
             
@@ -746,7 +744,6 @@ class DuelCompletionCheckResource(Resource):
             supabase.table('duels').update({
                 'status': 'completed',
                 'winner_id': winner_id,
-                'completed_at': now.isoformat(),
                 'updated_at': now.isoformat()
             }).eq('id', duel_id).execute()
             
@@ -771,7 +768,6 @@ class DuelCompletionCheckResource(Resource):
             # Tie between multiple participants
             supabase.table('duels').update({
                 'status': 'completed',
-                'completed_at': now.isoformat(),
                 'updated_at': now.isoformat()
             }).eq('id', duel_id).execute()
             
