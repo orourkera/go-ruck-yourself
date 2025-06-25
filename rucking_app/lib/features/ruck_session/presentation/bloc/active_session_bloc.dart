@@ -372,8 +372,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
       
       final validationResult = _validationService.validateLocationPoint(newPoint, _lastValidLocation);
-      if (!validationResult.isValid) {
-        AppLogger.warning('Invalid location point: ${validationResult.reason}');
+      if (!(validationResult['isValid'] as bool? ?? false)) {
+        final String message = validationResult['message'] as String? ?? 'Validation failed, no specific message';
+        AppLogger.warning('Invalid location point: $message');
         return;
       }
 
