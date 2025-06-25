@@ -41,11 +41,10 @@ class EventsListResource(Resource):
             
             logger.info(f"Query params - search: {search}, club_id: {club_id}, joined_only: {joined_only}, upcoming_only: {upcoming_only}, end_before: {end_before}")
             
-            # Base query
+            # Base query - fetch events without clubs join, we'll enrich separately
             query = admin_client.table('events').select("""
                 *,
-                creator:creator_user_id(id, username, avatar_url),
-                clubs!events_club_id_fkey(id, name, logo_url)
+                creator:creator_user_id(id, username, avatar_url)
             """)
             
             # Apply filters
@@ -81,7 +80,7 @@ class EventsListResource(Resource):
                 
                 # Get participant count
                 participant_count_result = admin_client.table('event_participants').select('id', count='exact').eq('event_id', event['id']).eq('status', 'approved').execute()
-                participant_count = participant_count_result.count
+                participant_count = participant_count_result.count or 0
                 
                 # Check user's participation status
                 user_participation = None
@@ -89,12 +88,21 @@ class EventsListResource(Resource):
                     participation_result = admin_client.table('event_participants').select('status').eq('event_id', event['id']).eq('user_id', current_user_id).execute()
                     user_participation = participation_result.data[0]['status'] if participation_result.data else None
                 
+                # Enrich with club data if applicable
+                hosting_club_data = None
+                if event.get('club_id'):
+                    try:
+                        club_result = admin_client.table('clubs').select('id, name, logo_url').eq('id', event['club_id']).execute()
+                        hosting_club_data = club_result.data[0] if club_result.data else None
+                    except Exception as club_fetch_error:
+                        logger.error(f"Error fetching club data for event {event['id']}: {club_fetch_error}")
+                
                 event_data = {
                     **event,
                     'participant_count': participant_count,
                     'user_participation_status': user_participation,
                     'is_creator': event['creator_user_id'] == current_user_id,
-                    'hosting_club': event.get('clubs')  # Map clubs field to hosting_club for frontend
+                    'hosting_club': hosting_club_data  # Map clubs field to hosting_club for frontend
                 }
                 
                 events.append(event_data)
@@ -218,8 +226,7 @@ class EventResource(Resource):
             # Get event details
             result = admin_client.table('events').select("""
                 *,
-                creator:creator_user_id(id, username, avatar_url),
-                clubs!events_club_id_fkey(id, name, logo_url)
+                creator:creator_user_id(id, username, avatar_url)
             """).eq('id', event_id).execute()
             
             if not result.data:
@@ -252,12 +259,21 @@ class EventResource(Resource):
                 participation_result = admin_client.table('event_participants').select('status').eq('event_id', event_id).eq('user_id', current_user_id).execute()
                 user_participation = participation_result.data[0]['status'] if participation_result.data else None
             
+            # Enrich with club data if applicable
+            hosting_club_data = None
+            if event.get('club_id'):
+                try:
+                    club_result = admin_client.table('clubs').select('id, name, logo_url').eq('id', event['club_id']).execute()
+                    hosting_club_data = club_result.data[0] if club_result.data else None
+                except Exception as club_fetch_error:
+                    logger.error(f"Error fetching club data for event {event['id']}: {club_fetch_error}")
+            
             event_details = {
                 **event,
                 'participant_count': len(participants),
                 'user_participation_status': user_participation,
                 'is_creator': event['creator_user_id'] == current_user_id,
-                'hosting_club': event.get('clubs')  # Map clubs field to hosting_club for frontend
+                'hosting_club': hosting_club_data  # Map clubs field to hosting_club for frontend
             }
             
             response_data = {
