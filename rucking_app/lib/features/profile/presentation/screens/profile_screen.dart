@@ -19,7 +19,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
-import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 /// Screen for displaying and managing user profile
@@ -316,12 +315,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 );
                               },
                             ),
-                            const Divider(),
-                            _buildClickableItem(
-                              icon: Icons.notifications_outlined,
-                              label: 'Test Notifications',
-                              onTap: () => _testNotifications(context),
-                            ),
+                            // Test notifications button removed for production
+                            // _buildClickableItem(
+                            //   icon: Icons.notifications_outlined,
+                            //   label: 'Test Notifications',
+                            //   onTap: () => _testNotifications(context),
+                            // ),
                           ],
                         ),
                         const SizedBox(height: 24),
@@ -712,101 +711,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
-  }
-
-  void _testNotifications(BuildContext context) async {
-    try {
-      // Show loading dialog
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text('Testing notifications...'),
-            ],
-          ),
-        ),
-      );
-
-      final firebaseService = FirebaseMessagingService();
-      
-      // Test the notification setup
-      await firebaseService.testNotificationSetup();
-      
-      // Get current token and status info
-      final token = firebaseService.deviceToken;
-      final isInitialized = firebaseService.isInitialized;
-      
-      // Dismiss loading dialog
-      if (context.mounted) {
-        Navigator.of(context).pop();
-      }
-      
-      // Show results dialog
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Notification Test Results'),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('🔔 Firebase Initialized: ${isInitialized ? "✅ Yes" : "❌ No"}'),
-                  const SizedBox(height: 8),
-                  Text('📱 Device Token: ${token != null ? "✅ Generated" : "❌ Missing"}'),
-                  if (token != null) ...[
-                    const SizedBox(height: 8),
-                    const Text('Token (first 50 chars):'),
-                    Text(
-                      token.length > 50 ? '${token.substring(0, 50)}...' : token,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  const Text('📋 Check console logs for detailed results'),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        );
-      }
-      
-    } catch (e) {
-      // Dismiss loading dialog if still open
-      if (context.mounted) {
-        Navigator.of(context).pop();
-      }
-      
-      // Show error dialog
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Notification Test Failed'),
-            content: Text('Error: $e\n\nCheck console logs for details.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        );
-      }
-      
-      print('❌ Notification test failed: $e');
-    }
   }
 
   void _showCustomAboutDialog(BuildContext context) async {

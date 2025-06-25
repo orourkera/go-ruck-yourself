@@ -729,4 +729,15 @@ class ApiClient {
     final match = RegExp(r'/rucks/([^/]+)/complete').firstMatch(path);
     return match?.group(1) ?? 'unknown';
   }
+
+  /// Sends a test notification via the backend API
+  Future<Map<String, dynamic>> sendTestNotification() async {
+    try {
+      final response = await post('/test-notification', {});
+      return response;
+    } catch (e) {
+      AppLogger.debug('[API] Test notification failed: $e');
+      rethrow;
+    }
+  }
 }

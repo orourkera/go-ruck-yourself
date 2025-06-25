@@ -188,15 +188,15 @@ class LocationServiceImpl implements LocationService {
           // Continue tracking but log the issue
         }
         
-        // Add to batch and immediately send to local stream
+        // Add to batch only - don't stream individual points immediately
         _locationBatch.add(locationPoint);
-        _batchedLocationController.add(locationPoint);
+        // _batchedLocationController.add(locationPoint); // Removed: Individual streaming
         
         // Update last location update timestamp
         _lastLocationUpdate = DateTime.now();
         _lastValidLocation = locationPoint;
         
-        AppLogger.debug('Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m)');
+        AppLogger.debug('Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m) - added to batch (${_locationBatch.length} total)');
       },
       onError: (error) {
         AppLogger.error('Location service error', exception: error);
@@ -365,9 +365,14 @@ class LocationServiceImpl implements LocationService {
   
   /// Send a batch of location updates to the API
   void _sendBatchUpdate() {
-    if (_locationBatch.isEmpty) return;
+    AppLogger.info('🔄 Batch timer fired - checking for pending location points...');
     
-    AppLogger.info('Preparing to send batch of ${_locationBatch.length} location points');
+    if (_locationBatch.isEmpty) {
+      AppLogger.info('📭 No location points to batch - skipping');
+      return;
+    }
+    
+    AppLogger.info('📦 Preparing to send batch of ${_locationBatch.length} location points');
     
     // Broadcast batch update event for active session to handle
     final batchCopy = List<LocationPoint>.from(_locationBatch);
@@ -383,6 +388,8 @@ class LocationServiceImpl implements LocationService {
     // For now, store the batch in a static variable that can be accessed
     _pendingBatch = batchCopy;
     _locationBatch.clear();
+    
+    AppLogger.info('✅ Batch update signal sent - ${batchCopy.length} points queued for upload');
   }
   
   static List<LocationPoint>? _pendingBatch;
