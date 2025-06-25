@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
+import '../../data/models/duel_participant_model.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 class DuelCard extends StatelessWidget {
   final Duel duel;
@@ -197,7 +200,7 @@ class DuelCard extends StatelessWidget {
               ),
               if (duel.winnerId != null)
                 Text(
-                  'Winner: ${_getWinnerText()}',
+                  'Winner: ${_getWinnerText(context)}',
                   style: const TextStyle(
                     fontSize: 14, // Increased from 12
                     color: Colors.green,
@@ -318,9 +321,41 @@ class DuelCard extends StatelessWidget {
     }
   }
 
-  String _getWinnerText() {
-    // TODO: Get winner name from participants or user service
-    return 'Champion';
+  String _getWinnerText(BuildContext context) {
+    if (duel.winnerId == null) return 'No winner';
+    
+    // Find the winner participant
+    final winnerParticipant = participants.firstWhere(
+      (p) => p.userId == duel.winnerId,
+      orElse: () => DuelParticipantModel(
+        id: '',
+        duelId: '',
+        userId: '',
+        username: 'Unknown',
+        status: DuelParticipantStatus.accepted,
+        currentValue: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    );
+    
+    // Get current user ID
+    String? currentUserId;
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        currentUserId = authState.user.userId;
+      }
+    } catch (e) {
+      // Handle error if context is not available
+    }
+    
+    // Return personalized text
+    if (currentUserId == duel.winnerId) {
+      return 'You won!';
+    } else {
+      return '${winnerParticipant.username} won!';
+    }
   }
 
   bool _shouldShowJoinButton() {

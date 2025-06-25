@@ -15,10 +15,10 @@ class HowDuelsWork extends StatelessWidget {
             child: Column(
               children: [
                 const SizedBox(height: 16),
-                Icon(
-                  Icons.sports_mma,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.primary,
+                Image.asset(
+                  'assets/images/duels rules.png',
+                  width: 80,
+                  height: 80,
                 ),
                 const SizedBox(height: 16),
                 Text(

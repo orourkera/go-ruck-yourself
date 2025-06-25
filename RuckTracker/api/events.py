@@ -72,7 +72,7 @@ class EventsListResource(Resource):
                     return {'events': [], 'total': 0}, 200
             
             # Execute query
-            result = query.order('scheduled_start_time', desc=False).execute()
+            result = query.execute()
             
             events = []
             for event in result.data:
@@ -107,8 +107,20 @@ class EventsListResource(Resource):
                 
                 events.append(event_data)
             
-            logger.info(f"Found {len(events)} events")
-            return {'events': events, 'total': len(events)}, 200
+            # Separate completed and active events
+            now = datetime.utcnow()
+            completed_events = [event for event in events if datetime.fromisoformat(event['scheduled_start_time']) < now - timedelta(hours=24)]
+            active_events = [event for event in events if event not in completed_events]
+            
+            # Sort each list separately
+            completed_events.sort(key=lambda x: datetime.fromisoformat(x['scheduled_start_time']), reverse=True)
+            active_events.sort(key=lambda x: datetime.fromisoformat(x['scheduled_start_time']))
+            
+            # Combine the lists
+            sorted_events = completed_events + active_events
+            
+            logger.info(f"Found {len(sorted_events)} events")
+            return {'events': sorted_events, 'total': len(sorted_events)}, 200
             
         except Exception as e:
             logger.error(f"Error fetching events: {e}", exc_info=True)
@@ -452,7 +464,7 @@ class EventParticipationResource(Resource):
                     admin_client.table('event_participant_progress').insert(progress_data).execute()
                 
                 # Get user info for notification
-                user_result = admin_client.table('profiles').select('username, avatar_url').eq('id', current_user_id).execute()
+                user_result = admin_client.table('user').select('username, avatar_url').eq('id', current_user_id).execute()
                 user_info = user_result.data[0] if user_result.data else {}
                 username = user_info.get('username', 'Someone')
                 

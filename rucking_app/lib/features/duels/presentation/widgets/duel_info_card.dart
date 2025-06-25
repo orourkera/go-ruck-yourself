@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
+import '../../data/models/duel_participant_model.dart';
 import '../../../../shared/theme/app_colors.dart';
 
 class DuelInfoCard extends StatefulWidget {
@@ -257,7 +258,7 @@ class _DuelInfoCardState extends State<DuelInfoCard> {
           Expanded(
             child: _buildStatItem(
               'Winner',
-              'Champion',
+              _getWinnerText(),
               Icons.emoji_events,
             ),
           ),
@@ -477,5 +478,31 @@ class _DuelInfoCardState extends State<DuelInfoCard> {
         .reduce((a, b) => a > b ? a : b);
 
     return maxProgress.clamp(0.0, 1.0);
+  }
+
+  String _getWinnerText() {
+    if (widget.duel.winnerId == null) return 'No winner';
+    
+    // Find the winner participant
+    final winnerParticipant = widget.participants.firstWhere(
+      (p) => p.userId == widget.duel.winnerId,
+      orElse: () => DuelParticipantModel(
+        id: '',
+        duelId: '',
+        userId: '',
+        username: 'Unknown',
+        status: DuelParticipantStatus.accepted,
+        currentValue: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    );
+    
+    // Return just the username (no "won!" text)
+    if (widget.currentUserId == widget.duel.winnerId) {
+      return 'You';
+    } else {
+      return winnerParticipant.username;
+    }
   }
 }
