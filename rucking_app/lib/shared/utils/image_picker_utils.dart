@@ -88,73 +88,100 @@ class ImagePickerUtils {
     return pickImage(context, showCropModal: true);
   }
 
-  /// Pick image for event banner (always shows crop modal with 3:1 aspect ratio)
+  /// Pick image for event banner (always shows crop modal with 16:9 aspect ratio)
   static Future<File?> pickEventBannerImage(BuildContext context) async {
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 80,
+      // Show loading indicator without awaiting
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
       );
 
-      if (image == null) return null;
+      try {
+        // First pick the image
+        AppLogger.debug('🖼️ Picking image from gallery...');
+        final image = await _pickImageFromGallery();
+        
+        // Dismiss loading indicator
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+        
+        if (image == null) {
+          AppLogger.debug('🖼️ No image selected');
+          return null;
+        }
+        
+        AppLogger.debug('🖼️ Image selected: ${image.path}');
 
-      if (context.mounted) {
-        // Show loading indicator while preparing crop modal
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
-
-        try {
-          // Small delay to ensure loading indicator shows
+        // Show crop modal with 16:9 aspect ratio (standard for banners)
+        if (context.mounted) {
+          AppLogger.debug('🖼️ Showing crop modal...');
+          
+          // Add a small delay to ensure the loading dialog is fully dismissed
           await Future.delayed(const Duration(milliseconds: 100));
           
-          // Dismiss loading indicator
-          if (context.mounted) {
-            Navigator.of(context).pop();
-          }
-
-          // Show crop modal
-          if (context.mounted) {
-            final croppedFile = await showModalBottomSheet<File?>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) => ImprovedImageCropModal(
+          final croppedFile = await showModalBottomSheet<File?>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            enableDrag: false, // Prevent accidental dismissal
+            isDismissible: false, // Prevent dismissal by tapping outside
+            builder: (context) {
+              AppLogger.debug('🖼️ Building crop modal bottom sheet');
+              return ImprovedImageCropModal(
                 imageFile: File(image.path),
                 title: 'Crop Event Banner',
-                aspectRatio: 16/9, // Changed from 3.0 to 16:9 for taller banner (200px height)
-                cropShape: CropShape.rectangle, // Use rectangle crop shape for banner
-              ),
-            );
-            
-            // Debug logging
-            AppLogger.debug('🖼️ Crop modal returned: ${croppedFile?.path ?? 'null'}');
-            if (croppedFile != null) {
-              final exists = await croppedFile.exists();
-              final size = exists ? await croppedFile.length() : 0;
-              AppLogger.debug('🖼️ Cropped file exists: $exists, size: $size bytes');
-            }
-            
+                aspectRatio: 16/9, // Standard widescreen aspect ratio for banners
+                cropShape: CropShape.rectangle,
+              );
+            },
+          );
+          
+          AppLogger.debug('🖼️ Crop modal dismissed, result: ${croppedFile?.path ?? "null"}');
+          
+          // Debug logging for crop result
+          if (croppedFile != null) {
+            final exists = await croppedFile.exists();
+            final size = exists ? await croppedFile.length() : 0;
+            AppLogger.debug('✅ Cropped file: ${croppedFile.path}');
+            AppLogger.debug('✅ File exists: $exists, size: $size bytes');
             return croppedFile;
+          } else {
+            AppLogger.debug('❌ Crop was cancelled or failed');
+            return null;
           }
-        } catch (e) {
-          // Dismiss loading indicator on error
-          if (context.mounted) {
-            Navigator.of(context).pop();
-          }
-          rethrow;
         }
+      } catch (e, stackTrace) {
+        AppLogger.error('Error in pickEventBannerImage: $e', stackTrace: stackTrace);
+        
+        // Dismiss loading indicator on error
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+        
+        // Show error to user
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to process image. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        
+        return null;
       }
-    } catch (e) {
-      AppLogger.error('Error picking event banner image: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Unexpected error in pickEventBannerImage: $e', stackTrace: stackTrace);
+      return null;
     }
+    
     return null;
   }
 

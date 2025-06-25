@@ -434,10 +434,6 @@ class DuelResource(Resource):
                 'updated_at': datetime.utcnow().isoformat()
             }).eq('id', duel_id).execute()
             
-            # Notification handled by database trigger
-            # from api.duel_comments import create_duel_deleted_notification
-            # create_duel_deleted_notification(duel_id, user_id)
-            
             return {'message': 'Duel deleted successfully'}
             
         except Exception as e:
@@ -496,10 +492,6 @@ class DuelJoinResource(Resource):
             # Get user name for notification
             user_response = supabase.table('user').select('username').eq('id', user_id).single().execute()
             user_name = user_response.data.get('username', 'Unknown User') if user_response.data else 'Unknown User'
-            
-            # Notification handled by database trigger
-            # from api.duel_comments import create_duel_joined_notification
-            # create_duel_joined_notification(duel_id, user_id, user_name)
             
             # Update user stats (optional - don't fail duel join if this fails)
             try:
@@ -563,10 +555,6 @@ class DuelJoinResource(Resource):
                     'ends_at': ends_at.isoformat(), 
                     'updated_at': now.isoformat()
                 }).eq('id', duel_id).execute()
-                
-                # Create duel started notifications for all participants
-                from api.duel_comments import create_duel_started_notification
-                create_duel_started_notification(duel_id)
             
             return {'message': 'Successfully joined duel'}
             
@@ -705,6 +693,10 @@ class DuelCompletionCheckResource(Resource):
                 'updated_at': now.isoformat()
             }).eq('id', duel_id).execute()
             
+            # Send push notifications (database notifications handled by trigger)
+            from api.duel_comments import send_duel_completed_push_notifications
+            send_duel_completed_push_notifications(duel_id)
+            
             return {
                 'duel_id': duel_id,
                 'title': duel['title'],
@@ -722,9 +714,9 @@ class DuelCompletionCheckResource(Resource):
                 'updated_at': now.isoformat()
             }).eq('id', duel_id).execute()
             
-            # Send no-winner notification
-            from api.duel_comments import create_duel_completed_notification
-            create_duel_completed_notification(duel_id)
+            # Send push notifications (database notifications handled by trigger)
+            from api.duel_comments import send_duel_completed_push_notifications
+            send_duel_completed_push_notifications(duel_id)
             
             return {
                 'duel_id': duel_id,
@@ -754,9 +746,9 @@ class DuelCompletionCheckResource(Resource):
                 'updated_at': now.isoformat()
             }], on_conflict='user_id').execute()
             
-            # Send completion notification
-            from api.duel_comments import create_duel_completed_notification
-            create_duel_completed_notification(duel_id)
+            # Send push notifications (database notifications handled by trigger)
+            from api.duel_comments import send_duel_completed_push_notifications
+            send_duel_completed_push_notifications(duel_id)
             
             return {
                 'duel_id': duel_id,
@@ -771,9 +763,9 @@ class DuelCompletionCheckResource(Resource):
                 'updated_at': now.isoformat()
             }).eq('id', duel_id).execute()
             
-            # Send completion notification
-            from api.duel_comments import create_duel_completed_notification
-            create_duel_completed_notification(duel_id)
+            # Send push notifications (database notifications handled by trigger)
+            from api.duel_comments import send_duel_completed_push_notifications
+            send_duel_completed_push_notifications(duel_id)
             
             return {
                 'duel_id': duel_id,

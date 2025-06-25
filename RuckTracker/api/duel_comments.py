@@ -299,6 +299,13 @@ def create_duel_completed_notification(duel_id):
         # Create notifications for each participant
         notifications = []
         message_text = f"'{duel_name}' has completed! Check the results"
+        
+        # Debug logging
+        logger.info(f"🔍 [DUEL_COMPLETION_NOTIFICATION] Creating notifications for duel {duel_id}")
+        logger.info(f"🔍 [DUEL_COMPLETION_NOTIFICATION] Duel name: '{duel_name}'")
+        logger.info(f"🔍 [DUEL_COMPLETION_NOTIFICATION] Message text: '{message_text}'")
+        logger.info(f"🔍 [DUEL_COMPLETION_NOTIFICATION] Number of participants: {len(participants_response.data)}")
+        
         participant_ids = []
         for participant in participants_response.data:
             user_id = participant['user_id']
@@ -317,8 +324,10 @@ def create_duel_completed_notification(duel_id):
                 }
             }
             notifications.append(notification)
+            logger.info(f"🔍 [DUEL_COMPLETION_NOTIFICATION] Created notification for user {user_id}: {notification}")
         
         if notifications:
+            logger.info(f"🔍 [DUEL_COMPLETION_NOTIFICATION] About to insert {len(notifications)} notifications")
             admin_client.table('notifications').insert(notifications).execute()
             logger.info(f"Created {len(notifications)} duel completed notifications")
             
@@ -505,6 +514,62 @@ def create_duel_deleted_notification(duel_id, deleter_id):
                     
     except Exception as e:
         logger.error(f"Failed to create duel deletion notifications: {e}")
+
+
+def send_duel_completed_push_notifications(duel_id):
+    """
+    Send push notifications for duel completion.
+    Database notifications are handled by trigger.
+    """
+    try:
+        admin_client = get_supabase_admin_client()
+        
+        # Get duel details and participants
+        duel_response = admin_client.table('duels') \
+            .select('title') \
+            .eq('id', duel_id) \
+            .single() \
+            .execute()
+            
+        if not duel_response.data:
+            logger.warning(f"Duel {duel_id} not found for push notifications")
+            return
+            
+        duel_name = duel_response.data.get('title', 'Unknown Duel')
+        
+        # Validate duel_name
+        if not duel_name or not str(duel_name).strip():
+            logger.warning(f"No valid duel title found for duel {duel_id}, using fallback")
+            duel_name = 'a duel'
+        
+        # Get all participants
+        participants_response = admin_client.table('duel_participants') \
+            .select('user_id') \
+            .eq('duel_id', duel_id) \
+            .eq('status', 'accepted') \
+            .execute()
+        
+        if not participants_response.data:
+            logger.info(f"No participants to notify for duel completion {duel_id}")
+            return
+            
+        participant_ids = [p['user_id'] for p in participants_response.data]
+        
+        # Send push notifications only
+        push_notification_service = PushNotificationService()
+        device_tokens = get_user_device_tokens(participant_ids)
+        if device_tokens:
+            push_notification_service.send_duel_completed_notification(
+                device_tokens=device_tokens,
+                duel_name=duel_name,
+                duel_id=duel_id
+            )
+            logger.info(f"✅ [DUEL_COMPLETION_PUSH] Sent push notifications to {len(device_tokens)} devices for duel completion")
+        else:
+            logger.info(f"🔕 [DUEL_COMPLETION_PUSH] No device tokens found for duel {duel_id} participants")
+                    
+    except Exception as e:
+        logger.error(f"❌ [DUEL_COMPLETION_PUSH] Failed to send duel completed push notifications: {e}")
 
 
 class DuelCommentsResource(Resource):

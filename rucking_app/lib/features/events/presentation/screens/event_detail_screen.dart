@@ -165,13 +165,18 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     // Add Edit option for event creators
     if (event.isCreator) {
       menuItems.add(
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'edit',
           child: Row(
             children: [
-              Icon(Icons.edit, size: 20),
-              SizedBox(width: 8),
-              Text('Edit Event'),
+              const Icon(Icons.edit, size: 20, color: Colors.black),
+              const SizedBox(width: 8),
+              Text(
+                'Edit Event',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontFamily: 'Inter',
+                ),
+              ),
             ],
           ),
         ),
@@ -181,13 +186,19 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     // Add Leave option for participants who can leave
     if (event.canLeave) {
       menuItems.add(
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'leave',
           child: Row(
             children: [
-              Icon(Icons.exit_to_app, size: 20, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Leave Event', style: TextStyle(color: Colors.red)),
+              const Icon(Icons.exit_to_app, size: 20, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(
+                'Leave Event',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.red,
+                  fontFamily: 'Inter',
+                ),
+              ),
             ],
           ),
         ),
@@ -200,13 +211,19 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         menuItems.add(const PopupMenuDivider());
       }
       menuItems.add(
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'cancel',
           child: Row(
             children: [
-              Icon(Icons.cancel, size: 20, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Cancel Event', style: TextStyle(color: Colors.red)),
+              const Icon(Icons.cancel, size: 20, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(
+                'Cancel Event',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.red,
+                  fontFamily: 'Inter',
+                ),
+              ),
             ],
           ),
         ),

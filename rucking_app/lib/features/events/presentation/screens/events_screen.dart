@@ -89,7 +89,7 @@ class _EventsScreenState extends State<EventsScreen> {
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add, color: Colors.white), // Make add button white
               onPressed: _navigateToCreateEvent,
             ),
           ],

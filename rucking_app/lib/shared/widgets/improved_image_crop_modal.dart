@@ -47,29 +47,68 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
   @override
   void initState() {
     super.initState();
-    _loadImage();
+    debugPrint('🖼️ [CROP] ImprovedImageCropModal initState');
+    debugPrint('🖼️ [CROP] Image file: ${widget.imageFile.path}');
+    debugPrint('🖼️ [CROP] Aspect ratio: ${widget.aspectRatio}');
+    debugPrint('🖼️ [CROP] Crop shape: ${widget.cropShape}');
+    
+    // Delay loading the image slightly to ensure the widget is fully built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugPrint('🖼️ [CROP] PostFrameCallback - starting image load');
+      _loadImage();
+    });
   }
 
   @override
   void dispose() {
+    debugPrint('🖼️ [CROP] ImprovedImageCropModal dispose');
     _controller.dispose();
     super.dispose();
   }
 
   Future<void> _loadImage() async {
-    final bytes = await widget.imageFile.readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frameInfo = await codec.getNextFrame();
-    
-    setState(() {
-      _image = frameInfo.image;
-      _imageLoaded = true;
-    });
+    try {
+      debugPrint('🖼️ [CROP] Starting to load image: ${widget.imageFile.path}');
+      debugPrint('🖼️ [CROP] File exists: ${await widget.imageFile.exists()}');
+      
+      final bytes = await widget.imageFile.readAsBytes();
+      debugPrint('🖼️ [CROP] Read ${bytes.length} bytes from file');
+      
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frameInfo = await codec.getNextFrame();
+      
+      debugPrint('🖼️ [CROP] Image loaded: ${frameInfo.image.width}x${frameInfo.image.height}');
+      
+      if (mounted) {
+        setState(() {
+          _image = frameInfo.image;
+          _imageLoaded = true;
+        });
 
-    // Auto-fit image when loaded
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fitImageToCropArea();
-    });
+        // Auto-fit image when loaded
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          debugPrint('🖼️ [CROP] Auto-fitting image to crop area');
+          if (mounted) {
+            _fitImageToCropArea();
+          }
+        });
+      } else {
+        debugPrint('❌ [CROP] Widget not mounted when image loaded');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ [CROP] Error loading image: $e');
+      debugPrint('❌ [CROP] Stack trace: $stackTrace');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to load image. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.of(context).pop(null);
+      }
+    }
   }
 
   void _fitImageToCropArea() {
@@ -135,11 +174,16 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🖼️ [CROP] Building crop modal - _imageLoaded: $_imageLoaded');
+    
     _screenSize = MediaQuery.of(context).size;
     _cropWidth = _screenSize.width * 0.8;
     _cropHeight = widget.cropShape == CropShape.rectangle 
         ? _cropWidth / widget.aspectRatio 
         : _cropWidth;
+    
+    debugPrint('🖼️ [CROP] Screen size: $_screenSize');
+    debugPrint('🖼️ [CROP] Crop dimensions: ${_cropWidth}x$_cropHeight');
     
     return Scaffold(
       backgroundColor: Colors.black,
@@ -161,6 +205,21 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
                   widget.imageFile,
                   fit: BoxFit.contain,
                 ),
+              ),
+            )
+          else
+            // Show loading indicator while image is loading
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(color: Colors.white),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading image...',
+                    style: AppTextStyles.bodyLarge.copyWith(color: Colors.white),
+                  ),
+                ],
               ),
             ),
           
@@ -184,13 +243,13 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
           
           // Top app bar with proper status bar handling
           Positioned(
-            top: 0, // Start from the very top
+            top: 60, // Move header down significantly from the top
             left: 0,
             right: 0,
             child: Container(
-              // Add status bar padding inside the container
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 8, // Status bar + extra padding
+              // Add normal padding without status bar calculations
+              padding: const EdgeInsets.only(
+                top: 16, // Increased padding for better spacing
                 left: 16,
                 right: 16,
                 bottom: 12,
@@ -209,7 +268,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => Navigator.of(context).pop(null), // Explicitly return null on close
                   ),
                   Expanded(
                     child: Text(
@@ -238,7 +297,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
           
           // Bottom controls
           Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 20,
+            bottom: 120, // Move save button down significantly from the bottom
             left: 0,
             right: 0,
             child: Container(
@@ -280,13 +339,35 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
   }
 
   Future<void> _cropAndSave() async {
+    File? resultFile;
+    
     try {
+      debugPrint('🖼️ Starting _cropAndSave...');
+      debugPrint('🖼️ _imageLoaded: $_imageLoaded');
+      debugPrint('🖼️ _cropKey.currentContext: ${_cropKey.currentContext}');
+      
+      if (!_imageLoaded) {
+        debugPrint('❌ Image not loaded, aborting crop');
+        _returnResult(null);
+        return;
+      }
+      
+      if (_cropKey.currentContext == null) {
+        debugPrint('❌ Crop key context is null, aborting crop');
+        _returnResult(null);
+        return;
+      }
+      
       // Capture the entire transformed image from RepaintBoundary
       final RenderRepaintBoundary boundary = 
           _cropKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       
+      debugPrint('🖼️ Found boundary, capturing image...');
+      
       // Get the full screen image with all transformations applied
       final ui.Image fullScreenImage = await boundary.toImage(pixelRatio: 3.0);
+      
+      debugPrint('🖼️ Captured full screen image: ${fullScreenImage.width}x${fullScreenImage.height}');
       
       // Calculate the exact crop area coordinates on the captured image
       final double pixelRatio = 3.0; // Same as used above
@@ -296,6 +377,8 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
         height: _cropHeight * pixelRatio,
       );
       
+      debugPrint('🖼️ Crop rect: $cropRect');
+      
       // Ensure crop rect is within image bounds
       final clampedCropRect = Rect.fromLTRB(
         math.max(0, cropRect.left),
@@ -303,6 +386,15 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
         math.min(fullScreenImage.width.toDouble(), cropRect.right),
         math.min(fullScreenImage.height.toDouble(), cropRect.bottom),
       );
+      
+      debugPrint('🖼️ Clamped crop rect: $clampedCropRect');
+      
+      // Ensure the crop rect has valid dimensions
+      if (clampedCropRect.width <= 0 || clampedCropRect.height <= 0) {
+        debugPrint('❌ Invalid crop dimensions: ${clampedCropRect.width}x${clampedCropRect.height}');
+        _returnResult(null);
+        return;
+      }
       
       // Create the final cropped image
       final recorder = ui.PictureRecorder();
@@ -312,11 +404,13 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
       final outputWidth = _cropWidth * pixelRatio;
       final outputHeight = _cropHeight * pixelRatio;
       
+      debugPrint('🖼️ Output size: ${outputWidth.toInt()}x${outputHeight.toInt()}');
+      
       // Draw only the crop area from the full image
       canvas.drawImageRect(
         fullScreenImage,
-        clampedCropRect, // Source: the crop area from full screen capture
-        Rect.fromLTWH(0, 0, outputWidth, outputHeight), // Destination: output image
+        clampedCropRect,
+        Rect.fromLTWH(0, 0, outputWidth, outputHeight),
         Paint(),
       );
       
@@ -324,36 +418,48 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
       final picture = recorder.endRecording();
       final croppedImage = await picture.toImage(outputWidth.toInt(), outputHeight.toInt());
       
+      debugPrint('🖼️ Created cropped image: ${croppedImage.width}x${croppedImage.height}');
+      
       // Convert to bytes and save
       final ByteData? byteData = await croppedImage.toByteData(format: ui.ImageByteFormat.png);
       
       if (byteData != null) {
+        debugPrint('🖼️ Converting to bytes...');
         final Uint8List pngBytes = byteData.buffer.asUint8List();
         
         final tempDir = await getTemporaryDirectory();
         final tempFile = File('${tempDir.path}/cropped_image_${DateTime.now().millisecondsSinceEpoch}.png');
         await tempFile.writeAsBytes(pngBytes);
         
-        // Debug logging
-        debugPrint('✅ Cropped image saved to: ${tempFile.path}');
-        debugPrint('✅ File exists: ${await tempFile.exists()}');
-        debugPrint('✅ File size: ${await tempFile.length()} bytes');
+        // Verify the file was written successfully
+        final fileExists = await tempFile.exists();
+        final fileSize = await tempFile.length();
         
-        if (mounted) {
-          debugPrint('✅ Returning cropped file to caller');
-          Navigator.of(context).pop(tempFile);
+        debugPrint('✅ Cropped image saved to: ${tempFile.path}');
+        debugPrint('✅ File exists: $fileExists');
+        debugPrint('✅ File size: $fileSize bytes');
+        
+        if (fileExists && fileSize > 0) {
+          resultFile = tempFile;
+        } else {
+          debugPrint('❌ Failed to write cropped image to file');
         }
+      } else {
+        debugPrint('❌ Failed to convert image to bytes');
       }
-    } catch (e) {
-      debugPrint('Error cropping image: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to crop image. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error cropping image: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+    } finally {
+      _returnResult(resultFile);
+    }
+  }
+  
+  void _returnResult(File? file) {
+    if (mounted) {
+      Navigator.of(context).pop(file);
+    } else {
+      debugPrint('⚠️ Context not mounted, cannot return result');
     }
   }
 }

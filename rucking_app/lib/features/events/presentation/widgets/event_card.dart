@@ -116,97 +116,28 @@ class EventCard extends StatelessWidget {
                                   style: AppTextStyles.titleMedium.copyWith(
                                     color: isDarkMode ? Colors.white : AppColors.textDark,
                                     fontWeight: FontWeight.w600,
+                                    fontFamily: 'Bangers', // Use Bangers font for club title
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                // Location row (right below club name)
-                                if (event.locationName != null && event.locationName!.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: GestureDetector(
-                                      onTap: () => _launchMaps(event.locationName!, event.latitude, event.longitude),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.location_on,
-                                            size: 14,
-                                            color: Colors.grey[600],
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              event.locationName!,
-                                              style: AppTextStyles.bodySmall.copyWith(
-                                                color: Colors.grey[600],
-                                                decoration: TextDecoration.underline,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
-                          // Difficulty level display
-                          if (event.difficultyLevel != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).primaryColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'Level ${event.difficultyLevel}',
-                                style: AppTextStyles.statValue.copyWith(
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     ],
                   ),
                 ),
               
-              // If no club, show location at top instead
-              if (event.hostingClub == null && event.locationName != null && event.locationName!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: GestureDetector(
-                    onTap: () => _launchMaps(event.locationName!, event.latitude, event.longitude),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 16,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            event.locationName!,
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: Colors.grey[600],
-                              decoration: TextDecoration.underline,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              // If no club, show nothing at top instead
+              if (event.hostingClub == null)
+                const SizedBox(),
               
               // Banner image (taller like ruck buddy card)
               if (event.bannerImageUrl != null)
                 ClipRRect(
-                  borderRadius: event.hostingClub != null || event.locationName != null
+                  borderRadius: event.hostingClub != null
                       ? BorderRadius.zero // No top radius if content above
                       : const BorderRadius.only(
                           topLeft: Radius.circular(12),
