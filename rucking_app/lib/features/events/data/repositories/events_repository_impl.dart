@@ -8,6 +8,7 @@ import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/features/events/domain/models/event_comment.dart';
 import 'package:rucking_app/features/events/domain/models/event_progress.dart';
 import 'package:rucking_app/features/events/domain/repositories/events_repository.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 class EventsRepositoryImpl implements EventsRepository {
   final ApiClient _apiClient;
@@ -79,8 +80,15 @@ class EventsRepositoryImpl implements EventsRepository {
 
     final response = await _apiClient.get('/events', queryParams: queryParams);
     
+    AppLogger.info('Events API Response: ${jsonEncode(response)}');
+    
     final eventsList = (response['events'] as List)
-        .map((json) => Event.fromJson(json as Map<String, dynamic>))
+        .map((json) {
+          AppLogger.info('Processing event JSON: ${jsonEncode(json)}');
+          AppLogger.info('Event club_id: ${json['club_id']}');
+          AppLogger.info('Event hosting_club: ${json['hosting_club']}');
+          return Event.fromJson(json as Map<String, dynamic>);
+        })
         .toList();
     
     // Cache the response data

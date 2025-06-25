@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:rucking_app/features/events/domain/models/event.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -19,6 +20,14 @@ class EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Debug logging for club info
+    AppLogger.info('EventCard Debug - Event ID: ${event.id}');
+    AppLogger.info('EventCard Debug - Event Title: ${event.title}');
+    AppLogger.info('EventCard Debug - Club ID: ${event.clubId}');
+    AppLogger.info('EventCard Debug - Hosting Club: ${event.hostingClub?.toString()}');
+    AppLogger.info('EventCard Debug - Hosting Club Name: ${event.hostingClub?.name}');
+    AppLogger.info('EventCard Debug - Hosting Club Logo: ${event.hostingClub?.logoUrl}');
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -61,6 +70,7 @@ class EventCard extends StatelessWidget {
                                       event.hostingClub!.logoUrl!,
                                       fit: BoxFit.cover,
                                       errorBuilder: (context, error, stackTrace) {
+                                        AppLogger.info('Error loading club logo: $error');
                                         return Container(
                                           decoration: BoxDecoration(
                                             color: Theme.of(context).primaryColor,
@@ -181,6 +191,7 @@ class EventCard extends StatelessWidget {
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
+                      AppLogger.info('Error loading banner image: $error');
                       return Container(
                         height: 200,
                         width: double.infinity,

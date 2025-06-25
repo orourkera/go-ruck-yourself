@@ -1,17 +1,10 @@
--- Fix event notification trigger to include event_id and club_id in data field
--- This enables proper navigation when tapping event notifications
+-- Fix event notification trigger to use correct column names and data types
 
 CREATE OR REPLACE FUNCTION notify_event_created()
 RETURNS TRIGGER AS $$
 DECLARE
     member_record RECORD;
-    club_name TEXT;
 BEGIN
-    -- Get club name
-    SELECT name INTO club_name 
-    FROM clubs 
-    WHERE id = NEW.club_id;
-    
     -- Create notifications for all club members except the event creator
     FOR member_record IN 
         SELECT cm.user_id 
@@ -51,7 +44,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Ensure the trigger exists
+-- Recreate the trigger
 DROP TRIGGER IF EXISTS event_created_notification ON events;
 CREATE TRIGGER event_created_notification
     AFTER INSERT ON events

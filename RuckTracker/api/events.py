@@ -77,6 +77,10 @@ class EventsListResource(Resource):
             
             events = []
             for event in result.data:
+                logger.info(f"Processing event: {event['id']}")
+                logger.info(f"Event club_id: {event.get('club_id')}")
+                logger.info(f"Event clubs field: {event.get('clubs')}")
+                
                 # Get participant count
                 participant_count_result = admin_client.table('event_participants').select('id', count='exact').eq('event_id', event['id']).eq('status', 'approved').execute()
                 participant_count = participant_count_result.count
@@ -87,13 +91,18 @@ class EventsListResource(Resource):
                     participation_result = admin_client.table('event_participants').select('status').eq('event_id', event['id']).eq('user_id', current_user_id).execute()
                     user_participation = participation_result.data[0]['status'] if participation_result.data else None
                 
+                hosting_club_data = event.get('clubs')
+                logger.info(f"Hosting club data before mapping: {hosting_club_data}")
+                
                 event_data = {
                     **event,
                     'participant_count': participant_count,
                     'user_participation_status': user_participation,
                     'is_creator': event['creator_user_id'] == current_user_id,
-                    'hosting_club': event.get('clubs')  # Map clubs field to hosting_club for frontend
+                    'hosting_club': hosting_club_data  # Map clubs field to hosting_club for frontend
                 }
+                
+                logger.info(f"Final event_data hosting_club: {event_data.get('hosting_club')}")
                 events.append(event_data)
             
             logger.info(f"Found {len(events)} events")

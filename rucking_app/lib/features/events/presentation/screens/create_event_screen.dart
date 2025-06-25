@@ -18,6 +18,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/utils/image_picker_utils.dart';
+import 'package:rucking_app/shared/widgets/full_screen_image_viewer.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final String? eventId; // For editing existing events
@@ -264,14 +265,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(11),
-                      child: InteractiveViewer(
-                        minScale: 1.0,
-                        maxScale: 3.0,
-                        child: Image.file(
-                          _bannerImage!,
-                          height: 200, // Updated to match container height
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+                      child: GestureDetector(
+                        onTap: () => FullScreenImageViewer.show(
+                          context,
+                          imageFile: _bannerImage!,
+                          heroTag: 'banner_image_new',
+                        ),
+                        child: Hero(
+                          tag: 'banner_image_new',
+                          child: Image.file(
+                            _bannerImage!,
+                            height: 200, // Updated to match container height
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ),
@@ -304,45 +311,51 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(11),
-                          child: InteractiveViewer(
-                            minScale: 1.0,
-                            maxScale: 3.0,
-                            child: Image.network(
-                              _eventToEdit!.bannerImageUrl!,
-                              height: 200, // Updated to match container height
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Container(
-                                  height: 200, // Updated to match container height
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  height: 200, // Updated to match container height
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.error_outline,
-                                      color: Colors.grey,
-                                      size: 40,
+                          child: GestureDetector(
+                            onTap: () => FullScreenImageViewer.show(
+                              context,
+                              imageUrl: _eventToEdit!.bannerImageUrl!,
+                              heroTag: 'banner_image_existing',
+                            ),
+                            child: Hero(
+                              tag: 'banner_image_existing',
+                              child: Image.network(
+                                _eventToEdit!.bannerImageUrl!,
+                                height: 200, // Updated to match container height
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    height: 200, // Updated to match container height
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(11),
                                     ),
-                                  ),
-                                );
-                              },
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 200, // Updated to match container height
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.error_outline,
+                                        color: Colors.grey,
+                                        size: 40,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),

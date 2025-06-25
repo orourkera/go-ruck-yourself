@@ -33,6 +33,7 @@ dependencies:
   flutter_cache_manager: ^3.3.1
   flutter_rating_bar: ^4.0.1
   shimmer: ^3.0.0
+  photo_view: ^0.15.0
   
   # State Management
   flutter_bloc: ^9.1.0

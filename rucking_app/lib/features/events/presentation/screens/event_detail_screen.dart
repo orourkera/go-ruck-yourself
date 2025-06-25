@@ -24,6 +24,7 @@ import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/shared/widgets/full_screen_image_viewer.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final String eventId;
@@ -380,27 +381,37 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           if (event.bannerImageUrl != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                event.bannerImageUrl!,
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
+              child: GestureDetector(
+                onTap: () => FullScreenImageViewer.show(
+                  context,
+                  imageUrl: event.bannerImageUrl!,
+                  heroTag: 'event_banner_${event.id}',
+                ),
+                child: Hero(
+                  tag: 'event_banner_${event.id}',
+                  child: Image.network(
+                    event.bannerImageUrl!,
                     height: 200,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.event,
-                        size: 60,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                  );
-                },
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 200,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.event,
+                            size: 60,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/shared/widgets/image_crop_modal.dart' show ImageCropModal, CropShape;
+import 'package:rucking_app/shared/widgets/improved_image_crop_modal.dart';
 
 /// Utility class for handling image selection and processing
 class ImagePickerUtils {
@@ -68,7 +68,7 @@ class ImagePickerUtils {
     if (showCropModal && context.mounted) {
       final croppedFile = await Navigator.of(context).push<File>(
         MaterialPageRoute(
-          builder: (context) => ImageCropModal(
+          builder: (context) => ImprovedImageCropModal(
             imageFile: selectedFile!,
             title: 'Crop Profile Picture',
             aspectRatio: 1.0, // Square for profile pictures
@@ -106,7 +106,7 @@ class ImagePickerUtils {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
-          builder: (context) => ImageCropModal(
+          builder: (context) => ImprovedImageCropModal(
             imageFile: File(image.path),
             title: 'Crop Event Banner',
             aspectRatio: 16/9, // Changed from 3.0 to 16:9 for taller banner (200px height)
