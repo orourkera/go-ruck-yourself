@@ -123,7 +123,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
     });
   }
 
-  void _resetView() {
+  void _resetCrop() {
     setState(() {
       _controller.value = Matrix4.identity();
     });
@@ -136,174 +136,145 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
   @override
   Widget build(BuildContext context) {
     _screenSize = MediaQuery.of(context).size;
-    _cropWidth = _screenSize.width * 0.9;
+    _cropWidth = _screenSize.width * 0.8;
     _cropHeight = widget.cropShape == CropShape.rectangle 
         ? _cropWidth / widget.aspectRatio 
         : _cropWidth;
     
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Full-screen interactive image
-            if (_imageLoaded)
-              RepaintBoundary(
-                key: _cropKey,
-                child: InteractiveViewer(
-                  transformationController: _controller,
-                  minScale: 0.1, // Allow zooming out to 10% of original size
-                  maxScale: 5.0, // Reduced max scale for better performance
-                  panEnabled: true,
-                  scaleEnabled: true,
-                  constrained: false, // Allow the child to be smaller than the viewport
-                  boundaryMargin: EdgeInsets.all(_screenSize.width), // Allow scrolling way beyond screen bounds
-                  child: Image.file(
-                    widget.imageFile,
-                    fit: BoxFit.contain, // Changed back to contain for better zoom out behavior  
-                  ),
-                ),
-              ),
-            
-            // Crop overlay (non-interactive)
-            IgnorePointer(
-              child: Container(
-                width: _screenSize.width,
-                height: _screenSize.height,
-                child: CustomPaint(
-                  painter: CropOverlayPainter(
-                    cropRect: Rect.fromCenter(
-                      center: Offset(_screenSize.width / 2, _screenSize.height / 2),
-                      width: _cropWidth,
-                      height: _cropHeight,
-                    ),
-                    cropShape: widget.cropShape,
-                  ),
+      body: Stack(
+        children: [
+          // Full-screen interactive image
+          if (_imageLoaded)
+            RepaintBoundary(
+              key: _cropKey,
+              child: InteractiveViewer(
+                transformationController: _controller,
+                minScale: 0.05, // Allow much smaller cropping
+                maxScale: 8.0, // Allow more zoom in
+                panEnabled: true,
+                scaleEnabled: true,
+                constrained: false,
+                boundaryMargin: EdgeInsets.all(_screenSize.width * 1.5), // More room to pan
+                child: Image.file(
+                  widget.imageFile,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
-            
-            // Top app bar
-            Positioned(
-              top: MediaQuery.of(context).padding.top, // Add status bar height
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.7),
-                      Colors.transparent,
-                    ],
+          
+          // Crop overlay (non-interactive)
+          IgnorePointer(
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              child: CustomPaint(
+                painter: CropOverlayPainter(
+                  cropRect: Rect.fromCenter(
+                    center: Offset(_screenSize.width / 2, _screenSize.height / 2),
+                    width: _cropWidth,
+                    height: _cropHeight,
                   ),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Text(
-                        widget.title,
-                        style: AppTextStyles.titleLarge.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _cropAndSave,
-                      child: Text(
-                        'DONE',
-                        style: TextStyle(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ],
+                  cropShape: widget.cropShape,
                 ),
               ),
             ),
-            
-            // Bottom controls
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.8),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildControlButton(
-                      icon: Icons.refresh,
-                      label: 'Reset',
-                      onPressed: _resetView,
-                    ),
-                    _buildControlButton(
-                      icon: Icons.center_focus_strong,
-                      label: 'Fit',
-                      onPressed: _fitImageToCropArea,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildControlButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.3),
-            width: 1,
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
+          
+          // Top app bar with proper status bar handling
+          Positioned(
+            top: 0, // Start from the very top
+            left: 0,
+            right: 0,
+            child: Container(
+              // Add status bar padding inside the container
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 8, // Status bar + extra padding
+                left: 16,
+                right: 16,
+                bottom: 12,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.8),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _cropAndSave,
+                    child: Text(
+                      'Save',
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          
+          // Bottom controls
+          Positioned(
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _resetCrop,
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    label: const Text('Reset', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black.withOpacity(0.7),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _fitImageToCropArea,
+                    icon: const Icon(Icons.fit_screen, color: Colors.white),
+                    label: const Text('Fit', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black.withOpacity(0.7),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -363,7 +334,13 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
         final tempFile = File('${tempDir.path}/cropped_image_${DateTime.now().millisecondsSinceEpoch}.png');
         await tempFile.writeAsBytes(pngBytes);
         
+        // Debug logging
+        debugPrint('✅ Cropped image saved to: ${tempFile.path}');
+        debugPrint('✅ File exists: ${await tempFile.exists()}');
+        debugPrint('✅ File size: ${await tempFile.length()} bytes');
+        
         if (mounted) {
+          debugPrint('✅ Returning cropped file to caller');
           Navigator.of(context).pop(tempFile);
         }
       }

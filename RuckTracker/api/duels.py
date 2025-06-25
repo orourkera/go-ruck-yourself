@@ -652,18 +652,33 @@ class DuelCompletionCheckResource(Resource):
             now = datetime.now(timezone.utc)
             supabase = get_supabase_admin_client()
             
+            logging.info(f"🔍 [DUEL_COMPLETION] Starting completion check at {now.isoformat()}")
+            
             # Get all active duels that have expired
             expired_duels_response = supabase.table('duels').select('*').eq('status', 'active').lt('ends_at', now.isoformat()).execute()
+            
+            logging.info(f"🔍 [DUEL_COMPLETION] Found {len(expired_duels_response.data)} expired duels")
+            
+            # Also log all active duels to see what we have
+            all_active_response = supabase.table('duels').select('*').eq('status', 'active').execute()
+            logging.info(f"🔍 [DUEL_COMPLETION] Total active duels: {len(all_active_response.data)}")
+            
+            for duel in all_active_response.data:
+                logging.info(f"🔍 [DUEL_COMPLETION] Active duel: {duel['id']} '{duel['title']}' ends_at={duel.get('ends_at')} vs now={now.isoformat()}")
             
             completed_duels = []
             
             for duel in expired_duels_response.data:
                 try:
+                    logging.info(f"🔄 [DUEL_COMPLETION] Processing expired duel: {duel['id']} '{duel['title']}'")
                     result = self._complete_expired_duel(duel, now, supabase)
                     completed_duels.append(result)
+                    logging.info(f"✅ [DUEL_COMPLETION] Completed duel: {duel['id']}")
                 except Exception as e:
-                    logging.error(f"Error completing duel {duel['id']}: {str(e)}")
+                    logging.error(f"❌ [DUEL_COMPLETION] Error completing duel {duel['id']}: {str(e)}")
                     continue
+            
+            logging.info(f"✅ [DUEL_COMPLETION] Completion check finished. Completed {len(completed_duels)} duels")
             
             return {
                 'message': f'Completed {len(completed_duels)} expired duels',
@@ -671,7 +686,7 @@ class DuelCompletionCheckResource(Resource):
             }
             
         except Exception as e:
-            logging.error(f"Error in DuelCompletionCheckResource.post: {str(e)}", exc_info=True)
+            logging.error(f"❌ [DUEL_COMPLETION] Error in DuelCompletionCheckResource.post: {str(e)}", exc_info=True)
             return {'error': str(e)}, 500
     
     def _complete_expired_duel(self, duel, now, supabase):

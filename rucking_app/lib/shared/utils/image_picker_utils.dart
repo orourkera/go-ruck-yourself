@@ -133,6 +133,15 @@ class ImagePickerUtils {
                 cropShape: CropShape.rectangle, // Use rectangle crop shape for banner
               ),
             );
+            
+            // Debug logging
+            AppLogger.debug('🖼️ Crop modal returned: ${croppedFile?.path ?? 'null'}');
+            if (croppedFile != null) {
+              final exists = await croppedFile.exists();
+              final size = exists ? await croppedFile.length() : 0;
+              AppLogger.debug('🖼️ Cropped file exists: $exists, size: $size bytes');
+            }
+            
             return croppedFile;
           }
         } catch (e) {
