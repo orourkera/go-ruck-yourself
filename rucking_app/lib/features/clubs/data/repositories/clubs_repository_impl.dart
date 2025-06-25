@@ -179,7 +179,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (action != null) body['action'] = action;
     if (role != null) body['role'] = role;
 
-    await _apiClient.post('/clubs/$clubId/members/$userId', body);
+    await _apiClient.put('/clubs/$clubId/members/$userId', body);
     
     // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);

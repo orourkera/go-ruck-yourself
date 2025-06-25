@@ -618,6 +618,10 @@ class ClubMemberManagementResource(Resource):
                     update_data['status'] = 'rejected'
                 elif data['action'] == 'deny':
                     update_data['status'] = 'rejected'
+                elif data['action'] == 'admin':
+                    update_data['role'] = 'admin'
+                elif data['action'] == 'member':
+                    update_data['role'] = 'member'
             
             # Direct status/role updates
             if 'status' in data:

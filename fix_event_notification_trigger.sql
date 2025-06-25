@@ -22,7 +22,7 @@ BEGIN
     LOOP
         INSERT INTO notifications (
             id,
-            user_id,
+            recipient_id,
             type,
             message,
             data,
