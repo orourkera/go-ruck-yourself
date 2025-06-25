@@ -43,12 +43,12 @@ class UserDuelStatsResource(Resource):
                 supabase.table('user_duel_stats').insert([stats]).execute()
             
             # Get additional computed stats
-            cursor = supabase.table('duel_participants').select('duel_id(title, challenge_type, status, completed_at, winner_id)').eq('user_id', target_user_id).order('joined_at', desc=True).execute()
+            cursor = supabase.table('duel_participants').select('duel_id(title, challenge_type, status, winner_id)').eq('user_id', target_user_id).order('joined_at', desc=True).execute()
             
             computed_stats = cursor.data
             
             # Get recent duel history
-            cursor = supabase.table('duel_participants').select('duel_id(id, title, challenge_type, status, completed_at, winner_id), current_value, status as participant_status').eq('user_id', target_user_id).order('joined_at', desc=True).limit(10).execute()
+            cursor = supabase.table('duel_participants').select('duel_id(id, title, challenge_type, status, winner_id), current_value, status as participant_status').eq('user_id', target_user_id).order('joined_at', desc=True).limit(10).execute()
             
             recent_duels = cursor.data
             
