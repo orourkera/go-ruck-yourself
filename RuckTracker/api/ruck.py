@@ -43,93 +43,79 @@ def clip_route_for_privacy(location_points):
     if not location_points or len(location_points) < 3:
         return location_points
     
-    # Privacy clipping distance (100m)
-    PRIVACY_DISTANCE_METERS = 100.0
+    # Privacy clipping distance (200m)
+    PRIVACY_DISTANCE_METERS = 200.0
     
-    # Convert location points to uniform format with timestamp
+    # Convert to consistent format
     normalized_points = []
     for point in location_points:
         if isinstance(point, dict):
             if 'lat' in point and 'lng' in point:
                 normalized_points.append({
-                    'latitude': point['lat'],
-                    'longitude': point['lng'],
-                    'timestamp': point.get('timestamp', '')
+                    'lat': float(point['lat']),
+                    'lng': float(point['lng'])
                 })
             elif 'latitude' in point and 'longitude' in point:
-                normalized_points.append(point)
+                normalized_points.append({
+                    'lat': float(point['latitude']),
+                    'lng': float(point['longitude'])
+                })
     
     if len(normalized_points) < 3:
         return location_points
     
-    # Sort points by timestamp to ensure correct order (empty timestamps go first)
-    sorted_points = sorted(normalized_points, key=lambda p: p.get('timestamp', ''))
-    
-    # Find the start clipping index (skip first ~100m)
+    # Find start clipping index (skip first ~100m)
     start_idx = 0
     cumulative_distance = 0
-    for i in range(1, len(sorted_points)):
-        prev_point = sorted_points[i-1]
-        curr_point = sorted_points[i]
+    for i in range(1, len(normalized_points)):
+        prev_point = normalized_points[i-1]
+        curr_point = normalized_points[i]
         
-        if prev_point.get('latitude') and prev_point.get('longitude') and \
-           curr_point.get('latitude') and curr_point.get('longitude'):
-            distance = haversine_distance(
-                prev_point['latitude'], prev_point['longitude'],
-                curr_point['latitude'], curr_point['longitude']
-            )
-            cumulative_distance += distance
-            
-            if cumulative_distance >= PRIVACY_DISTANCE_METERS:
-                start_idx = i
-                break
+        distance = haversine_distance(
+            prev_point['lat'], prev_point['lng'],
+            curr_point['lat'], curr_point['lng']
+        )
+        cumulative_distance += distance
+        
+        if cumulative_distance >= PRIVACY_DISTANCE_METERS:
+            start_idx = i
+            break
     
-    # Find the end clipping index (skip last ~100m) 
-    # Start from the end and work backwards
-    end_idx = len(sorted_points) - 1
+    # Find end clipping index (skip last ~100m)
+    end_idx = len(normalized_points)
     cumulative_distance = 0
-    for i in range(len(sorted_points) - 2, -1, -1):
-        curr_point = sorted_points[i]
-        next_point = sorted_points[i+1]
+    for i in range(len(normalized_points) - 2, -1, -1):
+        curr_point = normalized_points[i]
+        next_point = normalized_points[i+1]
         
-        if curr_point.get('latitude') and curr_point.get('longitude') and \
-           next_point.get('latitude') and next_point.get('longitude'):
-            distance = haversine_distance(
-                curr_point['latitude'], curr_point['longitude'],
-                next_point['latitude'], next_point['longitude']
-            )
-            cumulative_distance += distance
-            
-            if cumulative_distance >= PRIVACY_DISTANCE_METERS:
-                end_idx = i + 1  # Include this point in the visible route
-                break
+        distance = haversine_distance(
+            curr_point['lat'], curr_point['lng'],
+            next_point['lat'], next_point['lng']
+        )
+        cumulative_distance += distance
+        
+        if cumulative_distance >= PRIVACY_DISTANCE_METERS:
+            end_idx = i + 1
+            break
     
-    # Ensure we have valid indices and at least some points left
-    if start_idx >= end_idx or end_idx <= start_idx:
-        # If clipping would remove everything or indices are invalid, 
-        # return middle section (25% to 75% of route)
-        total_points = len(sorted_points)
-        start_idx = max(0, total_points // 4)
-        end_idx = min(total_points, 3 * total_points // 4)
-        
-        # Ensure end_idx is greater than start_idx
+    # Safety check: ensure we have valid indices and some points
+    if start_idx >= end_idx or start_idx >= len(normalized_points) or end_idx <= 0:
+        # Fallback: return middle 50% if distance clipping fails
+        total = len(normalized_points)
+        start_idx = total // 4
+        end_idx = 3 * total // 4
         if end_idx <= start_idx:
-            # Fallback: remove first and last point only
-            start_idx = 1
-            end_idx = total_points - 1
+            # Last resort: return all points
+            return normalized_points
     
-    # Extract the visible route section
-    clipped_points = sorted_points[start_idx:end_idx]
+    # Extract the visible portion
+    clipped_points = normalized_points[start_idx:end_idx]
     
-    # Convert back to original format
-    result = []
-    for point in clipped_points:
-        result.append({
-            'lat': point['latitude'],
-            'lng': point['longitude']
-        })
-    
-    return result
+    # Final safety: never return empty list
+    if not clipped_points:
+        return normalized_points
+        
+    return clipped_points
 
 class RuckSessionListResource(Resource):
     def get(self):
@@ -232,10 +218,10 @@ class RuckSessionListResource(Resource):
                 session_id = session['id']
                 if session_id in locations_by_session:
                     route_points = locations_by_session[session_id]
-                    # Apply privacy clipping
-                    clipped_route = clip_route_for_privacy(route_points)
-                    session['route'] = clipped_route
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Attached {len(clipped_route)} clipped points")
+                    # TEMPORARY: Skip privacy clipping to restore routes
+                    # clipped_route = clip_route_for_privacy(route_points)
+                    session['route'] = route_points  # Use raw points for now
+                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Attached {len(route_points)} raw points (clipping disabled)")
                 else:
                     session['route'] = []
                     logger.info(f"[ROUTE_DEBUG] Session {session_id}: No route data found")
