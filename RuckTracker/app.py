@@ -122,9 +122,9 @@ except Exception as e:
     app.logger.error(f"Redis cache service initialization failed: {str(e)}")
 
 # Initialize Memory Profiler
-from .api.memory_profiler import init_memory_routes, memory_profiler
+from .api.memory_profiler import init_memory_routes, auto_profiler
 init_memory_routes(app)
-app.logger.info(" Memory profiler initialized - available at /api/system/memory")
+app.logger.info(" Automatic memory profiler initialized - available at /api/system/memory")
 
 # Apply rate limit to specific HTTP methods
 app.logger.info("Setting HeartRateSampleUploadResource rate limit to: 3600 per hour")

@@ -678,7 +678,6 @@ class RuckSessionResumeResource(Resource):
             return {'message': f"Error resuming ruck session: {str(e)}"}, 500
 
 class RuckSessionCompleteResource(Resource):
-    @profile_memory("session_completion")
     def post(self, ruck_id):
         """Complete a ruck session"""
         try:
@@ -955,7 +954,6 @@ class RuckSessionCompleteResource(Resource):
             return {'message': f"Error ending ruck session: {str(e)}"}, 500
 
 class RuckSessionLocationResource(Resource):
-    @profile_memory
     def post(self, ruck_id):
         """Upload location points to an active ruck session (POST /api/rucks/<ruck_id>/location)"""
         try:

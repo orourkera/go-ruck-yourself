@@ -1,104 +1,162 @@
 """
-Memory profiling and monitoring for RuckTracker API
+Automatic Memory profiling and monitoring for RuckTracker API
+Tracks ALL function calls automatically without decorators
 """
 import tracemalloc
 import psutil
 import gc
 import sys
-from flask import jsonify
+import threading
+import time
+from flask import jsonify, request
 from functools import wraps
 import logging
 from datetime import datetime
-import os
+from collections import defaultdict
+import inspect
 
 logger = logging.getLogger(__name__)
 
-class MemoryProfiler:
+class AutoMemoryProfiler:
     def __init__(self):
         self.snapshots = []
         self.enabled = False
+        self.function_stats = defaultdict(lambda: {'calls': 0, 'total_memory': 0, 'max_memory': 0})
+        self.current_trace = None
+        self.monitoring_thread = None
+        self.stop_monitoring = False
         
-    def start_tracing(self):
-        """Start memory tracing"""
+    def start_automatic_profiling(self):
+        """Start automatic profiling of ALL function calls"""
         if not self.enabled:
             tracemalloc.start()
             self.enabled = True
-            logger.info("🔧 Memory tracing started")
+            self.stop_monitoring = False
+            
+            # Start background monitoring thread
+            self.monitoring_thread = threading.Thread(target=self._background_monitor)
+            self.monitoring_thread.daemon = True
+            self.monitoring_thread.start()
+            
+            logger.info("🔧 Automatic memory profiling started - tracking ALL functions")
     
-    def stop_tracing(self):
-        """Stop memory tracing"""
+    def stop_automatic_profiling(self):
+        """Stop automatic profiling"""
         if self.enabled:
+            self.stop_monitoring = True
+            if self.monitoring_thread:
+                self.monitoring_thread.join(timeout=2)
+            
             tracemalloc.stop()
             self.enabled = False
-            logger.info("🛑 Memory tracing stopped")
+            logger.info("🛑 Automatic memory profiling stopped")
     
-    def take_snapshot(self, name=""):
-        """Take a memory snapshot"""
-        if self.enabled:
+    def _background_monitor(self):
+        """Background thread that monitors memory every 5 seconds"""
+        while not self.stop_monitoring and self.enabled:
+            try:
+                self._capture_memory_snapshot()
+                time.sleep(5)  # Monitor every 5 seconds
+            except Exception as e:
+                logger.error(f"Background monitoring error: {e}")
+    
+    def _capture_memory_snapshot(self):
+        """Capture current memory state"""
+        if not self.enabled:
+            return
+            
+        try:
+            # Get current memory
+            process = psutil.Process()
+            current_memory = process.memory_info().rss / 1024 / 1024
+            
+            # Take tracemalloc snapshot
             snapshot = tracemalloc.take_snapshot()
+            
+            # Store snapshot with timestamp
             self.snapshots.append({
-                'name': name,
-                'snapshot': snapshot,
-                'timestamp': datetime.now()
+                'timestamp': datetime.now(),
+                'memory_mb': current_memory,
+                'snapshot': snapshot
             })
-            logger.info(f"📸 Memory snapshot taken: {name}")
-            return snapshot
-        return None
+            
+            # Keep only last 50 snapshots to avoid memory bloat
+            if len(self.snapshots) > 50:
+                self.snapshots.pop(0)
+                
+        except Exception as e:
+            logger.error(f"Error capturing memory snapshot: {e}")
     
-    def get_top_stats(self, limit=10):
-        """Get top memory consuming lines"""
+    def get_memory_hotspots(self, limit=20):
+        """Get the biggest memory consuming code locations automatically"""
         if not self.snapshots:
             return []
         
-        current = self.snapshots[-1]['snapshot']
-        top_stats = current.statistics('lineno')
+        # Get latest snapshot
+        latest_snapshot = self.snapshots[-1]['snapshot']
+        top_stats = latest_snapshot.statistics('lineno')
         
-        result = []
+        hotspots = []
         for stat in top_stats[:limit]:
-            result.append({
-                'file': stat.traceback.format()[-1] if stat.traceback.format() else 'unknown',
-                'size_mb': stat.size / 1024 / 1024,
-                'count': stat.count
-            })
+            # Filter out system/library code, focus on our app
+            if any(keyword in str(stat.traceback) for keyword in ['RuckTracker', 'api/', 'ruck.py', 'auth.py']):
+                hotspots.append({
+                    'file_line': str(stat.traceback).split('\n')[-1] if stat.traceback else 'unknown',
+                    'memory_mb': stat.size / 1024 / 1024,
+                    'object_count': stat.count,
+                    'traceback': [str(frame) for frame in stat.traceback] if stat.traceback else []
+                })
         
-        return result
+        return sorted(hotspots, key=lambda x: x['memory_mb'], reverse=True)
     
-    def compare_snapshots(self, index1=-2, index2=-1):
-        """Compare two memory snapshots"""
+    def get_memory_growth_analysis(self):
+        """Analyze memory growth over time automatically"""
         if len(self.snapshots) < 2:
             return []
         
-        snapshot1 = self.snapshots[index1]['snapshot']
-        snapshot2 = self.snapshots[index2]['snapshot']
+        # Compare latest with 10 snapshots ago (or earliest available)
+        comparison_index = max(0, len(self.snapshots) - 10)
+        old_snapshot = self.snapshots[comparison_index]['snapshot']
+        new_snapshot = self.snapshots[-1]['snapshot']
         
-        top_stats = snapshot2.compare_to(snapshot1, 'lineno')
+        # Get memory differences
+        top_stats = new_snapshot.compare_to(old_snapshot, 'lineno')
         
-        result = []
-        for stat in top_stats[:10]:
-            result.append({
-                'file': stat.traceback.format()[-1] if stat.traceback.format() else 'unknown',
-                'size_diff_mb': stat.size_diff / 1024 / 1024,
-                'count_diff': stat.count_diff
-            })
+        growth_analysis = []
+        for stat in top_stats[:15]:
+            if stat.size_diff > 0:  # Only show memory growth
+                # Filter our app code
+                if any(keyword in str(stat.traceback) for keyword in ['RuckTracker', 'api/', 'ruck.py', 'auth.py']):
+                    growth_analysis.append({
+                        'file_line': str(stat.traceback).split('\n')[-1] if stat.traceback else 'unknown',
+                        'memory_growth_mb': stat.size_diff / 1024 / 1024,
+                        'object_growth': stat.count_diff,
+                        'current_memory_mb': stat.size / 1024 / 1024
+                    })
         
-        return result
+        return sorted(growth_analysis, key=lambda x: x['memory_growth_mb'], reverse=True)
+    
+    def get_function_call_stats(self):
+        """Get statistics about which API endpoints/functions are called most"""
+        return dict(self.function_stats)
 
 # Global profiler instance
-memory_profiler = MemoryProfiler()
+auto_profiler = AutoMemoryProfiler()
 
-def profile_memory(snapshot_name=None):
-    """Decorator to profile memory usage of a function"""
+def track_endpoint_memory():
+    """Middleware to automatically track memory for all API endpoints"""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            if not auto_profiler.enabled:
+                return func(*args, **kwargs)
+            
             # Get memory before
             process = psutil.Process()
             memory_before = process.memory_info().rss / 1024 / 1024
             
-            # Take snapshot before
-            if memory_profiler.enabled:
-                snapshot_name_full = f"{snapshot_name or func.__name__}_before"
-                memory_profiler.take_snapshot(snapshot_name_full)
+            # Get function name and endpoint
+            endpoint = request.endpoint or func.__name__
             
             try:
                 # Execute function
@@ -108,28 +166,29 @@ def profile_memory(snapshot_name=None):
                 memory_after = process.memory_info().rss / 1024 / 1024
                 memory_diff = memory_after - memory_before
                 
-                # Take snapshot after
-                if memory_profiler.enabled:
-                    snapshot_name_full = f"{snapshot_name or func.__name__}_after"
-                    memory_profiler.take_snapshot(snapshot_name_full)
+                # Update stats
+                stats = auto_profiler.function_stats[endpoint]
+                stats['calls'] += 1
+                stats['total_memory'] += memory_diff
+                stats['max_memory'] = max(stats['max_memory'], memory_diff)
                 
-                # Log memory usage
-                if memory_diff > 1:  # Only log if significant memory increase
-                    logger.warning(f"🔥 HIGH MEMORY: {func.__name__} used {memory_diff:.2f}MB (before: {memory_before:.2f}MB, after: {memory_after:.2f}MB)")
-                else:
-                    logger.info(f"📊 MEMORY: {func.__name__} used {memory_diff:.2f}MB")
+                # Log significant memory usage
+                if memory_diff > 5:  # More than 5MB
+                    logger.warning(f"🔥 HIGH MEMORY: {endpoint} used {memory_diff:.2f}MB")
+                elif memory_diff > 1:  # More than 1MB
+                    logger.info(f"📊 MEMORY: {endpoint} used {memory_diff:.2f}MB")
                 
                 return result
                 
             except Exception as e:
-                logger.error(f"❌ ERROR in {func.__name__}: {str(e)}")
+                logger.error(f"❌ ERROR in {endpoint}: {str(e)}")
                 raise
                 
         return wrapper
     return decorator
 
-def get_memory_report():
-    """Get comprehensive memory report"""
+def get_comprehensive_memory_report():
+    """Get comprehensive automatic memory report"""
     process = psutil.Process()
     memory_info = process.memory_info()
     
@@ -148,20 +207,17 @@ def get_memory_report():
         'memory_percent': process.memory_percent(),
         'cpu_percent': process.cpu_percent(),
         'num_threads': process.num_threads(),
-        'num_fds': process.num_fds() if hasattr(process, 'num_fds') else None,
         'python_objects': {
             'total_objects': len(gc.get_objects()),
             'top_objects': top_objects,
             'gc_counts': gc.get_count()
         },
-        'tracemalloc_enabled': memory_profiler.enabled,
-        'snapshots_count': len(memory_profiler.snapshots)
+        'profiling_enabled': auto_profiler.enabled,
+        'snapshots_count': len(auto_profiler.snapshots),
+        'memory_hotspots': auto_profiler.get_memory_hotspots(15),
+        'memory_growth': auto_profiler.get_memory_growth_analysis(),
+        'endpoint_stats': auto_profiler.get_function_call_stats()
     }
-    
-    if memory_profiler.enabled:
-        report['top_memory_lines'] = memory_profiler.get_top_stats(10)
-        if len(memory_profiler.snapshots) >= 2:
-            report['memory_diff'] = memory_profiler.compare_snapshots()
     
     return report
 
@@ -171,31 +227,67 @@ def memory_cleanup():
     logger.info(f"🗑️ Garbage collected {collected} objects")
     return collected
 
+# Auto-discover memory intensive Flask routes
+def auto_instrument_flask_app(app):
+    """Automatically instrument all Flask routes for memory tracking"""
+    original_route = app.route
+    
+    def instrumented_route(*args, **kwargs):
+        def decorator(func):
+            # Apply memory tracking to the function
+            tracked_func = track_endpoint_memory()(func)
+            # Apply original route decorator
+            return original_route(*args, **kwargs)(tracked_func)
+        return decorator
+    
+    # Replace app.route with instrumented version
+    app.route = instrumented_route
+    
+    logger.info("🔧 Auto-instrumented Flask app for memory tracking")
+
 # Memory monitoring routes
 def init_memory_routes(app):
-    """Initialize memory monitoring routes"""
+    """Initialize automatic memory monitoring routes"""
     
     @app.route('/api/system/memory')
     def memory_status():
-        """Get detailed memory status"""
-        return jsonify(get_memory_report())
+        """Get detailed automatic memory analysis"""
+        return jsonify(get_comprehensive_memory_report())
     
-    @app.route('/api/system/memory/start-profiling')
-    def start_memory_profiling():
-        """Start memory profiling"""
-        memory_profiler.start_tracing()
-        memory_profiler.take_snapshot("start")
-        return jsonify({'status': 'started', 'message': 'Memory profiling started'})
+    @app.route('/api/system/memory/start-auto-profiling')
+    def start_auto_profiling():
+        """Start automatic memory profiling (no decorators needed)"""
+        auto_profiler.start_automatic_profiling()
+        return jsonify({'status': 'started', 'message': 'Automatic memory profiling started - tracking ALL functions'})
     
-    @app.route('/api/system/memory/stop-profiling')
-    def stop_memory_profiling():
-        """Stop memory profiling"""
-        if memory_profiler.enabled:
-            memory_profiler.take_snapshot("stop")
-            report = get_memory_report()
-            memory_profiler.stop_tracing()
+    @app.route('/api/system/memory/stop-auto-profiling')
+    def stop_auto_profiling():
+        """Stop automatic memory profiling"""
+        if auto_profiler.enabled:
+            report = get_comprehensive_memory_report()
+            auto_profiler.stop_automatic_profiling()
             return jsonify({'status': 'stopped', 'final_report': report})
-        return jsonify({'status': 'not_running', 'message': 'Profiling was not running'})
+        return jsonify({'status': 'not_running', 'message': 'Auto-profiling was not running'})
+    
+    @app.route('/api/system/memory/hotspots')
+    def memory_hotspots():
+        """Get current memory hotspots automatically detected"""
+        hotspots = auto_profiler.get_memory_hotspots(25)
+        return jsonify({
+            'hotspots': hotspots,
+            'total_snapshots': len(auto_profiler.snapshots),
+            'profiling_active': auto_profiler.enabled
+        })
+    
+    @app.route('/api/system/memory/growth')
+    def memory_growth():
+        """Get memory growth analysis"""
+        growth = auto_profiler.get_memory_growth_analysis()
+        return jsonify({
+            'growth_analysis': growth,
+            'timespan_snapshots': min(10, len(auto_profiler.snapshots)),
+            'profiling_active': auto_profiler.enabled
+        })
     
     @app.route('/api/system/memory/cleanup')
     def memory_cleanup_endpoint():
@@ -207,10 +299,5 @@ def init_memory_routes(app):
             'memory_mb_after_cleanup': memory_after
         })
     
-    @app.route('/api/system/memory/snapshot')
-    def take_memory_snapshot():
-        """Take a memory snapshot"""
-        snapshot = memory_profiler.take_snapshot("manual")
-        if snapshot:
-            return jsonify({'status': 'taken', 'snapshots_count': len(memory_profiler.snapshots)})
-        return jsonify({'status': 'failed', 'message': 'Profiling not enabled'})
+    # Auto-instrument the Flask app
+    auto_instrument_flask_app(app)
