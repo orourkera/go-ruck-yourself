@@ -119,7 +119,12 @@ try:
     else:
         app.logger.error("Redis cache service failed to connect - using memory caching fallback")
 except Exception as e:
-    app.logger.error(f"Error initializing Redis cache service: {e}")
+    app.logger.error(f"Redis cache service initialization failed: {str(e)}")
+
+# Initialize Memory Profiler
+from .api.memory_profiler import init_memory_routes, memory_profiler
+init_memory_routes(app)
+app.logger.info(" Memory profiler initialized - available at /api/system/memory")
 
 # Apply rate limit to specific HTTP methods
 app.logger.info("Setting HeartRateSampleUploadResource rate limit to: 3600 per hour")

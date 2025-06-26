@@ -8,6 +8,7 @@ from dateutil import tz
 
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.services.redis_cache_service import cache_delete_pattern, cache_get, cache_set
+from .memory_profiler import profile_memory
 
 logger = logging.getLogger(__name__)
 
@@ -677,7 +678,9 @@ class RuckSessionResumeResource(Resource):
             return {'message': f"Error resuming ruck session: {str(e)}"}, 500
 
 class RuckSessionCompleteResource(Resource):
+    @profile_memory("session_completion")
     def post(self, ruck_id):
+        """Complete a ruck session"""
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
@@ -952,6 +955,7 @@ class RuckSessionCompleteResource(Resource):
             return {'message': f"Error ending ruck session: {str(e)}"}, 500
 
 class RuckSessionLocationResource(Resource):
+    @profile_memory
     def post(self, ruck_id):
         """Upload location points to an active ruck session (POST /api/rucks/<ruck_id>/location)"""
         try:

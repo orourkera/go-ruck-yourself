@@ -6,6 +6,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:provider/provider.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
+import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
@@ -161,142 +162,224 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         return;
       }
       
-      // Set loading state immediately
-      setState(() {
-        _isCreating = true;
-      });
-
-      String? ruckId;
+      // Check location permissions BEFORE starting session creation
       try {
-        // Weight is stored internally in KG
-        // Double check the conversion for standard (imperial) weights is correct
-        double weightForApiKg = _ruckWeight;
+        final locationService = GetIt.instance<LocationService>();
+        bool hasPermission = await locationService.hasLocationPermission();
         
-        // Debug log the exact weight being saved
-        AppLogger.debug('Creating session with ruck weight: ${weightForApiKg.toStringAsFixed(2)} kg');
-        AppLogger.debug('Original selection was: ${_displayRuckWeight} ${_preferMetric ? "kg" : "lbs"}');
-        
-        // Prepare request data for creation
-        Map<String, dynamic> createRequestData = {
-          'ruck_weight_kg': weightForApiKg,
-        };
-        
-        // Add event context if creating session for an event
-        if (_eventId != null) {
-          createRequestData['event_id'] = _eventId;
-          createRequestData['session_type'] = 'event_ruck';
+        if (!hasPermission) {
+          // Try to request permission
+          hasPermission = await locationService.requestLocationPermission();
         }
         
-        // Add user's weight (required)
-        final userWeightRaw = _userWeightController.text;
-        if (userWeightRaw.isEmpty) {
-            throw Exception(sessionUserWeightRequired); // Use centralized error message
-        }
-        double userWeightKg = _preferMetric 
-            ? double.parse(userWeightRaw) 
-            : double.parse(userWeightRaw) / 2.20462; // Convert lbs to kg
-        createRequestData['weight_kg'] = userWeightKg;
-        
-        // --- Ensure planned duration is included ---
-        if (_plannedDuration != null && _plannedDuration! > 0) {
-          createRequestData['planned_duration_minutes'] = _plannedDuration;
-        }
-        // --- End planned duration addition ---
-        
-        // --- Add user_id for Supabase RLS ---
-        createRequestData['user_id'] = authState.user.userId;
-        // --- End user_id ---
-        
-        // ---- Step 1: Create session in the backend ----
-        
-        final apiClient = GetIt.instance<ApiClient>();
-        
-        // Try to create online session first, but fall back quickly to offline
-        try {
-          AppLogger.info('Attempting to create online session...');
-          final createResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(milliseconds: 800));
-
-          if (!mounted) return;
-          
-          // Check if response has the correct ID key
-          if (createResponse == null || createResponse['id'] == null) {
-            throw Exception('Invalid response from server when creating session');
-          }
-          
-          // Extract ruck ID from response
-          ruckId = createResponse['id'].toString();
-          AppLogger.info('✅ Created online session: $ruckId');
-        } catch (e) {
-          // Any error (network, timeout, etc.) immediately goes to offline mode
-          AppLogger.warning('Failed to create online session, proceeding offline: $e');
-          
-          // Create offline session ID
-          ruckId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
-          AppLogger.info('🔄 Created offline session: $ruckId');
-        }
-        
-        // Save the used weight (always in KG) to SharedPreferences on success
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setDouble('lastRuckWeightKg', weightForApiKg);
-
-        // Save the user's entered body weight
-        _saveUserWeight(_userWeightController.text);
-        
-        // Save duration if entered
-        if (_durationController.text.isNotEmpty) {
-          int duration = int.parse(_durationController.text);
-          _plannedDuration = duration;
-          await _saveLastDuration(duration);
-        }
-        
-        // Perform session preparation/validation without resetting _ruckWeight or _displayRuckWeight
-        // Log current state for debugging
-        
-
-        
-        // Delay and then navigate without resetting chip state
-        await Future.delayed(Duration(milliseconds: 500));
-        // Convert planned duration (minutes) to seconds; null means no planned duration
-        final int? plannedDuration = _plannedDuration != null ? _plannedDuration! * 60 : null;
-        
-        // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
-        final sessionArgs = ActiveSessionArgs(
-          ruckWeight: _ruckWeight,
-          userWeightKg: userWeightKg, // Pass the calculated userWeightKg (double)
-          notes: null, // Set to null, assuming no dedicated notes input for session args here. Adjust if a notes field exists.
-          plannedDuration: plannedDuration,
-          eventId: _eventId, // Use _eventId from route arguments, not widget.eventId
-        );
-        
-        AppLogger.sessionCompletion('Creating session with event context', context: {
-          'event_id': _eventId,
-          'event_title': _eventTitle,
-          'ruck_weight_kg': _ruckWeight,
-          'planned_duration_seconds': plannedDuration,
-        });
-        
-        // Navigate to CountdownPage which will handle the countdown and transition
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => CountdownPage(args: sessionArgs),
-          ),
-        );
-      } catch (e) {
-        
-        if (mounted) {
+        if (!hasPermission) {
           StyledSnackBar.showError(
             context: context,
-            message: e.toString().contains(sessionUserWeightRequired)
-              ? sessionUserWeightRequired
-              : 'Failed to create/start session: $e',
-            duration: const Duration(seconds: 3),
+            message: 'Location permission is required for ruck tracking. Please enable location access in Settings.',
+            duration: const Duration(seconds: 5),
           );
-          // Only set creating to false on error, success leads to navigation
           setState(() {
             _isCreating = false;
           });
+          return;
         }
-      } 
+        
+        AppLogger.info('Location permissions verified before session creation');
+        
+        // Check health permissions early to prevent permission pop-ups during session
+        final healthService = GetIt.instance<HealthService>();
+        try {
+          // Check if health integration is available on this device
+          bool isHealthAvailable = await healthService.isHealthDataAvailable();
+          if (isHealthAvailable) {
+            AppLogger.info('Health data available, requesting permissions...');
+            
+            // Request health permissions now instead of during session
+            bool healthAuthorized = await healthService.requestAuthorization();
+            if (!healthAuthorized) {
+              AppLogger.warning('Health permissions denied, continuing without health integration');
+              // Don't block session creation, just warn the user
+              StyledSnackBar.showError(
+                context: context,
+                message: 'Health permissions denied. Heart rate monitoring will be unavailable.',
+                duration: const Duration(seconds: 3),
+              );
+            } else {
+              AppLogger.info('Health permissions granted');
+            }
+          } else {
+            AppLogger.info('Health data not available on this device');
+          }
+        } catch (e) {
+          AppLogger.warning('Failed to check health permissions: $e');
+          // Don't block session creation if health check fails
+        }
+        
+        // Check battery optimization status for Android background location
+        if (Theme.of(context).platform == TargetPlatform.android) {
+          try {
+            // Use the proper modal dialog to explain and request battery optimization permissions
+            final batteryOptimizationGranted = await BatteryOptimizationService.ensureBackgroundExecutionPermissions(context: context);
+            
+            if (!batteryOptimizationGranted) {
+              AppLogger.info('Battery optimization permissions not granted, continuing anyway');
+              // Don't block session creation - just log the status
+            } else {
+              AppLogger.info('Battery optimization permissions granted');
+            }
+          } catch (e) {
+            AppLogger.warning('Failed to check battery optimization: $e');
+            // Don't block session creation if this check fails
+          }
+        }
+              } catch (e) {
+        AppLogger.error('Failed to check location permissions', exception: e);
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Unable to verify location permissions. Please check your device settings.',
+          duration: const Duration(seconds: 4),
+        );
+        setState(() {
+          _isCreating = false;
+        });
+        return;
+      }
+        // Set loading state immediately
+        setState(() {
+          _isCreating = true;
+        });
+
+        String? ruckId;
+        try {
+          // Weight is stored internally in KG
+          // Double check the conversion for standard (imperial) weights is correct
+          double weightForApiKg = _ruckWeight;
+          
+          // Debug log the exact weight being saved
+          AppLogger.debug('Creating session with ruck weight: ${weightForApiKg.toStringAsFixed(2)} kg');
+          AppLogger.debug('Original selection was: ${_displayRuckWeight} ${_preferMetric ? "kg" : "lbs"}');
+          
+          // Prepare request data for creation
+          Map<String, dynamic> createRequestData = {
+            'ruck_weight_kg': weightForApiKg,
+          };
+          
+          // Add event context if creating session for an event
+          if (_eventId != null) {
+            createRequestData['event_id'] = _eventId;
+            createRequestData['session_type'] = 'event_ruck';
+          }
+          
+          // Add user's weight (required)
+          final userWeightRaw = _userWeightController.text;
+          if (userWeightRaw.isEmpty) {
+              throw Exception(sessionUserWeightRequired); // Use centralized error message
+          }
+          double userWeightKg = _preferMetric 
+              ? double.parse(userWeightRaw) 
+              : double.parse(userWeightRaw) / 2.20462; // Convert lbs to kg
+          createRequestData['weight_kg'] = userWeightKg;
+          
+          // --- Ensure planned duration is included ---
+          if (_plannedDuration != null && _plannedDuration! > 0) {
+            createRequestData['planned_duration_minutes'] = _plannedDuration;
+          }
+          // --- End planned duration addition ---
+          
+          // --- Add user_id for Supabase RLS ---
+          createRequestData['user_id'] = authState.user.userId;
+          // --- End user_id ---
+          
+          // ---- Step 1: Create session in the backend ----
+          
+          final apiClient = GetIt.instance<ApiClient>();
+          
+          // Try to create online session first, but fall back quickly to offline
+          try {
+            AppLogger.info('Attempting to create online session...');
+            final createResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(milliseconds: 800));
+
+            if (!mounted) return;
+            
+            // Check if response has the correct ID key
+            if (createResponse == null || createResponse['id'] == null) {
+              throw Exception('Invalid response from server when creating session');
+            }
+            
+            // Extract ruck ID from response
+            ruckId = createResponse['id'].toString();
+            AppLogger.info('✅ Created online session: $ruckId');
+          } catch (e) {
+            // Any error (network, timeout, etc.) immediately goes to offline mode
+            AppLogger.warning('Failed to create online session, proceeding offline: $e');
+            
+            // Create offline session ID
+            ruckId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
+            AppLogger.info('🔄 Created offline session: $ruckId');
+          }
+          
+          // Save the used weight (always in KG) to SharedPreferences on success
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setDouble('lastRuckWeightKg', weightForApiKg);
+
+          // Save the user's entered body weight
+          _saveUserWeight(_userWeightController.text);
+          
+          // Save duration if entered
+          if (_durationController.text.isNotEmpty) {
+            int duration = int.parse(_durationController.text);
+            _plannedDuration = duration;
+            await _saveLastDuration(duration);
+          }
+          
+          // Perform session preparation/validation without resetting _ruckWeight or _displayRuckWeight
+          // Log current state for debugging
+          
+
+          
+          // Delay and then navigate without resetting chip state
+          await Future.delayed(Duration(milliseconds: 500));
+          // Convert planned duration (minutes) to seconds; null means no planned duration
+          final int? plannedDuration = _plannedDuration != null ? _plannedDuration! * 60 : null;
+          
+          // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
+          final sessionArgs = ActiveSessionArgs(
+            ruckWeight: _ruckWeight,
+            userWeightKg: userWeightKg, // Pass the calculated userWeightKg (double)
+            notes: null, // Set to null, assuming no dedicated notes input for session args here. Adjust if a notes field exists.
+            plannedDuration: plannedDuration,
+            eventId: _eventId, // Use _eventId from route arguments, not widget.eventId
+          );
+          
+          AppLogger.sessionCompletion('Creating session with event context', context: {
+            'event_id': _eventId,
+            'event_title': _eventTitle,
+            'ruck_weight_kg': _ruckWeight,
+            'planned_duration_seconds': plannedDuration,
+          });
+          
+          // Navigate to CountdownPage which will handle the countdown and transition
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => CountdownPage(args: sessionArgs),
+            ),
+          );
+        } catch (e) {
+          
+          if (mounted) {
+            StyledSnackBar.showError(
+              context: context,
+              message: e.toString().contains(sessionUserWeightRequired)
+                ? sessionUserWeightRequired
+                : 'Failed to create/start session: $e',
+              duration: const Duration(seconds: 3),
+            );
+            // Only set creating to false on error, success leads to navigation
+            setState(() {
+              _isCreating = false;
+            });
+          }
+        } 
     }
   }
 

@@ -44,6 +44,10 @@ import 'package:rucking_app/features/events/presentation/screens/events_screen.d
 import 'package:rucking_app/features/duels/presentation/screens/duels_list_screen.dart';
 import 'package:rucking_app/shared/utils/route_privacy_utils.dart';
 import 'package:rucking_app/core/services/duel_completion_service.dart';
+import 'package:rucking_app/core/services/location_service.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/core/services/battery_optimization_service.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -345,6 +349,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       _loadData();
       _checkForPhotoUploadError();
       _checkForSessionRecovery();
+      _requestEarlyPermissions(); // Request permissions early for better UX
     });
   }
   
@@ -1375,6 +1380,53 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       developer.log('[HOME_DEBUG] Started preloading ${profileUrls.length} profile pics and ${photoUrls.length} session photos');
     } catch (e) {
       developer.log('[HOME_DEBUG] Error preloading images: $e');
+    }
+  }
+
+  Future<void> _requestEarlyPermissions() async {
+    if (!mounted) return;
+    
+    try {
+      // Always request location permissions for all platforms
+      final locationService = GetIt.instance<LocationService>();
+      final hasLocationPermission = await locationService.hasLocationPermission();
+      
+      if (!hasLocationPermission) {
+        AppLogger.info('[HOME] Requesting location permissions early...');
+        await locationService.requestLocationPermission();
+      }
+      
+      // Only request health permissions for Android users
+      // iOS users get health permissions during registration flow
+      if (Theme.of(context).platform != TargetPlatform.iOS) {
+        try {
+          final healthService = GetIt.instance<HealthService>();
+          final isHealthAvailable = await healthService.isHealthDataAvailable();
+          
+          if (isHealthAvailable) {
+            AppLogger.info('[HOME] Requesting health permissions early for Android...');
+            await healthService.requestAuthorization();
+          }
+        } catch (e) {
+          AppLogger.warning('[HOME] Failed to request health permissions early: $e');
+          // Don't block app startup if health permission fails
+        }
+      }
+      
+      // Request battery optimization permissions for Android (with modal)
+      if (Theme.of(context).platform == TargetPlatform.android) {
+        try {
+          await BatteryOptimizationService.ensureBackgroundExecutionPermissions(context: context);
+        } catch (e) {
+          AppLogger.warning('[HOME] Failed to check battery optimization early: $e');
+          // Don't block app startup if battery optimization check fails
+        }
+      }
+      
+      AppLogger.info('[HOME] Early permission requests completed');
+    } catch (e) {
+      AppLogger.error('[HOME] Error during early permission requests: $e');
+      // Don't crash the app if permission requests fail
     }
   }
 } // Closes _HomeTabState class

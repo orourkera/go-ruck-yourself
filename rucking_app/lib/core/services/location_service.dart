@@ -146,7 +146,7 @@ class LocationServiceImpl implements LocationService {
           enableWakeLock: true, // Prevent CPU sleep
           enableWifiLock: true, // Prevent WiFi sleep
           notificationChannelName: 'Ruck Session Tracking',
-          notificationIcon: AndroidResource(name: 'ic_launcher'),
+          notificationIcon: AndroidResource(name: 'ic_notification'),
           setOngoing: true, // Prevents dismissal during active sessions
           color: Color.fromARGB(255, 255, 165, 0), // Orange color for high visibility
         ),
@@ -195,9 +195,9 @@ class LocationServiceImpl implements LocationService {
           // Continue tracking but log the issue
         }
         
-        // Add to batch only - don't stream individual points immediately
+        // Add to batch for API calls AND stream for UI updates
         _locationBatch.add(locationPoint);
-        _locationController.add(locationPoint); // Stream individual points
+        _locationController.add(locationPoint); // For UI updates (distance, elevation, map)
         
         // Update last location update timestamp
         _lastLocationUpdate = DateTime.now();
@@ -299,7 +299,7 @@ class LocationServiceImpl implements LocationService {
           enableWakeLock: true,
           enableWifiLock: true,
           notificationChannelName: 'Ruck Session Tracking',
-          notificationIcon: AndroidResource(name: 'ic_launcher'),
+          notificationIcon: AndroidResource(name: 'ic_notification'),
           setOngoing: true,
         ),
       );
@@ -322,7 +322,7 @@ class LocationServiceImpl implements LocationService {
           AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
           
           _locationBatch.add(locationPoint);
-          _locationController.add(locationPoint);
+          _locationController.add(locationPoint); // For UI updates (distance, elevation, map)
           _lastLocationUpdate = DateTime.now();
           _lastValidLocation = locationPoint;
           
@@ -359,7 +359,7 @@ class LocationServiceImpl implements LocationService {
         AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
         
         _locationBatch.add(locationPoint);
-        _locationController.add(locationPoint);
+        _locationController.add(locationPoint); // For UI updates (distance, elevation, map)
         _lastLocationUpdate = DateTime.now();
         _lastValidLocation = locationPoint;
         

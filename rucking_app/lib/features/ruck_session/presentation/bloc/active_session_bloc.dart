@@ -340,9 +340,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   void _startLocationUpdates(String sessionId) {
     _locationSubscription?.cancel();
     _batchLocationSubscription?.cancel();
+    
     _locationSubscription = _locationService.startLocationTracking().listen(
-      (location) {
-        add(LocationUpdated(location));
+      (locationPoint) {
+        add(LocationUpdated(locationPoint));
       },
       onError: (error) {
         AppLogger.warning('Location tracking error (continuing session without GPS): $error');
@@ -350,6 +351,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // This allows users to ruck indoors, on airplanes, or in poor GPS areas
       },
     );
+    
+    // Only use batch location updates to prevent duplicate API calls
     _batchLocationSubscription = _locationService.batchedLocationUpdates.listen(
       (batch) {
         add(BatchLocationUpdated(batch));
@@ -360,6 +363,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // This allows users to ruck indoors, on airplanes, or in poor GPS areas
       },
     );
+    
     AppLogger.debug('Location tracking started for session $sessionId.');
   }
 
@@ -445,9 +449,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         elapsedSeconds: currentState.elapsedSeconds,
         isPaused: currentState.isPaused,
       );
-
-      // Note: Individual location points are no longer sent immediately
-      // They are batched and sent via _processBatchLocationUpload
 
       emit(currentState.copyWith(
         locationPoints: newLocationPoints,

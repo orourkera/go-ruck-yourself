@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart'; 
@@ -113,8 +114,7 @@ class AuthServiceImpl implements AuthService {
   AuthServiceImpl(this._apiClient, this._storageService) {
     _googleSignIn = GoogleSignIn(
       scopes: ['email', 'profile'],
-      serverClientId: '966278977337-730qujnni7h9ukafh5brafjd06j1skqu.apps.googleusercontent.com', // Web client ID for server auth
-      clientId: '966278977337-l132nm2pas6ifl0kc3oh9977icfja6au.apps.googleusercontent.com', // iOS client ID
+      clientId: Platform.isIOS ? '966278977337-l132nm2pas6ifl0kc3oh9977icfja6au.apps.googleusercontent.com' : null, // iOS client ID only, Android uses google-services.json
     );
     
     // Set up the API client to use our refresh token method (with circuit breaker)
@@ -195,6 +195,7 @@ class AuthServiceImpl implements AuthService {
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
+        nonce: null, // Use null for Google (nonce is for Apple primarily)
       );
 
       final supabaseUser = response.user;

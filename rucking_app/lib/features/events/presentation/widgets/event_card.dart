@@ -113,14 +113,34 @@ class EventCard extends StatelessWidget {
                               children: [
                                 Text(
                                   event.hostingClub!.name,
-                                  style: AppTextStyles.titleMedium.copyWith(
+                                  style: AppTextStyles.titleLarge.copyWith(
                                     color: isDarkMode ? Colors.white : AppColors.textDark,
                                     fontWeight: FontWeight.w600,
                                     fontFamily: 'Bangers', // Use Bangers font for club title
+                                    fontSize: 20, // Bigger font size
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                // Add clickable address URL below club name
+                                if (event.locationName != null && event.locationName!.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () => _launchMaps(
+                                      event.locationName!,
+                                      event.latitude,
+                                      event.longitude,
+                                    ),
+                                    child: Text(
+                                      event.locationName!,
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: isDarkMode ? AppColors.primary : Colors.blue,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: isDarkMode ? AppColors.primary : Colors.blue,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
