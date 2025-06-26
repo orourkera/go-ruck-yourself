@@ -982,11 +982,13 @@ class RuckSessionLocationResource(Resource):
                 .execute()
             
             if not session_resp.data:
+                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
                 return {'message': 'Session not found or access denied'}, 404
             
             session_data = session_resp.data[0]
             if session_data['status'] != 'in_progress':
-                return {'message': 'Session not in progress'}, 400
+                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'in_progress'")
+                return {'message': f"Session not in progress (status: {session_data['status']})"}, 400
             
             # Insert location points (like heart rate samples)
             location_rows = []
@@ -1015,11 +1017,6 @@ class RuckSessionLocationResource(Resource):
             logger.error(f"Error adding location points for ruck session {ruck_id}: {e}")
             return {'message': f"Error uploading location points: {str(e)}"}, 500
 
-from flask import request, g
-from flask_restful import Resource
-
-from flask_limiter.util import get_remote_address
-
 class HeartRateSampleUploadResource(Resource):
     def get(self, ruck_id):
         """Get heart rate samples for a ruck session (GET /api/rucks/<ruck_id>/heart_rate)"""
@@ -1037,6 +1034,7 @@ class HeartRateSampleUploadResource(Resource):
                 .execute()
                 
             if not session_resp.data:
+                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
                 return {'message': 'Session not found or access denied'}, 404
             
             session_data = session_resp.data[0]
@@ -1072,11 +1070,13 @@ class HeartRateSampleUploadResource(Resource):
                 .execute()
             
             if not session_resp.data:
+                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
                 return {'message': 'Session not found or access denied'}, 404
             
             session_data = session_resp.data[0]
             if session_data['status'] != 'in_progress':
-                return {'message': 'Session not in progress'}, 400
+                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'in_progress'")
+                return {'message': f"Session not in progress (status: {session_data['status']})"}, 400
             
             # Insert heart rate samples
             heart_rate_rows = []
