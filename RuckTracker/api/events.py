@@ -113,7 +113,13 @@ class EventsListResource(Resource):
             active_events = []
             for event in events:
                 try:
-                    event_time = datetime.strptime(event['scheduled_start_time'], '%Y-%m-%d %H:%M:%S%z')
+                    try:
+                        # Try ISO format first (e.g., '2025-06-26T09:00:00+00:00')
+                        event_time = datetime.fromisoformat(event['scheduled_start_time'])
+                    except ValueError:
+                        # Fallback to old format (e.g., '2025-06-26 09:00:00+00:00')
+                        event_time = datetime.strptime(event['scheduled_start_time'], '%Y-%m-%d %H:%M:%S%z')
+                    
                     if event_time < now - timedelta(hours=24):
                         completed_events.append(event)
                     else:
@@ -436,7 +442,13 @@ class EventParticipationResource(Resource):
                 return {'error': 'Event is not active'}, 400
             
             # Check if event is in the past
-            event_time = datetime.strptime(event['scheduled_start_time'], '%Y-%m-%d %H:%M:%S%z')
+            try:
+                # Try ISO format first (e.g., '2025-06-26T09:00:00+00:00')
+                event_time = datetime.fromisoformat(event['scheduled_start_time'])
+            except ValueError:
+                # Fallback to old format (e.g., '2025-06-26 09:00:00+00:00')
+                event_time = datetime.strptime(event['scheduled_start_time'], '%Y-%m-%d %H:%M:%S%z')
+            
             if event_time < datetime.now(event_time.tzinfo):
                 return {'error': 'Cannot join past events'}, 400
             
