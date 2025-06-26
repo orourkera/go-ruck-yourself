@@ -8,7 +8,6 @@ from dateutil import tz
 
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.services.redis_cache_service import cache_delete_pattern, cache_get, cache_set
-from .memory_profiler import profile_memory
 
 logger = logging.getLogger(__name__)
 
