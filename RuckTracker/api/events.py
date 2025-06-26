@@ -116,9 +116,15 @@ class EventsListResource(Resource):
                     try:
                         # Try ISO format first (e.g., '2025-06-26T09:00:00+00:00')
                         event_time = datetime.fromisoformat(event['scheduled_start_time'])
+                        # Ensure timezone-aware for comparison
+                        if event_time.tzinfo is None:
+                            event_time = event_time.replace(tzinfo=timezone.utc)
                     except ValueError:
                         # Fallback to old format (e.g., '2025-06-26 09:00:00+00:00')
                         event_time = datetime.strptime(event['scheduled_start_time'], '%Y-%m-%d %H:%M:%S%z')
+                        # This should already be timezone-aware, but ensure it
+                        if event_time.tzinfo is None:
+                            event_time = event_time.replace(tzinfo=timezone.utc)
                     
                     if event_time < now - timedelta(hours=24):
                         completed_events.append(event)
@@ -447,9 +453,15 @@ class EventParticipationResource(Resource):
             try:
                 # Try ISO format first (e.g., '2025-06-26T09:00:00+00:00')
                 event_time = datetime.fromisoformat(event['scheduled_start_time'])
+                # Ensure timezone-aware for comparison
+                if event_time.tzinfo is None:
+                    event_time = event_time.replace(tzinfo=timezone.utc)
             except ValueError:
                 # Fallback to old format (e.g., '2025-06-26 09:00:00+00:00')
                 event_time = datetime.strptime(event['scheduled_start_time'], '%Y-%m-%d %H:%M:%S%z')
+                # This should already be timezone-aware, but ensure it
+                if event_time.tzinfo is None:
+                    event_time = event_time.replace(tzinfo=timezone.utc)
             
             if event_time < datetime.now(event_time.tzinfo):
                 return {'error': 'Cannot join past events'}, 400
