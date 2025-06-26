@@ -53,6 +53,15 @@ class LocationUpdated extends ActiveSessionEvent {
   List<Object?> get props => [locationPoint];
 }
 
+class BatchLocationUpdated extends ActiveSessionEvent {
+  final List<LocationPoint> locationPoints;
+  
+  const BatchLocationUpdated(this.locationPoints);
+  
+  @override
+  List<Object?> get props => [locationPoints];
+}
+
 class SessionPaused extends ActiveSessionEvent {
   final SessionActionSource source;
   const SessionPaused({this.source = SessionActionSource.unknown});

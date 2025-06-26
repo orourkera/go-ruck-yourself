@@ -5,7 +5,7 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_restful import Api, Resource
 from RuckTracker.api.auth import auth_required, get_user_id
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from RuckTracker.supabase_client import get_supabase_admin_client
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
 
@@ -59,7 +59,7 @@ class EventsListResource(Resource):
                 query = query.lt('scheduled_start_time', end_before)
             elif upcoming_only:
                 # Only show upcoming/active events if not looking for completed ones
-                now = datetime.utcnow()
+                now = datetime.utcnow().replace(tzinfo=timezone.utc)
                 query = query.gte('scheduled_start_time', (now - timedelta(hours=24)).isoformat())
             
             if joined_only:
@@ -108,7 +108,7 @@ class EventsListResource(Resource):
                 events.append(event_data)
             
             # Separate completed and active events
-            now = datetime.utcnow()
+            now = datetime.utcnow().replace(tzinfo=timezone.utc)
             completed_events = []
             active_events = []
             for event in events:
@@ -132,12 +132,14 @@ class EventsListResource(Resource):
             logger.debug(f"Completed events: {len(completed_events)}")
             logger.debug(f"Active events: {len(active_events)}")
             
-            # Sort each list separately
-            completed_events.sort(key=lambda x: x['scheduled_start_time'], reverse=True)
+            # Sort each list separately for optimal user experience:
+            # - Active/upcoming events: soonest first (ascending)
+            # - Completed/past events: newest first (descending) 
             active_events.sort(key=lambda x: x['scheduled_start_time'])
+            completed_events.sort(key=lambda x: x['scheduled_start_time'], reverse=True)
             
-            # Combine the lists
-            sorted_events = completed_events + active_events
+            # Combine: active events first (soonest to latest), then past events (newest to oldest)
+            sorted_events = active_events + completed_events
             
             logger.info(f"Found {len(sorted_events)} events")
             return {'events': sorted_events, 'total': len(sorted_events)}, 200

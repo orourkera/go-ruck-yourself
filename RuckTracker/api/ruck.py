@@ -979,11 +979,13 @@ class RuckSessionLocationResource(Resource):
                 .select('id,status') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
-                .single() \
                 .execute()
+            
             if not session_resp.data:
-                return {'message': 'Session not found'}, 404
-            if session_resp.data['status'] != 'in_progress':
+                return {'message': 'Session not found or access denied'}, 404
+            
+            session_data = session_resp.data[0]
+            if session_data['status'] != 'in_progress':
                 return {'message': 'Session not in progress'}, 400
             
             # Insert location points (like heart rate samples)
@@ -1032,11 +1034,12 @@ class HeartRateSampleUploadResource(Resource):
                 .select('id,user_id') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
-                .single() \
                 .execute()
                 
             if not session_resp.data:
-                return {'message': 'Session not found'}, 404
+                return {'message': 'Session not found or access denied'}, 404
+            
+            session_data = session_resp.data[0]
             
             # Get heart rate samples for this session
             response = supabase.table('heart_rate_sample') \
@@ -1063,13 +1066,18 @@ class HeartRateSampleUploadResource(Resource):
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Check if session exists and belongs to user
             session_resp = supabase.table('ruck_session') \
-                .select('id,user_id') \
+                .select('id,status') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
-                .single() \
                 .execute()
+            
             if not session_resp.data:
-                return {'message': 'Session not found'}, 404
+                return {'message': 'Session not found or access denied'}, 404
+            
+            session_data = session_resp.data[0]
+            if session_data['status'] != 'in_progress':
+                return {'message': 'Session not in progress'}, 400
+            
             # Insert heart rate samples
             heart_rate_rows = []
             for sample in data['samples']:

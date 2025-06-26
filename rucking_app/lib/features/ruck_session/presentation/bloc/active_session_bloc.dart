@@ -61,6 +61,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final ConnectivityService _connectivityService;
 
   StreamSubscription<LocationPoint>? _locationSubscription;
+  StreamSubscription<List<LocationPoint>>? _batchLocationSubscription;
   StreamSubscription<HeartRateSample>? _heartRateSubscription;
   StreamSubscription<List<HeartRateSample>>? _heartRateBufferSubscription;
   StreamSubscription<bool>? _connectivitySubscription;
@@ -119,6 +120,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
     on<SessionStarted>(_onSessionStarted);
     on<LocationUpdated>(_onLocationUpdated);
+    on<BatchLocationUpdated>(_onBatchLocationUpdated);
     on<SessionPaused>(_onSessionPaused);
     on<SessionResumed>(_onSessionResumed);
     on<SessionCompleted>(_onSessionCompleted);
@@ -337,12 +339,23 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   void _startLocationUpdates(String sessionId) {
     _locationSubscription?.cancel();
+    _batchLocationSubscription?.cancel();
     _locationSubscription = _locationService.startLocationTracking().listen(
       (location) {
         add(LocationUpdated(location));
       },
       onError: (error) {
         AppLogger.warning('Location tracking error (continuing session without GPS): $error');
+        // Don't stop the session - continue in offline mode without location updates
+        // This allows users to ruck indoors, on airplanes, or in poor GPS areas
+      },
+    );
+    _batchLocationSubscription = _locationService.batchedLocationUpdates.listen(
+      (batch) {
+        add(BatchLocationUpdated(batch));
+      },
+      onError: (error) {
+        AppLogger.warning('Batch location tracking error (continuing session without GPS): $error');
         // Don't stop the session - continue in offline mode without location updates
         // This allows users to ruck indoors, on airplanes, or in poor GPS areas
       },
@@ -360,16 +373,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       final LocationPoint newPoint = event.locationPoint;
       _lastLocationTimestamp = DateTime.now();
-      
-      // Check if this is a batch update marker (lat/lng = 0)
-      if (newPoint.latitude == 0 && newPoint.longitude == 0) {
-        // This is a batch update signal - process pending batch
-        final batch = LocationServiceImpl.getPendingBatch();
-        if (batch != null && batch.isNotEmpty && !currentState.sessionId.startsWith('offline_')) {
-          _processBatchLocationUpload(currentState.sessionId, batch);
-        }
-        return; // Don't process this marker as a real location point
-      }
       
       final validationResult = _validationService.validateLocationPoint(newPoint, _lastValidLocation);
       if (!(validationResult['isValid'] as bool? ?? false)) {
@@ -476,6 +479,26 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           AppLogger.warning('Failed to send location batch to backend: $e');
         }
       });
+  }
+  
+  Future<void> _onBatchLocationUpdated(
+    BatchLocationUpdated event, 
+    Emitter<ActiveSessionState> emit
+  ) async {
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      if (currentState.isPaused) return;
+
+      final batch = event.locationPoints;
+      _lastLocationTimestamp = DateTime.now();
+      
+      AppLogger.info('Processing batch of ${batch.length} location points for API upload');
+      
+      // Send batch to API (don't process individual points for UI updates)
+      if (batch.isNotEmpty && !currentState.sessionId.startsWith('offline_')) {
+        _processBatchLocationUpload(currentState.sessionId, batch);
+      }
+    }
   }
   
   Future<void> _onTimerStarted(TimerStarted event, Emitter<ActiveSessionState> emit) async {
@@ -1732,6 +1755,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   Future<void> close() async {
     _stopTickerAndWatchdog();
     _locationSubscription?.cancel();
+    _batchLocationSubscription?.cancel();
     _heartRateSubscription?.cancel();
     _heartRateBufferSubscription?.cancel();
     _connectivitySubscription?.cancel();

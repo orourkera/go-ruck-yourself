@@ -24,6 +24,9 @@ abstract class LocationService {
   /// Start tracking location updates continuously
   Stream<LocationPoint> startLocationTracking();
   
+  /// Stream of batched location points for API upload
+  Stream<List<LocationPoint>> get batchedLocationUpdates;
+  
   /// Stop tracking location updates
   Future<void> stopLocationTracking();
   
@@ -42,11 +45,15 @@ class LocationServiceImpl implements LocationService {
   Timer? _batchTimer;
   Timer? _locationTimeoutTimer;
   Timer? _stalenessCheckTimer;
-  final StreamController<LocationPoint> _batchedLocationController = StreamController<LocationPoint>.broadcast();
+  final StreamController<LocationPoint> _locationController = StreamController<LocationPoint>.broadcast();
+  final StreamController<List<LocationPoint>> _batchController = StreamController<List<LocationPoint>>.broadcast();
   StreamSubscription<Position>? _rawLocationSubscription;
   DateTime? _lastLocationUpdate;
   LocationPoint? _lastValidLocation;
   bool _isTracking = false;
+  
+  @override
+  Stream<List<LocationPoint>> get batchedLocationUpdates => _batchController.stream;
   
   @override
   Future<bool> hasLocationPermission() async {
@@ -190,7 +197,7 @@ class LocationServiceImpl implements LocationService {
         
         // Add to batch only - don't stream individual points immediately
         _locationBatch.add(locationPoint);
-        // _batchedLocationController.add(locationPoint); // Removed: Individual streaming
+        _locationController.add(locationPoint); // Stream individual points
         
         // Update last location update timestamp
         _lastLocationUpdate = DateTime.now();
@@ -200,7 +207,7 @@ class LocationServiceImpl implements LocationService {
       },
       onError: (error) {
         AppLogger.error('Location service error', exception: error);
-        _batchedLocationController.addError(error);
+        _locationController.addError(error);
         
         // Attempt to restart location tracking after error
         if (_isTracking) {
@@ -227,7 +234,7 @@ class LocationServiceImpl implements LocationService {
       _sendBatchUpdate();
     });
     
-    return _batchedLocationController.stream;
+    return _locationController.stream;
   }
   
   /// Start monitoring for stale location updates and restart if needed
@@ -315,7 +322,7 @@ class LocationServiceImpl implements LocationService {
           AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
           
           _locationBatch.add(locationPoint);
-          _batchedLocationController.add(locationPoint);
+          _locationController.add(locationPoint);
           _lastLocationUpdate = DateTime.now();
           _lastValidLocation = locationPoint;
           
@@ -352,7 +359,7 @@ class LocationServiceImpl implements LocationService {
         AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
         
         _locationBatch.add(locationPoint);
-        _batchedLocationController.add(locationPoint);
+        _locationController.add(locationPoint);
         _lastLocationUpdate = DateTime.now();
         _lastValidLocation = locationPoint;
         
@@ -372,33 +379,16 @@ class LocationServiceImpl implements LocationService {
       return;
     }
     
-    AppLogger.info('📦 Preparing to send batch of ${_locationBatch.length} location points');
+    final batchCount = _locationBatch.length;
+    AppLogger.info('📦 Preparing to send batch of $batchCount location points');
     
     // Broadcast batch update event for active session to handle
-    final batchCopy = List<LocationPoint>.from(_locationBatch);
-    _batchedLocationController.add(LocationPoint(
-      latitude: 0, // Special marker for batch update
-      longitude: 0,
-      elevation: 0,
-      accuracy: 0,
-      timestamp: DateTime.now(),
-      // Store batch data in a special way that can be detected
-    ));
+    _batchController.add(List<LocationPoint>.from(_locationBatch));
     
-    // For now, store the batch in a static variable that can be accessed
-    _pendingBatch = batchCopy;
+    // Clear batch  
     _locationBatch.clear();
     
-    AppLogger.info('✅ Batch update signal sent - ${batchCopy.length} points queued for upload');
-  }
-  
-  static List<LocationPoint>? _pendingBatch;
-  
-  /// Get and clear the pending batch of location points
-  static List<LocationPoint>? getPendingBatch() {
-    final batch = _pendingBatch;
-    _pendingBatch = null;
-    return batch;
+    AppLogger.info('✅ Batch update signal sent - $batchCount points queued for upload');
   }
   
   @override
@@ -443,6 +433,7 @@ class LocationServiceImpl implements LocationService {
     _batchTimer?.cancel();
     _locationTimeoutTimer?.cancel();
     _stalenessCheckTimer?.cancel();
-    _batchedLocationController.close();
+    _locationController.close();
+    _batchController.close();
   }
 }

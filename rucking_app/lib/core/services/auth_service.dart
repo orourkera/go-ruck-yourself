@@ -113,7 +113,7 @@ class AuthServiceImpl implements AuthService {
   AuthServiceImpl(this._apiClient, this._storageService) {
     _googleSignIn = GoogleSignIn(
       scopes: ['email', 'profile'],
-      serverClientId: '966278977337-730qujnni7h9ukafh5brafjd06j1skqu.apps.googleusercontent.com', // Exact Web client ID from Google Cloud Console
+      serverClientId: '966278977337-730qujnni7h9ukafh5brafjd06j1skqu.apps.googleusercontent.com', // Web client ID for server auth
       clientId: '966278977337-l132nm2pas6ifl0kc3oh9977icfja6au.apps.googleusercontent.com', // iOS client ID
     );
     
