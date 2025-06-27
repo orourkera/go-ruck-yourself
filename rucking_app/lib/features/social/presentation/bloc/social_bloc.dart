@@ -64,9 +64,6 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     try {
       final int ruckId = event.ruckId;
       
-      // Emit in-progress state
-      emit(LikeActionInProgress());
-      
       // Get current user
       final authState = _authBloc.state;
       if (authState is! Authenticated) {
@@ -74,28 +71,31 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         return;
       }
 
-      // Check current like status
-      final isCurrentlyLiked = await _socialRepository.hasUserLikedRuck(ruckId);
+      // Use cached like status to determine action - much faster than API call
+      final cachedLikeStatus = _socialRepository.getCachedLikeStatus(ruckId);
+      final isCurrentlyLiked = cachedLikeStatus ?? false; // Default to false if no cache
 
-      // Toggle the like
+      // Toggle the like - API endpoints will return updated state
       bool newLikedState;
+      int newLikeCount;
+      
       if (isCurrentlyLiked) {
         await _socialRepository.removeRuckLike(ruckId);
         newLikedState = false;
+        // Get the updated count from repository cache (already decremented)
+        newLikeCount = _socialRepository.getCachedLikeCount(ruckId) ?? 0;
       } else {
         await _socialRepository.addRuckLike(ruckId);
         newLikedState = true;
+        // Get the updated count from repository cache (already incremented)
+        newLikeCount = _socialRepository.getCachedLikeCount(ruckId) ?? 1;
       }
 
-      // Get updated like count
-      final likes = await _socialRepository.getRuckLikes(ruckId);
-      final likeCount = likes.length;
-
-      // Emit completed state
+      // Emit completed state immediately - no need for additional API calls
       emit(LikeActionCompleted(
         isLiked: newLikedState,
         ruckId: ruckId,
-        likeCount: likeCount,
+        likeCount: newLikeCount,
       ));
       
     } catch (e) {

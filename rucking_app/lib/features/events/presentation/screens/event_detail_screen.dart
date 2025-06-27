@@ -846,7 +846,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   }
 
   Widget _buildActionButton(Event event) {
-    if (event.isUserApproved && event.isUpcoming) {
+    if (event.isUserApproved && event.canStartRuck) {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton(

@@ -80,10 +80,12 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     _commentCount = widget.ruckBuddy.commentCount ?? 0;
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser ?? false;
     
-    developer.log('[SOCIAL_DEBUG] Initialized RuckBuddyCard with API data for ruck $_ruckId: likes=$_likeCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
+    // Update social repository cache with initial values to ensure consistency
+    if (_ruckId != null && _socialRepository != null) {
+      _socialRepository!.updateCacheWithInitialValues(_ruckId!, _isLiked, _likeCount!);
+    }
     
-    // No need to fetch social data separately since it's included in the API response
-    // This improves performance by avoiding unnecessary API calls
+    developer.log('[SOCIAL_DEBUG] Initialized RuckBuddyCard with API data for ruck $_ruckId: likes=$_likeCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
     
     // Request photos for this ruck if we have an ID
     if (_ruckId != null) {
@@ -231,23 +233,43 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     if (_isProcessingLike || _ruckId == null) return;
 
     try {
-      // Provide immediate strong haptic feedback
-      HapticFeedback.heavyImpact();
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: _handleLikeTap started for ruckId: $_ruckId', name: 'RuckBuddyCard');
       
-      // Use ToggleRuckLike event for both liking and unliking
-      context.read<SocialBloc>().add(ToggleRuckLike(_ruckId!));
+      // Store previous state for potential revert
+      final previousLikedState = _isLiked;
+      final previousLikeCount = _likeCount ?? 0;
       
-      // Optimistically update UI immediately
+      // Optimistically update UI immediately for instant feedback
+      final newLikedState = !_isLiked;
+      final newLikeCount = newLikedState ? previousLikeCount + 1 : (previousLikeCount - 1).clamp(0, 999999);
+      
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Before optimistic update - liked: $previousLikedState, count: $previousLikeCount', name: 'RuckBuddyCard');
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: After optimistic calculation - liked: $newLikedState, count: $newLikeCount', name: 'RuckBuddyCard');
+      
+      // Update UI state immediately - this should be instant
       setState(() {
-        _isLiked = !_isLiked;
-        _likeCount = _isLiked ? (_likeCount ?? 0) + 1 : (_likeCount ?? 1) - 1;
-        // Ensure like count doesn't go below 0
-        if (_likeCount! < 0) _likeCount = 0;
+        _isLiked = newLikedState;
+        _likeCount = newLikeCount;
+        _isProcessingLike = true;
+        developer.log('[SOCIAL_DEBUG] RuckBuddyCard: setState completed - UI should show liked: $newLikedState, count: $newLikeCount', name: 'RuckBuddyCard');
       });
       
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Sent ToggleRuckLike event for ruckId: $_ruckId, new status: $_isLiked', name: 'RuckBuddyCard');
+      // Send event to SocialBloc (async, won't block UI)
+      context.read<SocialBloc>().add(ToggleRuckLike(_ruckId!));
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: ToggleRuckLike event sent to SocialBloc', name: 'RuckBuddyCard');
+      
+      // Reset processing state after a very short delay
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          setState(() => _isProcessingLike = false);
+          developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Processing state reset after delay', name: 'RuckBuddyCard');
+        }
+      });
+      
     } catch (e) {
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Error toggling like: $e');
+      // Reset processing state on any error
+      setState(() => _isProcessingLike = false);
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Error in _handleLikeTap: $e', name: 'RuckBuddyCard');
     }
   }
 
@@ -319,26 +341,39 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
               developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeStatusChecked', name: 'RuckBuddyCard');
             });
           }
+          
+          // Handle successful like action completion - only update if significantly different
           if (state is LikeActionCompleted && state.ruckId == _ruckId) {
             setState(() {
               _isProcessingLike = false;
-              _isLiked = state.isLiked;
-              _likeCount = state.likeCount;
-              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeActionCompleted', name: 'RuckBuddyCard');
+              // Only update if there's a significant discrepancy (server correction)
+              final countDifference = (state.likeCount - (_likeCount ?? 0)).abs();
+              if (countDifference > 1 || _isLiked != state.isLiked) {
+                _isLiked = state.isLiked;
+                _likeCount = state.likeCount;
+                developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server correction - liked: ${state.isLiked}, count: ${state.likeCount}', name: 'RuckBuddyCard');
+              } else {
+                developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server confirmed optimistic update - no change needed', name: 'RuckBuddyCard');
+              }
             });
           }
+          
           if (state is CommentsLoaded && state.ruckId == _ruckId.toString()) {
             setState(() {
               _commentCount = state.comments.length;
               developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded', name: 'RuckBuddyCard');
             });
           }
-          if (state is LikeActionInProgress) {
-            setState(() => _isProcessingLike = true);
-          }
+          
           if (state is LikeActionError && state.ruckId == _ruckId) {
-            setState(() => _isProcessingLike = false);
-            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) encountered LikeActionError: ${state.message}', name: 'RuckBuddyCard');
+            // Revert optimistic update on error
+            setState(() {
+              _isProcessingLike = false;
+              _isLiked = !_isLiked; // Revert optimistic change
+              _likeCount = _isLiked ? (_likeCount ?? 0) + 1 : (_likeCount ?? 1) - 1; // Revert count
+              if (_likeCount! < 0) _likeCount = 0;
+            });
+            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) reverted optimistic update due to error: ${state.message}', name: 'RuckBuddyCard');
           }
         },
         builder: (context, socialState) {
@@ -560,25 +595,55 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         // Like button
-                        GestureDetector(
-                          onTap: widget.onLikeTap ?? _handleLikeTap,
-                          child: Row(
-                            children: [
-                              Image.asset(
-                                _isLiked 
-                                  ? 'assets/images/tactical_ruck_like_icon_active.png'
-                                  : 'assets/images/tactical_ruck_like_icon_transparent.png',
-                                width: 48,
-                                height: 48,
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _isProcessingLike ? null : () {
+                              HapticFeedback.selectionClick();
+                              
+                              if (widget.onLikeTap != null) {
+                                widget.onLikeTap!();
+                              } else {
+                                _handleLikeTap();
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(24),
+                            splashRadius: 30,
+                            child: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Row(
+                                children: [
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 150),
+                                    transitionBuilder: (Widget child, Animation<double> animation) {
+                                      return ScaleTransition(
+                                        scale: animation,
+                                        child: child,
+                                      );
+                                    },
+                                    child: Image.asset(
+                                      _isLiked 
+                                        ? 'assets/images/tactical_ruck_like_icon_active.png'
+                                        : 'assets/images/tactical_ruck_like_icon_transparent.png',
+                                      key: ValueKey(_isLiked),
+                                      width: 48,
+                                      height: 48,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 150),
+                                    child: Text(
+                                      '${_likeCount ?? 0}',
+                                      key: ValueKey(_likeCount),
+                                      style: AppTextStyles.titleMedium.copyWith(
+                                        color: isDarkMode ? Colors.white : Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${_likeCount ?? 0}',
-                                style: AppTextStyles.titleMedium.copyWith(
-                                  color: isDarkMode ? Colors.white : Colors.black,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                         const SizedBox(width: 20),

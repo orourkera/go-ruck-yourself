@@ -37,7 +37,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       // Initial fetch
       if (mounted) {
         debugPrint('🐞 [_RuckBuddiesScreenState.initState] Dispatching FetchRuckBuddiesEvent.');
-        context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent());
+        context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent(limit: 10));
       }
     });
   }

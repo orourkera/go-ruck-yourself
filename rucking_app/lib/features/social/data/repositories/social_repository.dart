@@ -48,6 +48,13 @@ class SocialRepository {
     _commentsCache.remove(ruckId);
   }
 
+  /// Update cache with initial values from UI to ensure consistency
+  void updateCacheWithInitialValues(int ruckId, bool isLiked, int likeCount) {
+    _likeStatusCache[ruckId] = isLiked;
+    _likeCountCache[ruckId] = likeCount;
+    _likeCacheTimestamps[ruckId] = DateTime.now();
+  }
+
   /// Constructor
   SocialRepository({
     required http.Client httpClient,

@@ -1,7 +1,9 @@
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, make_response
 from flask_jwt_extended import jwt_required
 import os
 import math
+import gzip
+import json
 from datetime import datetime, timedelta
 
 from RuckTracker.supabase_client import get_supabase_client
@@ -98,6 +100,40 @@ def clip_route_for_privacy(location_points):
     
     return sorted_points[start_idx:end_idx + 1]
 
+
+def sample_route_points(location_points, max_points=50):
+    """
+    Sample route points to reduce data size while maintaining route shape.
+    
+    Args:
+        location_points: List of location points
+        max_points: Maximum number of points to return
+    
+    Returns:
+        Sampled list of location points
+    """
+    if not location_points or len(location_points) <= max_points:
+        return location_points
+    
+    # Calculate sampling interval
+    interval = len(location_points) / max_points
+    
+    # Always include first and last points
+    sampled = [location_points[0]]
+    
+    # Sample intermediate points
+    for i in range(1, max_points - 1):
+        index = int(i * interval)
+        if index < len(location_points):
+            sampled.append(location_points[index])
+    
+    # Always include last point
+    if len(location_points) > 1:
+        sampled.append(location_points[-1])
+    
+    return sampled
+
+
 @ruck_buddies_bp.route('/api/ruck-buddies', methods=['GET'])
 @auth_required
 def get_ruck_buddies():
@@ -135,7 +171,9 @@ def get_ruck_buddies():
     cached_response = cache_get(cache_key)
     if cached_response:
         print(f"[CACHE HIT] Returning cached ruck buddies for key: {cache_key}")
-        return jsonify(cached_response)
+        response = make_response(gzip.compress(json.dumps(cached_response).encode('utf-8')))
+        response.headers['Content-Encoding'] = 'gzip'
+        return response
     
     print(f"[CACHE MISS] Fetching ruck buddies from database for key: {cache_key}")
     
@@ -205,14 +243,17 @@ def get_ruck_buddies():
         location_points = session.get('location_points', [])
         clipped_location_points = clip_route_for_privacy(location_points)
         
+        # Sample route points
+        sampled_location_points = sample_route_points(clipped_location_points)
+        
         # Log privacy clipping for verification
-        print(f"[PRIVACY_DEBUG] Session {session.get('id')}: Original points: {len(location_points)}, Clipped points: {len(clipped_location_points)}")
+        print(f"[PRIVACY_DEBUG] Session {session.get('id')}: Original points: {len(location_points)}, Clipped points: {len(clipped_location_points)}, Sampled points: {len(sampled_location_points)}")
         
         # Add computed fields to session data
         session['like_count'] = like_count
         session['is_liked_by_current_user'] = is_liked_by_current_user
         session['comment_count'] = comment_count
-        session['location_points'] = clipped_location_points
+        session['location_points'] = sampled_location_points
         
         # Remove the raw likes/comments arrays to keep response clean
         session.pop('likes', None)
@@ -232,7 +273,7 @@ def get_ruck_buddies():
     })
     
     # Return the processed data
-    return jsonify({
+    response = make_response(gzip.compress(json.dumps({
         'ruck_sessions': processed_sessions,
         'meta': {
             'count': len(response.data),
@@ -240,4 +281,9 @@ def get_ruck_buddies():
             'page': page,
             'sort_by': sort_by
         }
-    }), 200
+    }).encode('utf-8')))
+    response.headers['Content-Encoding'] = 'gzip'
+    response.headers['Content-Type'] = 'application/json'
+    # Cache for 5 minutes for better performance
+    response.headers['Cache-Control'] = 'public, max-age=300'
+    return response, 200

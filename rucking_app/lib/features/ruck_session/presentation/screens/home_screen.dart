@@ -1057,61 +1057,58 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                           ),
                                           PolylineLayer(
                                             polylines: () {
-                                              // Get user's metric preference for privacy calculations
-                                              bool preferMetric = true;
-                                              try {
-                                                final authState = context.read<AuthBloc>().state;
-                                                if (authState is Authenticated) {
-                                                  preferMetric = authState.user.preferMetric;
-                                                }
-                                              } catch (e) {
-                                                // Default to metric if can't get preference
-                                              }
-
+                                              // TODO: Privacy clipping not working properly - temporarily disabled
                                               // Split route into privacy segments for visual indication
-                                              final privacySegments = RoutePrivacyUtils.splitRouteForPrivacy(
-                                                routePoints,
-                                                preferMetric: preferMetric,
-                                              );
+                                              // final privacySegments = RoutePrivacyUtils.splitRouteForPrivacy(
+                                              //   routePoints,
+                                              //   preferMetric: preferMetric,
+                                              // );
 
                                               List<Polyline> polylines = [];
 
+                                              // TODO: Temporarily show full route instead of privacy segments
                                               // Add private start segment (dark gray)
-                                              if (privacySegments.privateStartSegment.isNotEmpty) {
-                                                polylines.add(Polyline(
-                                                  points: privacySegments.privateStartSegment,
-                                                  color: Colors.grey.shade800,
-                                                  strokeWidth: 3,
-                                                ));
-                                              }
+                                              // if (privacySegments.privateStartSegment.isNotEmpty) {
+                                              //   polylines.add(Polyline(
+                                              //     points: privacySegments.privateStartSegment,
+                                              //     color: Colors.grey.shade800,
+                                              //     strokeWidth: 3,
+                                              //   ));
+                                              // }
 
                                               // Add visible middle segment (orange)
-                                              if (privacySegments.visibleMiddleSegment.isNotEmpty) {
-                                                polylines.add(Polyline(
-                                                  points: privacySegments.visibleMiddleSegment,
-                                                  color: AppColors.secondary,
-                                                  strokeWidth: 4,
-                                                ));
-                                              }
+                                              // if (privacySegments.visibleMiddleSegment.isNotEmpty) {
+                                              //   polylines.add(Polyline(
+                                              //     points: privacySegments.visibleMiddleSegment,
+                                              //     color: AppColors.secondary,
+                                              //     strokeWidth: 4,
+                                              //   ));
+                                              // }
 
                                               // Add private end segment (dark gray)
-                                              if (privacySegments.privateEndSegment.isNotEmpty) {
-                                                polylines.add(Polyline(
-                                                  points: privacySegments.privateEndSegment,
-                                                  color: Colors.grey.shade800,
-                                                  strokeWidth: 3,
-                                                ));
-                                              }
+                                              // if (privacySegments.privateEndSegment.isNotEmpty) {
+                                              //   polylines.add(Polyline(
+                                              //     points: privacySegments.privateEndSegment,
+                                              //     color: Colors.grey.shade800,
+                                              //     strokeWidth: 3,
+                                              //   ));
+                                              // }
+
+                                              // Show full route without privacy clipping
+                                              polylines.add(Polyline(
+                                                points: routePoints,
+                                                color: AppColors.secondary,
+                                                strokeWidth: 4,
+                                              ));
 
                                               // Fallback: if no segments were created, show the full route
-                                              if (polylines.isEmpty) {
-                                                polylines.add(Polyline(
-                                                  points: routePoints,
-                                                  color: AppColors.secondary,
-                                                  strokeWidth: 4,
-                                                ));
-                                              }
-
+                                              // if (polylines.isEmpty) {
+                                              //   polylines.add(Polyline(
+                                              //     points: routePoints,
+                                              //     color: AppColors.secondary,
+                                              //     strokeWidth: 4,
+                                              //   ));
+                                              // }
                                               return polylines;
                                             }(),
                                           ),
