@@ -93,43 +93,114 @@ def clip_route_for_privacy(location_points):
     
     # Ensure we have at least some points left
     if start_idx >= end_idx:
-        # If clipping would remove everything, return a minimal route (middle section)
-        middle_start = max(0, len(sorted_points) // 4)
-        middle_end = min(len(sorted_points), 3 * len(sorted_points) // 4)
-        return sorted_points[middle_start:middle_end] if middle_end > middle_start else sorted_points[1:-1]
+        # If clipping would remove everything, reduce clipping distance
+        # Only clip 100m from each end instead of 200m
+        REDUCED_PRIVACY_DISTANCE = 100.0
+        
+        # Recalculate with reduced distance
+        start_idx = 0
+        cumulative_distance = 0
+        for i in range(1, len(sorted_points)):
+            prev_point = sorted_points[i-1]
+            curr_point = sorted_points[i]
+            
+            if prev_point.get('latitude') and prev_point.get('longitude') and \
+               curr_point.get('latitude') and curr_point.get('longitude'):
+                distance = haversine_distance(
+                    prev_point['latitude'], prev_point['longitude'],
+                    curr_point['latitude'], curr_point['longitude']
+                )
+                cumulative_distance += distance
+                
+                if cumulative_distance >= REDUCED_PRIVACY_DISTANCE:
+                    start_idx = i
+                    break
+        
+        # Recalculate end with reduced distance
+        end_idx = len(sorted_points) - 1
+        cumulative_distance = 0
+        for i in range(len(sorted_points) - 2, -1, -1):
+            curr_point = sorted_points[i]
+            next_point = sorted_points[i+1]
+            
+            if curr_point.get('latitude') and curr_point.get('longitude') and \
+               next_point.get('latitude') and next_point.get('longitude'):
+                distance = haversine_distance(
+                    curr_point['latitude'], curr_point['longitude'],
+                    next_point['latitude'], next_point['longitude']
+                )
+                cumulative_distance += distance
+                
+                if cumulative_distance >= REDUCED_PRIVACY_DISTANCE:
+                    end_idx = i
+                    break
+        
+        # If still too aggressive, just clip first and last 10% of points
+        if start_idx >= end_idx:
+            points_to_clip = max(1, len(sorted_points) // 10)
+            start_idx = points_to_clip
+            end_idx = len(sorted_points) - points_to_clip - 1
     
     return sorted_points[start_idx:end_idx + 1]
 
 
-def sample_route_points(location_points, max_points=50):
+def sample_route_points(location_points, target_distance_between_points_m=75):
     """
-    Sample route points to reduce data size while maintaining route shape.
+    Sample route points to reduce data size while maintaining consistent route detail.
+    Uses distance-based sampling instead of fixed point count.
     
     Args:
         location_points: List of location points
-        max_points: Maximum number of points to return
+        target_distance_between_points_m: Target distance between sampled points in meters
     
     Returns:
         Sampled list of location points
     """
-    if not location_points or len(location_points) <= max_points:
+    if not location_points or len(location_points) <= 2:
         return location_points
     
-    # Calculate sampling interval
-    interval = len(location_points) / max_points
-    
-    # Always include first and last points
+    # Always include first point
     sampled = [location_points[0]]
     
-    # Sample intermediate points
-    for i in range(1, max_points - 1):
-        index = int(i * interval)
-        if index < len(location_points):
-            sampled.append(location_points[index])
+    # Track cumulative distance to determine when to include next point
+    cumulative_distance = 0
+    last_included_idx = 0
     
-    # Always include last point
-    if len(location_points) > 1:
+    for i in range(1, len(location_points)):
+        prev_point = location_points[i-1]
+        curr_point = location_points[i]
+        
+        if prev_point.get('latitude') and prev_point.get('longitude') and \
+           curr_point.get('latitude') and curr_point.get('longitude'):
+            
+            # Calculate distance from previous point
+            distance = haversine_distance(
+                prev_point['latitude'], prev_point['longitude'],
+                curr_point['latitude'], curr_point['longitude']
+            )
+            cumulative_distance += distance
+            
+            # Include point if we've traveled enough distance since last included point
+            if cumulative_distance >= target_distance_between_points_m:
+                sampled.append(curr_point)
+                cumulative_distance = 0  # Reset distance counter
+                last_included_idx = i
+    
+    # Always include last point if it wasn't already included
+    if last_included_idx < len(location_points) - 1:
         sampled.append(location_points[-1])
+    
+    # Cap at reasonable maximum to prevent huge payloads (e.g., 500 points max)
+    if len(sampled) > 500:
+        # If still too many points, use traditional sampling
+        interval = len(sampled) / 500
+        final_sampled = [sampled[0]]
+        for i in range(1, 499):
+            index = int(i * interval)
+            if index < len(sampled):
+                final_sampled.append(sampled[index])
+        final_sampled.append(sampled[-1])
+        return final_sampled
     
     return sampled
 
