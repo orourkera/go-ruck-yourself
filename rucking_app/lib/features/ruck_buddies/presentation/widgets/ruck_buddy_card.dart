@@ -608,7 +608,6 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                               }
                             },
                             borderRadius: BorderRadius.circular(24),
-                            splashRadius: 30,
                             child: Padding(
                               padding: const EdgeInsets.all(4.0),
                               child: Row(

@@ -46,7 +46,8 @@ class EventProgress extends Equatable {
       totalDistance: (json['distance_km'] as num?)?.toDouble() ??
           (json['total_distance'] as num?)?.toDouble() ??
           0.0,
-      totalTime: json['duration_minutes'] as int? ??
+      totalTime: json['duration_seconds'] as int? ??
+          json['duration_minutes'] as int? ??
           json['total_time'] as int? ??
           0,
       sessionCount: json['session_count'] as int? ?? 1,
