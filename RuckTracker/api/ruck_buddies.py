@@ -286,9 +286,10 @@ def get_ruck_buddies():
         .eq('is_public', True) \
         .eq('user.allow_ruck_sharing', True) \
         .neq('user_id', g.user.id) \
-        .order(order_by) \
-        .limit(per_page) \
-        .offset(offset)
+        .gt('duration_seconds', 180)  # Exclude rucks shorter than 3 minutes (180 seconds)
+    
+    # Apply sorting and pagination
+    query = query.order(order_by).limit(per_page).offset(offset)
 
     # Execute the query
     response = query.execute()
