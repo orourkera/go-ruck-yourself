@@ -2,6 +2,7 @@ import 'package:intl/intl.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
 
 /// Enum representing the status of a ruck session
 enum RuckStatus {
@@ -41,6 +42,7 @@ class RuckSession {
     int? plannedDurationMinutes,
     int? pausedDurationSeconds,
     List<SessionSplit>? splits,
+    List<RuckPhoto>? photos,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -69,6 +71,7 @@ class RuckSession {
       plannedDurationMinutes: plannedDurationMinutes ?? this.plannedDurationMinutes,
       pausedDurationSeconds: pausedDurationSeconds ?? this.pausedDurationSeconds,
       splits: splits ?? this.splits,
+      photos: photos ?? this.photos,
     );
   }
 
@@ -99,6 +102,7 @@ class RuckSession {
   final int? maxHeartRate;
   final int? minHeartRate;
   final List<SessionSplit>? splits;
+  final List<RuckPhoto>? photos;
 
   RuckSession({
     this.id,
@@ -127,6 +131,7 @@ class RuckSession {
     this.plannedDurationMinutes,
     this.pausedDurationSeconds,
     this.splits,
+    this.photos,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -269,6 +274,11 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
                 .map((e) => SessionSplit.fromJson(e as Map<String, dynamic>))
                 .toList()
             : null,
+        photos: json['photos'] != null
+            ? (json['photos'] as List<dynamic>)
+                .map((e) => RuckPhoto.fromJson(e as Map<String, dynamic>))
+                .toList()
+            : null,
       );
     } catch (e) {
       AppLogger.error("Error parsing RuckSession from JSON: $e");
@@ -323,6 +333,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       'planned_duration_minutes': plannedDurationMinutes,
       'paused_duration_seconds': pausedDurationSeconds,
       'splits': splits?.map((e) => e.toJson()).toList(),
+      'photos': photos?.map((e) => e.toJson()).toList(),
     };
   }
 }

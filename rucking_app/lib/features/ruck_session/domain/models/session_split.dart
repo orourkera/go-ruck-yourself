@@ -5,6 +5,8 @@ class SessionSplit {
   final int splitDurationSeconds;
   final double totalDistance; // Total distance at this split
   final int totalDurationSeconds; // Total duration at this split
+  final double caloriesBurned; // Calories burned during this split
+  final double elevationGainM; // Elevation gain in meters during this split
   final DateTime timestamp;
 
   const SessionSplit({
@@ -13,6 +15,8 @@ class SessionSplit {
     required this.splitDurationSeconds,
     required this.totalDistance,
     required this.totalDurationSeconds,
+    this.caloriesBurned = 0.0,
+    this.elevationGainM = 0.0,
     required this.timestamp,
   });
 
@@ -24,6 +28,8 @@ class SessionSplit {
       splitDurationSeconds: json['splitDurationSeconds'] ?? json['split_duration_seconds'] ?? 0,
       totalDistance: (json['totalDistance'] ?? json['total_distance'] ?? 0.0).toDouble(),
       totalDurationSeconds: json['totalDurationSeconds'] ?? json['total_duration_seconds'] ?? 0,
+      caloriesBurned: (json['caloriesBurned'] ?? json['calories_burned'] ?? 0.0).toDouble(),
+      elevationGainM: (json['elevationGainM'] ?? json['elevation_gain_m'] ?? 0.0).toDouble(),
       timestamp: DateTime.parse(json['timestamp'] as String),
     );
   }
@@ -36,6 +42,8 @@ class SessionSplit {
       'split_duration_seconds': splitDurationSeconds,
       'total_distance': totalDistance,
       'total_duration_seconds': totalDurationSeconds,
+      'calories_burned': caloriesBurned,
+      'elevation_gain_m': elevationGainM,
       'timestamp': timestamp.toIso8601String(),
     };
   }
@@ -77,6 +85,8 @@ class SessionSplit {
         other.splitDurationSeconds == splitDurationSeconds &&
         other.totalDistance == totalDistance &&
         other.totalDurationSeconds == totalDurationSeconds &&
+        other.caloriesBurned == caloriesBurned &&
+        other.elevationGainM == elevationGainM &&
         other.timestamp == timestamp;
   }
 
@@ -88,6 +98,8 @@ class SessionSplit {
       splitDurationSeconds,
       totalDistance,
       totalDurationSeconds,
+      caloriesBurned,
+      elevationGainM,
       timestamp,
     );
   }

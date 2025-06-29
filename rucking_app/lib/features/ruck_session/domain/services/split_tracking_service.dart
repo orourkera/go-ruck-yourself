@@ -14,6 +14,8 @@ class SplitTrackingService {
   double _lastSplitDistanceKm = 0.0; // Last completed split distance in km
   DateTime? _lastSplitTime; // Time when last split was recorded
   List<Map<String, dynamic>> _splits = []; // History of all splits
+  double _lastSplitElevationM = 0.0; // Last elevation at split point
+  double _totalCaloriesBurned = 0.0; // Total calories burned so far
   
   SplitTrackingService({required WatchService watchService}) 
       : _watchService = watchService;
@@ -89,13 +91,25 @@ class SplitTrackingService {
         final DateTime splitStartTime = _lastSplitTime ?? sessionStartTime;
         final Duration splitDuration = splitEndTime.difference(splitStartTime);
         
+        // Calculate calories burned for this split
+        // Using rough estimate: 0.5 calories per kg per minute for walking/rucking
+        final double splitCalories = _calculateSplitCalories(
+          durationSeconds: splitDuration.inSeconds,
+          distanceKm: splitDistanceKm,
+        );
+        
+        // Calculate elevation gain for this split
+        final double splitElevationGain = _calculateSplitElevationGain();
+        
         // Record this split info
         final splitInfo = {
-          'splitNumber': currentMilestoneIndex,
-          'splitDistance': 1.0, // Always 1.0 as it represents 1km or 1mi
-          'splitDurationSeconds': splitDuration.inSeconds, // Convert Duration to seconds
-          'totalDistance': preferMetric ? currentDistanceKm : currentDistanceKm / 1.609, // Convert to mi if needed
-          'totalDurationSeconds': elapsedSeconds, // Use seconds instead of Duration
+          'split_number': currentMilestoneIndex,
+          'split_distance': 1.0, // Always 1.0 as it represents 1km or 1mi
+          'split_duration_seconds': splitDuration.inSeconds, // Convert Duration to seconds
+          'total_distance': preferMetric ? currentDistanceKm : currentDistanceKm / 1.609, // Convert to mi if needed
+          'total_duration_seconds': elapsedSeconds, // Use seconds instead of Duration
+          'calories_burned': splitCalories,
+          'elevation_gain_m': splitElevationGain,
           'timestamp': splitEndTime.toIso8601String(), // Convert DateTime to string
         };
         _splits.add(splitInfo);
@@ -127,6 +141,77 @@ class SplitTrackingService {
         'error': e.toString(),
         'current_distance_km': currentDistanceKm,
       });
+    }
+  }
+  
+  /// Calculate calories burned for a split based on duration and distance
+  /// Uses MET (Metabolic Equivalent) values for rucking/hiking
+  double _calculateSplitCalories({
+    required int durationSeconds,
+    required double distanceKm,
+  }) {
+    try {
+      // Get user weight from auth bloc
+      final authBloc = GetIt.instance<AuthBloc>();
+      double userWeightKg = 70.0; // Default weight
+      
+      if (authBloc.state is Authenticated) {
+        final user = (authBloc.state as Authenticated).user;
+        userWeightKg = user.weightKg ?? 70.0;
+      }
+      
+      // Calculate pace (minutes per km)
+      final double paceMinPerKm = (durationSeconds / 60.0) / distanceKm;
+      
+      // MET values for different paces (rucking with pack)
+      // Slower pace = higher MET due to carrying weight
+      double metValue;
+      if (paceMinPerKm <= 8.0) { // Fast pace (< 8 min/km)
+        metValue = 8.0; // High intensity rucking
+      } else if (paceMinPerKm <= 12.0) { // Moderate pace (8-12 min/km)
+        metValue = 6.5; // Moderate intensity rucking
+      } else { // Slow pace (> 12 min/km)
+        metValue = 5.0; // Light intensity rucking
+      }
+      
+      // Calories = MET × weight(kg) × time(hours)
+      final double timeHours = durationSeconds / 3600.0;
+      final double calories = metValue * userWeightKg * timeHours;
+      
+      _totalCaloriesBurned += calories;
+      
+      AppLogger.debug('[SPLITS] Calculated split calories: $calories (pace: ${paceMinPerKm.toStringAsFixed(1)} min/km, MET: $metValue)');
+      
+      return calories;
+    } catch (e) {
+      AppLogger.debug('[SPLITS] Error calculating split calories: $e');
+      return 0.0;
+    }
+  }
+  
+  /// Calculate elevation gain for this split
+  /// This is a placeholder - would need actual elevation data from location service
+  double _calculateSplitElevationGain() {
+    try {
+      // TODO: Get actual elevation data from location service
+      // For now, return 0 as we don't have elevation tracking implemented
+      // In a real implementation, this would:
+      // 1. Get current elevation from location service
+      // 2. Compare with _lastSplitElevationM
+      // 3. Calculate positive elevation change
+      // 4. Update _lastSplitElevationM for next split
+      
+      final double currentElevationM = 0.0; // Placeholder
+      final double elevationGain = (currentElevationM - _lastSplitElevationM).clamp(0.0, double.infinity);
+      
+      _lastSplitElevationM = currentElevationM;
+      
+      AppLogger.debug('[SPLITS] Calculated split elevation gain: ${elevationGain}m');
+      
+      return elevationGain;
+    } catch (e) {
+      AppLogger.debug('[SPLITS] Error calculating split elevation: $e');
+      return 0.0;
     }
   }
 }

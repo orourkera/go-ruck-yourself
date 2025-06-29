@@ -1522,11 +1522,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         }
         
         // Fetch photos
-        try {
-          photos = await _sessionRepository.getSessionPhotos(session.id!);
-        } catch (e) {
-          AppLogger.error('Failed to fetch photos for viewed session ${session.id}: $e');
-          photosError = 'Failed to load photos';
+        // Use photos from session data (now included in backend response)
+        if (session.photos != null && session.photos!.isNotEmpty) {
+          photos = session.photos!;
+          AppLogger.info('Using ${photos.length} photos from session data');
+        } else {
+          AppLogger.info('No photos found in session data');
         }
         
         // Final emit with all loaded data

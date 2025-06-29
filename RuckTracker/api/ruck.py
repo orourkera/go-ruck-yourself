@@ -266,14 +266,14 @@ class RuckSessionListResource(Resource):
             photos_by_session = {}
             try:
                 all_photos_resp = supabase.table('ruck_photos') \
-                    .select('session_id,id,file_name,file_size,public_url,uploaded_at') \
-                    .in_('session_id', session_ids) \
-                    .order('session_id,uploaded_at') \
+                    .select('ruck_id,id,file_name,file_size,public_url,uploaded_at') \
+                    .in_('ruck_id', session_ids) \
+                    .order('ruck_id,uploaded_at') \
                     .execute()
                 
                 if all_photos_resp.data:
                     for photo in all_photos_resp.data:
-                        session_id = photo['session_id']
+                        session_id = photo['ruck_id']
                         if session_id not in photos_by_session:
                             photos_by_session[session_id] = []
                         photos_by_session[session_id].append({
@@ -520,7 +520,7 @@ class RuckSessionResource(Resource):
             if is_own_session:
                 photos_resp = supabase.table('ruck_photos') \
                     .select('id,file_name,file_size,public_url,uploaded_at') \
-                    .eq('session_id', ruck_id) \
+                    .eq('ruck_id', ruck_id) \
                     .order('uploaded_at') \
                     .execute()
                 
@@ -592,12 +592,14 @@ class RuckSessionResource(Resource):
                     for split in splits_data:
                         split_record = {
                             'session_id': int(ruck_id),
-                            'split_number': split.get('splitNumber'),
-                            'split_distance_km': split.get('distance', 0) / 1000.0 if split.get('distance') else 0,  # Convert meters to km
-                            'split_duration_seconds': split.get('duration', {}).get('inSeconds') if isinstance(split.get('duration'), dict) else split.get('duration'),
-                            'total_distance_km': 0,  # Will be calculated by database trigger or set separately
-                            'total_duration_seconds': 0,  # Will be calculated by database trigger or set separately
-                            'split_timestamp': datetime.now(tz.tzutc()).isoformat()
+                            'split_number': split.get('split_number') or split.get('splitNumber'),  # Handle both formats
+                            'split_distance_km': split.get('split_distance', 1.0) or (split.get('distance', 0) / 1000.0 if split.get('distance') else 1.0),
+                            'split_duration_seconds': split.get('split_duration_seconds') or (split.get('duration', {}).get('inSeconds') if isinstance(split.get('duration'), dict) else split.get('duration')),
+                            'total_distance_km': split.get('total_distance', 0),
+                            'total_duration_seconds': split.get('total_duration_seconds', 0),
+                            'calories_burned': split.get('calories_burned', 0.0),
+                            'elevation_gain_m': split.get('elevation_gain_m', 0.0),
+                            'split_timestamp': split.get('timestamp') or datetime.now(tz.tzutc()).isoformat()
                         }
                         splits_to_insert.append(split_record)
                     
@@ -872,11 +874,13 @@ class RuckSessionCompleteResource(Resource):
                             # Handle the split data format from the Flutter app
                             split_record = {
                                 'session_id': int(ruck_id),
-                                'split_number': split.get('splitNumber'),
-                                'split_distance_km': split.get('splitDistance', 1.0),  # Always 1.0 (1km or 1mi)
-                                'split_duration_seconds': split.get('splitDurationSeconds'),
-                                'total_distance_km': split.get('totalDistance', 0),
-                                'total_duration_seconds': split.get('totalDurationSeconds', 0),
+                                'split_number': split.get('split_number'),
+                                'split_distance_km': split.get('split_distance', 1.0),  # Always 1.0 (1km or 1mi)
+                                'split_duration_seconds': split.get('split_duration_seconds'),
+                                'total_distance_km': split.get('total_distance', 0),
+                                'total_duration_seconds': split.get('total_duration_seconds', 0),
+                                'calories_burned': split.get('calories_burned', 0.0),
+                                'elevation_gain_m': split.get('elevation_gain_m', 0.0),
                                 'split_timestamp': split.get('timestamp') if split.get('timestamp') else datetime.now(tz.tzutc()).isoformat()
                             }
                             splits_to_insert.append(split_record)

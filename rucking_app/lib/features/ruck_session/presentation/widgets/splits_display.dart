@@ -31,7 +31,7 @@ class SplitsDisplay extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 80,
+          height: 100,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -124,6 +124,31 @@ class _SplitCard extends StatelessWidget {
               color: colorScheme.onSurfaceVariant,
             ),
           ),
+          // Calories and elevation (if available)
+          if (split.caloriesBurned > 0 || split.elevationGainM > 0) ..[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (split.caloriesBurned > 0)
+                  Text(
+                    '${split.caloriesBurned.toStringAsFixed(0)} cal',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.secondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                if (split.elevationGainM > 0)
+                  Text(
+                    '+${split.elevationGainM.toStringAsFixed(0)}m',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.tertiary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );

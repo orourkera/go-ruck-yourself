@@ -298,9 +298,10 @@ class SessionRepository {
         AppLogger.error('No response from backend for session $sessionId');
         return null;
       }
-      // Parse RuckSession
+      // Parse RuckSession (now includes photos from backend)
       final session = RuckSession.fromJson(response);
       AppLogger.info('DEBUGGING: Parsed session ${session.id} with start time ${session.startTime}');
+      AppLogger.info('DEBUGGING: Session includes ${session.photos?.length ?? 0} photos from backend');
       
       // Check if there are heart rate samples and parse them
       List<HeartRateSample> heartRateSamples = [];
