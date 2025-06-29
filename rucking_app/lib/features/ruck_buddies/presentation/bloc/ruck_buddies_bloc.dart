@@ -172,9 +172,17 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
         RuckBuddiesError(message: failure.message),
       ),
       (newRuckBuddies) async {
+        // Deduplicate by creating a Set of existing IDs and filtering out duplicates
+        final existingIds = currentState.ruckBuddies.map((buddy) => buddy.id).toSet();
+        final uniqueNewRuckBuddies = newRuckBuddies
+            .where((buddy) => !existingIds.contains(buddy.id))
+            .toList();
+        
+        debugPrint('[BLOC] Deduplication: ${newRuckBuddies.length} new items, ${uniqueNewRuckBuddies.length} unique items after filtering');
+        
         emit(
           RuckBuddiesLoaded(
-            ruckBuddies: [...currentState.ruckBuddies, ...newRuckBuddies],
+            ruckBuddies: [...currentState.ruckBuddies, ...uniqueNewRuckBuddies],
             hasReachedMax: newRuckBuddies.length < event.limit,
             filter: currentState.filter,
             isLoadingMore: false,

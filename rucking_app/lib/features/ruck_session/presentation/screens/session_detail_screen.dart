@@ -348,6 +348,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Session Details'),
+          centerTitle: true,
           backgroundColor: _getLadyModeColor(context),
           elevation: 0,
           iconTheme: const IconThemeData(

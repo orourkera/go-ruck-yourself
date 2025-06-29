@@ -43,7 +43,7 @@ def clip_route_for_privacy(location_points):
     if not location_points or len(location_points) < 3:
         return location_points
     
-    # Privacy clipping distance (200m)
+    # Privacy clipping distance (2fix 00m)
     PRIVACY_DISTANCE_METERS = 200.0
     
     # Convert to consistent format
@@ -266,9 +266,9 @@ class RuckSessionListResource(Resource):
             photos_by_session = {}
             try:
                 all_photos_resp = supabase.table('ruck_photos') \
-                    .select('ruck_id,id,filename,file_size,public_url,uploaded_at') \
+                    .select('ruck_id,id,filename,size,url,thumbnail_url,created_at') \
                     .in_('ruck_id', session_ids) \
-                    .order('ruck_id,uploaded_at') \
+                    .order('ruck_id,created_at') \
                     .execute()
                 
                 if all_photos_resp.data:
@@ -279,10 +279,10 @@ class RuckSessionListResource(Resource):
                         photos_by_session[session_id].append({
                             'id': photo['id'],
                             'file_name': photo['filename'],
-                            'file_size': photo['file_size'],
-                            'url': photo['public_url'],  # Frontend expects 'url'
-                            'thumbnail_url': photo['public_url'],  # Use same URL for thumbnail
-                            'uploaded_at': photo['uploaded_at']
+                            'file_size': photo['size'],
+                            'url': photo['url'],
+                            'thumbnail_url': photo['thumbnail_url'],
+                            'uploaded_at': photo['created_at']
                         })
             except Exception as e:
                 logger.error(f"ERROR: Failed to fetch photos: {e}")
@@ -520,9 +520,9 @@ class RuckSessionResource(Resource):
             if is_own_session:
                 logger.info(f"[PHOTO_DEBUG] Fetching photos for session {ruck_id} owned by user {g.user.id}")
                 photos_resp = supabase.table('ruck_photos') \
-                    .select('id,filename,file_size,public_url,uploaded_at') \
+                    .select('id,filename,size,url,thumbnail_url,created_at') \
                     .eq('ruck_id', ruck_id) \
-                    .order('uploaded_at') \
+                    .order('created_at') \
                     .execute()
                 
                 if photos_resp.data:
@@ -531,10 +531,10 @@ class RuckSessionResource(Resource):
                     session['photos'] = [{
                         'id': photo['id'],
                         'file_name': photo['filename'],
-                        'file_size': photo['file_size'],
-                        'url': photo['public_url'],  # Frontend expects 'url'
-                        'thumbnail_url': photo['public_url'],  # Use same URL for thumbnail
-                        'uploaded_at': photo['uploaded_at']
+                        'file_size': photo['size'],
+                        'url': photo['url'],
+                        'thumbnail_url': photo['thumbnail_url'],
+                        'uploaded_at': photo['created_at']
                     } for photo in photos_resp.data]
                     logger.info(f"[PHOTO_DEBUG] Transformed photos for session {ruck_id}: {[p['file_name'] for p in session['photos']]}")
                 else:
