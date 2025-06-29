@@ -51,8 +51,14 @@ class StyledSnackBar {
     SnackBarType type = SnackBarType.normal,
     SnackBarAnimationStyle animationStyle = SnackBarAnimationStyle.popIn,
   }) {
+    // Check if context is still valid and has a ScaffoldMessenger
+    if (!context.mounted) return;
+    
+    final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+    if (scaffoldMessenger == null) return;
+    
     // Dismiss any existing SnackBars
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    scaffoldMessenger.hideCurrentSnackBar();
     
     // Main and border colors based on type
     late Color mainColor;

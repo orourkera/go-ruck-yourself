@@ -99,12 +99,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_ruckId != null) {
+      if (_ruckId != null && mounted) {
         // Calculate pace from distance and duration
         if (widget.ruckBuddy.distanceKm > 0 && widget.ruckBuddy.durationSeconds > 0) {
-          setState(() {
-            _calculatedPace = widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm;
-          });
+          if (mounted) {
+            setState(() {
+              _calculatedPace = widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm;
+            });
+          }
         }
       }
     });
@@ -268,7 +270,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       
     } catch (e) {
       // Reset processing state on any error
-      setState(() => _isProcessingLike = false);
+      if (mounted) {
+        setState(() => _isProcessingLike = false);
+      }
       developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Error in _handleLikeTap: $e', name: 'RuckBuddyCard');
     }
   }
@@ -948,30 +952,31 @@ class _MediaCarouselState extends State<MediaCarousel>
               ),
             ),
             // Invisible stack to preload all photos immediately
-            if (_shouldPreloadRemaining && widget.mediaItems.length > 1)
-              Positioned(
-                left: -1000, // Position off-screen
-                top: 0,
-                child: SizedBox(
-                  width: 1,
-                  height: 1,
-                  child: Stack(
-                    children: widget.mediaItems
-                        .where((item) => item.type == MediaType.photo)
-                        .skip(1) // Skip first photo (already visible), only preload remaining
-                        .map((item) => StableCachedImage(
-                              key: ValueKey('${widget.ruckBuddyId}_preload_${item.photoUrl}'), // Unique across cards
-                              imageUrl: item.photoUrl!,
-                              thumbnailUrl: item.thumbnailUrl,
-                              width: 1,
-                              height: 1,
-                              fit: BoxFit.cover,
-                              useShimmer: false, // Disable shimmer for preloading
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ),
+            // Use Positioned.fill to ensure stable positioning and prevent ParentData crashes
+            Positioned(
+              left: -1000, // Position off-screen
+              top: 0,
+              width: 1,
+              height: 1,
+              child: _shouldPreloadRemaining && widget.mediaItems.length > 1
+                  ? Stack(
+                      children: widget.mediaItems
+                          .where((item) => item.type == MediaType.photo)
+                          .skip(1) // Skip first photo (already visible), only preload remaining
+                          .map((item) => StableCachedImage(
+                                key: ValueKey('${widget.ruckBuddyId}_preload_${item.photoUrl}'), // Unique across cards
+                                imageUrl: item.photoUrl!,
+                                thumbnailUrl: item.thumbnailUrl,
+                                width: 1,
+                                height: 1,
+                                placeholder: null,
+                                errorWidget: null,
+                                fit: BoxFit.cover,
+                              ))
+                          .toList(),
+                    )
+                  : const SizedBox.shrink(), // Always provide a child to maintain widget tree structure
+            ),
           ],
         ),
         // Page indicator dots
@@ -1126,26 +1131,27 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
                 ),
               ),
             ),
-            // Weight chip overlay
-            if (widget.ruckWeightKg != null)
-              Positioned(
-                top: 10,
-                right: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Text(
-                    weightText,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+            // Weight chip overlay - always positioned to prevent ParentData crashes
+            Positioned(
+              top: 10,
+              right: 10,
+              child: widget.ruckWeightKg != null
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Text(
+                        weightText,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
       );
@@ -1197,26 +1203,27 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
             width: double.infinity,
             child: _cachedMapWidget!,
           ),
-          // Weight chip overlay
-          if (widget.ruckWeightKg != null)
-            Positioned(
-              top: 10,
-              right: 10,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  weightText,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
+          // Weight chip overlay - always positioned to prevent ParentData crashes
+          Positioned(
+            top: 10,
+            right: 10,
+            child: widget.ruckWeightKg != null
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      weightText,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
         ],
       ),
     );

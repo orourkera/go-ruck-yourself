@@ -6,11 +6,13 @@ import 'dart:io';
 /// Provides manual WakeLock control and session resurrection features like FitoTrack
 class BackgroundLocationService {
   // Use different channel names for Android vs iOS
-  static MethodChannel get _channel {
+  static MethodChannel? get _channel {
     if (Platform.isAndroid) {
       return const MethodChannel('com.ruck.app/background_location');
     } else {
-      return const MethodChannel('com.goruckyourself.app/background_location');
+      // On iOS, return null to prevent any channel usage
+      debugPrint('iOS: No background location channel needed');
+      return null;
     }
   }
 
@@ -19,15 +21,25 @@ class BackgroundLocationService {
     // On iOS, background location is handled by the system with proper Info.plist configuration
     // Only Android needs the custom background service for aggressive battery optimization
     if (Platform.isAndroid) {
+      final channel = _channel;
+      if (channel == null) {
+        debugPrint('Android: No background location channel available');
+        return;
+      }
       try {
-        await _channel.invokeMethod('startTracking');
+        await channel.invokeMethod('startTracking');
         debugPrint('Background location tracking started');
       } on PlatformException catch (e) {
         debugPrint('Failed to start background tracking: ${e.message}');
         rethrow;
+      } catch (e) {
+        debugPrint('Unexpected error starting background tracking: $e');
+        // Don't rethrow - this prevents app crashes from background service issues
       }
     } else {
       debugPrint('iOS: Background location handled by system - no custom service needed');
+      // On iOS, explicitly return without any native calls
+      return;
     }
   }
 
@@ -36,15 +48,25 @@ class BackgroundLocationService {
     // On iOS, background location is handled by the system with proper Info.plist configuration
     // Only Android needs the custom background service for aggressive battery optimization
     if (Platform.isAndroid) {
+      final channel = _channel;
+      if (channel == null) {
+        debugPrint('Android: No background location channel available');
+        return;
+      }
       try {
-        await _channel.invokeMethod('stopTracking');
+        await channel.invokeMethod('stopTracking');
         debugPrint('Background location tracking stopped');
       } on PlatformException catch (e) {
         debugPrint('Failed to stop background tracking: ${e.message}');
         rethrow;
+      } catch (e) {
+        debugPrint('Unexpected error stopping background tracking: $e');
+        // Don't rethrow - this prevents app crashes from background service issues
       }
     } else {
       debugPrint('iOS: Background location handled by system - no custom service needed');
+      // On iOS, explicitly return without any native calls
+      return;
     }
   }
 
@@ -53,15 +75,24 @@ class BackgroundLocationService {
     // On iOS, background location is handled by the system
     // Only Android needs the custom background service tracking status
     if (Platform.isAndroid) {
+      final channel = _channel;
+      if (channel == null) {
+        debugPrint('Android: No background location channel available');
+        return false;
+      }
       try {
-        final result = await _channel.invokeMethod('isTracking');
+        final result = await channel.invokeMethod('isTracking');
         return result as bool;
       } on PlatformException catch (e) {
         debugPrint('Failed to check tracking status: ${e.message}');
         return false;
+      } catch (e) {
+        debugPrint('Unexpected error checking tracking status: $e');
+        return false;
       }
     } else {
       // On iOS, assume tracking is active if location permission is granted
+      debugPrint('iOS: Background location handled by system - returning true');
       return true;
     }
   }
@@ -71,11 +102,18 @@ class BackgroundLocationService {
     // On iOS, wake locks are handled automatically by the system during background location
     // Only Android needs manual wake lock management for aggressive battery optimization
     if (Platform.isAndroid) {
+      final channel = _channel;
+      if (channel == null) {
+        debugPrint('Android: No background location channel available');
+        return;
+      }
       try {
-        await _channel.invokeMethod('acquireWakeLock');
+        await channel.invokeMethod('acquireWakeLock');
         debugPrint('Manual WakeLock acquired');
       } on PlatformException catch (e) {
         debugPrint('Failed to acquire WakeLock: ${e.message}');
+      } catch (e) {
+        debugPrint('Unexpected error acquiring WakeLock: $e');
       }
     } else {
       debugPrint('iOS: WakeLock handled automatically by system');
@@ -87,11 +125,18 @@ class BackgroundLocationService {
     // On iOS, wake locks are handled automatically by the system during background location
     // Only Android needs manual wake lock management for aggressive battery optimization
     if (Platform.isAndroid) {
+      final channel = _channel;
+      if (channel == null) {
+        debugPrint('Android: No background location channel available');
+        return;
+      }
       try {
-        await _channel.invokeMethod('releaseWakeLock');
+        await channel.invokeMethod('releaseWakeLock');
         debugPrint('Manual WakeLock released');
       } on PlatformException catch (e) {
         debugPrint('Failed to release WakeLock: ${e.message}');
+      } catch (e) {
+        debugPrint('Unexpected error releasing WakeLock: $e');
       }
     } else {
       debugPrint('iOS: WakeLock handled automatically by system');

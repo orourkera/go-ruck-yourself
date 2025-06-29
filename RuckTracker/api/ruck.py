@@ -266,7 +266,7 @@ class RuckSessionListResource(Resource):
             photos_by_session = {}
             try:
                 all_photos_resp = supabase.table('ruck_photos') \
-                    .select('ruck_id,id,file_name,file_size,public_url,uploaded_at') \
+                    .select('ruck_id,id,filename,file_size,public_url,uploaded_at') \
                     .in_('ruck_id', session_ids) \
                     .order('ruck_id,uploaded_at') \
                     .execute()
@@ -278,7 +278,7 @@ class RuckSessionListResource(Resource):
                             photos_by_session[session_id] = []
                         photos_by_session[session_id].append({
                             'id': photo['id'],
-                            'file_name': photo['file_name'],
+                            'file_name': photo['filename'],
                             'file_size': photo['file_size'],
                             'url': photo['public_url'],  # Frontend expects 'url'
                             'thumbnail_url': photo['public_url'],  # Use same URL for thumbnail
@@ -518,23 +518,27 @@ class RuckSessionResource(Resource):
             
             # Fetch photos data (only for the session owner for now)
             if is_own_session:
+                logger.info(f"[PHOTO_DEBUG] Fetching photos for session {ruck_id} owned by user {g.user.id}")
                 photos_resp = supabase.table('ruck_photos') \
-                    .select('id,file_name,file_size,public_url,uploaded_at') \
+                    .select('id,filename,file_size,public_url,uploaded_at') \
                     .eq('ruck_id', ruck_id) \
                     .order('uploaded_at') \
                     .execute()
                 
                 if photos_resp.data:
+                    logger.info(f"[PHOTO_DEBUG] Found {len(photos_resp.data)} photos for session {ruck_id}")
                     # Transform photo data to match frontend expectations
                     session['photos'] = [{
                         'id': photo['id'],
-                        'file_name': photo['file_name'],
+                        'file_name': photo['filename'],
                         'file_size': photo['file_size'],
                         'url': photo['public_url'],  # Frontend expects 'url'
                         'thumbnail_url': photo['public_url'],  # Use same URL for thumbnail
                         'uploaded_at': photo['uploaded_at']
                     } for photo in photos_resp.data]
+                    logger.info(f"[PHOTO_DEBUG] Transformed photos for session {ruck_id}: {[p['file_name'] for p in session['photos']]}")
                 else:
+                    logger.info(f"[PHOTO_DEBUG] No photos found for session {ruck_id}")
                     session['photos'] = []
             else:
                 session['photos'] = []

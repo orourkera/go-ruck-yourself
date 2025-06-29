@@ -1522,25 +1522,45 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         }
         
         // Fetch photos
-        // Use photos from session data (now included in backend response)
-        if (session.photos != null && session.photos!.isNotEmpty) {
-          photos = session.photos!;
-          AppLogger.info('Using ${photos.length} photos from session data');
-        } else {
-          AppLogger.info('No photos found in session data');
+      // Check if photos are already included in session data
+      if (session.photos != null && session.photos!.isNotEmpty) {
+        photos = session.photos!;
+        AppLogger.info('Using ${photos.length} photos from session data');
+      } else {
+        // Photos not included - fetch full session details from API
+        AppLogger.info('No photos in session data, fetching full session details from API');
+        try {
+          final fullSession = await _sessionRepository.fetchSessionById(session.id!);
+          if (fullSession != null && fullSession.photos != null && fullSession.photos!.isNotEmpty) {
+            photos = fullSession.photos!;
+            AppLogger.info('Fetched ${photos.length} photos from full session API call');
+            // Update session with full data including photos
+            session = fullSession.copyWith(
+              heartRateSamples: session.heartRateSamples, // Keep any heart rate samples we loaded
+              avgHeartRate: session.avgHeartRate,
+              maxHeartRate: session.maxHeartRate,
+              minHeartRate: session.minHeartRate,
+            );
+          } else {
+            AppLogger.info('No photos found in full session data either');
+          }
+        } catch (e) {
+          AppLogger.error('Error fetching full session details: $e');
+          photosError = 'Failed to load photos';
         }
+      }
         
-        // Final emit with all loaded data
-        emit(SessionSummaryGenerated(
-          session: session, 
-          photos: photos, 
-          isPhotosLoading: false, 
-          photosError: photosError
-        ));
-        await _activeSessionStorage.clearSessionData();
+      // Final emit with all loaded data
+      emit(SessionSummaryGenerated(
+        session: session, 
+        photos: photos, 
+        isPhotosLoading: false, 
+        photosError: photosError
+      ));
+      await _activeSessionStorage.clearSessionData();
         
-      } catch (e) {
-        AppLogger.error('Error loading session for viewing: $e');
+    } catch (e) {
+      AppLogger.error('Error loading session for viewing: $e');
         emit(SessionSummaryGenerated(
           session: session, 
           photos: photos, 

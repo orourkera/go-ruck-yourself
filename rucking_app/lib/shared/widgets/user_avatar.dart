@@ -55,18 +55,53 @@ class UserAvatar extends StatelessWidget {
 
   Widget _buildAvatarImage() {
     // Check if the avatarUrl is a local file path
-    if (avatarUrl!.startsWith('file://') || avatarUrl!.startsWith('/')) {
+    // More robust detection for file paths and file:// URLs
+    final isLocalFile = avatarUrl!.startsWith('file://') || 
+                       avatarUrl!.startsWith('/') ||
+                       avatarUrl!.contains('/var/mobile/') ||
+                       avatarUrl!.contains('/data/data/') ||
+                       avatarUrl!.contains('cropped_image_');
+    
+    if (isLocalFile) {
       // Handle local file
-      final file = File(avatarUrl!.replaceFirst('file://', ''));
-      return Image.file(
-        file,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildInitialsAvatar(),
+      String filePath = avatarUrl!;
+      
+      // Remove file:// prefix if present
+      if (filePath.startsWith('file://')) {
+        filePath = filePath.replaceFirst('file://', '');
+      }
+      
+      final file = File(filePath);
+      
+      // Check if file exists before trying to display it
+      return FutureBuilder<bool>(
+        future: file.exists(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildInitialsAvatar();
+          }
+          
+          if (snapshot.data == true) {
+            return Image.file(
+              file,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('Error loading local avatar file: $error');
+                return _buildInitialsAvatar();
+              },
+            );
+          } else {
+            debugPrint('Local avatar file does not exist: $filePath');
+            return _buildInitialsAvatar();
+          }
+        },
       );
-    } else {
-      // Handle network URL
+    }
+    
+    // Handle network URL - ensure it's a valid HTTP/HTTPS URL
+    if (avatarUrl!.startsWith('http://') || avatarUrl!.startsWith('https://')) {
       return CachedNetworkImage(
         imageUrl: avatarUrl!,
         cacheManager: ImageCacheManager.profileCache,
@@ -74,10 +109,17 @@ class UserAvatar extends StatelessWidget {
         height: size,
         fit: BoxFit.cover,
         placeholder: (context, url) => _buildInitialsAvatar(),
-        errorWidget: (context, url, error) => _buildInitialsAvatar(),
+        errorWidget: (context, url, error) {
+          debugPrint('Error loading network avatar: $error');
+          return _buildInitialsAvatar();
+        },
         cacheKey: avatarUrl,
       );
     }
+    
+    // If it's not a recognized URL format, show initials
+    debugPrint('Unrecognized avatar URL format: $avatarUrl');
+    return _buildInitialsAvatar();
   }
 
   Widget _buildInitialsAvatar() {
