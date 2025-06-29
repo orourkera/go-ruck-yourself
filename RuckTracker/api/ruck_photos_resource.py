@@ -8,7 +8,7 @@ import uuid
 
 # Assuming get_supabase_client is the way to get a Supabase client instance
 # It's crucial that this client is initialized in the context of the authenticated user for RLS to work.
-from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
 
@@ -183,11 +183,13 @@ class RuckPhotosResource(Resource):
                 
                 logger.debug(f"RuckPhotosResource: Saved to temporary file {temp_file_path}. File size: {Path(temp_file_path).stat().st_size} bytes. Uploading to Supabase Storage at {storage_path}...")
                 
-                # Upload to Supabase storage
+                # Upload to Supabase storage using admin client to bypass RLS
                 try:
+                    # Use admin client for storage upload to bypass RLS policies
+                    admin_client = get_supabase_admin_client()
                     with open(temp_file_path, 'rb') as f_for_upload:
-                        logger.debug(f"RuckPhotosResource: Starting storage upload for {unique_filename}...")
-                        storage_response = supabase.storage.from_('ruck-photos').upload(
+                        logger.debug(f"RuckPhotosResource: Starting storage upload for {unique_filename} using admin client...")
+                        storage_response = admin_client.storage.from_('ruck-photos').upload(
                             path=storage_path,
                             file=f_for_upload, # Pass file object
                             file_options={"content-type": photo_file.content_type, "cache-control": "3600"}
@@ -345,10 +347,12 @@ class RuckPhotosResource(Resource):
             logger.error(f"RuckPhotosResource: Error getting photo information: {e}")
             return build_api_response(success=False, error="Error getting photo information", status_code=500)
         
-        # Delete the photo file from storage
+        # Delete the photo file from storage using admin client to bypass RLS
         try:
             storage_path = f"{user_id}/{ruck_id}/{filename}"
-            supabase.storage.from_('ruck-photos').remove([storage_path])
+            # Use admin client for storage deletion to bypass RLS policies
+            admin_client = get_supabase_admin_client()
+            admin_client.storage.from_('ruck-photos').remove([storage_path])
         except Exception as e:
             logger.error(f"RuckPhotosResource: Error deleting photo file from storage: {e}")
             # Continue even if storage deletion fails, as the metadata is more important
