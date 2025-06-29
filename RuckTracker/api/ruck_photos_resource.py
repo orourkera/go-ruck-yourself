@@ -204,14 +204,12 @@ class RuckPhotosResource(Resource):
                     logger.error(f"RuckPhotosResource: Supabase storage upload error for {unique_filename}: {storage_response.error}")
                     continue
                 
-                if not hasattr(storage_response, 'data') or not storage_response.data:
-                    logger.error(f"RuckPhotosResource: Supabase storage upload for {unique_filename} returned no data")
-                    continue
-
+                # For admin client uploads, the response might be different
+                # If we get here without an exception and no error, consider it successful
                 logger.debug(f"RuckPhotosResource: Successfully uploaded {unique_filename} to Supabase Storage.")
                 
-                # Get the public URL
-                public_url_data = supabase.storage.from_('ruck-photos').get_public_url(storage_path)
+                # Get the public URL using admin client
+                public_url_data = admin_client.storage.from_('ruck-photos').get_public_url(storage_path)
                 public_url = public_url_data # get_public_url usually returns the string directly
                 
                 if isinstance(public_url, str) and public_url.endswith('?'):
