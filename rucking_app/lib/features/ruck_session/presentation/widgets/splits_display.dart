@@ -125,7 +125,7 @@ class _SplitCard extends StatelessWidget {
             ),
           ),
           // Calories and elevation (if available)
-          if (split.caloriesBurned > 0 || split.elevationGainM > 0) ..[
+          if (split.caloriesBurned > 0 || split.elevationGainM > 0) ...[
             const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
