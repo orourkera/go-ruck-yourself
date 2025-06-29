@@ -342,10 +342,25 @@ api.add_resource(MonthlyStatsResource, '/api/stats/monthly', '/api/statistics/mo
 api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/yearly')
 
 # Ruck Photos Endpoint
-app.logger.info(f"Setting RuckPhotosResource rate limit to: 30 per minute")
-# Directly patch the RuckPhotosResource methods with the limiter decorator
-RuckPhotosResource.get = limiter.limit("30 per minute", override_defaults=True)(RuckPhotosResource.get)
-RuckPhotosResource.post = limiter.limit("30 per minute", override_defaults=True)(RuckPhotosResource.post)
+def get_user_id():
+    # Get the user ID from the JWT token in the Authorization header
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split("Bearer ")[1]
+        try:
+            supabase = get_supabase_client(user_jwt=token)
+            user_response = supabase.auth.get_user(token)
+            if user_response and hasattr(user_response, 'user') and user_response.user:
+                return f"user_{user_response.user.id}"
+        except Exception as e:
+            app.logger.error(f"Error getting user ID for rate limiting: {e}")
+    # Fall back to IP if user ID cannot be determined
+    return get_remote_address()
+
+# Set up rate limiting for photo uploads - 100 requests per minute per user
+app.logger.info(f"Setting RuckPhotosResource rate limit to: 100 per minute per user")
+RuckPhotosResource.get = limiter.limit("100 per minute", key_func=get_user_id, override_defaults=True)(RuckPhotosResource.get)
+RuckPhotosResource.post = limiter.limit("100 per minute", key_func=get_user_id, override_defaults=True)(RuckPhotosResource.post)
 
 # Now register the resource with modified methods
 api.add_resource(RuckPhotosResource, '/api/ruck-photos')

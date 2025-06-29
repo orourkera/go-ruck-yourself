@@ -5,6 +5,7 @@ import logging
 import tempfile
 from pathlib import Path
 import uuid
+import time  # Add time module for sleep
 
 # Assuming get_supabase_client is the way to get a Supabase client instance
 # It's crucial that this client is initialized in the context of the authenticated user for RLS to work.
@@ -148,6 +149,9 @@ class RuckPhotosResource(Resource):
         uploaded_photos = []
         photo_files = request.files.getlist('photos')
         
+        # Add a small delay between photo uploads to prevent rate limiting
+        UPLOAD_DELAY_SECONDS = 0.2  # 200ms delay between uploads
+        
         # Limit the number of photos that can be uploaded at once (e.g., 5)
         MAX_PHOTOS = 5
         if len(photo_files) > MAX_PHOTOS:
@@ -249,6 +253,10 @@ class RuckPhotosResource(Resource):
 
                 logger.info(f"RuckPhotosResource: Successfully processed and stored photo {unique_filename} with ID {insert_response.data[0].get('id')}")
                 uploaded_photos.append(insert_response.data[0])
+                
+                # Add a small delay between photo uploads to prevent rate limiting
+                if len(uploaded_photos) < len(photo_files):
+                    time.sleep(UPLOAD_DELAY_SECONDS)
                 
             except Exception as e:
                 logger.error(f"RuckPhotosResource: Unhandled exception while processing photo {photo_file.filename if photo_file else 'unknown'}: {e}", exc_info=True)
