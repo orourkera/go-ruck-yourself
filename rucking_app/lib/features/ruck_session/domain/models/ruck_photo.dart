@@ -29,21 +29,25 @@ class RuckPhoto extends Equatable {
   /// Create a RuckPhoto from JSON
   factory RuckPhoto.fromJson(Map<String, dynamic> json) {
     try {
-      // Extract the primary data fields
+      // Extract the primary data fields from backend response
       final String id = json['id']?.toString() ?? '';
-      final String url = json['photo_url']?.toString() ?? json['url']?.toString() ?? '';
+      final String url = json['url']?.toString() ?? json['photo_url']?.toString() ?? '';
       final String thumbnailUrl = json['thumbnail_url']?.toString() ?? '';
-      final String ruckSessionId = json['ruck_session_id']?.toString() ?? '';
+      final String ruckId = json['ruck_id']?.toString() ?? json['ruck_session_id']?.toString() ?? '';
+      final String userId = json['user_id']?.toString() ?? '';
+      final String filename = json['filename']?.toString() ?? json['file_name']?.toString() ?? '';
+      final String? originalFilename = json['original_filename']?.toString();
+      final String? contentType = json['content_type']?.toString();
+      final int? size = json['size'] is int ? json['size'] : (json['file_size'] is int ? json['file_size'] : null);
       
       // Handle the timestamp parsing with enhanced fallback options
       DateTime parsedAt;
       try {
-        final dynamic timestamp = json['taken_at'] ?? json['created_at'] ?? json['timestamp'];
+        final dynamic timestamp = json['created_at'] ?? json['taken_at'] ?? json['uploaded_at'] ?? json['timestamp'];
         
         if (timestamp is String) {
           // Handle ISO format timestamps like "2023-XX-XXTXX:XX:XX.XXXXXXZ"
-          final cleanedTimestamp = timestamp.replaceAll('T', ' ').replaceAll('Z', '');
-          parsedAt = DateTime.parse(cleanedTimestamp);
+          parsedAt = DateTime.parse(timestamp);
         } else if (timestamp is int) {
           // Handle Unix timestamps (seconds)
           parsedAt = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
@@ -58,29 +62,15 @@ class RuckPhoto extends Equatable {
         parsedAt = DateTime.now();
       }
       
-      // Extract optional metadata with safe parsing
-      final Map<String, dynamic> metadata = {};
-      if (json.containsKey('metadata') && json['metadata'] is Map) {
-        metadata.addAll(Map<String, dynamic>.from(json['metadata']));
-      }
-      
-      // Add location info to metadata if present in the root JSON object
-      if (json.containsKey('latitude') && json.containsKey('longitude')) {
-        final dynamic lat = json['latitude'];
-        final dynamic lng = json['longitude'];
-        
-        if (lat != null && lng != null) {
-          metadata['latitude'] = lat is String ? double.tryParse(lat) ?? 0.0 : lat.toDouble();
-          metadata['longitude'] = lng is String ? double.tryParse(lng) ?? 0.0 : lng.toDouble();
-        }
-      }
-      
       // Create and return the RuckPhoto object
       final photo = RuckPhoto(
         id: id,
-        ruckId: ruckSessionId,
-        userId: '',
-        filename: '',
+        ruckId: ruckId,
+        userId: userId,
+        filename: filename,
+        originalFilename: originalFilename,
+        contentType: contentType,
+        size: size,
         createdAt: parsedAt,
         url: url,
         thumbnailUrl: thumbnailUrl,
@@ -94,11 +84,11 @@ class RuckPhoto extends Equatable {
       try {
         final fallbackPhoto = RuckPhoto(
           id: json['id']?.toString() ?? '',
-          ruckId: json['ruck_session_id']?.toString() ?? '',
-          userId: '',
-          filename: '',
+          ruckId: json['ruck_id']?.toString() ?? json['ruck_session_id']?.toString() ?? '',
+          userId: json['user_id']?.toString() ?? '',
+          filename: json['filename']?.toString() ?? json['file_name']?.toString() ?? '',
           createdAt: DateTime.now(),
-          url: json['photo_url']?.toString() ?? json['url']?.toString() ?? '',
+          url: json['url']?.toString() ?? json['photo_url']?.toString() ?? '',
           thumbnailUrl: json['thumbnail_url']?.toString() ?? '',
         );
         return fallbackPhoto;

@@ -502,13 +502,20 @@ class SessionRepository {
               photosList = [responseData];
               AppLogger.debug('[PHOTO_DEBUG] Found direct photo object in response');
             }
-            // Format 2: {"success": true, "data": {...}}
+            // Format 2: {"success": true, "data": {"count": X, "photos": [...]}}
             else if (responseData is Map && responseData.containsKey('success') && responseData.containsKey('data')) {
               AppLogger.debug('[PHOTO_DEBUG] Found success/data format in response');
-              if (responseData['data'] is Map) {
-                photosList = [responseData['data']];
-              } else if (responseData['data'] is List) {
-                photosList = responseData['data'];
+              final data = responseData['data'];
+              if (data is Map && data.containsKey('photos')) {
+                // Backend returns {"success": true, "data": {"count": X, "photos": [...]}}
+                photosList = data['photos'] is List ? data['photos'] : null;
+                AppLogger.debug('[PHOTO_DEBUG] Found photos array in data.photos');
+              } else if (data is Map && data.containsKey('id')) {
+                // Single photo object in data
+                photosList = [data];
+              } else if (data is List) {
+                // Direct list in data
+                photosList = data;
               }
             }
             // Format 3: Just a list of photos

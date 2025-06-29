@@ -181,15 +181,30 @@ class RuckPhotosResource(Resource):
                     photo_file.save(temp_file) # Save incoming stream to temp_file object
                     temp_file_path = temp_file.name # Get the path for upload and cleanup
                 
-                logger.debug(f"RuckPhotosResource: Saved to temporary file {temp_file_path}. Uploading to Supabase Storage at {storage_path}...")
+                logger.debug(f"RuckPhotosResource: Saved to temporary file {temp_file_path}. File size: {Path(temp_file_path).stat().st_size} bytes. Uploading to Supabase Storage at {storage_path}...")
                 
                 # Upload to Supabase storage
-                with open(temp_file_path, 'rb') as f_for_upload:
-                    storage_response = supabase.storage.from_('ruck-photos').upload(
-                        path=storage_path,
-                        file=f_for_upload, # Pass file object
-                        file_options={"content-type": photo_file.content_type, "cache-control": "3600"}
-                    )
+                try:
+                    with open(temp_file_path, 'rb') as f_for_upload:
+                        logger.debug(f"RuckPhotosResource: Starting storage upload for {unique_filename}...")
+                        storage_response = supabase.storage.from_('ruck-photos').upload(
+                            path=storage_path,
+                            file=f_for_upload, # Pass file object
+                            file_options={"content-type": photo_file.content_type, "cache-control": "3600"}
+                        )
+                        logger.debug(f"RuckPhotosResource: Storage upload response for {unique_filename}: {storage_response}")
+                except Exception as storage_error:
+                    logger.error(f"RuckPhotosResource: Exception during storage upload for {unique_filename}: {storage_error}")
+                    continue
+
+                # Check if storage upload was successful
+                if hasattr(storage_response, 'error') and storage_response.error:
+                    logger.error(f"RuckPhotosResource: Supabase storage upload error for {unique_filename}: {storage_response.error}")
+                    continue
+                
+                if not hasattr(storage_response, 'data') or not storage_response.data:
+                    logger.error(f"RuckPhotosResource: Supabase storage upload for {unique_filename} returned no data")
+                    continue
 
                 logger.debug(f"RuckPhotosResource: Successfully uploaded {unique_filename} to Supabase Storage.")
                 
