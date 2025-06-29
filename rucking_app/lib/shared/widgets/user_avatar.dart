@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
@@ -37,16 +38,7 @@ class UserAvatar extends StatelessWidget {
       ),
       child: ClipOval(
         child: avatarUrl != null && avatarUrl!.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: avatarUrl!,
-                cacheManager: ImageCacheManager.profileCache, // Fix cache manager reference
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => _buildInitialsAvatar(),
-                errorWidget: (context, url, error) => _buildInitialsAvatar(),
-                cacheKey: avatarUrl, // Force refresh when URL changes
-              )
+            ? _buildAvatarImage()
             : _buildInitialsAvatar(),
       ),
     );
@@ -59,6 +51,33 @@ class UserAvatar extends StatelessWidget {
     }
 
     return avatarWidget;
+  }
+
+  Widget _buildAvatarImage() {
+    // Check if the avatarUrl is a local file path
+    if (avatarUrl!.startsWith('file://') || avatarUrl!.startsWith('/')) {
+      // Handle local file
+      final file = File(avatarUrl!.replaceFirst('file://', ''));
+      return Image.file(
+        file,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildInitialsAvatar(),
+      );
+    } else {
+      // Handle network URL
+      return CachedNetworkImage(
+        imageUrl: avatarUrl!,
+        cacheManager: ImageCacheManager.profileCache,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => _buildInitialsAvatar(),
+        errorWidget: (context, url, error) => _buildInitialsAvatar(),
+        cacheKey: avatarUrl,
+      );
+    }
   }
 
   Widget _buildInitialsAvatar() {

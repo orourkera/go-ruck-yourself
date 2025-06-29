@@ -62,10 +62,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
         }
       }
       
-      setState(() {
-        _weeklyStats = weeklyStats;
-        _isLoadingWeekly = false;
-      });
+      if (mounted) {
+        setState(() {
+          _weeklyStats = weeklyStats;
+          _isLoadingWeekly = false;
+        });
+      }
       
       // Fetch monthly stats
       final monthlyResponse = await _apiClient.get('/stats/monthly');
@@ -82,10 +84,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       }
       
       // Update state with monthly stats
-      setState(() {
-        _monthlyStats = monthlyStats;
-        _isLoadingMonthly = false;
-      });
+      if (mounted) {
+        setState(() {
+          _monthlyStats = monthlyStats;
+          _isLoadingMonthly = false;
+        });
+      }
       
       // Fetch yearly stats
       final yearlyResponse = await _apiClient.get('/stats/yearly');
@@ -102,18 +106,22 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       }
       
       // Update state with yearly stats
-      setState(() {
-        _yearlyStats = yearlyStats;
-        _isLoadingYearly = false;
-      });
+      if (mounted) {
+        setState(() {
+          _yearlyStats = yearlyStats;
+          _isLoadingYearly = false;
+        });
+      }
       
     } catch (e) {
       
-      setState(() {
-        _isLoadingWeekly = false;
-        _isLoadingMonthly = false;
-        _isLoadingYearly = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingWeekly = false;
+          _isLoadingMonthly = false;
+          _isLoadingYearly = false;
+        });
+      }
     }
   }
   

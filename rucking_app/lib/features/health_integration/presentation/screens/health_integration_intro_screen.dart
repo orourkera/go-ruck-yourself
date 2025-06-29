@@ -230,11 +230,9 @@ class HealthIntegrationIntroScreen extends StatelessWidget {
                         } catch (e) {
                           AppLogger.error('Error requesting HealthKit authorization: $e');
                           // Show error to user
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to request HealthKit access: $e'),
-                              backgroundColor: Colors.red,
-                            ),
+                          StyledSnackBar.showError(
+                            context: context,
+                            message: 'Failed to request HealthKit access: $e',
                           );
                         }
                       },

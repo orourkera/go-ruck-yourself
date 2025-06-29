@@ -194,34 +194,38 @@ class StyledSnackBar {
     // Create animation widgets
     late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
-      builder: (BuildContext context) => Positioned(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-        left: 20,
-        right: 20,
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (_, Widget? child) {
-            return Opacity(
-              opacity: opacity.value,
-              child: Transform.translate(
-                offset: position.value.scale(50, 50),  // Scale for more dramatic effect
-                child: Transform.scale(
-                  scale: scale.value,
-                  child: animationStyle == SnackBarAnimationStyle.spin
-                    ? Transform.rotate(
-                        angle: controller.value * 2 * math.pi,
-                        child: child,
-                      )
-                    : child,
-                ),
+      builder: (BuildContext context) => Stack(
+        children: [
+          Positioned(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+            left: 20,
+            right: 20,
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (_, Widget? child) {
+                return Opacity(
+                  opacity: opacity.value,
+                  child: Transform.translate(
+                    offset: position.value.scale(50, 50),  // Scale for more dramatic effect
+                    child: Transform.scale(
+                      scale: scale.value,
+                      child: animationStyle == SnackBarAnimationStyle.spin
+                        ? Transform.rotate(
+                            angle: controller.value * 2 * math.pi,
+                            child: child,
+                          )
+                        : child,
+                    ),
+                  ),
+                );
+              },
+              child: Material(
+                color: Colors.transparent,
+                child: content,
               ),
-            );
-          },
-          child: Material(
-            color: Colors.transparent,
-            child: content,
+            ),
           ),
-        ),
+        ],
       ),
     );
     
