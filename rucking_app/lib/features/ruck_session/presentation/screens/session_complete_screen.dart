@@ -119,6 +119,19 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     _apiClient = GetIt.I<ApiClient>();
     _notesController.text = widget.initialNotes ?? '';
     
+    // Debug logging for splits received
+    print('[DEBUG] SessionCompleteScreen received splits:');
+    print('[DEBUG] Splits type: ${widget.splits.runtimeType}');
+    print('[DEBUG] Splits length: ${widget.splits?.length ?? 'null'}');
+    if (widget.splits != null && widget.splits!.isNotEmpty) {
+      print('[DEBUG] First split: ${widget.splits!.first}');
+      for (int i = 0; i < widget.splits!.length; i++) {
+        print('[DEBUG] Split $i: ${widget.splits![i]}');
+      }
+    } else {
+      print('[DEBUG] No splits data received');
+    }
+    
     if (widget.heartRateSamples != null && widget.heartRateSamples!.isNotEmpty) {
       _setHeartRateSamples(widget.heartRateSamples!);
     }

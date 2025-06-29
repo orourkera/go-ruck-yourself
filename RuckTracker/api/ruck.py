@@ -262,6 +262,32 @@ class RuckSessionListResource(Resource):
                 logger.error(f"ERROR: Failed to fetch splits: {e}")
                 splits_by_session = {}
             
+            # Batch fetch photos for all sessions
+            photos_by_session = {}
+            try:
+                all_photos_resp = supabase.table('ruck_photos') \
+                    .select('session_id,id,file_name,file_size,public_url,uploaded_at') \
+                    .in_('session_id', session_ids) \
+                    .order('session_id,uploaded_at') \
+                    .execute()
+                
+                if all_photos_resp.data:
+                    for photo in all_photos_resp.data:
+                        session_id = photo['session_id']
+                        if session_id not in photos_by_session:
+                            photos_by_session[session_id] = []
+                        photos_by_session[session_id].append({
+                            'id': photo['id'],
+                            'file_name': photo['file_name'],
+                            'file_size': photo['file_size'],
+                            'url': photo['public_url'],  # Frontend expects 'url'
+                            'thumbnail_url': photo['public_url'],  # Use same URL for thumbnail
+                            'uploaded_at': photo['uploaded_at']
+                        })
+            except Exception as e:
+                logger.error(f"ERROR: Failed to fetch photos: {e}")
+                photos_by_session = {}
+            
             # Enrich sessions with location and splits data
             for session in sessions:
                 session_id = session['id']
@@ -285,6 +311,14 @@ class RuckSessionListResource(Resource):
                 else:
                     session['splits'] = []
                     logger.info(f"[ROUTE_DEBUG] Session {session_id}: No splits data found")
+                
+                # Add photos if available
+                if session_id in photos_by_session:
+                    session['photos'] = photos_by_session[session_id]
+                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Added {len(session['photos'])} photos")
+                else:
+                    session['photos'] = []
+                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: No photos found")
             
             # Cache the enriched result for 5 minutes
             cache_set(cache_key, sessions, 300)
@@ -481,6 +515,29 @@ class RuckSessionResource(Resource):
                     session['splits'] = []
             else:
                 session['splits'] = []
+            
+            # Fetch photos data (only for the session owner for now)
+            if is_own_session:
+                photos_resp = supabase.table('ruck_photos') \
+                    .select('id,file_name,file_size,public_url,uploaded_at') \
+                    .eq('session_id', ruck_id) \
+                    .order('uploaded_at') \
+                    .execute()
+                
+                if photos_resp.data:
+                    # Transform photo data to match frontend expectations
+                    session['photos'] = [{
+                        'id': photo['id'],
+                        'file_name': photo['file_name'],
+                        'file_size': photo['file_size'],
+                        'url': photo['public_url'],  # Frontend expects 'url'
+                        'thumbnail_url': photo['public_url'],  # Use same URL for thumbnail
+                        'uploaded_at': photo['uploaded_at']
+                    } for photo in photos_resp.data]
+                else:
+                    session['photos'] = []
+            else:
+                session['photos'] = []
             
             # Clean up user data before returning
             if 'user' in session:
@@ -795,6 +852,47 @@ class RuckSessionCompleteResource(Resource):
                 return {'message': 'Failed to end session'}, 500
         
             completed_session = update_resp.data[0]
+        
+            # Handle splits data if provided
+            if 'splits' in data and data['splits']:
+                splits_data = data['splits']
+                logger.info(f"Processing {len(splits_data)} splits for session {ruck_id}")
+                
+                try:
+                    # First, delete existing splits for this session
+                    delete_resp = supabase.table('session_splits') \
+                        .delete() \
+                        .eq('session_id', ruck_id) \
+                        .execute()
+                    
+                    # Insert new splits
+                    if splits_data and len(splits_data) > 0:
+                        splits_to_insert = []
+                        for split in splits_data:
+                            # Handle the split data format from the Flutter app
+                            split_record = {
+                                'session_id': int(ruck_id),
+                                'split_number': split.get('splitNumber'),
+                                'split_distance_km': split.get('splitDistance', 1.0),  # Always 1.0 (1km or 1mi)
+                                'split_duration_seconds': split.get('splitDurationSeconds'),
+                                'total_distance_km': split.get('totalDistance', 0),
+                                'total_duration_seconds': split.get('totalDurationSeconds', 0),
+                                'split_timestamp': split.get('timestamp') if split.get('timestamp') else datetime.now(tz.tzutc()).isoformat()
+                            }
+                            splits_to_insert.append(split_record)
+                        
+                        if splits_to_insert:
+                            insert_resp = supabase.table('session_splits') \
+                                .insert(splits_to_insert) \
+                                .execute()
+                            
+                            if insert_resp.data:
+                                logger.info(f"Successfully inserted {len(insert_resp.data)} splits for session {ruck_id}")
+                            else:
+                                logger.warning(f"Failed to insert splits for session {ruck_id}: {insert_resp.error}")
+                except Exception as splits_error:
+                    logger.error(f"Error handling splits for session {ruck_id}: {splits_error}")
+                    # Don't fail the session completion if splits insertion fails
         
             # Check if this session is associated with an event and update progress
             if completed_session.get('event_id'):

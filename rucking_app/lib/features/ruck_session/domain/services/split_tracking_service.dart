@@ -27,7 +27,14 @@ class SplitTrackingService {
   }
   
   /// Get all recorded splits
-  List<Map<String, dynamic>> getSplits() => _splits;
+  List<Map<String, dynamic>> getSplits() {
+    print('[DEBUG] SplitTrackingService.getSplits() called');
+    print('[DEBUG] Current splits count: ${_splits.length}');
+    if (_splits.isNotEmpty) {
+      print('[DEBUG] Splits data: $_splits');
+    }
+    return _splits;
+  }
   
   /// Check if a distance milestone has been reached and send a notification to the watch
   Future<void> checkForMilestone({
@@ -47,7 +54,9 @@ class SplitTrackingService {
       AppLogger.debug('[SPLITS] User preferMetric preference: $preferMetric');
       
       // Set the split distance based on user preference
-      final double splitDistanceKm = preferMetric ? 1.0 : 1.609; // 1km or 1mi (in km)
+      // TEMPORARY: Using 0.01km (10 meters) for testing instead of 1km/1mi
+      final double splitDistanceKm = 0.01; // 10 meters for testing
+      // final double splitDistanceKm = preferMetric ? 1.0 : 1.609; // 1km or 1mi (in km)
       
       AppLogger.debug('[SPLITS] Split distance in km: $splitDistanceKm (${preferMetric ? "1km" : "1mi"})');
       

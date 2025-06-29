@@ -311,6 +311,19 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         final heartRateSamples = state.session.heartRateSamples;
                         final splits = state.session.splits;
                         
+                        // Debug logging for splits
+                        print('[DEBUG] Splits data being passed to session complete:');
+                        print('[DEBUG] Splits type: ${splits.runtimeType}');
+                        print('[DEBUG] Splits length: ${splits?.length ?? 'null'}');
+                        if (splits != null && splits.isNotEmpty) {
+                          print('[DEBUG] First split: ${splits.first}');
+                          for (int i = 0; i < splits.length; i++) {
+                            print('[DEBUG] Split $i: ${splits[i]}');
+                          }
+                        } else {
+                          print('[DEBUG] No splits data available');
+                        }
+                        
                         // Get terrain segments from the previous running state if available
                         List<TerrainSegment> terrainSegments = [];
                         if (sessionRunning && _lastActiveSessionRunning != null) {
