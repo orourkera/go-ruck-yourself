@@ -39,6 +39,12 @@ class HeartRateService {
   
   // Track the last time we received a heart rate update
   DateTime? _lastHeartRateTime;
+  
+  // Track the last time we saved a heart rate sample (for downsampling)
+  DateTime? _lastSavedSampleTime;
+  
+  // Downsampling interval (20 seconds)
+  static const Duration _samplingInterval = Duration(seconds: 20);
 
   /// Stream of individual heart rate updates
   Stream<HeartRateSample> get heartRateStream => _heartRateController.stream;
@@ -109,8 +115,9 @@ class HeartRateService {
     _healthHeartRateSubscription = null;
     _watchdogTimer = null;
     
-    // Reset monitoring flag
+    // Reset monitoring flag and downsampling state
     _isMonitoringStarted = false;
+    _lastSavedSampleTime = null;
     
     AppLogger.info('HeartRateService: Heart rate monitoring stopped');
   }
@@ -248,7 +255,19 @@ class HeartRateService {
     _lastHeartRateTime = DateTime.now(); // Track when we received this sample
     
     AppLogger.info('HeartRateService: Received heart rate update from $source: ${sample.bpm} BPM');
-    _hrBuffer.add(sample);
+    
+    // Downsampling: only add to buffer if enough time has passed since last saved sample
+    final now = DateTime.now();
+    final shouldSave = _lastSavedSampleTime == null || 
+                      now.difference(_lastSavedSampleTime!) >= _samplingInterval;
+    
+    if (shouldSave) {
+      _hrBuffer.add(sample);
+      _lastSavedSampleTime = now;
+      AppLogger.info('HeartRateService: Saved heart rate sample to buffer (downsampled): ${sample.bpm} BPM');
+    } else {
+      AppLogger.debug('HeartRateService: Skipped saving heart rate sample (downsampling): ${sample.bpm} BPM');
+    }
     
     // Broadcast individual sample - this is critical for UI updates
     if (!_heartRateController.isClosed) {
@@ -344,6 +363,7 @@ class HeartRateService {
     // Clear any buffered data
     _hrBuffer.clear();
     _lastHeartRateTime = null;
+    _lastSavedSampleTime = null;
     
     AppLogger.info('HeartRateService: Disposed all resources');
   }

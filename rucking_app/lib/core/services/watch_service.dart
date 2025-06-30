@@ -287,16 +287,25 @@ class WatchService {
     required double totalDistance,
     required Duration totalDuration,
     required bool isMetric,
+    double? splitCalories,
+    double? splitElevationGain,
   }) async {
     try {
       AppLogger.info(
-          '[WATCH] Sending split notification: $splitDistance ${isMetric ? 'km' : 'mi'}, time: ${_formatDuration(splitDuration)}');
+          '[WATCH] Sending split notification: $splitDistance ${isMetric ? 'km' : 'mi'}, time: ${_formatDuration(splitDuration)}, calories: ${splitCalories?.round() ?? 0}, elevation: ${splitElevationGain?.round() ?? 0}m');
 
       final String formattedSplitDistance = '${splitDistance.toStringAsFixed(1)} ${isMetric ? 'km' : 'mi'}';
       final String formattedTotalDistance = '${totalDistance.toStringAsFixed(1)} ${isMetric ? 'km' : 'mi'}';
+      
+      // Format calories and elevation for display
+      final String formattedCalories = '${(splitCalories ?? 0).round()} cal';
+      final String formattedElevation = isMetric 
+          ? '${(splitElevationGain ?? 0).round()} m' 
+          : '${((splitElevationGain ?? 0) * 3.28084).round()} ft'; // Convert meters to feet
 
       AppLogger.debug('[WATCH] Formatted split distance for watch: $formattedSplitDistance');
       AppLogger.debug('[WATCH] User isMetric preference: $isMetric');
+      AppLogger.debug('[WATCH] Split calories: $formattedCalories, elevation: $formattedElevation');
 
       await _sendMessageToWatch({
         'command': 'splitNotification',
@@ -304,7 +313,9 @@ class WatchService {
         'splitTime': _formatDuration(splitDuration),
         'totalDistance': formattedTotalDistance,
         'totalTime': _formatDuration(totalDuration),
-        'isMetric': isMetric, // Add flag to trigger vibration on watch
+        'splitCalories': formattedCalories,
+        'splitElevation': formattedElevation,
+        'isMetric': isMetric,
         'shouldVibrate': true, // Add flag to trigger vibration on watch
       });
 

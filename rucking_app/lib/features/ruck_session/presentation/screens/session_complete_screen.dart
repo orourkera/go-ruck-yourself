@@ -758,6 +758,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   }
 
   Widget _buildSplitsSection(bool preferMetric) {
+    if (widget.splits == null || widget.splits!.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return SplitsDisplay(splits: widget.splits!, isMetric: preferMetric);
   }
 

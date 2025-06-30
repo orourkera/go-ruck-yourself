@@ -687,8 +687,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Stats',
-                      style: AppTextStyles.titleLarge,
+                      'STATS',
+                      style: AppTextStyles.displaySmall.copyWith(
+                        color: Theme.of(context).brightness == Brightness.dark 
+                          ? Colors.red
+                          : const Color(0xFF3E2723),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _buildDetailRow(

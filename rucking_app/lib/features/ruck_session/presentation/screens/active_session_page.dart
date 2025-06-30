@@ -425,6 +425,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       }
                       
                       if (state is ActiveSessionFailure) {
+                        // Log the error for debugging
+                        AppLogger.error('ActiveSessionFailure displayed to user: ${state.errorMessage} (session: ${state.sessionDetails?.sessionId ?? 'unknown'})');
+                        
                         return Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -436,15 +439,50 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                 style: AppTextStyles.headlineMedium,
                               ),
                               SizedBox(height: 8),
-                              Text(
-                                state.errorMessage,
-                                textAlign: TextAlign.center,
-                                style: AppTextStyles.bodyMedium,
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                                child: Text(
+                                  state.errorMessage,
+                                  textAlign: TextAlign.center,
+                                  style: AppTextStyles.bodyMedium,
+                                ),
                               ),
                               SizedBox(height: 24),
-                              ElevatedButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: Text('Go Back'),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      // Try to restart the session
+                                      context.read<ActiveSessionBloc>().add(SessionStarted(
+                                        ruckWeightKg: widget.args.ruckWeight,
+                                        userWeightKg: widget.args.userWeightKg,
+                                        notes: widget.args.notes,
+                                        plannedDuration: widget.args.plannedDuration,
+                                        eventId: widget.args.eventId,
+                                        initialLocation: widget.args.initialCenter == null 
+                                          ? null 
+                                          : LocationPoint(
+                                              latitude: widget.args.initialCenter!.latitude,
+                                              longitude: widget.args.initialCenter!.longitude,
+                                              timestamp: DateTime.now().toUtc(),
+                                              elevation: 0.0,
+                                              accuracy: 0.0,
+                                            )
+                                      ));
+                                    },
+                                    child: Text('Retry'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.grey,
+                                    ),
+                                    child: Text('Go Home'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -643,7 +681,39 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           ),
                         );
                       }
-                      return const SizedBox();
+                      
+                      // Catch-all error handler to prevent blank white screens
+                      AppLogger.error('Unknown ActiveSessionState encountered: ${state.runtimeType} - ${state.toString()}');
+                      
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.warning_amber_outlined, size: 64, color: Colors.orange),
+                            SizedBox(height: 16),
+                            Text(
+                              'Unexpected State',
+                              style: AppTextStyles.headlineMedium,
+                            ),
+                            SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              child: Text(
+                                'The session encountered an unexpected state: ${state.runtimeType}',
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.bodyMedium,
+                              ),
+                            ),
+                            SizedBox(height: 24),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                              },
+                              child: Text('Go Home'),
+                            ),
+                          ],
+                        ),
+                      );
                     },
                   ),
                 ),

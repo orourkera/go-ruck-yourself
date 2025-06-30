@@ -24,13 +24,17 @@ class SessionSplit {
   factory SessionSplit.fromJson(Map<String, dynamic> json) {
     return SessionSplit(
       splitNumber: json['splitNumber'] ?? json['split_number'] ?? 0,
-      splitDistance: (json['splitDistance'] ?? json['split_distance'] ?? 1.0).toDouble(),
+      splitDistance: (json['splitDistance'] ?? json['split_distance_km'] ?? json['split_distance'] ?? 1.0).toDouble(),
       splitDurationSeconds: json['splitDurationSeconds'] ?? json['split_duration_seconds'] ?? 0,
-      totalDistance: (json['totalDistance'] ?? json['total_distance'] ?? 0.0).toDouble(),
+      totalDistance: (json['totalDistance'] ?? json['total_distance_km'] ?? json['total_distance'] ?? 0.0).toDouble(),
       totalDurationSeconds: json['totalDurationSeconds'] ?? json['total_duration_seconds'] ?? 0,
       caloriesBurned: (json['caloriesBurned'] ?? json['calories_burned'] ?? 0.0).toDouble(),
       elevationGainM: (json['elevationGainM'] ?? json['elevation_gain_m'] ?? 0.0).toDouble(),
-      timestamp: DateTime.parse(json['timestamp'] as String),
+      timestamp: json['timestamp'] != null && json['timestamp'].toString().isNotEmpty 
+        ? DateTime.parse(json['timestamp'].toString()) 
+        : json['split_timestamp'] != null && json['split_timestamp'].toString().isNotEmpty
+            ? DateTime.parse(json['split_timestamp'].toString())
+            : DateTime.now(),
     );
   }
 

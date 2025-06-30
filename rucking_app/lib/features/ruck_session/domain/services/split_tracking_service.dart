@@ -56,9 +56,7 @@ class SplitTrackingService {
       AppLogger.debug('[SPLITS] User preferMetric preference: $preferMetric');
       
       // Set the split distance based on user preference
-      // TEMPORARY: Using 0.01km (10 meters) for testing instead of 1km/1mi
-      final double splitDistanceKm = 0.01; // 10 meters for testing
-      // final double splitDistanceKm = preferMetric ? 1.0 : 1.609; // 1km or 1mi (in km)
+      final double splitDistanceKm = preferMetric ? 1.0 : 1.609; // 1km or 1mi (in km)
       
       AppLogger.debug('[SPLITS] Split distance in km: $splitDistanceKm (${preferMetric ? "1km" : "1mi"})');
       
@@ -130,6 +128,8 @@ class SplitTrackingService {
           totalDistance: preferMetric ? currentDistanceKm : currentDistanceKm / 1.609, // Convert to mi if needed
           totalDuration: Duration(seconds: elapsedSeconds),
           isMetric: preferMetric,
+          splitCalories: splitCalories,
+          splitElevationGain: splitElevationGain,
         );
         
         AppLogger.sessionCompletion('Split notification sent to watch', context: {

@@ -256,7 +256,10 @@ class RuckSessionListResource(Resource):
                         splits_by_session[session_id].append({
                             'split_number': split['split_number'],
                             'split_distance_km': split['split_distance_km'],
-                            'split_duration_seconds': split['split_duration_seconds']
+                            'split_duration_seconds': split['split_duration_seconds'],
+                            'calories_burned': split.get('calories_burned', 0.0),
+                            'elevation_gain_m': split.get('elevation_gain_m', 0.0),
+                            'timestamp': split.get('split_timestamp')
                         })
             except Exception as e:
                 logger.error(f"ERROR: Failed to fetch splits: {e}")
@@ -509,7 +512,10 @@ class RuckSessionResource(Resource):
                             'splitNumber': split['split_number'],
                             'distance': distance_km * 1000, # Convert km to meters
                             'duration': duration_seconds,
-                            'paceSecondsPerKm': pace_seconds_per_km
+                            'paceSecondsPerKm': pace_seconds_per_km,
+                            'caloriesBurned': split.get('calories_burned', 0.0),
+                            'elevationGainM': split.get('elevation_gain_m', 0.0),
+                            'timestamp': split.get('split_timestamp')
                         })
                 else:
                     session['splits'] = []

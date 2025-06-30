@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Widget to display splits in a horizontal scrollable list above the heart rate graph
 class SplitsDisplay extends StatelessWidget {
@@ -24,9 +25,11 @@ class SplitsDisplay extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Text(
-            'Splits',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+            'SPLITS',
+            style: AppTextStyles.displaySmall.copyWith(
+              color: Theme.of(context).brightness == Brightness.dark 
+                ? Colors.red
+                : const Color(0xFF3E2723),
             ),
           ),
         ),
@@ -117,36 +120,34 @@ class _SplitCard extends StatelessWidget {
               color: colorScheme.onSurface,
             ),
           ),
-          // Split pace
-          Text(
-            '${split.formattedPace}/${isMetric ? 'km' : 'mi'}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          // Calories and elevation (if available)
-          if (split.caloriesBurned > 0 || split.elevationGainM > 0) ...[
-            const SizedBox(height: 4),
+          // Show calories and elevation (debug: show even if 0)
+          if (split.caloriesBurned >= 0 || split.elevationGainM >= 0) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (split.caloriesBurned > 0)
-                  Text(
-                    '${split.caloriesBurned.toStringAsFixed(0)} cal',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.secondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                Text(
+                  '${split.caloriesBurned.toStringAsFixed(0)} cal',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.secondary,
+                    fontWeight: FontWeight.w500,
                   ),
-                if (split.elevationGainM > 0)
-                  Text(
-                    '+${split.elevationGainM.toStringAsFixed(0)}m',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.tertiary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                ),
+                Text(
+                  '+${split.elevationGainM.toStringAsFixed(0)}m',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.tertiary,
+                    fontWeight: FontWeight.w500,
                   ),
+                ),
               ],
+            ),
+          ] else ...[
+            // Fallback to pace if no calories/elevation data
+            Text(
+              '${split.formattedPace}/${isMetric ? 'km' : 'mi'}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ],

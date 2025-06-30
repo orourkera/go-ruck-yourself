@@ -68,31 +68,18 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
     final pointsToShow = (widget.heartRateSamples.length * animationValue).round().clamp(1, widget.heartRateSamples.length);
     final visibleSamples = widget.heartRateSamples.sublist(0, pointsToShow);
     final firstTimestamp = widget.heartRateSamples.first.timestamp.millisecondsSinceEpoch.toDouble();
+    final lastTimestamp = widget.heartRateSamples.last.timestamp.millisecondsSinceEpoch.toDouble();
         
     final spots = visibleSamples.map((sample) {
       final timeOffset = (sample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
       return FlSpot(timeOffset, sample.bpm.toDouble());
     }).toList();
     
-    // Always use the total session duration for x-axis if available
-    // This ensures the graph always extends to the end time of the session
-    final double totalMinutes = widget.totalDuration != null
-        ? widget.totalDuration!.inMinutes.toDouble()
-        : spots.isNotEmpty ? spots.last.x + 5 : 10.0;
-        
-    // Ensure the chart shows all data points while maintaining good visualization
-    final double actualDataMaxX = spots.isNotEmpty ? spots.last.x : 0.0;
+    // Calculate the actual time range of heart rate data
+    final double actualDataRangeMinutes = (lastTimestamp - firstTimestamp) / (1000 * 60);
     
-    // If session duration is much longer than heart rate data, prioritize data visibility
-    // If they're similar, use session duration for context
-    final double safeMaxX;
-    if (totalMinutes > actualDataMaxX * 2 && actualDataMaxX > 0) {
-      // Session much longer than HR data - show data range with reasonable buffer
-      safeMaxX = actualDataMaxX + math.max(3.0, actualDataMaxX * 0.3);
-    } else {
-      // Use session duration as it provides good context
-      safeMaxX = math.max(totalMinutes, actualDataMaxX + 2.0);
-    }
+    // Use the actual heart rate data range for x-axis with small buffer
+    final double safeMaxX = actualDataRangeMinutes + 2.0;
         
     // Ensure min and max Y values are proper doubles
     final double safeMinY = ((widget.minHeartRate != null) ? widget.minHeartRate!.toDouble() : 60.0) - 10.0;
@@ -103,8 +90,8 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
         show: true,
         drawVerticalLine: true,
         horizontalInterval: 30,
-        // Reduce vertical grid lines to match our new x-axis labels
-        verticalInterval: safeMaxX > 5 ? (safeMaxX / 4).roundToDouble().clamp(5.0, 30.0) : 5,
+        // Set appropriate vertical grid intervals based on session duration
+        verticalInterval: safeMaxX > 30 ? 10.0 : safeMaxX > 15 ? 5.0 : 2.5,
         getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade300, strokeWidth: 1),
         getDrawingVerticalLine: (_) => FlLine(color: Colors.grey.shade300, strokeWidth: 1),
       ),
@@ -116,27 +103,9 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 22,
-            // Significantly reduce the number of x-axis labels by using a larger interval
-            // For a typical session, show only start, 1/4, 1/2, 3/4, and end points
-            interval: safeMaxX > 5 ? (safeMaxX / 4).roundToDouble().clamp(5.0, 30.0) : 5,
+            // Set appropriate intervals based on session duration
+            interval: safeMaxX > 30 ? 10.0 : safeMaxX > 15 ? 5.0 : 2.5,
             getTitlesWidget: (value, meta) {
-              // Only show labels at 0, 25%, 50%, 75% and 100% of the duration
-              // Skip other labels to reduce clutter
-              if (safeMaxX > 10) {
-                final percentOfTotal = (value / safeMaxX);
-                if (percentOfTotal < 0.05 || 
-                    (percentOfTotal > 0.23 && percentOfTotal < 0.27) || 
-                    (percentOfTotal > 0.48 && percentOfTotal < 0.52) || 
-                    (percentOfTotal > 0.73 && percentOfTotal < 0.77) ||
-                    percentOfTotal > 0.95) {
-                  return SideTitleWidget(
-                    axisSide: meta.axisSide,
-                    child: Text('${value.round()}m', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-                  );
-                }
-                return const SizedBox.shrink();
-              }
-              
               return SideTitleWidget(
                 axisSide: meta.axisSide,
                 child: Text('${value.round()}m', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
