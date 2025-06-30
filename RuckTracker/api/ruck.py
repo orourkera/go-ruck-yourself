@@ -511,8 +511,8 @@ class RuckSessionResource(Resource):
                         
                         session['splits'].append({
                             'splitNumber': split['split_number'],
-                            'distance': distance_km * 1000, # Convert km to meters
-                            'duration': duration_seconds,
+                            'splitDistance': distance_km,  # Keep in km to match frontend expectations
+                            'splitDurationSeconds': duration_seconds,
                             'paceSecondsPerKm': pace_seconds_per_km,
                             'caloriesBurned': split.get('calories_burned', 0.0),
                             'elevationGainM': split.get('elevation_gain_m', 0.0),
