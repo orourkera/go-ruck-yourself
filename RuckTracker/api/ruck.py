@@ -1152,14 +1152,54 @@ class HeartRateSampleUploadResource(Resource):
             
             session_data = session_resp.data[0]
             
-            # Get heart rate samples for this session
-            response = supabase.table('heart_rate_sample') \
-                .select('*') \
+            # Get heart rate samples for this session with intelligent downsampling
+            # First get count to determine if we need downsampling
+            count_response = supabase.table('heart_rate_sample') \
+                .select('id', count='exact') \
                 .eq('session_id', ruck_id) \
-                .order('timestamp') \
                 .execute()
+                
+            total_samples = count_response.count or 0
+            logger.info(f"Total heart rate samples for session {ruck_id}: {total_samples}")
             
-            logger.info(f"Retrieved {len(response.data)} heart rate samples for session {ruck_id}")
+            # If we have more than 500 samples, downsample by taking every Nth sample
+            # This maintains chart quality while reducing payload size dramatically
+            if total_samples > 500:
+                # Calculate step size to get approximately 300-400 samples
+                step_size = max(1, total_samples // 350)
+                logger.info(f"Downsampling heart rate data: taking every {step_size} samples")
+                
+                # Get all samples first (we'll optimize this with DB function later)
+                all_samples_response = supabase.table('heart_rate_sample') \
+                    .select('*') \
+                    .eq('session_id', ruck_id) \
+                    .order('timestamp') \
+                    .execute()
+                
+                # Downsample in Python for now (can optimize with SQL later)
+                if all_samples_response.data:
+                    downsampled = all_samples_response.data[::step_size]
+                    # Ensure we always include the last sample for accurate end time
+                    if len(all_samples_response.data) > 0 and all_samples_response.data[-1] not in downsampled:
+                        downsampled.append(all_samples_response.data[-1])
+                    
+                    # Create a mock response object
+                    class MockResponse:
+                        def __init__(self, data):
+                            self.data = data
+                    
+                    response = MockResponse(downsampled)
+                else:
+                    response = all_samples_response
+            else:
+                # For sessions with reasonable sample counts, return all data
+                response = supabase.table('heart_rate_sample') \
+                    .select('*') \
+                    .eq('session_id', ruck_id) \
+                    .order('timestamp') \
+                    .execute()
+            
+            logger.info(f"Retrieved {len(response.data)} heart rate samples for session {ruck_id} (downsampled from {total_samples})")
             return response.data, 200
             
         except Exception as e:

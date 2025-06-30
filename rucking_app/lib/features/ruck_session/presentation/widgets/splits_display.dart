@@ -23,7 +23,7 @@ class SplitsDisplay extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
           child: Text(
             'SPLITS',
             style: AppTextStyles.displaySmall.copyWith(
