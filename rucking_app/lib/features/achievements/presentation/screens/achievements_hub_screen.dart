@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/animated_counter.dart';
@@ -50,14 +53,42 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
       _tabController.animateTo(1); // Collection tab index (now index 1)
     }
     
-    // Get user ID from auth
-    final authState = context.read<AuthBloc>().state;
-    final userId = authState is Authenticated ? authState.user.userId : '';
-    
-    // Load achievement data
-    context.read<AchievementBloc>().add(const LoadAchievements());
-    context.read<AchievementBloc>().add(LoadUserAchievements(userId)); // Load user's earned achievements
-    context.read<AchievementBloc>().add(LoadAchievementStats(userId));
+    _loadAchievementData();
+  }
+
+  Future<void> _loadAchievementData() async {
+    try {
+      // Get current user context
+      final authState = context.read<AuthBloc>().state;
+      final userId = authState is Authenticated ? authState.user.userId : '';
+      
+      // Get user's unit preference
+      final storageService = GetIt.I<StorageService>();
+      final storedUserData = await storageService.getObject(AppConfig.userProfileKey);
+      bool preferMetric = false; // Default to imperial (standard)
+      
+      if (storedUserData != null && storedUserData.containsKey('preferMetric')) {
+        preferMetric = storedUserData['preferMetric'] as bool;
+      }
+      
+      final unitPreference = preferMetric ? 'metric' : 'standard';
+      debugPrint('🏆 [AchievementsHub] Loading achievements with unit preference: $unitPreference');
+      
+      // Load achievement data with proper unit preference
+      if (mounted) {
+        context.read<AchievementBloc>().add(LoadAchievements(unitPreference: unitPreference));
+        context.read<AchievementBloc>().add(LoadUserAchievements(userId));
+        context.read<AchievementBloc>().add(LoadAchievementStats(userId, unitPreference: unitPreference));
+      }
+    } catch (e) {
+      debugPrint('🏆 [AchievementsHub] Error loading unit preference: $e');
+      // Fallback to standard if error occurs
+      if (mounted) {
+        context.read<AchievementBloc>().add(const LoadAchievements(unitPreference: 'standard'));
+        context.read<AchievementBloc>().add(LoadUserAchievements(userId));
+        context.read<AchievementBloc>().add(LoadAchievementStats(userId, unitPreference: 'standard'));
+      }
+    }
   }
 
   @override

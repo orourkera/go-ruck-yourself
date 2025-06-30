@@ -499,6 +499,7 @@ class RuckSessionResource(Resource):
                     .execute()
                 
                 if splits_resp.data:
+                    logger.info(f"[SPLITS_DEBUG] Raw splits data for session {ruck_id}: {splits_resp.data}")
                     # Convert splits to the format expected by frontend
                     session['splits'] = []
                     for split in splits_resp.data:

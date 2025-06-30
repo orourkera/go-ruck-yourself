@@ -229,8 +229,31 @@ class CheckSessionAchievementsResource(Resource):
                 return session.get('ruck_weight_kg', 0) >= target
             
             elif criteria_type == 'power_points':
+                # Power points are always cumulative across all sessions
+                try:
+                    response = supabase.rpc('calculate_user_power_points', {
+                        'user_id_param': user_id
+                    }).execute()
+                    total_power_points = response.data or 0
+                except Exception as rpc_error:
+                    # Fallback to manual calculation if RPC doesn't exist
+                    logger.warning(f"RPC calculate_user_power_points not available, using fallback: {str(rpc_error)}")
+                    power_response = supabase.table('ruck_session').select(
+                        'power_points'
+                    ).eq('user_id', user_id).eq('status', 'completed').execute()
+                    
+                    total_power_points = 0
+                    if power_response.data:
+                        for sess in power_response.data:
+                            power_points = sess.get('power_points')
+                            if power_points is not None:
+                                try:
+                                    total_power_points += float(power_points)
+                                except (ValueError, TypeError):
+                                    continue
+                
                 target = criteria.get('target', 0)
-                return session.get('power_points', 0) >= target
+                return total_power_points >= target
             
             elif criteria_type == 'elevation_gain':
                 target = criteria.get('target', 0)
@@ -288,13 +311,277 @@ class CheckSessionAchievementsResource(Resource):
                         count = count_response.data or 0
                         return count >= target_count
             
-            # More complex criteria would be handled here (streaks, consistency, etc.)
+            elif criteria_type == 'daily_streak':
+                # Check for consecutive daily rucks
+                target = criteria.get('target', 7)
+                current_streak = self._calculate_daily_streak(supabase, user_id)
+                return current_streak >= target
+        
+            elif criteria_type == 'weekly_streak':
+                # Check for consecutive weekly rucks
+                target = criteria.get('target', 8)
+                current_streak = self._calculate_weekly_streak(supabase, user_id)
+                return current_streak >= target
+        
+            elif criteria_type == 'weekend_streak':
+                # Check for consecutive weekend rucks
+                target = criteria.get('target', 4)
+                current_streak = self._calculate_weekend_streak(supabase, user_id)
+                return current_streak >= target
+        
+            elif criteria_type == 'monthly_consistency':
+                # Check for consistent monthly activity
+                target = criteria.get('target', 3)  # months
+                min_rucks = criteria.get('min_rucks', 4)  # per month
+                return self._check_monthly_consistency(supabase, user_id, target, min_rucks)
+        
+            elif criteria_type == 'negative_split':
+                # Check if this session had a negative split
+                return self._check_negative_split(session)
+        
+            elif criteria_type == 'pace_consistency':
+                # Check pace consistency across multiple sessions
+                target = criteria.get('target', 0.1)  # variance threshold
+                return self._check_pace_consistency(supabase, user_id, target)
+        
+            elif criteria_type == 'photo_uploads':
+                # Check total photo uploads
+                target = criteria.get('target', 10)
+                total_photos = self._count_user_photos(supabase, user_id)
+                return total_photos >= target
+        
+            elif criteria_type == 'weather_variety':
+                # Check variety of weather conditions
+                target = criteria.get('target', 3)
+                weather_types = self._count_weather_variety(supabase, user_id)
+                return weather_types >= target
+        
+            elif criteria_type == 'total_likes_given':
+                # Check total likes given by user
+                target = criteria.get('target', 100)
+                total_likes = self._count_likes_given(supabase, user_id)
+                return total_likes >= target
+        
+            elif criteria_type == 'total_likes_received':
+                # Check total likes received by user
+                target = criteria.get('target', 50)
+                total_likes = self._count_likes_received(supabase, user_id)
+                return total_likes >= target
+        
+            # More complex criteria would be handled here
             logger.warning(f"Unhandled achievement criteria type: {criteria_type}")
             return False
             
         except Exception as e:
             logger.error(f"Error checking achievement criteria: {str(e)}")
             return False
+    
+    def _calculate_daily_streak(self, supabase, user_id: str) -> int:
+        """Calculate current daily streak"""
+        try:
+            # Get sessions ordered by date
+            response = supabase.table('ruck_session').select(
+                'start_time'
+            ).eq('user_id', user_id).eq('status', 'completed').order('start_time', desc=True).execute()
+            
+            if not response.data:
+                return 0
+            
+            streak = 0
+            current_date = datetime.utcnow().date()
+            
+            for session in response.data:
+                session_date = datetime.fromisoformat(session['start_time'].replace('Z', '+00:00')).date()
+                if session_date == current_date:
+                    streak += 1
+                    current_date -= timedelta(days=1)
+                else:
+                    break
+            
+            return streak
+        except Exception as e:
+            logger.error(f"Error calculating daily streak: {str(e)}")
+            return 0
+    
+    def _calculate_weekly_streak(self, supabase, user_id: str) -> int:
+        """Calculate current weekly streak"""
+        try:
+            # Get sessions grouped by week
+            response = supabase.table('ruck_session').select(
+                'start_time'
+            ).eq('user_id', user_id).eq('status', 'completed').order('start_time', desc=True).execute()
+            
+            if not response.data:
+                return 0
+            
+            # Group by week
+            weeks_with_rucks = set()
+            for session in response.data:
+                session_date = datetime.fromisoformat(session['start_time'].replace('Z', '+00:00')).date()
+                week_start = session_date - timedelta(days=session_date.weekday())
+                weeks_with_rucks.add(week_start)
+            
+            # Count consecutive weeks from current week backwards
+            streak = 0
+            current_week_start = datetime.utcnow().date() - timedelta(days=datetime.utcnow().weekday())
+            
+            while current_week_start in weeks_with_rucks:
+                streak += 1
+                current_week_start -= timedelta(days=7)
+            
+            return streak
+        except Exception as e:
+            logger.error(f"Error calculating weekly streak: {str(e)}")
+            return 0
+    
+    def _calculate_weekend_streak(self, supabase, user_id: str) -> int:
+        """Calculate current weekend streak"""
+        try:
+            # Get weekend sessions (Saturday = 5, Sunday = 6)
+            response = supabase.table('ruck_session').select(
+                'start_time'
+            ).eq('user_id', user_id).eq('status', 'completed').order('start_time', desc=True).execute()
+            
+            if not response.data:
+                return 0
+            
+            weekends_with_rucks = set()
+            for session in response.data:
+                session_date = datetime.fromisoformat(session['start_time'].replace('Z', '+00:00')).date()
+                if session_date.weekday() >= 5:  # Saturday or Sunday
+                    # Get the Saturday of this weekend
+                    weekend_start = session_date - timedelta(days=session_date.weekday() - 5)
+                    weekends_with_rucks.add(weekend_start)
+            
+            # Count consecutive weekends
+            streak = 0
+            current_weekend = datetime.utcnow().date()
+            current_weekend -= timedelta(days=current_weekend.weekday() - 5 if current_weekend.weekday() >= 5 else current_weekend.weekday() + 2)
+            
+            while current_weekend in weekends_with_rucks:
+                streak += 1
+                current_weekend -= timedelta(days=7)
+            
+            return streak
+        except Exception as e:
+            logger.error(f"Error calculating weekend streak: {str(e)}")
+            return 0
+    
+    def _check_monthly_consistency(self, supabase, user_id: str, target_months: int, min_rucks_per_month: int) -> bool:
+        """Check monthly consistency"""
+        try:
+            # Get sessions from last target_months
+            months_ago = datetime.utcnow().replace(day=1) - timedelta(days=target_months * 31)
+            
+            response = supabase.table('ruck_session').select(
+                'start_time'
+            ).eq('user_id', user_id).eq('status', 'completed').gte('start_time', months_ago.isoformat()).execute()
+            
+            if not response.data:
+                return False
+            
+            # Group by month
+            month_counts = {}
+            for session in response.data:
+                session_date = datetime.fromisoformat(session['start_time'].replace('Z', '+00:00')).date()
+                month_key = (session_date.year, session_date.month)
+                month_counts[month_key] = month_counts.get(month_key, 0) + 1
+            
+            # Check if we have enough consecutive months with min_rucks
+            consecutive_months = 0
+            current_month = datetime.utcnow().replace(day=1)
+            
+            for _ in range(target_months):
+                month_key = (current_month.year, current_month.month)
+                if month_counts.get(month_key, 0) >= min_rucks_per_month:
+                    consecutive_months += 1
+                else:
+                    break
+                current_month -= timedelta(days=32)
+                current_month = current_month.replace(day=1)
+            
+            return consecutive_months >= target_months
+        except Exception as e:
+            logger.error(f"Error checking monthly consistency: {str(e)}")
+            return False
+    
+    def _check_negative_split(self, session: Dict) -> bool:
+        """Check if session had negative split"""
+        try:
+            # This would require split data - for now return False
+            # TODO: Implement when split data is available in session
+            return False
+        except Exception as e:
+            logger.error(f"Error checking negative split: {str(e)}")
+            return False
+    
+    def _check_pace_consistency(self, supabase, user_id: str, variance_threshold: float) -> bool:
+        """Check pace consistency across sessions"""
+        try:
+            # Get recent sessions
+            response = supabase.table('ruck_session').select(
+                'pace_seconds_per_km'
+            ).eq('user_id', user_id).eq('status', 'completed').limit(10).execute()
+            
+            if not response.data or len(response.data) < 3:
+                return False
+            
+            paces = [s['pace_seconds_per_km'] for s in response.data if s.get('pace_seconds_per_km')]
+            if len(paces) < 3:
+                return False
+            
+            # Calculate coefficient of variation
+            mean_pace = sum(paces) / len(paces)
+            variance = sum((p - mean_pace) ** 2 for p in paces) / len(paces)
+            std_dev = variance ** 0.5
+            cv = std_dev / mean_pace if mean_pace > 0 else 1
+            
+            return cv <= variance_threshold
+        except Exception as e:
+            logger.error(f"Error checking pace consistency: {str(e)}")
+            return False
+    
+    def _count_user_photos(self, supabase, user_id: str) -> int:
+        """Count total photos uploaded by user"""
+        try:
+            response = supabase.rpc('count', {
+                'table_name': 'ruck_photos',
+                'conditions': f"user_id = '{user_id}'"
+            }).execute()
+            return response.data or 0
+        except Exception as e:
+            logger.error(f"Error counting user photos: {str(e)}")
+            return 0
+    
+    def _count_weather_variety(self, supabase, user_id: str) -> int:
+        """Count distinct weather conditions"""
+        try:
+            # This would require weather data in sessions
+            # TODO: Implement when weather data is available
+            return 0
+        except Exception as e:
+            logger.error(f"Error counting weather variety: {str(e)}")
+            return 0
+    
+    def _count_likes_given(self, supabase, user_id: str) -> int:
+        """Count total likes given by user"""
+        try:
+            # This would require likes table
+            # TODO: Implement when likes system is available
+            return 0
+        except Exception as e:
+            logger.error(f"Error counting likes given: {str(e)}")
+            return 0
+    
+    def _count_likes_received(self, supabase, user_id: str) -> int:
+        """Count total likes received by user"""
+        try:
+            # This would require likes table
+            # TODO: Implement when likes system is available
+            return 0
+        except Exception as e:
+            logger.error(f"Error counting likes received: {str(e)}")
+            return 0
 
 
 class AchievementStatsResource(Resource):

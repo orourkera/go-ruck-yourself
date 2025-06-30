@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/animated_counter.dart';
@@ -33,18 +36,45 @@ class _AchievementSummaryState extends State<AchievementSummary> {
     _loadAchievementData();
   }
 
-  void _loadAchievementData() {
-    final authBloc = BlocProvider.of<AuthBloc>(context);
-    final achievementBloc = BlocProvider.of<AchievementBloc>(context);
-    
-    if (authBloc.state is Authenticated) {
-      final userId = (authBloc.state as Authenticated).user.userId;
+  void _loadAchievementData() async {
+    try {
+      final authBloc = context.read<AuthBloc>();
+      final achievementBloc = context.read<AchievementBloc>();
       
-      // Load achievements data
-      achievementBloc.add(const LoadAchievements());
-      achievementBloc.add(LoadUserAchievements(userId)); // Load user's earned achievements
-      achievementBloc.add(LoadAchievementStats(userId));
-      achievementBloc.add(const LoadRecentAchievements());
+      if (authBloc.state is Authenticated) {
+        final userId = (authBloc.state as Authenticated).user.userId;
+        
+        // Get user's unit preference
+        final storageService = GetIt.I<StorageService>();
+        final storedUserData = await storageService.getObject(AppConfig.userProfileKey);
+        bool preferMetric = false; // Default to imperial (standard)
+        
+        if (storedUserData != null && storedUserData.containsKey('preferMetric')) {
+          preferMetric = storedUserData['preferMetric'] as bool;
+        }
+        
+        final unitPreference = preferMetric ? 'metric' : 'standard';
+        debugPrint('🏆 [AchievementSummary] Loading achievements with unit preference: $unitPreference');
+        
+        // Load achievements data with proper unit preference
+        achievementBloc.add(LoadAchievements(unitPreference: unitPreference));
+        achievementBloc.add(LoadUserAchievements(userId));
+        achievementBloc.add(LoadAchievementStats(userId, unitPreference: unitPreference));
+        achievementBloc.add(const LoadRecentAchievements());
+      }
+    } catch (e) {
+      debugPrint('🏆 [AchievementSummary] Error loading unit preference: $e');
+      // Fallback to standard if error occurs
+      final authBloc = context.read<AuthBloc>();
+      final achievementBloc = context.read<AchievementBloc>();
+      
+      if (authBloc.state is Authenticated) {
+        final userId = (authBloc.state as Authenticated).user.userId;
+        achievementBloc.add(const LoadAchievements(unitPreference: 'standard'));
+        achievementBloc.add(LoadUserAchievements(userId));
+        achievementBloc.add(LoadAchievementStats(userId, unitPreference: 'standard'));
+        achievementBloc.add(const LoadRecentAchievements());
+      }
     }
   }
 
@@ -227,24 +257,65 @@ class _AchievementSummaryState extends State<AchievementSummary> {
     String progressText = '';
     String achievementId = '';
     
-    // First try to find an achievement with progress
+    // First try to find an achievement with progress using smart selection
     if (achievementsWithProgress.isNotEmpty) {
-      // Sort by closest to completion
-      final sortedByProgress = achievementsWithProgress.map((achievement) {
+      // Calculate smart scores for each achievement
+      final scoredAchievements = achievementsWithProgress.map((achievement) {
         final progress = state.getProgressForAchievement(achievement.id);
         final percent = progress != null 
             ? (progress.currentValue / progress.targetValue) 
             : 0.0;
-        return {'achievement': achievement, 'percent': percent};
+        
+        // Calculate smart score based on multiple factors
+        double score = 0.0;
+        
+        // Factor 1: Sweet spot progress (10-70% complete) - 40% weight
+        if (percent >= 0.1 && percent <= 0.7) {
+          score += 0.4;
+        } else if (percent > 0.7) {
+          // Penalize achievements stuck at high % (like elevation for flat routes)
+          score += 0.1;
+        } else {
+          // Some progress is better than none
+          score += 0.2;
+        }
+        
+        // Factor 2: Category diversity - 30% weight
+        // Avoid elevation-heavy achievements if user likely doesn't do elevation
+        final category = achievement.category.toLowerCase();
+        if (category != 'elevation') {
+          score += 0.3;
+        } else {
+          score += 0.05; // Still possible, just less likely
+        }
+        
+        // Factor 3: Tier appropriateness - 20% weight
+        final tier = achievement.tier.toLowerCase();
+        if (tier == 'beginner' || tier == 'easy') {
+          score += 0.2;
+        } else if (tier == 'intermediate' || tier == 'medium') {
+          score += 0.15;
+        } else {
+          score += 0.05;
+        }
+        
+        // Factor 4: Actual progress amount - 10% weight
+        score += percent * 0.1;
+        
+        return {
+          'achievement': achievement, 
+          'percent': percent, 
+          'score': score
+        };
       }).toList();
       
-      // Sort by highest completion percentage
-      sortedByProgress.sort((a, b) => (b['percent'] as double).compareTo(a['percent'] as double));
+      // Sort by smart score (highest first)
+      scoredAchievements.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
       
-      if (sortedByProgress.isNotEmpty) {
-        nextChallenge = sortedByProgress.first['achievement'] as Achievement;
+      if (scoredAchievements.isNotEmpty) {
+        nextChallenge = scoredAchievements.first['achievement'] as Achievement;
         achievementId = nextChallenge.id;
-        final percent = sortedByProgress.first['percent'] as double;
+        final percent = scoredAchievements.first['percent'] as double;
         final progress = state.getProgressForAchievement(nextChallenge.id);
         
         if (progress != null) {
@@ -253,19 +324,38 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       }
     }
     
-    // If no achievement with progress, pick a random beginner one
+    // If no achievement with progress, pick a smart beginner one
     if (nextChallenge == null) {
       final beginnerAchievements = lockedAchievements
           .where((a) => a.tier.toLowerCase() == 'beginner' || a.tier.toLowerCase() == 'easy')
           .toList();
       
       if (beginnerAchievements.isNotEmpty) {
-        // Get a random beginner achievement
-        nextChallenge = beginnerAchievements[DateTime.now().millisecondsSinceEpoch % beginnerAchievements.length];
+        // First try to get non-elevation achievements for better variety
+        final nonElevationBeginners = beginnerAchievements
+            .where((a) => a.category.toLowerCase() != 'elevation')
+            .toList();
+        
+        if (nonElevationBeginners.isNotEmpty) {
+          // Rotate through different achievements based on day of year for variety
+          final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
+          nextChallenge = nonElevationBeginners[dayOfYear % nonElevationBeginners.length];
+        } else {
+          // Fallback to any beginner achievement
+          nextChallenge = beginnerAchievements[DateTime.now().millisecondsSinceEpoch % beginnerAchievements.length];
+        }
         achievementId = nextChallenge.id;
       } else {
-        // Just get any locked achievement
-        nextChallenge = lockedAchievements[0];
+        // Just get any locked achievement (prefer non-elevation)
+        final nonElevationAchievements = lockedAchievements
+            .where((a) => a.category.toLowerCase() != 'elevation')
+            .toList();
+        
+        if (nonElevationAchievements.isNotEmpty) {
+          nextChallenge = nonElevationAchievements[0];
+        } else {
+          nextChallenge = lockedAchievements[0];
+        }
         achievementId = nextChallenge.id;
       }
     }
