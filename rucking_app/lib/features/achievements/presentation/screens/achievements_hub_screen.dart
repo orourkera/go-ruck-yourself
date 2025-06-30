@@ -57,10 +57,11 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
   }
 
   Future<void> _loadAchievementData() async {
+    // Get current user context
+    final authState = context.read<AuthBloc>().state;
+    final userId = authState is Authenticated ? authState.user.userId : '';
+    
     try {
-      // Get current user context
-      final authState = context.read<AuthBloc>().state;
-      final userId = authState is Authenticated ? authState.user.userId : '';
       
       // Get user's unit preference
       final storageService = GetIt.I<StorageService>();

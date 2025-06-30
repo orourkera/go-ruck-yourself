@@ -10,18 +10,18 @@ WITH daily_streaks AS (
         SELECT 
             user_id,
             session_date,
-            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY session_date) - 
-            ROW_NUMBER() OVER (PARTITION BY user_id, streak_group ORDER BY session_date) as streak_length
+            COUNT(*) as streak_length
         FROM (
             SELECT DISTINCT 
                 user_id,
                 DATE(session_start_time) as session_date,
-                DATE(session_start_time) - INTERVAL ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY DATE(session_start_time)) DAY as streak_group
+                DATE(session_start_time) - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY DATE(session_start_time)) || ' days')::INTERVAL as streak_group
             FROM ruck_session 
             WHERE session_status = 'completed'
         ) dated_sessions
+        GROUP BY user_id, streak_group
     ) streak_calc
-    GROUP BY user_id, streak_group
+    GROUP BY user_id
 )
 -- Award Daily Streak 7 days
 INSERT INTO user_achievements (user_id, achievement_id, earned_date, session_id)
@@ -71,19 +71,18 @@ WITH weekly_streaks AS (
         SELECT 
             user_id,
             week_year,
-            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY week_year) - 
-            ROW_NUMBER() OVER (PARTITION BY user_id, week_group ORDER BY week_year) as weekly_streak
+            COUNT(*) as weekly_streak
         FROM (
             SELECT DISTINCT 
                 user_id,
-                CONCAT(EXTRACT(YEAR FROM session_start_time), '-', EXTRACT(WEEK FROM session_start_time)) as week_year,
-                CONCAT(EXTRACT(YEAR FROM session_start_time), '-', EXTRACT(WEEK FROM session_start_time)) - 
-                INTERVAL ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY CONCAT(EXTRACT(YEAR FROM session_start_time), '-', EXTRACT(WEEK FROM session_start_time))) WEEK as week_group
+                EXTRACT(YEAR FROM session_start_time)::text || '-' || EXTRACT(WEEK FROM session_start_time)::text as week_year,
+                DATE_TRUNC('week', session_start_time) - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY DATE_TRUNC('week', session_start_time)) || ' weeks')::INTERVAL as week_group
             FROM ruck_session 
             WHERE session_status = 'completed'
         ) weekly_sessions
+        GROUP BY user_id, week_group
     ) week_calc
-    GROUP BY user_id, week_group
+    GROUP BY user_id
 )
 -- Award Weekly Streak 4 weeks
 INSERT INTO user_achievements (user_id, achievement_id, earned_date, session_id)
@@ -137,20 +136,19 @@ WITH weekend_streaks AS (
         SELECT 
             user_id,
             weekend_date,
-            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY weekend_date) - 
-            ROW_NUMBER() OVER (PARTITION BY user_id, weekend_group ORDER BY weekend_date) as weekend_streak
+            COUNT(*) as weekend_streak
         FROM (
             SELECT DISTINCT 
                 user_id,
-                DATE(session_start_time - INTERVAL EXTRACT(DOW FROM session_start_time) DAY) as weekend_date,
-                DATE(session_start_time - INTERVAL EXTRACT(DOW FROM session_start_time) DAY) - 
-                INTERVAL ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY DATE(session_start_time - INTERVAL EXTRACT(DOW FROM session_start_time) DAY)) WEEK as weekend_group
+                DATE_TRUNC('week', session_start_time) as weekend_date,
+                DATE_TRUNC('week', session_start_time) - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY DATE_TRUNC('week', session_start_time)) || ' weeks')::INTERVAL as weekend_group
             FROM ruck_session 
             WHERE session_status = 'completed'
                 AND EXTRACT(DOW FROM session_start_time) IN (0, 6) -- Sunday = 0, Saturday = 6
         ) weekend_sessions
+        GROUP BY user_id, weekend_group
     ) weekend_calc
-    GROUP BY user_id, weekend_group
+    GROUP BY user_id
 )
 INSERT INTO user_achievements (user_id, achievement_id, earned_date, session_id)
 SELECT DISTINCT 

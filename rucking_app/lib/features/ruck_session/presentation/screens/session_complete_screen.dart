@@ -304,6 +304,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       // Reset active session state to return to home screen properly
       context.read<ActiveSessionBloc>().add(const SessionReset());
       
+      // Check for achievements AFTER navigation is complete
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAchievementsAfterNavigation();
+      });
+      
       // Upload photos in background if any are selected - using repository
       if (_selectedPhotos.isNotEmpty) {
         // Start background upload using repository's independent method
@@ -524,6 +529,52 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     }
   }
 
+  /// Check for achievements after session submission and navigation
+  void _checkAchievementsAfterNavigation() {
+    if (!mounted) return;
+    
+    // Get the current context from navigator to show dialog over home screen
+    final currentContext = Navigator.of(context).context;
+    
+    // Listen for achievement check results
+    final achievementBloc = currentContext.read<AchievementBloc>();
+    
+    // Set up a listener for achievement results
+    late StreamSubscription<AchievementState> subscription;
+    subscription = achievementBloc.stream.listen((state) {
+      if (state is AchievementsSessionChecked && mounted) {
+        subscription.cancel();
+        
+        if (state.newAchievements.isNotEmpty) {
+          // Show achievement modal over home screen
+          showDialog(
+            context: currentContext,
+            barrierDismissible: false,
+            builder: (dialogContext) => AlertDialog(
+              content: SessionAchievementNotification(
+                newAchievements: state.newAchievements,
+                onDismiss: () {
+                  Navigator.of(dialogContext).pop();
+                },
+              ),
+              contentPadding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+          );
+        }
+      }
+    });
+    
+    // Trigger achievement check for the submitted session
+    final sessionId = int.tryParse(widget.ruckId);
+    if (sessionId != null) {
+      achievementBloc.add(CheckSessionAchievements(sessionId));
+    } else {
+      print('[ERROR] Could not parse ruckId to int: ${widget.ruckId}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
@@ -558,6 +609,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         BlocListener<AchievementBloc, AchievementState>(
           listener: (context, state) {
             print('[DEBUG] SessionComplete: Achievement state changed to ${state.runtimeType}');
+            // DISABLED: Achievement checking moved to post-navigation
+            // We no longer show achievements during session complete screen
+            // Instead, they are shown after navigation to home screen
+            /*
             if (state is AchievementsSessionChecked) {
               print('[DEBUG] SessionComplete: AchievementsSessionChecked with ${state.newAchievements.length} new achievements');
               if (state.newAchievements.isNotEmpty) {
@@ -595,6 +650,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                 });
               }
             }
+            */
           },
         ),
       ],

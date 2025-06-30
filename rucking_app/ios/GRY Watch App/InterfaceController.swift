@@ -195,9 +195,13 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
                 
             case "workoutStopped":
                 self.statusLabel.setText("Workout Ended")
+                // Let SessionManager handle the termination logic
+                // It will end the workout and terminate the app properly
+                SessionManager.shared.delegate?.didReceiveMessage(["command": "workoutStopped"])
+                // Also end the local workout manager
                 self.workoutManager?.endWorkout { error in
                     if let error = error {
-                        self.statusLabel.setText("Workout End Error: \(error.localizedDescription)")
+                        print("[WATCH UI] Workout End Error: \(error.localizedDescription)")
                     }
                 }
                 

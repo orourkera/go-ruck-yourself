@@ -491,6 +491,15 @@ class WatchService {
     
     bool success = false;
     try {
+      // CRITICAL: Send workoutStopped command to the watch to terminate the app
+      AppLogger.debug('[WATCH_SERVICE] Sending workoutStopped command to watch to terminate app');
+      await _sendMessageToWatch({
+        'command': 'workoutStopped',
+      });
+      
+      // Give the watch a moment to process the termination command
+      await Future.delayed(const Duration(milliseconds: 500));
+      
       // Create the API instance
       final api = FlutterRuckingApi();
       
@@ -499,7 +508,7 @@ class WatchService {
       
       // Set success flag if no exceptions
       success = true;
-      // Session ended on watch
+      AppLogger.info('[WATCH_SERVICE] Session ended on watch successfully, app should be terminated');
     } catch (e) {
       // Log the error
       AppLogger.error('[WATCH_SERVICE] Failed to end session on watch: $e');

@@ -353,6 +353,14 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                         
                         // Force UI refresh to clear any background state
                         WKInterfaceDevice.current().play(.stop)
+                        
+                        // Terminate the app to remove from lock screen
+                        // Delay slightly to ensure cleanup completes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            // Exit the app completely
+                            // This will remove it from the lock screen and prevent battery drain
+                            exit(0)
+                        }
                     }
                 }
                 
@@ -654,6 +662,14 @@ extension SessionManager {
             
             // Log workout end for debugging
             print("[WORKOUT] Workout ended via delegate - all state cleared")
+            
+            // Terminate the app to remove from lock screen
+            // Delay slightly to ensure cleanup completes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Exit the app completely
+                // This will remove it from the lock screen and prevent battery drain
+                exit(0)
+            }
         }
     }
 }
