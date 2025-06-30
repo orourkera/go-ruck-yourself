@@ -493,7 +493,7 @@ class RuckSessionResource(Resource):
             # Fetch splits data (only for the session owner for now)
             if is_own_session:
                 splits_resp = supabase.table('session_splits') \
-                    .select('split_number,split_distance_km,split_duration_seconds') \
+                    .select('split_number,split_distance_km,split_duration_seconds,calories_burned,elevation_gain_m,split_timestamp') \
                     .eq('session_id', ruck_id) \
                     .order('split_number') \
                     .execute()
