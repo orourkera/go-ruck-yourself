@@ -1178,14 +1178,24 @@ class HeartRateSampleUploadResource(Resource):
                 logger.info(f"Downsampling heart rate data: interval={interval}, target={MAX_HR_SAMPLES} samples")
                 
                 # Try RPC function for efficient database-level sampling
-                response = supabase.rpc('get_sampled_heart_rate', {
-                    'p_session_id': int(ruck_id),
-                    'p_interval': interval,
-                    'p_max_samples': MAX_HR_SAMPLES
-                }).execute()
+                try:
+                    response = supabase.rpc('get_sampled_heart_rate', {
+                        'p_session_id': int(ruck_id),
+                        'p_interval': interval,
+                        'p_max_samples': MAX_HR_SAMPLES
+                    }).execute()
+                    
+                    # If RPC worked and returned data, use it
+                    if response.data:
+                        logger.info(f"Successfully used RPC function for heart rate downsampling")
+                    else:
+                        response = None
+                except Exception as rpc_error:
+                    logger.info(f"RPC function not available: {rpc_error}")
+                    response = None
                 
-                # Fallback to Python-based downsampling if RPC doesn't exist
-                if not response.data:
+                # Fallback to Python-based downsampling if RPC doesn't exist or failed
+                if not response or not response.data:
                     logger.info("RPC function not available, using Python-based downsampling")
                     all_samples_response = supabase.table('heart_rate_sample') \
                         .select('*') \
