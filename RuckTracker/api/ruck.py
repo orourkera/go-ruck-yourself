@@ -490,38 +490,23 @@ class RuckSessionResource(Resource):
                 session['route'] = []
                 session['location_points'] = []
             
-            # Fetch splits data (only for the session owner for now)
-            if is_own_session:
+            # Fetch splits data (for all sessions - public sessions should also show splits)
+            try:
                 splits_resp = supabase.table('session_splits') \
-                    .select('split_number,split_distance_km,split_duration_seconds,calories_burned,elevation_gain_m,split_timestamp') \
+                    .select('*') \
                     .eq('session_id', ruck_id) \
                     .order('split_number') \
                     .execute()
                 
                 if splits_resp.data:
-                    logger.info(f"[SPLITS_DEBUG] Raw splits data for session {ruck_id}: {splits_resp.data}")
-                    # Convert splits to the format expected by frontend
-                    session['splits'] = []
-                    for split in splits_resp.data:
-                        distance_km = split['split_distance_km']
-                        duration_seconds = split['split_duration_seconds']
-                        
-                        # Calculate pace (seconds per km)
-                        pace_seconds_per_km = duration_seconds / distance_km if distance_km > 0 else 0
-                        
-                        session['splits'].append({
-                            'splitNumber': split['split_number'],
-                            'splitDistance': distance_km,  # Keep in km to match frontend expectations
-                            'splitDurationSeconds': duration_seconds,
-                            'paceSecondsPerKm': pace_seconds_per_km,
-                            'caloriesBurned': split.get('calories_burned', 0.0),
-                            'elevationGainM': split.get('elevation_gain_m', 0.0),
-                            'timestamp': split.get('split_timestamp')
-                        })
+                    session['splits'] = splits_resp.data
+                    logger.info(f"[SPLITS_DEBUG] Included {len(splits_resp.data)} splits in detail response for session {ruck_id}")
                 else:
                     session['splits'] = []
-            else:
-                session['splits'] = []
+                    logger.info(f"[SPLITS_DEBUG] No splits found for session {ruck_id}")
+            except Exception as splits_fetch_error:
+                logger.error(f"Error fetching splits for session {ruck_id}: {splits_fetch_error}")
+                session['splits'] = []  # Ensure splits field exists even if fetch fails
             
             # Fetch photos data (only for the session owner for now)
             if is_own_session:

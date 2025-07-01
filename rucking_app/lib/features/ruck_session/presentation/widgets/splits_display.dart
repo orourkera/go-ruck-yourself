@@ -120,14 +120,14 @@ class _SplitCard extends StatelessWidget {
               color: colorScheme.onSurface,
             ),
           ),
-          // Show calories and elevation if they have meaningful values (lowered threshold for calories)
-          if (split.caloriesBurned >= 0.1 || split.elevationGainM > 0) ...[
+          // Show calories and elevation - prioritize showing data over pace
+          if (split.caloriesBurned > 0 || split.elevationGainM > 0) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (split.caloriesBurned >= 0.1)
+                if (split.caloriesBurned > 0)
                   Text(
-                    '${split.caloriesBurned.toStringAsFixed(1)} cal',
+                    '${split.caloriesBurned >= 10 ? split.caloriesBurned.toStringAsFixed(0) : split.caloriesBurned.toStringAsFixed(1)} cal',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.secondary,
                     fontWeight: FontWeight.w500,
@@ -143,12 +143,13 @@ class _SplitCard extends StatelessWidget {
                   ),
               ],
             ),
-          ] else ...[
-            // Fallback to pace if no calories/elevation data
+          ] else if (split.caloriesBurned <= 0 && split.elevationGainM <= 0) ...[
+            // Show split info when no calories/elevation data available
             Text(
-              '${split.formattedPace}/${isMetric ? 'km' : 'mi'}',
+              'Split ${split.splitNumber}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
