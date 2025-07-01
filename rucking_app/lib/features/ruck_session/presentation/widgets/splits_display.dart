@@ -120,25 +120,27 @@ class _SplitCard extends StatelessWidget {
               color: colorScheme.onSurface,
             ),
           ),
-          // Show calories and elevation (debug: show even if 0)
-          if (split.caloriesBurned >= 0 || split.elevationGainM >= 0) ...[
+          // Show calories and elevation if they have meaningful values (lowered threshold for calories)
+          if (split.caloriesBurned >= 0.1 || split.elevationGainM > 0) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${split.caloriesBurned.toStringAsFixed(0)} cal',
+                if (split.caloriesBurned >= 0.1)
+                  Text(
+                    '${split.caloriesBurned.toStringAsFixed(1)} cal',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.secondary,
                     fontWeight: FontWeight.w500,
                   ),
-                ),
-                Text(
-                  '+${split.elevationGainM.toStringAsFixed(0)}m',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.tertiary,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
+                if (split.elevationGainM > 0)
+                  Text(
+                    '+${split.elevationGainM.toStringAsFixed(0)}m',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.tertiary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
               ],
             ),
           ] else ...[

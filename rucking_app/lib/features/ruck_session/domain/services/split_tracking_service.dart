@@ -190,28 +190,10 @@ class SplitTrackingService {
   }
   
   /// Calculate elevation gain for this split
-  /// This is a placeholder - would need actual elevation data from location service
+  /// Currently returns 0.0 - elevation data comes from the backend
   double _calculateSplitElevationGain() {
-    try {
-      // TODO: Get actual elevation data from location service
-      // For now, return 0 as we don't have elevation tracking implemented
-      // In a real implementation, this would:
-      // 1. Get current elevation from location service
-      // 2. Compare with _lastSplitElevationM
-      // 3. Calculate positive elevation change
-      // 4. Update _lastSplitElevationM for next split
-      
-      final double currentElevationM = 0.0; // Placeholder
-      final double elevationGain = (currentElevationM - _lastSplitElevationM).clamp(0.0, double.infinity);
-      
-      _lastSplitElevationM = currentElevationM;
-      
-      AppLogger.debug('[SPLITS] Calculated split elevation gain: ${elevationGain}m');
-      
-      return elevationGain;
-    } catch (e) {
-      AppLogger.debug('[SPLITS] Error calculating split elevation: $e');
-      return 0.0;
-    }
+    // Real-time elevation tracking not implemented yet
+    // Elevation data is calculated and stored by the backend
+    return 0.0;
   }
 }

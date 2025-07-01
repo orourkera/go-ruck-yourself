@@ -33,6 +33,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
@@ -960,11 +961,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
                 });
                 
                 AppLogger.debug('Found completed session, proceeding with summary...');
+                
+                // Debug logging for splits data
+                final splits = completedSession.splits ?? _splitTrackingService.getSplits().map((split) => SessionSplit.fromJson(split)).toList();
+                AppLogger.debug('[SPLITS_DEBUG] Creating enriched session - completed session splits: ${completedSession.splits?.length ?? 'null'}');
+                AppLogger.debug('[SPLITS_DEBUG] Creating enriched session - service splits: ${_splitTrackingService.getSplits().length}');
+                AppLogger.debug('[SPLITS_DEBUG] Creating enriched session - final splits: ${splits.length}');
+                
                 final RuckSession enrichedSession = completedSession.copyWith(
                   heartRateSamples: completedSession.heartRateSamples ?? _allHeartRateSamples,
                   avgHeartRate: completedSession.avgHeartRate ?? avgHeartRate,
                   maxHeartRate: completedSession.maxHeartRate ?? _maxHeartRate,
-                  minHeartRate: completedSession.minHeartRate ?? _minHeartRate
+                  minHeartRate: completedSession.minHeartRate ?? _minHeartRate,
+                  splits: splits
                 );
                 
                 emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
@@ -1007,11 +1016,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           });
         
         // Create a modified session that includes heart rate data if not present in the API response
+        // Debug logging for splits data
+        final splits = completedSession.splits ?? _splitTrackingService.getSplits().map((split) => SessionSplit.fromJson(split)).toList();
+        AppLogger.debug('[SPLITS_DEBUG] Creating enriched session - newly completed session splits: ${completedSession.splits?.length ?? 'null'}');
+        AppLogger.debug('[SPLITS_DEBUG] Creating enriched session - service splits: ${_splitTrackingService.getSplits().length}');
+        AppLogger.debug('[SPLITS_DEBUG] Creating enriched session - final splits: ${splits.length}');
+        
         final RuckSession enrichedSession = completedSession.copyWith(
           heartRateSamples: completedSession.heartRateSamples ?? _allHeartRateSamples,
           avgHeartRate: completedSession.avgHeartRate ?? avgHeartRate,
           maxHeartRate: completedSession.maxHeartRate ?? _maxHeartRate,
-          minHeartRate: completedSession.minHeartRate ?? _minHeartRate
+          minHeartRate: completedSession.minHeartRate ?? _minHeartRate,
+          splits: splits
         );
         
         AppLogger.sessionCompletion('Emitting session summary', context: {
