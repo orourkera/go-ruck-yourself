@@ -151,22 +151,37 @@ class AchievementRepositoryImpl implements AchievementRepository {
   Future<List<Achievement>> checkSessionAchievements(int sessionId) async {
     try {
       final endpoint = ApiEndpoints.getCheckSessionAchievementsEndpoint(sessionId.toString());
-      print('[DEBUG] AchievementRepo: Calling endpoint: $endpoint');
+      print('[ACHIEVEMENT_DEBUG] AchievementRepo: Calling endpoint: $endpoint');
       final response = await _apiClient.post(endpoint, {});
-      print('[DEBUG] AchievementRepo: Response: $response');
+      print('[ACHIEVEMENT_DEBUG] AchievementRepo: Full response: $response');
+      print('[ACHIEVEMENT_DEBUG] AchievementRepo: Response type: ${response.runtimeType}');
+      
+      if (response != null) {
+        print('[ACHIEVEMENT_DEBUG] AchievementRepo: Response status: ${response['status']}');
+        print('[ACHIEVEMENT_DEBUG] AchievementRepo: Response new_achievements: ${response['new_achievements']}');
+        print('[ACHIEVEMENT_DEBUG] AchievementRepo: Response new_achievements type: ${response['new_achievements']?.runtimeType}');
+      }
       
       if (response['status'] == 'success' && response['new_achievements'] != null) {
         final newAchievementsData = response['new_achievements'] as List;
-        print('[DEBUG] AchievementRepo: Found ${newAchievementsData.length} new achievements in response');
-        return newAchievementsData
+        print('[ACHIEVEMENT_DEBUG] AchievementRepo: Found ${newAchievementsData.length} new achievements in response');
+        print('[ACHIEVEMENT_DEBUG] AchievementRepo: Achievement data: $newAchievementsData');
+        
+        final achievements = newAchievementsData
             .map((json) => Achievement.fromJson(json))
             .toList();
+        print('[ACHIEVEMENT_DEBUG] AchievementRepo: Parsed ${achievements.length} achievements');
+        for (int i = 0; i < achievements.length; i++) {
+          print('[ACHIEVEMENT_DEBUG] AchievementRepo: Achievement $i: ${achievements[i].name} (ID: ${achievements[i].id})');
+        }
+        return achievements;
       }
       
-      print('[DEBUG] AchievementRepo: No new achievements or status not success');
+      print('[ACHIEVEMENT_DEBUG] AchievementRepo: No new achievements or status not success');
       return [];
     } catch (e) {
-      print('[DEBUG] AchievementRepo: Error: $e');
+      print('[ACHIEVEMENT_DEBUG] AchievementRepo: Error: $e');
+      print('[ACHIEVEMENT_DEBUG] AchievementRepo: Error type: ${e.runtimeType}');
       AppLogger.error('Error checking session achievements', exception: e);
       throw Exception('Failed to check session achievements: $e');
     }

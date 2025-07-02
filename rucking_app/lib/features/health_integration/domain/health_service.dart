@@ -59,8 +59,8 @@ class HealthService {
   
   /// Request authorization to access and write health data
   Future<bool> requestAuthorization() async {
-    if (!Platform.isIOS && !Platform.isAndroid) {
-      AppLogger.warning('Health integration only available on iOS and Android');
+    if (!Platform.isIOS) {
+      AppLogger.warning('Health integration only available on iOS');
       return false;
     }
     
@@ -109,7 +109,8 @@ class HealthService {
   
   /// Check if health data access is available
   Future<bool> isHealthDataAvailable() async {
-    if (!Platform.isIOS && !Platform.isAndroid) return false;
+    // Only available on iOS for Apple Health integration
+    if (!Platform.isIOS) return false;
     
     try {
       // Simply check if authorization can be requested

@@ -458,45 +458,74 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   void _checkAchievementsAfterNavigation() {
     if (!mounted) return;
     
-    print('[DEBUG] Starting achievement check for session ${widget.ruckId}');
+    print('[ACHIEVEMENT_DEBUG] Starting achievement check for session ${widget.ruckId}');
     
     // Listen for achievement check results using current context
     final achievementBloc = context.read<AchievementBloc>();
+    print('[ACHIEVEMENT_DEBUG] Got achievement bloc: ${achievementBloc.runtimeType}');
+    print('[ACHIEVEMENT_DEBUG] Current achievement bloc state: ${achievementBloc.state.runtimeType}');
     
     // Set up a listener for achievement results
     late StreamSubscription<AchievementState> subscription;
     subscription = achievementBloc.stream.listen((state) {
-      if (state is AchievementsSessionChecked && mounted) {
-        subscription.cancel();
+      print('[ACHIEVEMENT_DEBUG] Received achievement state: ${state.runtimeType}');
+      
+      if (state is AchievementsSessionChecked) {
+        print('[ACHIEVEMENT_DEBUG] Received AchievementsSessionChecked state');
+        print('[ACHIEVEMENT_DEBUG] Mounted: $mounted');
+        print('[ACHIEVEMENT_DEBUG] New achievements count: ${state.newAchievements.length}');
         
-        if (state.newAchievements.isNotEmpty) {
-          print('[DEBUG] Showing achievement dialog for ${state.newAchievements.length} achievements');
-          // Show achievement modal over home screen
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (dialogContext) => AlertDialog(
-              content: SessionAchievementNotification(
-                newAchievements: state.newAchievements,
-                onDismiss: () {
-                  Navigator.of(dialogContext).pop();
-                },
+        if (mounted) {
+          subscription.cancel();
+          
+          if (state.newAchievements.isNotEmpty) {
+            print('[ACHIEVEMENT_DEBUG] Showing achievement dialog for ${state.newAchievements.length} achievements');
+            for (int i = 0; i < state.newAchievements.length; i++) {
+              print('[ACHIEVEMENT_DEBUG] Achievement $i: ${state.newAchievements[i].name}');
+            }
+            
+            // Show achievement modal over home screen
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (dialogContext) => AlertDialog(
+                content: SessionAchievementNotification(
+                  newAchievements: state.newAchievements,
+                  onDismiss: () {
+                    print('[ACHIEVEMENT_DEBUG] Achievement modal dismissed');
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+                contentPadding: EdgeInsets.zero,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
               ),
-              contentPadding: EdgeInsets.zero,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-            ),
-          );
+            );
+            print('[ACHIEVEMENT_DEBUG] Achievement dialog shown');
+          } else {
+            print('[ACHIEVEMENT_DEBUG] No new achievements to show');
+          }
+        } else {
+          print('[ACHIEVEMENT_DEBUG] Widget not mounted, skipping dialog');
         }
+      } else if (state is AchievementsError) {
+        print('[ACHIEVEMENT_DEBUG] Received AchievementsError: ${state.message}');
+        subscription.cancel();
+      } else {
+        print('[ACHIEVEMENT_DEBUG] Received other state: ${state.runtimeType}');
       }
     });
+    
+    print('[ACHIEVEMENT_DEBUG] Set up achievement listener');
     
     // Trigger achievement check for the submitted session
     final sessionId = int.tryParse(widget.ruckId);
     if (sessionId != null) {
+      print('[ACHIEVEMENT_DEBUG] Triggering achievement check for session ID: $sessionId');
       achievementBloc.add(CheckSessionAchievements(sessionId));
+      print('[ACHIEVEMENT_DEBUG] Achievement check event added to bloc');
     } else {
-      print('[ERROR] Could not parse ruckId to int: ${widget.ruckId}');
+      print('[ACHIEVEMENT_DEBUG] ERROR: Could not parse ruckId to int: ${widget.ruckId}');
     }
   }
 

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -103,8 +104,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   Center(
                     child: Image.asset(
                       'assets/images/joint image.png',
-                      width: 150,
-                      height: 150,
+                      width: 225,
+                      height: 225,
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -146,28 +147,30 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Apple Sign-In Button
-                  OutlinedButton.icon(
-                    onPressed: _handleAppleLogin,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  // Apple Sign-In Button (iOS only)
+                  if (Platform.isIOS) ...[  
+                    OutlinedButton.icon(
+                      onPressed: _handleAppleLogin,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        side: BorderSide(color: AppColors.textDark),
+                        backgroundColor: AppColors.textDark,
                       ),
-                      side: BorderSide(color: AppColors.textDark),
-                      backgroundColor: AppColors.textDark,
-                    ),
-                    icon: Icon(
-                      Icons.apple,
-                      color: Colors.white,
-                    ),
-                    label: Text(
-                      'Continue with Apple',
-                      style: AppTextStyles.labelLarge.copyWith(
+                      icon: Icon(
+                        Icons.apple,
                         color: Colors.white,
                       ),
+                      label: Text(
+                        'Continue with Apple',
+                        style: AppTextStyles.labelLarge.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 24),
                   
                   // OR divider

@@ -289,8 +289,8 @@ class ApiClient {
   /// Makes a POST request to the specified endpoint with the given body
   Future<dynamic> post(String endpoint, dynamic body) async {
     try {
-      // Require token for /rucks/*, /users/*, and /duels/* endpoints, EXCEPT for /users/register
-      bool requiresAuth = ((endpoint.startsWith('/rucks') || endpoint.startsWith('/users/') || endpoint.startsWith('/duels/')) && 
+      // Require token for /rucks/*, /users/*, /achievements/*, and /duels/* endpoints, EXCEPT for /users/register
+      bool requiresAuth = ((endpoint.startsWith('/rucks') || endpoint.startsWith('/users/') || endpoint.startsWith('/achievements/') || endpoint.startsWith('/duels/')) && 
                         endpoint != '/users/register') ||
                         endpoint.startsWith('/duel-'); // Also include /duel-invitations, /duel-stats endpoints
       // Explicitly do not set auth token for /auth/refresh endpoint

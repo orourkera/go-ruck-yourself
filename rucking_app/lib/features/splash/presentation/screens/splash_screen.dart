@@ -226,7 +226,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ScaleTransition(
-                      scale: Tween<double>(begin: 1.0, end: 1.5).animate(
+                      scale: Tween<double>(begin: 1.0, end: 1.0).animate(
                         CurvedAnimation(
                           parent: _animationController,
                           curve: Curves.elasticOut,

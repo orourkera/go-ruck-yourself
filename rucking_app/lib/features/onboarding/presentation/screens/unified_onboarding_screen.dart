@@ -30,7 +30,7 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
 
   // Permission states
   bool _locationPermissionGranted = false;
-  bool _healthPermissionGranted = false;
+  bool _healthPermissionGranted = !Platform.isIOS; // Auto-grant on non-iOS platforms
   bool _batteryOptimizationHandled = false;
 
   @override
@@ -45,8 +45,8 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
       final locationService = GetIt.instance<LocationService>();
       _locationPermissionGranted = await locationService.hasLocationPermission();
 
-      // Check health permission (if available)
-      if (Platform.isIOS || Platform.isAndroid) {
+      // Check health permission (only on iOS)
+      if (Platform.isIOS) {
         final healthService = GetIt.instance<HealthService>();
         final isHealthAvailable = await healthService.isHealthDataAvailable();
         if (isHealthAvailable) {
@@ -98,7 +98,7 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
     // Determine which step to show
     if (!_locationPermissionGranted) {
       return _buildLocationPermissionStep();
-    } else if (!_healthPermissionGranted && (Platform.isIOS || Platform.isAndroid)) {
+    } else if (!_healthPermissionGranted && Platform.isIOS) {
       return _buildHealthPermissionStep();
     } else if (!_batteryOptimizationHandled && Platform.isAndroid) {
       return _buildBatteryOptimizationStep();
