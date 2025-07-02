@@ -161,6 +161,20 @@ class CheckSessionAchievementsResource(Resource):
             logger.info(f"Checking achievements for session {session_id}, user {user_id}")
             logger.info(f"Session data: {session}")
             
+            # Validate session data - skip achievement checking for sessions with invalid/extreme values
+            distance_km = session.get('distance_km', 0)
+            duration_seconds = session.get('duration_seconds', 0)
+            
+            # Skip if distance is extremely small (likely invalid data) or duration is 0
+            if distance_km < 0.001 or duration_seconds <= 0:  # Less than 1 meter or no duration
+                logger.warning(f"Skipping achievement check for session {session_id} - invalid data: distance={distance_km}km, duration={duration_seconds}s")
+                return {
+                    'status': 'success', 
+                    'new_achievements': [],
+                    'session_id': session_id,
+                    'message': 'Session has invalid data - skipped achievement check'
+                }, 200
+            
             # Get all achievements
             achievements_response = supabase.table('achievements').select('*').eq('is_active', True).execute()
             achievements = achievements_response.data or []
@@ -295,11 +309,15 @@ class CheckSessionAchievementsResource(Resource):
                 return pace >= target
             
             elif criteria_type == 'cumulative_distance':
-                # Get user's total distance
-                response = supabase.rpc('get_user_total_distance', {'p_user_id': user_id}).execute()
-                total_distance = response.data or 0
-                target = criteria.get('target', 0)
-                return total_distance >= target
+                # Get user's total distance with error handling
+                try:
+                    response = supabase.rpc('get_user_total_distance', {'p_user_id': user_id}).execute()
+                    total_distance = response.data or 0
+                    target = criteria.get('target', 0)
+                    return total_distance >= target
+                except Exception as e:
+                    logger.error(f"Error getting user total distance: {str(e)}")
+                    return False
             
             elif criteria_type == 'time_of_day':
                 # Check early bird / night owl achievements
@@ -313,24 +331,32 @@ class CheckSessionAchievementsResource(Resource):
                         before_hour = criteria.get('before_hour')
                         
                         # Count sessions starting before this hour
-                        count_response = supabase.rpc('count_sessions_before_hour', {
-                            'p_user_id': user_id,
-                            'p_hour': before_hour
-                        }).execute()
-                        count = count_response.data or 0
-                        return count >= target_count
+                        try:
+                            count_response = supabase.rpc('count_sessions_before_hour', {
+                                'p_user_id': user_id,
+                                'p_hour': before_hour
+                            }).execute()
+                            count = count_response.data or 0
+                            return count >= target_count
+                        except Exception as e:
+                            logger.error(f"Error counting sessions before hour: {str(e)}")
+                            return False
                     
                     elif 'after_hour' in criteria:
                         target_count = criteria.get('target', 1)
                         after_hour = criteria.get('after_hour')
                         
                         # Count sessions starting after this hour
-                        count_response = supabase.rpc('count_sessions_after_hour', {
-                            'p_user_id': user_id,
-                            'p_hour': after_hour
-                        }).execute()
-                        count = count_response.data or 0
-                        return count >= target_count
+                        try:
+                            count_response = supabase.rpc('count_sessions_after_hour', {
+                                'p_user_id': user_id,
+                                'p_hour': after_hour
+                            }).execute()
+                            count = count_response.data or 0
+                            return count >= target_count
+                        except Exception as e:
+                            logger.error(f"Error counting sessions after hour: {str(e)}")
+                            return False
             
             elif criteria_type == 'daily_streak':
                 # Check for consecutive daily rucks
@@ -395,15 +421,19 @@ class CheckSessionAchievementsResource(Resource):
                 current_year = datetime.utcnow().year
                 current_month = datetime.utcnow().month
                 
-                monthly_distance_response = supabase.rpc('get_user_monthly_distance', {
-                    'p_user_id': user_id,
-                    'p_year': current_year,
-                    'p_month': current_month
-                }).execute()
-                
-                monthly_distance = monthly_distance_response.data or 0
-                logger.debug(f"Monthly distance check: {monthly_distance} >= {target} = {monthly_distance >= target}")
-                return monthly_distance >= target
+                try:
+                    monthly_distance_response = supabase.rpc('get_user_monthly_distance', {
+                        'p_user_id': user_id,
+                        'p_year': current_year,
+                        'p_month': current_month
+                    }).execute()
+                    
+                    monthly_distance = monthly_distance_response.data or 0
+                    logger.debug(f"Monthly distance check: {monthly_distance} >= {target} = {monthly_distance >= target}")
+                    return monthly_distance >= target
+                except Exception as e:
+                    logger.error(f"Error getting user monthly distance: {str(e)}")
+                    return False
         
             elif criteria_type == 'quarterly_distance':
                 # Check quarterly distance achievement
@@ -411,15 +441,19 @@ class CheckSessionAchievementsResource(Resource):
                 current_year = datetime.utcnow().year
                 current_quarter = (datetime.utcnow().month - 1) // 3 + 1
                 
-                quarterly_distance_response = supabase.rpc('get_user_quarterly_distance', {
-                    'p_user_id': user_id,
-                    'p_year': current_year,
-                    'p_quarter': current_quarter
-                }).execute()
-                
-                quarterly_distance = quarterly_distance_response.data or 0
-                logger.debug(f"Quarterly distance check: {quarterly_distance} >= {target} = {quarterly_distance >= target}")
-                return quarterly_distance >= target
+                try:
+                    quarterly_distance_response = supabase.rpc('get_user_quarterly_distance', {
+                        'p_user_id': user_id,
+                        'p_year': current_year,
+                        'p_quarter': current_quarter
+                    }).execute()
+                    
+                    quarterly_distance = quarterly_distance_response.data or 0
+                    logger.debug(f"Quarterly distance check: {quarterly_distance} >= {target} = {quarterly_distance >= target}")
+                    return quarterly_distance >= target
+                except Exception as e:
+                    logger.error(f"Error getting user quarterly distance: {str(e)}")
+                    return False
         
             # More complex criteria would be handled here
             logger.warning(f"Unhandled achievement criteria type: {criteria_type}")

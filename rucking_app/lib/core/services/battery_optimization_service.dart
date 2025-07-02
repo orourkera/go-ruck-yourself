@@ -50,8 +50,8 @@ class BatteryOptimizationService {
       AppLogger.info('[BATTERY] Battery optimization status: $batteryOptimizationStatus');
       AppLogger.info('[BATTERY] Status details - isDenied: ${batteryOptimizationStatus.isDenied}, isGranted: ${batteryOptimizationStatus.isGranted}, isPermanentlyDenied: ${batteryOptimizationStatus.isPermanentlyDenied}');
       
-      if (batteryOptimizationStatus.isDenied) {
-        AppLogger.info('[BATTERY] Permission is denied - showing explanation dialog');
+      if (!batteryOptimizationStatus.isGranted) {
+        AppLogger.info('[BATTERY] Permission not granted (status: $batteryOptimizationStatus) - showing explanation dialog');
         // Show custom explanation dialog first if context is provided
         if (context != null) {
           final userAccepted = await showBatteryOptimizationExplanation(context);
@@ -69,7 +69,7 @@ class BatteryOptimizationService {
         AppLogger.info('[BATTERY] Battery optimization request result: $result');
         return result.isGranted;
       } else {
-        AppLogger.info('[BATTERY] Permission not denied (status: $batteryOptimizationStatus) - no dialog needed');
+        AppLogger.info('[BATTERY] Permission already granted (status: $batteryOptimizationStatus) - no dialog needed');
       }
       
       final isGranted = batteryOptimizationStatus.isGranted;
@@ -137,7 +137,7 @@ class BatteryOptimizationService {
       // Request battery optimization exemption with custom explanation
       PermissionStatus batteryOptimization = await Permission.ignoreBatteryOptimizations.status;
       
-      if (batteryOptimization.isDenied && context != null) {
+      if (!batteryOptimization.isGranted && context != null) {
         // Show custom explanation dialog first
         final userAccepted = await showBatteryOptimizationExplanation(context);
         if (!userAccepted) {
@@ -146,7 +146,7 @@ class BatteryOptimizationService {
         } else {
           batteryOptimization = await Permission.ignoreBatteryOptimizations.request();
         }
-      } else if (batteryOptimization.isDenied) {
+      } else if (!batteryOptimization.isGranted) {
         // Fallback to direct request if no context
         batteryOptimization = await Permission.ignoreBatteryOptimizations.request();
       }
