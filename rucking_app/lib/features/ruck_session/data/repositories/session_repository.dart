@@ -268,10 +268,11 @@ class SessionRepository {
   }
 
   /// Fetch a ruck session by its ID, including all heart rate samples.
-  Future<RuckSession?> fetchSessionById(String sessionId) async {
+  /// Set [forceRefresh] to true to bypass cache and fetch fresh data.
+  Future<RuckSession?> fetchSessionById(String sessionId, {bool forceRefresh = false}) async {
     try {
-      // Check if we have cached data for this session
-      if (_sessionDetailCache.containsKey(sessionId)) {
+      // Check if we have cached data for this session (unless force refresh is requested)
+      if (!forceRefresh && _sessionDetailCache.containsKey(sessionId)) {
         final cacheTime = _sessionDetailCacheTime[sessionId];
         final now = DateTime.now();
         

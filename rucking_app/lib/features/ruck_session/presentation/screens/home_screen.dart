@@ -1390,7 +1390,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       
       if (!hasLocationPermission) {
         AppLogger.info('[HOME] Requesting location permissions early...');
-        await locationService.requestLocationPermission();
+        await locationService.requestLocationPermission(context: context);
       }
       
       // Only request health permissions for Android users

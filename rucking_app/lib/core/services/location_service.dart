@@ -3,12 +3,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:flutter/material.dart' show Color;
+import 'package:flutter/material.dart' show Color, BuildContext;
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/background_location_service.dart';
+import 'package:rucking_app/shared/widgets/location_disclosure_dialog.dart';
 
 /// Interface for location services
 abstract class LocationService {
@@ -16,7 +17,9 @@ abstract class LocationService {
   Future<bool> hasLocationPermission();
   
   /// Request location permission from the user
-  Future<bool> requestLocationPermission();
+  /// For Android: Shows prominent disclosure dialog first (Google Play compliance)
+  /// For iOS: Direct permission request
+  Future<bool> requestLocationPermission({BuildContext? context});
   
   /// Get the current location once
   Future<LocationPoint?> getCurrentLocation();
@@ -63,7 +66,7 @@ class LocationServiceImpl implements LocationService {
   }
   
   @override
-  Future<bool> requestLocationPermission() async {
+  Future<bool> requestLocationPermission({BuildContext? context}) async {
     try {
       AppLogger.info('Requesting location permissions...');
       
@@ -73,6 +76,22 @@ class LocationServiceImpl implements LocationService {
           currentPermission == LocationPermission.whileInUse) {
         AppLogger.info('Location permission already granted: $currentPermission');
         return true;
+      }
+      
+      // Show prominent disclosure dialog first (required for Google Play compliance)
+      // Show on both platforms for better UX, but it's only required for Android
+      if (context != null) {
+        AppLogger.info('${Platform.isAndroid ? '[REQUIRED]' : '[UX]'} Showing location disclosure dialog...');
+        final userConsent = await LocationDisclosureDialog.show(context);
+        
+        if (!userConsent) {
+          AppLogger.info('User declined location disclosure');
+          return false;
+        }
+        
+        AppLogger.info('User accepted location disclosure, proceeding with system permission...');
+      } else {
+        AppLogger.warning('No context provided for disclosure dialog, proceeding directly to system permission');
       }
       
       // Request basic location permission using Geolocator (single dialog)

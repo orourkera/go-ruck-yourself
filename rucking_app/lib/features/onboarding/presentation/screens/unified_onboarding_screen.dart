@@ -387,7 +387,7 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
     
     try {
       final locationService = GetIt.instance<LocationService>();
-      final granted = await locationService.requestLocationPermission();
+      final granted = await locationService.requestLocationPermission(context: context);
       
       setState(() {
         _locationPermissionGranted = granted;

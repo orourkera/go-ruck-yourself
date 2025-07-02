@@ -1086,6 +1086,63 @@ class RuckSessionCompleteResource(Resource):
                 logger.error(f"Error updating duel progress for session {ruck_id}: {duel_error}")
                 # Don't fail the session completion if duel progress update fails
         
+            # Check for achievements after session completion
+            try:
+                logger.info(f"Checking achievements for completed session {ruck_id}")
+                
+                # Import achievement checking function
+                from RuckTracker.api.achievements import CheckSessionAchievementsResource
+                
+                # Create instance and check achievements
+                achievement_checker = CheckSessionAchievementsResource()
+                new_achievements = []
+                
+                # Get all active achievements
+                achievements_response = supabase.table('achievements').select('*').eq('is_active', True).execute()
+                achievements = achievements_response.data or []
+                
+                # Check each achievement
+                for achievement in achievements:
+                    # Check if user already has this achievement
+                    existing = supabase.table('user_achievements').select('id').eq(
+                        'user_id', g.user.id
+                    ).eq('achievement_id', achievement['id']).execute()
+                    
+                    if existing.data:
+                        continue  # User already has this achievement
+                    
+                    # Check if user meets criteria for this achievement
+                    if achievement_checker._check_achievement_criteria(supabase, g.user.id, completed_session, achievement):
+                        # Award the achievement
+                        award_data = {
+                            'user_id': g.user.id,
+                            'achievement_id': achievement['id'],
+                            'session_id': ruck_id,
+                            'earned_at': datetime.utcnow().isoformat(),
+                            'metadata': {'triggered_by_session': ruck_id}
+                        }
+                        
+                        supabase.table('user_achievements').insert(award_data).execute()
+                        new_achievements.append(achievement)
+                        
+                        logger.info(f"Awarded achievement {achievement['name']} to user {g.user.id} for session {ruck_id}")
+                
+                # Add achievements to response for frontend display
+                completed_session['new_achievements'] = new_achievements
+                
+                if new_achievements:
+                    logger.info(f"User {g.user.id} earned {len(new_achievements)} new achievements in session {ruck_id}")
+                    # Add achievements to response for frontend to display
+                    completed_session['new_achievements'] = new_achievements
+                else:
+                    logger.info(f"No new achievements earned by user {g.user.id} in session {ruck_id}")
+                    completed_session['new_achievements'] = []
+                    
+            except Exception as achievement_error:
+                logger.error(f"Error checking achievements for session {ruck_id}: {achievement_error}")
+                # Don't fail the session completion if achievement checking fails
+                completed_session['new_achievements'] = []
+        
             cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             cache_delete_pattern("ruck_buddies:*")
             cache_delete_pattern(f"weekly_stats:{g.user.id}:*")

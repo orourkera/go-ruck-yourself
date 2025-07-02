@@ -168,8 +168,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         bool hasPermission = await locationService.hasLocationPermission();
         
         if (!hasPermission) {
-          // Try to request permission
-          hasPermission = await locationService.requestLocationPermission();
+          // Try to request permission with context for disclosure dialog
+          hasPermission = await locationService.requestLocationPermission(context: context);
         }
         
         if (!hasPermission) {
