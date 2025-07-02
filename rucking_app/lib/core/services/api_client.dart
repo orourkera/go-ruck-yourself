@@ -269,8 +269,8 @@ class ApiClient {
       // Set timeout to prevent hanging requests
       final options = Options(
         headers: await _getHeaders(),
-        sendTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 45),
+        receiveTimeout: const Duration(seconds: 45),
       );
       
       // Make API call
@@ -318,8 +318,8 @@ class ApiClient {
         validateStatus: (status) {
           return status != null && status < 500;
         },
-        sendTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 45),
+        receiveTimeout: const Duration(seconds: 45),
       );
       if (excludeAuth) {
         options.headers?.remove('Authorization');

@@ -165,7 +165,7 @@ class CheckSessionAchievementsResource(Resource):
             distance_km = session.get('distance_km', 0)
             duration_seconds = session.get('duration_seconds', 0)
             
-            # Skip if distance is extremely small (likely invalid data) or duration is 0
+            # Skip if distance is extremely small (likely invalid data) or duration is too short
             if distance_km < 0.001 or duration_seconds <= 0:  # Less than 1 meter or no duration
                 logger.warning(f"Skipping achievement check for session {session_id} - invalid data: distance={distance_km}km, duration={duration_seconds}s")
                 return {
@@ -173,6 +173,16 @@ class CheckSessionAchievementsResource(Resource):
                     'new_achievements': [],
                     'session_id': session_id,
                     'message': 'Session has invalid data - skipped achievement check'
+                }, 200
+        
+            # Skip if session is suspiciously short (likely a test session)
+            if duration_seconds < 60 and distance_km < 0.1:  # Less than 1 minute AND less than 100 meters
+                logger.warning(f"Skipping achievement check for session {session_id} - likely test session: distance={distance_km}km, duration={duration_seconds}s")
+                return {
+                    'status': 'success', 
+                    'new_achievements': [],
+                    'session_id': session_id,
+                    'message': 'Session too short - likely test session'
                 }, 200
             
             # Get all achievements
@@ -185,7 +195,8 @@ class CheckSessionAchievementsResource(Resource):
             new_achievements = []
             
             for achievement in achievements:
-                logger.debug(f"Checking achievement: {achievement['name']} (ID: {achievement['id']})")
+                logger.info(f"Checking achievement: {achievement['name']} (ID: {achievement['id']}) - Key: {achievement.get('achievement_key', 'unknown')}")
+                logger.info(f"Achievement criteria: {achievement.get('criteria', {})}")
                 
                 # Check if user already has this achievement
                 existing = supabase.table('user_achievements').select('id').eq(
@@ -198,7 +209,11 @@ class CheckSessionAchievementsResource(Resource):
                 
                 # Check if user meets criteria for this achievement
                 criteria_met = self._check_achievement_criteria(supabase, user_id, session, achievement)
-                logger.debug(f"Achievement {achievement['name']} criteria met: {criteria_met}")
+                logger.info(f"Achievement {achievement['name']} criteria met: {criteria_met}")
+                
+                # Log specific details for suspicious achievements
+                if criteria_met and ('62' in achievement['name'] or 'mile' in achievement['name'] or 'pacer' in achievement['name'] or 'rucker' in achievement['name'] or 'mover' in achievement['name']):
+                    logger.warning(f"SUSPICIOUS ACHIEVEMENT AWARDED: {achievement['name']} for session with distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s, pace={session.get('average_pace')}")
                 
                 if criteria_met:
                     # Award the achievement
@@ -255,7 +270,17 @@ class CheckSessionAchievementsResource(Resource):
             
             elif criteria_type == 'single_session_distance':
                 target = criteria.get('target', 0)
-                return session.get('distance_km', 0) >= target
+                distance = session.get('distance_km', 0)
+                result = distance >= target
+                logger.info(f"DISTANCE CHECK: distance={distance}km, target={target}km, result={result}")
+                return result
+            
+            elif criteria_type == 'session_duration':
+                target = criteria.get('target', 0)
+                duration = session.get('duration_seconds', 0)
+                result = duration >= target
+                logger.info(f"DURATION CHECK: duration={duration}s, target={target}s, result={result}")
+                return result
             
             elif criteria_type == 'session_weight':
                 target = criteria.get('target', 0)
@@ -292,20 +317,20 @@ class CheckSessionAchievementsResource(Resource):
                 target = criteria.get('target', 0)
                 return session.get('elevation_gain_m', 0) >= target
             
-            elif criteria_type == 'session_duration':
-                target = criteria.get('target', 0)
-                return session.get('duration_seconds', 0) >= target
+
             
             elif criteria_type == 'pace_faster_than':
                 target = criteria.get('target', 999999)
                 pace = session.get('average_pace', 999999)
-                logger.debug(f"Pace faster than check: {pace} <= {target} = {pace <= target}")
+                logger.info(f"PACE FASTER THAN CHECK: pace={pace}, target={target}, result={pace <= target}")
+                logger.info(f"Session data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s")
                 return pace <= target
-            
+        
             elif criteria_type == 'pace_slower_than':
                 target = criteria.get('target', 0)
                 pace = session.get('average_pace', 0)
-                logger.debug(f"Pace slower than check: {pace} >= {target} = {pace >= target}")
+                logger.info(f"PACE SLOWER THAN CHECK: pace={pace}, target={target}, result={pace >= target}")
+                logger.info(f"Session data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s")
                 return pace >= target
             
             elif criteria_type == 'cumulative_distance':

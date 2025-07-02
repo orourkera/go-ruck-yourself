@@ -27,6 +27,10 @@ class SessionAchievementNotification extends StatelessWidget {
       margin: const EdgeInsets.all(16.0),
       elevation: 4.0,
       child: Container(
+        constraints: const BoxConstraints(
+          maxWidth: 400,
+          maxHeight: 500,
+        ),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12.0),
           gradient: LinearGradient(
@@ -41,6 +45,7 @@ class SessionAchievementNotification extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
@@ -175,6 +180,7 @@ class SessionAchievementNotification extends StatelessWidget {
 
   Widget _buildMultipleAchievements(ThemeData theme) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -184,12 +190,14 @@ class SessionAchievementNotification extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12.0),
-        SizedBox(
+        Container(
           height: 80,
-          child: ListView.builder(
+          width: double.infinity,
+          child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            itemCount: newAchievements.length,
-            itemBuilder: (context, index) {
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(newAchievements.length, (index) {
               final achievement = newAchievements[index];
               return Padding(
                 padding: const EdgeInsets.only(right: 12.0),
@@ -216,7 +224,8 @@ class SessionAchievementNotification extends StatelessWidget {
                   ],
                 ),
               );
-            },
+            }),
+            ),
           ),
         ),
       ],

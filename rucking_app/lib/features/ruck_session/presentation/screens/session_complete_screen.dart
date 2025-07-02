@@ -1,7 +1,7 @@
 // Standard library imports
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:async';
 
 // Flutter and third-party imports
 import 'package:fl_chart/fl_chart.dart';
@@ -206,49 +206,14 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       // Save session first - this is fast and immediate
       await _apiClient.patch('/rucks/${widget.ruckId}', completionData);
       
-      // Check premium status and navigate accordingly
-      final premiumState = context.read<PremiumBloc>().state;
-      bool isPremium = false;
-      if (premiumState is PremiumLoaded) {
-        isPremium = premiumState.isPremium;
-      }
-      
-      // SIMPLIFIED: Always navigate to home (no paywall for any user)
-      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-
-      // Clear session history cache so new session appears in history
+      // Clear caches before checking achievements
       SessionRepository.clearSessionHistoryCache();
-
-      // Clear achievement cache so achievements summary refreshes
       final achievementRepository = GetIt.instance<AchievementRepository>();
       await achievementRepository.clearCache();
       AppLogger.sessionCompletion('Cleared achievement cache after session completion');
 
-      // Reset active session state to return
-      GetIt.instance<ActiveSessionBloc>().add(SessionReset());
-
-      // Schedule achievement check to run after navigation
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _checkAchievementsAfterNavigation();
-        }
-      });  
-      
-      // Upload photos in background if any are selected - using repository
-      if (_selectedPhotos.isNotEmpty) {
-        // Start background upload using repository's independent method
-        _sessionRepo.uploadSessionPhotosInBackground(
-          widget.ruckId,
-          _selectedPhotos.map((path) => File(path)).toList(),
-        );
-        
-        // Show notification that upload started
-        StyledSnackBar.show(
-          context: context, 
-          message: 'Uploading ${_selectedPhotos.length} photos in background...',
-          duration: const Duration(seconds: 3),
-        );
-      }
+      // Check for achievements BEFORE navigation so modal shows correctly
+      await _checkAchievementsBeforeNavigation();
       
     } catch (e) {
       StyledSnackBar.showError(context: context, message: 'Error saving session: $e');
@@ -451,6 +416,119 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       });
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       _pendingSessionData = null;
+    }
+  }
+
+  /// Check for achievements before navigation and show modal on current screen
+  Future<void> _checkAchievementsBeforeNavigation() async {
+    if (!mounted) return;
+    
+    print('[ACHIEVEMENT_DEBUG] Starting achievement check BEFORE navigation for session ${widget.ruckId}');
+    
+    final achievementBloc = context.read<AchievementBloc>();
+    print('[ACHIEVEMENT_DEBUG] Got achievement bloc: ${achievementBloc.runtimeType}');
+    
+    // Create a completer to wait for achievement check result
+    final Completer<void> achievementCompleter = Completer<void>();
+    
+    // Set up a listener for achievement results
+    late StreamSubscription<AchievementState> subscription;
+    subscription = achievementBloc.stream.listen((state) {
+      print('[ACHIEVEMENT_DEBUG] Received achievement state: ${state.runtimeType}');
+      
+      if (state is AchievementsSessionChecked) {
+        print('[ACHIEVEMENT_DEBUG] Received AchievementsSessionChecked state');
+        print('[ACHIEVEMENT_DEBUG] New achievements count: ${state.newAchievements.length}');
+        
+        subscription.cancel();
+        
+        if (state.newAchievements.isNotEmpty && mounted) {
+          print('[ACHIEVEMENT_DEBUG] Showing achievement dialog for ${state.newAchievements.length} achievements');
+          for (int i = 0; i < state.newAchievements.length; i++) {
+            print('[ACHIEVEMENT_DEBUG] Achievement $i: ${state.newAchievements[i].name}');
+          }
+          
+          // Show achievement modal on current screen (session complete screen)
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (dialogContext) => AlertDialog(
+              content: SessionAchievementNotification(
+                newAchievements: state.newAchievements,
+                onDismiss: () {
+                  print('[ACHIEVEMENT_DEBUG] Achievement modal dismissed');
+                  Navigator.of(dialogContext).pop();
+                  // Complete the achievement process and continue to navigation
+                  if (!achievementCompleter.isCompleted) {
+                    achievementCompleter.complete();
+                  }
+                },
+              ),
+              contentPadding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+          );
+          print('[ACHIEVEMENT_DEBUG] Achievement dialog shown');
+        } else {
+          print('[ACHIEVEMENT_DEBUG] No new achievements to show or widget not mounted');
+          // Complete immediately if no achievements
+          if (!achievementCompleter.isCompleted) {
+            achievementCompleter.complete();
+          }
+        }
+      } else if (state is AchievementsError) {
+        print('[ACHIEVEMENT_DEBUG] Received AchievementsError: ${state.message}');
+        subscription.cancel();
+        if (!achievementCompleter.isCompleted) {
+          achievementCompleter.complete();
+        }
+      } else {
+        print('[ACHIEVEMENT_DEBUG] Received other state: ${state.runtimeType}');
+      }
+    });
+    
+    // Trigger achievement check for the submitted session
+    final sessionId = int.tryParse(widget.ruckId);
+    if (sessionId != null) {
+      print('[ACHIEVEMENT_DEBUG] Triggering achievement check for session ID: $sessionId');
+      achievementBloc.add(CheckSessionAchievements(sessionId));
+      print('[ACHIEVEMENT_DEBUG] Achievement check event added to bloc');
+    } else {
+      print('[ACHIEVEMENT_DEBUG] ERROR: Could not parse ruckId to int: ${widget.ruckId}');
+      subscription.cancel();
+      if (!achievementCompleter.isCompleted) {
+        achievementCompleter.complete();
+      }
+    }
+    
+    // Wait for achievement check to complete (either with achievements or without)
+    await achievementCompleter.future;
+    print('[ACHIEVEMENT_DEBUG] Achievement check completed, proceeding with navigation');
+    
+    // Now proceed with navigation and cleanup
+    if (mounted) {
+      // Reset active session state
+      GetIt.instance<ActiveSessionBloc>().add(SessionReset());
+      
+      // Navigate to home
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      
+      // Upload photos in background if any are selected - using repository
+      if (_selectedPhotos.isNotEmpty) {
+        // Start background upload using repository's independent method
+        _sessionRepo.uploadSessionPhotosInBackground(
+          widget.ruckId,
+          _selectedPhotos.map((path) => File(path)).toList(),
+        );
+        
+        // Show notification that upload started
+        StyledSnackBar.show(
+          context: context, 
+          message: 'Uploading ${_selectedPhotos.length} photos in background...',
+          duration: const Duration(seconds: 3),
+        );
+      }
     }
   }
 
