@@ -23,6 +23,7 @@ import 'package:rucking_app/features/achievements/presentation/bloc/achievement_
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_event.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
 import 'package:rucking_app/features/achievements/presentation/widgets/session_achievement_notification.dart';
+import 'package:rucking_app/features/achievements/domain/repositories/achievement_repository.dart';
 
 // Project-specific imports
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -205,13 +206,6 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       // Save session first - this is fast and immediate
       await _apiClient.patch('/rucks/${widget.ruckId}', completionData);
       
-      // Check for new achievements after saving the session
-      context.read<AchievementBloc>().add(CheckSessionAchievements(int.parse(widget.ruckId)));
-      AppLogger.sessionCompletion('Dispatched CheckSessionAchievements event', context: {
-        'session_id': widget.ruckId,
-        'completion_screen': 'session_complete',
-      });
-      
       // Check premium status and navigate accordingly
       final premiumState = context.read<PremiumBloc>().state;
       bool isPremium = false;
@@ -219,95 +213,26 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         isPremium = premiumState.isPremium;
       }
       
-      // COMMENTED OUT: Paywall/upsell logic disabled per user request
-      /*
-      if (!isPremium) {
-        // Free user - navigate to post-session upsell screen
-        double avgPace = 0.0;
-        if (widget.distance > 0) {
-          avgPace = (widget.duration.inSeconds / 60) / widget.distance;
-        }
-        
-        // Try to get location points from active session state first or the repository
-        List<dynamic>? locationPoints;
-        final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
-        
-        if (activeSessionState is ActiveSessionRunning && activeSessionState.locationPoints.isNotEmpty) {
-          // Convert LocationPoint objects to Map<String, dynamic>
-          locationPoints = activeSessionState.locationPoints
-              .map((point) => point.toJson())
-              .toList();
-          AppLogger.info('Using ${locationPoints.length} location points from active session');
-        } else {
-          // Fallback: try to load from repository
-          try {
-            final sessionRepository = GetIt.instance<SessionRepository>();
-            final fullSession = await sessionRepository.fetchSessionById(widget.ruckId);
-            locationPoints = fullSession?.locationPoints;
-            AppLogger.info('Loaded ${locationPoints?.length ?? 0} location points from repository');
-          } catch (e) {
-            AppLogger.warning('Could not load location points from repository: $e');
-            locationPoints = null;
-          }
-        }
-        
-        final sessionData = RuckSession(
-          id: widget.ruckId,
-          startTime: DateTime.now().subtract(widget.duration),
-          endTime: DateTime.now(),
-          duration: widget.duration,
-          distance: widget.distance,
-          elevationGain: widget.elevationGain,
-          elevationLoss: widget.elevationLoss,
-          caloriesBurned: widget.caloriesBurned,
-          ruckWeightKg: widget.ruckWeight,
-          status: RuckStatus.completed,
-          notes: _notesController.text.trim(),
-          rating: _rating,
-          averagePace: avgPace,
-          heartRateSamples: _heartRateSamples,
-          avgHeartRate: _avgHeartRate,
-          maxHeartRate: _maxHeartRate,
-          minHeartRate: _minHeartRate,
-          locationPoints: locationPoints,
-          splits: widget.splits,
-        );
-        
-        // Check if we're currently showing achievements
-        if (_isAchievementDialogShowing) {
-          // Wait for achievements to be dismissed before navigating
-          setState(() {
-            _pendingUpsellNavigation = true;
-            _pendingSessionData = sessionData;
-          });
-        } else {
-          // No achievements showing, navigate immediately
-          Navigator.pushNamedAndRemoveUntil(
-            context, 
-            '/post_session_upsell', 
-            (route) => false,
-            arguments: sessionData,
-          );
-        }
-      } else {
-        // Premium user - navigate directly to home
-        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-      }
-      */
-      
       // SIMPLIFIED: Always navigate to home (no paywall for any user)
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
 
       // Clear session history cache so new session appears in history
       SessionRepository.clearSessionHistoryCache();
 
-      // Reset active session state to return to home screen properly
-      context.read<ActiveSessionBloc>().add(const SessionReset());
-      
-      // Check for achievements AFTER navigation is complete
+      // Clear achievement cache so achievements summary refreshes
+      final achievementRepository = GetIt.instance<AchievementRepository>();
+      await achievementRepository.clearCache();
+      AppLogger.sessionCompletion('Cleared achievement cache after session completion');
+
+      // Reset active session state to return
+      GetIt.instance<ActiveSessionBloc>().add(SessionReset());
+
+      // Schedule achievement check to run after navigation
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkAchievementsAfterNavigation();
-      });
+        if (mounted) {
+          _checkAchievementsAfterNavigation();
+        }
+      });  
       
       // Upload photos in background if any are selected - using repository
       if (_selectedPhotos.isNotEmpty) {
@@ -533,11 +458,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   void _checkAchievementsAfterNavigation() {
     if (!mounted) return;
     
-    // Get the current context from navigator to show dialog over home screen
-    final currentContext = Navigator.of(context).context;
+    print('[DEBUG] Starting achievement check for session ${widget.ruckId}');
     
-    // Listen for achievement check results
-    final achievementBloc = currentContext.read<AchievementBloc>();
+    // Listen for achievement check results using current context
+    final achievementBloc = context.read<AchievementBloc>();
     
     // Set up a listener for achievement results
     late StreamSubscription<AchievementState> subscription;
@@ -546,9 +470,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         subscription.cancel();
         
         if (state.newAchievements.isNotEmpty) {
+          print('[DEBUG] Showing achievement dialog for ${state.newAchievements.length} achievements');
           // Show achievement modal over home screen
           showDialog(
-            context: currentContext,
+            context: context,
             barrierDismissible: false,
             builder: (dialogContext) => AlertDialog(
               content: SessionAchievementNotification(

@@ -485,9 +485,9 @@ class PushNotificationService:
         
         data = {
             'type': 'achievement_earned',
-            'achievement_names': achievement_names,
-            'achievement_count': count,
-            'session_id': session_id,
+            'achievement_names': ','.join(achievement_names),  # Convert list to comma-separated string
+            'achievement_count': str(count),  # Convert int to string
+            'session_id': str(session_id),  # Convert int to string
             'click_action': 'FLUTTER_NOTIFICATION_CLICK'
         }
         

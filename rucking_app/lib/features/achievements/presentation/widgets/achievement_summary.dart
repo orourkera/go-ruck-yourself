@@ -87,6 +87,11 @@ class _AchievementSummaryState extends State<AchievementSummary> {
           return const AchievementSummarySkeleton();
         }
         
+        // If we have a session checked state, use the previous state data
+        if (state is AchievementsSessionChecked) {
+          state = state.previousState;
+        }
+        
         return Card(
           elevation: 4,
           shape: RoundedRectangleBorder(

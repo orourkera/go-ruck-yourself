@@ -53,6 +53,10 @@ class _LoginScreenState extends State<LoginScreen> {
     context.read<AuthBloc>().add(AuthGoogleLoginRequested());
   }
 
+  void _handleAppleLogin() {
+    context.read<AuthBloc>().add(AuthAppleLoginRequested());
+  }
+
   bool _isFormValid() {
     return _formKey.currentState!.validate();
   }
@@ -98,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // App logo
                   Center(
                     child: Image.asset(
-                      'assets/images/go ruck yourself copy.png',
+                      'assets/images/joint image.png',
                       width: 150,
                       height: 150,
                       fit: BoxFit.contain,
@@ -137,6 +141,30 @@ class _LoginScreenState extends State<LoginScreen> {
                       'Continue with Google',
                       style: AppTextStyles.labelLarge.copyWith(
                         color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Apple Sign-In Button
+                  OutlinedButton.icon(
+                    onPressed: _handleAppleLogin,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      side: BorderSide(color: AppColors.textDark),
+                      backgroundColor: AppColors.textDark,
+                    ),
+                    icon: Icon(
+                      Icons.apple,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      'Continue with Apple',
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: Colors.white,
                       ),
                     ),
                   ),

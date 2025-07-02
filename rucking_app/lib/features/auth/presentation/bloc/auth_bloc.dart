@@ -20,6 +20,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthCheckRequested>(_onAuthCheckRequested);
     on<AuthLoginRequested>(_onAuthLoginRequested);
     on<AuthGoogleLoginRequested>(_onAuthGoogleLoginRequested);
+    on<AuthAppleLoginRequested>(_onAuthAppleLoginRequested);
     on<AuthRegisterRequested>(_onAuthRegisterRequested);
     on<AuthGoogleRegisterRequested>(_onAuthGoogleRegisterRequested);
     on<AuthLogoutRequested>(_onAuthLogoutRequested);
@@ -138,6 +139,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       } else {
         emit(AuthError('Google login failed: $e'));
       }
+    }
+  }
+
+  /// Handle Apple login request
+  Future<void> _onAuthAppleLoginRequested(
+    AuthAppleLoginRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    
+    try {
+      final user = await _authRepository.appleLogin();
+      // 🔥 Set user info in Crashlytics after Apple login
+      FirebaseCrashlytics.instance.setUserIdentifier(user.userId);
+      FirebaseCrashlytics.instance.setCustomKey('user_email', user.email);
+      FirebaseCrashlytics.instance.setCustomKey('user_username', user.username ?? 'unknown');
+      FirebaseCrashlytics.instance.log('User logged in via Apple: ${user.email}');
+      
+      emit(Authenticated(user));
+      
+      // Register Firebase token after successful authentication
+      _registerFirebaseTokenAfterAuth();
+    } catch (e) {
+      AppLogger.error('Apple login failed', exception: e);
+      emit(AuthError('Apple login failed: $e'));
     }
   }
 

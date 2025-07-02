@@ -11,6 +11,9 @@ abstract class AuthRepository {
   /// Login with Google
   Future<User> googleLogin();
   
+  /// Login with Apple
+  Future<User> appleLogin();
+  
   /// Complete Google user registration 
   Future<User> googleRegister({
     required String email,

@@ -21,6 +21,11 @@ class AuthRepositoryImpl implements AuthRepository {
   }
   
   @override
+  Future<User> appleLogin() async {
+    return await _authService.appleSignIn();
+  }
+  
+  @override
   Future<User> googleRegister({
     required String email,
     required String displayName,

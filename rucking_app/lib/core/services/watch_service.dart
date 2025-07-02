@@ -235,6 +235,14 @@ class WatchService {
       };
       AppLogger.info('[WATCH_SERVICE] Sending message to watch: $message');
       await _sendMessageToWatch(message);
+      
+      // Send session start notification to alert user about watch app availability
+      // Small delay to ensure the workout start command is processed first
+      await Future.delayed(const Duration(milliseconds: 500));
+      await sendSessionStartNotification(
+        ruckWeight: ruckWeight,
+        isMetric: isMetric,
+      );
     } catch (e) {
       AppLogger.error('[ERROR] Failed to start session on Watch: $e');
     }
@@ -323,6 +331,40 @@ class WatchService {
       return true;
     } catch (e) {
       AppLogger.error('[WATCH] Failed to send split notification: $e');
+      return false;
+    }
+  }
+
+  /// Send a session start notification to alert users the watch app is available
+  Future<bool> sendSessionStartNotification({
+    required double ruckWeight,
+    required bool isMetric,
+  }) async {
+    try {
+      AppLogger.info('[WATCH] Sending session start notification to alert user about watch app availability');
+      
+      // Format ruck weight for display
+      final String formattedWeight = isMetric 
+          ? '${ruckWeight.toStringAsFixed(1)} kg'
+          : '${(ruckWeight * 2.20462).toStringAsFixed(1)} lbs'; // Convert kg to lbs
+      
+      final message = {
+        'command': 'sessionStartAlert',
+        'title': 'Ruck Session Started',
+        'message': 'Session tracking on your watch with $formattedWeight',
+        'ruckWeight': formattedWeight,
+        'isMetric': isMetric,
+        'shouldVibrate': true, // Alert vibration to get user's attention
+        'showNotification': true, // Flag to show prominent notification
+      };
+      
+      AppLogger.debug('[WATCH] Session start alert message: $message');
+      await _sendMessageToWatch(message);
+      
+      // Session start notification sent successfully
+      return true;
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to send session start notification: $e');
       return false;
     }
   }

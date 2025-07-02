@@ -152,29 +152,41 @@ class CheckSessionAchievementsResource(Resource):
             session_response = supabase.table('ruck_session').select('*').eq('id', session_id).single().execute()
             
             if not session_response.data:
+                logger.error(f"Session {session_id} not found")
                 return {'error': 'Session not found'}, 404
                 
             session = session_response.data
             user_id = session['user_id']
             
+            logger.info(f"Checking achievements for session {session_id}, user {user_id}")
+            logger.info(f"Session data: {session}")
+            
             # Get all achievements
             achievements_response = supabase.table('achievements').select('*').eq('is_active', True).execute()
             achievements = achievements_response.data or []
+            
+            logger.info(f"Found {len(achievements)} active achievements to check")
             
             # Check for new achievements
             new_achievements = []
             
             for achievement in achievements:
+                logger.debug(f"Checking achievement: {achievement['name']} (ID: {achievement['id']})")
+                
                 # Check if user already has this achievement
                 existing = supabase.table('user_achievements').select('id').eq(
                     'user_id', user_id
                 ).eq('achievement_id', achievement['id']).execute()
                 
                 if existing.data:
+                    logger.debug(f"User already has achievement: {achievement['name']}")
                     continue  # User already has this achievement
                 
                 # Check if user meets criteria for this achievement
-                if self._check_achievement_criteria(supabase, user_id, session, achievement):
+                criteria_met = self._check_achievement_criteria(supabase, user_id, session, achievement)
+                logger.debug(f"Achievement {achievement['name']} criteria met: {criteria_met}")
+                
+                if criteria_met:
                     # Award the achievement
                     award_data = {
                         'user_id': user_id,
@@ -184,10 +196,13 @@ class CheckSessionAchievementsResource(Resource):
                         'metadata': {'triggered_by_session': session_id}
                     }
                     
-                    supabase.table('user_achievements').insert(award_data).execute()
-                    new_achievements.append(achievement)
-                    
-                    logger.info(f"Awarded achievement {achievement['name']} to user {user_id}")
+                    try:
+                        insert_result = supabase.table('user_achievements').insert(award_data).execute()
+                        logger.info(f"Successfully awarded achievement {achievement['name']} to user {user_id}")
+                        logger.debug(f"Insert result: {insert_result.data}")
+                        new_achievements.append(achievement)
+                    except Exception as insert_error:
+                        logger.error(f"Failed to insert achievement {achievement['name']}: {str(insert_error)}")
             
             # Send push notification
             if new_achievements:
@@ -201,6 +216,10 @@ class CheckSessionAchievementsResource(Resource):
                         session_id=session_id
                     )
             
+            logger.info(f"Achievement check complete. New achievements: {len(new_achievements)}")
+            if new_achievements:
+                logger.info(f"New achievements awarded: {[a['name'] for a in new_achievements]}")
+        
             return {
                 'status': 'success',
                 'new_achievements': new_achievements,
@@ -265,12 +284,14 @@ class CheckSessionAchievementsResource(Resource):
             
             elif criteria_type == 'pace_faster_than':
                 target = criteria.get('target', 999999)
-                pace = session.get('pace_seconds_per_km', 999999)
+                pace = session.get('average_pace', 999999)
+                logger.debug(f"Pace faster than check: {pace} <= {target} = {pace <= target}")
                 return pace <= target
             
             elif criteria_type == 'pace_slower_than':
                 target = criteria.get('target', 0)
-                pace = session.get('pace_seconds_per_km', 0)
+                pace = session.get('average_pace', 0)
+                logger.debug(f"Pace slower than check: {pace} >= {target} = {pace >= target}")
                 return pace >= target
             
             elif criteria_type == 'cumulative_distance':
@@ -367,6 +388,38 @@ class CheckSessionAchievementsResource(Resource):
                 target = criteria.get('target', 50)
                 total_likes = self._count_likes_received(supabase, user_id)
                 return total_likes >= target
+        
+            elif criteria_type == 'monthly_distance':
+                # Check monthly distance achievement
+                target = criteria.get('target', 50)
+                current_year = datetime.utcnow().year
+                current_month = datetime.utcnow().month
+                
+                monthly_distance_response = supabase.rpc('get_user_monthly_distance', {
+                    'p_user_id': user_id,
+                    'p_year': current_year,
+                    'p_month': current_month
+                }).execute()
+                
+                monthly_distance = monthly_distance_response.data or 0
+                logger.debug(f"Monthly distance check: {monthly_distance} >= {target} = {monthly_distance >= target}")
+                return monthly_distance >= target
+        
+            elif criteria_type == 'quarterly_distance':
+                # Check quarterly distance achievement
+                target = criteria.get('target', 200)
+                current_year = datetime.utcnow().year
+                current_quarter = (datetime.utcnow().month - 1) // 3 + 1
+                
+                quarterly_distance_response = supabase.rpc('get_user_quarterly_distance', {
+                    'p_user_id': user_id,
+                    'p_year': current_year,
+                    'p_quarter': current_quarter
+                }).execute()
+                
+                quarterly_distance = quarterly_distance_response.data or 0
+                logger.debug(f"Quarterly distance check: {quarterly_distance} >= {target} = {quarterly_distance >= target}")
+                return quarterly_distance >= target
         
             # More complex criteria would be handled here
             logger.warning(f"Unhandled achievement criteria type: {criteria_type}")

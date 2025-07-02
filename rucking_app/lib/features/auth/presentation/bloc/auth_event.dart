@@ -28,6 +28,9 @@ class AuthLoginRequested extends AuthEvent {
 /// Event to request Google login
 class AuthGoogleLoginRequested extends AuthEvent {}
 
+/// Event to request Apple login
+class AuthAppleLoginRequested extends AuthEvent {}
+
 /// Event to request user registration
 class AuthRegisterRequested extends AuthEvent {
   final String username;

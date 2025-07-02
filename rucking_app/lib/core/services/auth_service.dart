@@ -5,6 +5,7 @@ import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart'; 
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:logger/logger.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
@@ -72,6 +73,9 @@ abstract class AuthService {
 
   /// Sign in with Google
   Future<User> googleSignIn();
+  
+  /// Sign in with Apple
+  Future<User> appleSignIn();
   
   /// Complete Google user registration with profile creation
   Future<User> googleRegister({
@@ -261,6 +265,122 @@ class AuthServiceImpl implements AuthService {
     }
   }
   
+  @override
+  Future<User> appleSignIn() async {
+    try {
+      AppLogger.info('Attempting Apple Sign-In');
+      
+      // Check if Apple Sign-In is available
+      if (!await SignInWithApple.isAvailable()) {
+        throw AuthException(
+          'Apple Sign-In is not available on this device',
+          'APPLE_SIGNIN_NOT_AVAILABLE'
+        );
+      }
+      
+      // Request Apple ID credential
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+      
+      if (credential.identityToken == null) {
+        throw AuthException('No Identity Token found', 'APPLE_AUTH_NO_ID_TOKEN');
+      }
+      
+      AppLogger.info('Apple credential obtained, authenticating with Supabase');
+      
+      // Authenticate with Supabase using Apple tokens
+      final response = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.apple,
+        idToken: credential.identityToken!,
+        accessToken: credential.authorizationCode,
+      );
+      
+      final supabaseUser = response.user;
+      final session = response.session;
+      
+      if (supabaseUser == null || session == null) {
+        throw AuthException('Supabase authentication failed', 'SUPABASE_AUTH_FAILED');
+      }
+      
+      AppLogger.info('Apple authentication successful, user: ${supabaseUser.email}');
+      
+      // Store tokens FIRST before making any API calls
+      await _storageService.setSecureString(AppConfig.tokenKey, session.accessToken);
+      await _storageService.setSecureString(AppConfig.refreshTokenKey, session.refreshToken!);
+      
+      // Set auth token for API calls AFTER storing
+      _apiClient.setAuthToken(session.accessToken);
+      
+      // Reset refresh failure counter on successful login
+      _consecutiveRefreshFailures = 0;
+      
+      // Add small delay to ensure token is properly set
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      try {
+        // Try to get existing user profile from your backend
+        AppLogger.info('Fetching user profile after Apple authentication');
+        final user = await _fetchUserProfileWithRetry();
+        
+        AppLogger.info('Apple Sign-In successful for existing user: ${user.email}');
+        return user;
+      } catch (e) {
+        AppLogger.info('User profile not found, creating new profile for Apple user: ${supabaseUser.email}');
+        
+        // Extract user data from Apple credential
+        String displayName = '';
+        if (credential.givenName != null || credential.familyName != null) {
+          displayName = '${credential.givenName ?? ''} ${credential.familyName ?? ''}'.trim();
+        }
+        
+        // If no name provided, use email prefix
+        if (displayName.isEmpty) {
+          displayName = supabaseUser.email?.split('@')[0] ?? 'User';
+        }
+        
+        final newUserData = {
+          'email': supabaseUser.email!,
+          'username': displayName,
+          'is_metric': true, // Default to metric
+        };
+        
+        try {
+          final createResponse = await _apiClient.post('/users/profile', newUserData);
+          final newUser = User.fromJson(createResponse);
+          
+          AppLogger.info('Apple Sign-In successful for new user: ${newUser.email}');
+          return newUser;
+        } catch (createError) {
+          AppLogger.error('Failed to create user profile after Apple login', exception: createError);
+          throw AuthException(
+            'Failed to create user profile after Apple authentication: ${createError.toString()}',
+            'PROFILE_CREATION_FAILED'
+          );
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Apple sign-in failed', exception: e);
+      
+      // Handle specific Apple Sign-In errors
+      if (e is SignInWithAppleAuthorizationException) {
+        if (e.code == AuthorizationErrorCode.canceled) {
+          throw AuthException('Apple Sign-In was cancelled', 'APPLE_SIGNIN_CANCELLED');
+        }
+        throw AuthException('Apple Sign-In failed: ${e.message}', 'APPLE_SIGNIN_ERROR');
+      }
+      
+      if (e is AuthException) {
+        throw e;
+      }
+      
+      throw AuthException('Apple Sign-In failed: ${e.toString()}', 'APPLE_SIGNIN_ERROR');
+    }
+  }
+
   @override
   Future<User> googleRegister({
     required String email,
