@@ -238,21 +238,18 @@ class AuthServiceImpl implements AuthService {
         };
         
         try {
-          final createResponse = await _apiClient.put('/users/profile', newUserData);
+          final createResponse = await _apiClient.post('/users/profile', newUserData);
           final newUser = User.fromJson(createResponse);
           
           AppLogger.info('Google Sign-In successful for new user: ${newUser.email}');
           return newUser;
         } catch (createError) {
           AppLogger.error('Failed to create user profile after Google login', exception: createError);
-          // If profile creation fails, still return basic user info
-          final basicUser = User(
-            userId: supabaseUser.id,
-            email: supabaseUser.email!,
-            username: supabaseUser.userMetadata?['full_name'] ?? supabaseUser.email!.split('@')[0],
-            preferMetric: true,
+          // Profile creation failed - this is a critical error that should not be silently handled
+          throw AuthException(
+            'Failed to create user profile after Google authentication: ${createError.toString()}',
+            'PROFILE_CREATION_FAILED'
           );
-          return basicUser;
         }
       }
     } catch (e) {

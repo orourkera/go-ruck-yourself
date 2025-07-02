@@ -382,6 +382,57 @@ class UserProfileResource(Resource):
         except Exception as e:
             logger.error(f"Error updating user profile: {str(e)}", exc_info=True)
             return {'message': f'Error updating user profile: {str(e)}'}, 500
+            
+    def post(self):
+        """Create new user profile (primarily for Google OAuth users)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+                
+            data = request.get_json()
+            if not data:
+                return {'message': 'No profile data provided'}, 400
+                
+            # Check if user profile already exists
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            existing_response = supabase.table('user') \
+                .select('id') \
+                .eq('id', str(g.user.id)) \
+                .execute()
+                
+            if existing_response.data and len(existing_response.data) > 0:
+                logger.info(f"User profile already exists for ID: {g.user.id}, updating instead")
+                # User already exists, update instead
+                return self.put()
+                
+            # Create new user profile
+            create_data = {
+                'id': str(g.user.id),
+                'email': getattr(g.user, 'email', data.get('email')),
+                'username': data.get('username', ''),
+                'prefer_metric': data.get('is_metric', True),  # Google users get 'is_metric' field
+                'weight_kg': 70.0,  # Default weight
+                'created_at': 'now()',
+                'updated_at': 'now()'
+            }
+            
+            logger.info(f"Creating new user profile for Google OAuth user: {g.user.id}")
+            logger.debug(f"Profile data: {create_data}")
+            
+            insert_response = supabase.table('user').insert(create_data).execute()
+            
+            if not insert_response.data or len(insert_response.data) == 0:
+                logger.error(f"Profile creation failed - no data returned for user ID {g.user.id}")
+                return {'message': 'Failed to create user profile'}, 500
+                
+            profile_data = insert_response.data[0]
+            logger.info(f"Successfully created user profile for Google OAuth user: {g.user.id}")
+            
+            return profile_data, 201
+            
+        except Exception as e:
+            logger.error(f"Error creating user profile: {str(e)}", exc_info=True)
+            return {'message': f'Error creating user profile: {str(e)}'}, 500
 
 
 class UserAvatarUploadResource(Resource):
