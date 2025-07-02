@@ -308,12 +308,21 @@ class UserProfileResource(Resource):
     def put(self):
         """Update the current user's profile in the user table"""
         try:
+            # Enhanced debugging for Google Auth users
+            logger.info(f"Profile update request - User: {getattr(g, 'user', None)}")
+            logger.info(f"Has access_token: {hasattr(g, 'access_token') and g.access_token is not None}")
+            logger.info(f"Authorization header: {request.headers.get('Authorization', 'None')[:50]}...")
+            
             if not hasattr(g, 'user') or g.user is None:
+                logger.error("Profile update failed: User not authenticated - no g.user")
                 return {'message': 'User not authenticated'}, 401
                 
             data = request.get_json()
             if not data:
-                 return {'message': 'No update data provided'}, 400
+                logger.error("Profile update failed: No update data provided")
+                return {'message': 'No update data provided'}, 400
+                
+            logger.info(f"Profile update data received: {list(data.keys())}")
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
@@ -353,21 +362,60 @@ class UserProfileResource(Resource):
                  return {'message': 'No valid fields provided for update'}, 400
 
             logger.debug(f"Authenticated user id: {g.user.id}")
-            logger.debug(f"Attempting update on 'user' table where id = {g.user.id} with: {update_data}")
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            # Only allow updating the row where id = g.user.id
-            response = supabase.table('user') \
-                .update(update_data) \
-                .eq('id', str(g.user.id)) \
-                .execute()
-            logger.debug(f"Update response: {response.__dict__}")
             
-            # After update/insert, fetch the complete user data to return
-            fetch_response = supabase.table('user').select('*').eq('id', str(g.user.id)).execute()
-
-            if not fetch_response.data or len(fetch_response.data) == 0:
-                 logger.error(f"Profile update seemed successful but failed to fetch updated data for user ID {g.user.id}")
-                 return {'message': 'Profile update may have succeeded, but failed to retrieve updated data.'}, 500
+            # First check if user profile exists
+            logger.info(f"Checking if user profile exists for user ID: {g.user.id}")
+            try:
+                existing_response = supabase.table('user').select('id').eq('id', str(g.user.id)).execute()
+                logger.info(f"Profile existence check result: {len(existing_response.data) if existing_response.data else 0} records found")
+            except Exception as profile_check_error:
+                logger.error(f"RLS Error during profile existence check for {g.user.id}: {str(profile_check_error)}")
+                # If we can't check existence due to RLS, assume it doesn't exist and try to create
+                existing_response = type('obj', (object,), {'data': []})()
+            
+            if not existing_response.data or len(existing_response.data) == 0:
+                # User profile doesn't exist - create it first (common for Google Auth users)
+                logger.info(f"User profile not found for {g.user.id}, creating before update")
+                create_data = {
+                    'id': str(g.user.id),
+                    'email': getattr(g.user, 'email', ''),
+                    'username': update_data.get('username', ''),
+                    'prefer_metric': update_data.get('prefer_metric', True),
+                    'weight_kg': update_data.get('weight_kg', 70.0),
+                    'created_at': 'now()',
+                    'updated_at': 'now()'
+                }
+                # Add any other fields from update_data
+                for field, value in update_data.items():
+                    if field not in create_data:
+                        create_data[field] = value
+                        
+                insert_response = supabase.table('user').insert(create_data).execute()
+                logger.info(f"Created user profile for {g.user.id} during avatar update")
+                
+                if not insert_response.data or len(insert_response.data) == 0:
+                    logger.error(f"Profile creation failed during update for user ID {g.user.id}")
+                    return {'message': 'Failed to create user profile'}, 500
+                    
+                profile_data = insert_response.data[0]
+            else:
+                # User profile exists - update it
+                logger.debug(f"Updating existing profile for {g.user.id} with: {update_data}")
+                response = supabase.table('user') \
+                    .update(update_data) \
+                    .eq('id', str(g.user.id)) \
+                    .execute()
+                logger.debug(f"Update response: {response.__dict__}")
+                
+                # Fetch the updated data
+                fetch_response = supabase.table('user').select('*').eq('id', str(g.user.id)).execute()
+                
+                if not fetch_response.data or len(fetch_response.data) == 0:
+                    logger.error(f"Profile update seemed successful but failed to fetch updated data for user ID {g.user.id}")
+                    return {'message': 'Profile update may have succeeded, but failed to retrieve updated data.'}, 500
+                    
+                profile_data = fetch_response.data[0]
             
             profile_data = fetch_response.data[0]
             logger.debug(f"Profile updated/fetched successfully: {profile_data}")
