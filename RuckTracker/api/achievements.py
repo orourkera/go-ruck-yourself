@@ -185,18 +185,33 @@ class CheckSessionAchievementsResource(Resource):
                     'message': 'Session too short - likely test session'
                 }, 200
             
-            # Get all achievements
-            achievements_response = supabase.table('achievements').select('*').eq('is_active', True).execute()
+            # Get user's unit preference
+            user_response = supabase.table('user').select('prefer_metric').eq('id', user_id).single().execute()
+            prefer_metric = user_response.data.get('prefer_metric', True) if user_response.data else True
+            unit_preference = 'metric' if prefer_metric else 'standard'
+            
+            logger.info(f"User {user_id} prefers {'metric' if prefer_metric else 'standard'} units")
+            
+            # Get achievements filtered by unit preference
+            # Include universal achievements (unit_preference is null) and user's preferred unit
+            achievements_query = supabase.table('achievements').select('*').eq('is_active', True)
+            achievements_response = achievements_query.or_(f'unit_preference.is.null,unit_preference.eq.{unit_preference}').execute()
             achievements = achievements_response.data or []
             
-            logger.info(f"Found {len(achievements)} active achievements to check")
+            logger.info(f"Found {len(achievements)} active achievements to check for {unit_preference} user")
             
             # Check for new achievements
             new_achievements = []
             
             for achievement in achievements:
-                logger.info(f"Checking achievement: {achievement['name']} (ID: {achievement['id']}) - Key: {achievement.get('achievement_key', 'unknown')}")
-                logger.info(f"Achievement criteria: {achievement.get('criteria', {})}")
+                achievement_unit = achievement.get('unit_preference')
+                logger.info(f"Checking achievement: {achievement['name']} (ID: {achievement['id']}) - Unit: {achievement_unit or 'universal'}")
+                logger.debug(f"Achievement criteria: {achievement.get('criteria', {})}")
+                
+                # Double-check unit compatibility (safety check)
+                if achievement_unit is not None and achievement_unit != unit_preference:
+                    logger.warning(f"Skipping achievement {achievement['name']} - unit mismatch: user={unit_preference}, achievement={achievement_unit}")
+                    continue
                 
                 # Check if user already has this achievement
                 existing = supabase.table('user_achievements').select('id').eq(
@@ -216,18 +231,37 @@ class CheckSessionAchievementsResource(Resource):
                     logger.warning(f"SUSPICIOUS ACHIEVEMENT AWARDED: {achievement['name']} for session with distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s, pace={session.get('average_pace')}")
                 
                 if criteria_met:
+                    # Safety check: prevent mass awarding more than 5 achievements per session
+                    if len(new_achievements) >= 5:
+                        logger.warning(f"SAFETY LIMIT: Already awarded {len(new_achievements)} achievements for session {session_id}. Skipping {achievement['name']} to prevent mass awarding.")
+                        continue
+                    
+                    # Final validation: double-check if achievement already exists (race condition protection)
+                    final_check = supabase.table('user_achievements').select('id').eq(
+                        'user_id', user_id
+                    ).eq('achievement_id', achievement['id']).execute()
+                    
+                    if final_check.data:
+                        logger.warning(f"Race condition detected: Achievement {achievement['name']} already exists for user {user_id}")
+                        continue
+                    
                     # Award the achievement
                     award_data = {
                         'user_id': user_id,
                         'achievement_id': achievement['id'],
                         'session_id': session_id,
                         'earned_at': datetime.utcnow().isoformat(),
-                        'metadata': {'triggered_by_session': session_id}
+                        'metadata': {
+                            'triggered_by_session': session_id,
+                            'unit_preference': unit_preference,
+                            'session_distance_km': session.get('distance_km'),
+                            'session_duration_s': session.get('duration_seconds')
+                        }
                     }
                     
                     try:
                         insert_result = supabase.table('user_achievements').insert(award_data).execute()
-                        logger.info(f"Successfully awarded achievement {achievement['name']} to user {user_id}")
+                        logger.info(f"✅ AWARDED: {achievement['name']} to user {user_id} (unit: {unit_preference})")
                         logger.debug(f"Insert result: {insert_result.data}")
                         new_achievements.append(achievement)
                     except Exception as insert_error:
