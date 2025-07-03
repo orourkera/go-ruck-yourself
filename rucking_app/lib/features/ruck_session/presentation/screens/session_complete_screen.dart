@@ -23,6 +23,7 @@ import 'package:rucking_app/features/achievements/presentation/bloc/achievement_
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_event.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_state.dart';
 import 'package:rucking_app/features/achievements/presentation/widgets/session_achievement_notification.dart';
+import 'package:rucking_app/features/achievements/presentation/widgets/achievement_unlock_popup.dart';
 import 'package:rucking_app/features/achievements/domain/repositories/achievement_repository.dart';
 
 // Project-specific imports
@@ -448,25 +449,21 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             print('[ACHIEVEMENT_DEBUG] Achievement $i: ${state.newAchievements[i].name}');
           }
           
-          // Show achievement modal on current screen (session complete screen)
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (dialogContext) => AlertDialog(
-              content: SessionAchievementNotification(
+          // Show achievement celebration popup directly
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              opaque: false,
+              pageBuilder: (context, animation, secondaryAnimation) => AchievementUnlockPopup(
                 newAchievements: state.newAchievements,
                 onDismiss: () {
                   print('[ACHIEVEMENT_DEBUG] Achievement modal dismissed');
-                  Navigator.of(dialogContext).pop();
+                  Navigator.of(context).pop();
                   // Complete the achievement process and continue to navigation
                   if (!achievementCompleter.isCompleted) {
                     achievementCompleter.complete();
                   }
                 },
               ),
-              contentPadding: EdgeInsets.zero,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
             ),
           );
           print('[ACHIEVEMENT_DEBUG] Achievement dialog shown');

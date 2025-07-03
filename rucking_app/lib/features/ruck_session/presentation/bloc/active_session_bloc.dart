@@ -449,6 +449,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         sessionStartTime: currentState.originalSessionStartTimeUtc,
         elapsedSeconds: currentState.elapsedSeconds,
         isPaused: currentState.isPaused,
+        currentElevationGain: newElevationGain,
       );
 
       emit(currentState.copyWith(
@@ -606,6 +607,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         sessionStartTime: currentState.originalSessionStartTimeUtc,
         elapsedSeconds: newElapsed,
         isPaused: currentState.isPaused,
+        currentElevationGain: currentState.elevationGain,
       );
 
       emit(currentState.copyWith(

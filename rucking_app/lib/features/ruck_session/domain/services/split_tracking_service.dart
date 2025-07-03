@@ -25,6 +25,8 @@ class SplitTrackingService {
     _lastSplitDistanceKm = 0.0;
     _lastSplitTime = null;
     _splits = [];
+    _lastSplitElevationM = 0.0;
+    _totalCaloriesBurned = 0.0;
     AppLogger.info('[SPLITS] Split tracking service reset');
   }
   
@@ -44,6 +46,7 @@ class SplitTrackingService {
     required DateTime sessionStartTime,
     required int elapsedSeconds,
     required bool isPaused,
+    double? currentElevationGain,
   }) async {
     if (isPaused) return; // Don't check for milestones during pauses
     
@@ -97,7 +100,7 @@ class SplitTrackingService {
         );
         
         // Calculate elevation gain for this split
-        final double splitElevationGain = _calculateSplitElevationGain();
+        final double splitElevationGain = _calculateSplitElevationGain(currentElevationGain);
         
         // Record this split info
         final splitInfo = {
@@ -190,10 +193,27 @@ class SplitTrackingService {
   }
   
   /// Calculate elevation gain for this split
-  /// Currently returns 0.0 - elevation data comes from the backend
-  double _calculateSplitElevationGain() {
-    // Real-time elevation tracking not implemented yet
-    // Elevation data is calculated and stored by the backend
-    return 0.0;
+  /// Uses the current session elevation gain to calculate split elevation gain
+  double _calculateSplitElevationGain(double? currentElevationGain) {
+    if (currentElevationGain == null) {
+      return 0.0;
+    }
+    
+    // For the first split, use the current elevation gain as the split elevation gain
+    if (_lastSplitElevationM == 0.0) {
+      _lastSplitElevationM = currentElevationGain;
+      AppLogger.debug('[SPLITS] First split elevation gain: ${currentElevationGain.toStringAsFixed(1)}m');
+      return currentElevationGain.clamp(0.0, double.infinity); // Only positive elevation gains
+    }
+    
+    // Calculate elevation gain for this split
+    final double splitElevationGain = currentElevationGain - _lastSplitElevationM;
+    
+    // Update the last split elevation for next calculation
+    _lastSplitElevationM = currentElevationGain;
+    
+    AppLogger.debug('[SPLITS] Split elevation gain: ${splitElevationGain.toStringAsFixed(1)}m (current: ${currentElevationGain.toStringAsFixed(1)}m, previous: ${(_lastSplitElevationM - splitElevationGain).toStringAsFixed(1)}m)');
+    
+    return splitElevationGain.clamp(0.0, double.infinity); // Only positive elevation gains
   }
 }

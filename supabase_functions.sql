@@ -1,5 +1,54 @@
 -- Create missing Postgres functions for achievement system
 
+-- CRITICAL: Function to handle automatic user creation in public.user
+-- This function is triggered when a user is created in auth.users (via Google/Apple/Email auth)
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+SECURITY DEFINER
+SET search_path = public
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Insert new user into public.user table
+  INSERT INTO public.user (
+    id,
+    email,
+    username,
+    avatar_url,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(
+      NEW.raw_user_meta_data->>'display_name',
+      NEW.raw_user_meta_data->>'full_name', 
+      NEW.raw_user_meta_data->>'name',
+      SPLIT_PART(NEW.email, '@', 1)
+    ),
+    NEW.raw_user_meta_data->>'avatar_url',
+    NEW.created_at,
+    NOW()
+  )
+  ON CONFLICT (id) DO NOTHING;
+  
+  RETURN NEW;
+END;
+$$;
+
+-- Create trigger that fires when a new user is created in auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA public TO authenticated, anon;
+GRANT ALL ON public.user TO authenticated;
+GRANT SELECT ON public.user TO anon;
+
 -- Function to calculate user's total distance
 CREATE OR REPLACE FUNCTION get_user_total_distance(p_user_id uuid)
 RETURNS numeric

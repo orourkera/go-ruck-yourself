@@ -871,47 +871,11 @@ class RuckSessionCompleteResource(Resource):
                     if splits_data and len(splits_data) > 0:
                         splits_to_insert = []
                         for split in splits_data:
-                            # Calculate elevation gain for this split
-                            split_elevation_gain = 0.0
+                            # Use elevation gain data from frontend instead of recalculating
+                            # The frontend now properly calculates elevation gains for splits
+                            split_elevation_gain = split.get('elevation_gain_m', 0.0)
                             
-                            if session_location_points:
-                                try:
-                                    # Calculate elevation gain for this split based on location points
-                                    split_number = split.get('split_number', 1)
-                                    total_distance_km = split.get('total_distance', 0)
-                                    prev_total_distance_km = 0
-                                    
-                                    # Find previous split's total distance
-                                    if split_number > 1:
-                                        for prev_split in splits_data:
-                                            if prev_split.get('split_number') == split_number - 1:
-                                                prev_total_distance_km = prev_split.get('total_distance', 0)
-                                                break
-                                    
-                                    # Find location points that fall within this split's distance range
-                                    split_start_points = []
-                                    split_end_points = []
-                                    
-                                    for point in session_location_points:
-                                        if isinstance(point, dict) and 'cumulative_distance_km' in point and 'altitude' in point:
-                                            point_distance = point['cumulative_distance_km']
-                                            if prev_total_distance_km <= point_distance <= total_distance_km:
-                                                if not split_start_points and point_distance >= prev_total_distance_km:
-                                                    split_start_points.append(point)
-                                                if point_distance >= total_distance_km * 0.9:  # Near end of split
-                                                    split_end_points.append(point)
-                                    
-                                    # Calculate elevation gain
-                                    if split_start_points and split_end_points:
-                                        start_elevation = sum(p['altitude'] for p in split_start_points) / len(split_start_points)
-                                        end_elevation = sum(p['altitude'] for p in split_end_points) / len(split_end_points)
-                                        split_elevation_gain = max(0, end_elevation - start_elevation)  # Only positive gain
-                                        
-                                        logger.debug(f"Split {split_number}: elevation gain calculated as {split_elevation_gain:.1f}m (start: {start_elevation:.1f}m, end: {end_elevation:.1f}m)")
-                                    
-                                except Exception as elev_calc_error:
-                                    logger.warning(f"Error calculating elevation for split {split.get('split_number')}: {elev_calc_error}")
-                                    split_elevation_gain = 0.0
+                            logger.debug(f"Split {split.get('split_number')}: using frontend elevation gain: {split_elevation_gain:.1f}m")
                             
                             # Handle the split data format from the Flutter app
                             split_record = {

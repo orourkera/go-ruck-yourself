@@ -71,6 +71,32 @@ struct ContentView: View {
                             .font(.system(size: 46, weight: .bold))
                             .foregroundColor(.green)
                         
+                        // Split metrics - calories and elevation
+                        HStack(spacing: 20) {
+                            if !sessionManager.splitCalories.isEmpty {
+                                VStack(spacing: 4) {
+                                    Text("Calories")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                    Text(sessionManager.splitCalories)
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                            
+                            if !sessionManager.splitElevation.isEmpty {
+                                VStack(spacing: 4) {
+                                    Text("Elevation")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                    Text(sessionManager.splitElevation)
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundColor(.cyan)
+                                }
+                            }
+                        }
+                        .padding(.top, 16)
+                        
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

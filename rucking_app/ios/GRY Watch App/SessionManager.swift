@@ -31,6 +31,8 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     @Published var splitTime: String = ""
     @Published var totalDistance: String = ""
     @Published var totalTime: String = ""
+    @Published var splitCalories: String = ""
+    @Published var splitElevation: String = ""
     
     // Published user's metric preference (true = metric, false = imperial)
     @Published var isMetric: Bool = true
@@ -302,6 +304,9 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             switch command {
             case "splitNotification":
                 processSplitNotification(message)
+                
+            case "sessionStartAlert":
+                processSessionStartAlert(message)
                 
             case "startSession", "workoutStarted":
                 print("[SessionManager] Received workoutStarted command")
@@ -611,6 +616,10 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 self.totalDistance = totalDistance
                 self.totalTime = totalTime
                 
+                // Extract calories and elevation if present
+                self.splitCalories = message["splitCalories"] as? String ?? ""
+                self.splitElevation = message["splitElevation"] as? String ?? ""
+                
                 // Show the notification
                 self.showingSplitNotification = true
                 
@@ -634,6 +643,33 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     self.showingSplitNotification = false
                 }
             }
+        }
+    }
+    
+    // Process a session start alert message
+    func processSessionStartAlert(_ message: [String: Any]) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            print("[WATCH] Received session start alert")
+            
+            // Extract alert data
+            let title = message["title"] as? String ?? "Session Started"
+            let alertMessage = message["message"] as? String ?? "Ruck session active"
+            let shouldVibrate = message["shouldVibrate"] as? Bool ?? true
+            
+            // Play vibration if requested
+            if shouldVibrate {
+                print("[WATCH] Playing session start vibration")
+                WKInterfaceDevice.current().play(.notification)
+                
+                // Optional: Add a second haptic for emphasis
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    WKInterfaceDevice.current().play(.success)
+                }
+            }
+            
+            print("[WATCH] Session start alert processed: \(title) - \(alertMessage)")
         }
     }
     
