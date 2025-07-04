@@ -15,7 +15,7 @@
   <title>Go Ruck Yourself</title>
   <link rel="stylesheet" href="/static/style.css" />
   <!-- Google Fonts: Bangers and Inter -->
-  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
   <meta property="og:title" content="Ruck" />
   <meta property="og:description" content="The ultimate rucking tracker app." />
@@ -44,12 +44,28 @@
       align-items: center;
       gap: 20px;
     }
+    
+    /* App icon styling */
+    .app-icon {
+      width: 120px;
+      height: 120px;
+      display: block;
+      margin: 0 auto 24px auto;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    }
+    
+    /* Subtitle styling with lighter weight and letter spacing */
+    .subtitle {
+      font-weight: 300;
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
   <div class="landing-container" style="margin-top: -100px; padding-left: 20px; padding-right: 20px;">
-    <h1 class="headline">Ruck</h1>
-    <div class="subtitle">The ultimate rucking tracker app. Track your ruck, count your calories, and share with ruckers around the world.</div>
+    <img src="{{ url_for('static', filename='images/app icon.png') }}" alt="Ruck App Icon" class="app-icon">
+    <div class="subtitle">The World's #1 Rucking App. Track your ruck, count your calories, and connect with other ruckers around the world.</div>
     <div class="download-links">
       <a class="store-badge" href="https://apps.apple.com/us/app/go-ruck-yourself/id6744974620" target="_blank" rel="noopener">
         <img src="{{ url_for('static', filename='images/app-store-badge.png') }}" alt="Download on the App Store" class="store-img">
@@ -58,7 +74,6 @@
         <img src="{{ url_for('static', filename='images/google-play-badge.png') }}" alt="Get it on Google Play" class="store-img">
       </a>
     </div>
-    <img src="/static/images/go ruck yourself.png" class="main-image mascot mascot-up" alt="Go Ruck Yourself">
   </div>
   <footer class="footer-pinned">
     <div class="footer-links">

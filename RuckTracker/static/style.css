@@ -5,8 +5,7 @@ body, html {
 }
 body {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-  background: url('/static/images/bg-test.png') no-repeat center center fixed;
-  background-size: cover;
+  background: #2A3714;
   color: #F7F3E8;
   min-height: 100vh;
   box-sizing: border-box;
