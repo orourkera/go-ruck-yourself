@@ -318,6 +318,15 @@ class CheckSessionAchievementsResource(Resource):
     def _check_achievement_criteria(self, supabase, user_id: str, session: Dict, achievement: Dict, user_stats: Dict = None) -> bool:
         """Check if user meets criteria for a specific achievement"""
         try:
+            # CRITICAL: Check minimum session requirements first
+            session_distance = session.get('distance_km', 0)
+            session_duration = session.get('duration_seconds', 0)
+            
+            # Minimum session requirements: at least 5 minutes AND 500 meters
+            if session_duration < 300 or session_distance < 0.5:
+                logger.info(f"Session too short for achievements: {session_duration}s, {session_distance}km")
+                return False
+            
             criteria = achievement['criteria']
             criteria_type = criteria.get('type')
             
@@ -381,8 +390,44 @@ class CheckSessionAchievementsResource(Resource):
             elif criteria_type == 'pace_faster_than':
                 target = criteria.get('target', 999999)
                 pace = session.get('average_pace', 999999)
+                
+                # CRITICAL: Pace achievements must also meet minimum distance requirements
+                achievement_name = achievement.get('name', '').lower()
+                required_distance = 0
+                
+                if '80' in achievement_name and 'km' in achievement_name:
+                    required_distance = 80
+                elif '50' in achievement_name and 'km' in achievement_name:
+                    required_distance = 50
+                elif '42' in achievement_name and 'km' in achievement_name:
+                    required_distance = 42.195  # Marathon
+                elif '20' in achievement_name and 'km' in achievement_name:
+                    required_distance = 20
+                elif '10' in achievement_name and 'km' in achievement_name:
+                    required_distance = 10
+                elif '5' in achievement_name and 'km' in achievement_name:
+                    required_distance = 5
+                elif 'mile' in achievement_name:
+                    if '26' in achievement_name:
+                        required_distance = 26.2 * 1.609  # Marathon in km
+                    elif '13' in achievement_name:
+                        required_distance = 13.1 * 1.609  # Half marathon in km
+                    elif '10' in achievement_name:
+                        required_distance = 10 * 1.609
+                    elif '6' in achievement_name:
+                        required_distance = 6 * 1.609
+                    elif '3' in achievement_name:
+                        required_distance = 3 * 1.609
+                
+                session_distance = session.get('distance_km', 0)
+                
+                # If this is a distance-specific pace achievement, check distance requirement
+                if required_distance > 0 and session_distance < required_distance:
+                    logger.info(f"PACE CHECK FAILED: {achievement_name} requires {required_distance}km but session only {session_distance}km")
+                    return False
+                
                 logger.info(f"PACE FASTER THAN CHECK: pace={pace}, target={target}, result={pace <= target}")
-                logger.info(f"Session data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s")
+                logger.info(f"Session data: distance={session_distance}km, duration={session.get('duration_seconds')}s, required_distance={required_distance}km")
                 return pace <= target
         
             elif criteria_type == 'pace_slower_than':
