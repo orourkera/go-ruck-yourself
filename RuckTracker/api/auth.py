@@ -441,17 +441,37 @@ class UserProfileResource(Resource):
             if not data:
                 return {'message': 'No profile data provided'}, 400
                 
-            # Check if user profile already exists
+            # Check if user profile already exists by ID OR email
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            existing_response = supabase.table('user') \
-                .select('id') \
+            user_email = getattr(g.user, 'email', data.get('email'))
+            
+            # Check by ID first
+            existing_by_id = supabase.table('user') \
+                .select('id, email') \
                 .eq('id', str(g.user.id)) \
                 .execute()
                 
-            if existing_response.data and len(existing_response.data) > 0:
+            # Check by email to prevent duplicate emails
+            existing_by_email = supabase.table('user') \
+                .select('id, email') \
+                .eq('email', user_email) \
+                .execute()
+                
+            if existing_by_id.data and len(existing_by_id.data) > 0:
                 logger.info(f"User profile already exists for ID: {g.user.id}, updating instead")
-                # User already exists, update instead
                 return self.put()
+                
+            if existing_by_email.data and len(existing_by_email.data) > 0:
+                existing_user = existing_by_email.data[0]
+                logger.warning(f"User profile already exists for email: {user_email} with different ID: {existing_user['id']}. This suggests an orphaned user or auth/user table mismatch.")
+                
+                # Critical decision: Should we update the existing user or return an error?
+                # For now, return an error to prevent data corruption
+                return {
+                    'message': f'A user profile already exists for this email address. Please contact support if you believe this is an error.',
+                    'error': 'duplicate_email',
+                    'existing_user_id': existing_user['id']
+                }, 409
                 
             # Create new user profile
             create_data = {
