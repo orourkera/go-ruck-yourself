@@ -27,6 +27,9 @@ class AppColors {
   static final Color premium = Color(0xFFFFD700); // Gold for premium features
   static final Color premiumDark = Color(0xFFB8860B); // Dark gold
   
+  // Splash screen color - Dark army green
+  static final Color splashBackground = Color(0xFF2A3714); // Dark army green for unified splash
+  
   // Neutral colors
   static final Color white = Color(0xFFFFFFFF);
   static final Color black = Color(0xFF000000);

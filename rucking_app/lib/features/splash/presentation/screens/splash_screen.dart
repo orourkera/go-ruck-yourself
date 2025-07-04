@@ -234,8 +234,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ),
                       child: Image.asset(
                         splashImagePath,
-                        width: 421.875, 
-                        height: 421.875, 
+                        width: 120, 
+                        height: 120, 
                         fit: BoxFit.contain,
                       ),
                     ),

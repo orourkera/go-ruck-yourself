@@ -30,15 +30,15 @@ class SplashHelper {
     }
   }
   
-  /// Determines which splash image to use based on gender status
+  /// Returns the unified app icon for splash screen
+  /// No longer depends on gender - uses the same icon for all users
   static String getSplashImagePath(bool isLadyMode) {
-    return isLadyMode
-        ? 'assets/images/ladyruckerpin.png' // Female version
-        : 'assets/images/go ruck yourself copy.png'; // Default/male version
+    return 'assets/images/app_icon.png'; // Unified app icon for all users
   }
   
-  /// Gets the appropriate background color based on gender
+  /// Gets the unified background color for splash screen
+  /// No longer depends on gender - uses the same color for all users
   static Color getBackgroundColor(bool isLadyMode) {
-    return isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+    return AppColors.splashBackground; // Unified dark green for all users
   }
 }

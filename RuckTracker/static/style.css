@@ -5,7 +5,8 @@ body, html {
 }
 body {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-  background: #2A3714;
+  background: #2A3714 url('/static/images/bg-test.png') no-repeat center center fixed;
+  background-size: cover;
   color: #F7F3E8;
   min-height: 100vh;
   box-sizing: border-box;
@@ -15,7 +16,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   padding: -8px 16px 0 16px;
   box-sizing: border-box;
   position: relative;
