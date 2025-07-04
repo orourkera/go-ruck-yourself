@@ -185,20 +185,48 @@ class CheckSessionAchievementsResource(Resource):
                     'message': 'Session too short - likely test session'
                 }, 200
             
-            # Get user's unit preference
-            user_response = supabase.table('user').select('prefer_metric').eq('id', user_id).single().execute()
-            prefer_metric = user_response.data.get('prefer_metric', True) if user_response.data else True
+            # BATCH APPROACH: Get all data in fewer queries
+            logger.info("Starting batch achievement check...")
+            
+            # Single query: Get user data + existing achievements + user stats
+            user_data_response = supabase.table('user').select('prefer_metric').eq('id', user_id).single().execute()
+            prefer_metric = user_data_response.data.get('prefer_metric', True) if user_data_response.data else True
             unit_preference = 'metric' if prefer_metric else 'standard'
             
-            logger.info(f"User {user_id} prefers {'metric' if prefer_metric else 'standard'} units")
+            # Batch query: Get all user's existing achievements in one call
+            existing_achievements_response = supabase.table('user_achievements').select('achievement_id').eq('user_id', user_id).execute()
+            existing_achievement_ids = {a['achievement_id'] for a in existing_achievements_response.data or []}
             
-            # Get achievements filtered by unit preference
-            # Include universal achievements (unit_preference is null) and user's preferred unit
+            # Batch query: Get filtered achievements (pre-filtered by unit preference)
             achievements_query = supabase.table('achievements').select('*').eq('is_active', True)
             achievements_response = achievements_query.or_(f'unit_preference.is.null,unit_preference.eq.{unit_preference}').execute()
-            achievements = achievements_response.data or []
+            all_achievements = achievements_response.data or []
             
-            logger.info(f"Found {len(achievements)} active achievements to check for {unit_preference} user")
+            # Pre-filter: Remove achievements user already has (in memory, no DB calls)
+            achievements = [a for a in all_achievements if a['id'] not in existing_achievement_ids]
+            
+            # Batch query: Get user stats that are commonly needed for criteria checking
+            user_stats = {}
+            try:
+                # Get total distance, power points, and session counts in one query
+                stats_response = supabase.rpc('get_user_achievement_stats', {'user_id': user_id}).execute()
+                user_stats = stats_response.data or {}
+            except Exception as e:
+                # Fallback: Get stats individually if RPC doesn't exist
+                logger.warning(f"RPC get_user_achievement_stats not available, using fallback: {str(e)}")
+                try:
+                    distance_response = supabase.rpc('get_user_total_distance', {'p_user_id': user_id}).execute()
+                    user_stats['total_distance'] = distance_response.data or 0
+                except:
+                    user_stats['total_distance'] = 0
+            
+                try:
+                    power_response = supabase.rpc('calculate_user_power_points', {'user_id_param': user_id}).execute()
+                    user_stats['total_power_points'] = power_response.data or 0
+                except:
+                    user_stats['total_power_points'] = 0
+        
+            logger.info(f"Batch optimized: User={unit_preference}, Total achievements={len(all_achievements)}, Already earned={len(existing_achievement_ids)}, To check={len(achievements)}, Stats loaded={len(user_stats)}")
             
             # Check for new achievements
             new_achievements = []
@@ -208,22 +236,16 @@ class CheckSessionAchievementsResource(Resource):
                 logger.info(f"Checking achievement: {achievement['name']} (ID: {achievement['id']}) - Unit: {achievement_unit or 'universal'}")
                 logger.debug(f"Achievement criteria: {achievement.get('criteria', {})}")
                 
-                # Double-check unit compatibility (safety check)
+                # Double-check unit compatibility (safety check - should be redundant now)
                 if achievement_unit is not None and achievement_unit != unit_preference:
                     logger.warning(f"Skipping achievement {achievement['name']} - unit mismatch: user={unit_preference}, achievement={achievement_unit}")
                     continue
                 
-                # Check if user already has this achievement
-                existing = supabase.table('user_achievements').select('id').eq(
-                    'user_id', user_id
-                ).eq('achievement_id', achievement['id']).execute()
+                # Skip redundant existing check - already pre-filtered in batch approach
+                # This eliminates N database queries per session!
                 
-                if existing.data:
-                    logger.debug(f"User already has achievement: {achievement['name']}")
-                    continue  # User already has this achievement
-                
-                # Check if user meets criteria for this achievement
-                criteria_met = self._check_achievement_criteria(supabase, user_id, session, achievement)
+                # Check if user meets criteria for this achievement (with pre-loaded stats)
+                criteria_met = self._check_achievement_criteria(supabase, user_id, session, achievement, user_stats)
                 logger.info(f"Achievement {achievement['name']} criteria met: {criteria_met}")
                 
                 # Log specific details for suspicious achievements
@@ -293,7 +315,7 @@ class CheckSessionAchievementsResource(Resource):
             logger.error(f"Error checking session achievements: {str(e)}")
             return {'error': 'Failed to check session achievements'}, 500
     
-    def _check_achievement_criteria(self, supabase, user_id: str, session: Dict, achievement: Dict) -> bool:
+    def _check_achievement_criteria(self, supabase, user_id: str, session: Dict, achievement: Dict, user_stats: Dict = None) -> bool:
         """Check if user meets criteria for a specific achievement"""
         try:
             criteria = achievement['criteria']
@@ -321,29 +343,32 @@ class CheckSessionAchievementsResource(Resource):
                 return session.get('ruck_weight_kg', 0) >= target
             
             elif criteria_type == 'power_points':
-                # Power points are always cumulative across all sessions
-                try:
-                    response = supabase.rpc('calculate_user_power_points', {
-                        'user_id_param': user_id
-                    }).execute()
-                    total_power_points = response.data or 0
-                except Exception as rpc_error:
-                    # Fallback to manual calculation if RPC doesn't exist
-                    logger.warning(f"RPC calculate_user_power_points not available, using fallback: {str(rpc_error)}")
-                    power_response = supabase.table('ruck_session').select(
-                        'power_points'
-                    ).eq('user_id', user_id).eq('status', 'completed').execute()
-                    
-                    total_power_points = 0
-                    if power_response.data:
-                        for sess in power_response.data:
-                            power_points = sess.get('power_points')
-                            if power_points is not None:
-                                try:
-                                    total_power_points += float(power_points)
-                                except (ValueError, TypeError):
-                                    continue
-                
+                # Use pre-loaded stats if available, otherwise fall back to individual queries
+                if user_stats and 'total_power_points' in user_stats:
+                    total_power_points = user_stats['total_power_points']
+                else:
+                    # Fallback: individual database call (slower)
+                    try:
+                        response = supabase.rpc('calculate_user_power_points', {
+                            'user_id_param': user_id
+                        }).execute()
+                        total_power_points = response.data or 0
+                    except Exception as rpc_error:
+                        logger.warning(f"RPC calculate_user_power_points not available, using manual calculation: {str(rpc_error)}")
+                        power_response = supabase.table('ruck_session').select(
+                            'power_points'
+                        ).eq('user_id', user_id).eq('status', 'completed').execute()
+                        
+                        total_power_points = 0
+                        if power_response.data:
+                            for sess in power_response.data:
+                                power_points = sess.get('power_points')
+                                if power_points is not None:
+                                    try:
+                                        total_power_points += float(power_points)
+                                    except (ValueError, TypeError):
+                                        continue
+            
                 target = criteria.get('target', 0)
                 return total_power_points >= target
             
@@ -366,18 +391,23 @@ class CheckSessionAchievementsResource(Resource):
                 logger.info(f"PACE SLOWER THAN CHECK: pace={pace}, target={target}, result={pace >= target}")
                 logger.info(f"Session data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s")
                 return pace >= target
-            
+        
             elif criteria_type == 'cumulative_distance':
-                # Get user's total distance with error handling
-                try:
-                    response = supabase.rpc('get_user_total_distance', {'p_user_id': user_id}).execute()
-                    total_distance = response.data or 0
-                    target = criteria.get('target', 0)
-                    return total_distance >= target
-                except Exception as e:
-                    logger.error(f"Error getting user total distance: {str(e)}")
-                    return False
+                # Use pre-loaded stats if available, otherwise fall back to individual queries
+                if user_stats and 'total_distance' in user_stats:
+                    total_distance = user_stats['total_distance']
+                else:
+                    # Fallback: individual database call (slower)
+                    try:
+                        response = supabase.rpc('get_user_total_distance', {'p_user_id': user_id}).execute()
+                        total_distance = response.data or 0
+                    except Exception as e:
+                        logger.error(f"Error getting user total distance: {str(e)}")
+                        return False
             
+                target = criteria.get('target', 0)
+                return total_distance >= target
+        
             elif criteria_type == 'time_of_day':
                 # Check early bird / night owl achievements
                 start_time = session.get('start_time')
