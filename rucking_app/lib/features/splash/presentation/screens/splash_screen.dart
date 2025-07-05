@@ -63,10 +63,12 @@ class _SplashScreenState extends State<SplashScreen> {
     if (authState is Authenticated || authState is Unauthenticated || authState is AuthError) {
       if (!_authCheckCompleted) { // Process only the first definitive auth state
         debugPrint('[Splash] Definitive AuthState received: ${authState.runtimeType}');
-        setState(() {
-          _authCheckCompleted = true;
-          _definitiveAuthState = authState;
-        });
+        if (mounted) {
+          setState(() {
+            _authCheckCompleted = true;
+            _definitiveAuthState = authState;
+          });
+        }
         _attemptNavigation(); // Attempt navigation when auth state is definitive
       } else {
         debugPrint('[Splash] Auth check already completed with ${_definitiveAuthState?.runtimeType}, new state ${authState.runtimeType} ignored for navigation processing.');
@@ -167,6 +169,14 @@ class _SplashScreenState extends State<SplashScreen> {
   }
   
 
+
+  @override
+  void dispose() {
+    debugPrint('[Splash] dispose: Cleaning up splash screen');
+    // Note: Future.delayed doesn't return cancelable timers, but we check mounted in all callbacks
+    // This ensures that any pending futures won't cause issues
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

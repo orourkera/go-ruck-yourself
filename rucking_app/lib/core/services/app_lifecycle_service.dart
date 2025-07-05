@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 
@@ -29,6 +30,7 @@ class AppLifecycleService with WidgetsBindingObserver {
   // Bloc references - will be set when app starts
   ActiveSessionBloc? _activeSessionBloc;
   NotificationBloc? _notificationBloc;
+  AuthBloc? _authBloc;
   
   /// Initialize the lifecycle service
   void initialize() {
@@ -52,9 +54,11 @@ class AppLifecycleService with WidgetsBindingObserver {
   void setBlocReferences({
     ActiveSessionBloc? activeSessionBloc,
     NotificationBloc? notificationBloc,
+    AuthBloc? authBloc,
   }) {
     _activeSessionBloc = activeSessionBloc;
     _notificationBloc = notificationBloc;
+    _authBloc = authBloc;
     AppLogger.info('Lifecycle service bloc references set');
   }
   
@@ -146,10 +150,14 @@ class AppLifecycleService with WidgetsBindingObserver {
     AppLogger.info('App resumed - resuming background services');
     
     try {
-      // Immediately check for new notifications and resume polling
-      if (_notificationBloc != null) {
+      // Only resume notification polling if user is authenticated
+      final authState = _authBloc?.state;
+      if (_notificationBloc != null && authState is Authenticated) {
+        AppLogger.info('User authenticated - resuming notification polling');
         _notificationBloc!.add(const NotificationsRequested());
         _notificationBloc!.resumePolling(interval: const Duration(seconds: 30)); // More frequent polling
+      } else {
+        AppLogger.info('User not authenticated - skipping notification polling resume');
       }
       
       // Check if we need to recover any services

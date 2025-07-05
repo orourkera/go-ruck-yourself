@@ -288,7 +288,12 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     return MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>(
-          create: (context) => getIt<AuthBloc>(),
+          create: (context) {
+            final bloc = getIt<AuthBloc>();
+            // Set bloc reference in lifecycle service
+            _lifecycleService.setBlocReferences(authBloc: bloc);
+            return bloc;
+          },
         ),
         BlocProvider<SessionHistoryBloc>(
           create: (context) => getIt<SessionHistoryBloc>(),
