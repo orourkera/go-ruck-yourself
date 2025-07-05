@@ -686,6 +686,20 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         );
                       }
                       
+                      if (state is SessionSummaryGenerated) {
+                        // Show loading while navigating to session complete screen
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('Completing session...'),
+                            ],
+                          ),
+                        );
+                      }
+                      
                       // Catch-all error handler to prevent blank white screens
                       AppLogger.error('Unknown ActiveSessionState encountered: ${state.runtimeType} - ${state.toString()}');
                       

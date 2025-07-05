@@ -7,6 +7,8 @@ import 'package:rucking_app/core/services/first_launch_service.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/paywall/presentation/screens/paywall_screen.dart';
+import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/splash/service/splash_helper.dart';
 
@@ -18,59 +20,23 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _paintProgress;
+class _SplashScreenState extends State<SplashScreen> {
   static bool _hasAnimatedOnceThisLaunch = false;
 
   // New state variables for timed splash screen
   bool _minimumDisplayTimeElapsed = false;
   bool _authCheckCompleted = false;
   AuthState? _definitiveAuthState; 
-  bool _navigationAttempted = false; 
+  bool _navigationAttempted = false;
+  bool _authRetryScheduled = false; // Prevent multiple retry timers 
 
   @override
   void initState() {
     super.initState();
-    debugPrint('[Splash] initState: New _SplashScreenState created. HasAnimatedOnce: $_hasAnimatedOnceThisLaunch');
+    debugPrint('[Splash] initState: Splash screen initialized');
     
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000), // 2 seconds for smooth painting
-    );
-    _animationController.addStatusListener((status) {
-      debugPrint('[Splash] Animation status changed: $status');
-      if (status == AnimationStatus.completed) {
-        if (mounted) { 
-          _hasAnimatedOnceThisLaunch = true;
-          debugPrint('[Splash] Animation completed and _hasAnimatedOnceThisLaunch set to true.');
-        }
-      }
-    });
-    
-    _paintProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
-    );
-    
-    if (!_hasAnimatedOnceThisLaunch) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        debugPrint('[Splash] addPostFrameCallback executed (condition: !_hasAnimatedOnceThisLaunch).');
-        if (mounted && !_animationController.isAnimating && _animationController.status != AnimationStatus.completed) {
-          debugPrint('[Splash] Forwarding animation controller from addPostFrameCallback.');
-          _animationController.forward();
-        } else {
-          debugPrint('[Splash] NOT forwarding animation (check in addPostFrameCallback): mounted=$mounted, isAnimating=${_animationController.isAnimating}, status=${_animationController.status}');
-        }
-      });
-    } else {
-      debugPrint('[Splash] Animation already played this launch, skipping forward in initState.');
-      if (mounted && _animationController.status != AnimationStatus.completed && !_animationController.isAnimating) {
-        _animationController.value = 1.0; 
-      }
-    }
+    // Mark animation as completed since GIF handles its own animation
+    _hasAnimatedOnceThisLaunch = true;
     
     // Check initial auth state after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -105,8 +71,32 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       } else {
         debugPrint('[Splash] Auth check already completed with ${_definitiveAuthState?.runtimeType}, new state ${authState.runtimeType} ignored for navigation processing.');
       }
+    } else if (authState is AuthLoading) {
+      // Set up multiple timeouts to re-check auth if stuck in loading
+      if (!_authRetryScheduled) {
+        debugPrint('[Splash] AuthLoading state detected. Setting up retry timeouts...');
+        _authRetryScheduled = true;
+        
+        // First retry after 3 seconds (for quick token refresh)
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted && !_authCheckCompleted) {
+            debugPrint('[Splash] Auth still loading after 3 seconds, triggering first retry');
+            context.read<AuthBloc>().add(AuthCheckRequested());
+          }
+        });
+        
+        // Second retry after 6 seconds (for slower network)
+        Future.delayed(const Duration(seconds: 6), () {
+          if (mounted && !_authCheckCompleted) {
+            debugPrint('[Splash] Auth still loading after 6 seconds, triggering second retry');
+            context.read<AuthBloc>().add(AuthCheckRequested());
+          }
+        });
+      } else {
+        debugPrint('[Splash] AuthLoading detected but retries already scheduled');
+      }
     } else {
-      // For states like AuthInitial or AuthLoading, do nothing here.
+      // For states like AuthInitial, do nothing here.
       debugPrint('[Splash] Non-definitive AuthState: ${authState.runtimeType}. Waiting.');
     }
   }
@@ -176,16 +166,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
   
-  @override
-  void dispose() {
-    debugPrint('[Splash] dispose: _SplashScreenState disposed. HasAnimatedOnce: $_hasAnimatedOnceThisLaunch');
-    _animationController.dispose();
-    super.dispose();
-  }
+
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[Splash] build: _SplashScreenState build method called. Animation controller status: ${_animationController.status}');
+    debugPrint('[Splash] build: Splash screen building with GIF animation');
     debugPrint('[Splash] BUILD METHOD CALLED - Widget is building');
     
     return BlocListener<AuthBloc, AuthState>(
@@ -225,17 +210,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           return Scaffold(
             backgroundColor: backgroundColor,
             body: Center(
-              child: AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return CustomPaint(
-                    painter: PaintedTextPainter(
-                      text: 'RUCK',
-                      progress: _paintProgress.value,
-                    ),
-                    size: const Size(280, 80),
-                  );
-                },
+              child: Image.asset(
+                'assets/images/splash.gif',
+                width: 200,
+                height: 200,
+                fit: BoxFit.contain,
               ),
             ),
           );

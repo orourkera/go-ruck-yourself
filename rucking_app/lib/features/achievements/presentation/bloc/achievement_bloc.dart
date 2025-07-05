@@ -218,6 +218,28 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
         AppLogger.sessionCompletion('No new achievements earned for session', context: {
           'session_id': event.sessionId,
         });
+        
+        // Still need to emit AchievementsSessionChecked even with no achievements
+        // so the completion flow knows the check is complete
+        if (state is AchievementsLoaded) {
+          final currentState = state as AchievementsLoaded;
+          emit(AchievementsSessionChecked(
+            newAchievements: [],
+            previousState: currentState,
+          ));
+        } else {
+          emit(AchievementsSessionChecked(
+            newAchievements: [],
+            previousState: AchievementsLoaded(
+              allAchievements: [],
+              categories: [],
+              userAchievements: [],
+              userProgress: [],
+              recentAchievements: [],
+              newlyEarned: [],
+            ),
+          ));
+        }
       }
     } catch (e) {
       AppLogger.sessionCompletion('Error checking session achievements', context: {
