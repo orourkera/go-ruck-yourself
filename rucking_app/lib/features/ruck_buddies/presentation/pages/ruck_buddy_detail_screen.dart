@@ -1337,6 +1337,10 @@ class _RouteMapState extends State<_RouteMap> {
             retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
             // Add tile caching for performance
             tileProvider: NetworkTileProvider(),
+            errorTileCallback: (tile, error, stackTrace) {
+              print('Ruck buddy detail map tile error: $error');
+              // Just log the error - can't return a widget from this callback
+            },
           ),
           PolylineLayer(
             polylines: [

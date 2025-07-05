@@ -20,7 +20,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  late Animation<double> _fadeInAnimation;
+  late Animation<double> _paintProgress;
   static bool _hasAnimatedOnceThisLaunch = false;
 
   // New state variables for timed splash screen
@@ -36,7 +36,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 2000), // 2 seconds for smooth painting
     );
     _animationController.addStatusListener((status) {
       debugPrint('[Splash] Animation status changed: $status');
@@ -48,7 +48,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
     });
     
-    _fadeInAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(_animationController);
+    _paintProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
     
     if (!_hasAnimatedOnceThisLaunch) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -220,42 +225,161 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           return Scaffold(
             backgroundColor: backgroundColor,
             body: Center(
-              child: FadeTransition(
-                opacity: _fadeInAnimation,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ScaleTransition(
-                      scale: Tween<double>(begin: 1.0, end: 1.0).animate(
-                        CurvedAnimation(
-                          parent: _animationController,
-                          curve: Curves.elasticOut,
-                        ),
-                      ),
-                      child: Image.asset(
-                        splashImagePath,
-                        width: 120, 
-                        height: 120, 
-                        fit: BoxFit.contain,
-                      ),
+              child: AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  return CustomPaint(
+                    painter: PaintedTextPainter(
+                      text: 'RUCK',
+                      progress: _paintProgress.value,
                     ),
-                    const SizedBox(height: 70),
-                    Text(
-                      'You\'ll never ruck alone.',
-                      style: AppTextStyles.titleMedium.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: 'Bangers',
-                        fontSize: AppTextStyles.titleMedium.fontSize != null ? AppTextStyles.titleMedium.fontSize! * 1.5 : 30,
-                      ),
-                    ),
-                  ],
-                ),
+                    size: const Size(280, 80),
+                  );
+                },
               ),
             ),
           );
         },
       ),
     );
+  }
+}
+
+/// Custom painter that creates a painted/drawn text effect
+class PaintedTextPainter extends CustomPainter {
+  final String text;
+  final double progress;
+  
+  PaintedTextPainter({
+    required this.text,
+    required this.progress,
+  });
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Create text style - smaller and lighter
+    final textStyle = TextStyle(
+      fontSize: 65, // Smaller than 80
+      fontWeight: FontWeight.w400, // Much lighter than w600
+      fontFamily: 'Impact',
+      letterSpacing: 4.0, // Good spacing
+    );
+    
+    final textSpan = TextSpan(text: text, style: textStyle);
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    );
+    
+    textPainter.layout();
+    
+    // Center the text
+    final textOffset = Offset(
+      (size.width - textPainter.width) / 2,
+      (size.height - textPainter.height) / 2,
+    );
+    
+    // Create paint for stroke effect
+    final strokePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5 // Thinner stroke
+      ..color = Colors.white
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    
+    // Create paint for shadow
+    final shadowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
+      ..color = Colors.black.withOpacity(0.3)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    
+    // Draw each letter with progress-based reveal
+    const letters = ['R', 'U', 'C', 'K'];
+    double currentX = textOffset.dx;
+    
+    for (int i = 0; i < letters.length; i++) {
+      final letter = letters[i];
+      final letterProgress = ((progress * letters.length) - i).clamp(0.0, 1.0);
+      
+      if (letterProgress > 0) {
+        // Create individual letter painter
+        final letterTextSpan = TextSpan(text: letter, style: textStyle);
+        final letterPainter = TextPainter(
+          text: letterTextSpan,
+          textDirection: TextDirection.ltr,
+        );
+        letterPainter.layout();
+        
+        final letterOffset = Offset(currentX, textOffset.dy);
+        
+        // Draw shadow first
+        canvas.save();
+        canvas.translate(letterOffset.dx + 1, letterOffset.dy + 2);
+        
+        // Create shadow with opacity based on progress
+        final shadowWithOpacity = shadowPaint..color = Colors.black.withOpacity(0.3 * letterProgress);
+        
+        // Draw shadow stroke
+        final shadowSpan = TextSpan(
+          text: letter,
+          style: textStyle.copyWith(color: Colors.transparent),
+        );
+        final shadowTextPainter = TextPainter(
+          text: shadowSpan,
+          textDirection: TextDirection.ltr,
+        );
+        shadowTextPainter.layout();
+        shadowTextPainter.paint(canvas, Offset.zero);
+        
+        canvas.restore();
+        
+        // Draw main letter stroke
+        canvas.save();
+        canvas.translate(letterOffset.dx, letterOffset.dy);
+        
+        // Adjust stroke opacity based on progress
+        final strokeWithOpacity = strokePaint..color = Colors.white.withOpacity(letterProgress);
+        
+        // Use a clipRect to simulate drawing progress
+        if (letterProgress < 1.0) {
+          final clipHeight = letterPainter.height * letterProgress;
+          canvas.clipRect(Rect.fromLTWH(0, 0, letterPainter.width, clipHeight));
+        }
+        
+        // Draw the letter stroke
+        final strokeSpan = TextSpan(
+          text: letter,
+          style: textStyle.copyWith(
+            foreground: strokeWithOpacity,
+          ),
+        );
+        final strokeTextPainter = TextPainter(
+          text: strokeSpan,
+          textDirection: TextDirection.ltr,
+        );
+        strokeTextPainter.layout();
+        strokeTextPainter.paint(canvas, Offset.zero);
+        
+        canvas.restore();
+        
+        currentX += letterPainter.width;
+      } else {
+        // Even if not drawing, we need to account for letter width
+        final letterTextSpan = TextSpan(text: letter, style: textStyle);
+        final letterPainter = TextPainter(
+          text: letterTextSpan,
+          textDirection: TextDirection.ltr,
+        );
+        letterPainter.layout();
+        currentX += letterPainter.width;
+      }
+    }
+  }
+  
+  @override
+  bool shouldRepaint(covariant PaintedTextPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.text != text;
   }
 } 

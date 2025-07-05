@@ -522,50 +522,54 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               // Map with weight chip overlay
                               Padding(
                                 padding: const EdgeInsets.only(top: 4.0, left: 8.0, right: 8.0),
-                                child: Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(18),
-                                      child: SizedBox(
-                                        height: MediaQuery.of(context).size.height * 0.27,
-                                        width: double.infinity,
-                                        child: sessionRunning && uiInitialized
-                                        ? _RouteMap(
-                                            route: route,
-                                            initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
-                                            onMapReady: () {
-                                              if (!mapReady) {
-                                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                  if (mounted) {
-                                                    setState(() {
-                                                      mapReady = true;
+                                child: Builder(
+                                  builder: (context) {
+                                    // Defensive wrapper to prevent ParentData crashes
+                                    return Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(18),
+                                          child: SizedBox(
+                                            height: MediaQuery.of(context).size.height * 0.27,
+                                            width: double.infinity,
+                                            child: sessionRunning && uiInitialized
+                                            ? _RouteMap(
+                                                route: route,
+                                                initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                                                onMapReady: () {
+                                                  if (!mapReady) {
+                                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                      if (mounted) {
+                                                        setState(() {
+                                                          mapReady = true;
+                                                        });
+                                                      }
                                                     });
+                                                    _checkAnimateOverlay();
                                                   }
-                                                });
-                                                _checkAnimateOverlay();
-                                              }
-                                            },
-                                          )
-                                        : Container(
-                                            color: const Color(0xFFE5E3DF), // Match map color
-                                            child: const Center(
-                                              child: CircularProgressIndicator(),
-                                            ),
+                                                },
+                                              )
+                                            : Container(
+                                                color: const Color(0xFFE5E3DF), // Match map color
+                                                child: const Center(
+                                                  child: CircularProgressIndicator(),
+                                                ),
+                                              ),
                                           ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top: 12,
-                                      right: 12,
-                                      child: _WeightChip(weightKg: state.ruckWeightKg),
-                                    ),
-                                    if (state.isPaused)
-                                      const Positioned.fill(child: IgnorePointer(
-                                        ignoring: true, // Let touch events pass through
-                                        child: _PauseOverlay(),
-                                      )),
-
-                                  ],
+                                        ),
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          child: _WeightChip(weightKg: state.ruckWeightKg),
+                                        ),
+                                        if (state.isPaused)
+                                          const Positioned.fill(child: IgnorePointer(
+                                            ignoring: true, // Let touch events pass through
+                                            child: _PauseOverlay(),
+                                          )),
+                                      ],
+                                    );
+                                  },
                                 ),
                               ),
                               const SizedBox(height: 8.0), // Added for spacing
@@ -1078,6 +1082,10 @@ class _RouteMapState extends State<_RouteMap> {
                     // Set tiles as loaded on first tile
                     _onTilesLoaded();
                     return tileWidget;
+                  },
+                  errorTileCallback: (tile, error, stackTrace) {
+                    print('Map tile loading error: $error');
+                    // Just log the error - errorTileCallback is void
                   },
                 ),
                 if (widget.route.isNotEmpty || widget.initialCenter != null)

@@ -898,8 +898,11 @@ class _MediaCarouselState extends State<MediaCarousel>
 
     return Column(
       children: [
-        Stack(
-          children: [
+        Builder(
+          builder: (context) {
+            // Defensive wrapper to prevent ParentData crashes during widget rebuilds
+            return Stack(
+              children: [
             // Main PageView
             SizedBox(
               height: widget.height,
@@ -976,8 +979,9 @@ class _MediaCarouselState extends State<MediaCarousel>
                           .toList(),
                     )
                   : const SizedBox.shrink(), // Always provide a child to maintain widget tree structure
-            ),
-          ],
+              ),
+            ]);
+          },
         ),
         // Page indicator dots
         if (widget.mediaItems.length > 1)
@@ -1176,6 +1180,10 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
             retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
             // Add tile caching for performance
             tileProvider: NetworkTileProvider(),
+            errorTileCallback: (tile, error, stackTrace) {
+              print('Ruck buddy map tile error: $error');
+              // Just log the error - errorTileCallback is void
+            },
           ),
           if (routePoints.isNotEmpty)
             PolylineLayer(

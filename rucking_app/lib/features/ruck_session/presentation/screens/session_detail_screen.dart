@@ -1541,6 +1541,10 @@ class _SessionRouteMap extends StatelessWidget {
               urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
               userAgentPackageName: 'com.getrucky.gfy',
               retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+              errorTileCallback: (tile, error, stackTrace) {
+                print('Session detail map tile error: $error');
+                // Just log the error - errorTileCallback is void
+              },
             ),
             PolylineLayer(
               polylines: () {
