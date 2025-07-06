@@ -26,7 +26,7 @@ class NotificationNavigation {
           final userId = notification.data!['user_id']?.toString() ?? '';
           
           // Create a minimal RuckBuddy with just the ID and userId
-          // The detail screen will fetch the full data including the proper user profile
+          // The detail screen will fetch the full data including location points and user profile
           final ruckBuddy = RuckBuddy(
             id: ruckId,
             userId: userId,  // Set the userId from notification data
@@ -42,6 +42,8 @@ class NotificationNavigation {
               username: '',  // Leave empty to trigger profile fetch in detail screen
               gender: '',    // Leave empty, will be properly set when profile is fetched
             ),
+            locationPoints: null, // Will be loaded by detail screen
+            photos: null, // Will be loaded by detail screen
           );
           
           Navigator.push(

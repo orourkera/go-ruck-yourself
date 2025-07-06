@@ -18,6 +18,7 @@ import 'package:rucking_app/features/notifications/presentation/widgets/notifica
 import 'package:rucking_app/features/notifications/presentation/pages/notifications_screen.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
@@ -471,8 +472,17 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       // Preload images for better UX
       await _preloadSessionImages(completedSessions.take(5).toList());
     } catch (e, stack) {
-      debugPrint('Error fetching data: $e');
-      debugPrint('Stack trace: $stack');
+      // Enhanced error handling with Sentry
+      await AppErrorHandler.handleError(
+        'home_screen_data_fetch',
+        e,
+        context: {
+          'screen': 'home',
+          'was_manual_refresh': _isRefreshing,
+          'is_loading': _isLoading,
+        },
+        sendToBackend: true,
+      );
       
       if (!mounted) return;
       

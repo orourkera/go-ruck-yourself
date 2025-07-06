@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:get_it/get_it.dart';
 
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -64,18 +65,20 @@ Future<String> _compressPhotoIsolateWork(String originalPhotoPath) async {
     final bytes = await originalPhoto.readAsBytes();
 
     final image = img.decodeImage(bytes);
-    if (image == null) return originalPhotoPath; // Return original path if decoding fails
-
+    if (image == null) return originalPhotoPath;    // Return original path if decoding fails
+    // Resize to max 1080px on longest side (was 1920px) for faster uploads
     img.Image resized = image;
-    if (image.width > 1920 || image.height > 1920) {
+    const int maxDimension = 1080; // Reduced from 1920 to prevent timeouts
+    if (image.width > maxDimension || image.height > maxDimension) {
       if (image.width > image.height) {
-        resized = img.copyResize(image, width: 1920);
+        resized = img.copyResize(image, width: maxDimension);
       } else {
-        resized = img.copyResize(image, height: 1920);
+        resized = img.copyResize(image, height: maxDimension);
       }
     }
 
-    final compressedBytes = img.encodeJpg(resized, quality: 80);
+    // Lower quality for smaller file sizes (was 80)
+    final compressedBytes = img.encodeJpg(resized, quality: 60);
 
     final tempDir = await getTemporaryDirectory();
     final String compressedFilePath = 
@@ -360,7 +363,16 @@ class SessionRepository {
       AppLogger.info('Successfully deleted session: $sessionId. Response: $response');
       return true;
     } catch (e) {
-      AppLogger.error('Error deleting session: $e');
+      // Enhanced error handling with Sentry
+      await AppErrorHandler.handleError(
+        'session_delete',
+        e,
+        context: {
+          'session_id': sessionId,
+        },
+        userId: await getCurrentUserId(),
+        sendToBackend: true,
+      );
       return false;
     }
   }
@@ -578,7 +590,18 @@ class SessionRepository {
       return allUploadedPhotos;
       
     } catch (e) {
-      AppLogger.error('Error uploading photos: $e');
+      // Enhanced error handling with Sentry (critical for user content)
+      await AppErrorHandler.handleCriticalError(
+        'session_photo_upload',
+        e,
+        context: {
+          'ruck_id': ruckId,
+          'photo_count': photos.length,
+          'uploaded_count': allUploadedPhotos.length,
+          'operation': 'bulk_photo_upload',
+        },
+        userId: await getCurrentUserId(),
+      );
       rethrow;
     }
   }
@@ -672,7 +695,28 @@ class SessionRepository {
     
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        AppLogger.info('[PHOTO_DEBUG] Uploading photo $photoIndex (attempt $attempt/$maxRetries)');
+        // 🔧 PREVENT H18: Check file size before upload
+        final fileSize = await photo.length();
+        const maxFileSizeMB = 5; // 5MB limit to prevent timeouts
+        const maxFileSizeBytes = maxFileSizeMB * 1024 * 1024;
+        
+        if (fileSize > maxFileSizeBytes) {
+          await AppErrorHandler.handleWarning(
+            'photo_upload_file_too_large',
+            Exception('File size ${(fileSize / 1024 / 1024).toStringAsFixed(1)}MB exceeds ${maxFileSizeMB}MB limit'),
+            context: {
+              'ruck_id': ruckId,
+              'photo_index': photoIndex,
+              'file_size_bytes': fileSize,
+              'file_size_mb': (fileSize / 1024 / 1024).toStringAsFixed(1),
+              'max_size_mb': maxFileSizeMB,
+            },
+            userId: await getCurrentUserId(),
+          );
+          throw Exception('Photo file too large: ${(fileSize / 1024 / 1024).toStringAsFixed(1)}MB (max: ${maxFileSizeMB}MB)');
+        }
+        
+        AppLogger.info('[PHOTO_DEBUG] Uploading photo $photoIndex (attempt $attempt/$maxRetries) - Size: ${(fileSize / 1024 / 1024).toStringAsFixed(1)}MB');
         
         final fileName = 'ruck_${ruckId}_photo_${photoIndex}_${DateTime.now().millisecondsSinceEpoch}.jpg';
         
@@ -696,8 +740,9 @@ class SessionRepository {
           ),
         );
         
-        // Extended timeout for potentially slow server responses
-        final streamedResponse = await request.send().timeout(const Duration(seconds: 90));
+        // 🔧 REDUCED timeout to prevent H18 errors (was 90s, now 25s)
+        // Heroku times out at 30s, so we fail faster and retry
+        final streamedResponse = await request.send().timeout(const Duration(seconds: 25));
         final response = await http.Response.fromStream(streamedResponse);
         
         if (response.statusCode == 200 || response.statusCode == 201) {
@@ -728,6 +773,23 @@ class SessionRepository {
         }
         
       } catch (e) {
+        // 🔧 ENHANCED: Monitor H18-like errors with Sentry
+        await AppErrorHandler.handleCriticalError(
+          'photo_upload_timeout',
+          e,
+          context: {
+            'ruck_id': ruckId,
+            'photo_index': photoIndex,
+            'attempt': attempt,
+            'max_retries': maxRetries,
+            'error_type': e.runtimeType.toString(),
+            'is_timeout': e.toString().contains('timeout') || e.toString().contains('TimeoutException'),
+            'file_size_bytes': await photo.length(),
+            'file_path': photo.path,
+          },
+          userId: await getCurrentUserId(),
+        );
+        
         AppLogger.error('[PHOTO_DEBUG] Photo $photoIndex upload error (attempt $attempt): $e');
         
         if (attempt < maxRetries) {

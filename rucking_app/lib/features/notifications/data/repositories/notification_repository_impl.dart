@@ -1,5 +1,6 @@
 import 'package:rucking_app/core/error/exceptions.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/features/notifications/data/datasources/notification_remote_datasource.dart';
 import 'package:rucking_app/features/notifications/domain/entities/app_notification.dart';
 import 'package:rucking_app/features/notifications/domain/repositories/notification_repository.dart';
@@ -18,7 +19,15 @@ class NotificationRepositoryImpl implements NotificationRepository {
       AppLogger.error('Repository: Failed to get notifications: ${e.message}');
       return [];
     } catch (e) {
-      AppLogger.error('Repository: Unexpected error getting notifications: $e');
+      // Enhanced error handling with Sentry
+      await AppErrorHandler.handleError(
+        'notifications_fetch',
+        e,
+        context: {
+          'operation': 'get_notifications',
+        },
+        sendToBackend: true,
+      );
       return [];
     }
   }

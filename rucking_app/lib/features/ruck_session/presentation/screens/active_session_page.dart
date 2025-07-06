@@ -700,6 +700,52 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         );
                       }
                       
+                      if (state is SessionCompletionUploading) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(),
+                              const SizedBox(height: 24),
+                              Text(
+                                state.progressMessage,
+                                style: AppTextStyles.headlineMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Processing ${state.locationPointsCount} location points\nand ${state.heartRateSamplesCount} heart rate samples',
+                                style: AppTextStyles.bodyMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${state.distanceKm.toStringAsFixed(1)} km • ${(state.durationSeconds / 60).toStringAsFixed(0)} min',
+                                style: AppTextStyles.bodySmall,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
+                      if (state is SessionSummaryGenerated) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(),
+                              const SizedBox(height: 24),
+                              Text(
+                                'Completing session...',
+                                style: AppTextStyles.headlineMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
                       // Catch-all error handler to prevent blank white screens
                       AppLogger.error('Unknown ActiveSessionState encountered: ${state.runtimeType} - ${state.toString()}');
                       

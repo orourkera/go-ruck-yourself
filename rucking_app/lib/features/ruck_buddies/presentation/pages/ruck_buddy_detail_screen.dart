@@ -209,21 +209,42 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
 
         // Process location points
         List<Map<String, dynamic>> locationPoints = [];
+        print('RuckBuddyDetailScreen _loadRuckDetails: Raw route data: ${data['route']}');
+        print('RuckBuddyDetailScreen _loadRuckDetails: Route data type: ${data['route'].runtimeType}');
+        
         if (data['route'] != null && data['route'] is List) {
+          print('RuckBuddyDetailScreen _loadRuckDetails: Route is a list with ${data['route'].length} items');
           try {
-            for (final point in data['route']) {
+            for (int i = 0; i < data['route'].length; i++) {
+              final point = data['route'][i];
+              print('RuckBuddyDetailScreen _loadRuckDetails: Processing route point $i: $point (type: ${point.runtimeType})');
+              
               if (point is Map) {
                 final lat = _parseDouble(point['lat'] ?? point['latitude']);
                 final lng = _parseDouble(point['lng'] ?? point['longitude'] ?? point['lon']);
+                print('RuckBuddyDetailScreen _loadRuckDetails: Parsed coordinates - lat: $lat, lng: $lng');
 
                 if (lat != null && lng != null) {
                   locationPoints.add({'lat': lat, 'lng': lng});
+                  print('RuckBuddyDetailScreen _loadRuckDetails: Added valid point: {lat: $lat, lng: $lng}');
+                } else {
+                  print('RuckBuddyDetailScreen _loadRuckDetails: Skipped invalid point - lat: $lat, lng: $lng');
                 }
+              } else {
+                print('RuckBuddyDetailScreen _loadRuckDetails: Point is not a Map: $point');
               }
             }
           } catch (e) {
             print('Error parsing route points: $e');
           }
+        } else {
+          print('RuckBuddyDetailScreen _loadRuckDetails: No route data available or route is not a List');
+        }
+        
+        print('RuckBuddyDetailScreen _loadRuckDetails: Final locationPoints count: ${locationPoints.length}');
+        if (locationPoints.isNotEmpty) {
+          print('RuckBuddyDetailScreen _loadRuckDetails: First location point: ${locationPoints.first}');
+          print('RuckBuddyDetailScreen _loadRuckDetails: Last location point: ${locationPoints.last}');
         }
 
         // Process photos
@@ -384,7 +405,16 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
             _likeCount = _completeBuddy!.likeCount;
             _commentCount = _completeBuddy!.commentCount;
             _photos = _completeBuddy!.photos ?? [];
-            log('RuckBuddyDetailScreen _loadRuckDetails: _completeBuddy state updated. Username: ${_completeBuddy?.user.username}, Distance: ${_completeBuddy?.distanceKm}');
+            
+            // Enhanced debugging for location points
+            final locationPointsCount = _completeBuddy?.locationPoints?.length ?? 0;
+            log('RuckBuddyDetailScreen _loadRuckDetails: _completeBuddy state updated. Username: ${_completeBuddy?.user.username}, Distance: ${_completeBuddy?.distanceKm}, LocationPoints: $locationPointsCount');
+            print('RuckBuddyDetailScreen _loadRuckDetails: Updated state with ${locationPointsCount} location points');
+            if (locationPointsCount > 0) {
+              print('RuckBuddyDetailScreen _loadRuckDetails: First route point in _completeBuddy: ${_completeBuddy?.locationPoints?.first}');
+            } else {
+              print('RuckBuddyDetailScreen _loadRuckDetails: WARNING: No location points in _completeBuddy!');
+            }
           });
         }
       } else {
@@ -610,10 +640,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         child: Scaffold(
           backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
           appBar: AppBar(
-            iconTheme: IconThemeData(
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-            ),
-            foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+            foregroundColor: Colors.white,
             title: const Text('Ruck Details'),
             actions: [
               // IconButton(
@@ -707,10 +735,28 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                 SizedBox(
                   height: 250,
                   width: double.infinity,
-                  child: _RouteMap(
-                    locationPoints: displayBuddy.locationPoints,
-                    ruckWeightKg: displayBuddy.ruckWeightKg,
-                  ),
+                  child: () {
+                    final locationPoints = displayBuddy.locationPoints;
+                    final hasLocationPoints = locationPoints != null && locationPoints.isNotEmpty;
+                    
+                    if (hasLocationPoints) {
+                      return _RouteMap(
+                        locationPoints: locationPoints,
+                        ruckWeightKg: displayBuddy.ruckWeightKg,
+                      );
+                    } else {
+                      return const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 8),
+                            Text('Loading route...'),
+                          ],
+                        ),
+                      );
+                    }
+                  }(),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -1193,7 +1239,13 @@ class _RouteMapState extends State<_RouteMap> {
   List<LatLng> _getRoutePoints() {
     final pts = <LatLng>[];
     final lp = widget.locationPoints;
+    
+    // Enhanced debugging for route points conversion
+    print('RouteMap _getRoutePoints: Input locationPoints: $lp');
+    print('RouteMap _getRoutePoints: locationPoints count: ${lp?.length ?? 0}');
+    
     if (lp == null || lp.isEmpty) {
+      print('RouteMap _getRoutePoints: No location points available, returning default San Francisco location');
       // Return default location if no points available
       return [const LatLng(37.7749, -122.4194)]; // San Francisco as default
     }

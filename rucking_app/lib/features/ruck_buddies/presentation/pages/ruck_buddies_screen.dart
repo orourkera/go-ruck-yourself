@@ -115,6 +115,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Ruck Buddies'),
+        iconTheme: const IconThemeData(color: Colors.white),
         // Info icon removed per request
       ),
       body: SafeArea(

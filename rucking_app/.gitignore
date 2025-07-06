@@ -47,3 +47,5 @@ app.*.map.json
 # Env files
 .env
 ios/build/
+
+sentry.properties

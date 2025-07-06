@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rucking_app/features/premium/services/premium_service.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'premium_event.dart';
 import 'premium_state.dart';
 
@@ -63,6 +64,16 @@ class PremiumBloc extends Bloc<PremiumEvent, PremiumState> {
         emit(const PremiumPurchaseError('Purchase failed'));
       }
     } catch (e) {
+      // Monitor premium purchase failures (critical for revenue)
+      await AppErrorHandler.handleCriticalError(
+        'premium_purchase',
+        e,
+        context: {
+          'purchase_attempt': true,
+          'service_available': _premiumService != null,
+        },
+      );
+      
       emit(PremiumPurchaseError('Purchase error: ${e.toString()}'));
     }
   }
@@ -81,6 +92,16 @@ class PremiumBloc extends Bloc<PremiumEvent, PremiumState> {
         emit(const PremiumError('No purchases to restore'));
       }
     } catch (e) {
+      // Monitor purchase restoration failures (affects user experience)
+      await AppErrorHandler.handleError(
+        'premium_restore_purchases',
+        e,
+        context: {
+          'restore_attempt': true,
+          'service_available': _premiumService != null,
+        },
+      );
+      
       emit(PremiumError('Restore error: ${e.toString()}'));
     }
   }

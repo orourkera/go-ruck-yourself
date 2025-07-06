@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:rucking_app/core/error/exceptions.dart';
 import 'package:rucking_app/core/error/failures.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/features/ruck_buddies/data/datasources/ruck_buddies_remote_datasource.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/repositories/ruck_buddies_repository.dart';
@@ -79,6 +80,18 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } catch (e) {
+      // Enhanced error handling with Sentry
+      await AppErrorHandler.handleError(
+        'ruck_buddies_fetch',
+        e,
+        context: {
+          'filter': filter,
+          'limit': limit,
+          'offset': offset,
+          'has_location': latitude != null && longitude != null,
+        },
+        sendToBackend: true,
+      );
       return Left(ServerFailure(message: 'Unexpected error occurred: ${e.toString()}'));
     }
   }

@@ -12,6 +12,7 @@ import '../../features/notifications/util/notification_navigation.dart';
 import '../../features/notifications/domain/entities/app_notification.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../services/api_client.dart';
+import '../services/app_error_handler.dart';
 
 /// Service for handling Firebase Cloud Messaging (FCM) push notifications
 class FirebaseMessagingService {
@@ -139,6 +140,16 @@ class FirebaseMessagingService {
       print('✅ Firebase Messaging initialized successfully');
       
     } catch (e) {
+      // Monitor Firebase messaging initialization failures (critical for notifications)
+      await AppErrorHandler.handleCriticalError(
+        'firebase_messaging_init',
+        e,
+        context: {
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+          'firebase_core_initialized': Firebase.apps.isNotEmpty,
+        },
+      );
+      
       print('❌ Error initializing Firebase Messaging: $e');
       _isInitialized = true; // Mark as initialized to prevent blocking retries
       // Don't rethrow - let app continue without push notifications
@@ -234,6 +245,17 @@ class FirebaseMessagingService {
       print('🔔 Device token registration response: $response');
       print('🔔 Device token registered successfully with backend');
     } catch (e) {
+      // Monitor device token registration failures (affects push notification delivery)
+      await AppErrorHandler.handleError(
+        'firebase_token_registration',
+        e,
+        context: {
+          'token_length': token.length,
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+          'has_auth': GetIt.instance.isRegistered<ApiClient>(),
+        },
+      );
+      
       print('❌ Failed to register device token: $e');
       // Don't throw - we want Firebase to still work even if backend registration fails
     }

@@ -7,6 +7,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 part 'auth_event.dart';
@@ -104,6 +105,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
     } catch (e) {
+      // Monitor authentication failures
+      await AppErrorHandler.handleCriticalError(
+        'auth_login_email',
+        e,
+        context: {
+          'email': event.email,
+          'has_password': event.password.isNotEmpty,
+        },
+      );
       emit(AuthError('Login failed: $e'));
     }
   }
@@ -246,6 +256,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       emit(Unauthenticated());
     } catch (e) {
+      // Monitor logout failures (critical for app lifecycle)
+      await AppErrorHandler.handleCriticalError(
+        'auth_logout',
+        e,
+        context: {
+          'services_stopped': true,
+        },
+      );
       emit(AuthError('Logout failed: $e'));
     }
   }

@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/services/background_location_service.dart';
 import 'package:rucking_app/shared/widgets/location_disclosure_dialog.dart';
 
@@ -120,6 +121,15 @@ class LocationServiceImpl implements LocationService {
       AppLogger.info('Location permission denied: $permission');
       return false;
     } catch (e) {
+      // Monitor location permission failures (critical for fitness tracking)
+      await AppErrorHandler.handleCriticalError(
+        'location_permission_request',
+        e,
+        context: {
+          'has_context': context != null,
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+        },
+      );
       AppLogger.error('Error requesting location permissions', exception: e);
       return false;
     }
@@ -140,6 +150,14 @@ class LocationServiceImpl implements LocationService {
         timestamp: DateTime.now(),
       );
     } catch (e) {
+      // Monitor location retrieval failures (critical for fitness tracking)
+      await AppErrorHandler.handleError(
+        'location_current_position',
+        e,
+        context: {
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+        },
+      );
       AppLogger.error('Failed to get current location: $e');
       return null;
     }
@@ -208,6 +226,31 @@ class LocationServiceImpl implements LocationService {
         // Log elevation data for debugging iOS vs Android differences
         AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
         
+        // Cross-platform location tracking diagnostics (sends to Crashlytics)
+        final platform = Platform.isIOS ? 'iOS' : 'Android';
+        final timeSinceLastUpdate = _lastLocationUpdate != null 
+            ? DateTime.now().difference(_lastLocationUpdate!).inSeconds 
+            : 0;
+        
+        // Critical: Log significant gaps to Crashlytics for production debugging
+        if (timeSinceLastUpdate > 60) {
+          final issueType = Platform.isIOS ? 'iOS background throttling' : 'Android Doze Mode or battery optimization';
+          AppLogger.critical('$platform Location Gap: ${timeSinceLastUpdate}s gap detected - possible $issueType', 
+            exception: '${platform}_LOCATION_GAP_${timeSinceLastUpdate}s');
+        }
+        
+        // Critical: Log GPS accuracy degradation to Crashlytics
+        if (position.accuracy > 20) {
+          AppLogger.critical('$platform GPS Accuracy Degraded: ${position.accuracy}m accuracy - possible power saving mode', 
+            exception: '${platform}_GPS_ACCURACY_${position.accuracy.toStringAsFixed(1)}m');
+        }
+        
+        // For extreme issues, log detailed location data to Crashlytics
+        if (timeSinceLastUpdate > 120 || position.accuracy > 50) {
+          AppLogger.critical('$platform Location Quality Issue', 
+            exception: 'platform=$platform, gap=${timeSinceLastUpdate}s, accuracy=${position.accuracy}m, lat=${position.latitude.toStringAsFixed(6)}, lng=${position.longitude.toStringAsFixed(6)}');
+        }
+        
         // Validate location quality
         if (position.accuracy > 50) {
           AppLogger.warning('Poor GPS accuracy: ${position.accuracy}m - using fallback');
@@ -224,7 +267,18 @@ class LocationServiceImpl implements LocationService {
         
         AppLogger.debug('Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m) - added to batch (${_locationBatch.length} total)');
       },
-      onError: (error) {
+      onError: (error) async {
+        // Monitor location tracking failures (critical for fitness sessions)
+        await AppErrorHandler.handleError(
+          'location_tracking_stream',
+          error,
+          context: {
+            'is_tracking': _isTracking,
+            'batch_size': _locationBatch.length,
+            'last_update': _lastLocationUpdate?.toIso8601String(),
+            'platform': Platform.isAndroid ? 'android' : 'ios',
+          },
+        );
         AppLogger.error('Location service error', exception: error);
         _locationController.addError(error);
         
@@ -241,7 +295,16 @@ class LocationServiceImpl implements LocationService {
     );
     
     // Integrate with background location service
-    BackgroundLocationService.startBackgroundTracking().catchError((error) {
+    BackgroundLocationService.startBackgroundTracking().catchError((error) async {
+      // Monitor background location service failures (critical for session tracking)
+      await AppErrorHandler.handleCriticalError(
+        'location_background_service',
+        error,
+        context: {
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+          'is_tracking': _isTracking,
+        },
+      );
       AppLogger.error('Failed to start background service', exception: error);
     });
     

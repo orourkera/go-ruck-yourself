@@ -20,6 +20,7 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -315,6 +316,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 );
                               },
                             ),
+                            const Divider(),
                             // Test notifications button removed for production
                             // _buildClickableItem(
                             //   icon: Icons.notifications_outlined,

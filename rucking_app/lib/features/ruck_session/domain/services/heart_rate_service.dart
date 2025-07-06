@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 
@@ -239,6 +240,14 @@ class HeartRateService {
         AppLogger.info('HeartRateService: Initial heart rate not available');
       }
     } catch (e) {
+      // Monitor heart rate initialization failures (affects fitness tracking quality)
+      await AppErrorHandler.handleError(
+        'heart_rate_initial_fetch',
+        e,
+        context: {
+          'health_service_available': _healthService != null,
+        },
+      );
       AppLogger.error('HeartRateService: Error fetching initial heart rate: $e');
     }
   }

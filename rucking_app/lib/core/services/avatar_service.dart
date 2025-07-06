@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
+import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:get_it/get_it.dart';
 
 /// Service for handling avatar upload operations using Supabase Storage
 class AvatarService {
@@ -21,22 +23,22 @@ class AvatarService {
   /// [imageFile] - The image file to upload
   /// Returns the public URL of the uploaded avatar
   Future<String> uploadAvatar(File imageFile) async {
+    // Get authenticated user from AuthService
+    final user = await _authService.getCurrentUser();
+    if (user == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final userId = user.userId;
+    AppLogger.info('Uploading avatar for user $userId');
+    
+    // Create unique filename
+    final fileName = 'avatar_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    
     try {
-      // Get authenticated user from AuthService
-      final user = await _authService.getCurrentUser();
-      if (user == null) {
-        throw Exception('User not authenticated');
-      }
-
-      final userId = user.userId;
-      AppLogger.info('Uploading avatar for user $userId');
-
       // Read image file
       final bytes = await imageFile.readAsBytes();
       AppLogger.info('Image size: ${bytes.length} bytes');
-
-      // Create unique filename
-      final fileName = 'avatar_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final storagePath = 'avatars/$fileName';
 
       // Upload directly to Supabase Storage using efficient multipart
@@ -62,7 +64,18 @@ class AvatarService {
       return avatarUrl;
       
     } catch (e) {
-      AppLogger.error('Avatar upload failed: $e');
+      // Use comprehensive error handler for monitoring
+      await AppErrorHandler.handleCriticalError(
+        'avatar_upload',
+        e,
+        context: {
+          'bucket': 'avatars',
+          'file_name': fileName,
+          'user_id': userId,
+        },
+        userId: userId,
+      );
+      
       throw Exception('Failed to upload avatar: $e');
     }
   }

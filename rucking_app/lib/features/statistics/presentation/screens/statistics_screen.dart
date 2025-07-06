@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -114,14 +115,24 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       }
       
     } catch (e) {
-      
-      if (mounted) {
-        setState(() {
-          _isLoadingWeekly = false;
-          _isLoadingMonthly = false;
-          _isLoadingYearly = false;
-        });
-      }
+    // Enhanced error handling with Sentry
+    await AppErrorHandler.handleError(
+      'statistics_fetch',
+      e,
+      context: {
+        'screen': 'statistics',
+        'current_tab': _tabController.index,
+      },
+      sendToBackend: true,
+    );
+    
+    if (mounted) {
+      setState(() {
+        _isLoadingWeekly = false;
+        _isLoadingMonthly = false;
+        _isLoadingYearly = false;
+      });
+    }
     }
   }
   

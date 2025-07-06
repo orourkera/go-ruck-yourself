@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 
 /// Platform channel for native background location service integration
 /// Provides manual WakeLock control and session resurrection features like FitoTrack
@@ -30,9 +31,28 @@ class BackgroundLocationService {
         await channel.invokeMethod('startTracking');
         debugPrint('Background location tracking started');
       } on PlatformException catch (e) {
+        // Monitor platform-specific background location failures
+        await AppErrorHandler.handleCriticalError(
+          'background_location_platform',
+          e,
+          context: {
+            'platform': 'android',
+            'error_code': e.code,
+            'error_message': e.message,
+          },
+        );
         debugPrint('Failed to start background tracking: ${e.message}');
         rethrow;
       } catch (e) {
+        // Monitor general background location failures
+        await AppErrorHandler.handleError(
+          'background_location_general',
+          e,
+          context: {
+            'platform': 'android',
+            'operation': 'start_tracking',
+          },
+        );
         debugPrint('Unexpected error starting background tracking: $e');
         // Don't rethrow - this prevents app crashes from background service issues
       }

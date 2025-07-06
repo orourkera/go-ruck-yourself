@@ -28,12 +28,50 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:sentry/sentry.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Load environment variables
   await dotenv.load(fileName: ".env");
+  
+  // Initialize Sentry for error monitoring
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
+      options.environment = dotenv.env['SENTRY_ENVIRONMENT'] ?? 'production';
+      options.release = '2.5.5+42';
+      
+      // Performance Monitoring
+      options.tracesSampleRate = 0.1; // 10% of transactions for performance monitoring
+      options.enableAutoSessionTracking = true;
+      options.attachStacktrace = true;
+      options.captureFailedRequests = true;
+      options.sendDefaultPii = false; // Don't send personally identifiable information
+      
+      // 🔧 FIX: Keep profiling disabled for iOS compatibility 
+      options.profilesSampleRate = 0.0; // Disable profiling
+      
+      // Enhanced Configuration for 9.3.0
+      options.beforeSend = (event, hint) {
+        // Filter out sensitive data if needed
+        return event;
+      };
+    },
+    appRunner: () => _runApp(),
+  );
+  
+  // Set global tags after initialization
+  Sentry.configureScope((scope) => scope
+    ..setTag('platform', 'flutter')
+    ..setTag('app', 'rucking_app')
+    ..setTag('version', '2.5.5+42')
+  );
+}
+
+Future<void> _runApp() async {
   
   // Initialize Firebase first
   await Firebase.initializeApp();
@@ -249,6 +287,16 @@ class AppBlocObserver extends BlocObserver {
       stackTrace, 
       reason: '${bloc.runtimeType} error',
       fatal: false,
+    );
+    
+    // Also send to Sentry with better context
+    Sentry.captureException(
+      error,
+      stackTrace: stackTrace,
+      withScope: (scope) {
+        scope.setTag('error_type', 'bloc_error');
+        scope.setTag('bloc_type', bloc.runtimeType.toString());
+      },
     );
     
     super.onError(bloc, error, stackTrace);

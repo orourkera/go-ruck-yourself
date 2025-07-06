@@ -1,6 +1,7 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
@@ -23,10 +24,11 @@ class SessionHistoryBloc extends Bloc<SessionHistoryEvent, SessionHistoryState> 
   ) async {
     emit(SessionHistoryLoading());
     
+    // Determine date filters based on the filter type
+    DateTime? startDate;
+    DateTime? endDate;
+    
     try {
-      // Determine date filters based on the filter type
-      DateTime? startDate;
-      DateTime? endDate;
       
       if (event.filter != null) {
         switch (event.filter) {
@@ -63,7 +65,19 @@ class SessionHistoryBloc extends Bloc<SessionHistoryEvent, SessionHistoryState> 
       
       emit(SessionHistoryLoaded(sessions: sessions));
     } catch (e) {
-      AppLogger.error('Error fetching sessions: $e');
+      // Enhanced error handling with Sentry
+      await AppErrorHandler.handleError(
+        'session_history_load',
+        e,
+        context: {
+          'filter': event.filter?.toString(),
+          'has_start_date': startDate != null,
+          'has_end_date': endDate != null,
+        },
+        userId: await _sessionRepository.getCurrentUserId(),
+        sendToBackend: true,
+      );
+      
       emit(SessionHistoryError(message: e.toString()));
     }
   }

@@ -299,6 +299,34 @@ class ActiveSessionComplete extends ActiveSessionState {
   List<Object?> get props => [session];
 }
 
+class SessionCompletionUploading extends ActiveSessionState {
+  final String sessionId;
+  final double distanceKm;
+  final int durationSeconds;
+  final int locationPointsCount;
+  final int heartRateSamplesCount;
+  final String progressMessage;
+  
+  const SessionCompletionUploading({
+    required this.sessionId,
+    required this.distanceKm,
+    required this.durationSeconds,
+    required this.locationPointsCount,
+    required this.heartRateSamplesCount,
+    required this.progressMessage,
+  });
+  
+  @override
+  List<Object?> get props => [
+    sessionId,
+    distanceKm,
+    durationSeconds,
+    locationPointsCount,
+    heartRateSamplesCount,
+    progressMessage,
+  ];
+}
+
 class ActiveSessionCompleted extends ActiveSessionState {
   final String sessionId;
   final double finalDistanceKm;

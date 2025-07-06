@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 
 import 'package:rucking_app/features/social/domain/models/ruck_like.dart';
@@ -156,6 +157,19 @@ class SocialRepository {
       }
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
+      
+      // Enhanced error handling with Sentry
+      await AppErrorHandler.handleError(
+        'social_add_like',
+        e,
+        context: {
+          'ruck_id': ruckId,
+          'operation': 'add_like',
+        },
+        userId: (await _authService.getCurrentUser())?.userId,
+        sendToBackend: true,
+      );
+      
       throw ServerException(message: 'Failed to add like: $e');
     }
   }

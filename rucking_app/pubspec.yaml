@@ -16,7 +16,7 @@ publish_to: 'none'
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.5.5+42
+version: 2.5.6+43
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -42,6 +42,9 @@ dependencies:
   equatable: ^2.0.5
   flutter_riverpod: ^2.4.0
   dartz: ^0.10.1
+  
+  # Error Monitoring
+  sentry_flutter: ^9.3.0
   
   # Deep Links
   app_links: ^6.1.4
@@ -100,6 +103,7 @@ dependencies:
   # carousel_slider removed due to conflicts with Flutter's Material package
   
 dev_dependencies:
+  sentry_dart_plugin: ^3.1.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
@@ -136,7 +140,7 @@ flutter:
           weight: 700
     - family: Bangers
       fonts:
-        - asset: assets/fonts/Bangers-Regular.ttf
+        - asset: assets/fonts/Bangers-Ruck.ttf
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Regular.otf
@@ -144,3 +148,8 @@ flutter:
           weight: 500
         - asset: assets/fonts/Inter-Bold.otf
           weight: 700 
+sentry:
+  upload_debug_symbols: true
+  upload_source_maps: true
+  project: ruck
+  org: get-rucky-llc

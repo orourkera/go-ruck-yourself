@@ -28,6 +28,8 @@ import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
@@ -88,7 +90,33 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   /// Heart rate API throttling - only send to API every 30 seconds
   DateTime? _lastApiHeartRateTime;
 
+  // Batch upload system for real-time data uploads during session
+  Timer? _batchUploadTimer;
+  final List<LocationPoint> _pendingLocationPoints = [];
+  final List<HeartRateSample> _pendingHeartRateSamples = [];
+  static const Duration _batchUploadInterval = Duration(minutes: 5);
+  DateTime? _lastBatchUploadTime;
+  bool _isBatchUploadInProgress = false;
+
   int? _authRetryCounter;
+
+  // Session Performance & Quality Diagnostics
+  DateTime? _sessionStartTime;
+  DateTime? _lastCrashlyticsReport;
+  int _locationUpdatesCount = 0;
+  int _heartRateUpdatesCount = 0;
+  int _apiCallsCount = 0;
+  int _failedApiCallsCount = 0;
+  double _totalApiLatencyMs = 0.0;
+  int _backgroundTransitions = 0;
+  int _foregroundTransitions = 0;
+  Duration _totalPausedTime = Duration.zero;
+  int _pauseCount = 0;
+  int _locationValidationFailures = 0;
+  double _worstGpsAccuracy = 0.0;
+  int _gpsAccuracyWarnings = 0;
+  static const Duration _diagnosticsReportInterval = Duration(minutes: 5);
+  Timer? _diagnosticsTimer;
 
   ActiveSessionBloc({
     required ApiClient apiClient,
@@ -256,6 +284,23 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.info(' Creating offline session: $sessionId - all data will be stored locally and synced when connection is restored');
         AppLogger.warning('API Error: $apiError');
       }
+      
+      // Initialize session performance tracking
+      _sessionStartTime = DateTime.now();
+      _lastCrashlyticsReport = DateTime.now();
+      _resetSessionDiagnostics();
+      
+      // Start periodic diagnostics reporting
+      _startDiagnosticsTimer();
+      
+      // Send session start event to Crashlytics
+      AppLogger.critical('Session Started', exception: {
+        'session_id': sessionId,
+        'ruck_weight_kg': event.ruckWeightKg,
+        'user_weight_kg': event.userWeightKg,
+        'platform': Platform.isIOS ? 'iOS' : 'Android',
+        'start_time': _sessionStartTime!.toIso8601String(),
+      }.toString());
       final initialSessionState = ActiveSessionRunning(
         sessionId: sessionId,
         locationPoints: const [],
@@ -333,6 +378,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
     } catch (e, stackTrace) {
       String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Start');
+      
+      // Monitor session start failures (critical for core functionality)
+      await AppErrorHandler.handleCriticalError(
+        'session_start',
+        e,
+        context: {
+          'session_type': 'ruck_session',
+          'has_location_permission': await _locationService.hasLocationPermission(),
+          'is_authenticated': GetIt.I<AuthService>().isAuthenticated(),
+        },
+      );
+      
       AppLogger.error('Error starting session: $errorMessage\nError: $e\n$stackTrace');
       emit(ActiveSessionFailure(errorMessage: errorMessage));
     }
@@ -345,6 +402,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _locationSubscription = _locationService.startLocationTracking().listen(
       (locationPoint) {
         add(LocationUpdated(locationPoint));
+        _lastLocationTimestamp = DateTime.now(); // Update last location timestamp
       },
       onError: (error) {
         AppLogger.warning('Location tracking error (continuing session without GPS): $error');
@@ -379,10 +437,31 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final LocationPoint newPoint = event.locationPoint;
       _lastLocationTimestamp = DateTime.now();
       
+      // Track location diagnostics
+      _locationUpdatesCount++;
+      if (newPoint.accuracy > _worstGpsAccuracy) {
+        _worstGpsAccuracy = newPoint.accuracy;
+      }
+      if (newPoint.accuracy > 30) {
+        _gpsAccuracyWarnings++;
+      }
+      
       final validationResult = _validationService.validateLocationPoint(newPoint, _lastValidLocation);
       if (!(validationResult['isValid'] as bool? ?? false)) {
         final String message = validationResult['message'] as String? ?? 'Validation failed, no specific message';
         AppLogger.warning('Invalid location point: $message');
+        _locationValidationFailures++;
+        
+        // Log validation failures to Crashlytics for pattern analysis
+        if (_locationValidationFailures % 10 == 0) {
+          AppLogger.critical('Location Validation Failures', exception: {
+            'session_id': currentState.sessionId,
+            'total_failures': _locationValidationFailures,
+            'failure_rate': (_locationValidationFailures / _locationUpdatesCount * 100).toStringAsFixed(1),
+            'last_failure_reason': message,
+            'platform': Platform.isIOS ? 'iOS' : 'Android',
+          }.toString());
+        }
         return;
       }
 
@@ -452,6 +531,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         currentElevationGain: newElevationGain,
       );
 
+      // Add to pending batch for upload
+      _pendingLocationPoints.add(newPoint);
+      AppLogger.debug('[BATCH_UPLOAD] Added location point to pending batch. Total pending: ${_pendingLocationPoints.length}');
+
       emit(currentState.copyWith(
         locationPoints: newLocationPoints,
         distanceKm: newDistanceKm,
@@ -465,23 +548,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
   
   /// Process batch upload of location points
-  void _processBatchLocationUpload(String sessionId, List<LocationPoint> locationPoints) {
+  Future<void> _processBatchLocationUpload(String sessionId, List<LocationPoint> locationPoints) async {
     AppLogger.info('Uploading batch of ${locationPoints.length} location points');
     
     final locationData = locationPoints.map((point) => point.toJson()).toList();
     
-    _apiClient.addLocationPoints(sessionId, locationData)
-      .then((_) {
-        AppLogger.info('Successfully uploaded ${locationPoints.length} location points');
-      })
-      .catchError((e) {
-        if (e.toString().contains('401') || e.toString().contains('Already Used')) {
-          AppLogger.warning('[SESSION_RECOVERY] Location batch sync failed due to auth issue, will retry: $e');
-          // Don't kill the session - continue tracking locally
-        } else {
-          AppLogger.warning('Failed to send location batch to backend: $e');
-        }
-      });
+    try {
+      await _apiClient.addLocationPoints(sessionId, locationData);
+      AppLogger.info('Successfully uploaded ${locationPoints.length} location points');
+    } catch (e) {
+      if (e.toString().contains('401') || e.toString().contains('Already Used')) {
+        AppLogger.warning('[SESSION_RECOVERY] Location batch sync failed due to auth issue, will retry: $e');
+        // Don't kill the session - continue tracking locally
+      } else {
+        AppLogger.warning('Failed to send location batch to backend: $e');
+      }
+    }
   }
   
   Future<void> _onBatchLocationUpdated(
@@ -527,13 +609,100 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         await _activeSessionStorage.saveActiveSession(currentState);
       }
     });
+
+    // Start batch upload timer for real-time data uploads
+    _startBatchUploadTimer();
   }
 
   void _stopTickerAndWatchdog() {
     _ticker?.cancel(); _ticker = null;
     _watchdogTimer?.cancel(); _watchdogTimer = null;
     _sessionPersistenceTimer?.cancel(); _sessionPersistenceTimer = null;
-    AppLogger.debug('Master timer, watchdog, and session persistence timer stopped.');
+    _batchUploadTimer?.cancel(); _batchUploadTimer = null;
+    AppLogger.debug('Master timer, watchdog, session persistence, and batch upload timers stopped.');
+  }
+
+  /// Start batch upload timer for real-time data uploads during session
+  void _startBatchUploadTimer() {
+    _batchUploadTimer?.cancel();
+    _batchUploadTimer = Timer.periodic(_batchUploadInterval, (timer) async {
+      if (state is ActiveSessionRunning && !_isBatchUploadInProgress) {
+        final currentState = state as ActiveSessionRunning;
+        await _processBatchUpload(currentState.sessionId);
+      }
+    });
+    AppLogger.info('Batch upload timer started - uploading data every ${_batchUploadInterval.inMinutes} minutes');
+  }
+
+  /// Process batch upload of pending location points and heart rate samples
+  Future<void> _processBatchUpload(String sessionId) async {
+    if (_isBatchUploadInProgress) {
+      AppLogger.debug('Batch upload already in progress, skipping');
+      return;
+    }
+
+    _isBatchUploadInProgress = true;
+    final now = DateTime.now();
+    
+    try {
+      // Upload location points if any
+      if (_pendingLocationPoints.isNotEmpty) {
+        final pointsCount = _pendingLocationPoints.length;
+        await _uploadLocationPointsBatch(sessionId, List.from(_pendingLocationPoints));
+        _pendingLocationPoints.clear();
+        AppLogger.info('Uploaded $pointsCount location points in batch');
+      }
+
+      // Upload heart rate samples if any
+      if (_pendingHeartRateSamples.isNotEmpty) {
+        final samplesCount = _pendingHeartRateSamples.length;
+        await _uploadHeartRateSamplesBatch(sessionId, List.from(_pendingHeartRateSamples));
+        _pendingHeartRateSamples.clear();
+        AppLogger.info('Uploaded $samplesCount heart rate samples in batch');
+      }
+
+      _lastBatchUploadTime = now;
+      AppLogger.debug('Batch upload completed successfully');
+    } catch (e) {
+      AppLogger.error('Batch upload failed: $e');
+      // Don't clear pending data on failure - retry on next cycle
+    } finally {
+      _isBatchUploadInProgress = false;
+    }
+  }
+
+  /// Upload location points batch to API
+  Future<void> _uploadLocationPointsBatch(String sessionId, List<LocationPoint> points) async {
+    if (points.isEmpty) return;
+
+    try {
+      final payload = {
+        'points': points.map((point) => point.toJson()).toList(),
+      };
+      
+      await _apiClient.post('/rucks/$sessionId/location', payload);
+      AppLogger.debug('Successfully uploaded ${points.length} location points');
+    } catch (e) {
+      AppLogger.error('Failed to upload location points batch: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload heart rate samples batch to API
+  Future<void> _uploadHeartRateSamplesBatch(String sessionId, List<HeartRateSample> samples) async {
+    if (samples.isEmpty) return;
+
+    try {
+      final payload = {
+        'samples': samples.map((sample) => sample.toJson()).toList(),
+      };
+      
+      await _apiClient.post('/rucks/$sessionId/heart_rate', payload);
+      AppLogger.debug('Successfully uploaded ${samples.length} heart rate samples');
+    } catch (e) {
+      AppLogger.error('Failed to upload heart rate samples batch: $e');
+      rethrow;
+    }
   }
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
@@ -695,6 +864,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
+      
+      // Track pause diagnostics
+      _pauseCount++;
+      
       _heartRateService.stopHeartRateMonitoring(); // Stop HR monitoring during pause
       // Send any buffered heart rate samples before pausing
       if (_heartRateService.heartRateBuffer.isNotEmpty) {
@@ -750,20 +923,47 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     final startTime = DateTime.now();
     
-    if (state is ActiveSessionRunning) {
-      final currentState = state as ActiveSessionRunning;
-      
-      // Start tracking session completion flow
-      AppLogger.sessionCompletion('Session completion started', context: {
-        'session_id': currentState.sessionId,
-        'distance_km': currentState.distanceKm,
-        'duration_seconds': _elapsedCounter,
-      });
-      
-      try {
-        AppLogger.sessionCompletion('Stopping services', context: {
+    // Start Sentry performance monitoring
+    final transaction = Sentry.startTransaction(
+      'session_completion', 
+      'ruck_session_save',
+      description: 'Complete and save ruck session',
+    );
+    
+    try {
+      if (state is ActiveSessionRunning) {
+        final currentState = state as ActiveSessionRunning;
+        
+        // Start tracking session completion flow
+        AppLogger.sessionCompletion('Session completion started', context: {
           'session_id': currentState.sessionId,
+          'distance_km': currentState.distanceKm,
+          'duration_seconds': _elapsedCounter,
         });
+        
+        // Show upload progress indicator for long sessions
+        String progressMessage = "Saving your session...";
+        final bool isLongSession = currentState.distanceKm > 10 || _elapsedCounter > 3600; // 10km+ or 1hr+
+        final bool hasLargeDataset = currentState.locationPoints.length > 1000 || _allHeartRateSamples.length > 100;
+        
+        if (isLongSession || hasLargeDataset) {
+          progressMessage = "Oof, that was a long ruck. Give us a second to handle all the data.";
+        }
+        
+        // Emit uploading state to show progress indicator
+        emit(SessionCompletionUploading(
+          sessionId: currentState.sessionId,
+          distanceKm: currentState.distanceKm,
+          durationSeconds: _elapsedCounter,
+          locationPointsCount: currentState.locationPoints.length,
+          heartRateSamplesCount: _allHeartRateSamples.length,
+          progressMessage: progressMessage,
+        ));
+        
+        try {
+          AppLogger.sessionCompletion('Stopping services', context: {
+            'session_id': currentState.sessionId,
+          });
         
         _stopTickerAndWatchdog();
         _locationService.stopLocationTracking();
@@ -780,6 +980,33 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final int finalDurationSeconds = _elapsedCounter; // Use the BLoC's tracked elapsed time
 
         final double finalDistanceKm = currentState.distanceKm;
+        
+        // Cross-Platform Location Tracking Diagnostics - Send to Crashlytics for production debugging
+        final platform = Platform.isIOS ? 'iOS' : 'Android';
+        final sessionDurationMinutes = finalDurationSeconds / 60;
+        final locationPointsCount = currentState.locationPoints.length;
+        final avgLocationsPerMinute = locationPointsCount / sessionDurationMinutes;
+        
+        // Send location tracking summary to Crashlytics for both platforms
+        AppLogger.critical('$platform Session Location Summary', exception: {
+          'session_id': currentState.sessionId,
+          'platform': platform,
+          'total_distance_km': finalDistanceKm.toStringAsFixed(3),
+          'duration_minutes': sessionDurationMinutes.toStringAsFixed(1),
+          'location_points_count': locationPointsCount,
+          'avg_locations_per_minute': avgLocationsPerMinute.toStringAsFixed(2),
+          'valid_location_count': _validLocationCount,
+          'session_start_time': currentState.originalSessionStartTimeUtc.toIso8601String(),
+          'session_end_time': DateTime.now().toUtc().toIso8601String(),
+        }.toString());
+        
+        // Alert for potentially problematic sessions on both platforms
+        if (avgLocationsPerMinute < 2.0 || locationPointsCount < 20) {
+          final issueType = Platform.isIOS ? 'iOS background throttling' : 'Android Doze Mode or battery optimization';
+          AppLogger.critical('$platform Low Location Frequency Detected', 
+            exception: 'platform=$platform, avg_per_min=${avgLocationsPerMinute.toStringAsFixed(2)}, total=$locationPointsCount, distance=${finalDistanceKm.toStringAsFixed(3)}km, likely_cause=$issueType');
+        }
+        
         // Check if auth state is Authenticated before accessing user property
         final authState = GetIt.I<AuthBloc>().state;
         final User? currentUser = authState is Authenticated ? authState.user : null;
@@ -811,12 +1038,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         });
 
         // Build payload in background to prevent UI blocking for large datasets
+        final payloadSpan = transaction.startChild(
+          'payload_building',
+          description: 'Build session completion payload',
+        );
+        payloadSpan.setData('location_points_count', currentState.locationPoints.length);
+        payloadSpan.setData('heart_rate_samples_count', _allHeartRateSamples.length);
+        
         final Map<String, dynamic> payload = await _buildCompletionPayloadInBackground(
           currentState,
           terrainStats,
           currentState.locationPoints,
           _allHeartRateSamples,
         );
+        
+        payloadSpan.setData('payload_size_bytes', payload.toString().length);
+        await payloadSpan.finish();
 
         AppLogger.sessionCompletion('Session completion payload built', context: {
           'session_id': currentState.sessionId,
@@ -861,6 +1098,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'session_id': currentState.sessionId,
             'total_time_ms': DateTime.now().difference(startTime).inMilliseconds,
           });
+          
+          // Finish transaction for offline session
+          transaction.setData('offline_session', true);
+          transaction.setData('completion_time_ms', DateTime.now().difference(startTime).inMilliseconds);
+          transaction.setData('session_id', currentState.sessionId);
+          await transaction.finish();
           
           // Try to sync offline sessions in background
           _syncOfflineSessionsInBackground();
@@ -907,10 +1150,25 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'payload_size': payload.toString().length,
           });
 
+          // Start monitoring the API call
+          final apiSpan = transaction.startChild(
+            'api_session_completion',
+            description: 'POST /rucks/{sessionId}/complete',
+          );
+          apiSpan.setData('session_id', currentState.sessionId);
+          apiSpan.setData('payload_size_bytes', payload.toString().length);
+          apiSpan.setData('timeout_seconds', completionTimeout.inSeconds);
+
+          // Track API call performance
+          final apiStartTime = DateTime.now();
+          _apiCallsCount++;
+          
           final response = await _apiClient.postSessionCompletion(
             '/rucks/${currentState.sessionId}/complete', 
             payload
           ).timeout(completionTimeout, onTimeout: () {
+            apiSpan.finish();
+            _failedApiCallsCount++;
             AppLogger.sessionCompletion('Session completion API call timed out', context: {
               'session_id': currentState.sessionId,
               'timeout_duration_seconds': completionTimeout.inSeconds,
@@ -918,9 +1176,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             throw TimeoutException('Session completion timed out');
           });
 
+          // Track API latency
+          final apiLatency = DateTime.now().difference(apiStartTime).inMilliseconds.toDouble();
+          _totalApiLatencyMs += apiLatency;
+          
+          await apiSpan.finish();
+
           AppLogger.sessionCompletion('Session completion API call succeeded', context: {
             'session_id': currentState.sessionId,
             'response_data': response,
+            'api_latency_ms': apiLatency.toStringAsFixed(1),
           });
 
           // Handle response and check for errors...
@@ -1036,7 +1301,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           'session_id': currentState.sessionId,
         });
         
+        // Start monitoring the handoff to session complete screen
+        final handoffSpan = transaction.startChild(
+          'session_complete_handoff',
+          description: 'Emit SessionSummaryGenerated and navigate to complete screen',
+        );
+        handoffSpan.setData('session_id', currentState.sessionId);
+        handoffSpan.setData('photos_count', currentState.photos.length);
+        
         emit(SessionSummaryGenerated(session: enrichedSession, photos: currentState.photos, isPhotosLoading: false));
+        
+        await handoffSpan.finish();
         await _activeSessionStorage.clearSessionData();
         AppLogger.debug('Session data cleared from local storage (newly completed)');
         
@@ -1044,6 +1319,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           'session_id': currentState.sessionId,
           'total_time_ms': DateTime.now().difference(startTime).inMilliseconds,
         });
+        
+        // Finish transaction with success
+        transaction.setData('completion_time_ms', DateTime.now().difference(startTime).inMilliseconds);
+        transaction.setData('session_id', currentState.sessionId);
+        await transaction.finish();
         
         // Log heart rate data for debugging
         AppLogger.debug('Heart rate samples count: ${_allHeartRateSamples.length}');
@@ -1065,6 +1345,32 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
               elevationGainMeters: completedSession.elevationGain,
               elevationLossMeters: completedSession.elevationLoss,
         );
+        
+        // Send final session diagnostics to Crashlytics
+        _reportSessionDiagnostics();
+        
+        // Send session completion summary to Crashlytics
+        final sessionDuration = _sessionStartTime != null 
+            ? DateTime.now().difference(_sessionStartTime!)
+            : Duration.zero;
+        
+        AppLogger.critical('Session Completed Successfully', exception: {
+          'session_id': currentState.sessionId,
+          'platform': Platform.isIOS ? 'iOS' : 'Android',
+          'total_duration_minutes': sessionDuration.inMinutes,
+          'final_distance_km': completedSession.distance.toStringAsFixed(3),
+          'final_calories': completedSession.caloriesBurned.toStringAsFixed(0),
+          'avg_heart_rate': completedSession.avgHeartRate?.toString() ?? 'none',
+          'location_points_collected': _locationUpdatesCount,
+          'hr_samples_collected': _heartRateUpdatesCount,
+          'api_calls_made': _apiCallsCount,
+          'api_failures': _failedApiCallsCount,
+          'session_pauses': _pauseCount,
+          'completion_success': true,
+        }.toString());
+        
+        // Clean up diagnostics timer
+        _stopDiagnosticsTimer();
 
       } catch (e, stackTrace) {
         final completionDuration = DateTime.now().difference(startTime).inMilliseconds;
@@ -1082,6 +1388,24 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             'duration_ms': completionDuration,
           });
         }
+        
+        // Monitor session completion failures (critical for data integrity)
+        await AppErrorHandler.handleCriticalError(
+          'session_completion',
+          e,
+          context: {
+            'session_id': currentState.sessionId,
+            'duration_ms': completionDuration,
+            'has_location_data': currentState.locationPoints.isNotEmpty,
+            'has_heart_rate_data': currentState.heartRateSamples.isNotEmpty,
+          },
+        );
+        
+        // Finish transaction with error
+        transaction.setData('error_message', e.toString());
+        transaction.setData('completion_time_ms', completionDuration);
+        transaction.throwable = e;
+        await transaction.finish();
         
         String errorMessage = ErrorHandler.getUserFriendlyMessage(e, 'Session Complete');
         AppLogger.error('Error completing session: $errorMessage\nError: $e\n$stackTrace');
@@ -1101,6 +1425,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           exception: e,
           stackTrace: stackTrace,
         );
+        
+        // Finish transaction with error for outer catch
+        transaction.setData('error_message', e.toString());
+        transaction.setData('completion_time_ms', completionDuration);
+        transaction.throwable = e;
+        await transaction.finish();
+        
         // currentState is defined at the start of the 'if (state is ActiveSessionRunning)' block
         emit(ActiveSessionFailure(
           errorMessage: 'An unexpected error occurred while completing the session.',
@@ -1108,9 +1439,31 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         ));
       } 
     } else {
+      // Session is not in running state
+      transaction.setData('error', 'Session not in running state');
+      transaction.setData('current_state', state.runtimeType.toString());
+      await transaction.finish();
+      
+      emit(ActiveSessionInitial());
+    }
+  } catch (outerError, outerStackTrace) {
+    // Handle any errors that occurred in the transaction setup itself
+    AppLogger.error('Error in session completion transaction setup: $outerError');
+    transaction.setData('setup_error', outerError.toString());
+    transaction.throwable = outerError;
+    await transaction.finish();
+    
+    // Still try to emit a failure state if possible
+    if (state is ActiveSessionRunning) {
+      emit(ActiveSessionFailure(
+        errorMessage: 'Failed to complete session due to system error.',
+        sessionDetails: state as ActiveSessionRunning,
+      ));
+    } else {
       emit(ActiveSessionInitial());
     }
   }
+}
 
   Future<void> _onSessionFailed(
     SessionFailed event, 
@@ -1179,6 +1532,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final currentState = state as ActiveSessionRunning;
       final bpm = event.sample.bpm;
       _latestHeartRate = bpm;
+      
+      // Track heart rate diagnostics
+      _heartRateUpdatesCount++;
+      
+      // Log unusual heart rate values to Crashlytics
+      if (bpm < 40 || bpm > 200) {
+        AppLogger.critical('Unusual Heart Rate Detected', exception: {
+          'session_id': currentState.sessionId,
+          'bpm': bpm,
+          'platform': Platform.isIOS ? 'iOS' : 'Android',
+          'hr_updates_count': _heartRateUpdatesCount,
+        }.toString());
+      }
 
       if (_minHeartRate == null || bpm < _minHeartRate!) _minHeartRate = bpm;
       if (_maxHeartRate == null || bpm > _maxHeartRate!) _maxHeartRate = bpm;
@@ -1191,7 +1557,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       if (shouldSaveSample) {
         _allHeartRateSamples.add(event.sample);
         _lastSavedHeartRateTime = now;
-        AppLogger.debug('[HR_THROTTLE] Saved heart rate sample: ${bpm}bpm (${_allHeartRateSamples.length} total saved)');
+        
+        // Add to pending batch for upload
+        _pendingHeartRateSamples.add(event.sample);
+        AppLogger.debug('[HR_THROTTLE] Saved heart rate sample: ${bpm}bpm (${_allHeartRateSamples.length} total saved, ${_pendingHeartRateSamples.length} pending upload)');
       } else {
         AppLogger.debug('[HR_THROTTLE] Skipped heart rate sample: ${bpm}bpm (throttled)');
       }
@@ -2046,5 +2415,91 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.warning('Failed to sync offline session: $e. Will retry on next connectivity event.');
       }
     }
+  }
+  
+  /// Reset session diagnostics counters
+  void _resetSessionDiagnostics() {
+    _locationUpdatesCount = 0;
+    _heartRateUpdatesCount = 0;
+    _apiCallsCount = 0;
+    _failedApiCallsCount = 0;
+    _totalApiLatencyMs = 0.0;
+    _backgroundTransitions = 0;
+    _foregroundTransitions = 0;
+    _totalPausedTime = Duration.zero;
+    _pauseCount = 0;
+    _locationValidationFailures = 0;
+    _worstGpsAccuracy = 0.0;
+    _gpsAccuracyWarnings = 0;
+  }
+  
+  /// Start periodic diagnostics reporting timer
+  void _startDiagnosticsTimer() {
+    _diagnosticsTimer?.cancel();
+    _diagnosticsTimer = Timer.periodic(_diagnosticsReportInterval, (_) {
+      _reportSessionDiagnostics();
+    });
+  }
+  
+  /// Report comprehensive session diagnostics to Crashlytics
+  void _reportSessionDiagnostics() {
+    if (state is! ActiveSessionRunning) return;
+    
+    final currentState = state as ActiveSessionRunning;
+    final sessionDuration = _sessionStartTime != null 
+        ? DateTime.now().difference(_sessionStartTime!)
+        : Duration.zero;
+    
+    final sessionDurationMinutes = sessionDuration.inMinutes;
+    if (sessionDurationMinutes == 0) return; // Avoid division by zero
+    
+    // Calculate rates and quality metrics
+    final locationUpdatesPerMinute = _locationUpdatesCount / sessionDurationMinutes;
+    final heartRateUpdatesPerMinute = _heartRateUpdatesCount / sessionDurationMinutes;
+    final apiFailureRate = _apiCallsCount > 0 ? (_failedApiCallsCount / _apiCallsCount * 100) : 0.0;
+    final avgApiLatency = _apiCallsCount > 0 ? (_totalApiLatencyMs / _apiCallsCount) : 0.0;
+    final locationValidationFailureRate = _locationUpdatesCount > 0 ? (_locationValidationFailures / _locationUpdatesCount * 100) : 0.0;
+    final gpsAccuracyWarningRate = _locationUpdatesCount > 0 ? (_gpsAccuracyWarnings / _locationUpdatesCount * 100) : 0.0;
+    
+    // Send comprehensive diagnostics to Crashlytics
+    AppLogger.critical('Session Performance Report', exception: {
+      'session_id': currentState.sessionId,
+      'platform': Platform.isIOS ? 'iOS' : 'Android',
+      'session_duration_minutes': sessionDurationMinutes,
+      'distance_km': currentState.distanceKm.toStringAsFixed(3),
+      'location_updates_per_minute': locationUpdatesPerMinute.toStringAsFixed(2),
+      'hr_updates_per_minute': heartRateUpdatesPerMinute.toStringAsFixed(2),
+      'api_calls_total': _apiCallsCount,
+      'api_failure_rate_percent': apiFailureRate.toStringAsFixed(1),
+      'avg_api_latency_ms': avgApiLatency.toStringAsFixed(1),
+      'worst_gps_accuracy_meters': _worstGpsAccuracy.toStringAsFixed(1),
+      'location_validation_failure_rate_percent': locationValidationFailureRate.toStringAsFixed(1),
+      'gps_accuracy_warning_rate_percent': gpsAccuracyWarningRate.toStringAsFixed(1),
+      'pause_count': _pauseCount,
+      'total_paused_minutes': _totalPausedTime.inMinutes,
+      'background_transitions': _backgroundTransitions,
+      'foreground_transitions': _foregroundTransitions,
+    }.toString());
+    
+    // Alert for poor performance metrics
+    if (locationUpdatesPerMinute < 1.0 || apiFailureRate > 20.0 || avgApiLatency > 5000.0) {
+      AppLogger.critical('Poor Session Performance Detected', exception: {
+        'session_id': currentState.sessionId,
+        'low_location_rate': locationUpdatesPerMinute < 1.0,
+        'high_api_failures': apiFailureRate > 20.0,
+        'high_api_latency': avgApiLatency > 5000.0,
+        'location_rate': locationUpdatesPerMinute.toStringAsFixed(2),
+        'api_failure_rate': apiFailureRate.toStringAsFixed(1),
+        'avg_latency': avgApiLatency.toStringAsFixed(1),
+      }.toString());
+    }
+    
+    _lastCrashlyticsReport = DateTime.now();
+  }
+  
+  /// Clean up diagnostics timer
+  void _stopDiagnosticsTimer() {
+    _diagnosticsTimer?.cancel();
+    _diagnosticsTimer = null;
   }
 }

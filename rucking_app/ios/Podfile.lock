@@ -94,7 +94,7 @@ PODS:
     - GoogleUtilities/Reachability (~> 8.0)
     - GoogleUtilities/UserDefaults (~> 8.0)
     - nanopb (~> 3.30910.0)
-  - FirebaseRemoteConfigInterop (11.14.0)
+  - FirebaseRemoteConfigInterop (11.15.0)
   - FirebaseSessions (11.10.0):
     - FirebaseCore (~> 11.10.0)
     - FirebaseCoreExtension (~> 11.10.0)
@@ -236,6 +236,11 @@ PODS:
   - SDWebImageWebPCoder (0.14.6):
     - libwebp (~> 1.0)
     - SDWebImage/Core (~> 5.17)
+  - Sentry/HybridSDK (8.52.1)
+  - sentry_flutter (9.3.0):
+    - Flutter
+    - FlutterMacOS
+    - Sentry/HybridSDK (= 8.52.1)
   - share_plus (0.0.1):
     - Flutter
   - shared_preferences_foundation (0.0.1):
@@ -274,6 +279,7 @@ DEPENDENCIES:
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - purchases_flutter (from `.symlinks/plugins/purchases_flutter/ios`)
+  - sentry_flutter (from `.symlinks/plugins/sentry_flutter/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/ios`)
@@ -310,6 +316,7 @@ SPEC REPOS:
     - RevenueCat
     - SDWebImage
     - SDWebImageWebPCoder
+    - Sentry
 
 EXTERNAL SOURCES:
   app_links:
@@ -356,6 +363,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
   purchases_flutter:
     :path: ".symlinks/plugins/purchases_flutter/ios"
+  sentry_flutter:
+    :path: ".symlinks/plugins/sentry_flutter/ios"
   share_plus:
     :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
@@ -388,7 +397,7 @@ SPEC CHECKSUMS:
   FirebaseCrashlytics: 84b073c997235740e6a951b7ee49608932877e5c
   FirebaseInstallations: 9980995bdd06ec8081dfb6ab364162bdd64245c3
   FirebaseMessaging: 2b9f56aa4ed286e1f0ce2ee1d413aabb8f9f5cb9
-  FirebaseRemoteConfigInterop: 7b74ceaa54e28863ed17fa39da8951692725eced
+  FirebaseRemoteConfigInterop: 1c6135e8a094cc6368949f5faeeca7ee8948b8aa
   FirebaseSessions: 9b3b30947b97a15370e0902ee7a90f50ef60ead6
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_image_compress_common: 1697a328fd72bfb335507c6bca1a65fa5ad87df1
@@ -419,6 +428,8 @@ SPEC CHECKSUMS:
   RevenueCat: d8174cfd72fab33f3b877d38c9f033142dc87c60
   SDWebImage: f29024626962457f3470184232766516dee8dfea
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
+  Sentry: 2cbbe3592f30050c60e916c63c7f5a2fa584005e
+  sentry_flutter: a89808603bda7694d4f617c347e44ae02faa42c8
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
   sign_in_with_apple: c5dcc141574c8c54d5ac99dd2163c0c72ad22418
