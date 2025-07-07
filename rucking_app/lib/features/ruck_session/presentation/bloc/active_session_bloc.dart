@@ -2764,12 +2764,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   /// Force garbage collection to free memory
   void _forceGarbageCollection() {
     try {
-      // Force garbage collection
-      dev.gc();
+      // Trigger garbage collection indirectly by creating/destroying objects
+      // Note: Dart doesn't provide direct GC control for user code
+      for (int i = 0; i < 3; i++) {
+        // Create temporary objects to encourage GC
+        final temp = List.generate(1000, (index) => index);
+        temp.clear();
+      }
       
-      AppLogger.debug('Forced garbage collection completed');
+      AppLogger.debug('Garbage collection encouragement completed');
     } catch (e) {
-      AppLogger.error('Error during garbage collection: $e');
+      AppLogger.error('Error during garbage collection attempt: $e');
     }
   }
   
