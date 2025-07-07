@@ -2606,7 +2606,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _lastCrashlyticsReport = DateTime.now();
   }
   
-{{ ... }}
   void _stopDiagnosticsTimer() {
     _diagnosticsTimer?.cancel();
     _diagnosticsTimer = null;
