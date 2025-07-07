@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
-import '../../core/logging/app_logger.dart';
+import '../../../core/utils/app_logger.dart';
 
 /// Robust tile layer with comprehensive error handling, retry logic, and fallback strategies
 class RobustTileLayer extends StatefulWidget {
