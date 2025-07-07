@@ -7,12 +7,14 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 /**
  * Dedicated location tracking service for background session recording.
@@ -104,18 +106,70 @@ class LocationTrackingService : Service() {
     }
     
     private fun startForegroundWithType() {
-        val notification = createNotification()
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10+ requires explicit foreground service type
-            startForeground(
-                NOTIFICATION_ID, 
-                notification, 
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            // Check if we have all required permissions before starting foreground service
+            if (!hasRequiredPermissions()) {
+                Log.e("LocationService", "Missing required permissions for foreground service")
+                stopSelf()
+                return
+            }
+            
+            val notification = createNotification()
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android 10+ requires explicit foreground service type
+                startForeground(
+                    NOTIFICATION_ID, 
+                    notification, 
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            
+            Log.i("LocationService", "Foreground service started successfully")
+            
+        } catch (e: SecurityException) {
+            Log.e("LocationService", "SecurityException starting foreground service - insufficient permissions", e)
+            // Stop the service if we can't start it properly
+            stopSelf()
+        } catch (e: Exception) {
+            Log.e("LocationService", "Failed to start foreground service", e)
+            stopSelf()
         }
+    }
+    
+    private fun hasRequiredPermissions(): Boolean {
+        val hasLocationPermission = ContextCompat.checkSelfPermission(
+            this, 
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || 
+        ContextCompat.checkSelfPermission(
+            this, 
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        val hasForegroundServicePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ContextCompat.checkSelfPermission(
+                this, 
+                android.Manifest.permission.FOREGROUND_SERVICE
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Not required on older versions
+        }
+        
+        val hasLocationForegroundServicePermission = if (Build.VERSION.SDK_INT >= 34) {
+            ContextCompat.checkSelfPermission(
+                this, 
+                android.Manifest.permission.FOREGROUND_SERVICE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Not required on older versions
+        }
+        
+        Log.d("LocationService", "Permission check - Location: $hasLocationPermission, ForegroundService: $hasForegroundServicePermission, LocationForegroundService: $hasLocationForegroundServicePermission")
+        
+        return hasLocationPermission && hasForegroundServicePermission && hasLocationForegroundServicePermission
     }
     
     private fun acquireWakeLock() {

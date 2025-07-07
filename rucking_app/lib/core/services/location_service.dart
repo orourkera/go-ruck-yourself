@@ -390,8 +390,18 @@ class LocationServiceImpl implements LocationService {
   
   /// Start monitoring for stale location updates and restart if needed
   void _startLocationMonitoring() {
-    _locationTimeoutTimer?.cancel();
-    _stalenessCheckTimer?.cancel();
+    // Safely cancel existing timers
+    try {
+      _locationTimeoutTimer?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - monitoring location timeout timer cancellation: $e');
+    }
+    
+    try {
+      _stalenessCheckTimer?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - monitoring staleness check timer cancellation: $e');
+    }
     
     // Check for complete location timeout (no updates at all)
     _locationTimeoutTimer = Timer.periodic(Duration(seconds: _locationTimeoutSeconds), (timer) {
@@ -430,8 +440,12 @@ class LocationServiceImpl implements LocationService {
     
     AppLogger.info('Restarting location tracking...');
     
-    // Cancel existing subscription
-    await _rawLocationSubscription?.cancel();
+    // Safely cancel existing subscription
+    try {
+      await _rawLocationSubscription?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - restart location subscription cancellation: $e');
+    }
     
     // Wait a moment before restarting
     await Future.delayed(const Duration(seconds: 2));
@@ -547,10 +561,30 @@ class LocationServiceImpl implements LocationService {
     AppLogger.info('Stopping location tracking...');
     _isTracking = false;
     
-    await _rawLocationSubscription?.cancel();
-    _batchTimer?.cancel();
-    _locationTimeoutTimer?.cancel();
-    _stalenessCheckTimer?.cancel();
+    // Safely cancel all subscriptions and timers
+    try {
+      await _rawLocationSubscription?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - location subscription cancellation: $e');
+    }
+    
+    try {
+      _batchTimer?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - batch timer cancellation: $e');
+    }
+    
+    try {
+      _locationTimeoutTimer?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - location timeout timer cancellation: $e');
+    }
+    
+    try {
+      _stalenessCheckTimer?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - staleness check timer cancellation: $e');
+    }
     
     // Stop background location service
     await BackgroundLocationService.stopBackgroundTracking();
@@ -618,9 +652,18 @@ class LocationServiceImpl implements LocationService {
   /// Restart location tracking with new configuration
   void _restartLocationTrackingWithNewConfig() async {
     try {
-      // Cancel current tracking
-      await _rawLocationSubscription?.cancel();
-      _batchTimer?.cancel();
+      // Safely cancel current tracking
+      try {
+        await _rawLocationSubscription?.cancel();
+      } catch (e) {
+        AppLogger.debug('Safe to ignore - config restart location subscription cancellation: $e');
+      }
+      
+      try {
+        _batchTimer?.cancel();
+      } catch (e) {
+        AppLogger.debug('Safe to ignore - config restart batch timer cancellation: $e');
+      }
       
       // Start tracking with new configuration
       final locationSettings = LocationSettings(
@@ -667,11 +710,41 @@ class LocationServiceImpl implements LocationService {
   
   /// Dispose of resources
   void dispose() {
-    _rawLocationSubscription?.cancel();
-    _batchTimer?.cancel();
-    _locationTimeoutTimer?.cancel();
-    _stalenessCheckTimer?.cancel();
-    _locationController.close();
-    _batchController.close();
+    // Safely dispose of all resources
+    try {
+      _rawLocationSubscription?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - dispose location subscription cancellation: $e');
+    }
+    
+    try {
+      _batchTimer?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - dispose batch timer cancellation: $e');
+    }
+    
+    try {
+      _locationTimeoutTimer?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - dispose location timeout timer cancellation: $e');
+    }
+    
+    try {
+      _stalenessCheckTimer?.cancel();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - dispose staleness check timer cancellation: $e');
+    }
+    
+    try {
+      _locationController.close();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - dispose location controller close: $e');
+    }
+    
+    try {
+      _batchController.close();
+    } catch (e) {
+      AppLogger.debug('Safe to ignore - dispose batch controller close: $e');
+    }
   }
 }
