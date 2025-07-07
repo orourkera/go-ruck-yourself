@@ -83,7 +83,15 @@ class FirebaseMessagingService {
       _deviceToken = await _getTokenWithRetry();
       
       if (_deviceToken == null) {
-        throw Exception('Failed to obtain FCM token after multiple attempts');
+        print('⚠️ Warning: Failed to obtain FCM token after multiple attempts');
+        print('📱 Push notifications will be unavailable until token is obtained');
+        // Don't throw exception - allow app to continue without push notifications
+        // Token can be retried later when network conditions improve
+        
+        // Schedule background retry after 30 seconds
+        Future.delayed(const Duration(seconds: 30), () {
+          retryTokenInBackground();
+        });
       }
       
       print('🔔 FCM Token result: ${_deviceToken ?? "STILL NULL"}');
@@ -672,6 +680,28 @@ class FirebaseMessagingService {
     } catch (e) {
       print('Error refreshing FCM token: $e');
       return null;
+    }
+  }
+  
+  /// Retry token retrieval in background when network conditions improve
+  Future<void> retryTokenInBackground() async {
+    if (_deviceToken != null) {
+      return; // Already have token
+    }
+    
+    print('🔄 Attempting background FCM token retrieval...');
+    
+    try {
+      _deviceToken = await _getTokenWithRetry(maxAttempts: 2);
+      
+      if (_deviceToken != null) {
+        await _registerDeviceToken(_deviceToken!);
+        print('✅ Background FCM token retrieval successful');
+      } else {
+        print('❌ Background FCM token retrieval failed');
+      }
+    } catch (e) {
+      print('❌ Background FCM token retry error: $e');
     }
   }
 
