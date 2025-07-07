@@ -33,10 +33,13 @@ logging.basicConfig(
     ]
 )
 
-# Set specific logger levels
-logging.getLogger('werkzeug').setLevel(logging.INFO)  # Ensure werkzeug logs are captured
-logging.getLogger('gunicorn').setLevel(logging.INFO)
-logging.getLogger('flask').setLevel(logging.INFO)
+# Set specific logger levels to reduce log volume
+logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce werkzeug verbosity
+logging.getLogger('gunicorn').setLevel(logging.WARNING)  # Reduce gunicorn verbosity
+logging.getLogger('flask').setLevel(logging.WARNING)    # Reduce flask verbosity
+logging.getLogger('httpx').setLevel(logging.WARNING)    # Reduce httpx client logging
+logging.getLogger('httpcore').setLevel(logging.WARNING) # Reduce httpcore logging
+logging.getLogger('urllib3').setLevel(logging.WARNING)  # Reduce urllib3 logging
 
 logger = logging.getLogger(__name__)
 logger.info("Starting RuckTracker API server...")
@@ -580,10 +583,14 @@ logger.info("Application initialized successfully! All API endpoints registered.
 
 @app.after_request
 def log_request_info(response):
-    """Log all requests for debugging and monitoring"""
-    # Log request details
-    logger.info(f"REQUEST: {request.method} {request.path} - Status: {response.status_code} - "
-               f"IP: {request.remote_addr} - User-Agent: {request.headers.get('User-Agent', 'Unknown')[:100]}")
+    """Log requests selectively to reduce log volume"""
+    # Skip logging for static files and health checks
+    if (request.path.startswith('/static/') or 
+        request.path.startswith('/favicon.ico') or 
+        request.path.startswith('/apple-app-site-association') or
+        request.path.startswith('/health') or
+        request.path.startswith('/robots.txt')):
+        return response
     
     # Log performance for slow requests
     if hasattr(g, 'start_time'):
@@ -591,26 +598,33 @@ def log_request_info(response):
         if duration > 2.0:  # Log slow requests (>2 seconds)
             logger.warning(f"SLOW REQUEST: {request.method} {request.path} took {duration:.2f}s")
     
-    # Log errors in detail
+    # Log errors in detail (but reduce verbosity)
     if response.status_code >= 400:
         logger.error(f"HTTP ERROR {response.status_code}: {request.method} {request.path} - "
-                    f"IP: {request.remote_addr} - Response: {response.get_data(as_text=True)[:500]}")
+                    f"IP: {request.remote_addr}")
+    
+    # Log successful API requests at DEBUG level only
+    elif request.path.startswith('/api/') and response.status_code < 400:
+        logger.debug(f"API {request.method} {request.path} - {response.status_code}")
     
     return response
 
 @app.before_request
 def before_request_logging():
-    """Track request start time and log important request details"""
+    """Track request start time for performance monitoring"""
     g.start_time = datetime.now()
     
-    # Log authentication attempts
-    if request.headers.get('Authorization'):
-        logger.debug(f"AUTH REQUEST: {request.method} {request.path} - Has auth token")
+    # Skip detailed logging for static files and health checks
+    if (request.path.startswith('/static/') or 
+        request.path.startswith('/favicon.ico') or 
+        request.path.startswith('/apple-app-site-association') or
+        request.path.startswith('/health') or
+        request.path.startswith('/robots.txt')):
+        return
     
-    # Log API requests with body size
-    if request.path.startswith('/api/'):
-        body_size = len(request.get_data()) if request.get_data() else 0
-        logger.debug(f"API REQUEST: {request.method} {request.path} - Body size: {body_size} bytes")
+    # Log authentication failures only (not all auth attempts)
+    if request.headers.get('Authorization') and request.path.startswith('/api/'):
+        logger.debug(f"AUTH REQUEST: {request.method} {request.path}")
 
 # Error Handlers
 @app.errorhandler(400)

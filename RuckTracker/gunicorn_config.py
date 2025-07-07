@@ -17,11 +17,12 @@ max_requests = 1000
 max_requests_jitter = 100
 preload_app = True
 
-# Logging
+# Logging - Reduced verbosity to prevent log overflow
 accesslog = "-"
 errorlog = "-"
-loglevel = "info"
-access_log_format = '%h %l %u %t "%r" %s %b "%{Referer}i" "%{User-Agent}i" %D'
+loglevel = "warning"  # Reduced from 'info' to 'warning'
+# Simplified access log format (remove user agent and referer to reduce log size)
+access_log_format = '%h %t "%r" %s %b %D'
 
 # Security
 limit_request_line = 4094
@@ -31,18 +32,20 @@ limit_request_field_size = 4096  # Tighten if possible
 # Performance
 # Removed worker_tmp_dir unless verified on Heroku
 
-# Logging hooks
+# Logging hooks - Reduced verbosity
 def when_ready(server):
     server.log.info("Server is ready. Spawning workers")
 
 def worker_int(worker):
-    worker.log.info("worker received INT or QUIT signal")
+    worker.log.warning("worker received INT or QUIT signal")
 
 def pre_fork(server, worker):
-    server.log.info("Worker spawned (pid: %s)", worker.pid)
+    # Only log at debug level to reduce verbosity
+    pass
 
 def post_fork(server, worker):
-    server.log.info("Worker spawned (pid: %s)", worker.pid)
+    # Only log at debug level to reduce verbosity
+    pass
 
 def worker_abort(worker):
-    worker.log.info("worker received SIGABRT signal")
+    worker.log.error("worker received SIGABRT signal")

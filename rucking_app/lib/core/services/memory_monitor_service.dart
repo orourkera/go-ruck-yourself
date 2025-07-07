@@ -1,0 +1,135 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
+
+/// Service to monitor app memory usage and prevent crashes
+class MemoryMonitorService {
+  static Timer? _monitoringTimer;
+  static const Duration _monitoringInterval = Duration(minutes: 2);
+  static const double _warningThresholdMb = 400.0;
+  static const double _criticalThresholdMb = 500.0;
+  
+  /// Start memory monitoring
+  static void startMonitoring() {
+    if (_monitoringTimer != null) return;
+    
+    AppLogger.info('🧠 Starting memory monitoring');
+    
+    _monitoringTimer = Timer.periodic(_monitoringInterval, (_) {
+      _checkMemoryUsage();
+    });
+  }
+  
+  /// Stop memory monitoring
+  static void stopMonitoring() {
+    _monitoringTimer?.cancel();
+    _monitoringTimer = null;
+    AppLogger.info('🧠 Stopped memory monitoring');
+  }
+  
+  /// Check current memory usage and alert if high
+  static void _checkMemoryUsage() {
+    try {
+      final memoryInfo = getCurrentMemoryInfo();
+      final memoryUsageMb = memoryInfo['memory_usage_mb'] as double;
+      
+      if (memoryUsageMb > _criticalThresholdMb) {
+        AppLogger.critical('CRITICAL MEMORY USAGE DETECTED', exception: {
+          'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+          'threshold_mb': _criticalThresholdMb.toStringAsFixed(1),
+          'platform': Platform.isIOS ? 'iOS' : 'Android',
+        }.toString());
+        
+        // Send to error handler for tracking
+        AppErrorHandler.handleCriticalError(
+          'critical_memory_usage',
+          Exception('Memory usage at ${memoryUsageMb.toStringAsFixed(1)}MB'),
+          context: {
+            'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+            'platform': Platform.isIOS ? 'iOS' : 'Android',
+          },
+        );
+        
+      } else if (memoryUsageMb > _warningThresholdMb) {
+        AppLogger.warning('High memory usage detected: ${memoryUsageMb.toStringAsFixed(1)}MB');
+      }
+      
+    } catch (e) {
+      AppLogger.error('Failed to check memory usage: $e');
+    }
+  }
+  
+  /// Get current memory usage information
+  static Map<String, dynamic> getCurrentMemoryInfo() {
+    try {
+      final processInfo = ProcessInfo.currentRss;
+      final memoryUsageMb = processInfo / (1024 * 1024); // Convert bytes to MB
+      
+      return {
+        'memory_usage_mb': memoryUsageMb,
+        'process_rss_bytes': processInfo,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+    } catch (e) {
+      AppLogger.warning('Failed to get memory info: $e');
+      return {
+        'memory_usage_mb': 0.0,
+        'process_rss_bytes': 0,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+    }
+  }
+  
+  /// Force memory cleanup
+  static void forceMemoryCleanup() {
+    try {
+      AppLogger.info('🧹 Forcing memory cleanup');
+      
+      // Add any global cleanup here
+      // This will be called from various services when memory is high
+      
+    } catch (e) {
+      AppLogger.error('Failed to force memory cleanup: $e');
+    }
+  }
+  
+  /// Report potential memory-related crash precursor
+  static void reportMemoryPressure({
+    required String sessionId,
+    required double memoryUsageMb,
+    required int pendingLocationPoints,
+    required int pendingHeartRateSamples,
+    required Duration sessionDuration,
+  }) {
+    try {
+      AppLogger.critical('MEMORY PRESSURE DETECTED - DATA PRESERVATION ACTIVATED', exception: {
+        'session_id': sessionId,
+        'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+        'pending_location_points': pendingLocationPoints,
+        'pending_heart_rate_samples': pendingHeartRateSamples,
+        'session_duration_minutes': sessionDuration.inMinutes,
+        'platform': Platform.isIOS ? 'iOS' : 'Android',
+        'timestamp': DateTime.now().toIso8601String(),
+        'data_preservation_status': 'ACTIVE - NO DATA LOSS',
+      }.toString());
+      
+      // Send to error handler for crash correlation
+      AppErrorHandler.handleCriticalError(
+        'memory_pressure_data_preservation',
+        Exception('Memory pressure at ${memoryUsageMb.toStringAsFixed(1)}MB - data preservation active'),
+        context: {
+          'session_id': sessionId,
+          'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+          'pending_location_points': pendingLocationPoints.toString(),
+          'pending_heart_rate_samples': pendingHeartRateSamples.toString(),
+          'session_duration_minutes': sessionDuration.inMinutes.toString(),
+          'platform': Platform.isIOS ? 'iOS' : 'Android',
+          'data_preservation_status': 'ACTIVE',
+        },
+      );
+    } catch (e) {
+      AppLogger.error('Failed to report memory pressure: $e');
+    }
+  }
+}

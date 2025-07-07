@@ -644,6 +644,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _isBatchUploadInProgress = true;
     final now = DateTime.now();
     
+    // Check memory and force cleanup if needed
+    _checkMemoryPressure();
+    
     try {
       // Upload location points if any
       if (_pendingLocationPoints.isNotEmpty) {
@@ -2453,6 +2456,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     final sessionDurationMinutes = sessionDuration.inMinutes;
     if (sessionDurationMinutes == 0) return; // Avoid division by zero
     
+    // Get memory usage information
+    final memoryInfo = _getMemoryInfo();
+    
     // Calculate rates and quality metrics
     final locationUpdatesPerMinute = _locationUpdatesCount / sessionDurationMinutes;
     final heartRateUpdatesPerMinute = _heartRateUpdatesCount / sessionDurationMinutes;
@@ -2479,19 +2485,40 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       'total_paused_minutes': _totalPausedTime.inMinutes,
       'background_transitions': _backgroundTransitions,
       'foreground_transitions': _foregroundTransitions,
+      'memory_usage_mb': memoryInfo['memory_usage_mb'],
+      'pending_location_points': _pendingLocationPoints.length,
+      'pending_heart_rate_samples': _pendingHeartRateSamples.length,
     }.toString());
     
-    // Alert for poor performance metrics
-    if (locationUpdatesPerMinute < 1.0 || apiFailureRate > 20.0 || avgApiLatency > 5000.0) {
+    // Alert for poor performance metrics OR high memory usage
+    final memoryUsageMb = memoryInfo['memory_usage_mb'] as double;
+    if (locationUpdatesPerMinute < 1.0 || apiFailureRate > 20.0 || avgApiLatency > 5000.0 || memoryUsageMb > 400.0) {
       AppLogger.critical('Poor Session Performance Detected', exception: {
         'session_id': currentState.sessionId,
         'low_location_rate': locationUpdatesPerMinute < 1.0,
         'high_api_failures': apiFailureRate > 20.0,
         'high_api_latency': avgApiLatency > 5000.0,
+        'high_memory_usage': memoryUsageMb > 400.0,
         'location_rate': locationUpdatesPerMinute.toStringAsFixed(2),
         'api_failure_rate': apiFailureRate.toStringAsFixed(1),
         'avg_latency': avgApiLatency.toStringAsFixed(1),
+        'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+        'pending_location_points': _pendingLocationPoints.length,
+        'pending_heart_rate_samples': _pendingHeartRateSamples.length,
       }.toString());
+    }
+    
+    // Critical memory alert - force garbage collection
+    if (memoryUsageMb > 500.0) {
+      AppLogger.critical('CRITICAL MEMORY USAGE - FORCING GC', exception: {
+        'session_id': currentState.sessionId,
+        'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+        'pending_location_points': _pendingLocationPoints.length,
+        'pending_heart_rate_samples': _pendingHeartRateSamples.length,
+      }.toString());
+      
+      // Force garbage collection
+      _forceGarbageCollection();
     }
     
     _lastCrashlyticsReport = DateTime.now();
@@ -2501,5 +2528,155 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   void _stopDiagnosticsTimer() {
     _diagnosticsTimer?.cancel();
     _diagnosticsTimer = null;
+  }
+  
+  /// Get current memory usage information
+  Map<String, dynamic> _getMemoryInfo() {
+    try {
+      // Get current process memory usage
+      final processInfo = ProcessInfo.currentRss;
+      final memoryUsageMb = processInfo / (1024 * 1024); // Convert bytes to MB
+      
+      return {
+        'memory_usage_mb': memoryUsageMb,
+        'process_rss_bytes': processInfo,
+      };
+    } catch (e) {
+      AppLogger.warning('Failed to get memory info: $e');
+      return {
+        'memory_usage_mb': 0.0,
+        'process_rss_bytes': 0,
+      };
+    }
+  }
+  
+  /// Emergency upload of location points to preserve data
+  Future<void> _emergencyUploadLocationPoints(String sessionId) async {
+    if (_pendingLocationPoints.isEmpty) return;
+    
+    try {
+      AppLogger.info('🚨 Emergency upload: Saving ${_pendingLocationPoints.length} location points');
+      
+      // Upload in smaller batches to avoid overwhelming the API
+      const batchSize = 500;
+      final totalBatches = (_pendingLocationPoints.length / batchSize).ceil();
+      
+      for (int i = 0; i < totalBatches; i++) {
+        final startIndex = i * batchSize;
+        final endIndex = math.min(startIndex + batchSize, _pendingLocationPoints.length);
+        final batch = _pendingLocationPoints.sublist(startIndex, endIndex);
+        
+        await _uploadLocationPointsBatch(sessionId, batch);
+        AppLogger.info('Emergency upload batch ${i + 1}/$totalBatches completed');
+      }
+      
+      // Clear only after successful upload
+      _pendingLocationPoints.clear();
+      AppLogger.info('✅ Emergency upload completed - all location points preserved');
+      
+    } catch (e) {
+      AppLogger.error('Emergency location upload failed: $e');
+      // Don't clear data on failure - keep it for next retry
+    }
+  }
+  
+  /// Emergency upload of heart rate samples to preserve data
+  Future<void> _emergencyUploadHeartRateSamples(String sessionId) async {
+    if (_pendingHeartRateSamples.isEmpty) return;
+    
+    try {
+      AppLogger.info('🚨 Emergency upload: Saving ${_pendingHeartRateSamples.length} heart rate samples');
+      
+      // Upload in smaller batches
+      const batchSize = 300;
+      final totalBatches = (_pendingHeartRateSamples.length / batchSize).ceil();
+      
+      for (int i = 0; i < totalBatches; i++) {
+        final startIndex = i * batchSize;
+        final endIndex = math.min(startIndex + batchSize, _pendingHeartRateSamples.length);
+        final batch = _pendingHeartRateSamples.sublist(startIndex, endIndex);
+        
+        await _uploadHeartRateSamplesBatch(sessionId, batch);
+        AppLogger.info('Emergency HR upload batch ${i + 1}/$totalBatches completed');
+      }
+      
+      // Clear only after successful upload
+      _pendingHeartRateSamples.clear();
+      AppLogger.info('✅ Emergency upload completed - all heart rate samples preserved');
+      
+    } catch (e) {
+      AppLogger.error('Emergency heart rate upload failed: $e');
+      // Don't clear data on failure - keep it for next retry
+    }
+  }
+  
+  /// Increase upload frequency during high memory usage
+  void _increaseUploadFrequency() {
+    try {
+      // Cancel current timer and start a more frequent one
+      _batchUploadTimer?.cancel();
+      
+      // Switch to 2-minute uploads during memory pressure
+      _batchUploadTimer = Timer.periodic(const Duration(minutes: 2), (_) async {
+        if (state is ActiveSessionRunning) {
+          final currentState = state as ActiveSessionRunning;
+          await _processBatchUpload(currentState.sessionId);
+        }
+      });
+      
+      AppLogger.info('⏱️ Increased upload frequency to 2 minutes due to memory pressure');
+      
+    } catch (e) {
+      AppLogger.error('Failed to increase upload frequency: $e');
+    }
+  }
+  
+  /// Check for memory pressure and take preventive action WITHOUT losing data
+  void _checkMemoryPressure() {
+    try {
+      final memoryInfo = _getMemoryInfo();
+      final memoryUsageMb = memoryInfo['memory_usage_mb'] as double;
+      
+      // Get current session for emergency upload
+      final currentState = state;
+      String? sessionId;
+      if (currentState is ActiveSessionRunning) {
+        sessionId = currentState.sessionId;
+      }
+      
+      // Emergency upload if too much pending data (PRESERVE ALL DATA!)
+      if (_pendingLocationPoints.length > 2000 && sessionId != null) {
+        AppLogger.warning('Excessive pending location points (${_pendingLocationPoints.length}), triggering emergency upload');
+        _emergencyUploadLocationPoints(sessionId);
+      }
+      
+      if (_pendingHeartRateSamples.length > 1000 && sessionId != null) {
+        AppLogger.warning('Excessive pending heart rate samples (${_pendingHeartRateSamples.length}), triggering emergency upload');
+        _emergencyUploadHeartRateSamples(sessionId);
+      }
+      
+      // Increase upload frequency if memory is getting high
+      if (memoryUsageMb > 350.0) {
+        AppLogger.info('High memory usage (${memoryUsageMb.toStringAsFixed(1)}MB), increasing upload frequency');
+        _increaseUploadFrequency();
+      }
+      
+      // Report memory pressure for crash correlation (but don't clear data)
+      if (memoryUsageMb > 400.0 && sessionId != null) {
+        final sessionDuration = _sessionStartTime != null 
+            ? DateTime.now().difference(_sessionStartTime!)
+            : Duration.zero;
+        
+        AppLogger.critical('Memory pressure detected - preserving data', exception: {
+          'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+          'pending_location_points': _pendingLocationPoints.length,
+          'pending_heart_rate_samples': _pendingHeartRateSamples.length,
+          'session_duration_minutes': sessionDuration.inMinutes,
+        }.toString());
+      }
+      
+    } catch (e) {
+      AppLogger.error('Failed to check memory pressure: $e');
+    }
   }
 }

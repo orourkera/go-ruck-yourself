@@ -24,6 +24,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:rucking_app/core/services/session_recovery_service.dart';
+import 'package:rucking_app/core/services/memory_monitor_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -189,14 +190,33 @@ Future<void> _runApp() async {
   FirebaseCrashlytics.instance.log('Crashlytics initialized with debug collection enabled');
   
   // Initialize Firebase Messaging Service (non-blocking)
-  FirebaseMessagingService().initialize().catchError((error) {
+  FirebaseMessagingService().initialize().catchError((error) async {
     print('❌ Firebase Messaging initialization failed: $error');
+    
+    // Handle TOO_MANY_REGISTRATIONS error with automatic cleanup
+    if (error.toString().contains('TOO_MANY_REGISTRATIONS')) {
+      print('🚨 TOO_MANY_REGISTRATIONS detected - attempting automatic cleanup');
+      
+      try {
+        final success = await FirebaseMessagingService().cleanupRegistrations();
+        if (success) {
+          print('✅ FCM registration cleanup successful');
+        } else {
+          print('❌ FCM registration cleanup failed');
+        }
+      } catch (cleanupError) {
+        print('❌ FCM cleanup error: $cleanupError');
+      }
+    }
   });
   
   // 🔄 CRITICAL: Recover any locally saved sessions from previous app crashes/network failures
   SessionRecoveryService.recoverSavedSessions().catchError((error) {
     AppLogger.error('Session recovery failed: $error');
   });
+  
+  // 🧠 Start memory monitoring to prevent crashes
+  MemoryMonitorService.startMonitoring();
   
   // Supabase already initialized earlier
   

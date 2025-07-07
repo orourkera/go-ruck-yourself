@@ -70,23 +70,20 @@ class FirebaseMessagingService {
         }
       }
       
-      _deviceToken = await _firebaseMessaging.getToken().timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          print('⚠️ FCM token request timed out, attempting to retry...');
-          return null;
-        },
-      );
+      // Clear any existing token first to prevent accumulation
+      try {
+        await _firebaseMessaging.deleteToken();
+        print('🔔 Cleared existing FCM token');
+        await Future.delayed(const Duration(seconds: 1)); // Small delay after deletion
+      } catch (e) {
+        print('⚠️ Failed to clear existing token (may not exist): $e');
+      }
       
-      // If token is null, try to get it again with a different approach
+      // Get new token with retry logic and proper timeout
+      _deviceToken = await _getTokenWithRetry();
+      
       if (_deviceToken == null) {
-        print('🔔 Retrying FCM token request...');
-        try {
-          await Future.delayed(const Duration(seconds: 2));
-          _deviceToken = await _firebaseMessaging.getToken(vapidKey: null);
-        } catch (e) {
-          print('⚠️ Second token attempt failed: $e');
-        }
+        throw Exception('Failed to obtain FCM token after multiple attempts');
       }
       
       print('🔔 FCM Token result: ${_deviceToken ?? "STILL NULL"}');
@@ -266,6 +263,57 @@ class FirebaseMessagingService {
     // TODO: Implement device ID generation
     // You might want to use device_info_plus package
     return 'device_${DateTime.now().millisecondsSinceEpoch}';
+  }
+  
+  /// Get FCM token with retry logic to handle TOO_MANY_REGISTRATIONS
+  Future<String?> _getTokenWithRetry({int maxAttempts = 3}) async {
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        print('🔔 FCM token request attempt $attempt/$maxAttempts');
+        
+        final token = await _firebaseMessaging.getToken().timeout(
+          const Duration(seconds: 20),
+          onTimeout: () {
+            print('⚠️ FCM token request timed out on attempt $attempt');
+            return null;
+          },
+        );
+        
+        if (token != null && token.isNotEmpty) {
+          print('✅ FCM token obtained successfully on attempt $attempt');
+          print('🔔 Token length: ${token.length} chars');
+          return token;
+        }
+        
+        print('⚠️ FCM token was null/empty on attempt $attempt');
+        
+      } catch (e) {
+        print('❌ FCM token request failed on attempt $attempt: $e');
+        
+        // Check if it's the TOO_MANY_REGISTRATIONS error
+        if (e.toString().contains('TOO_MANY_REGISTRATIONS')) {
+          print('🚨 TOO_MANY_REGISTRATIONS detected - attempting cleanup');
+          
+          try {
+            // Delete existing tokens and wait longer
+            await _firebaseMessaging.deleteToken();
+            print('🗑️ Deleted existing tokens due to registration limit');
+            
+            // Wait longer before retry
+            await Future.delayed(Duration(seconds: attempt * 3));
+            
+          } catch (deleteError) {
+            print('⚠️ Failed to delete token during cleanup: $deleteError');
+          }
+        } else {
+          // For other errors, wait progressively longer
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
+      }
+    }
+    
+    print('❌ Failed to obtain FCM token after $maxAttempts attempts');
+    return null;
   }
 
   /// Handle foreground messages (when app is open)
@@ -587,14 +635,37 @@ class FirebaseMessagingService {
     print('🔔 Notification setup test complete');
   }
 
-  /// Refresh FCM token
+  /// Refresh FCM token with proper cleanup
   Future<String?> refreshToken() async {
     try {
+      print('🔄 Refreshing FCM token...');
+      
+      // Unregister old token from backend first
+      if (_deviceToken != null) {
+        try {
+          final apiClient = GetIt.I<ApiClient>();
+          await apiClient.delete('/device-token?fcm_token=$_deviceToken');
+          print('🗑️ Unregistered old token from backend');
+        } catch (e) {
+          print('⚠️ Failed to unregister old token: $e');
+        }
+      }
+      
+      // Delete the FCM token
       await _firebaseMessaging.deleteToken();
-      _deviceToken = await _firebaseMessaging.getToken();
+      _deviceToken = null;
+      
+      // Wait a moment before requesting new token
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // Get new token with retry logic
+      _deviceToken = await _getTokenWithRetry();
       
       if (_deviceToken != null) {
         await _registerDeviceToken(_deviceToken!);
+        print('✅ FCM token refreshed successfully');
+      } else {
+        print('❌ FCM token refresh failed');
       }
       
       return _deviceToken;
@@ -619,6 +690,63 @@ class FirebaseMessagingService {
       print('Device token unregistered successfully');
     } catch (e) {
       print('Error unregistering device token: $e');
+    }
+  }
+  
+  /// Clean up FCM registration issues (for TOO_MANY_REGISTRATIONS recovery)
+  Future<bool> cleanupRegistrations() async {
+    try {
+      print('🧹 Starting FCM registration cleanup...');
+      
+      // Step 1: Unregister current token from backend
+      if (_deviceToken != null) {
+        try {
+          final apiClient = GetIt.I<ApiClient>();
+          await apiClient.delete('/device-token?fcm_token=$_deviceToken');
+          print('🗑️ Cleaned up backend registration');
+        } catch (e) {
+          print('⚠️ Backend cleanup failed: $e');
+        }
+      }
+      
+      // Step 2: Delete FCM tokens (may need multiple attempts)
+      for (int i = 0; i < 3; i++) {
+        try {
+          await _firebaseMessaging.deleteToken();
+          print('🗑️ Deleted FCM token (attempt ${i + 1})');
+          await Future.delayed(const Duration(seconds: 2));
+        } catch (e) {
+          print('⚠️ Token deletion attempt ${i + 1} failed: $e');
+        }
+      }
+      
+      // Step 3: Clear local state
+      _deviceToken = null;
+      _isInitialized = false;
+      
+      // Step 4: Wait before attempting reinitialization
+      await Future.delayed(const Duration(seconds: 5));
+      
+      // Step 5: Reinitialize with clean state
+      await initialize();
+      
+      print('✅ FCM registration cleanup completed');
+      return _deviceToken != null;
+      
+    } catch (e) {
+      print('❌ FCM cleanup failed: $e');
+      
+      // Report cleanup failure for monitoring
+      await AppErrorHandler.handleError(
+        'fcm_cleanup_failure',
+        e,
+        context: {
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+          'had_token': (_deviceToken != null).toString(),
+        },
+      );
+      
+      return false;
     }
   }
 

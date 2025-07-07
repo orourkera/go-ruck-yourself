@@ -18,11 +18,16 @@ import time
 from apscheduler.schedulers.blocking import BlockingScheduler
 from datetime import datetime
 
-# Configure logging
+# Configure logging - Reduced verbosity
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,  # Reduced from INFO to WARNING
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Reduce third-party library logging
+logging.getLogger('apscheduler').setLevel(logging.WARNING)
+logging.getLogger('requests').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
