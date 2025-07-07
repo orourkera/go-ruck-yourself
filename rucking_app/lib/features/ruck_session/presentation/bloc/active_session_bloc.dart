@@ -2,6 +2,7 @@ library active_session_bloc;
 
 import 'dart:async';
 import 'dart:convert'; // For JSON encoding/decoding
+import 'dart:developer' as dev;
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:bloc/bloc.dart';
@@ -2677,6 +2678,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
     } catch (e) {
       AppLogger.error('Failed to check memory pressure: $e');
+    }
+  }
+  
+  /// Force garbage collection to free memory
+  void _forceGarbageCollection() {
+    try {
+      // Force garbage collection
+      dev.gc();
+      
+      AppLogger.debug('Forced garbage collection completed');
+    } catch (e) {
+      AppLogger.error('Error during garbage collection: $e');
     }
   }
 }
