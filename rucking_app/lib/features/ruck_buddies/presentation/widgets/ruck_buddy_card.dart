@@ -18,6 +18,7 @@ import 'package:rucking_app/features/social/data/repositories/social_repository.
 import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/shared/utils/route_parser.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';

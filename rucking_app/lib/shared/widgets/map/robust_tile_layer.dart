@@ -44,10 +44,6 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
       maxNativeZoom: 18,
       maxZoom: 20,
       
-      // Improved retry and timeout settings
-      retryDelayMs: 1000,
-      maxRetry: 2,
-      
       // Custom tile builder with error handling
       tileBuilder: (context, tileWidget, tile) {
         widget.onTileLoaded?.call();
@@ -61,7 +57,7 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
       
       // Enhanced error handling
       errorTileCallback: (tile, error, stackTrace) {
-        _handleTileError(tile, error, stackTrace);
+        _handleTileError(tile.coordinates, error, stackTrace);
       },
       
       // Additional settings for stability
@@ -156,17 +152,15 @@ class SafeTileLayer extends StatelessWidget {
         urlTemplate: 'https://tiles.stadiamaps.com/tiles/$style/{z}/{x}/{y}{r}.png?api_key=$apiKey',
         userAgentPackageName: 'com.ruckingapp',
         retinaMode: retinaMode,
-        maxRetry: 2,
-        retryDelayMs: 1000,
         maxNativeZoom: 18,
         maxZoom: 20,
         errorTileCallback: (tile, error, stackTrace) {
           AppLogger.warning(
             'Map tile loading error: $error',
             context: {
-              'tile_z': tile.z,
-              'tile_x': tile.x,
-              'tile_y': tile.y,
+              'tile_z': tile.coordinates.z,
+              'tile_x': tile.coordinates.x,
+              'tile_y': tile.coordinates.y,
             },
           );
           onTileError?.call();
@@ -187,8 +181,6 @@ class SafeTileLayer extends StatelessWidget {
       return TileLayer(
         urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         userAgentPackageName: 'com.ruckingapp',
-        maxRetry: 1,
-        retryDelayMs: 2000,
         errorTileCallback: (tile, error, stackTrace) {
           AppLogger.warning('Fallback tile loading error: $error');
           onTileError?.call();
