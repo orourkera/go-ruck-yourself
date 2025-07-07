@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -49,6 +50,8 @@ import 'package:rucking_app/features/events/domain/repositories/events_repositor
 import 'package:rucking_app/features/events/presentation/bloc/events_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_comments_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_progress_bloc.dart';
+import 'package:rucking_app/core/services/feature_flags.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_coordinator.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -82,6 +85,10 @@ Future<void> setupServiceLocator() async {
     authService: getIt<AuthService>(),
     apiClient: getIt<ApiClient>(),
   ));
+  
+  // Feature flags
+  getIt.registerSingleton<FeatureFlags>(FeatureFlags(getIt<StorageService>()));
+  await getIt<FeatureFlags>().initialize();
   
   // Connect services to resolve circular dependencies
   apiClient.setStorageService(getIt<StorageService>());
@@ -174,18 +181,37 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<SessionHistoryBloc>(() => SessionHistoryBloc(
     sessionRepository: getIt<SessionRepository>(),
   ));
-  getIt.registerFactory<ActiveSessionBloc>(() => ActiveSessionBloc(
-        apiClient: getIt<ApiClient>(),
-        locationService: getIt<LocationService>(),
-        healthService: getIt<HealthService>(),
-        watchService: getIt<WatchService>(),
-        heartRateService: getIt<HeartRateService>(),
-        splitTrackingService: getIt<SplitTrackingService>(),
-        sessionRepository: getIt<SessionRepository>(),
-        activeSessionStorage: getIt<ActiveSessionStorage>(),
-        terrainTracker: getIt<TerrainTracker>(),
-        connectivityService: getIt<ConnectivityService>(),
-      ));
+  // Conditionally register ActiveSessionBloc or ActiveSessionCoordinator based on feature flag
+  final featureFlags = getIt<FeatureFlags>();
+  
+  if (featureFlags.shouldUseRefactoredActiveSessionBloc) {
+    // Register the new refactored coordinator
+    getIt.registerFactory(() => ActiveSessionCoordinator(
+      sessionRepository: getIt<SessionRepository>(),
+      locationService: getIt<LocationService>(),
+      authService: getIt<AuthService>(),
+      watchService: getIt<WatchService>(),
+      storageService: getIt<StorageService>(),
+      apiClient: getIt<ApiClient>(),
+      splitTrackingService: getIt<SplitTrackingService>(),
+      terrainTracker: getIt<TerrainTracker>(),
+      heartRateService: getIt<HeartRateService>(),
+    ));
+  } else {
+    // Register the old monolithic bloc
+    getIt.registerFactory(() => ActiveSessionBloc(
+      apiClient: getIt<ApiClient>(),
+      locationService: getIt<LocationService>(),
+      healthService: getIt<HealthService>(),
+      watchService: getIt<WatchService>(),
+      heartRateService: getIt<HeartRateService>(),
+      splitTrackingService: getIt<SplitTrackingService>(),
+      sessionRepository: getIt<SessionRepository>(),
+      activeSessionStorage: getIt<ActiveSessionStorage>(),
+      terrainTracker: getIt<TerrainTracker>(),
+      connectivityService: getIt<ConnectivityService>(),
+    ));
+  }
       
   // Register session bloc for operations like delete
   getIt.registerFactory<SessionBloc>(() => SessionBloc(

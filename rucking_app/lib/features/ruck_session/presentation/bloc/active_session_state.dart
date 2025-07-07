@@ -1,4 +1,6 @@
-part of active_session_bloc;
+part of 'active_session_bloc.dart';
+
+enum PhotoLoadingStatus { initial, loading, success, failure }
 
 abstract class ActiveSessionState extends Equatable {
   const ActiveSessionState();
