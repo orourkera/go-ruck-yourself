@@ -456,7 +456,7 @@ class LocationServiceImpl implements LocationService {
     try {
       final locationSettings = AndroidSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: _minDistanceFilter.toInt(),
+        distanceFilter: _currentConfig.distanceFilter.toInt(),
         intervalDuration: const Duration(seconds: 5),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Ruck in Progress',
