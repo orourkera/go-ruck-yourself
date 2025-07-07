@@ -33,6 +33,7 @@ import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
+import '../../../../shared/widgets/map/robust_tile_layer.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
@@ -1060,13 +1061,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                           ),
                                         ),
                                         children: [
-                                          TileLayer(
-                                            urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-                                            userAgentPackageName: 'com.getrucky.gfy',
+                                          SafeTileLayer(
+                                            style: 'stamen_terrain',
                                             retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-                                            errorTileCallback: (tile, error, stackTrace) {
-                                              print('Home screen map tile error: $error');
-                                              // Just log the error - errorTileCallback is void
+                                            onTileError: () {
+                                              AppLogger.warning('Map tile loading error in home screen');
                                             },
                                           ),
                                           PolylineLayer(

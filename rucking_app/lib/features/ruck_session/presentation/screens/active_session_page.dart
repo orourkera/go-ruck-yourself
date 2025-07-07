@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:flutter_map/flutter_map.dart';
+import '../../../../shared/widgets/map/robust_tile_layer.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/models/location_point.dart';
@@ -1134,18 +1135,15 @@ class _RouteMapState extends State<_RouteMap> {
                 },
               ),
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}',
-                  userAgentPackageName: 'com.ruckingapp',
+                SafeTileLayer(
+                  style: 'stamen_terrain',
                   retinaMode: RetinaMode.isHighDensity(context),
-                  tileBuilder: (context, tileWidget, tile) {
+                  onTileLoaded: () {
                     // Set tiles as loaded on first tile
                     _onTilesLoaded();
-                    return tileWidget;
                   },
-                  errorTileCallback: (tile, error, stackTrace) {
-                    print('Map tile loading error: $error');
-                    // Just log the error - errorTileCallback is void
+                  onTileError: () {
+                    AppLogger.warning('Map tile loading error in active session');
                   },
                 ),
                 if (widget.route.isNotEmpty || widget.initialCenter != null)

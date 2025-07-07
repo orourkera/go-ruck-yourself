@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
+import '../../../../shared/widgets/map/robust_tile_layer.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:rucking_app/shared/utils/route_parser.dart';
 import 'package:rucking_app/shared/utils/route_privacy_utils.dart';
@@ -1537,13 +1538,11 @@ class _SessionRouteMap extends StatelessWidget {
             maxZoom: 18.0,
           ),
           children: [
-            TileLayer(
-              urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-              userAgentPackageName: 'com.getrucky.gfy',
+            SafeTileLayer(
+              style: 'stamen_terrain',
               retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-              errorTileCallback: (tile, error, stackTrace) {
-                print('Session detail map tile error: $error');
-                // Just log the error - errorTileCallback is void
+              onTileError: () {
+                AppLogger.warning('Map tile loading error in session detail');
               },
             ),
             PolylineLayer(

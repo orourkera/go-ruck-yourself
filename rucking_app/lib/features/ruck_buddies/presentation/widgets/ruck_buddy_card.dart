@@ -26,6 +26,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
+import '../../../../shared/widgets/map/robust_tile_layer.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
@@ -1174,15 +1175,11 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
           interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
         ),
         children: [
-          TileLayer(
-            urlTemplate: "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png?api_key=${dotenv.env['STADIA_MAPS_API_KEY']}",
-            userAgentPackageName: 'com.getrucky.gfy',
+          SafeTileLayer(
+            style: 'stamen_terrain',
             retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-            // Add tile caching for performance
-            tileProvider: NetworkTileProvider(),
-            errorTileCallback: (tile, error, stackTrace) {
-              print('Ruck buddy map tile error: $error');
-              // Just log the error - errorTileCallback is void
+            onTileError: () {
+              AppLogger.warning('Map tile loading error in ruck buddy card');
             },
           ),
           if (routePoints.isNotEmpty)
