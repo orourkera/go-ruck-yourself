@@ -84,16 +84,7 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
     _lastErrorTime = DateTime.now();
     
     AppLogger.warning(
-      'Map tile loading error (${_consecutiveErrors}/$_maxConsecutiveErrors)',
-      exception: error,
-      stackTrace: stackTrace,
-      context: {
-        'tile_z': tile.z,
-        'tile_x': tile.x,
-        'tile_y': tile.y,
-        'use_offline_mode': _useOfflineMode,
-        'consecutive_errors': _consecutiveErrors,
-      },
+      'Map tile loading error (${_consecutiveErrors}/$_maxConsecutiveErrors): $error',
     );
     
     // Switch to offline mode if too many consecutive errors
@@ -156,12 +147,7 @@ class SafeTileLayer extends StatelessWidget {
         maxZoom: 20,
         errorTileCallback: (tile, error, stackTrace) {
           AppLogger.warning(
-            'Map tile loading error: $error',
-            context: {
-              'tile_z': tile.coordinates.z,
-              'tile_x': tile.coordinates.x,
-              'tile_y': tile.coordinates.y,
-            },
+            'Map tile loading error: $error (tile: ${tile.coordinates.z}/${tile.coordinates.x}/${tile.coordinates.y})',
           );
           onTileError?.call();
         },
