@@ -64,9 +64,6 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
         _handleTileError(tile, error, stackTrace);
       },
       
-      // Fallback tile provider
-      fallbackUrl: _getFallbackTileUrl(),
-      
       // Additional settings for stability
       tileProvider: _useOfflineMode 
           ? _createOfflineTileProvider()
@@ -84,11 +81,6 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
     }
     
     return 'https://tiles.stadiamaps.com/tiles/$style/{z}/{x}/{y}{r}.png?api_key=$apiKey';
-  }
-  
-  String _getFallbackTileUrl() {
-    // OpenStreetMap as fallback when Stadia Maps fails
-    return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   }
   
   void _handleTileError(TileCoordinates tile, Object error, StackTrace? stackTrace) {
@@ -155,39 +147,57 @@ class SafeTileLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Builder(
-      builder: (context) {
-        try {
-          return RobustTileLayer(
-            style: style,
-            retinaMode: retinaMode,
-            onTileLoaded: onTileLoaded,
-            onTileError: onTileError,
-          );
-        } catch (e, stackTrace) {
-          AppLogger.error(
-            'Failed to build map tile layer',
-            exception: e,
-            stackTrace: stackTrace,
-          );
-          
-          // Return a fallback tile layer with minimal configuration
-          return TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.ruckingapp',
-            maxRetry: 1,
-            retryDelayMs: 2000,
-            errorTileCallback: (tile, error, stackTrace) {
-              AppLogger.warning('Fallback tile loading error: $error');
-              onTileError?.call();
-            },
-            tileBuilder: (context, tileWidget, tile) {
-              onTileLoaded?.call();
-              return tileWidget;
+    // Use a simple, stable tile layer to prevent widget tree issues
+    try {
+      final apiKey = dotenv.env['STADIA_MAPS_API_KEY'];
+      final style = this.style ?? 'stamen_terrain';
+      
+      return TileLayer(
+        urlTemplate: 'https://tiles.stadiamaps.com/tiles/$style/{z}/{x}/{y}{r}.png?api_key=$apiKey',
+        userAgentPackageName: 'com.ruckingapp',
+        retinaMode: retinaMode,
+        maxRetry: 2,
+        retryDelayMs: 1000,
+        maxNativeZoom: 18,
+        maxZoom: 20,
+        errorTileCallback: (tile, error, stackTrace) {
+          AppLogger.warning(
+            'Map tile loading error: $error',
+            context: {
+              'tile_z': tile.z,
+              'tile_x': tile.x,
+              'tile_y': tile.y,
             },
           );
-        }
-      },
-    );
+          onTileError?.call();
+        },
+        tileBuilder: (context, tileWidget, tile) {
+          onTileLoaded?.call();
+          return tileWidget;
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Failed to build map tile layer',
+        exception: e,
+        stackTrace: stackTrace,
+      );
+      
+      // Return a fallback tile layer with minimal configuration
+      return TileLayer(
+        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        userAgentPackageName: 'com.ruckingapp',
+        maxRetry: 1,
+        retryDelayMs: 2000,
+        errorTileCallback: (tile, error, stackTrace) {
+          AppLogger.warning('Fallback tile loading error: $error');
+          onTileError?.call();
+        },
+        tileBuilder: (context, tileWidget, tile) {
+          onTileLoaded?.call();
+          return tileWidget;
+        },
+      );
+    }
   }
 }
