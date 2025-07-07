@@ -6,6 +6,7 @@ import 'package:app_links/app_links.dart';
 
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/features/auth/presentation/screens/password_reset_screen.dart';
@@ -281,6 +282,44 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     // The AppLifecycleService automatically handles this via WidgetsBindingObserver
+  }
+  
+  @override
+  void didHaveMemoryPressure() {
+    super.didHaveMemoryPressure();
+    _handleMemoryPressure();
+  }
+  
+  /// Handle memory pressure events (Flutter equivalent of Android's onTrimMemory)
+  void _handleMemoryPressure() {
+    try {
+      print('🚨 System memory pressure detected - triggering emergency cleanup');
+      
+      // Get the active session bloc if it exists
+      final activeSessionBloc = getIt.isRegistered<ActiveSessionBloc>() 
+          ? getIt<ActiveSessionBloc>() 
+          : null;
+      
+      if (activeSessionBloc != null) {
+        // Trigger emergency upload to preserve data
+        activeSessionBloc.add(const MemoryPressureDetected());
+        
+        print('✅ Memory pressure event sent to ActiveSessionBloc');
+      } else {
+        print('ℹ️ No active session - memory pressure handled by system');
+      }
+      
+      // Log memory pressure event for monitoring
+      AppLogger.critical('System memory pressure detected', exception: {
+        'platform': Platform.isAndroid ? 'android' : 'ios',
+        'has_active_session': activeSessionBloc != null,
+        'timestamp': DateTime.now().toIso8601String(),
+      }.toString());
+      
+    } catch (e) {
+      print('❌ Error handling memory pressure: $e');
+      AppLogger.error('Memory pressure handling failed: $e');
+    }
   }
 
   @override

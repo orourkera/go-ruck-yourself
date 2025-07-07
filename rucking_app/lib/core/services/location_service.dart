@@ -12,6 +12,65 @@ import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/services/background_location_service.dart';
 import 'package:rucking_app/shared/widgets/location_disclosure_dialog.dart';
 
+/// Location tracking modes for adaptive optimization
+enum LocationTrackingMode {
+  /// High accuracy mode - best for normal conditions
+  high,
+  /// Balanced mode - reduces battery usage
+  balanced,
+  /// Power save mode - minimal GPS usage during memory pressure
+  powerSave,
+  /// Emergency mode - bare minimum for data preservation
+  emergency,
+}
+
+/// Configuration for location tracking
+class LocationTrackingConfig {
+  final double distanceFilter;
+  final int batchInterval;
+  final LocationAccuracy accuracy;
+  final LocationTrackingMode mode;
+  
+  const LocationTrackingConfig({
+    required this.distanceFilter,
+    required this.batchInterval,
+    required this.accuracy,
+    required this.mode,
+  });
+  
+  /// High accuracy configuration
+  static const LocationTrackingConfig high = LocationTrackingConfig(
+    distanceFilter: 3.0,
+    batchInterval: 10,
+    accuracy: LocationAccuracy.bestForNavigation,
+    mode: LocationTrackingMode.high,
+  );
+  
+  /// Balanced configuration
+  static const LocationTrackingConfig balanced = LocationTrackingConfig(
+    distanceFilter: 5.0,
+    batchInterval: 15,
+    accuracy: LocationAccuracy.best,
+    mode: LocationTrackingMode.balanced,
+  );
+  
+  /// Power save configuration
+  static const LocationTrackingConfig powerSave = LocationTrackingConfig(
+    distanceFilter: 10.0,
+    batchInterval: 30,
+    accuracy: LocationAccuracy.high,
+    mode: LocationTrackingMode.powerSave,
+  );
+  
+  /// Emergency configuration
+  static const LocationTrackingConfig emergency = LocationTrackingConfig(
+    distanceFilter: 15.0,
+    batchInterval: 60,
+    accuracy: LocationAccuracy.medium,
+    mode: LocationTrackingMode.emergency,
+  );
+}
+
 /// Interface for location services
 abstract class LocationService {
   /// Check if the app has location permission 
@@ -36,14 +95,21 @@ abstract class LocationService {
   
   /// Calculate distance between two points in kilometers
   double calculateDistance(LocationPoint point1, LocationPoint point2);
+  
+  /// Adjust location tracking frequency based on memory pressure
+  void adjustTrackingFrequency(LocationTrackingMode mode);
+  
+  /// Get current tracking configuration
+  LocationTrackingConfig get currentTrackingConfig;
 }
 
 /// Implementation of location service using Geolocator
 class LocationServiceImpl implements LocationService {
-  static const double _minDistanceFilter = 3.0; // Reduced from 5m for better tracking
-  static const int _batchInterval = 10; // Reduced from 15s for more frequent updates
   static const int _locationTimeoutSeconds = 30; // Location timeout detection
   static const int _stalenessCheckSeconds = 45; // Check for stale location updates
+  
+  // Dynamic configuration for adaptive tracking
+  LocationTrackingConfig _currentConfig = LocationTrackingConfig.high;
   
   final List<LocationPoint> _locationBatch = [];
   Timer? _batchTimer;
@@ -58,6 +124,9 @@ class LocationServiceImpl implements LocationService {
   
   @override
   Stream<List<LocationPoint>> get batchedLocationUpdates => _batchController.stream;
+  
+  @override
+  LocationTrackingConfig get currentTrackingConfig => _currentConfig;
   
   @override
   Future<bool> hasLocationPermission() async {
@@ -174,8 +243,8 @@ class LocationServiceImpl implements LocationService {
     
     if (Platform.isAndroid) {
       locationSettings = AndroidSettings(
-        accuracy: LocationAccuracy.bestForNavigation, // Upgraded from 'best' for fitness tracking
-        distanceFilter: _minDistanceFilter.toInt(),
+        accuracy: _currentConfig.accuracy,
+        distanceFilter: _currentConfig.distanceFilter.toInt(),
         intervalDuration: const Duration(seconds: 5), // Force frequent updates
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Ruck in Progress',
@@ -190,8 +259,8 @@ class LocationServiceImpl implements LocationService {
       );
     } else if (Platform.isIOS) {
       locationSettings = AppleSettings(
-        accuracy: LocationAccuracy.bestForNavigation, // Critical for elevation
-        distanceFilter: _minDistanceFilter.toInt(),
+        accuracy: _currentConfig.accuracy,
+        distanceFilter: _currentConfig.distanceFilter.toInt(),
         pauseLocationUpdatesAutomatically: false, // Critical: Keep GPS active in background
         activityType: ActivityType.fitness, // Optimize for fitness tracking
         showBackgroundLocationIndicator: true, // Required for background location
@@ -200,8 +269,8 @@ class LocationServiceImpl implements LocationService {
     } else {
       // Fallback for other platforms
       locationSettings = LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: _minDistanceFilter.toInt(),
+        accuracy: _currentConfig.accuracy,
+        distanceFilter: _currentConfig.distanceFilter.toInt(),
       );
     }
     
@@ -312,7 +381,7 @@ class LocationServiceImpl implements LocationService {
     _startLocationMonitoring();
     
     // Start batch timer
-    _batchTimer = Timer.periodic(Duration(seconds: _batchInterval), (timer) {
+    _batchTimer = Timer.periodic(Duration(seconds: _currentConfig.batchInterval), (timer) {
       _sendBatchUpdate();
     });
     
@@ -507,6 +576,93 @@ class LocationServiceImpl implements LocationService {
     final double c = 2 * atan2(sqrt(a), sqrt(1 - a)); // CORRECT: sqrt(1 - a)
     
     return earthRadius * c; // Return distance in kilometers
+  }
+  
+  @override
+  void adjustTrackingFrequency(LocationTrackingMode mode) {
+    AppLogger.info('📡 Adjusting location tracking frequency to: $mode');
+    
+    // Get new configuration based on mode
+    LocationTrackingConfig newConfig;
+    switch (mode) {
+      case LocationTrackingMode.high:
+        newConfig = LocationTrackingConfig.high;
+        break;
+      case LocationTrackingMode.balanced:
+        newConfig = LocationTrackingConfig.balanced;
+        break;
+      case LocationTrackingMode.powerSave:
+        newConfig = LocationTrackingConfig.powerSave;
+        break;
+      case LocationTrackingMode.emergency:
+        newConfig = LocationTrackingConfig.emergency;
+        break;
+    }
+    
+    // Only restart if configuration actually changed
+    if (_currentConfig.mode != newConfig.mode) {
+      _currentConfig = newConfig;
+      
+      // If currently tracking, restart with new configuration
+      if (_isTracking) {
+        AppLogger.info('♻️ Restarting location tracking with new configuration');
+        _restartLocationTrackingWithNewConfig();
+      }
+      
+      AppLogger.info('✅ Location tracking frequency adjusted: ${newConfig.mode} (${newConfig.distanceFilter}m, ${newConfig.batchInterval}s)');
+    } else {
+      AppLogger.info('ℹ️ Location tracking already at requested frequency: $mode');
+    }
+  }
+  
+  /// Restart location tracking with new configuration
+  void _restartLocationTrackingWithNewConfig() async {
+    try {
+      // Cancel current tracking
+      await _rawLocationSubscription?.cancel();
+      _batchTimer?.cancel();
+      
+      // Start tracking with new configuration
+      final locationSettings = LocationSettings(
+        accuracy: _currentConfig.accuracy,
+        distanceFilter: _currentConfig.distanceFilter.toInt(),
+      );
+      
+      _rawLocationSubscription = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        (Position position) {
+          if (_isTracking) {
+            final locationPoint = LocationPoint(
+              latitude: position.latitude,
+              longitude: position.longitude,
+              elevation: position.altitude,
+              accuracy: position.accuracy,
+              timestamp: DateTime.now(),
+            );
+            
+            _locationBatch.add(locationPoint);
+            _locationController.add(locationPoint);
+            _lastLocationUpdate = DateTime.now();
+            _lastValidLocation = locationPoint;
+          }
+        },
+        onError: (error) {
+          AppLogger.error('Location stream error after config restart', exception: error);
+        },
+      );
+      
+      // Restart batch timer with new interval
+      _batchTimer = Timer.periodic(
+        Duration(seconds: _currentConfig.batchInterval),
+        (_) => _sendBatchUpdate(),
+      );
+      
+      AppLogger.info('🔄 Location tracking restarted with new configuration');
+      
+    } catch (e) {
+      AppLogger.error('Failed to restart location tracking with new config', exception: e);
+    }
   }
   
   /// Dispose of resources

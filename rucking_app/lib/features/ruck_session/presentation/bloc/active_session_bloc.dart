@@ -171,6 +171,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<HeartRateBufferProcessed>(_onHeartRateBufferProcessed);
     on<SessionReset>(_onSessionReset);
     on<SessionCleanupRequested>(_onSessionCleanupRequested);
+    on<MemoryPressureDetected>(_onMemoryPressureDetected);
   }
 
   Future<void> _onSessionStarted(
@@ -2223,6 +2224,63 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.error('Error during session cleanup: $e');
     }
   }
+  
+  /// Handle system memory pressure events (triggered by Flutter's didHaveMemoryPressure)
+  Future<void> _onMemoryPressureDetected(
+    MemoryPressureDetected event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.critical('System memory pressure detected - executing emergency data preservation');
+    
+    try {
+      final currentState = state;
+      
+      // Only handle if we have an active session
+      if (currentState is ActiveSessionRunning) {
+        final sessionId = currentState.sessionId;
+        
+        AppLogger.info('Memory pressure: Emergency upload for session $sessionId');
+        
+        // Force emergency upload of pending location points
+        if (_pendingLocationPoints.isNotEmpty) {
+          await _emergencyUploadLocationPoints(sessionId);
+        }
+        
+        // Force emergency upload of pending heart rate samples
+        if (_pendingHeartRateSamples.isNotEmpty) {
+          await _emergencyUploadHeartRateSamples(sessionId);
+        }
+        
+        // Force garbage collection to free memory
+        _forceGarbageCollection();
+        
+        // Reduce location tracking frequency to save memory and battery
+        _adjustLocationTrackingForMemoryPressure();
+        
+        // Increase upload frequency to prevent future pressure
+        _increaseUploadFrequency();
+        
+        AppLogger.info('Memory pressure: Emergency data preservation completed');
+        
+      } else {
+        AppLogger.info('Memory pressure: No active session - system cleanup only');
+      }
+      
+    } catch (e) {
+      AppLogger.error('Memory pressure handling failed: $e');
+      
+      // Report failure to monitoring systems
+      await AppErrorHandler.handleError(
+        'memory_pressure_handling_failed',
+        e,
+        context: {
+          'has_active_session': state is ActiveSessionRunning,
+          'pending_location_points': _pendingLocationPoints.length,
+          'pending_heart_rate_samples': _pendingHeartRateSamples.length,
+        },
+      );
+    }
+  }
 
   /// Sync offline sessions to backend when connectivity is restored
   void _syncOfflineSessionsInBackground() {
@@ -2509,7 +2567,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }.toString());
     }
     
-    // Critical memory alert - force garbage collection
+    // Adaptive GPS tracking based on memory pressure levels
     if (memoryUsageMb > 500.0) {
       AppLogger.critical('CRITICAL MEMORY USAGE - FORCING GC', exception: {
         'session_id': currentState.sessionId,
@@ -2518,14 +2576,37 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         'pending_heart_rate_samples': _pendingHeartRateSamples.length,
       }.toString());
       
+      // Emergency mode for critical memory pressure
+      _adjustLocationTrackingMode(LocationTrackingMode.emergency);
+      
       // Force garbage collection
       _forceGarbageCollection();
+    } else if (memoryUsageMb > 400.0) {
+      AppLogger.critical('Memory pressure detected - preserving data', exception: {
+        'session_id': currentState.sessionId,
+        'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+        'pending_location_points': _pendingLocationPoints.length,
+        'pending_heart_rate_samples': _pendingHeartRateSamples.length,
+      }.toString());
+      
+      // Switch to power save mode for aggressive memory conservation
+      _adjustLocationTrackingMode(LocationTrackingMode.powerSave);
+    } else if (memoryUsageMb > 350.0) {
+      _increaseUploadFrequency();
+      // Switch to power save mode for moderate memory conservation
+      _adjustLocationTrackingMode(LocationTrackingMode.powerSave);
+    } else if (memoryUsageMb > 300.0) {
+      // Proactive: Switch to balanced mode before pressure becomes critical
+      _adjustLocationTrackingMode(LocationTrackingMode.balanced);
+    } else if (memoryUsageMb < 200.0) {
+      // Recovery: Return to high accuracy when memory is available
+      _adjustLocationTrackingMode(LocationTrackingMode.high);
     }
     
     _lastCrashlyticsReport = DateTime.now();
   }
   
-  /// Clean up diagnostics timer
+{{ ... }}
   void _stopDiagnosticsTimer() {
     _diagnosticsTimer?.cancel();
     _diagnosticsTimer = null;
@@ -2690,6 +2771,51 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.debug('Forced garbage collection completed');
     } catch (e) {
       AppLogger.error('Error during garbage collection: $e');
+    }
+  }
+  
+  /// Adjust location tracking frequency to reduce memory pressure
+  void _adjustLocationTrackingForMemoryPressure() {
+    try {
+      AppLogger.info('📍 Reducing location tracking frequency due to memory pressure');
+      
+      // Switch to power save mode to reduce GPS frequency and memory usage
+      _locationService.adjustTrackingFrequency(LocationTrackingMode.powerSave);
+      
+      AppLogger.info('✅ Location tracking frequency reduced to power save mode');
+      
+    } catch (e) {
+      AppLogger.error('Failed to adjust location tracking frequency: $e');
+    }
+  }
+  
+  /// Smart location tracking mode adjustment with debouncing
+  LocationTrackingMode? _lastLocationMode;
+  DateTime? _lastLocationModeChange;
+  
+  void _adjustLocationTrackingMode(LocationTrackingMode targetMode) {
+    try {
+      // Debounce rapid mode changes (don't change more than once per 30 seconds)
+      final now = DateTime.now();
+      if (_lastLocationModeChange != null && 
+          now.difference(_lastLocationModeChange!).inSeconds < 30 &&
+          _lastLocationMode == targetMode) {
+        return; // Skip redundant changes
+      }
+      
+      // Only adjust if the mode is actually different
+      if (_lastLocationMode != targetMode) {
+        AppLogger.info('🎯 Adjusting location tracking mode: ${_lastLocationMode ?? "unknown"} → $targetMode');
+        
+        _locationService.adjustTrackingFrequency(targetMode);
+        _lastLocationMode = targetMode;
+        _lastLocationModeChange = now;
+        
+        AppLogger.info('✅ Location tracking mode adjusted to: $targetMode');
+      }
+      
+    } catch (e) {
+      AppLogger.error('Failed to adjust location tracking mode to $targetMode: $e');
     }
   }
 }

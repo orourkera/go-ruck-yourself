@@ -265,3 +265,11 @@ class SessionCleanupRequested extends ActiveSessionEvent {
   @override
   List<Object?> get props => [];
 }
+
+/// Event triggered when system memory pressure is detected
+class MemoryPressureDetected extends ActiveSessionEvent {
+  const MemoryPressureDetected();
+
+  @override
+  List<Object?> get props => [];
+}
