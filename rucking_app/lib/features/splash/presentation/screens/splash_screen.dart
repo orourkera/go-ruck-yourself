@@ -178,6 +178,113 @@ class _SplashScreenState extends State<SplashScreen> {
     super.dispose();
   }
 
+  /// Builds the splash image with defensive error handling to prevent native crashes
+  Widget _buildSplashImage(String primaryImagePath) {
+    return Container(
+      width: 200,
+      height: 200,
+      child: _buildImageWithFallbacks(),
+    );
+  }
+  
+  /// Attempts to load images with multiple fallbacks
+  Widget _buildImageWithFallbacks() {
+    final fallbackPaths = SplashHelper.getFallbackImagePaths();
+    
+    return _tryLoadImage(fallbackPaths, 0);
+  }
+  
+  /// Recursively tries to load images from the fallback list
+  Widget _tryLoadImage(List<String> imagePaths, int currentIndex) {
+    if (currentIndex >= imagePaths.length) {
+      debugPrint('[Splash] All image fallbacks exhausted, using programmatic fallback');
+      return _buildFallbackImage();
+    }
+    
+    final currentPath = imagePaths[currentIndex];
+    debugPrint('[Splash] Attempting to load image: $currentPath (attempt ${currentIndex + 1}/${imagePaths.length})');
+    
+    try {
+      return Image.asset(
+        currentPath,
+        width: 200,
+        height: 200,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('[Splash] Failed to load $currentPath: $error');
+          // Try next fallback
+          return _tryLoadImage(imagePaths, currentIndex + 1);
+        },
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[Splash] Critical error loading $currentPath: $e');
+      
+      // Log comprehensive crash context
+      _logSplashCrashContext(currentPath, e, stackTrace, currentIndex);
+      
+      // Try next fallback or show programmatic fallback
+      return _tryLoadImage(imagePaths, currentIndex + 1);
+    }
+  }
+  
+  /// Logs detailed context for splash screen crashes to help with debugging
+  void _logSplashCrashContext(String imagePath, dynamic error, StackTrace stackTrace, int attemptIndex) {
+    try {
+      final crashContext = {
+        'image_path': imagePath,
+        'attempt_index': attemptIndex,
+        'error_type': error.runtimeType.toString(),
+        'error_message': error.toString(),
+        'widget_mounted': mounted,
+        'has_material_app': context.mounted,
+      };
+      
+      debugPrint('[Splash] CRASH CONTEXT: $crashContext');
+      
+      // TODO: Send to crashlytics when available
+      // FirebaseCrashlytics.instance.recordError(error, stackTrace, 
+      //   information: crashContext.entries.map((e) => 
+      //     DiagnosticsProperty(e.key, e.value)).toList());
+      
+    } catch (loggingError) {
+      debugPrint('[Splash] Failed to log crash context: $loggingError');
+    }
+  }
+
+  /// Builds a fallback image when primary assets fail to load
+  Widget _buildFallbackImage() {
+    return Container(
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[400]!, width: 2),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.fitness_center,
+            size: 60,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'RUCK',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+              fontFamily: 'Impact',
+              letterSpacing: 2.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('[Splash] build: Splash screen building with GIF animation');
@@ -220,12 +327,7 @@ class _SplashScreenState extends State<SplashScreen> {
           return Scaffold(
             backgroundColor: backgroundColor,
             body: Center(
-              child: Image.asset(
-                'assets/images/splash.gif',
-                width: 200,
-                height: 200,
-                fit: BoxFit.contain,
-              ),
+              child: _buildSplashImage(splashImagePath),
             ),
           );
         },

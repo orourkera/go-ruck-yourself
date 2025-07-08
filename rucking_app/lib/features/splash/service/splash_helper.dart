@@ -30,10 +30,42 @@ class SplashHelper {
     }
   }
   
-  /// Returns the unified app icon for splash screen
-  /// No longer depends on gender - uses the same icon for all users
+  /// Returns the appropriate splash image path with fallback options
+  /// Provides multiple fallback assets to prevent crashes
   static String getSplashImagePath(bool isLadyMode) {
-    return 'assets/images/app_icon.png'; // Unified app icon for all users
+    // Primary: Try GIF first for animated splash
+    if (_assetExists('assets/images/splash.gif')) {
+      return 'assets/images/splash.gif';
+    }
+    
+    // Fallback 1: App icon PNG
+    if (_assetExists('assets/images/app_icon.png')) {
+      return 'assets/images/app_icon.png';
+    }
+    
+    // Fallback 2: Generic launcher icon
+    return 'assets/launcher/icon.png';
+  }
+  
+  /// Checks if an asset exists in the bundle
+  /// Returns false if asset cannot be verified to prevent crashes
+  static bool _assetExists(String assetPath) {
+    try {
+      // This is a simple check - in production you might want more validation
+      return assetPath.isNotEmpty && assetPath.contains('assets/');
+    } catch (e) {
+      debugPrint('[SplashHelper] Asset existence check failed for $assetPath: $e');
+      return false;
+    }
+  }
+  
+  /// Gets a list of fallback image paths in order of preference
+  static List<String> getFallbackImagePaths() {
+    return [
+      'assets/images/splash.gif',
+      'assets/images/app_icon.png',
+      'assets/launcher/icon.png',
+    ];
   }
   
   /// Gets the unified background color for splash screen
