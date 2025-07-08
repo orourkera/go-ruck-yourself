@@ -130,39 +130,55 @@ class SignUpResource(Resource):
 class SignInResource(Resource):
     def post(self):
         """Sign in a user"""
-        print("--- SignInResource POST method entered ---", file=sys.stderr)
+        logger.debug("SignInResource POST method called")
         try:
             data = request.get_json()
             email = data.get('email')
             password = data.get('password')
             
             if not email or not password:
+                logger.warning("Login attempt with missing email or password")
                 return {'message': 'Email and password are required'}, 400
                 
             # Sign in with Supabase
             supabase = get_supabase_client()
-            auth_response = supabase.auth.sign_in_with_password({
-                "email": email,
-                "password": password,
-            })
             
-            if auth_response.user:
+            try:
+                auth_response = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password,
+                })
+                
+                if not auth_response or not hasattr(auth_response, 'user') or not auth_response.user:
+                    logger.warning(f"Invalid credentials for email: {email}")
+                    return {'message': 'Invalid email or password'}, 401
+                
                 # Convert user model to a JSON-serializable dictionary
                 user_data = auth_response.user.model_dump(mode='json')
-                logger.debug(f"Returning user data: {user_data}")
+                logger.info(f"User {user_data.get('id')} logged in successfully")
                 
                 return {
                     'token': auth_response.session.access_token if auth_response.session else None,
                     'refresh_token': auth_response.session.refresh_token if auth_response.session else None,
                     'user': user_data
                 }, 200
-            else:
-                logger.warning("Sign in failed: Invalid credentials")
-                return {'message': 'Invalid credentials'}, 401
+                
+            except Exception as auth_error:
+                # Handle specific Supabase auth errors
+                error_msg = str(auth_error).lower()
+                if 'wrong password' in error_msg or 'email not confirmed' in error_msg:
+                    logger.warning(f"Authentication failed for {email}: {error_msg}")
+                    return {'message': 'Invalid email or password'}, 401
+                if 'too many requests' in error_msg:
+                    logger.warning(f"Rate limited login attempt for {email}")
+                    return {'message': 'Too many login attempts. Please try again later.'}, 429
+                
+                # Re-raise unexpected errors to be caught by the outer try/except
+                raise
                 
         except Exception as e:
-            logger.error(f"Error during signin: {str(e)}", exc_info=True)
-            return {'message': f'Error during signin: {str(e)}'}, 500
+            logger.error(f"Unexpected error during signin: {str(e)}", exc_info=True)
+            return {'message': 'An unexpected error occurred during sign in. Please try again.'}, 500
 
 class SignOutResource(Resource):
     def post(self):
