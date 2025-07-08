@@ -646,7 +646,7 @@ def bad_request(error):
 @app.errorhandler(401)
 def unauthorized(error):
     """Handle 401 Unauthorized errors"""
-    logger.warning(f"401 UNAUTHORIZED: {request.method} {request.path} - "
+    logger.error(f"401 UNAUTHORIZED: {request.method} {request.path} - "
                   f"IP: {request.remote_addr} - Auth header: {bool(request.headers.get('Authorization'))}")
     return jsonify({
         'error': 'Unauthorized',
@@ -668,7 +668,7 @@ def forbidden(error):
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 Not Found errors"""
-    logger.warning(f"404 NOT FOUND: {request.method} {request.path} - "
+    logger.error(f"404 NOT FOUND: {request.method} {request.path} - "
                   f"IP: {request.remote_addr} - Referrer: {request.headers.get('Referer', 'None')}")
     return jsonify({
         'error': 'Not Found',
