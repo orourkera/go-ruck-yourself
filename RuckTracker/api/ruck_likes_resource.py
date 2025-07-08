@@ -208,7 +208,7 @@ class RuckLikesResource(Resource):
             # Send push notification to ruck owner
             try:
                 # Get ruck owner info
-                ruck_response = supabase.table('ruck_sessions') \
+                ruck_response = supabase.table('ruck_session') \
                     .select('user_id') \
                     .eq('id', ruck_id) \
                     .execute()
@@ -323,3 +323,112 @@ class RuckLikesResource(Resource):
         except Exception as e:
             logger.error(f"RuckLikesResource: Error removing like: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while removing like.", status_code=500)
+
+
+class RuckLikesBatchResource(Resource):
+    @auth_required
+    def get(self):
+        """
+        Get social data (likes and comments) for multiple ruck sessions in a batch.
+        
+        Endpoint:
+        - /api/ruck-likes/batch?ruck_ids=1,2,3 - Get likes/comments for multiple rucks
+        
+        The user must be authenticated.
+        """
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            logger.warning("RuckLikesBatchResource: Missing or invalid Authorization header.")
+            return build_api_response(success=False, error="Unauthorized", status_code=401)
+        
+        token = auth_header.split("Bearer ")[1]
+
+        # Initialize Supabase client with the user's token to respect RLS
+        try:
+            supabase = get_supabase_client(user_jwt=token)
+            user_response = supabase.auth.get_user(token)
+            if not user_response.user:
+                logger.warning("RuckLikesBatchResource: Invalid token or user not found.")
+                return build_api_response(success=False, error="Invalid token or user not found.", status_code=401)
+            
+            user_id = user_response.user.id
+            logger.debug(f"RuckLikesBatchResource: Authenticated user {user_id}")
+        except Exception as e:
+            logger.error(f"RuckLikesBatchResource: Error during Supabase client initialization or user auth: {e}")
+            return build_api_response(success=False, error="Authentication error.", status_code=500)
+
+        # Get ruck_ids from query parameters
+        ruck_ids_str = request.args.get('ruck_ids')
+        if not ruck_ids_str:
+            logger.info("RuckLikesBatchResource: Missing ruck_ids query parameter.")
+            return build_api_response(success=False, error="Missing ruck_ids query parameter", status_code=400)
+        
+        try:
+            ruck_ids = [int(x.strip()) for x in ruck_ids_str.split(',') if x.strip()]
+            if not ruck_ids:
+                raise ValueError("No valid ruck IDs provided")
+        except ValueError as e:
+            logger.info(f"RuckLikesBatchResource: Invalid ruck_ids format: {ruck_ids_str}")
+            return build_api_response(success=False, error="Invalid ruck_ids format, must be comma-separated integers.", status_code=400)
+
+        # Limit batch size to prevent abuse
+        if len(ruck_ids) > 50:
+            logger.warning(f"RuckLikesBatchResource: Too many ruck IDs requested: {len(ruck_ids)}")
+            return build_api_response(success=False, error="Too many ruck IDs requested, maximum 50 allowed.", status_code=400)
+
+        try:
+            # Get all likes for the requested rucks
+            likes_response = supabase.table('ruck_likes') \
+                                   .select('ruck_id, user_id, created_at, users(first_name, last_name)') \
+                                   .in_('ruck_id', ruck_ids) \
+                                   .execute()
+            
+            # Get user's like status for each ruck
+            user_likes_response = supabase.table('ruck_likes') \
+                                        .select('ruck_id') \
+                                        .in_('ruck_id', ruck_ids) \
+                                        .eq('user_id', user_id) \
+                                        .execute()
+            
+            # Get comment counts for each ruck
+            comments_response = supabase.table('ruck_comments') \
+                                      .select('ruck_id') \
+                                      .in_('ruck_id', ruck_ids) \
+                                      .execute()
+            
+            # Process the data
+            user_liked_rucks = {item['ruck_id'] for item in user_likes_response.data}
+            
+            # Group likes by ruck_id
+            likes_by_ruck = {}
+            for like in likes_response.data:
+                ruck_id = like['ruck_id']
+                if ruck_id not in likes_by_ruck:
+                    likes_by_ruck[ruck_id] = []
+                likes_by_ruck[ruck_id].append(like)
+            
+            # Count comments by ruck_id
+            comments_by_ruck = {}
+            for comment in comments_response.data:
+                ruck_id = comment['ruck_id']
+                comments_by_ruck[ruck_id] = comments_by_ruck.get(ruck_id, 0) + 1
+            
+            # Build response data
+            batch_data = {}
+            for ruck_id in ruck_ids:
+                likes = likes_by_ruck.get(ruck_id, [])
+                batch_data[str(ruck_id)] = {
+                    'likes': likes,
+                    'likes_count': len(likes),
+                    'comments_count': comments_by_ruck.get(ruck_id, 0),
+                    'user_has_liked': ruck_id in user_liked_rucks
+                }
+            
+            return build_api_response(
+                data=batch_data,
+                status_code=200
+            )
+            
+        except Exception as e:
+            logger.error(f"RuckLikesBatchResource: Error fetching batch data: {e}", exc_info=True)
+            return build_api_response(success=False, error="An error occurred while fetching batch data.", status_code=500)

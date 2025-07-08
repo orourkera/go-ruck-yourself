@@ -130,39 +130,55 @@ class SignUpResource(Resource):
 class SignInResource(Resource):
     def post(self):
         """Sign in a user"""
-        print("--- SignInResource POST method entered ---", file=sys.stderr)
+        logger.debug("SignInResource POST method called")
         try:
             data = request.get_json()
             email = data.get('email')
             password = data.get('password')
             
             if not email or not password:
+                logger.warning("Login attempt with missing email or password")
                 return {'message': 'Email and password are required'}, 400
                 
             # Sign in with Supabase
             supabase = get_supabase_client()
-            auth_response = supabase.auth.sign_in_with_password({
-                "email": email,
-                "password": password,
-            })
             
-            if auth_response.user:
+            try:
+                auth_response = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password,
+                })
+                
+                if not auth_response or not hasattr(auth_response, 'user') or not auth_response.user:
+                    logger.warning(f"Invalid credentials for email: {email}")
+                    return {'message': 'Invalid email or password'}, 401
+                
                 # Convert user model to a JSON-serializable dictionary
                 user_data = auth_response.user.model_dump(mode='json')
-                logger.debug(f"Returning user data: {user_data}")
+                logger.info(f"User {user_data.get('id')} logged in successfully")
                 
                 return {
                     'token': auth_response.session.access_token if auth_response.session else None,
                     'refresh_token': auth_response.session.refresh_token if auth_response.session else None,
                     'user': user_data
                 }, 200
-            else:
-                logger.warning("Sign in failed: Invalid credentials")
-                return {'message': 'Invalid credentials'}, 401
+                
+            except Exception as auth_error:
+                # Handle specific Supabase auth errors
+                error_msg = str(auth_error).lower()
+                if 'wrong password' in error_msg or 'email not confirmed' in error_msg:
+                    logger.warning(f"Authentication failed for {email}: {error_msg}")
+                    return {'message': 'Invalid email or password'}, 401
+                if 'too many requests' in error_msg:
+                    logger.warning(f"Rate limited login attempt for {email}")
+                    return {'message': 'Too many login attempts. Please try again later.'}, 429
+                
+                # Re-raise unexpected errors to be caught by the outer try/except
+                raise
                 
         except Exception as e:
-            logger.error(f"Error during signin: {str(e)}", exc_info=True)
-            return {'message': f'Error during signin: {str(e)}'}, 500
+            logger.error(f"Unexpected error during signin: {str(e)}", exc_info=True)
+            return {'message': 'An unexpected error occurred during sign in. Please try again.'}, 500
 
 class SignOutResource(Resource):
     def post(self):
@@ -226,22 +242,60 @@ class ForgotPasswordResource(Resource):
             data = request.get_json()
             email = data.get('email')
             if not email:
+                logger.warning("Password reset attempt with no email provided")
                 return {'message': 'Email is required'}, 400
+                
+            # The final destination URL for the mobile app
+            # The email template will wrap this in the auth/redirect endpoint
+            mobile_app_url = 'com.getrucky.app://auth/callback'
+            
+            logger.info(f"Sending password reset email to {email} with mobile app redirect: {mobile_app_url}")
+            
+            # Get the Supabase client
             supabase = get_supabase_client()
             
-            # Use the correct redirect URL for mobile app callback
-            redirect_url = 'com.getrucky.app://auth/callback'
+            # Send the password reset email with the mobile app URL
+            # The email template will wrap this in auth/redirect automatically
             response = supabase.auth.reset_password_email(
                 email=email,
-                options={'redirect_to': redirect_url}
+                options={
+                    'redirect_to': mobile_app_url,
+                    'data': {
+                        'email': email,
+                        'app_name': 'RuckTracker'
+                    }
+                }
             )
             
+            # Log the response for debugging
+            logger.debug(f"Password reset response: {response}")
+            
+            # Check for errors in the response
             if hasattr(response, 'error') and response.error:
-                return {'message': f'Failed to send reset email: {response.error.message}'}, 400
-            return {'message': 'If an account exists for this email, a password reset link has been sent.'}, 200
+                logger.error(f"Error sending password reset email to {email}: {response.error.message}")
+            else:
+                logger.info(f"Password reset email sent to {email}")
+                
+                # The actual sending of the email is handled by Supabase
+                return {
+                    'message': 'If an account exists for this email, a password reset link has been sent.',
+                    'email_sent': True
+                }, 200
+            
+            # If we get here, something went wrong but we don't want to leak info
+            logger.warning(f"Unexpected response from reset_password_email: {response}")
+            return {
+                'message': 'If an account exists for this email, a password reset link has been sent.',
+                'email_sent': True
+            }, 200
+            
         except Exception as e:
-            logger.error(f"Error during forgot password: {str(e)}", exc_info=True)
-            return {'message': f'Error during forgot password: {str(e)}'}, 500
+            logger.error(f"Unexpected error during password reset for {email}: {str(e)}", exc_info=True)
+            # Still return success to avoid email enumeration
+            return {
+                'message': 'If an account exists for this email, a password reset link has been sent.',
+                'email_sent': True
+            }, 200
 
 class UserProfileResource(Resource):
     def get(self):

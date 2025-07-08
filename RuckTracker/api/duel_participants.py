@@ -43,7 +43,7 @@ class DuelParticipantProgressResource(Resource):
                 return {'error': 'Duel has ended'}, 400
             
             # Verify session exists and belongs to user
-            session_response = supabase.table('ruck_sessions').select('id, user_id, status, distance_km, duration_minutes, completed_at').eq('id', data['session_id']).eq('user_id', user_id).execute()
+            session_response = supabase.table('ruck_session').select('id, user_id, status, distance_km, duration_minutes, completed_at').eq('id', data['session_id']).eq('user_id', user_id).execute()
             
             session = session_response.data[0] if session_response.data else None
             if not session:
@@ -178,7 +178,7 @@ class DuelParticipantProgressResource(Resource):
             
             # Get session details
             session_ids = [s['session_id'] for s in sessions]
-            session_response = supabase.table('ruck_sessions').select('id, start_time, end_time, distance, duration, elevation_gain, power_points').in_('id', session_ids).execute()
+            session_response = supabase.table('ruck_session').select('id, start_time, end_time, distance, duration, elevation_gain, power_points').in_('id', session_ids).execute()
             
             session_details = {s['id']: s for s in session_response.data}
             
@@ -230,7 +230,7 @@ class DuelLeaderboardResource(Resource):
             
             # Get session details
             session_ids = [a['session_id'] for a in recent_activity]
-            session_response = supabase.table('ruck_sessions').select('id, start_time, end_time, distance, duration, elevation_gain, power_points').in_('id', session_ids).execute()
+            session_response = supabase.table('ruck_session').select('id, start_time, end_time, distance, duration, elevation_gain, power_points').in_('id', session_ids).execute()
             
             session_details = {s['id']: s for s in session_response.data}
             
