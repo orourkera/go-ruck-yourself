@@ -242,22 +242,60 @@ class ForgotPasswordResource(Resource):
             data = request.get_json()
             email = data.get('email')
             if not email:
+                logger.warning("Password reset attempt with no email provided")
                 return {'message': 'Email is required'}, 400
+                
+            # The final destination URL for the mobile app
+            # The email template will wrap this in the auth/redirect endpoint
+            mobile_app_url = 'com.getrucky.app://auth/callback'
+            
+            logger.info(f"Sending password reset email to {email} with mobile app redirect: {mobile_app_url}")
+            
+            # Get the Supabase client
             supabase = get_supabase_client()
             
-            # Use the correct redirect URL for mobile app callback
-            redirect_url = 'com.getrucky.app://auth/callback'
+            # Send the password reset email with the mobile app URL
+            # The email template will wrap this in auth/redirect automatically
             response = supabase.auth.reset_password_email(
                 email=email,
-                options={'redirect_to': redirect_url}
+                options={
+                    'redirect_to': mobile_app_url,
+                    'data': {
+                        'email': email,
+                        'app_name': 'RuckTracker'
+                    }
+                }
             )
             
+            # Log the response for debugging
+            logger.debug(f"Password reset response: {response}")
+            
+            # Check for errors in the response
             if hasattr(response, 'error') and response.error:
-                return {'message': f'Failed to send reset email: {response.error.message}'}, 400
-            return {'message': 'If an account exists for this email, a password reset link has been sent.'}, 200
+                logger.error(f"Error sending password reset email to {email}: {response.error.message}")
+            else:
+                logger.info(f"Password reset email sent to {email}")
+                
+                # The actual sending of the email is handled by Supabase
+                return {
+                    'message': 'If an account exists for this email, a password reset link has been sent.',
+                    'email_sent': True
+                }, 200
+            
+            # If we get here, something went wrong but we don't want to leak info
+            logger.warning(f"Unexpected response from reset_password_email: {response}")
+            return {
+                'message': 'If an account exists for this email, a password reset link has been sent.',
+                'email_sent': True
+            }, 200
+            
         except Exception as e:
-            logger.error(f"Error during forgot password: {str(e)}", exc_info=True)
-            return {'message': f'Error during forgot password: {str(e)}'}, 500
+            logger.error(f"Unexpected error during password reset for {email}: {str(e)}", exc_info=True)
+            # Still return success to avoid email enumeration
+            return {
+                'message': 'If an account exists for this email, a password reset link has been sent.',
+                'email_sent': True
+            }, 200
 
 class UserProfileResource(Resource):
     def get(self):
