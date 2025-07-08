@@ -481,6 +481,102 @@ def auth_redirect():
     
     return response
 
+@app.route('/auth/callback')
+def auth_callback():
+    """
+    Handle authentication callback from Supabase for password reset and other auth flows.
+    This endpoint receives tokens and redirects to the mobile app.
+    """
+    # Get tokens from URL parameters or fragment
+    access_token = request.args.get('access_token')
+    refresh_token = request.args.get('refresh_token')
+    token_type = request.args.get('type')
+    expires_in = request.args.get('expires_in')
+    
+    logger.info(f"Auth callback received - type: {token_type}, access_token: {'present' if access_token else 'missing'}")
+    
+    # Build mobile app URL with tokens
+    mobile_url = 'com.getrucky.app://auth/callback'
+    if access_token:
+        mobile_url += f'?access_token={access_token}'
+        if token_type:
+            mobile_url += f'&type={token_type}'
+        if refresh_token:
+            mobile_url += f'&refresh_token={refresh_token}'
+        if expires_in:
+            mobile_url += f'&expires_in={expires_in}'
+    
+    logger.info(f"Redirecting to mobile app: {mobile_url}")
+    
+    # Create HTML page that handles the redirect
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Redirecting to RuckTracker...</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0;
+                padding: 20px;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }}
+            .container {{
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                text-align: center;
+                max-width: 400px;
+            }}
+            .spinner {{
+                border: 4px solid #f3f3f3;
+                border-top: 4px solid #667eea;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 20px auto;
+            }}
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>🎒 RuckTracker</h2>
+            <div class="spinner"></div>
+            <p>Redirecting to the RuckTracker app...</p>
+            <p><small>If the app doesn't open automatically, <a href="{mobile_url}">click here</a></small></p>
+        </div>
+        
+        <script>
+            // Try to redirect to mobile app immediately
+            window.location.href = '{mobile_url}';
+            
+            // Fallback: show download links if app doesn't open
+            setTimeout(() => {{
+                document.querySelector('.container').innerHTML = `
+                    <h2>🎒 RuckTracker</h2>
+                    <p>App not found. Please download the RuckTracker app:</p>
+                    <a href="https://apps.apple.com/app/rucktracker/id123456789" style="display: inline-block; margin: 10px; padding: 12px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 6px;">Download for iOS</a>
+                    <a href="https://play.google.com/store/apps/details?id=com.getrucky.app" style="display: inline-block; margin: 10px; padding: 12px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 6px;">Download for Android</a>
+                `;
+            }}, 3000);
+        </script>
+    </body>
+    </html>
+    """
+    
+    return html_content
+
 @app.route('/api/auth/password-reset-confirm', methods=['POST'])
 @limiter.limit("5 per minute")
 def password_reset_confirm():
@@ -668,8 +764,15 @@ def forbidden(error):
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 Not Found errors"""
-    logger.warning(f"404 NOT FOUND: {request.method} {request.path} - "
-                  f"IP: {request.remote_addr} - Referrer: {request.headers.get('Referer', 'None')}")
+    # Only log 404s for API endpoints to avoid spam from bots hitting random URLs
+    if request.path.startswith('/api/'):
+        logger.error(f"404 NOT FOUND: {request.method} {request.path} - "
+                    f"IP: {request.remote_addr} - Referrer: {request.headers.get('Referer', 'None')}")
+    else:
+        # Log bot traffic at debug level (won't appear in production logs)
+        logger.debug(f"404 BOT TRAFFIC: {request.method} {request.path} - IP: {request.remote_addr}")
+    
+>>>>>>> ad889e4b (add back missing /auth/callback endpoint for password reset)
     return jsonify({
         'error': 'Not Found',
         'message': 'The requested resource was not found',
