@@ -234,7 +234,7 @@ from .api.stats import ( # Import new stats resources
 )
 
 from .api.ruck_photos_resource import RuckPhotosResource # Added import for RuckPhotosResource
-from .api.ruck_likes_resource import RuckLikesResource # Import for RuckLikesResource
+from .api.ruck_likes_resource import RuckLikesResource, RuckLikesBatchResource # Import for RuckLikesResource and batch
 from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
 from .api.notifications_resource import NotificationsResource, NotificationReadResource, ReadAllNotificationsResource # Import for Notification resources
 from .api.resources import UserResource # Import UserResource
@@ -377,6 +377,11 @@ RuckLikesResource.delete = limiter.limit("2000 per minute", override_defaults=Tr
 
 # Now register the resource with modified methods
 api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
+
+# Ruck Likes Batch Endpoints
+app.logger.info(f"Setting RuckLikesBatchResource rate limit to: 100 per minute")
+RuckLikesBatchResource.get = limiter.limit("100 per minute", override_defaults=True)(RuckLikesBatchResource.get)
+api.add_resource(RuckLikesBatchResource, '/api/ruck-likes/batch')
 
 # Ruck Comments Endpoints
 app.logger.info(f"Setting RuckCommentsResource rate limit to: 500 per minute")

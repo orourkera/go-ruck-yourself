@@ -144,7 +144,7 @@ class RuckCommentsResource(Resource):
             # Send push notification to ruck owner
             try:
                 # Get ruck owner info
-                ruck_response = supabase.table('ruck_sessions') \
+                ruck_response = supabase.table('ruck_session') \
                     .select('user_id') \
                     .eq('id', ruck_id) \
                     .execute()
