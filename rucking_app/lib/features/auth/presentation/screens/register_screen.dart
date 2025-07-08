@@ -225,10 +225,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // Insert our custom widget into the overlay (similar to how StyledSnackBar does it)
           final overlayState = Overlay.of(context);
           final overlayEntry = OverlayEntry(
-            builder: (context) => Positioned(
-              bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-              left: 20,
-              right: 20,
+            builder: (context) => Stack(
+              children: [
+                Positioned(
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+                  left: 20,
+                  right: 20,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
@@ -252,6 +254,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: content,
                 ),
               ),
+                ),
+              ],
             ),
           );
           

@@ -798,7 +798,12 @@ class WatchService {
 
   void _restartNativeHeartRateListener() {
     // Restart heart rate listener
-    _nativeHeartRateSubscription?.cancel();
+    try {
+      _nativeHeartRateSubscription?.cancel();
+    } catch (e) {
+      // Ignore cancellation errors for streams that may not be active
+      AppLogger.debug('[WATCH_SERVICE] Heart rate subscription restart cancellation (safe to ignore): $e');
+    }
     _setupNativeHeartRateListener();
   }
   
