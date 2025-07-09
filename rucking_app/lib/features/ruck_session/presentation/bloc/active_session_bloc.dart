@@ -236,22 +236,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     BatchLocationUpdated event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    // Batch location processing is now handled by LocationTrackingManager
-    AppLogger.debug('Delegating batch location processing to managers');
+    AppLogger.debug('Batch location update received: ${event.points.length} points');
     
-    // TODO: Route event to LocationTrackingManager through coordinator
-    AppLogger.warning('Batch location processing delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for batch location update');
+    }
   }
 
   Future<void> _onLocationUpdated(
     LocationUpdated event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Location processing is now managed by LocationTrackingManager
-    AppLogger.debug('Delegating location update to managers');
+    AppLogger.debug('Location update received: ${event.location}');
     
-    // TODO: Route event to LocationTrackingManager through coordinator
-    AppLogger.warning('Location update delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for location update');
+    }
   }
   
   /// Process batch upload of location points
@@ -324,21 +330,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   /// Process batch upload of pending location points and heart rate samples
   Future<void> _processBatchUpload(String sessionId) async {
-    // Batch upload logic is now handled by UploadManager
-    AppLogger.debug('Delegating batch upload to managers');
+    AppLogger.debug('Processing batch upload for session: $sessionId');
     
-    // TODO: Route to UploadManager through coordinator
-    AppLogger.warning('Batch upload delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      // Create a custom event for batch upload processing
+      _coordinator!.add(SessionBatchUploadRequested(sessionId: sessionId));
+    } else {
+      AppLogger.warning('No coordinator available for batch upload');
+    }
   }
 
   // Upload methods now handled by UploadManager
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
-    // Session timer, metrics, and state updates are now handled by multiple managers
-    AppLogger.debug('Delegating tick processing to managers');
+    AppLogger.debug('Processing tick event through coordinator');
     
-    // TODO: Route to SessionLifecycleManager, HeartRateManager, and others through coordinator
-    AppLogger.warning('Tick delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for tick processing');
+    }
   }
 
   Future<void> _onSessionPaused(
@@ -375,50 +388,67 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionCompleted event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    // Session completion logic is now handled by SessionLifecycleManager
-    AppLogger.debug('Delegating session completion to managers');
+    AppLogger.info('Completing session with delegation to coordinator');
     
-    // TODO: Route event to SessionLifecycleManager through coordinator
-    AppLogger.warning('Session completion delegation not yet implemented - requires coordinator integration');
-    
-    // For now, emit initial state to prevent app from getting stuck
-    emit(ActiveSessionInitial());
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for session completion');
+      emit(ActiveSessionError('Session coordinator not initialized'));
+    }
   }
 
   Future<void> _onSessionFailed(
     SessionFailed event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Session failure handling is now managed by SessionLifecycleManager
-    AppLogger.debug('Delegating session failure to managers');
+    AppLogger.error('Session failed with delegation to coordinator', exception: Exception(event.errorMessage));
     
-    // TODO: Route event to SessionLifecycleManager through coordinator
-    AppLogger.warning('Session failure delegation not yet implemented - requires coordinator integration');
-    
-    // For now, emit a failure state to prevent app from getting stuck
-    emit(ActiveSessionFailure(errorMessage: event.errorMessage, sessionDetails: null));
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for session failure');
+      emit(ActiveSessionFailure(errorMessage: event.errorMessage, sessionDetails: null));
+    }
   }
 
   // Heart rate monitoring start/stop is now handled by HeartRateManager
   Future<void> _startHeartRateMonitoring(String sessionId) async {
-    // TODO: Route to HeartRateManager through coordinator
-    AppLogger.warning('Heart rate monitoring start delegation not yet implemented - requires coordinator integration');
+    AppLogger.debug('Starting heart rate monitoring through coordinator');
+    
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(HeartRateMonitoringStartRequested(sessionId: sessionId));
+    } else {
+      AppLogger.warning('No coordinator available for heart rate monitoring start');
+    }
   }
 
   Future<void> _stopHeartRateMonitoring() async {
-    // TODO: Route to HeartRateManager through coordinator
-    AppLogger.warning('Heart rate monitoring stop delegation not yet implemented - requires coordinator integration');
+    AppLogger.debug('Stopping heart rate monitoring through coordinator');
+    
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(HeartRateMonitoringStopRequested());
+    } else {
+      AppLogger.warning('No coordinator available for heart rate monitoring stop');
+    }
   }
 
   Future<void> _onHeartRateUpdated(
     HeartRateUpdated event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    // Heart rate processing logic is now handled by HeartRateManager
-    AppLogger.debug('Delegating heart rate update to managers');
+    AppLogger.debug('Heart rate updated: ${event.heartRate} bpm');
     
-    // TODO: Route event to HeartRateManager through coordinator
-    AppLogger.warning('Heart rate update delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for heart rate update');
+    }
   }
 
   Future<void> _onHeartRateBufferProcessed(
@@ -434,8 +464,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           now.difference(_lastApiHeartRateTime!).inSeconds >= 30;
       
       if (shouldSendToApi) {
-        // TODO: Delegate to HeartRateManager for API upload
-        AppLogger.debug('[HR_API_THROTTLE] [STUB] Would send ${event.samples.length} heart rate samples to API');
+        // Delegate to coordinator for heart rate batch upload
+        if (_coordinator != null) {
+          _coordinator!.add(HeartRateBatchUploadRequested(samples: event.samples));
+        } else {
+          AppLogger.warning('No coordinator available for heart rate batch upload');
+        }
         _lastApiHeartRateTime = now;
       } else {
         AppLogger.debug('[HR_API_THROTTLE] Skipped sending ${event.samples.length} heart rate samples to API (throttled)');
@@ -448,29 +482,38 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   Future<void> _onFetchSessionPhotosRequested(
     FetchSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
-    // Photo fetching logic is now handled by PhotoManager
-    AppLogger.debug('Delegating photo fetching to managers');
+    AppLogger.debug('Fetching session photos through coordinator');
     
-    // TODO: Route event to PhotoManager through coordinator
-    AppLogger.warning('Photo fetching delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for photo fetching');
+    }
   }
 
   Future<void> _onUploadSessionPhotosRequested(
       UploadSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
-    // Photo uploading logic is now handled by PhotoManager
-    AppLogger.debug('Delegating photo uploading to managers');
+    AppLogger.debug('Uploading session photos through coordinator');
     
-    // TODO: Route event to PhotoManager through coordinator
-    AppLogger.warning('Photo uploading delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for photo uploading');
+    }
   }
 
   Future<void> _onDeleteSessionPhotoRequested(
       DeleteSessionPhotoRequested event, Emitter<ActiveSessionState> emit) async {
-    // Photo deletion logic is now handled by PhotoManager
-    AppLogger.debug('Delegating photo deletion to managers');
+    AppLogger.debug('Deleting session photo through coordinator');
     
-    // TODO: Route event to PhotoManager through coordinator
-    AppLogger.warning('Photo deletion delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for photo deletion');
+    }
   }
 
   void _onClearSessionPhotos(ClearSessionPhotos event, Emitter<ActiveSessionState> emit) {
@@ -481,34 +524,42 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onTakePhotoRequested(TakePhotoRequested event, Emitter<ActiveSessionState> emit) async {
-    // Photo capture logic is now handled by PhotoManager
-    AppLogger.debug('Delegating photo capture to managers');
+    AppLogger.debug('Taking photo through coordinator');
     
-    // TODO: Route event to PhotoManager through coordinator
-    AppLogger.warning('Photo capture delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for photo capture');
+    }
   }
 
   Future<void> _onPickPhotoRequested(PickPhotoRequested event, Emitter<ActiveSessionState> emit) async {
-    // Photo picking logic is now handled by PhotoManager
-    AppLogger.debug('Delegating photo picking to managers');
+    AppLogger.debug('Picking photo through coordinator');
     
-    // TODO: Route event to PhotoManager through coordinator
-    AppLogger.warning('Photo picking delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for photo picking');
+    }
   }
   
   Future<void> _onLoadSessionForViewing(LoadSessionForViewing event, Emitter<ActiveSessionState> emit) async {
-    // Session loading logic is now handled by SessionLifecycleManager and PhotoManager
-    AppLogger.debug('Delegating session loading to managers');
+    AppLogger.debug('Loading session for viewing through coordinator');
     
-    // TODO: Route to SessionLifecycleManager and PhotoManager through coordinator
-    // For now, emit simple state to prevent UI breakage
-    emit(SessionSummaryGenerated(
-      session: event.session,
-      photos: event.session.photos ?? [],
-      isPhotosLoading: false,
-    ));
-    
-    AppLogger.warning('Session loading delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for session loading');
+      // Fallback to prevent UI breakage
+      emit(SessionSummaryGenerated(
+        session: event.session,
+        photos: event.session.photos ?? [],
+        isPhotosLoading: false,
+      ));
+    }
   }
 
   void _onUpdateStateWithSessionPhotos(UpdateStateWithSessionPhotos event, Emitter<ActiveSessionState> emit) {
@@ -545,25 +596,29 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionRecoveryRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Session recovery logic is now handled by SessionLifecycleManager
-    AppLogger.debug('Delegating session recovery to managers');
+    AppLogger.debug('Requesting session recovery through coordinator');
     
-    // TODO: Route event to SessionLifecycleManager through coordinator
-    AppLogger.warning('Session recovery delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for session recovery');
+    }
   }
 
   Future<void> _onSessionReset(
     SessionReset event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    // Session reset logic is now handled by SessionLifecycleManager
-    AppLogger.debug('Delegating session reset to managers');
+    AppLogger.debug('Resetting session through coordinator');
     
-    // TODO: Route event to SessionLifecycleManager through coordinator
-    AppLogger.warning('Session reset delegation not yet implemented - requires coordinator integration');
-    
-    // For now, emit initial state to prevent app from getting stuck
-    emit(const ActiveSessionInitial());
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for session reset');
+      emit(const ActiveSessionInitial());
+    }
   }
 
   double? _calculateCurrentPace(List<LocationPoint> points) {
@@ -643,19 +698,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionCleanupRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Session cleanup logic is now handled by MemoryManager
-    AppLogger.debug('Delegating session cleanup to managers');
+    AppLogger.debug('Requesting session cleanup through coordinator');
     
-    // TODO: Route event to MemoryManager through coordinator
-    AppLogger.warning('Session cleanup delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for session cleanup');
+    }
   }
   
   // Memory pressure handling is now managed by MemoryPressureManager
 
   // Offline session sync is now handled by UploadManager
   void _syncOfflineSessionsInBackground() {
-    // TODO: Route to UploadManager through coordinator
-    AppLogger.warning('Offline session sync delegation not yet implemented - requires coordinator integration');
+    AppLogger.debug('Syncing offline sessions through coordinator');
+    
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(OfflineSessionSyncRequested());
+    } else {
+      AppLogger.warning('No coordinator available for offline session sync');
+    }
   }
 
   // Session completion payload building is now handled by SessionLifecycleManager
@@ -665,27 +729,56 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     List<LocationPoint> route,
     List<HeartRateSample> heartRateSamples,
   ) async {
-    // TODO: Route to SessionLifecycleManager through coordinator
-    AppLogger.warning('Completion payload building delegation not yet implemented - requires coordinator integration');
-    return {};
+    AppLogger.debug('Building completion payload through coordinator');
+    
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(CompletionPayloadBuildRequested(
+        currentState: currentState,
+        terrainStats: terrainStats,
+        route: route,
+        heartRateSamples: heartRateSamples,
+      ));
+    } else {
+      AppLogger.warning('No coordinator available for completion payload building');
+    }
+    return {}; // Placeholder - actual data will come through coordinator
   }
 
   // Connectivity monitoring is now handled by LocationTrackingManager
   void _startConnectivityMonitoring(String sessionId) {
-    // TODO: Route to LocationTrackingManager through coordinator
-    AppLogger.warning('Connectivity monitoring delegation not yet implemented - requires coordinator integration');
+    AppLogger.debug('Starting connectivity monitoring through coordinator');
+    
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(ConnectivityMonitoringStartRequested(sessionId: sessionId));
+    } else {
+      AppLogger.warning('No coordinator available for connectivity monitoring');
+    }
   }
 
   // Location tracking ensurance is now handled by LocationTrackingManager
   void _ensureLocationTrackingActive(String sessionId) {
-    // TODO: Route to LocationTrackingManager through coordinator
-    AppLogger.warning('Location tracking delegation not yet implemented - requires coordinator integration');
+    AppLogger.debug('Ensuring location tracking through coordinator');
+    
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(LocationTrackingEnsureActiveRequested(sessionId: sessionId));
+    } else {
+      AppLogger.warning('No coordinator available for location tracking ensurance');
+    }
   }
 
   // Offline session sync is now handled by UploadManager
   Future<void> _attemptOfflineSessionSync(String sessionId) async {
-    // TODO: Route to UploadManager through coordinator
-    AppLogger.warning('Offline session sync delegation not yet implemented - requires coordinator integration');
+    AppLogger.debug('Attempting offline session sync through coordinator');
+    
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(OfflineSessionSyncAttemptRequested(sessionId: sessionId));
+    } else {
+      AppLogger.warning('No coordinator available for offline session sync attempt');
+    }
   }
   
   // All diagnostic methods removed - now handled by managers
@@ -694,11 +787,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     MemoryPressureDetected event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Memory pressure handling is now managed by MemoryManager
-    AppLogger.debug('Delegating memory pressure detection to managers');
+    AppLogger.debug('Memory pressure detected, delegating to coordinator');
     
-    // TODO: Route event to MemoryManager through coordinator
-    AppLogger.warning('Memory pressure delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for memory pressure handling');
+    }
   }
   
   // All diagnostic and memory pressure methods removed - now handled by dedicated managers

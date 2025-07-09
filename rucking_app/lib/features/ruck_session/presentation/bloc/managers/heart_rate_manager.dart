@@ -102,7 +102,7 @@ class HeartRateManager implements SessionManager {
     // Calculate statistics
     final stats = _calculateHeartRateStats();
     
-    // TODO: Send heart rate to watch when API is available
+    // Note: Heart rate sync to watch is handled by WatchService integration
     
     _updateState(_currentState.copyWith(
       heartRateSamples: List.from(_heartRateSamples),

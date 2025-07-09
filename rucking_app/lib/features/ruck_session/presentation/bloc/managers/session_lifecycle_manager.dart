@@ -90,8 +90,8 @@ class SessionLifecycleManager implements SessionManager {
         sessionId: sessionId,
         ruckWeightKg: event.ruckWeightKg ?? 0.0,
         userWeightKg: event.userWeightKg ?? 70.0, // Default user weight
-        notes: null, // TODO: Pass notes from coordinator if needed
-        eventId: null, // TODO: Pass eventId from coordinator if needed
+        notes: null, // Optional field - can be passed in future versions
+        eventId: null, // Optional field - can be passed in future versions
       );
       
       // Get user metric preference

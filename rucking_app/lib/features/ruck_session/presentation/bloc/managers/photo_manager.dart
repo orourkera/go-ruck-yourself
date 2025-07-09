@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/storage_service.dart';
 import '../../../../../core/utils/app_logger.dart';
 import '../../../data/repositories/session_repository.dart';
@@ -94,10 +96,16 @@ class PhotoManager implements SessionManager {
       
       // Create photo object
       final photoId = const Uuid().v4();
+      
+      // Get current user ID from auth service
+      final authService = GetIt.instance<AuthService>();
+      final currentUser = await authService.getCurrentUser();
+      final userId = currentUser?.id ?? '';
+      
       final photo = RuckPhoto(
         id: photoId,
         ruckId: _activeSessionId!,
-        userId: '', // TODO: Get from auth service
+        userId: userId,
         filename: photoId,
         createdAt: DateTime.now(),
         url: event.photoPath, // Using local path temporarily
@@ -144,12 +152,18 @@ class PhotoManager implements SessionManager {
       // Delete local file
       final photo = _photos.firstWhere(
         (p) => p.id == event.photoId,
-        orElse: () => RuckPhoto(
-          id: event.photoId,
-          ruckId: _activeSessionId!,
-          userId: '', // TODO: Get user ID from auth service
-          filename: 'photo_${event.photoId}.jpg',
-          createdAt: DateTime.now(),
+        orElse: () {
+          // Get current user ID from auth service for fallback photo
+          final authService = GetIt.instance<AuthService>();
+          final currentUser = authService.getCurrentUser();
+          final userId = currentUser?.id ?? '';
+          
+          return RuckPhoto(
+            id: event.photoId,
+            ruckId: _activeSessionId!,
+            userId: userId,
+            filename: 'photo_${event.photoId}.jpg',
+            createdAt: DateTime.now(),
         ),
       );
       if (photo.url != null && photo.url!.startsWith('/')) {
@@ -222,10 +236,29 @@ class PhotoManager implements SessionManager {
       
       // Upload photo to server
       try {
-        // TODO: Implement photo upload when backend API is available
-        AppLogger.info('[PHOTO_MANAGER] Photo upload not yet implemented');
+        AppLogger.info('[PHOTO_MANAGER] Uploading photo to backend: ${photo.filename}');
         
-        // For now, just mark as "uploaded" with local path
+        // Read the image file
+        final imageFile = File(photo.url!);
+        if (!await imageFile.exists()) {
+          throw Exception('Photo file not found: ${photo.url}');
+        }
+        
+        // Upload to backend using session repository
+        final uploadedPhoto = await _sessionRepository.uploadSessionPhoto(
+          sessionId: photo.ruckId,
+          photoFile: imageFile,
+          filename: photo.filename,
+        );
+        
+        // Update photo with server URL
+        final index = _photos.indexWhere((p) => p.id == photo.id);
+        if (index != -1) {
+          _photos[index] = uploadedPhoto;
+        }
+        
+        AppLogger.info('[PHOTO_MANAGER] Photo uploaded successfully: ${uploadedPhoto.url}');
+        
         _updateState(_currentState.copyWith(
           photos: List.from(_photos),
         ));

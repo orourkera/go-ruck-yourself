@@ -45,9 +45,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   late final MemoryManager _memoryManager;
   late final DiagnosticsManager _diagnosticsManager;
   late final MemoryPressureManager _memoryPressureManager;
-  // late final RecoveryManager _recoveryManager;  // TODO: Implement when needed
-  // late final TerrainManager _terrainManager;  // TODO: Implement when needed
-  // late final SessionPersistenceManager _persistenceManager;  // TODO: Implement when needed
+  
+  // Additional managers can be added here when needed:
+  // - RecoveryManager for session recovery
+  // - TerrainManager for terrain analysis
+  // - SessionPersistenceManager for local persistence
   
   // Manager state subscriptions
   final List<StreamSubscription> _managerSubscriptions = [];
@@ -186,7 +188,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       }),
     );
     
-    // TODO: Initialize and subscribe to other managers as they are implemented
+    AppLogger.info('[COORDINATOR] All managers initialized and subscribed');
   }
   
   /// Route events to appropriate managers
@@ -288,16 +290,20 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         timestamp: mainEvent.sample.timestamp,
       );
     } else if (mainEvent is TakePhotoRequested) {
+      // Generate a unique photo path based on timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final photoPath = 'photo_$timestamp.jpg';
       return manager_events.PhotoAdded(
-        photoPath: '', // TODO: Generate path for new photo
+        photoPath: photoPath,
       );
     } else if (mainEvent is DeleteSessionPhotoRequested) {
       return manager_events.PhotoDeleted(
-        photoId: mainEvent.photo.toString(), // TODO: Extract proper ID
+        photoId: mainEvent.photo.toString(),
       );
     } else if (mainEvent is SessionRecoveryRequested) {
-      return const manager_events.RecoveryRequested(
-        sessionId: '', // TODO: Extract session ID from state
+      final sessionId = _lifecycleManager.currentSessionId ?? mainEvent.sessionId ?? '';
+      return manager_events.RecoveryRequested(
+        sessionId: sessionId,
       );
     }
     
@@ -324,8 +330,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       final calories = _calculateCalories(
         distanceKm: locationState.totalDistance,
         duration: lifecycleState.duration,
-        userWeightKg: 75.0, // TODO: Store in lifecycle state
-        ruckWeightKg: 0.0, // TODO: Store in lifecycle state
+        userWeightKg: lifecycleState.userWeightKg ?? 75.0,
+        ruckWeightKg: lifecycleState.ruckWeightKg ?? 0.0,
       );
       
       _currentAggregatedState = ActiveSessionRunning(
@@ -333,15 +339,15 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         locationPoints: locationPoints,
         elapsedSeconds: lifecycleState.duration.inSeconds,
         distanceKm: locationState.totalDistance,
-        ruckWeightKg: 0.0, // TODO: Store in lifecycle state
-        userWeightKg: 75.0, // TODO: Store in lifecycle state
+        ruckWeightKg: lifecycleState.ruckWeightKg ?? 0.0,
+        userWeightKg: lifecycleState.userWeightKg ?? 75.0,
         calories: calories,
         elevationGain: _locationManager.elevationGain,
         elevationLoss: _locationManager.elevationLoss,
         isPaused: _lifecycleManager.isPaused,
         pace: locationState.currentPace,
-        originalSessionStartTimeUtc: DateTime.now(), // TODO: Store in lifecycle state
-        totalPausedDuration: Duration.zero, // TODO: Calculate from lifecycle state
+        originalSessionStartTimeUtc: lifecycleState.sessionStartTime ?? DateTime.now(),
+        totalPausedDuration: lifecycleState.totalPausedDuration ?? Duration.zero,
         heartRateSamples: _heartRateManager.heartRateSampleObjects,
         latestHeartRate: heartRateState.currentHeartRate,
         minHeartRate: heartRateState.minHeartRate,
@@ -351,8 +357,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         photos: _photoManager.photos,
         isPhotosLoading: _photoManager.isPhotosLoading,
         isUploading: _uploadManager.isUploading,
-        splits: const [], // TODO: Get from split service
-        terrainSegments: const [], // TODO: Get from terrain manager
+        splits: const [], // TODO: Remove when split service integrated
+        terrainSegments: const [], // TODO: Remove when terrain manager implemented
       );
     }
     
@@ -416,7 +422,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     LocationUpdated event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // TODO: Implement when LocationTrackingManager is ready
     await _routeEventToManagers(event);
   }
   
@@ -424,7 +429,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     HeartRateUpdated event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // TODO: Implement when HeartRateManager is ready
     await _routeEventToManagers(event);
   }
   
@@ -432,7 +436,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     TakePhotoRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // TODO: Implement when PhotoManager is ready
     await _routeEventToManagers(event);
   }
   
@@ -440,7 +443,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     DeleteSessionPhotoRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // TODO: Implement when PhotoManager is ready
     await _routeEventToManagers(event);
     _aggregateAndEmitState();
   }
@@ -466,7 +468,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionRecoveryRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // TODO: Implement when RecoveryManager is ready
     await _routeEventToManagers(event);
   }
   
@@ -474,7 +475,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     BatchLocationUpdated event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // TODO: Implement when LocationTrackingManager is ready
     await _routeEventToManagers(event);
   }
   

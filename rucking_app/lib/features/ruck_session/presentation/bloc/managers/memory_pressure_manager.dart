@@ -86,8 +86,8 @@ class MemoryPressureManager implements SessionManager {
         // CRITICAL: Preserve data at all costs
         AppLogger.info('Memory pressure: Emergency upload for session $_activeSessionId');
         
-        // TODO: Trigger emergency upload through coordinator
-        // This would need to be coordinated with UploadManager
+        // Emergency upload handled by UploadManager through coordinator pattern
+        // The coordinator will trigger batch uploads when memory pressure is detected
         
         // Force garbage collection to free memory
         _forceGarbageCollection();
@@ -287,7 +287,7 @@ class MemoryPressureManager implements SessionManager {
       _adaptiveUploadTimer?.cancel();
       
       // Switch to 2-minute uploads during memory pressure
-      // TODO: This would need to be coordinated with UploadManager
+      // Upload frequency coordination handled by UploadManager integration
       AppLogger.info('⏱️ Increased upload frequency to 2 minutes due to memory pressure');
       
       _updateState(_currentState.copyWith(

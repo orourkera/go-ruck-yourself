@@ -56,6 +56,63 @@ class SessionReset extends ActiveSessionEvent {
   const SessionReset();
 }
 
+class SessionBatchUploadRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const SessionBatchUploadRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class OfflineSessionSyncRequested extends ActiveSessionEvent {
+  const OfflineSessionSyncRequested();
+}
+
+class OfflineSessionSyncAttemptRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const OfflineSessionSyncAttemptRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class CompletionPayloadBuildRequested extends ActiveSessionEvent {
+  final dynamic currentState;
+  final Map<String, dynamic> terrainStats;
+  final List<dynamic> route;
+  final List<dynamic> heartRateSamples;
+  
+  const CompletionPayloadBuildRequested({
+    required this.currentState,
+    required this.terrainStats,
+    required this.route,
+    required this.heartRateSamples,
+  });
+  
+  @override
+  List<Object?> get props => [currentState, terrainStats, route, heartRateSamples];
+}
+
+class ConnectivityMonitoringStartRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const ConnectivityMonitoringStartRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class LocationTrackingEnsureActiveRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const LocationTrackingEnsureActiveRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
 /// Location events
 class LocationUpdated extends ActiveSessionEvent {
   final Position position;
@@ -87,6 +144,28 @@ class HeartRateUpdated extends ActiveSessionEvent {
   
   @override
   List<Object?> get props => [heartRate, timestamp];
+}
+
+class HeartRateMonitoringStartRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const HeartRateMonitoringStartRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+class HeartRateMonitoringStopRequested extends ActiveSessionEvent {
+  const HeartRateMonitoringStopRequested();
+}
+
+class HeartRateBatchUploadRequested extends ActiveSessionEvent {
+  final List<dynamic> samples;
+  
+  const HeartRateBatchUploadRequested({required this.samples});
+  
+  @override
+  List<Object?> get props => [samples];
 }
 
 /// Photo events
