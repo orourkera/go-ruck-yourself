@@ -195,7 +195,11 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     // Check if this is an auth callback (custom scheme OR universal link)
     bool isAuthCallbackOld = false;
     
-    if ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app' || uri.scheme == 'com.getrucky.app') && uri.path == '/auth/callback') {
+    // Handle both URI parsing formats:
+    // Legacy: com.getrucky.app://auth/callback (path == '/auth/callback')
+    // Current: com.getrucky.app://auth/callback (host == 'auth', path == '/callback')
+    if ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app' || uri.scheme == 'com.getrucky.app') && 
+        (uri.path == '/auth/callback' || (uri.host == 'auth' && uri.path == '/callback'))) {
       isAuthCallbackOld = true;
       print('✅ Custom scheme auth callback detected for ${uri.scheme}');
     } else if (uri.scheme == 'https' && 
