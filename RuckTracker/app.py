@@ -544,7 +544,7 @@ def auth_callback():
             <h2>🎒 RuckTracker</h2>
             <div class="spinner"></div>
             <p>Redirecting to the RuckTracker app...</p>
-            <p><small>If the app doesn't open automatically, <a href="{mobile_url}">click here</a></small></p>
+            <p><small>If the app doesn't open automatically, <a href="#" id="manual-link">click here</a></small></p>
         </div>
         
         <script>
@@ -603,7 +603,7 @@ def auth_callback():
             console.log('Redirecting to mobile app:', mobileUrl);
             
             // Update the manual link
-            document.querySelector('a[href="{mobile_url}"]').href = mobileUrl;
+            document.getElementById('manual-link').href = mobileUrl;
             
             // Redirect to mobile app
             window.location.href = mobileUrl;

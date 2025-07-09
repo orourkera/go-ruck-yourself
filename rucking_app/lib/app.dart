@@ -142,13 +142,8 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         if (errorDescMatch != null) errorDescription = Uri.decodeComponent(errorDescMatch.group(1)!);
         if (errorCodeMatch != null) errorCode = Uri.decodeComponent(errorCodeMatch.group(1)!);
         
-        // Rebuild a clean URL with platform-specific scheme
-        String cleanUrl;
-        if (Platform.isAndroid) {
-          cleanUrl = 'com.ruck.app://auth/callback';
-        } else {
-          cleanUrl = 'com.goruckyourself.app://auth/callback';
-        }
+        // Keep the original com.getrucky.app scheme since that's what Supabase is configured for
+        String cleanUrl = 'com.getrucky.app://auth/callback';
         List<String> params = [];
         
         if (accessToken != null) params.add('access_token=$accessToken');
@@ -200,7 +195,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     // Check if this is an auth callback (custom scheme OR universal link)
     bool isAuthCallbackOld = false;
     
-    if ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app') && uri.path == '/auth/callback') {
+    if ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app' || uri.scheme == 'com.getrucky.app') && uri.path == '/auth/callback') {
       isAuthCallbackOld = true;
       print('✅ Custom scheme auth callback detected for ${uri.scheme}');
     } else if (uri.scheme == 'https' && 
