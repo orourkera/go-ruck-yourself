@@ -206,48 +206,63 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Route to lifecycle manager (always gets events)
     await _lifecycleManager.handleEvent(managerEvent);
     
+    // For SessionStartRequested events, use the actual session ID from lifecycle manager
+    // after it has processed the event and generated the ID
+    manager_events.ActiveSessionEvent finalManagerEvent = managerEvent;
+    if (managerEvent is manager_events.SessionStartRequested) {
+      final sessionId = _lifecycleManager.activeSessionId;
+      if (sessionId != null && sessionId.isNotEmpty) {
+        finalManagerEvent = manager_events.SessionStartRequested(
+          sessionId: sessionId,
+          ruckWeightKg: managerEvent.ruckWeightKg,
+          userWeightKg: managerEvent.userWeightKg,
+        );
+        AppLogger.debug('[COORDINATOR] Using session ID from lifecycle manager: $sessionId');
+      }
+    }
+    
     // Route to location manager
-    if (managerEvent is manager_events.SessionStartRequested ||
-        managerEvent is manager_events.SessionStopRequested ||
-        managerEvent is manager_events.SessionPaused ||
-        managerEvent is manager_events.SessionResumed ||
-        managerEvent is manager_events.LocationUpdated ||
-        managerEvent is manager_events.BatchLocationUpdated) {
-      await _locationManager.handleEvent(managerEvent);
+    if (finalManagerEvent is manager_events.SessionStartRequested ||
+        finalManagerEvent is manager_events.SessionStopRequested ||
+        finalManagerEvent is manager_events.SessionPaused ||
+        finalManagerEvent is manager_events.SessionResumed ||
+        finalManagerEvent is manager_events.LocationUpdated ||
+        finalManagerEvent is manager_events.BatchLocationUpdated) {
+      await _locationManager.handleEvent(finalManagerEvent);
     }
     
     // Route to heart rate manager
-    if (managerEvent is manager_events.SessionStartRequested ||
-        managerEvent is manager_events.SessionStopRequested ||
-        managerEvent is manager_events.SessionPaused ||
-        managerEvent is manager_events.SessionResumed ||
-        managerEvent is manager_events.HeartRateUpdated) {
-      await _heartRateManager.handleEvent(managerEvent);
+    if (finalManagerEvent is manager_events.SessionStartRequested ||
+        finalManagerEvent is manager_events.SessionStopRequested ||
+        finalManagerEvent is manager_events.SessionPaused ||
+        finalManagerEvent is manager_events.SessionResumed ||
+        finalManagerEvent is manager_events.HeartRateUpdated) {
+      await _heartRateManager.handleEvent(finalManagerEvent);
     }
     
     // Route to photo manager
-    if (managerEvent is manager_events.SessionStartRequested ||
-        managerEvent is manager_events.SessionStopRequested ||
-        managerEvent is manager_events.PhotoAdded ||
-        managerEvent is manager_events.PhotoDeleted) {
-      await _photoManager.handleEvent(managerEvent);
+    if (finalManagerEvent is manager_events.SessionStartRequested ||
+        finalManagerEvent is manager_events.SessionStopRequested ||
+        finalManagerEvent is manager_events.PhotoAdded ||
+        finalManagerEvent is manager_events.PhotoDeleted) {
+      await _photoManager.handleEvent(finalManagerEvent);
     }
     
     // Route to upload manager
-    if (managerEvent is manager_events.SessionStartRequested ||
-        managerEvent is manager_events.SessionStopRequested ||
-        managerEvent is manager_events.BatchLocationUpdated) {
-      await _uploadManager.handleEvent(managerEvent);
+    if (finalManagerEvent is manager_events.SessionStartRequested ||
+        finalManagerEvent is manager_events.SessionStopRequested ||
+        finalManagerEvent is manager_events.BatchLocationUpdated) {
+      await _uploadManager.handleEvent(finalManagerEvent);
     }
     
     // Route to memory manager
-    if (managerEvent is manager_events.SessionStartRequested ||
-        managerEvent is manager_events.SessionStopRequested ||
-        managerEvent is manager_events.SessionPaused ||
-        managerEvent is manager_events.SessionResumed ||
-        managerEvent is manager_events.MemoryUpdated ||
-        managerEvent is manager_events.RestoreSessionRequested) {
-      await _memoryManager.handleEvent(managerEvent);
+    if (finalManagerEvent is manager_events.SessionStartRequested ||
+        finalManagerEvent is manager_events.SessionStopRequested ||
+        finalManagerEvent is manager_events.SessionPaused ||
+        finalManagerEvent is manager_events.SessionResumed ||
+        finalManagerEvent is manager_events.MemoryUpdated ||
+        finalManagerEvent is manager_events.RestoreSessionRequested) {
+      await _memoryManager.handleEvent(finalManagerEvent);
     }
   }
   
@@ -256,7 +271,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Map main bloc events to manager events
     if (mainEvent is SessionStarted) {
       return manager_events.SessionStartRequested(
-        sessionId: '', // Session ID will be generated during start process
+        sessionId: null, // Let lifecycle manager generate the session ID
         ruckWeightKg: mainEvent.ruckWeightKg,
         userWeightKg: mainEvent.userWeightKg,
       );

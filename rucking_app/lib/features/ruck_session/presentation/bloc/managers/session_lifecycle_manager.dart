@@ -78,16 +78,22 @@ class SessionLifecycleManager implements SessionManager {
     try {
       AppLogger.info('Starting new ruck session with weight: ${event.ruckWeightKg}kg');
       
-      _updateState(_currentState.copyWith(isLoading: true));
+      // Optimistically mark session as active before backend confirmation
+      _updateState(_currentState.copyWith(
+        isActive: true,
+        sessionId: null, // will set after ID generation below
+        // keep isLoading false to avoid showing initializing screen
+        // isLoading: true,
+      ));
       
-      // Create session ID
-      final sessionId = event.sessionId ?? const Uuid().v4();
-      _activeSessionId = sessionId;
+      // Create preliminary session ID (may be overridden by backend)
+      final provisionalId = event.sessionId ?? const Uuid().v4();
+      _activeSessionId = provisionalId;
       _sessionStartTime = DateTime.now();
       
-      // Create initial session
-      await _createInitialSession(
-        sessionId: sessionId,
+      // Ensure backend session is created before other managers start uploading
+      final backendId = await _createInitialSession(
+        sessionId: provisionalId,
         ruckWeightKg: event.ruckWeightKg ?? 0.0,
         userWeightKg: event.userWeightKg ?? 70.0, // Default user weight
         notes: null, // Optional field - can be passed in future versions
@@ -97,20 +103,23 @@ class SessionLifecycleManager implements SessionManager {
       // Get user metric preference
       final preferMetric = await _getUserMetricPreference();
       
+      // Choose the ID to use (backend if available, otherwise provisional)
+      final finalSessionId = backendId ?? provisionalId;
+      
       // Start watch session
       await _watchService.startSessionOnWatch(event.ruckWeightKg ?? 0.0, isMetric: preferMetric);
-      await _watchService.sendSessionIdToWatch(sessionId);
+      await _watchService.sendSessionIdToWatch(finalSessionId);
       
       _updateState(_currentState.copyWith(
         isActive: true,
-        sessionId: sessionId,
+        sessionId: finalSessionId,
         startTime: _sessionStartTime,
         duration: Duration.zero,
         isLoading: false,
         errorMessage: null,
       ));
       
-      AppLogger.debug('Session lifecycle started successfully: $sessionId');
+      AppLogger.debug('Session lifecycle started successfully: $finalSessionId');
       
     } catch (e, stackTrace) {
       AppLogger.error('Error starting session: $e\n$stackTrace');
@@ -212,7 +221,7 @@ class SessionLifecycleManager implements SessionManager {
     }
   }
 
-  Future<void> _createInitialSession({
+  Future<String?> _createInitialSession({
     required String sessionId,
     required double ruckWeightKg,
     required double userWeightKg,
@@ -221,7 +230,7 @@ class SessionLifecycleManager implements SessionManager {
   }) async {
     try {
       // Create session in backend
-      await _apiClient.post('/sessions', {
+      final result = await _apiClient.post('/rucks', {
         'id': sessionId,
         'ruck_weight_kg': ruckWeightKg,
         'user_weight_kg': userWeightKg,
@@ -231,10 +240,19 @@ class SessionLifecycleManager implements SessionManager {
         'start_time': _sessionStartTime!.toIso8601String(),
       });
       
-      AppLogger.info('Initial session created in backend: $sessionId');
+      String backendId = sessionId;
+      if (result is Map && (result['id'] != null || result['ruck_id'] != null)) {
+        backendId = (result['id'] ?? result['ruck_id']).toString();
+        AppLogger.info('Backend assigned session ID: $backendId');
+      } else {
+        AppLogger.warning('Backend response did not include ID, using local: $sessionId');
+      }
+      
+      return backendId;
     } catch (e) {
       AppLogger.warning('Failed to create initial session in backend: $e');
       // Continue with offline session
+      return null;
     }
   }
 

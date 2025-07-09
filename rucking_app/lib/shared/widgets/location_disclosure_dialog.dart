@@ -41,7 +41,7 @@ class LocationDisclosureDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'RuckingApp needs location access to provide core functionality during your ruck sessions:',
+            'Ruck! needs location access to provide core functionality during your ruck sessions:',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -183,6 +183,10 @@ class LocationDisclosureDialog extends StatelessWidget {
 
   /// Show the location disclosure dialog
   static Future<bool> show(BuildContext context) async {
+    // Only show on Android; on iOS return true immediately
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return true;
+    }
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,

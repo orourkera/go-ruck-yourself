@@ -102,12 +102,14 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
           
           // Listen for session state changes
           _blocSubscription = _sessionBloc.stream.listen((state) {
-            if (state is ActiveSessionRunning && mounted) {
+            if (state is ActiveSessionRunning) {
               // Session is now running - mark as ready
               AppLogger.debug('[COUNTDOWN] ActiveSessionRunning state received - setting isLoading=false');
-              setState(() {
-                _isLoading = false;
-              });
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                });
+              }
             }
           });
         }
@@ -119,6 +121,11 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     
     // Start countdown timer
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
       if (_count > 1) {
         setState(() {
           _count--;
@@ -164,9 +171,11 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     // Simulate resource loading with a minimum delay so the countdown animation isn't cut short
     await Future.delayed(const Duration(seconds: 3));
     
-    setState(() {
-      _preloadComplete = true;
-    });
+    if (mounted) {
+      setState(() {
+        _preloadComplete = true;
+      });
+    }
     AppLogger.debug('[COUNTDOWN] Preload complete');
     _checkAndNavigateIfReady();
   }
