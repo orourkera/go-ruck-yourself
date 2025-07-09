@@ -312,7 +312,7 @@ api.add_resource(SignUpResource, '/api/auth/signup', '/api/users/register')
 api.add_resource(SignInResource, '/api/auth/signin', '/api/auth/login', endpoint='signin')
 api.add_resource(SignOutResource, '/api/auth/signout', '/api/auth/logout')
 api.add_resource(RefreshTokenResource, '/api/auth/refresh')
-api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password')
+api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password', '/api/auth/password-reset')
 api.add_resource(UserProfileResource, '/api/auth/profile', '/api/users/profile')
 api.add_resource(UserAvatarUploadResource, '/api/auth/avatar')
 
