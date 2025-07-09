@@ -158,6 +158,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<SessionReset>(_onSessionReset);
     on<SessionCleanupRequested>(_onSessionCleanupRequested);
     on<MemoryPressureDetected>(_onMemoryPressureDetected);
+    on<_CoordinatorStateForwarded>(_onCoordinatorStateForwarded);
   }
 
   Future<void> _onSessionStarted(
@@ -170,11 +171,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Create coordinator if it doesn't exist
       if (_coordinator == null) {
         _coordinator = _createCoordinator();
-        
-        // Subscribe to coordinator state changes
-        _coordinatorSubscription = _coordinator!.stream.listen((coordinatorState) {
-          emit(coordinatorState);
-        });
+        _setupCoordinatorSubscription();
       }
       
       // Delegate to coordinator
@@ -182,7 +179,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       
     } catch (e) {
       AppLogger.error('Session start failed: $e');
-      emit(ActiveSessionError('Failed to start session: $e'));
+      emit(ActiveSessionFailure(errorMessage: 'Failed to start session: $e'));
     }
   }
 
@@ -199,6 +196,33 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       terrainTracker: _terrainTracker,
       heartRateService: _heartRateService,
     );
+  }
+
+  /// Setup coordinator subscription using event forwarding instead of direct emit
+  void _setupCoordinatorSubscription() {
+    _coordinatorSubscription?.cancel();
+    _coordinatorSubscription = _coordinator!.stream.listen(
+      (coordinatorState) {
+        // Forward coordinator state as an internal event instead of calling emit directly
+        // This prevents "emit after event handler completed" errors
+        _forwardCoordinatorState(coordinatorState);
+      },
+      onError: (error) {
+        AppLogger.error('Coordinator state error: $error');
+        // Use a generic sessionId since we don't have access to the actual session ID during setup
+        add(SessionFailed(
+          errorMessage: 'Session coordination failed: $error',
+          sessionId: 'coordinator-setup-error',
+        ));
+      },
+    );
+  }
+
+  /// Forward coordinator state safely by converting it to an internal event
+  void _forwardCoordinatorState(ActiveSessionState coordinatorState) {
+    // Instead of calling emit directly, we use a custom event to safely forward states
+    // This ensures the emission happens within a proper event handler context
+    add(_CoordinatorStateForwarded(coordinatorState));
   }
 
   void _startLocationUpdates(String sessionId) {
@@ -236,7 +260,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     BatchLocationUpdated event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    AppLogger.debug('Batch location update received: ${event.points.length} points');
+    AppLogger.debug('Batch location update received: ${event.locationPoints.length} points');
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
@@ -250,7 +274,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     LocationUpdated event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.debug('Location update received: ${event.location}');
+    AppLogger.debug('Location update received: ${event.locationPoint}');
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
@@ -365,7 +389,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _coordinator!.add(event);
     } else {
       AppLogger.warning('No coordinator available for session pause');
-      emit(ActiveSessionError('Session coordinator not initialized'));
+      emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
     }
   }
 
@@ -380,7 +404,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _coordinator!.add(event);
     } else {
       AppLogger.warning('No coordinator available for session resume');
-      emit(ActiveSessionError('Session coordinator not initialized'));
+      emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
     }
   }
 
@@ -395,7 +419,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _coordinator!.add(event);
     } else {
       AppLogger.warning('No coordinator available for session completion');
-      emit(ActiveSessionError('Session coordinator not initialized'));
+      emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
     }
   }
 
@@ -441,7 +465,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     HeartRateUpdated event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    AppLogger.debug('Heart rate updated: ${event.heartRate} bpm');
+    AppLogger.debug('Heart rate updated: ${event.sample.bpm} bpm');
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
@@ -797,5 +821,24 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
   }
   
+  /// Handle coordinator state forwarding
+  void _onCoordinatorStateForwarded(
+    _CoordinatorStateForwarded event,
+    Emitter<ActiveSessionState> emit,
+  ) {
+    // Safely emit the coordinator state within an event handler context
+    emit(event.state);
+  }
+  
   // All diagnostic and memory pressure methods removed - now handled by dedicated managers
+}
+
+/// Internal event for safely forwarding coordinator states
+class _CoordinatorStateForwarded extends ActiveSessionEvent {
+  final ActiveSessionState state;
+  
+  const _CoordinatorStateForwarded(this.state);
+  
+  @override
+  List<Object> get props => [state];
 }

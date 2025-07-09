@@ -94,6 +94,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     on<Tick>(_onTick);
     on<SessionRecoveryRequested>(_onSessionRecoveryRequested);
     on<BatchLocationUpdated>(_onBatchLocationUpdated);
+    on<StateAggregationRequested>(_onStateAggregationRequested);
     
     AppLogger.info('[COORDINATOR] ActiveSessionCoordinator initialized');
   }
@@ -255,7 +256,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Map main bloc events to manager events
     if (mainEvent is SessionStarted) {
       return manager_events.SessionStartRequested(
-        sessionId: mainEvent.sessionId,
+        sessionId: '', // Session ID will be generated during start process
         ruckWeightKg: mainEvent.ruckWeightKg,
         userWeightKg: mainEvent.userWeightKg,
       );
@@ -301,7 +302,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         photoId: mainEvent.photo.toString(),
       );
     } else if (mainEvent is SessionRecoveryRequested) {
-      final sessionId = _lifecycleManager.currentSessionId ?? mainEvent.sessionId ?? '';
+      final sessionId = _lifecycleManager.activeSessionId ?? '';
       return manager_events.RecoveryRequested(
         sessionId: sessionId,
       );
@@ -327,11 +328,16 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     } else if (lifecycleState.isActive && lifecycleState.sessionId != null) {
       // Aggregate states from all managers into ActiveSessionRunning
       final locationPoints = _locationManager.locationPoints;
+      // Get user and ruck weight from lifecycle manager's session data
+      final session = lifecycleState.currentSession;
+      final userWeightKg = session?.weightKg ?? 75.0;
+      final ruckWeightKg = session?.ruckWeightKg ?? 0.0;
+      
       final calories = _calculateCalories(
         distanceKm: locationState.totalDistance,
         duration: lifecycleState.duration,
-        userWeightKg: lifecycleState.userWeightKg ?? 75.0,
-        ruckWeightKg: lifecycleState.ruckWeightKg ?? 0.0,
+        userWeightKg: userWeightKg,
+        ruckWeightKg: ruckWeightKg,
       );
       
       _currentAggregatedState = ActiveSessionRunning(
@@ -339,15 +345,15 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         locationPoints: locationPoints,
         elapsedSeconds: lifecycleState.duration.inSeconds,
         distanceKm: locationState.totalDistance,
-        ruckWeightKg: lifecycleState.ruckWeightKg ?? 0.0,
-        userWeightKg: lifecycleState.userWeightKg ?? 75.0,
+        ruckWeightKg: ruckWeightKg,
+        userWeightKg: userWeightKg,
         calories: calories,
         elevationGain: _locationManager.elevationGain,
         elevationLoss: _locationManager.elevationLoss,
         isPaused: _lifecycleManager.isPaused,
         pace: locationState.currentPace,
-        originalSessionStartTimeUtc: lifecycleState.sessionStartTime ?? DateTime.now(),
-        totalPausedDuration: lifecycleState.totalPausedDuration ?? Duration.zero,
+        originalSessionStartTimeUtc: lifecycleState.startTime ?? DateTime.now(),
+        totalPausedDuration: Duration.zero, // TODO: Implement paused duration tracking
         heartRateSamples: _heartRateManager.heartRateSampleObjects,
         latestHeartRate: heartRateState.currentHeartRate,
         minHeartRate: heartRateState.minHeartRate,
@@ -362,7 +368,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       );
     }
     
-    emit(_currentAggregatedState);
+    // Trigger internal event to emit the aggregated state
+    add(const StateAggregationRequested());
   }
   
   double _calculateCalories({
@@ -476,6 +483,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     Emitter<ActiveSessionState> emit,
   ) async {
     await _routeEventToManagers(event);
+  }
+  
+  Future<void> _onStateAggregationRequested(
+    StateAggregationRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    emit(_currentAggregatedState);
   }
   
   @override

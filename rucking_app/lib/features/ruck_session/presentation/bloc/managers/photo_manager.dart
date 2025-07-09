@@ -100,7 +100,7 @@ class PhotoManager implements SessionManager {
       // Get current user ID from auth service
       final authService = GetIt.instance<AuthService>();
       final currentUser = await authService.getCurrentUser();
-      final userId = currentUser?.id ?? '';
+      final userId = currentUser?.userId ?? '';
       
       final photo = RuckPhoto(
         id: photoId,
@@ -150,22 +150,23 @@ class PhotoManager implements SessionManager {
       }
       
       // Delete local file
-      final photo = _photos.firstWhere(
-        (p) => p.id == event.photoId,
-        orElse: () {
-          // Get current user ID from auth service for fallback photo
-          final authService = GetIt.instance<AuthService>();
-          final currentUser = authService.getCurrentUser();
-          final userId = currentUser?.id ?? '';
-          
-          return RuckPhoto(
-            id: event.photoId,
-            ruckId: _activeSessionId!,
-            userId: userId,
-            filename: 'photo_${event.photoId}.jpg',
-            createdAt: DateTime.now(),
-        ),
-      );
+      RuckPhoto? photo;
+      try {
+        photo = _photos.firstWhere((p) => p.id == event.photoId);
+      } catch (e) {
+        // Photo not found in local list, create fallback photo
+        final authService = GetIt.instance<AuthService>();
+        final currentUser = await authService.getCurrentUser();
+        final userId = currentUser?.userId ?? '';
+        
+        photo = RuckPhoto(
+          id: event.photoId,
+          ruckId: _activeSessionId!,
+          userId: userId,
+          filename: 'photo_${event.photoId}.jpg',
+          createdAt: DateTime.now(),
+        );
+      }
       if (photo.url != null && photo.url!.startsWith('/')) {
         // Local file path
         final file = File(photo.url!);
@@ -244,20 +245,24 @@ class PhotoManager implements SessionManager {
           throw Exception('Photo file not found: ${photo.url}');
         }
         
-        // Upload to backend using session repository
-        final uploadedPhoto = await _sessionRepository.uploadSessionPhoto(
-          sessionId: photo.ruckId,
-          photoFile: imageFile,
-          filename: photo.filename,
+        // Upload to backend using session repository with compression
+        final uploadedPhotos = await _sessionRepository.uploadSessionPhotosOptimized(
+          photo.ruckId,
+          [imageFile],  // Pass as single-item list
         );
         
-        // Update photo with server URL
-        final index = _photos.indexWhere((p) => p.id == photo.id);
-        if (index != -1) {
-          _photos[index] = uploadedPhoto;
+        if (uploadedPhotos.isNotEmpty) {
+          // Update photo with server URL
+          final uploadedPhoto = uploadedPhotos.first;
+          final index = _photos.indexWhere((p) => p.id == photo.id);
+          if (index != -1) {
+            _photos[index] = uploadedPhoto;
+          }
+          final uploadedPhotoUrl = uploadedPhoto.url;
+          AppLogger.info('[PHOTO_MANAGER] Photo uploaded successfully: $uploadedPhotoUrl');
+        } else {
+          throw Exception('Photo upload failed - no photos returned');
         }
-        
-        AppLogger.info('[PHOTO_MANAGER] Photo uploaded successfully: ${uploadedPhoto.url}');
         
         _updateState(_currentState.copyWith(
           photos: List.from(_photos),

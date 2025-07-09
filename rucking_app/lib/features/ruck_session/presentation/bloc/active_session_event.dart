@@ -273,3 +273,105 @@ class MemoryPressureDetected extends ActiveSessionEvent {
   @override
   List<Object?> get props => [];
 }
+
+/// Event to trigger batch upload of session data
+class SessionBatchUploadRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const SessionBatchUploadRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+/// Event to start heart rate monitoring
+class HeartRateMonitoringStartRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const HeartRateMonitoringStartRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+/// Event to stop heart rate monitoring
+class HeartRateMonitoringStopRequested extends ActiveSessionEvent {
+  const HeartRateMonitoringStopRequested();
+  
+  @override
+  List<Object?> get props => [];
+}
+
+/// Event to trigger batch upload of heart rate data
+class HeartRateBatchUploadRequested extends ActiveSessionEvent {
+  final List<HeartRateSample> samples;
+  
+  const HeartRateBatchUploadRequested({required this.samples});
+  
+  @override
+  List<Object?> get props => [samples];
+}
+
+/// Event to trigger offline session sync
+class OfflineSessionSyncRequested extends ActiveSessionEvent {
+  const OfflineSessionSyncRequested();
+  
+  @override
+  List<Object?> get props => [];
+}
+
+/// Event to trigger completion payload building
+class CompletionPayloadBuildRequested extends ActiveSessionEvent {
+  final ActiveSessionRunning currentState;
+  final Map<String, dynamic> terrainStats;
+  final List<LocationPoint> route;
+  final List<HeartRateSample> heartRateSamples;
+  
+  const CompletionPayloadBuildRequested({
+    required this.currentState,
+    required this.terrainStats,
+    required this.route,
+    required this.heartRateSamples,
+  });
+  
+  @override
+  List<Object?> get props => [currentState, terrainStats, route, heartRateSamples];
+}
+
+/// Event to start connectivity monitoring
+class ConnectivityMonitoringStartRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const ConnectivityMonitoringStartRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+/// Event to ensure location tracking is active
+class LocationTrackingEnsureActiveRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const LocationTrackingEnsureActiveRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+/// Event to attempt offline session sync
+class OfflineSessionSyncAttemptRequested extends ActiveSessionEvent {
+  final String sessionId;
+  
+  const OfflineSessionSyncAttemptRequested({required this.sessionId});
+  
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+/// Internal event to trigger state aggregation
+class StateAggregationRequested extends ActiveSessionEvent {
+  const StateAggregationRequested();
+  
+  @override
+  List<Object?> get props => [];
+}
