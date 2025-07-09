@@ -148,10 +148,10 @@ class LocationServiceImpl implements LocationService {
         return true;
       }
       
-      // Show prominent disclosure dialog first (required for Google Play compliance)
-      // Show on both platforms for better UX, but it's only required for Android
-      if (context != null) {
-        AppLogger.info('${Platform.isAndroid ? '[REQUIRED]' : '[UX]'} Showing location disclosure dialog...');
+      // Show prominent disclosure dialog first (required for Google Play compliance on Android)
+      // Only show on Android to avoid extra modal on iOS
+      if (context != null && Platform.isAndroid) {
+        AppLogger.info('[ANDROID REQUIRED] Showing location disclosure dialog...');
         final userConsent = await LocationDisclosureDialog.show(context);
         
         if (!userConsent) {
@@ -160,8 +160,10 @@ class LocationServiceImpl implements LocationService {
         }
         
         AppLogger.info('User accepted location disclosure, proceeding with system permission...');
-      } else {
+      } else if (context == null) {
         AppLogger.warning('No context provided for disclosure dialog, proceeding directly to system permission');
+      } else {
+        AppLogger.info('[iOS] Skipping disclosure dialog, proceeding directly to system permission');
       }
       
       // Request basic location permission using Geolocator (single dialog)
