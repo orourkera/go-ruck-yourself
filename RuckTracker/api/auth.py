@@ -245,21 +245,21 @@ class ForgotPasswordResource(Resource):
                 logger.warning("Password reset attempt with no email provided")
                 return {'message': 'Email is required'}, 400
                 
-            # The final destination URL for the mobile app
-            # The email template will wrap this in the auth/redirect endpoint
-            mobile_app_url = 'com.getrucky.app://auth/callback'
+            # Use our web callback endpoint that will redirect to the mobile app
+            # This ensures Supabase uses a proper HTTPS URL instead of a custom scheme
+            callback_url = 'https://getrucky.com/auth/callback'
             
-            logger.info(f"Sending password reset email to {email} with mobile app redirect: {mobile_app_url}")
+            logger.info(f"Sending password reset email to {email} with callback URL: {callback_url}")
             
             # Get the Supabase client
             supabase = get_supabase_client()
             
-            # Send the password reset email with the mobile app URL
-            # The email template will wrap this in auth/redirect automatically
+            # Send the password reset email with the web callback URL
+            # This will redirect to our /auth/callback endpoint which handles mobile app redirect
             response = supabase.auth.reset_password_email(
                 email=email,
                 options={
-                    'redirect_to': mobile_app_url,
+                    'redirect_to': callback_url,
                     'data': {
                         'email': email,
                         'app_name': 'RuckTracker'

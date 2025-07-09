@@ -486,27 +486,17 @@ def auth_callback():
     """
     Handle authentication callback from Supabase for password reset and other auth flows.
     This endpoint receives tokens and redirects to the mobile app.
+    Supabase sends tokens in URL fragment, so we need JavaScript to extract them.
     """
-    # Get tokens from URL parameters or fragment
+    # Get tokens from URL parameters (fallback)
     access_token = request.args.get('access_token')
     refresh_token = request.args.get('refresh_token')
     token_type = request.args.get('type')
     expires_in = request.args.get('expires_in')
     
     logger.info(f"Auth callback received - type: {token_type}, access_token: {'present' if access_token else 'missing'}")
-    
-    # Build mobile app URL with tokens
-    mobile_url = 'com.getrucky.app://auth/callback'
-    if access_token:
-        mobile_url += f'?access_token={access_token}'
-        if token_type:
-            mobile_url += f'&type={token_type}'
-        if refresh_token:
-            mobile_url += f'&refresh_token={refresh_token}'
-        if expires_in:
-            mobile_url += f'&expires_in={expires_in}'
-    
-    logger.info(f"Redirecting to mobile app: {mobile_url}")
+    logger.info(f"Request URL: {request.url}")
+    logger.info(f"Query params: {dict(request.args)}")
     
     # Create HTML page that handles the redirect
     html_content = f"""
@@ -554,12 +544,69 @@ def auth_callback():
             <h2>🎒 RuckTracker</h2>
             <div class="spinner"></div>
             <p>Redirecting to the RuckTracker app...</p>
-            <p><small>If the app doesn't open automatically, <a href="{mobile_url}">click here</a></small></p>
+            <p><small>If the app doesn't open automatically, <a href="#" id="manual-link">click here</a></small></p>
         </div>
         
         <script>
+            // Extract tokens from URL fragment (Supabase sends tokens after #)
+            function getTokensFromFragment() {{
+                const fragment = window.location.hash.substring(1); // Remove #
+                const params = new URLSearchParams(fragment);
+                return {{
+                    access_token: params.get('access_token'),
+                    refresh_token: params.get('refresh_token'),
+                    type: params.get('type'),
+                    expires_in: params.get('expires_in')
+                }};
+            }}
+            
+            // Extract tokens from query parameters (fallback)
+            function getTokensFromQuery() {{
+                const params = new URLSearchParams(window.location.search);
+                return {{
+                    access_token: params.get('access_token'),
+                    refresh_token: params.get('refresh_token'),
+                    type: params.get('type'),
+                    expires_in: params.get('expires_in')
+                }};
+            }}
+            
+            // Build mobile app URL with tokens
+            function buildMobileUrl() {{
+                let tokens = getTokensFromFragment();
+                if (!tokens.access_token) {{
+                    tokens = getTokensFromQuery();
+                }}
+                
+                console.log('Extracted tokens:', tokens);
+                
+                let mobileUrl = 'com.getrucky.app://auth/callback';
+                
+                if (tokens.access_token) {{
+                    mobileUrl += '?access_token=' + encodeURIComponent(tokens.access_token);
+                    if (tokens.type) {{
+                        mobileUrl += '&type=' + encodeURIComponent(tokens.type);
+                    }}
+                    if (tokens.refresh_token) {{
+                        mobileUrl += '&refresh_token=' + encodeURIComponent(tokens.refresh_token);
+                    }}
+                    if (tokens.expires_in) {{
+                        mobileUrl += '&expires_in=' + encodeURIComponent(tokens.expires_in);
+                    }}
+                }}
+                
+                return mobileUrl;
+            }}
+            
             // Try to redirect to mobile app immediately
-            window.location.href = '{mobile_url}';
+            const mobileUrl = buildMobileUrl();
+            console.log('Redirecting to mobile app:', mobileUrl);
+            
+            // Update the manual link
+            document.getElementById('manual-link').href = mobileUrl;
+            
+            // Redirect to mobile app
+            window.location.href = mobileUrl;
             
             // Fallback: show download links if app doesn't open
             setTimeout(() => {{
@@ -742,7 +789,7 @@ def bad_request(error):
 @app.errorhandler(401)
 def unauthorized(error):
     """Handle 401 Unauthorized errors"""
-    logger.warning(f"401 UNAUTHORIZED: {request.method} {request.path} - "
+    logger.error(f"401 UNAUTHORIZED: {request.method} {request.path} - "
                   f"IP: {request.remote_addr} - Auth header: {bool(request.headers.get('Authorization'))}")
     return jsonify({
         'error': 'Unauthorized',
@@ -772,7 +819,6 @@ def not_found(error):
         # Log bot traffic at debug level (won't appear in production logs)
         logger.debug(f"404 BOT TRAFFIC: {request.method} {request.path} - IP: {request.remote_addr}")
     
->>>>>>> ad889e4b (add back missing /auth/callback endpoint for password reset)
     return jsonify({
         'error': 'Not Found',
         'message': 'The requested resource was not found',

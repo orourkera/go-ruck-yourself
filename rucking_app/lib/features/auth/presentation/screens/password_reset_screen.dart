@@ -68,12 +68,10 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
               type: SnackBarType.error,
             );
           } else if (state is PasswordResetSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Password reset successfully! Please log in with your new password.'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
+            StyledSnackBar.show(
+              context: context,
+              message: 'Password reset successfully! Please log in with your new password.',
+              type: SnackBarType.success,
             );
             // Redirect to login screen after a short delay
             Future.delayed(const Duration(seconds: 1), () {
