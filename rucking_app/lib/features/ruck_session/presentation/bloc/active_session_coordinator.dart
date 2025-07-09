@@ -253,6 +253,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Map main bloc events to manager events
     if (mainEvent is SessionStarted) {
       return manager_events.SessionStartRequested(
+        sessionId: mainEvent.sessionId,
         ruckWeightKg: mainEvent.ruckWeightKg,
         userWeightKg: mainEvent.userWeightKg,
       );

@@ -44,6 +44,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'active_session_coordinator.dart';
 
 part 'active_session_event.dart';
 part 'active_session_state.dart';
@@ -62,6 +63,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final ActiveSessionStorage _activeSessionStorage;
   final TerrainTracker _terrainTracker;
   final ConnectivityService _connectivityService;
+
+  // Coordinator for delegating to managers
+  ActiveSessionCoordinator? _coordinator;
+  StreamSubscription<ActiveSessionState>? _coordinatorSubscription;
 
   StreamSubscription<LocationPoint>? _locationSubscription;
   StreamSubscription<List<LocationPoint>>? _batchLocationSubscription;
@@ -159,16 +164,41 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    // Session start logic is now handled by SessionLifecycleManager
-    // This bloc now serves as a coordination layer
-    AppLogger.debug('Delegating session start to managers');
+    AppLogger.info('Starting session with delegation to coordinator');
     
-    // TODO: Route event to SessionLifecycleManager through coordinator
-    // For now, emit loading state
-    emit(ActiveSessionLoading());
-    
-    // This should be replaced with proper manager coordination
-    AppLogger.warning('Session start delegation not yet implemented - requires coordinator integration');
+    try {
+      // Create coordinator if it doesn't exist
+      if (_coordinator == null) {
+        _coordinator = _createCoordinator();
+        
+        // Subscribe to coordinator state changes
+        _coordinatorSubscription = _coordinator!.stream.listen((coordinatorState) {
+          emit(coordinatorState);
+        });
+      }
+      
+      // Delegate to coordinator
+      _coordinator!.add(event);
+      
+    } catch (e) {
+      AppLogger.error('Session start failed: $e');
+      emit(ActiveSessionError('Failed to start session: $e'));
+    }
+  }
+
+  /// Create and configure the coordinator with all necessary services
+  ActiveSessionCoordinator _createCoordinator() {
+    return ActiveSessionCoordinator(
+      sessionRepository: _sessionRepository,
+      locationService: _locationService,
+      authService: GetIt.I<AuthService>(),
+      watchService: _watchService,
+      storageService: GetIt.I<StorageService>(),
+      apiClient: _apiClient,
+      splitTrackingService: _splitTrackingService,
+      terrainTracker: _terrainTracker,
+      heartRateService: _heartRateService,
+    );
   }
 
   void _startLocationUpdates(String sessionId) {
@@ -315,22 +345,30 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionPaused event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    // Session pause logic is now handled by SessionLifecycleManager
-    AppLogger.debug('Delegating session pause to managers');
+    AppLogger.info('Pausing session with delegation to coordinator');
     
-    // TODO: Route event to SessionLifecycleManager through coordinator
-    AppLogger.warning('Session pause delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for session pause');
+      emit(ActiveSessionError('Session coordinator not initialized'));
+    }
   }
 
   Future<void> _onSessionResumed(
     SessionResumed event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    // Session resume logic is now handled by SessionLifecycleManager
-    AppLogger.debug('Delegating session resume to managers');
+    AppLogger.info('Resuming session with delegation to coordinator');
     
-    // TODO: Route event to SessionLifecycleManager through coordinator
-    AppLogger.warning('Session resume delegation not yet implemented - requires coordinator integration');
+    // Delegate to coordinator if it exists
+    if (_coordinator != null) {
+      _coordinator!.add(event);
+    } else {
+      AppLogger.warning('No coordinator available for session resume');
+      emit(ActiveSessionError('Session coordinator not initialized'));
+    }
   }
 
   Future<void> _onSessionCompleted(
@@ -567,8 +605,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   Future<void> close() async {
     AppLogger.debug('Closing ActiveSessionBloc - cleaning up resources');
     
-    // Clean up the underlying services that this bloc still directly manages
+    // Clean up coordinator first
     try {
+      await _coordinatorSubscription?.cancel();
+      await _coordinator?.close();
+      _coordinator = null;
+      
+      // Clean up the underlying services that this bloc still directly manages
       // Stop location tracking
       await _locationService.stopLocationTracking();
       
