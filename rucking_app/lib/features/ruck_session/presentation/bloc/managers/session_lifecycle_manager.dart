@@ -105,6 +105,8 @@ class SessionLifecycleManager implements SessionManager {
       
       // Choose the ID to use (backend if available, otherwise provisional)
       final finalSessionId = backendId ?? provisionalId;
+      // Update the in-memory active sessionId so all other managers use the correct backend ID
+      _activeSessionId = finalSessionId;
       
       // Start watch session
       await _watchService.startSessionOnWatch(event.ruckWeightKg ?? 0.0, isMetric: preferMetric);
@@ -156,11 +158,20 @@ class SessionLifecycleManager implements SessionManager {
       // Stop watch session
       await _watchService.endSessionOnWatch();
       
-      // Clear active session
-      _activeSessionId = null;
-      _sessionStartTime = null;
-      
-      _updateState(const SessionLifecycleState());
+      // Mark session as inactive but preserve identifiers for completion screen
+      final duration = _sessionStartTime != null ? DateTime.now().difference(_sessionStartTime!) : Duration.zero;
+
+      _updateState(_currentState.copyWith(
+        isActive: false,
+        // Keep the sessionId so downstream managers & UI can access it
+        sessionId: _activeSessionId,
+        duration: duration,
+        isSaving: false,
+      ));
+
+      // NOTE: we intentionally keep _activeSessionId & _sessionStartTime until the
+      // coordinator has emitted an `ActiveSessionCompleted` state. They will be
+      // cleared when the coordinator is closed.
       
       AppLogger.info('Session lifecycle stopped successfully');
       

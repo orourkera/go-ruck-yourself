@@ -25,6 +25,7 @@ import 'managers/memory_pressure_manager.dart';
 
 /// Main coordinator that orchestrates all session managers
 class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionState> {
+  Type? _lastLoggedAggregatedStateType;
   // Services
   final SessionRepository _sessionRepository;
   final LocationService _locationService;
@@ -194,7 +195,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   
   /// Route events to appropriate managers
   Future<void> _routeEventToManagers(ActiveSessionEvent event) async {
-    AppLogger.debug('[COORDINATOR] Routing ${event.runtimeType} to managers');
+    if (event is! Tick) {
+      AppLogger.debug('[COORDINATOR] Routing ${event.runtimeType} to managers');
+    }
     
     // Convert main bloc events to manager events
     final managerEvent = _convertToManagerEvent(event);
@@ -340,7 +343,43 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       _currentAggregatedState = ActiveSessionFailure(
         errorMessage: lifecycleState.errorMessage!,
       );
-    } else if (lifecycleState.isActive && lifecycleState.sessionId != null) {
+    } else if (!lifecycleState.isActive && lifecycleState.sessionId != null) {
+    // Session has ended – build completed state
+    final totalDistance = _locationManager.currentState.totalDistance;
+    final route = _locationManager.locationPoints;
+    final duration = lifecycleState.duration;
+
+    // Use weights similar to running case
+    final session = lifecycleState.currentSession;
+    final userWeightKg = session?.weightKg ?? 75.0;
+    final ruckWeightKg = session?.ruckWeightKg ?? 0.0;
+
+    final calories = _calculateCalories(
+      distanceKm: totalDistance,
+      duration: duration,
+      userWeightKg: userWeightKg,
+      ruckWeightKg: ruckWeightKg,
+    ).round();
+
+    _currentAggregatedState = ActiveSessionCompleted(
+      sessionId: lifecycleState.sessionId!,
+      finalDistanceKm: totalDistance,
+      finalDurationSeconds: duration.inSeconds,
+      finalCalories: calories,
+      elevationGain: _locationManager.elevationGain,
+      elevationLoss: _locationManager.elevationLoss,
+      averagePace: totalDistance > 0 ? duration.inSeconds / totalDistance : null,
+      route: route,
+      heartRateSamples: _heartRateManager.heartRateSampleObjects,
+      averageHeartRate: _heartRateManager.currentState.averageHeartRate.toInt(),
+      minHeartRate: _heartRateManager.currentState.minHeartRate,
+      maxHeartRate: _heartRateManager.currentState.maxHeartRate,
+      sessionPhotos: _photoManager.photos,
+      splits: const [],
+      completedAt: DateTime.now(),
+      isOffline: false,
+    );
+  } else if (lifecycleState.isActive && lifecycleState.sessionId != null) {
       // Aggregate states from all managers into ActiveSessionRunning
       final locationPoints = _locationManager.locationPoints;
       // Get user and ruck weight from lifecycle manager's session data
@@ -383,6 +422,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       );
     }
     
+    // Log aggregated state only when the state TYPE changes
+    if (_currentAggregatedState.runtimeType != _lastLoggedAggregatedStateType) {
+      AppLogger.debug('[COORDINATOR] Aggregated state: ${_currentAggregatedState.runtimeType}');
+      _lastLoggedAggregatedStateType = _currentAggregatedState.runtimeType;
+    }
     // Trigger internal event to emit the aggregated state
     add(const StateAggregationRequested());
   }

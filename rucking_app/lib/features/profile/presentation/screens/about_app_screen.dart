@@ -81,6 +81,8 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
               ),
               const SizedBox(height: 12),
               const Text('All rights reserved. 2025 Ruck!.'),
+              const SizedBox(height: 8),
+              const Text('Terrain data © OpenStreetMap contributors (ODbL).'),
             ],
           ),
         ),

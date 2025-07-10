@@ -10,6 +10,7 @@ import '../../../../../core/utils/location_validator.dart';
 import '../../../../../core/models/location_point.dart';
 import '../../../domain/services/split_tracking_service.dart';
 import '../../../../../core/services/terrain_tracker.dart';
+import '../../../../../core/models/terrain_segment.dart';
 import '../events/session_events.dart';
 import '../models/manager_states.dart';
 import 'session_manager.dart';
@@ -39,6 +40,9 @@ class LocationTrackingManager implements SessionManager {
   DateTime? _sessionStartTime;
   bool _isPaused = false;
   
+  // List of captured terrain segments for current session
+  final List<TerrainSegment> _terrainSegments = [];
+
   LocationTrackingManager({
     required LocationService locationService,
     required SplitTrackingService splitTrackingService,
@@ -81,6 +85,7 @@ class LocationTrackingManager implements SessionManager {
     
     // Reset state
     _locationPoints.clear();
+    _terrainSegments.clear();
     _pendingLocationPoints.clear();
     _validLocationCount = 0;
     
@@ -110,6 +115,7 @@ class LocationTrackingManager implements SessionManager {
     _activeSessionId = null;
     _sessionStartTime = null;
     _locationPoints.clear();
+    _terrainSegments.clear();
     _pendingLocationPoints.clear();
     
     _updateState(const LocationTrackingState());
@@ -154,6 +160,25 @@ class LocationTrackingManager implements SessionManager {
     );
     
     _locationPoints.add(newPoint);
+
+  // Terrain tracking – attempt to capture a segment between the last point and this one
+  if (_locationPoints.length >= 2) {
+    try {
+      if (_terrainTracker.shouldQueryTerrain(newPoint)) {
+        final prevPoint = _locationPoints[_locationPoints.length - 2];
+        final segment = await _terrainTracker.trackTerrainSegment(
+          startLocation: prevPoint,
+          endLocation: newPoint,
+        );
+        if (segment != null) {
+          _terrainSegments.add(segment);
+          AppLogger.debug('[LOCATION_MANAGER] Captured terrain segment ${segment.surfaceType} for ${(segment.distanceKm * 1000).toStringAsFixed(1)}m');
+        }
+      }
+    } catch (e) {
+      AppLogger.error('[LOCATION_MANAGER] Error capturing terrain segment: $e');
+    }
+  }
     
     // Calculate metrics
     final newDistance = _calculateTotalDistance();
@@ -403,6 +428,7 @@ class LocationTrackingManager implements SessionManager {
   double get totalDistance => _currentState.totalDistance;
   bool get isGpsReady => _validLocationCount > 5;
   List<LocationPoint> get locationPoints => List.unmodifiable(_locationPoints);
+  List<TerrainSegment> get terrainSegments => List.unmodifiable(_terrainSegments);
   Position? get currentPosition => _currentState.currentPosition;
   double get elevationGain => _calculateElevationGain()['gain'] ?? 0.0;
   double get elevationLoss => _calculateElevationGain()['loss'] ?? 0.0;

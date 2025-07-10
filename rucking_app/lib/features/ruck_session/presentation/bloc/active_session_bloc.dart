@@ -368,7 +368,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   // Upload methods now handled by UploadManager
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
-    AppLogger.debug('Processing tick event through coordinator');
+    
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
