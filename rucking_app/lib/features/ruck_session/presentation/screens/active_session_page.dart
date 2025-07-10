@@ -886,7 +886,7 @@ class _RouteMap extends StatefulWidget {
   State<_RouteMap> createState() => _RouteMapState();
 }
 
-class _RouteMapState extends State<_RouteMap> {
+class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
   bool _mapReadyCalled = false;
   bool _tilesLoaded = false; // Track if map tiles have loaded
   Timer? _fallbackTimer;
@@ -902,6 +902,15 @@ class _RouteMapState extends State<_RouteMap> {
   }
   
   // This method will be called when map tiles are loaded
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.detached) {
+      // Cancel timers to stop texture updates while app is in background
+      _animationTimer?.cancel();
+      _fallbackTimer?.cancel();
+    }
+  }
+
   void _onTilesLoaded() {
     if (!_tilesLoaded && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -917,6 +926,8 @@ class _RouteMapState extends State<_RouteMap> {
   @override
   void initState() {
     super.initState();
+    // Register lifecycle observer to pause timers when app is backgrounded
+    WidgetsBinding.instance.addObserver(this);
     _fallbackTimer = Timer(const Duration(seconds: 5), () {
       if (!_mapReadyCalled) {
         print("Fallback timer triggered: calling onMapReady");
@@ -1218,6 +1229,8 @@ class _RouteMapState extends State<_RouteMap> {
     _fallbackTimer?.cancel();
     _animationTimer?.cancel();
     _controller.dispose();
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 }

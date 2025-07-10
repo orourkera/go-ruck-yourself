@@ -337,7 +337,44 @@ class LocationServiceImpl implements LocationService {
         AppLogger.debug('Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m) - added to batch (${_locationBatch.length} total)');
       },
       onError: (error) async {
-        // Monitor location tracking failures (critical for fitness sessions)
+        // kCLErrorDomain code 1 (iOS) == permission denied. Treat differently so we don't spam Crashlytics.
+        final errorString = error.toString();
+        final isPermissionDenied = errorString.contains('kCLErrorDomain error 1') ||
+            errorString.contains('PERMISSION_DENIED') ||
+            error is PermissionDeniedException;
+
+        if (isPermissionDenied) {
+          AppLogger.warning('Location permission denied while tracking – pausing GPS updates');
+
+          // Stop tracking to avoid endless error spam
+          await stopLocationTracking();
+
+          // Optionally, you could show a UI prompt or schedule a silent retry later.
+          // Here we retry once after 30 s in case the user re-enabled Location Services.
+          Timer(const Duration(seconds: 30), () async {
+            if (!_isTracking) {
+              final hasPermission = await hasLocationPermission();
+              if (hasPermission) {
+                AppLogger.info('Permission restored – resuming location tracking');
+                startLocationTracking();
+              }
+            }
+          });
+
+          // Still report to Crashlytics, but as warning not error
+          await AppErrorHandler.handleError(
+            'location_permission_denied',
+            error,
+            context: {
+              'is_tracking': _isTracking,
+              'platform': Platform.isAndroid ? 'android' : 'ios',
+            },
+            severity: ErrorSeverity.warning,
+          );
+          return; // Skip the generic critical-error flow below
+        }
+
+        // Other errors – keep existing critical flow
         await AppErrorHandler.handleError(
           'location_tracking_stream',
           error,
@@ -350,7 +387,7 @@ class LocationServiceImpl implements LocationService {
         );
         AppLogger.error('Location service error', exception: error);
         _locationController.addError(error);
-        
+
         // Attempt to restart location tracking after error
         if (_isTracking) {
           AppLogger.info('Attempting to restart location tracking after error...');
