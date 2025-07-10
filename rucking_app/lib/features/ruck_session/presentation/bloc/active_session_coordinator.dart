@@ -386,9 +386,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         minHeartRate: _heartRateManager.currentState.minHeartRate,
         maxHeartRate: _heartRateManager.currentState.maxHeartRate,
         sessionPhotos: _photoManager.photos,
-        splits: const [],
+        splits: _locationManager.splits,
         completedAt: DateTime.now(),
         isOffline: false,
+        ruckWeightKg: ruckWeightKg,
       );
       AppLogger.info('[COORDINATOR] Completion state built successfully');
     } else if (lifecycleState.isActive && lifecycleState.sessionId != null) {

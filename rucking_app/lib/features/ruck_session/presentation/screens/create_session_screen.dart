@@ -792,11 +792,11 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   CustomTextField(
                     controller: _customRuckWeightController,
                     label: 'Custom Ruck Weight ($weightUnit)',
-                    hint: 'e.g. 37',
-                    keyboardType: TextInputType.number,
+                    hint: 'e.g. 37.5',
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     prefixIcon: Icons.fitness_center_outlined,
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
                     ],
                     validator: (value) {
                       if (!_showCustomRuckWeightInput) return null; // Skip if not shown
@@ -833,7 +833,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   controller: _userWeightController,
                   label: 'Your Weight ($weightUnit)',
                   hint: 'Enter your weight',
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   prefixIcon: Icons.monitor_weight_outlined,
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),

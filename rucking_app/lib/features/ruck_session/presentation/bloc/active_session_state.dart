@@ -343,9 +343,10 @@ class ActiveSessionCompleted extends ActiveSessionState {
   final int? minHeartRate;
   final int? maxHeartRate;
   final List<dynamic> sessionPhotos;
-  final List<dynamic> splits;
+  final List<SessionSplit> splits;
   final DateTime completedAt;
   final bool isOffline;
+  final double ruckWeightKg;
   
   const ActiveSessionCompleted({
     required this.sessionId,
@@ -364,6 +365,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
     required this.splits,
     required this.completedAt,
     this.isOffline = false,
+    required this.ruckWeightKg,
   });
   
   @override
@@ -384,6 +386,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
     splits,
     completedAt,
     isOffline,
+    ruckWeightKg,
   ];
 }
 

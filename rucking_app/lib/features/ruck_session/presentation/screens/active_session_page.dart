@@ -28,6 +28,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
@@ -689,10 +690,37 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       
                       if (state is ActiveSessionCompleted) {
                         print('[UI] ActiveSessionCompleted state received: distance=${state.finalDistanceKm}km, duration=${state.finalDurationSeconds}s');
-                        return Center(
-                          child: Text(
-                            'Session Completed — Distance: ${state.finalDistanceKm.toStringAsFixed(2)} km',
-                            style: AppTextStyles.titleMedium,
+                        
+                        // Navigate to SessionCompleteScreen with full session data
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (context) => SessionCompleteScreen(
+                                completedAt: state.completedAt,
+                                ruckId: state.sessionId,
+                                duration: Duration(seconds: state.finalDurationSeconds),
+                                distance: state.finalDistanceKm,
+                                caloriesBurned: state.finalCalories,
+                                elevationGain: state.elevationGain,
+                                elevationLoss: state.elevationLoss,
+                                ruckWeight: state.ruckWeightKg,
+                                heartRateSamples: state.heartRateSamples,
+                                splits: state.splits.isEmpty ? null : state.splits,
+                                terrainSegments: null, // Can be added later if needed
+                              ),
+                            ),
+                          );
+                        });
+                        
+                        // Show loading indicator while navigating
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('Loading session summary...')
+                            ],
                           ),
                         );
                       }
