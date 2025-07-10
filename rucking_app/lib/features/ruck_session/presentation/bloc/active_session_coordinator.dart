@@ -94,6 +94,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     on<TimerStarted>(_onTimerStarted);
     on<Tick>(_onTick);
     on<SessionRecoveryRequested>(_onSessionRecoveryRequested);
+    on<SessionReset>(_onSessionReset);
     on<BatchLocationUpdated>(_onBatchLocationUpdated);
     on<StateAggregationRequested>(_onStateAggregationRequested);
     
@@ -574,6 +575,18 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     Emitter<ActiveSessionState> emit,
   ) async {
     await _routeEventToManagers(event);
+  }
+  
+  Future<void> _onSessionReset(
+    SessionReset event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('[COORDINATOR] Session reset requested');
+    await _routeEventToManagers(event);
+    
+    // Reset to initial state
+    _currentAggregatedState = const ActiveSessionInitial();
+    emit(_currentAggregatedState);
   }
   
   Future<void> _onBatchLocationUpdated(

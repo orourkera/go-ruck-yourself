@@ -21,6 +21,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:rucking_app/core/utils/push_notification_test.dart';
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -257,6 +258,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               label: 'Notification Settings',
                               onTap: () {
                                 Navigator.pushNamed(context, '/notification_settings');
+                              },
+                            ),
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.bug_report_outlined,
+                              label: 'Test Push Notifications',
+                              onTap: () async {
+                                await PushNotificationTest.testSetup();
+                                if (mounted) {
+                                  StyledSnackBar.showSuccess(
+                                    context: context,
+                                    message: 'Push notification test completed. Check logs for details.',
+                                  );
+                                }
+                              },
+                            ),
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.notifications_active_outlined,
+                              label: 'Test Local Notification',
+                              onTap: () async {
+                                await PushNotificationTest.sendTestLocalNotification();
+                                if (mounted) {
+                                  StyledSnackBar.showSuccess(
+                                    context: context,
+                                    message: 'Local notification sent! Check your notification center.',
+                                  );
+                                }
                               },
                             ),
                           ],
