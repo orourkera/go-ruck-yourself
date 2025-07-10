@@ -6,6 +6,7 @@ import os
 import sys
 import logging
 import time
+import argparse
 
 # Add RuckTracker to path for Heroku deployment
 sys.path.append(os.path.join(os.path.dirname(__file__), 'RuckTracker'))
@@ -15,14 +16,14 @@ from services.push_notification_service import PushNotificationService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def test_push_notification():
-    """Test push notification with hardcoded FCM token"""
+def test_push_notification(fcm_token=None):
+    """Test push notification with provided or default FCM token"""
     
     print("🧪 TESTING PUSH NOTIFICATIONS ON HEROKU")
     print("=" * 50)
     
-    # Your FCM token from the diagnostic logs
-    FCM_TOKEN = "dsoCTDrtb00GkCZieamvNZ:APA91bE_OiXgR3JIro6tGGZm7Bg2JzgsRiVmRj2QrWgioZAG3XhIY9Z3SmEcPThBiO2_KBvlTqqzBmzcVnY2fAdR1W1xKhQ0sTH_C52Anl09W0D-lpEs6e8"
+    # Use provided token or default
+    FCM_TOKEN = fcm_token or "dsoCTDrtb00GkCZieamvNZ:APA91bGaSSQCe1ujVtzxvJf5ykyJnipy1kUTX57WF8aDES5EjyK8LNyI7KtOA2vlWsua1aLPgwJ5ymWkQUig-kvUg2p4mupiQB1QZafLuFLjMQqP35ZpGqI"
     
     print(f"📱 Testing with token: {FCM_TOKEN[:20]}...")
     
@@ -54,4 +55,8 @@ def test_push_notification():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    test_push_notification()
+    parser = argparse.ArgumentParser(description='Test push notifications')
+    parser.add_argument('--token', '-t', type=str, help='FCM token to test with')
+    args = parser.parse_args()
+    
+    test_push_notification(args.token)
