@@ -336,56 +336,68 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     final locationState = _locationManager.currentState;
     final heartRateState = _heartRateManager.currentState;
     
+    AppLogger.info('[COORDINATOR] Aggregating state: lifecycle(isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage})');
+    AppLogger.info('[COORDINATOR] Location state: ${locationState.totalDistance}km');
+    
     // Map manager states to ActiveSessionState
     if (!lifecycleState.isActive && lifecycleState.sessionId == null) {
+      AppLogger.info('[COORDINATOR] Path: Initial state (not active, no session)');
       _currentAggregatedState = const ActiveSessionInitial();
     } else if (lifecycleState.errorMessage != null) {
+      AppLogger.info('[COORDINATOR] Path: Failure state (error: ${lifecycleState.errorMessage})');
       _currentAggregatedState = ActiveSessionFailure(
         errorMessage: lifecycleState.errorMessage!,
       );
     } else if (!lifecycleState.isActive && lifecycleState.sessionId != null) {
-    // Session has ended – build completed state
-    final totalDistance = _locationManager.currentState.totalDistance;
-    final route = _locationManager.locationPoints;
-    final duration = lifecycleState.duration;
+      AppLogger.info('[COORDINATOR] Path: Completion state (not active, has session)');
+      // Session has ended – build completed state
+      final totalDistance = _locationManager.currentState.totalDistance;
+      final route = _locationManager.locationPoints;
+      final duration = lifecycleState.duration;
 
-    // Use weights similar to running case
-    final session = lifecycleState.currentSession;
-    final userWeightKg = session?.weightKg ?? 75.0;
-    final ruckWeightKg = session?.ruckWeightKg ?? 0.0;
+      AppLogger.info('[COORDINATOR] Building completion state: distance=${totalDistance}km, duration=${duration.inSeconds}s, routePoints=${route.length}');
 
-    final calories = _calculateCalories(
-      distanceKm: totalDistance,
-      duration: duration,
-      userWeightKg: userWeightKg,
-      ruckWeightKg: ruckWeightKg,
-    ).round();
+      // Get weights from lifecycle state
+      final userWeightKg = lifecycleState.userWeightKg;
+      final ruckWeightKg = lifecycleState.ruckWeightKg;
+      
+      AppLogger.info('[COORDINATOR] Weights: user=${userWeightKg}kg, ruck=${ruckWeightKg}kg');
 
-    _currentAggregatedState = ActiveSessionCompleted(
-      sessionId: lifecycleState.sessionId!,
-      finalDistanceKm: totalDistance,
-      finalDurationSeconds: duration.inSeconds,
-      finalCalories: calories,
-      elevationGain: _locationManager.elevationGain,
-      elevationLoss: _locationManager.elevationLoss,
-      averagePace: totalDistance > 0 ? duration.inSeconds / totalDistance : null,
-      route: route,
-      heartRateSamples: _heartRateManager.heartRateSampleObjects,
-      averageHeartRate: _heartRateManager.currentState.averageHeartRate.toInt(),
-      minHeartRate: _heartRateManager.currentState.minHeartRate,
-      maxHeartRate: _heartRateManager.currentState.maxHeartRate,
-      sessionPhotos: _photoManager.photos,
-      splits: const [],
-      completedAt: DateTime.now(),
-      isOffline: false,
-    );
-  } else if (lifecycleState.isActive && lifecycleState.sessionId != null) {
+      final calories = _calculateCalories(
+        distanceKm: totalDistance,
+        duration: duration,
+        userWeightKg: userWeightKg,
+        ruckWeightKg: ruckWeightKg,
+      ).round();
+      
+      AppLogger.info('[COORDINATOR] Calculated ${calories} calories');
+
+      _currentAggregatedState = ActiveSessionCompleted(
+        sessionId: lifecycleState.sessionId!,
+        finalDistanceKm: totalDistance,
+        finalDurationSeconds: duration.inSeconds,
+        finalCalories: calories,
+        elevationGain: _locationManager.elevationGain,
+        elevationLoss: _locationManager.elevationLoss,
+        averagePace: totalDistance > 0 ? duration.inSeconds / totalDistance : null,
+        route: route,
+        heartRateSamples: _heartRateManager.heartRateSampleObjects,
+        averageHeartRate: _heartRateManager.currentState.averageHeartRate.toInt(),
+        minHeartRate: _heartRateManager.currentState.minHeartRate,
+        maxHeartRate: _heartRateManager.currentState.maxHeartRate,
+        sessionPhotos: _photoManager.photos,
+        splits: const [],
+        completedAt: DateTime.now(),
+        isOffline: false,
+      );
+      AppLogger.info('[COORDINATOR] Completion state built successfully');
+    } else if (lifecycleState.isActive && lifecycleState.sessionId != null) {
+      AppLogger.info('[COORDINATOR] Path: Running state (active, has session)');
       // Aggregate states from all managers into ActiveSessionRunning
       final locationPoints = _locationManager.locationPoints;
-      // Get user and ruck weight from lifecycle manager's session data
-      final session = lifecycleState.currentSession;
-      final userWeightKg = session?.weightKg ?? 75.0;
-      final ruckWeightKg = session?.ruckWeightKg ?? 0.0;
+      // Get user and ruck weight from lifecycle state
+      final userWeightKg = lifecycleState.userWeightKg;
+      final ruckWeightKg = lifecycleState.ruckWeightKg;
       
       final calories = _calculateCalories(
         distanceKm: locationState.totalDistance,
@@ -407,7 +419,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         isPaused: _lifecycleManager.isPaused,
         pace: locationState.currentPace,
         originalSessionStartTimeUtc: lifecycleState.startTime ?? DateTime.now(),
-        totalPausedDuration: Duration.zero, // TODO: Implement paused duration tracking
+        totalPausedDuration: _lifecycleManager.totalPausedDuration,
         heartRateSamples: _heartRateManager.heartRateSampleObjects,
         latestHeartRate: heartRateState.currentHeartRate,
         minHeartRate: heartRateState.minHeartRate,
@@ -417,9 +429,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         photos: _photoManager.photos,
         isPhotosLoading: _photoManager.isPhotosLoading,
         isUploading: _uploadManager.isUploading,
-        splits: const [], // TODO: Remove when split service integrated
-        terrainSegments: const [], // TODO: Remove when terrain manager implemented
+        splits: _locationManager.splits,
+        terrainSegments: _locationManager.terrainSegments,
       );
+    } else {
+      AppLogger.warning('[COORDINATOR] Unmatched state combination: isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage}');
+      // Default to initial state for unmatched combinations
+      _currentAggregatedState = const ActiveSessionInitial();
     }
     
     // Log aggregated state only when the state TYPE changes
@@ -462,10 +478,32 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionCompleted event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.info('[COORDINATOR] Session completed');
+    AppLogger.info('[COORDINATOR] Session completion started');
+    AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
+    AppLogger.info('[COORDINATOR] Lifecycle state before: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
+    
     // Stop the timer by pausing first
+    AppLogger.info('[COORDINATOR] Pausing session first');
     add(const SessionPaused());
+    
+    AppLogger.info('[COORDINATOR] Routing event to managers');
     await _routeEventToManagers(event);
+    
+    AppLogger.info('[COORDINATOR] Lifecycle state after: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
+    
+    // Aggregate and emit the completed state
+    AppLogger.info('[COORDINATOR] Aggregating state');
+    _aggregateAndEmitState();
+    AppLogger.info('[COORDINATOR] New aggregated state: ${_currentAggregatedState.runtimeType}');
+    
+    if (_currentAggregatedState is ActiveSessionCompleted) {
+      final completedState = _currentAggregatedState as ActiveSessionCompleted;
+      AppLogger.info('[COORDINATOR] Session completed successfully: sessionId=${completedState.sessionId}, distance=${completedState.finalDistanceKm}km, duration=${completedState.finalDurationSeconds}s');
+    }
+    
+    AppLogger.info('[COORDINATOR] Emitting completed state');
+    emit(_currentAggregatedState);
+    AppLogger.info('[COORDINATOR] Session completion process finished');
   }
   
   Future<void> _onSessionPaused(

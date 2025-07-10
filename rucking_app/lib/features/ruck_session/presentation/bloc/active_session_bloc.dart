@@ -412,13 +412,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionCompleted event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    AppLogger.info('Completing session with delegation to coordinator');
+    AppLogger.info('[OLD_BLOC] Session completion requested');
+    AppLogger.info('[OLD_BLOC] Current state: ${state.runtimeType}');
+    AppLogger.info('[OLD_BLOC] Session completed event: $event');
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
+      AppLogger.info('[OLD_BLOC] Delegating to coordinator');
       _coordinator!.add(event);
+      AppLogger.info('[OLD_BLOC] Event sent to coordinator, waiting for state update');
     } else {
-      AppLogger.warning('No coordinator available for session completion');
+      AppLogger.error('[OLD_BLOC] No coordinator available for session completion');
       emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
     }
   }

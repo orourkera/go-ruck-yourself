@@ -10,6 +10,7 @@ import '../../../../../core/utils/location_validator.dart';
 import '../../../../../core/models/location_point.dart';
 import '../../../domain/services/split_tracking_service.dart';
 import '../../../../../core/services/terrain_tracker.dart';
+import '../../../domain/models/session_split.dart';
 import '../../../../../core/models/terrain_segment.dart';
 import '../events/session_events.dart';
 import '../models/manager_states.dart';
@@ -432,4 +433,7 @@ class LocationTrackingManager implements SessionManager {
   Position? get currentPosition => _currentState.currentPosition;
   double get elevationGain => _calculateElevationGain()['gain'] ?? 0.0;
   double get elevationLoss => _calculateElevationGain()['loss'] ?? 0.0;
+  List<SessionSplit> get splits => _splitTrackingService.getSplits()
+      .map((splitData) => SessionSplit.fromJson(splitData))
+      .toList();
 }

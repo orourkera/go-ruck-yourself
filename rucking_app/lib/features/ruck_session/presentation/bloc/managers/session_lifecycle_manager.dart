@@ -117,6 +117,8 @@ class SessionLifecycleManager implements SessionManager {
         sessionId: finalSessionId,
         startTime: _sessionStartTime,
         duration: Duration.zero,
+        ruckWeightKg: event.ruckWeightKg ?? 0.0,
+        userWeightKg: event.userWeightKg ?? 70.0,
         isLoading: false,
         errorMessage: null,
       ));
@@ -147,7 +149,8 @@ class SessionLifecycleManager implements SessionManager {
 
   Future<void> _onSessionStopRequested(manager_events.SessionStopRequested event) async {
     try {
-      AppLogger.info('Stopping ruck session');
+      AppLogger.info('[LIFECYCLE] Stopping ruck session - sessionId: $_activeSessionId');
+      AppLogger.info('[LIFECYCLE] Current state before stop: isActive=${_currentState.isActive}, sessionId=${_currentState.sessionId}');
       
       _updateState(_currentState.copyWith(isSaving: true));
       
@@ -160,23 +163,28 @@ class SessionLifecycleManager implements SessionManager {
       
       // Mark session as inactive but preserve identifiers for completion screen
       final duration = _sessionStartTime != null ? DateTime.now().difference(_sessionStartTime!) : Duration.zero;
+      AppLogger.info('[LIFECYCLE] Session duration: ${duration.inSeconds}s');
 
-      _updateState(_currentState.copyWith(
+      final newState = _currentState.copyWith(
         isActive: false,
         // Keep the sessionId so downstream managers & UI can access it
         sessionId: _activeSessionId,
         duration: duration,
         isSaving: false,
-      ));
+      );
+      
+      AppLogger.info('[LIFECYCLE] Updating state: isActive=${newState.isActive}, sessionId=${newState.sessionId}');
+      _updateState(newState);
+      AppLogger.info('[LIFECYCLE] State updated successfully');
 
       // NOTE: we intentionally keep _activeSessionId & _sessionStartTime until the
       // coordinator has emitted an `ActiveSessionCompleted` state. They will be
       // cleared when the coordinator is closed.
       
-      AppLogger.info('Session lifecycle stopped successfully');
+      AppLogger.info('[LIFECYCLE] Session lifecycle stopped successfully');
       
     } catch (e) {
-      AppLogger.error('Error stopping session: $e');
+      AppLogger.error('[LIFECYCLE] Error stopping session: $e');
       _updateState(_currentState.copyWith(
         isSaving: false,
         errorMessage: 'Failed to stop session',
@@ -197,6 +205,7 @@ class SessionLifecycleManager implements SessionManager {
     
     _updateState(_currentState.copyWith(
       isActive: false, // Using isActive to track pause state
+      pausedAt: DateTime.now(),
     ));
   }
 
@@ -204,6 +213,11 @@ class SessionLifecycleManager implements SessionManager {
     if (_currentState.isActive) return;
     
     AppLogger.info('Resuming session');
+    
+    // Calculate pause duration
+    final pausedDuration = _currentState.pausedAt != null
+        ? DateTime.now().difference(_currentState.pausedAt!)
+        : Duration.zero;
     
     // Resume timers
     _startTimer();
@@ -213,6 +227,8 @@ class SessionLifecycleManager implements SessionManager {
     
     _updateState(_currentState.copyWith(
       isActive: true,
+      pausedAt: null,
+      totalPausedDuration: _currentState.totalPausedDuration + pausedDuration,
     ));
   }
 
@@ -321,4 +337,5 @@ class SessionLifecycleManager implements SessionManager {
   DateTime? get sessionStartTime => _sessionStartTime;
   bool get isSessionActive => _currentState.isActive;
   bool get isPaused => !_currentState.isActive && _activeSessionId != null;
+  Duration get totalPausedDuration => _currentState.totalPausedDuration;
 }

@@ -687,6 +687,16 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         );
                       }
                       
+                      if (state is ActiveSessionCompleted) {
+                        print('[UI] ActiveSessionCompleted state received: distance=${state.finalDistanceKm}km, duration=${state.finalDurationSeconds}s');
+                        return Center(
+                          child: Text(
+                            'Session Completed — Distance: ${state.finalDistanceKm.toStringAsFixed(2)} km',
+                            style: AppTextStyles.titleMedium,
+                          ),
+                        );
+                      }
+                      
                       if (state is SessionSummaryGenerated) {
                         // Show loading while navigating to session complete screen
                         return const Center(

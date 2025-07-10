@@ -1,9 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../../../../core/services/terrain_tracker.dart';
 import '../../../domain/models/ruck_photo.dart';
 import '../../../domain/models/ruck_session.dart';
-import '../../../domain/models/session_split.dart';
 import '../../../domain/models/terrain_type.dart';
 
 /// Base class for all manager-specific states
@@ -17,6 +15,10 @@ class SessionLifecycleState extends SessionManagerState {
   final String? sessionId;
   final DateTime? startTime;
   final Duration duration;
+  final Duration totalPausedDuration;
+  final DateTime? pausedAt;
+  final double ruckWeightKg;
+  final double userWeightKg;
   final String? errorMessage;
   final bool isSaving;
   final bool isLoading;
@@ -27,6 +29,10 @@ class SessionLifecycleState extends SessionManagerState {
     this.sessionId,
     this.startTime,
     this.duration = Duration.zero,
+    this.totalPausedDuration = Duration.zero,
+    this.pausedAt,
+    this.ruckWeightKg = 0.0,
+    this.userWeightKg = 70.0,
     this.errorMessage,
     this.isSaving = false,
     this.isLoading = false,
@@ -38,6 +44,10 @@ class SessionLifecycleState extends SessionManagerState {
     String? sessionId,
     DateTime? startTime,
     Duration? duration,
+    Duration? totalPausedDuration,
+    DateTime? pausedAt,
+    double? ruckWeightKg,
+    double? userWeightKg,
     String? errorMessage,
     bool? isSaving,
     bool? isLoading,
@@ -48,6 +58,10 @@ class SessionLifecycleState extends SessionManagerState {
       sessionId: sessionId ?? this.sessionId,
       startTime: startTime ?? this.startTime,
       duration: duration ?? this.duration,
+      totalPausedDuration: totalPausedDuration ?? this.totalPausedDuration,
+      pausedAt: pausedAt,
+      ruckWeightKg: ruckWeightKg ?? this.ruckWeightKg,
+      userWeightKg: userWeightKg ?? this.userWeightKg,
       errorMessage: errorMessage,
       isSaving: isSaving ?? this.isSaving,
       isLoading: isLoading ?? this.isLoading,
@@ -61,6 +75,10 @@ class SessionLifecycleState extends SessionManagerState {
         sessionId,
         startTime,
         duration,
+        totalPausedDuration,
+        pausedAt,
+        ruckWeightKg,
+        userWeightKg,
         errorMessage,
         isSaving,
         isLoading,

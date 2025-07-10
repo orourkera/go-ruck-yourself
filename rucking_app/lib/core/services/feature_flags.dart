@@ -11,7 +11,7 @@ class FeatureFlags {
   
   final StorageService _storageService;
   final Map<String, bool> _defaultValues = {
-    useRefactoredActiveSessionBloc: false, // Default to old implementation
+    useRefactoredActiveSessionBloc: true, // Enable new implementation for testing
   };
   
   // Cache for performance
@@ -72,9 +72,18 @@ class FeatureFlags {
   bool get shouldUseRefactoredActiveSessionBloc {
     // Force new implementation in debug mode for testing
     if (kDebugMode && const bool.fromEnvironment('FORCE_NEW_BLOC', defaultValue: false)) {
+      print('[FEATURE_FLAGS] FORCE_NEW_BLOC environment variable is true');
       return true;
     }
     
-    return isEnabled(useRefactoredActiveSessionBloc);
+    // Temporarily force enable for debugging session completion
+    if (kDebugMode) {
+      print('[FEATURE_FLAGS] Debug mode detected, forcing refactored bloc to true');
+      return true;
+    }
+    
+    final result = isEnabled(useRefactoredActiveSessionBloc);
+    print('[FEATURE_FLAGS] shouldUseRefactoredActiveSessionBloc result: $result');
+    return result;
   }
 }

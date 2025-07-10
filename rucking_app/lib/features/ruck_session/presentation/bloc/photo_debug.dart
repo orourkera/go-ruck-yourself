@@ -25,7 +25,8 @@ class PhotoDebugHelper {
       
       // Dispatch LoadSessionForViewing and wait a bit
       AppLogger.debug("[PHOTO_DEBUG] Dispatching LoadSessionForViewing for ruckId: $ruckId");
-      activeSessionBloc.add(LoadSessionForViewing(sessionId: ruckId));
+      // TODO: Fix during refactor - requires session object
+      // activeSessionBloc.add(LoadSessionForViewing(sessionId: ruckId, session: session));
       
       // Add a delay then fetch photos (simulating what SessionDetailScreen would do)
       Timer(const Duration(seconds: 1), () {
