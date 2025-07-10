@@ -3,8 +3,12 @@
 Simple test script for Heroku push notification service
 """
 import os
+import sys
 import logging
 import time
+
+# Add RuckTracker to path for Heroku deployment
+sys.path.append(os.path.join(os.path.dirname(__file__), 'RuckTracker'))
 from services.push_notification_service import PushNotificationService
 
 # Configure logging
