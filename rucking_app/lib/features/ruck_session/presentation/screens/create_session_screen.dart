@@ -69,7 +69,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   late final VoidCallback _durationListener;
 
   bool _isOfflineMode = false;
-  final TextEditingController _offlineDurationController = TextEditingController();
+  final TextEditingController _offlineDurationMinutesController = TextEditingController();
+  final TextEditingController _offlineDurationSecondsController = TextEditingController();
   final TextEditingController _offlineDistanceController = TextEditingController();
   final TextEditingController _offlineElevationGainController = TextEditingController();
   final TextEditingController _offlineElevationLossController = TextEditingController();
@@ -402,11 +403,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         double userWeightKg = double.tryParse(_userWeightController.text) ?? 70.0;
         if (!_preferMetric) userWeightKg /= 2.20462;
 
-        final durationMin = int.parse(_offlineDurationController.text);
-        final duration = Duration(minutes: durationMin);
+        final minutes = int.parse(_offlineDurationMinutesController.text);
+        final seconds = int.tryParse(_offlineDurationSecondsController.text) ?? 0;
+        final duration = Duration(minutes: minutes, seconds: seconds);
         final distance = double.parse(_offlineDistanceController.text);
         final distanceKm = _preferMetric ? distance : distance * 1.60934;
-        final paceMinPerKm = durationMin / distanceKm;
+        final paceMinPerKm = duration.inSeconds / distanceKm;
         final calories = _calculateCalories(duration.inSeconds, distanceKm, _ruckWeight, userWeightKg);
         double elevationGainM = double.tryParse(_offlineElevationGainController.text) ?? 0.0;
         double elevationLossM = double.tryParse(_offlineElevationLossController.text) ?? 0.0;
@@ -434,6 +436,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         final repo = GetIt.I<SessionRepository>();
         final apiRuckId = await repo.createManualSession(session.toJson());
 
+        // Invalidate cached session history so homepage refresh shows new ruck
+        SessionRepository.clearSessionHistoryCache();
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -446,6 +451,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
               elevationGain: elevationGainM,
               elevationLoss: elevationLossM,
               ruckWeight: _ruckWeight,
+              isManual: true,
             ),
           ),
         );
@@ -974,11 +980,23 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 if (_isOfflineMode) ...[
                   const SizedBox(height: 16),
                   CustomTextField(
-                    controller: _offlineDurationController,
-                    label: 'Ruck Duration (minutes)',
+                    controller: _offlineDurationMinutesController,
+                    label: 'Duration Minutes',
                     hint: 'e.g. 45',
                     keyboardType: TextInputType.number,
-                    validator: (value) => value?.isEmpty ?? true ? 'Duration is required' : null,
+                    validator: (value) => value?.isEmpty ?? true ? 'Minutes required' : null,
+                  ),
+                  const SizedBox(height: 8),
+                  CustomTextField(
+                    controller: _offlineDurationSecondsController,
+                    label: 'Duration Seconds',
+                    hint: 'e.g. 30',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value?.isEmpty ?? true) return null;
+                      final sec = int.tryParse(value!);
+                      return (sec == null || sec < 0 || sec >= 60) ? '0-59' : null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
@@ -1028,19 +1046,22 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     onPressed: _isOfflineMode ? _saveOfflineRuck : _createSession,
                   ),
                 ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _isOfflineMode = !_isOfflineMode;
-                      if (!_isOfflineMode) {
-                        _offlineDurationController.clear();
-                        _offlineDistanceController.clear();
-                        _offlineElevationGainController.clear();
-                        _offlineElevationLossController.clear();
-                      }
-                    });
-                  },
-                  child: Text(_isOfflineMode ? 'Cancel' : 'Record Offline Ruck', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                Center(
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _isOfflineMode = !_isOfflineMode;
+                        if (!_isOfflineMode) {
+                          _offlineDurationMinutesController.clear();
+                          _offlineDurationSecondsController.clear();
+                          _offlineDistanceController.clear();
+                          _offlineElevationGainController.clear();
+                          _offlineElevationLossController.clear();
+                        }
+                      });
+                    },
+                    child: Text(_isOfflineMode ? 'Cancel' : 'Record Offline Ruck', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                  ),
                 ),
               ],
             ),

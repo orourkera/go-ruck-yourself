@@ -68,6 +68,7 @@ class SessionCompleteScreen extends StatefulWidget {
   final List<HeartRateSample>? heartRateSamples;
   final List<SessionSplit>? splits;
   final List<TerrainSegment>? terrainSegments;
+  final bool isManual;
 
   const SessionCompleteScreen({
     super.key,
@@ -83,6 +84,7 @@ class SessionCompleteScreen extends StatefulWidget {
     this.heartRateSamples,
     this.splits,
     this.terrainSegments,
+    this.isManual = false,
   });
 
   @override
@@ -261,7 +263,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         status: RuckStatus.completed,
         heartRateSamples: widget.heartRateSamples,
         splits: widget.splits,
-        isManual: false, // Set based on your logic, or pass from creation
+        isManual: widget.isManual, // Set based on your logic, or pass from creation
       );
 
       if (!localSession.isManual) {
