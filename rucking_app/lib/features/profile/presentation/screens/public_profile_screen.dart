@@ -41,7 +41,39 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
             return SingleChildScrollView(
               child: Column(
                 children: [
-                  ProfileHeader(profile: state.profile, isOwnProfile: false),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Row(
+                      children: [
+                        // Avatar
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundImage: state.profile.avatarUrl != null ? NetworkImage(state.profile.avatarUrl!) : null,
+                        ),
+                        const SizedBox(width: 24),
+                        // Counts
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildCountColumn(
+                                context,
+                                label: 'Followers',
+                                count: state.stats?.followersCount ?? 0,
+                                onTap: () => Navigator.pushNamed(context, '/followers', arguments: state.profile.id),
+                              ),
+                              _buildCountColumn(
+                                context,
+                                label: 'Following',
+                                count: state.stats?.followingCount ?? 0,
+                                onTap: () => Navigator.pushNamed(context, '/following', arguments: state.profile.id),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   if (!state.profile.isPrivateProfile) ...[
                     ProfileStatsGrid(stats: state.stats ?? UserProfileStats.fromJson({})),
                     TabBar(controller: _tabController, tabs: [Tab(text: 'Stats'), Tab(text: 'Clubs'), Tab(text: 'Recent')]),

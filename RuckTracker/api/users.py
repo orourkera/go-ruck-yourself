@@ -53,19 +53,19 @@ def get_public_profile(user_id):
                 followers_count_res = (
                     get_supabase_client()
                     .table('user_follows')
-                    .select('count', count='exact')
+                    .select('id')
                     .eq('followed_id', user_id)
                     .execute()
                 )
-                followers_count = followers_count_res.count or 0
+                followers_count = len(followers_count_res.data or [])
                 following_count_res = (
                     get_supabase_client()
                     .table('user_follows')
-                    .select('count', count='exact')
+                    .select('id')
                     .eq('follower_id', user_id)
                     .execute()
                 )
-                following_count = following_count_res.count or 0
+                following_count = len(following_count_res.data or [])
             except Exception:
                 followers_count = 0
                 following_count = 0
@@ -106,15 +106,8 @@ def get_public_profile(user_id):
             # simply return an empty list instead of falling back to the legacy name that is now
             # known to cause "could not find relationship" (PGRST200) errors.
             try:
-                # Embed the related club via the primary club_id foreign key. Specify the exact
-                # relationship name to avoid PostgREST ambiguity errors (PGRST201).
-                clubs_res = (
-                    get_supabase_client()
-                    .from_('club_memberships')
-                    .select('clubs!club_memberships_club_id_fkey(*)')
-                    .eq('user_id', user_id)
-                    .execute()
-                )
+                admin_client = get_supabase_client()
+                clubs_res = admin_client.from_('club_memberships').select('clubs(*)').eq('user_id', user_id).execute()
                 response['clubs'] = [row['clubs'] for row in clubs_res.data] if clubs_res.data else []
                 # Add clubsCount into stats dict
                 response['stats']['clubsCount'] = len(response['clubs'])
