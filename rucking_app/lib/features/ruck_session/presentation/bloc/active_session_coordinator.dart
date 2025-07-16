@@ -91,6 +91,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     on<HeartRateUpdated>(_onHeartRateUpdated);
     on<TakePhotoRequested>(_onTakePhotoRequested);
     on<DeleteSessionPhotoRequested>(_onDeleteSessionPhotoRequested);
+    on<LoadSessionForViewing>(_onLoadSessionForViewing);
     on<TimerStarted>(_onTimerStarted);
     on<Tick>(_onTick);
     on<SessionRecoveryRequested>(_onSessionRecoveryRequested);
@@ -325,6 +326,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       return manager_events.PhotoDeleted(
         photoId: mainEvent.photo.toString(),
       );
+    } else if (mainEvent is LoadSessionForViewing) {
+      return manager_events.RestoreSessionRequested(
+        sessionId: mainEvent.sessionId,
+      );
     } else if (mainEvent is SessionRecoveryRequested) {
       final sessionId = _lifecycleManager.activeSessionId ?? '';
       return manager_events.RecoveryRequested(
@@ -556,6 +561,15 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     DeleteSessionPhotoRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
+    await _routeEventToManagers(event);
+    _aggregateAndEmitState();
+  }
+  
+  Future<void> _onLoadSessionForViewing(
+    LoadSessionForViewing event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.debug('[COORDINATOR] Loading session for viewing');
     await _routeEventToManagers(event);
     _aggregateAndEmitState();
   }

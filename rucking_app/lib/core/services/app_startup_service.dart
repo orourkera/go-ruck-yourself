@@ -28,7 +28,7 @@ class AppStartupService {
         
         // Trigger session recovery
         if (context.mounted) {
-          context.read<ActiveSessionBloc>().add(const SessionRecoveryRequested());
+          context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(const SessionRecoveryRequested());
           
           // Navigate to active session screen
           await _navigateToActiveSession(context);

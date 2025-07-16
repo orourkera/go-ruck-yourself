@@ -7,11 +7,10 @@ class FeatureFlags {
   static const String _storageKeyPrefix = 'feature_flag_';
   
   // Feature flag keys
-  static const String useRefactoredActiveSessionBloc = 'use_refactored_active_session_bloc';
   
   final StorageService _storageService;
   final Map<String, bool> _defaultValues = {
-    useRefactoredActiveSessionBloc: true, // Enable new implementation
+    // No feature flags currently defined
   };
   
   // Cache for performance
@@ -58,32 +57,5 @@ class FeatureFlags {
     }
   }
   
-  /// Enable refactored ActiveSessionBloc for testing
-  Future<void> enableRefactoredActiveSessionBloc() async {
-    await setFeatureFlag(useRefactoredActiveSessionBloc, true);
-  }
-  
-  /// Disable refactored ActiveSessionBloc (use old implementation)
-  Future<void> disableRefactoredActiveSessionBloc() async {
-    await setFeatureFlag(useRefactoredActiveSessionBloc, false);
-  }
-  
-  /// Check if we should use the refactored ActiveSessionBloc
-  bool get shouldUseRefactoredActiveSessionBloc {
-    // Force new implementation in debug mode for testing
-    if (kDebugMode && const bool.fromEnvironment('FORCE_NEW_BLOC', defaultValue: false)) {
-      print('[FEATURE_FLAGS] FORCE_NEW_BLOC environment variable is true');
-      return true;
-    }
-    
-    // Temporarily force enable for debugging session completion
-    if (kDebugMode) {
-      print('[FEATURE_FLAGS] Debug mode detected, forcing refactored bloc to true');
-      return true;
-    }
-    
-    final result = isEnabled(useRefactoredActiveSessionBloc);
-    print('[FEATURE_FLAGS] shouldUseRefactoredActiveSessionBloc result: $result');
-    return result;
-  }
+  // Feature flag methods can be added here as needed
 }

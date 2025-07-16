@@ -98,7 +98,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       
       if (needsHeartRate || needsLocationPoints) {
         AppLogger.debug('[SESSION DETAIL] Loading full session data - heart rate missing: $needsHeartRate, location points missing: $needsLocationPoints');
-        GetIt.instance<ActiveSessionBloc>().add(LoadSessionForViewing(
+        GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(LoadSessionForViewing(
           sessionId: widget.session.id!, 
           session: widget.session
         ));
@@ -643,7 +643,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             onDeleteRequest: (index) {
                               if (photos.length > index) {
                                 final photoToDelete = photos[index];
-                                context.read<ActiveSessionBloc>().add(
+                                context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(
                                   DeleteSessionPhotoRequested(
                                     sessionId: widget.session.id!,
                                     photo: photoToDelete,
@@ -661,7 +661,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 AppLogger.info('[PHOTO_DEBUG] Session Detail: Preparing to dispatch UploadSessionPhotosRequested event with ${photos.length} photos');
                                 AppLogger.info('[PHOTO_DEBUG] Session ID: ${widget.session.id!}');
                                 
-                                final bloc = context.read<ActiveSessionBloc>();
+                                final bloc = context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>();
                                 AppLogger.info('[PHOTO_DEBUG] ActiveSessionBloc instance: ${bloc.hashCode}, Current state: ${bloc.state.runtimeType}');
                                 
                                 bloc.add(

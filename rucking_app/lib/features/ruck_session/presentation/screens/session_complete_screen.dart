@@ -277,7 +277,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       
       // Try to get location points from active session state first
       List<dynamic>? locationPoints;
-      final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
+      final activeSessionState = GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>().state;
       
       if (activeSessionState is ActiveSessionRunning && activeSessionState.locationPoints.isNotEmpty) {
         // Convert LocationPoint objects to Map<String, dynamic>
@@ -454,7 +454,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       
       // Reset active session state AFTER navigation to prevent auto-start
       Future.delayed(const Duration(milliseconds: 100), () {
-        GetIt.instance<ActiveSessionBloc>().add(SessionReset());
+        GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(SessionReset());
       });
     }
   }
@@ -551,7 +551,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       // Reset active session state AFTER navigation to prevent auto-start
       // Use a slight delay to ensure navigation completes first
       Future.delayed(const Duration(milliseconds: 100), () {
-        GetIt.instance<ActiveSessionBloc>().add(SessionReset());
+        GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(SessionReset());
       });
       
       // Upload photos in background if any are selected - using repository
