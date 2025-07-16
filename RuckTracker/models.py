@@ -16,6 +16,8 @@ class User(UserMixin, db.Model):
     gender = db.Column(db.String(10), nullable=True)  # User's gender (male/female)
     height_cm = db.Column(db.Float, nullable=True)  # User's height in cm
     allow_ruck_sharing = db.Column(db.Boolean, nullable=False, default=True)  # User's preference for sharing ruck data
+    avatar_url = db.Column(db.String(255), nullable=True)  # User's avatar URL
+    is_private_profile = db.Column(db.Boolean, nullable=False, default=False)  # User's profile privacy setting
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -44,6 +46,11 @@ class User(UserMixin, db.Model):
             'gender': self.gender,
             'allow_ruck_sharing': self.allow_ruck_sharing,
             'prefer_metric': self.prefer_metric, # Added prefer_metric
+            'avatarUrl': self.avatar_url,  # camelCase for frontend
+            'isPrivateProfile': self.is_private_profile,  # camelCase for frontend
+            'isFollowing': False,  # TODO: implement following logic
+            'isFollowedBy': False,  # TODO: implement following logic
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

@@ -317,6 +317,7 @@ api.add_resource(UserProfileResource, '/api/auth/profile', '/api/users/profile')
 api.add_resource(UserAvatarUploadResource, '/api/auth/avatar')
 
 api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
+api.add_resource(UserResource, '/api/users/<string:user_id>/profile') # Add public profile endpoint
 
 # Ruck session endpoints (prefixed with /api)
 api.add_resource(RuckSessionListResource, '/api/rucks')
