@@ -152,6 +152,7 @@ def get_following_feed():
 
 @users_bp.route('/me/privacy', methods=['PATCH'])
 def update_privacy():
+    """Update the current user's profile privacy setting."""
     try:
         data = request.get_json()
         if not isinstance(data, dict) or 'isPrivateProfile' not in data:
@@ -159,14 +160,31 @@ def update_privacy():
         is_private = data['isPrivateProfile']
         if not isinstance(is_private, bool):
             return api_error('isPrivateProfile must be boolean', status_code=400)
+
         current_user_id = g.current_user['id']
-        update_res = get_supabase_client().table('user').update({'is_profile_private': is_private}).eq('id', current_user_id).execute()
-        if update_res.data:
-            return api_response({'success': True, 'isPrivateProfile': is_private})
-        return api_error('Failed to update privacy', status_code=400)
-    except Exception as e:
-        return api_error(str(e), status_code=500)             else:
+
+        # Try to update the correct column name first. If that fails because the
+        # column does not exist (older DB), fall back to the legacy name.
+        try:
+            update_res = (
+                get_supabase_client()
+                .table('user')
+                .update({'is_profile_private': is_private})
+                .eq('id', current_user_id)
+                .execute()
+            )
+        except Exception as upd_err:
+            if '42703' in str(upd_err) or ('column' in str(upd_err) and 'is_profile_private' in str(upd_err)):
+                update_res = (
+                    get_supabase_client()
+                    .table('user')
+                    .update({'is_private_profile': is_private})
+                    .eq('id', current_user_id)
+                    .execute()
+                )
+            else:
                 raise
+
         if update_res.data:
             return api_response({'success': True, 'isPrivateProfile': is_private})
         return api_error('Failed to update privacy', status_code=400)
