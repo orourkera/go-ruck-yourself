@@ -259,8 +259,16 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       });
       
       // Send event to SocialBloc (async, won't block UI)
-      context.read<SocialBloc>().add(ToggleRuckLike(_ruckId!));
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: ToggleRuckLike event sent to SocialBloc', name: 'RuckBuddyCard');
+      // Double-check that _ruckId is not null before using it
+      if (_ruckId != null) {
+        context.read<SocialBloc>().add(ToggleRuckLike(_ruckId!));
+        developer.log('[SOCIAL_DEBUG] RuckBuddyCard: ToggleRuckLike event sent to SocialBloc for ruckId: $_ruckId', name: 'RuckBuddyCard');
+      } else {
+        developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Cannot toggle like - _ruckId is null (failed to parse "${widget.ruckBuddy.id}")', name: 'RuckBuddyCard');
+        // Reset processing state since we can't proceed
+        setState(() => _isProcessingLike = false);
+        return;
+      }
       
       // Reset processing state after a very short delay
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -299,88 +307,51 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     final String formattedCalories = '${widget.ruckBuddy.caloriesBurned.round()} kcal';
     final String formattedWeight = MeasurementUtils.formatWeight(widget.ruckBuddy.ruckWeightKg, metric: preferMetric);
 
-    return MultiBlocListener(
-      listeners: [
-        BlocListener<ActiveSessionBloc, ActiveSessionState>(
-          listener: (context, state) {
-            if (!mounted || _ruckId == null) return;
-            
-            // Handle SessionSummaryGenerated state
-            if (state is SessionSummaryGenerated && state.session.id == widget.ruckBuddy.id) {
-              if (!state.isPhotosLoading && state.photos.isNotEmpty) {
-                setState(() {
-                  _photos = state.photos;
-                  developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionSummaryGenerated: ${_photos.length}', name: 'RuckBuddyCard');
-                });
-              }
-            } 
-            // Handle ActiveSessionRunning state
-            else if (state is ActiveSessionRunning && state.sessionId == widget.ruckBuddy.id) {
-              if (!state.isPhotosLoading && state.photos.isNotEmpty) {
-                setState(() {
-                  _photos = state.photos;
-                  developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from ActiveSessionRunning: ${_photos.length}', name: 'RuckBuddyCard');
-                });
-              }
-            }
-            // We don't need to handle ActiveSessionLoaded since it doesn't exist in this bloc
-            // Handle SessionPhotosLoadedForId state
-            else if (state is SessionPhotosLoadedForId && state.sessionId.toString() == widget.ruckBuddy.id.toString()) {
-              if (state.photos.isNotEmpty) {
-                setState(() {
-                  _photos = state.photos;
-                  developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionPhotosLoadedForId: ${_photos.length}', name: 'RuckBuddyCard');
-                });
-              }
-            }
-          },
-        ),
-      ],
-      child: BlocConsumer<SocialBloc, SocialState>(
-        listener: (context, state) {
-          if (!mounted || _ruckId == null) return;
+    return BlocConsumer<SocialBloc, SocialState>(
+      listener: (context, state) {
+        if (!mounted || _ruckId == null) return;
 
-          if (state is LikeStatusChecked && state.ruckId == _ruckId) {
-            setState(() {
+        if (state is LikeStatusChecked && state.ruckId == _ruckId) {
+          setState(() {
+            _isLiked = state.isLiked;
+            _likeCount = state.likeCount; 
+            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeStatusChecked', name: 'RuckBuddyCard');
+          });
+        }
+        
+        // Handle successful like action completion - only update if significantly different
+        if (state is LikeActionCompleted && state.ruckId == _ruckId) {
+          setState(() {
+            _isProcessingLike = false;
+            // Only update if there's a significant discrepancy (server correction)
+            final countDifference = (state.likeCount - (_likeCount ?? 0)).abs();
+            if (countDifference > 1 || _isLiked != state.isLiked) {
               _isLiked = state.isLiked;
-              _likeCount = state.likeCount; 
-              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeStatusChecked', name: 'RuckBuddyCard');
-            });
-          }
-          
-          // Handle successful like action completion - only update if significantly different
-          if (state is LikeActionCompleted && state.ruckId == _ruckId) {
-            setState(() {
-              _isProcessingLike = false;
-              // Only update if there's a significant discrepancy (server correction)
-              final countDifference = (state.likeCount - (_likeCount ?? 0)).abs();
-              if (countDifference > 1 || _isLiked != state.isLiked) {
-                _isLiked = state.isLiked;
-                _likeCount = state.likeCount;
-                developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server correction - liked: ${state.isLiked}, count: ${state.likeCount}', name: 'RuckBuddyCard');
-              } else {
-                developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server confirmed optimistic update - no change needed', name: 'RuckBuddyCard');
-              }
-            });
-          }
-          
-          if (state is CommentsLoaded && state.ruckId == _ruckId.toString()) {
-            setState(() {
-              _commentCount = state.comments.length;
-              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded', name: 'RuckBuddyCard');
-            });
-          }
-          
-          if (state is LikeActionError && state.ruckId == _ruckId) {
-            // Revert optimistic update on error
-            setState(() {
-              _isProcessingLike = false;
-              _isLiked = !_isLiked; // Revert optimistic change
-              _likeCount = _isLiked ? (_likeCount ?? 0) + 1 : (_likeCount ?? 1) - 1; // Revert count
-              if (_likeCount! < 0) _likeCount = 0;
-            });
-            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) reverted optimistic update due to error: ${state.message}', name: 'RuckBuddyCard');
-          }
+              _likeCount = state.likeCount;
+              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server correction - liked: ${state.isLiked}, count: ${state.likeCount}', name: 'RuckBuddyCard');
+            } else {
+              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server confirmed optimistic update - no change needed', name: 'RuckBuddyCard');
+            }
+          });
+        }
+        
+        if (state is CommentsLoaded && state.ruckId == _ruckId.toString()) {
+          setState(() {
+            _commentCount = state.comments.length;
+            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded', name: 'RuckBuddyCard');
+          });
+        }
+        
+        if (state is LikeActionError && state.ruckId == _ruckId) {
+          // Revert optimistic update on error
+          setState(() {
+            _isProcessingLike = false;
+            _isLiked = !_isLiked; // Revert optimistic change
+            _likeCount = _isLiked ? (_likeCount ?? 0) + 1 : (_likeCount ?? 1) - 1; // Revert count
+            if (_likeCount! < 0) _likeCount = 0;
+          });
+          developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) reverted optimistic update due to error: ${state.message}', name: 'RuckBuddyCard');
+        }
         },
         builder: (context, socialState) {
           // Only include stable values in the key to prevent unnecessary rebuilds
@@ -690,8 +661,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
             ),
           );
         },
-      ),
-    );
+      );
   }
 
   Widget _buildAvatar(UserInfo? user) {
@@ -1110,7 +1080,9 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
-    final String weightText = widget.ruckWeightKg != null ? '${widget.ruckWeightKg!.toStringAsFixed(1)} kg' : '';
+    final String weightText = widget.ruckWeightKg != null 
+        ? (widget.ruckWeightKg! == 0 ? 'HIKE' : '${widget.ruckWeightKg!.toStringAsFixed(1)} kg')
+        : '';
 
     if (routePoints.isEmpty) {
       return ClipRRect(

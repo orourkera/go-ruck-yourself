@@ -252,7 +252,7 @@ class LocationServiceImpl implements LocationService {
           enableWakeLock: true, // Prevent CPU sleep
           enableWifiLock: true, // Prevent WiFi sleep
           notificationChannelName: 'Ruck Session Tracking',
-          notificationIcon: AndroidResource(name: 'ic_notification'),
+          notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
           setOngoing: true, // Prevents dismissal during active sessions
           color: Color.fromARGB(255, 255, 165, 0), // Orange color for high visibility
         ),
@@ -308,22 +308,21 @@ class LocationServiceImpl implements LocationService {
             exception: '${platform}_LOCATION_GAP_${timeSinceLastUpdate}s');
         }
         
-        // Critical: Log GPS accuracy degradation to Crashlytics
-        if (position.accuracy > 20) {
-          AppLogger.critical('$platform GPS Accuracy Degraded: ${position.accuracy}m accuracy - possible power saving mode', 
-            exception: '${platform}_GPS_ACCURACY_${position.accuracy.toStringAsFixed(1)}m');
+        // Log GPS accuracy degradation to Crashlytics (non-critical)
+        if (position.accuracy > 30) {
+          // Use warning level instead of critical for moderate accuracy issues
+          AppLogger.warning('$platform GPS Accuracy Reduced: ${position.accuracy}m accuracy');
         }
         
-        // For extreme issues, log detailed location data to Crashlytics
-        if (timeSinceLastUpdate > 120 || position.accuracy > 50) {
-          AppLogger.critical('$platform Location Quality Issue', 
-            exception: 'platform=$platform, gap=${timeSinceLastUpdate}s, accuracy=${position.accuracy}m, lat=${position.latitude.toStringAsFixed(6)}, lng=${position.longitude.toStringAsFixed(6)}');
+        // For severe accuracy issues, log with more details
+        if (position.accuracy > 100) {
+          AppLogger.critical('$platform Very Poor GPS Accuracy: ${position.accuracy}m', 
+            exception: 'platform=$platform, accuracy=${position.accuracy}m, lat=${position.latitude.toStringAsFixed(6)}, lng=${position.longitude.toStringAsFixed(6)}');
         }
         
-        // Validate location quality
-        if (position.accuracy > 50) {
-          AppLogger.warning('Poor GPS accuracy: ${position.accuracy}m - using fallback');
-          // Continue tracking but log the issue
+        // Log location gaps (separate from accuracy issues)
+        if (timeSinceLastUpdate > 120) {
+          AppLogger.warning('$platform Location Update Gap: ${timeSinceLastUpdate}s since last update');
         }
         
         // Add to batch for API calls AND stream for UI updates
@@ -501,7 +500,7 @@ class LocationServiceImpl implements LocationService {
           enableWakeLock: true,
           enableWifiLock: true,
           notificationChannelName: 'Ruck Session Tracking',
-          notificationIcon: AndroidResource(name: 'ic_notification'),
+          notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
           setOngoing: true,
         ),
       );

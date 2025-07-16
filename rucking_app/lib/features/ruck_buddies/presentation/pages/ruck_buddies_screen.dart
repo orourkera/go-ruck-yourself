@@ -276,17 +276,21 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                       debugPrint('🔍 Attempting to like ruck buddy with id: ${ruckBuddy.id}');
                       
                       // Parse ruckId to int since SocialBloc expects an integer
-                      final ruckId = int.parse(ruckBuddy.id);
-                      debugPrint('🔍 Parsed ruckId as int: $ruckId');
-                      
-                      // Check if SocialBloc is available
-                      final socialBloc = context.read<SocialBloc>();
-                      debugPrint('🔍 SocialBloc instance found: ${socialBloc != null}');
-                      
-                      // Use the SocialBloc to toggle like
-                      debugPrint('🔍 Dispatching ToggleRuckLike event to SocialBloc');
-                      socialBloc.add(ToggleRuckLike(ruckId));
-                      debugPrint('🔍 ToggleRuckLike event dispatched successfully');
+                      final ruckId = int.tryParse(ruckBuddy.id);
+                      if (ruckId != null) {
+                        debugPrint('🔍 Parsed ruckId as int: $ruckId');
+                        
+                        // Check if SocialBloc is available
+                        final socialBloc = context.read<SocialBloc>();
+                        debugPrint('🔍 SocialBloc instance found: ${socialBloc != null}');
+                        
+                        // Use the SocialBloc to toggle like
+                        debugPrint('🔍 Dispatching ToggleRuckLike event to SocialBloc');
+                        socialBloc.add(ToggleRuckLike(ruckId));
+                        debugPrint('🔍 ToggleRuckLike event dispatched successfully');
+                      } else {
+                        debugPrint('🔍 Failed to parse ruckId "${ruckBuddy.id}" as integer - cannot toggle like');
+                      }
                     } catch (e) {
                       debugPrint('❌ Error toggling like: $e');
                       ScaffoldMessenger.of(context).showSnackBar(

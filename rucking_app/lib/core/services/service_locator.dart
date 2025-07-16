@@ -184,9 +184,10 @@ Future<void> setupServiceLocator() async {
   // Conditionally register ActiveSessionBloc or ActiveSessionCoordinator based on feature flag
   final featureFlags = getIt<FeatureFlags>();
   
+  // Register ActiveSessionBloc based on feature flag
   if (featureFlags.shouldUseRefactoredActiveSessionBloc) {
     // Register the new refactored coordinator
-    getIt.registerFactory(() => ActiveSessionCoordinator(
+    final coordinator = () => ActiveSessionCoordinator(
       sessionRepository: getIt<SessionRepository>(),
       locationService: getIt<LocationService>(),
       authService: getIt<AuthService>(),
@@ -196,10 +197,13 @@ Future<void> setupServiceLocator() async {
       splitTrackingService: getIt<SplitTrackingService>(),
       terrainTracker: getIt<TerrainTracker>(),
       heartRateService: getIt<HeartRateService>(),
-    ));
+    );
+    
+    // Register as the generic Bloc type that widgets expect
+    getIt.registerFactory<Bloc<ActiveSessionEvent, ActiveSessionState>>(coordinator);
   } else {
     // Register the old monolithic bloc
-    getIt.registerFactory(() => ActiveSessionBloc(
+    final oldBloc = () => ActiveSessionBloc(
       apiClient: getIt<ApiClient>(),
       locationService: getIt<LocationService>(),
       healthService: getIt<HealthService>(),
@@ -210,7 +214,11 @@ Future<void> setupServiceLocator() async {
       activeSessionStorage: getIt<ActiveSessionStorage>(),
       terrainTracker: getIt<TerrainTracker>(),
       connectivityService: getIt<ConnectivityService>(),
-    ));
+    );
+    
+    // Register as both specific and generic types
+    getIt.registerFactory<ActiveSessionBloc>(oldBloc);
+    getIt.registerFactory<Bloc<ActiveSessionEvent, ActiveSessionState>>(oldBloc);
   }
       
   // Register session bloc for operations like delete

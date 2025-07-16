@@ -35,13 +35,24 @@ class RuckLike extends Equatable {
 
   /// Creates a RuckLike from a JSON map
   factory RuckLike.fromJson(Map<String, dynamic> json) {
+    // Gracefully handle ruck_id that may arrive as String or null
+    int parsedRuckId;
+    final rawRuckId = json['ruck_id'];
+    if (rawRuckId is int) {
+      parsedRuckId = rawRuckId;
+    } else if (rawRuckId is String) {
+      parsedRuckId = int.tryParse(rawRuckId) ?? 0;
+    } else {
+      parsedRuckId = 0; // fallback value – callers should validate
+    }
+
     return RuckLike(
-      id: json['id'],
-      ruckId: json['ruck_id'],
-      userId: json['user_id'],
+      id: json['id'] ?? '',
+      ruckId: parsedRuckId,
+      userId: json['user_id'] ?? '',
       userDisplayName: json['user_display_name'] ?? 'Anonymous',
       userAvatarUrl: json['user_avatar_url'],
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
     );
   }
 

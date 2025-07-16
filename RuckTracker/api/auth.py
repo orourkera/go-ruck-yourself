@@ -64,36 +64,91 @@ class SignUpResource(Resource):
             if auth_response.user:
                 user_id = auth_response.user.id
                 
-                # Prepare data for the public.user table
-                # Only include columns defined in the User model, EXCLUDING email
-                user_data = {
-                    'id': str(user_id), 
-                    'username': username, # Save username (display name) as username
-                    'email': email, # User table needs the email column
-                    'weight_kg': data.get('weight_kg'),
-                    'height_cm': data.get('height_cm'),
-                    'date_of_birth': data.get('date_of_birth'),
-                    'gender': data.get('gender'),
-                    'prefer_metric': data.get('preferMetric') # Read camelCase from request
-                }
-                user_data_clean = {k: v for k, v in user_data.items() if v is not None}
+                # Check if user was created by trigger (new approach)
+                admin_supabase = get_supabase_admin_client()
                 
-                logger.debug(f"Inserting into user table for user {user_id}: {user_data_clean}") 
+                # Wait briefly for trigger to complete
+                import time
+                time.sleep(0.1)  # Give trigger time to complete
+                
+                # Check if user already exists (created by trigger)
                 try:
-                    admin_supabase = get_supabase_admin_client()
-                    user_insert_response = admin_supabase.table('user').insert(user_data_clean).execute()
+                    existing_user = admin_supabase.table('user').select('*').eq('id', str(user_id)).execute()
+                    
+                    if existing_user.data and len(existing_user.data) > 0:
+                        # User exists - update with additional data from registration
+                        logger.info(f"User {user_id} already exists (created by trigger), updating with registration data")
+                        
+                        update_data = {}
+                        if data.get('weight_kg'):
+                            update_data['weight_kg'] = data.get('weight_kg')
+                        if data.get('height_cm'):
+                            update_data['height_cm'] = data.get('height_cm')
+                        if data.get('date_of_birth'):
+                            update_data['date_of_birth'] = data.get('date_of_birth')
+                        if data.get('gender'):
+                            update_data['gender'] = data.get('gender')
+                        if data.get('preferMetric') is not None:
+                            update_data['prefer_metric'] = data.get('preferMetric')
+                        if username:
+                            update_data['username'] = username
+                        
+                        if update_data:
+                            user_insert_response = admin_supabase.table('user').update(update_data).eq('id', str(user_id)).execute()
+                        else:
+                            user_insert_response = existing_user
+                    else:
+                        # User doesn't exist - create manually (fallback)
+                        logger.warning(f"User {user_id} not created by trigger, creating manually")
+                        user_data = {
+                            'id': str(user_id), 
+                            'username': username,
+                            'email': email,
+                            'weight_kg': data.get('weight_kg'),
+                            'height_cm': data.get('height_cm'),
+                            'date_of_birth': data.get('date_of_birth'),
+                            'gender': data.get('gender'),
+                            'prefer_metric': data.get('preferMetric', True)
+                        }
+                        user_data_clean = {k: v for k, v in user_data.items() if v is not None}
+                        user_insert_response = admin_supabase.table('user').insert(user_data_clean).execute()
+                        
                 except Exception as user_insert_err:
                     db_error_message = str(user_insert_err)
-                    logger.error(f"Error inserting user record using admin client for user {user_id}: {db_error_message}", exc_info=True)
-                    try:
-                        logger.warning(f"Attempting to delete auth user {user_id} due to user record creation failure.")
-                        admin_supabase.auth.admin.delete_user(user_id)
-                    except Exception as delete_err:
-                        logger.error(f"Failed to delete auth user {user_id} after insert failure: {delete_err}", exc_info=True)
-                    return {'message': f'User created in auth, but failed to create user record: {db_error_message}'}, 500 
+                    logger.error(f"Error handling user record for user {user_id}: {db_error_message}", exc_info=True)
+                    
+                    # Check if it's a duplicate/conflict error (common patterns)
+                    is_duplicate_error = any([
+                        "duplicate key" in db_error_message.lower(),
+                        "already exists" in db_error_message.lower(),
+                        "409" in db_error_message,
+                        "conflict" in db_error_message.lower(),
+                        "unique constraint" in db_error_message.lower(),
+                        "violates unique constraint" in db_error_message.lower()
+                    ])
+                    
+                    if is_duplicate_error:
+                        logger.info(f"User {user_id} already exists (duplicate/conflict), continuing with success response")
+                        # Get the existing user data
+                        try:
+                            existing_user = admin_supabase.table('user').select('*').eq('id', str(user_id)).execute()
+                            user_insert_response = existing_user
+                        except Exception as fetch_err:
+                            logger.error(f"Failed to fetch existing user {user_id}: {fetch_err}")
+                            # Create a minimal response if we can't fetch the user
+                            user_insert_response = type('obj', (object,), {'data': [{'id': str(user_id), 'email': email, 'username': username}]})
+                    else:
+                        # Real error - delete auth user and return error
+                        logger.error(f"Real error creating user record for {user_id}: {db_error_message}")
+                        try:
+                            logger.warning(f"Attempting to delete auth user {user_id} due to user record creation failure.")
+                            admin_supabase.auth.admin.delete_user(user_id)
+                        except Exception as delete_err:
+                            logger.error(f"Failed to delete auth user {user_id} after insert failure: {delete_err}", exc_info=True)
+                        return {'message': f'User created in auth, but failed to create user record: {db_error_message}'}, 500
                 
-                logger.info(f"Successfully created user record for user {user_id}")
-                
+                logger.info(f"Successfully handled user record for user {user_id}")
+                    
                 user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else {}
                 
                 # Merge data from the user table insert into the response

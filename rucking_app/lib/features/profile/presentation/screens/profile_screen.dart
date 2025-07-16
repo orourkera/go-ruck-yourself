@@ -260,6 +260,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 Navigator.pushNamed(context, '/notification_settings');
                               },
                             ),
+                            // Test push notification buttons hidden after confirming backend works
+                            // Uncomment for debugging if needed:
+                            /*
                             const Divider(),
                             _buildClickableItem(
                               icon: Icons.bug_report_outlined,
@@ -288,6 +291,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 }
                               },
                             ),
+                            */
                           ],
                         ),
                         const SizedBox(height: 24),

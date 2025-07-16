@@ -93,7 +93,13 @@ class MeasurementUtils {
   }
 
   /// Weight formatted with one decimal place + unit label.
+  /// Shows 'HIKE' when weight is 0 (for hiking without additional weight).
   static String formatWeight(double kg, {required bool metric}) {
+    // Show 'HIKE' for zero weight sessions (hiking without additional weight)
+    if (kg == 0) {
+      return 'HIKE';
+    }
+    
     if (metric) {
       return '${kg.toStringAsFixed(1)} kg'; // Show one decimal place for metric
     } else {

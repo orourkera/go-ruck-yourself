@@ -11,7 +11,7 @@ class FeatureFlags {
   
   final StorageService _storageService;
   final Map<String, bool> _defaultValues = {
-    useRefactoredActiveSessionBloc: true, // Enable new implementation for testing
+    useRefactoredActiveSessionBloc: true, // Enable new implementation
   };
   
   // Cache for performance

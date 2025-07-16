@@ -229,17 +229,7 @@ class FirebaseMessagingService {
   /// Register device token with backend
   Future<void> _registerDeviceToken(String token) async {
     try {
-      print('🔔 Registering device token with backend...');
       final apiClient = GetIt.I<ApiClient>();
-      
-      // Check if user is authenticated before registering token
-      final authBloc = GetIt.I<AuthBloc>();
-      final authState = authBloc.state;
-      if (authState is! Authenticated) {
-        print('🔔 User not authenticated, skipping device token registration');
-        return;
-      }
-      
       final deviceId = await _getDeviceId();
       final deviceType = Platform.isIOS ? 'ios' : 'android';
       
@@ -791,11 +781,10 @@ class FirebaseMessagingService {
   }
 
   /// Manually register device token after authentication
+  /// No-op since token registration now happens immediately during initialization
   Future<void> registerTokenAfterAuth() async {
-    if (_deviceToken != null) {
-      print('🔔 Registering token after authentication...');
-      await _registerDeviceToken(_deviceToken!);
-    }
+    // Token registration now happens immediately during initialization
+    // This method is kept for backward compatibility
   }
 
   /// Background message handler (must be top-level function)
