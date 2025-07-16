@@ -71,36 +71,78 @@ def get_public_profile(user_id):
                 followers_count = 0
                 following_count = 0
 
-            # Safely fetch profile stats; fallback to empty dict on error
+            # Calculate stats directly from ruck_session table instead of user_profile_stats
             try:
-                stats_res = (
+                # Get completed sessions for this user
+                sessions_res = (
                     get_supabase_client()
-                    .table('user_profile_stats')
-                    .select('*')
+                    .table('ruck_session')
+                    .select('distance_km, duration_seconds, calories_burned, elevation_gain_m, power_points')
                     .eq('user_id', user_id)
+                    .eq('status', 'completed')
                     .execute()
                 )
-                raw_stats = stats_res.data[0] if stats_res.data else {}
-                # Convert snake_case keys to camelCase expected by frontend
+                
+                sessions = sessions_res.data or []
+                
+                # Calculate aggregated stats from sessions
+                total_rucks = len(sessions)
+                total_distance_km = sum(s.get('distance_km', 0) or 0 for s in sessions)
+                total_duration_seconds = sum(s.get('duration_seconds', 0) or 0 for s in sessions)
+                total_elevation_gain_m = sum(s.get('elevation_gain_m', 0) or 0 for s in sessions)
+                total_calories_burned = sum(s.get('calories_burned', 0) or 0 for s in sessions)
+                
+                # Get duel stats
+                duels_won = 0
+                duels_lost = 0
+                try:
+                    duel_stats_res = (
+                        get_supabase_client()
+                        .table('user_duel_stats')
+                        .select('duels_won, duels_lost')
+                        .eq('user_id', user_id)
+                        .execute()
+                    )
+                    if duel_stats_res.data:
+                        duels_won = duel_stats_res.data[0].get('duels_won', 0)
+                        duels_lost = duel_stats_res.data[0].get('duels_lost', 0)
+                except Exception:
+                    pass
+                
+                # Convert to camelCase for frontend
                 stats = {
-                    'totalRucks': raw_stats.get('total_rucks'),
-                    'totalDistanceKm': raw_stats.get('total_distance_km'),
-                    'totalDurationSeconds': raw_stats.get('total_duration_seconds'),
-                    'totalElevationGainM': raw_stats.get('total_elevation_gain_m'),
-                    'totalCaloriesBurned': raw_stats.get('total_calories_burned'),
-                    'duelsWon': raw_stats.get('duels_won'),
-                    'duelsLost': raw_stats.get('duels_lost'),
-                    'eventsCompleted': raw_stats.get('events_completed'),
+                    'totalRucks': total_rucks,
+                    'totalDistanceKm': total_distance_km,
+                    'totalDurationSeconds': total_duration_seconds,
+                    'totalElevationGainM': total_elevation_gain_m,
+                    'totalCaloriesBurned': total_calories_burned,
+                    'duelsWon': duels_won,
+                    'duelsLost': duels_lost,
+                    'eventsCompleted': 0,  # TODO: Implement when events are added
+                    'followersCount': followers_count,
+                    'followingCount': following_count,
                 }
-                stats['followersCount'] = followers_count
-                stats['followingCount'] = following_count
+                
                 # Provide distance in miles if user prefers imperial
                 prefer_metric = user.get('prefer_metric', True)
                 if not prefer_metric and stats.get('totalDistanceKm') is not None:
                     stats['totalDistanceMi'] = round(stats['totalDistanceKm'] * 0.621371, 2)
-                response['stats'] = {k: (v if v is not None else 0) for k, v in stats.items()}
-            except Exception:
-                response['stats'] = {}
+                
+                response['stats'] = stats
+            except Exception as e:
+                print(f"[ERROR] Failed to calculate stats for user {user_id}: {e}")
+                response['stats'] = {
+                    'totalRucks': 0,
+                    'totalDistanceKm': 0,
+                    'totalDurationSeconds': 0,
+                    'totalElevationGainM': 0,
+                    'totalCaloriesBurned': 0,
+                    'duelsWon': 0,
+                    'duelsLost': 0,
+                    'eventsCompleted': 0,
+                    'followersCount': followers_count,
+                    'followingCount': following_count,
+                }
 
             # Fetch clubs the user belongs to.
             # Prefer the correct 'club_memberships' table. If the table or relationship is missing

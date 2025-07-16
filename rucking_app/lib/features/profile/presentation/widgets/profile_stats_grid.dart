@@ -3,25 +3,33 @@ import 'package:rucking_app/features/profile/domain/entities/user_profile_stats.
 
 class ProfileStatsGrid extends StatelessWidget {
   final UserProfileStats stats;
+  final bool preferMetric;
   final VoidCallback? onFollowersPressed;
   final VoidCallback? onFollowingPressed;
 
   const ProfileStatsGrid({
     Key? key,
     required this.stats,
+    this.preferMetric = true,
     this.onFollowersPressed,
     this.onFollowingPressed,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Convert distance based on user preference
+    final distanceValue = preferMetric 
+        ? stats.totalDistanceKm 
+        : stats.totalDistanceKm * 0.621371; // Convert km to miles
+    final distanceUnit = preferMetric ? 'km' : 'mi';
+    
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
       children: [
         _buildStatCard(context, 'Total Rucks', stats.totalRucks.toString()),
-        _buildStatCard(context, 'Distance (km)', stats.totalDistanceKm.toStringAsFixed(1)),
+        _buildStatCard(context, 'Distance ($distanceUnit)', distanceValue.toStringAsFixed(1)),
         _buildStatCard(context, 'Followers', stats.followersCount.toString(), onTap: onFollowersPressed),
         _buildStatCard(context, 'Following', stats.followingCount.toString(), onTap: onFollowingPressed),
         // Add more stats as needed

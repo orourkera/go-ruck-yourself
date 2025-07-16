@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/bloc/profile_bloc.dart';
+import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
 import 'package:rucking_app/shared/widgets/user_avatar.dart';
 import 'package:rucking_app/shared/utils/image_picker_utils.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
@@ -150,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 20),
                         // Avatar + follower/following counts row
                         BlocProvider<PublicProfileBloc>(
-                          create: (_) => getIt<PublicProfileBloc>()..add(LoadPublicProfile(user.userId)),
+                          create: (_) => GetIt.instance<PublicProfileBloc>()..add(LoadPublicProfile(user.userId)),
                           child: BlocBuilder<PublicProfileBloc, PublicProfileState>(
                             builder: (context, pState) {
                               int followers = 0;
@@ -213,34 +214,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(height: 16)
-                        BlocListener<ProfileBloc, ProfileState>(
-                          listener: (context, profileState) {
-                            if (profileState is AvatarUploadSuccess) {
-                              StyledSnackBar.showSuccess(
-                                context: context,
-                                message: 'Avatar updated successfully!',
-                              );
-                            } else if (profileState is AvatarUploadFailure) {
-                              StyledSnackBar.showError(
-                                context: context,
-                                message: 'Failed to upload avatar: ${profileState.error}',
-                              );
-                            }
-                          },
-                          child: BlocBuilder<ProfileBloc, ProfileState>(
-                            builder: (context, profileState) {
-                              return EditableUserAvatar(
-                                avatarUrl: user.avatarUrl,
-                                username: user.username,
-                                size: 100,
-                                isLoading: profileState is AvatarUploading,
-                                onEditPressed: () async {
-                                  final imageFile = await ImagePickerUtils.pickProfileImage(context);
-                                  if (imageFile != null && mounted) {
-                                    context.read<ProfileBloc>().add(UploadAvatar(imageFile));
-                                  }
                         const SizedBox(height: 16),
+                        // Username and email under the avatar
                         Text(
                           user.username,
                           style: AppTextStyles.headlineMedium.copyWith(

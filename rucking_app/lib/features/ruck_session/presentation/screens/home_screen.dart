@@ -619,10 +619,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                       username: userName,
                                       size: 40,
                                       onTap: () {
-                                        final userId = state.user.userId;
-                                        if (userId != null) {
-                                          Navigator.pushNamed(context, '/profile/$userId');
-                                        }
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                        );
                                       },
                                     ),
                                     const SizedBox(width: 12),
@@ -733,13 +733,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                   _buildHeaderAction(
                                     icon: _buildProfileHeaderIcon(),
                                     onTap: () {
-                                      final authState = context.read<AuthBloc>().state;
-                                      if (authState is Authenticated) {
-                                        final userId = authState.user.userId;
-                                        if (userId != null) {
-                                          Navigator.pushNamed(context, '/profile/$userId');
-                                        }
-                                      }
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                      );
                                     },
                                   ),
                                 ],

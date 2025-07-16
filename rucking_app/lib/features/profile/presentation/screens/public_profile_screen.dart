@@ -4,6 +4,10 @@ import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bl
 import 'package:rucking_app/features/profile/presentation/widgets/profile_header.dart';
 import 'package:rucking_app/features/profile/presentation/widgets/profile_stats_grid.dart';
 import 'package:rucking_app/features/profile/domain/entities/user_profile_stats.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/shared/widgets/user_avatar.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   final String userId;
@@ -39,26 +43,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
           if (state is PublicProfileError) return Center(child: Text(state.message));
           if (state is PublicProfileLoaded) {
             return SingleChildScrollView(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    child: Row(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Avatar + follower/following counts row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Avatar
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundImage: state.profile.avatarUrl != null && state.profile.avatarUrl!.isNotEmpty
-                              ? NetworkImage(state.profile.avatarUrl!)
-                              : null,
-                          child: (state.profile.avatarUrl == null || state.profile.avatarUrl!.isEmpty)
-                              ? Image.asset(
-                                  state.profile.gender?.toLowerCase() == 'female'
-                                      ? 'assets/images/lady rucker profile.png'
-                                      : 'assets/images/profile.png',
-                                  fit: BoxFit.contain,
-                                )
-                              : null,
+                        UserAvatar(
+                          avatarUrl: state.profile.avatarUrl,
+                          username: state.profile.username,
+                          size: 80,
+                          onTap: null,
                         ),
                         const SizedBox(width: 24),
                         // Counts
@@ -83,32 +81,85 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text(state.profile.username, style: Theme.of(context).textTheme.titleMedium),
-                    ),
-                  ),
-                  if (!state.profile.isPrivateProfile) ...[
-                    ProfileStatsGrid(stats: state.stats ?? UserProfileStats.fromJson({})),
-                    TabBar(controller: _tabController, tabs: [Tab(text: 'Stats'), Tab(text: 'Clubs'), Tab(text: 'Recent')]),
-                    SizedBox(
-                      height: 300,
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          Text('Detailed Stats'),
-                          ListView.builder(itemCount: state.clubs?.length ?? 0, itemBuilder: (_, i) => ListTile(title: Text(state.clubs![i].name ?? ''))),
-                          ListView.builder(itemCount: state.recentRucks?.length ?? 0, itemBuilder: (_, i) => ListTile(title: Text('Ruck ${i+1}'))),
-                        ],
+                    const SizedBox(height: 16),
+                    // Username
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        state.profile.username,
+                        style: AppTextStyles.headlineMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ] else
-                    Center(child: Text('This profile is private')),
-                ],
+                    const SizedBox(height: 16),
+                    // Follow button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          context.read<PublicProfileBloc>().add(ToggleFollow(widget.userId));
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: state.isFollowing ? Colors.grey : AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          minimumSize: const Size(double.infinity, 44),
+                        ),
+                        child: Text(
+                          state.isFollowing ? 'Following' : 'Follow',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Stats section
+                    if (!state.profile.isPrivateProfile) ...[
+                      BlocBuilder<AuthBloc, AuthState>(
+                        builder: (context, authState) {
+                          bool preferMetric = true; // Default to metric
+                          if (authState is Authenticated) {
+                            preferMetric = authState.user.preferMetric;
+                          }
+                          return ProfileStatsGrid(
+                            stats: state.stats ?? UserProfileStats.empty(),
+                            preferMetric: preferMetric,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      TabBar(controller: _tabController, tabs: [Tab(text: 'Stats'), Tab(text: 'Clubs'), Tab(text: 'Recent')]),
+                      SizedBox(
+                        height: 300,
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildStatsTab(state.stats),
+                            _buildClubsTab(state.clubs),
+                            _buildRecentTab(state.recentRucks),
+                          ],
+                        ),
+                      ),
+                    ] else
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            children: [
+                              Icon(Icons.lock, size: 64, color: Colors.grey),
+                              const SizedBox(height: 16),
+                              Text(
+                                'This profile is private',
+                                style: AppTextStyles.titleMedium.copyWith(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             );
           }
@@ -131,6 +182,73 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatsTab(UserProfileStats? stats) {
+    if (stats == null) return Center(child: Text('No stats available'));
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          _buildStatRow('Total Rucks', stats.totalRucks.toString()),
+          _buildStatRow('Total Distance', '${stats.totalDistanceKm.toStringAsFixed(1)} km'),
+          _buildStatRow('Total Duration', '${(stats.totalDurationSeconds / 3600).toStringAsFixed(1)} hours'),
+          _buildStatRow('Calories Burned', stats.totalCaloriesBurned.toStringAsFixed(0)),
+          _buildStatRow('Elevation Gain', '${stats.totalElevationGainM.toStringAsFixed(0)} m'),
+          _buildStatRow('Duels Won', stats.duelsWon.toString()),
+          _buildStatRow('Events Completed', stats.eventsCompleted.toString()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTextStyles.bodyMedium),
+          Text(value, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClubsTab(List<dynamic>? clubs) {
+    if (clubs == null || clubs.isEmpty) {
+      return Center(child: Text('No clubs joined'));
+    }
+    
+    return ListView.builder(
+      itemCount: clubs.length,
+      itemBuilder: (context, index) {
+        final club = clubs[index];
+        return ListTile(
+          title: Text(club.name ?? 'Unknown Club'),
+          subtitle: Text('${club.memberCount ?? 0} members'),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecentTab(List<dynamic>? recentRucks) {
+    if (recentRucks == null || recentRucks.isEmpty) {
+      return Center(child: Text('No recent rucks'));
+    }
+    
+    return ListView.builder(
+      itemCount: recentRucks.length,
+      itemBuilder: (context, index) {
+        final ruck = recentRucks[index];
+        return ListTile(
+          title: Text('Ruck ${index + 1}'),
+          subtitle: Text('${ruck.distanceKm?.toStringAsFixed(1) ?? '0.0'} km'),
+          trailing: Text('${ruck.durationSeconds != null ? (ruck.durationSeconds! / 60).toStringAsFixed(0) : '0'} min'),
+        );
+      },
     );
   }
 } 
