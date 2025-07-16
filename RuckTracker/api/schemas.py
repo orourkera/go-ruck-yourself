@@ -3,12 +3,16 @@ from datetime import datetime
 from pydantic import BaseModel
 
 class UserSchema(Schema):
+    class Meta:
+        unknown = "exclude"  # Ignore unknown fields gracefully
     """Schema for validating user data"""
     id = fields.Int(dump_only=True)
     username = fields.Str(validate=validate.Length(min=3, max=64))  # Not required for registration
     email = fields.Email(required=True)
     password = fields.Str(load_only=True, validate=validate.Length(min=8))
     weight_kg = fields.Float(validate=validate.Range(min=20, max=500))
+    # Accept camelCase from frontend
+    weightKg = fields.Float(attribute='weight_kg', data_key='weightKg', validate=validate.Range(min=20, max=500))
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 

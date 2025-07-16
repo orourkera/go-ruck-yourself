@@ -55,6 +55,9 @@ import 'package:rucking_app/core/services/feature_flags.dart';
 import 'package:rucking_app/core/services/dau_tracking_service.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_coordinator.dart';
+import 'package:rucking_app/features/profile/data/repositories/profile_repository_impl.dart';
+import 'package:rucking_app/features/profile/domain/repositories/profile_repository.dart';
+import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -193,6 +196,11 @@ Future<void> setupServiceLocator() async {
     FirebaseMessagingService()
   );
   
+  // Profile repository
+  getIt.registerSingleton<ProfileRepository>(
+    ProfileRepositoryImpl(getIt<ApiClient>())
+  );
+  
   // Blocs
   print('🔧 [ServiceLocator] Registering AuthBloc...');
   getIt.registerLazySingleton<AuthBloc>(() => AuthBloc(getIt<AuthRepository>()));
@@ -248,6 +256,9 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<EventsBloc>(() => EventsBloc(getIt<EventsRepository>(), getIt<LocationService>()));
   getIt.registerFactory<EventCommentsBloc>(() => EventCommentsBloc(getIt<EventsRepository>()));
   getIt.registerFactory<EventProgressBloc>(() => EventProgressBloc(getIt<EventsRepository>()));
+
+  // Public profile bloc
+  getIt.registerFactory<PublicProfileBloc>(() => PublicProfileBloc(getIt<ProfileRepository>()));
 
   // Initialize Ruck Buddies feature
   initRuckBuddiesFeature(getIt);

@@ -39,7 +39,15 @@ class UserResource(Resource):
     def put(self, user_id):
         """Update a user's information"""
         user = User.query.get_or_404(user_id)
-        data = request.get_json()
+        data = request.get_json() or {}
+        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+        camel_to_snake = {
+            'weightKg': 'weight_kg',
+            'isMetric': 'prefer_metric',
+            'heightCm': 'height_cm',
+            'avatarUrl': 'avatar_url'
+        }
+        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
         
         # Validate data
         errors = user_schema.validate(data, partial=True)
@@ -53,6 +61,12 @@ class UserResource(Resource):
             user.email = data['email']
         if 'weight_kg' in data:
             user.weight_kg = data['weight_kg']
+        if 'prefer_metric' in data:
+            user.prefer_metric = data['prefer_metric']
+        if 'height_cm' in data:
+            user.height_cm = data['height_cm']
+        if 'avatar_url' in data:
+            user.avatar_url = data['avatar_url']
         
         db.session.commit()
         return {"user": user.to_dict()}, 200
@@ -124,7 +138,15 @@ class UserListResource(Resource):
     
     def post(self):
         """Create a new user"""
-        data = request.get_json()
+        data = request.get_json() or {}
+        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+        camel_to_snake = {
+            'weightKg': 'weight_kg',
+            'isMetric': 'prefer_metric',
+            'heightCm': 'height_cm',
+            'avatarUrl': 'avatar_url'
+        }
+        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
         
         # Validate data
         errors = user_schema.validate(data)
@@ -168,7 +190,15 @@ class SessionResource(Resource):
     def put(self, session_id):
         """Update a session's information"""
         session = RuckSession.query.get_or_404(session_id)
-        data = request.get_json()
+        data = request.get_json() or {}
+        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+        camel_to_snake = {
+            'weightKg': 'weight_kg',
+            'isMetric': 'prefer_metric',
+            'heightCm': 'height_cm',
+            'avatarUrl': 'avatar_url'
+        }
+        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
         
         # Validate data
         errors = session_schema.validate(data, partial=True)
@@ -232,7 +262,15 @@ class SessionListResource(Resource):
     
     def post(self):
         """Create a new session"""
-        data = request.get_json()
+        data = request.get_json() or {}
+        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+        camel_to_snake = {
+            'weightKg': 'weight_kg',
+            'isMetric': 'prefer_metric',
+            'heightCm': 'height_cm',
+            'avatarUrl': 'avatar_url'
+        }
+        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
         
         # Validate data
         errors = session_schema.validate(data)
@@ -268,7 +306,15 @@ class SessionStatisticsResource(Resource):
         if session.status != 'active':
             return {"message": f"Session is not active (current status: {session.status})"}, 400
         
-        data = request.get_json()
+        data = request.get_json() or {}
+        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+        camel_to_snake = {
+            'weightKg': 'weight_kg',
+            'isMetric': 'prefer_metric',
+            'heightCm': 'height_cm',
+            'avatarUrl': 'avatar_url'
+        }
+        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
         
         # Validate location data
         errors = location_point_schema.validate(data)
@@ -352,7 +398,15 @@ class SessionReviewResource(Resource):
     def post(self, session_id):
         """Create or update a review for a session"""
         session = RuckSession.query.get_or_404(session_id)
-        data = request.get_json()
+        data = request.get_json() or {}
+        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+        camel_to_snake = {
+            'weightKg': 'weight_kg',
+            'isMetric': 'prefer_metric',
+            'heightCm': 'height_cm',
+            'avatarUrl': 'avatar_url'
+        }
+        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
         
         # Validate review data
         errors = session_review_schema.validate(data)
@@ -521,7 +575,15 @@ class UserProfileResource(Resource):
             return {'message': 'Authentication required'}, 401
         
         try:
-            data = request.get_json()
+            data = request.get_json() or {}
+        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+        camel_to_snake = {
+            'weightKg': 'weight_kg',
+            'isMetric': 'prefer_metric',
+            'heightCm': 'height_cm',
+            'avatarUrl': 'avatar_url'
+        }
+        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
             
             # Check if user record already exists
             existing_user = User.query.filter_by(id=g.user.id).first()
