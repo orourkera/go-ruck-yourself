@@ -5,6 +5,13 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 /// Automatically disables detailed logs in production builds
 class AppLogger {
   static const String _debugPrefix = '[DEBUG]';
+
+  // Controls whether verbose debug/info logs should be printed. Defaults to false unless
+  // a compile–time dart-define named `VERBOSE_LOGS` is supplied.
+  // Usage when running/debugging the app:
+  // flutter run --dart-define=VERBOSE_LOGS=true
+  // In CI/release builds omit the flag to keep logs quiet.
+  static const bool _verboseLogs = bool.fromEnvironment('VERBOSE_LOGS', defaultValue: false);
   static const String _infoPrefix = '[INFO]';
   static const String _warningPrefix = '[WARNING]';
   static const String _errorPrefix = '[ERROR]';
@@ -12,27 +19,31 @@ class AppLogger {
   /// Logs detailed debug messages only in debug mode
   /// These are more verbose than info messages and mainly used for development
   static void debug(String message) {
-    if (kDebugMode) {
+    if (_shouldSuppress(message)) return;
+    if (kDebugMode && _verboseLogs) {
       debugPrint('$_debugPrefix $message');
     }
   }
 
   /// Logs information messages only in debug mode
   static void info(String message) {
-    if (kDebugMode) {
+    if (_shouldSuppress(message)) return;
+    if (kDebugMode && _verboseLogs) {
       debugPrint('$_infoPrefix $message');
     }
   }
 
   /// Logs warning messages only in debug mode
   static void warning(String message) {
-    if (kDebugMode) {
+    if (_shouldSuppress(message)) return;
+    if (kDebugMode && _verboseLogs) {
       debugPrint('$_warningPrefix $message');
     }
   }
 
   /// Logs error messages
   static void error(String message, {dynamic exception, StackTrace? stackTrace}) {
+    if (_shouldSuppress(message)) return;
     // In both debug and release mode, we log to console
     debugPrint('$_errorPrefix $message');
     if (exception != null) {
@@ -46,6 +57,8 @@ class AppLogger {
   /// Logs critical errors even in release mode
   /// Only use for critical issues that need immediate reporting
   static void critical(String message, {dynamic exception, StackTrace? stackTrace}) {
+    // critical logs are always printed even if verbose logs disabled, unless suppressed
+    if (_shouldSuppress(message)) return;
     // Always log to console in both debug and release modes
     debugPrint('$_errorPrefix [CRITICAL] $message');
     
@@ -90,6 +103,7 @@ class AppLogger {
   /// Logs session completion flow steps to Crashlytics for debugging hangs
   /// This helps track where session completion gets stuck
   static void sessionCompletion(String step, {Map<String, dynamic>? context}) {
+    if (_shouldSuppress(step)) return;
     final message = '[SESSION_COMPLETION] $step';
     debugPrint('$_infoPrefix $message');
     
@@ -120,6 +134,7 @@ class AppLogger {
     String? lastStep,
     Map<String, dynamic>? networkInfo,
   }) {
+    if (_shouldSuppress(message)) return;
     final fullMessage = '[SESSION_TIMEOUT] $message';
     debugPrint('$_errorPrefix $fullMessage');
     
@@ -159,5 +174,18 @@ class AppLogger {
     } catch (e) {
       debugPrint('$_errorPrefix Failed to send timeout log to Crashlytics: $e');
     }
+  }
+
+  /// Determine if the provided message is considered too noisy and should be suppressed.
+  /// Filters out high-frequency coordinate/location messages unless verbose logs enabled.
+  static bool _shouldSuppress(String message) {
+    if (_verboseLogs) return false; // developer explicitly asked for logs
+
+    final lower = message.toLowerCase();
+    if (lower.startsWith('location update:') ||
+        (lower.contains('latitude') && lower.contains('longitude'))) {
+      return true;
+    }
+    return false;
   }
 }

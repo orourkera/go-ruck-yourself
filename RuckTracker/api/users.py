@@ -23,7 +23,7 @@ def get_public_profile(user_id):
             return api_error('User not found', status_code=404)
         user = user_res.data
         is_own_profile = current_user_id == user_id
-        is_private = user['is_profile_private'] and not is_own_profile
+        is_private = user.get('is_profile_private', False) and not is_own_profile
         is_following = False
         is_followed_by = False
         if current_user_id:
