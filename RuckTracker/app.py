@@ -323,6 +323,23 @@ api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password', '/api/auth
 api.add_resource(UserProfileResource, '/api/auth/profile', '/api/users/profile')
 api.add_resource(UserAvatarUploadResource, '/api/auth/avatar')
 
+# Helper used by Flask-Limiter to uniquely identify the caller (user ID or IP)
+
+def get_user_id():
+    """Return a stable identifier for rate-limiting: user_<uuid> if auth, else remote IP."""
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split("Bearer ")[1]
+        try:
+            supabase = get_supabase_client(user_jwt=token)
+            user_response = supabase.auth.get_user(token)
+            if user_response and hasattr(user_response, 'user') and user_response.user:
+                return f"user_{user_response.user.id}"
+        except Exception as e:
+            app.logger.error(f"Error determining user ID for rate limiting: {e}")
+    # Fallback to IP address if JWT missing/invalid
+    return get_remote_address()
+
 api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
 
 # Ruck session endpoints (prefixed with /api)
@@ -355,20 +372,6 @@ api.add_resource(MonthlyStatsResource, '/api/stats/monthly', '/api/statistics/mo
 api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/yearly')
 
 # Ruck Photos Endpoint
-def get_user_id():
-    # Get the user ID from the JWT token in the Authorization header
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        token = auth_header.split("Bearer ")[1]
-        try:
-            supabase = get_supabase_client(user_jwt=token)
-            user_response = supabase.auth.get_user(token)
-            if user_response and hasattr(user_response, 'user') and user_response.user:
-                return f"user_{user_response.user.id}"
-        except Exception as e:
-            app.logger.error(f"Error getting user ID for rate limiting: {e}")
-    # Fall back to IP if user ID cannot be determined
-    return get_remote_address()
 
 # Set up rate limiting for photo uploads - 100 requests per minute per user
 app.logger.info(f"Setting RuckPhotosResource rate limit to: 100 per minute per user")
