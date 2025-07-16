@@ -2,6 +2,7 @@ class UserProfile {
   final String id;
   final String username;
   final String? avatarUrl;
+  final String? gender;
   final DateTime createdAt;
   final bool isFollowing;
   final bool isFollowedBy;
@@ -11,6 +12,7 @@ class UserProfile {
     required this.id,
     required this.username,
     this.avatarUrl,
+    this.gender,
     required this.createdAt,
     required this.isFollowing,
     required this.isFollowedBy,
@@ -21,6 +23,7 @@ class UserProfile {
     id: json['id'] as String,
     username: json['username'] as String,
     avatarUrl: json['avatarUrl'] as String?,
+    gender: json['gender'] as String?,
     createdAt: DateTime.tryParse(json['createdAt'] as String ?? '') ?? DateTime.now(),
     isFollowing: json['isFollowing'] as bool? ?? false,
     isFollowedBy: json['isFollowedBy'] as bool? ?? false,
@@ -31,6 +34,7 @@ class UserProfile {
     'id': id,
     'username': username,
     'avatarUrl': avatarUrl,
+    'gender': gender,
     'createdAt': createdAt.toIso8601String(),
     'isFollowing': isFollowing,
     'isFollowedBy': isFollowedBy,

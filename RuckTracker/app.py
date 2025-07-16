@@ -160,6 +160,17 @@ def rate_limit_resource(resource, limit):
     resource.dispatch_request = wrapped_dispatch_request
     return resource
 
+# Increase rate limit for user profile endpoint
+try:
+    view_key = 'users.get_public_profile'
+    if view_key in app.view_functions:
+        app.logger.info("Setting get_public_profile rate limit to 300 per hour")
+        app.view_functions[view_key] = limiter.limit("300 per hour", override_defaults=True)(app.view_functions[view_key])
+    else:
+        app.logger.warning(f"View function {view_key} not found when applying rate limit")
+except Exception as e:
+    app.logger.error(f"Failed to set rate limit for get_public_profile: {e}")
+
 # Apply rate limiting to Flask-RESTful endpoints - using higher defaults
 # Individual resources can have their own specific limits applied via rate_limit_resource
 decorators = []  # No global rate limit - we'll set specific limits per endpoint

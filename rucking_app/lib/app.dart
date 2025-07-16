@@ -473,7 +473,17 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           final path = settings.name ?? '';
                           final userId = path.split('/').last;
                           if (userId.isNotEmpty) {
-                            return MaterialPageRoute(builder: (_) => PublicProfileScreen(userId: userId));
+                            return MaterialPageRoute(builder: (_) {
+                              final authState = BlocProvider.of<AuthBloc>(_).state;
+                              final currentUserId = authState is Authenticated ? authState.user.id : '';
+                              if (userId == currentUserId) {
+                                return const ProfileScreen();
+                              }
+                              return BlocProvider<PublicProfileBloc>(
+                                  create: (_) => getIt<PublicProfileBloc>()..add(LoadPublicProfile(userId)),
+                                  child: PublicProfileScreen(userId: userId),
+                                );
+                            });
                           }
                         }
                         break;

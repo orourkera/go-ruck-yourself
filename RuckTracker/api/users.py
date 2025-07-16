@@ -10,7 +10,7 @@ def get_public_profile(user_id):
         current_user_id = g.current_user['id'] if 'current_user' in g else None
         # Fetch basic profile fields. Some older databases may not yet have avatar_url or is_profile_private columns
         try:
-            user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, prefer_metric, is_profile_private').eq('id', user_id).single().execute()
+            user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, prefer_metric, is_profile_private, gender').eq('id', user_id).single().execute()
         except Exception as fetch_err:
             # If the requested columns do not exist (e.g. column does not exist error), retry with a reduced column list
             err_msg = str(fetch_err)
@@ -41,7 +41,8 @@ def get_public_profile(user_id):
                 'isFollowing': is_following,
                 'isFollowedBy': is_followed_by,
                 'isOwnProfile': is_own_profile,
-                'isPrivateProfile': user.get('is_profile_private', False)
+                'isPrivateProfile': user.get('is_profile_private', False),
+                'gender': user.get('gender')
             },
             'stats': {},
             'clubs': None,
