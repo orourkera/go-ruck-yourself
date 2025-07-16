@@ -200,7 +200,7 @@ def follow_user(user_id):
         if insert_res.data:
             count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
             followers_count = count_res.data[0]['count'] if count_res.data else 0
-            return api_response({'success': True, 'isFollowing': True, 'followersCount': followers_count})
+            return jsonify({'success': True, 'isFollowing': True, 'followersCount': followers_count})
         return api_error('Failed to follow', status_code=400)
     except Exception as e:
         return api_error(str(e), status_code=500)
@@ -212,7 +212,7 @@ def unfollow_user(user_id):
         delete_res = get_supabase_client().table('user_follows').delete().eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
         count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
         followers_count = count_res.data[0]['count'] if count_res.data else 0
-        return api_response({'success': True, 'isFollowing': False, 'followersCount': followers_count})
+        return jsonify({'success': True, 'isFollowing': False, 'followersCount': followers_count})
     except Exception as e:
         return api_error(str(e), status_code=500)
 
