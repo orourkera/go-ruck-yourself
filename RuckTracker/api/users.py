@@ -8,7 +8,17 @@ users_bp = Blueprint('users', __name__)
 def get_public_profile(user_id):
     try:
         current_user_id = g.current_user['id'] if 'current_user' in g else None
-        user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, is_profile_private').eq('id', user_id).single().execute()
+        # Fetch basic profile fields. Some older databases may not yet have avatar_url or is_profile_private columns
+        try:
+            user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, is_profile_private').eq('id', user_id).single().execute()
+        except Exception as fetch_err:
+            # If the requested columns do not exist (e.g. column does not exist error), retry with a reduced column list
+            err_msg = str(fetch_err)
+            if '42703' in err_msg or 'column' in err_msg and ('avatar_url' in err_msg or 'is_profile_private' in err_msg):
+                user_res = get_supabase_client().table('user').select('id, username, created_at').eq('id', user_id).single().execute()
+            else:
+                raise
+
         if not user_res.data:
             return api_error('User not found', status_code=404)
         user = user_res.data
@@ -25,11 +35,11 @@ def get_public_profile(user_id):
             'user': {
                 'id': user['id'],
                 'username': user['username'],
-                'avatarUrl': user['avatar_url'],
+                'avatarUrl': user.get('avatar_url'),
                 'createdAt': user['created_at'],
                 'isFollowing': is_following,
                 'isFollowedBy': is_followed_by,
-                'isPrivateProfile': user['is_profile_private']
+                'isPrivateProfile': user.get('is_profile_private', False)
             },
             'stats': None,
             'clubs': None,
@@ -151,6 +161,12 @@ def update_privacy():
             return api_error('isPrivateProfile must be boolean', status_code=400)
         current_user_id = g.current_user['id']
         update_res = get_supabase_client().table('user').update({'is_profile_private': is_private}).eq('id', current_user_id).execute()
+        if update_res.data:
+            return api_response({'success': True, 'isPrivateProfile': is_private})
+        return api_error('Failed to update privacy', status_code=400)
+    except Exception as e:
+        return api_error(str(e), status_code=500)             else:
+                raise
         if update_res.data:
             return api_response({'success': True, 'isPrivateProfile': is_private})
         return api_error('Failed to update privacy', status_code=400)

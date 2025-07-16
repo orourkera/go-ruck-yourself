@@ -303,7 +303,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                   child: Container(
                     padding: const EdgeInsets.all(16.0),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(8.0),
                     ),
                     child: Row(

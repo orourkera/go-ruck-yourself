@@ -619,8 +619,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                       username: userName,
                                       size: 40,
                                       onTap: () {
-                                        // Navigate to profile page
-                                        Navigator.pushNamed(context, '/profile');
+                                        final userId = state.user.userId;
+                                        if (userId != null) {
+                                          Navigator.pushNamed(context, '/profile/$userId');
+                                        }
                                       },
                                     ),
                                     const SizedBox(width: 12),
@@ -731,7 +733,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                   _buildHeaderAction(
                                     icon: _buildProfileHeaderIcon(),
                                     onTap: () {
-                                      Navigator.pushNamed(context, '/profile');
+                                      final authState = context.read<AuthBloc>().state;
+                                      if (authState is Authenticated) {
+                                        final userId = authState.user.userId;
+                                        if (userId != null) {
+                                          Navigator.pushNamed(context, '/profile/$userId');
+                                        }
+                                      }
                                     },
                                   ),
                                 ],
