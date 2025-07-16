@@ -21,9 +21,9 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/error_messages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
-import 'package:rucking_app/features/ruck_session/domain/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
-import 'package:rucking_app/features/ruck_session/domain/session_repository.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -408,8 +408,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         final distanceKm = _preferMetric ? distance : distance * 1.60934;
         final paceMinPerKm = durationMin / distanceKm;
         final calories = _calculateCalories(duration.inSeconds, distanceKm, _ruckWeight, userWeightKg);
-        final elevationGainM = double.tryParse(_offlineElevationGainController.text) ?? 0.0;
-        final elevationLossM = double.tryParse(_offlineElevationLossController.text) ?? 0.0;
+        double elevationGainM = double.tryParse(_offlineElevationGainController.text) ?? 0.0;
+        double elevationLossM = double.tryParse(_offlineElevationLossController.text) ?? 0.0;
         if (!_preferMetric) {
           elevationGainM *= 0.3048;
           elevationLossM *= 0.3048;
@@ -432,14 +432,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         );
 
         final repo = GetIt.I<SessionRepository>();
-        await repo.createManualSession(session.toJson());
+        final apiRuckId = await repo.createManualSession(session.toJson());
 
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => SessionCompleteScreen(
               completedAt: now,
-              ruckId: session.id!,
+              ruckId: apiRuckId,
               duration: duration,
               distance: distanceKm,
               caloriesBurned: calories.toInt(),

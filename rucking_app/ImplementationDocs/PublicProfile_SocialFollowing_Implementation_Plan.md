@@ -147,6 +147,17 @@ Response: {
 }
 ```
 
+### Implementation Details for GET /users/{userId}/profile
+- **Authentication**: Require authenticated user. Use Supabase auth to get current_user_id.
+- **Privacy Check**: If target user's is_profile_private=true and current_user_id != userId, return only basic user info with stats/clubs/recentRucks=null.
+- **User Fetch**: SELECT id, username, avatar_url, created_at, is_profile_private FROM public.user WHERE id = {userId}.
+- **Follow Status**: Check if exists in user_follows for isFollowing (current follows target) and isFollowedBy (target follows current).
+- **Stats Aggregation**: If not private or own profile, run SQL: SELECT COUNT(*) as total_rucks, SUM(distance_km) as total_distance_km, etc. FROM ruck_sessions WHERE user_id = {userId}. Use user_profile_stats table if implemented for caching.
+- **Clubs Fetch**: If allowed, SELECT * FROM clubs JOIN club_members ON clubs.id = club_members.club_id WHERE club_members.user_id = {userId}.
+- **Recent Rucks**: If allowed, SELECT * FROM ruck_sessions WHERE user_id = {userId} ORDER BY end_time DESC LIMIT 5.
+- **Error Handling**: 404 if user not found, 403 if private and not owner, 500 on DB errors.
+- **Optimization**: Cache response for 1 hour if not own profile.
+
 #### GET `/users/{userId}/followers`
 ```typescript
 Response: {
@@ -223,6 +234,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   // Profile data, stats, follow status
   // Tab controller for different sections
 }
+
+// UI Layout Note:
+// - Profile picture and name should be left-aligned.
+// - Followers count and Following count should be right-aligned.
+// - Tapping on followers count opens FollowersScreen with list of followers, allowing easy follow-back or unfollow.
+// - Tapping on following count opens FollowingScreen with list of followed users, allowing easy unfollow.
 ```
 
 #### `lib/features/profile/presentation/pages/followers_screen.dart`
