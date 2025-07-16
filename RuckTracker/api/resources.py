@@ -67,6 +67,8 @@ class UserResource(Resource):
             user.height_cm = data['height_cm']
         if 'avatar_url' in data:
             user.avatar_url = data['avatar_url']
+        if 'is_profile_private' in data:
+            user.is_profile_private = data['is_profile_private']
         
         db.session.commit()
         return {"user": user.to_dict()}, 200

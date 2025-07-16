@@ -4,7 +4,7 @@ from RuckTracker.supabase_client import get_supabase_client
 
 users_bp = Blueprint('users', __name__)
 
-@users_bp.route('/&lt;user_id&gt;/profile', methods=['GET'])
+@users_bp.route('/<user_id>/profile', methods=['GET'])
 def get_public_profile(user_id):
     try:
         current_user_id = g.current_user['id'] if 'current_user' in g else None
@@ -46,7 +46,7 @@ def get_public_profile(user_id):
     except Exception as e:
         return api_error(str(e), status=500)
 
-@users_bp.route('/&lt;user_id&gt;/followers', methods=['GET'])
+@users_bp.route('/<user_id>/followers', methods=['GET'])
 def get_followers(user_id):
     try:
         current_user_id = g.current_user['id'] if 'current_user' in g else None
@@ -72,7 +72,7 @@ def get_followers(user_id):
     except Exception as e:
         return api_error(str(e), status=500)
 
-@users_bp.route('/&lt;user_id&gt;/following', methods=['GET'])
+@users_bp.route('/<user_id>/following', methods=['GET'])
 def get_following(user_id):
     try:
         current_user_id = g.current_user['id'] if 'current_user' in g else None
@@ -98,7 +98,7 @@ def get_following(user_id):
     except Exception as e:
         return api_error(str(e), status=500)
 
-@users_bp.route('/&lt;user_id&gt;/follow', methods=['POST'])
+@users_bp.route('/<user_id>/follow', methods=['POST'])
 def follow_user(user_id):
     try:
         current_user_id = g.current_user['id']
@@ -111,7 +111,7 @@ def follow_user(user_id):
     except Exception as e:
         return api_error(str(e), status=500)
 
-@users_bp.route('/&lt;user_id&gt;/follow', methods=['DELETE'])
+@users_bp.route('/<user_id>/follow', methods=['DELETE'])
 def unfollow_user(user_id):
     try:
         current_user_id = g.current_user['id']
