@@ -10,7 +10,7 @@ def get_public_profile(user_id):
         current_user_id = g.current_user['id'] if 'current_user' in g else None
         user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, is_profile_private').eq('id', user_id).single().execute()
         if not user_res.data:
-            return api_error('User not found', status=404)
+            return api_error('User not found', status_code=404)
         user = user_res.data
         is_own_profile = current_user_id == user_id
         is_private = user['is_profile_private'] and not is_own_profile
@@ -44,7 +44,7 @@ def get_public_profile(user_id):
             response['recentRucks'] = rucks_res.data or []
         return api_response(response)
     except Exception as e:
-        return api_error(str(e), status=500)
+        return api_error(str(e), status_code=500)
 
 @users_bp.route('/<uuid:user_id>/followers', methods=['GET'])
 def get_followers(user_id):
@@ -70,7 +70,7 @@ def get_followers(user_id):
         has_more = len(followers) == per_page
         return api_response({'followers': followers, 'pagination': {'page': page, 'hasMore': has_more}})
     except Exception as e:
-        return api_error(str(e), status=500)
+        return api_error(str(e), status_code=500)
 
 @users_bp.route('/<uuid:user_id>/following', methods=['GET'])
 def get_following(user_id):
@@ -96,7 +96,7 @@ def get_following(user_id):
         has_more = len(following) == per_page
         return api_response({'following': following, 'pagination': {'page': page, 'hasMore': has_more}})
     except Exception as e:
-        return api_error(str(e), status=500)
+        return api_error(str(e), status_code=500)
 
 @users_bp.route('/<uuid:user_id>/follow', methods=['POST'])
 def follow_user(user_id):
@@ -107,9 +107,9 @@ def follow_user(user_id):
             count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
             followers_count = count_res.data[0]['count'] if count_res.data else 0
             return api_response({'success': True, 'isFollowing': True, 'followersCount': followers_count})
-        return api_error('Failed to follow', status=400)
+        return api_error('Failed to follow', status_code=400)
     except Exception as e:
-        return api_error(str(e), status=500)
+        return api_error(str(e), status_code=500)
 
 @users_bp.route('/<uuid:user_id>/follow', methods=['DELETE'])
 def unfollow_user(user_id):
@@ -120,7 +120,7 @@ def unfollow_user(user_id):
         followers_count = count_res.data[0]['count'] if count_res.data else 0
         return api_response({'success': True, 'isFollowing': False, 'followersCount': followers_count})
     except Exception as e:
-        return api_error(str(e), status=500)
+        return api_error(str(e), status_code=500)
 
 @users_bp.route('/social/following-feed', methods=['GET'])
 def get_following_feed():
@@ -138,21 +138,21 @@ def get_following_feed():
         has_more = len(rucks_res.data or []) == per_page
         return api_response({'rucks': rucks_res.data or [], 'pagination': {'page': page, 'hasMore': has_more}})
     except Exception as e:
-        return api_error(str(e), status=500)
+        return api_error(str(e), status_code=500)
 
 @users_bp.route('/me/privacy', methods=['PATCH'])
 def update_privacy():
     try:
         data = request.get_json()
         if not isinstance(data, dict) or 'isPrivateProfile' not in data:
-            return api_error('Invalid request: missing isPrivateProfile', status=400)
+            return api_error('Invalid request: missing isPrivateProfile', status_code=400)
         is_private = data['isPrivateProfile']
         if not isinstance(is_private, bool):
-            return api_error('isPrivateProfile must be boolean', status=400)
+            return api_error('isPrivateProfile must be boolean', status_code=400)
         current_user_id = g.current_user['id']
         update_res = get_supabase_client().table('user').update({'is_profile_private': is_private}).eq('id', current_user_id).execute()
         if update_res.data:
             return api_response({'success': True, 'isPrivateProfile': is_private})
-        return api_error('Failed to update privacy', status=400)
+        return api_error('Failed to update privacy', status_code=400)
     except Exception as e:
-        return api_error(str(e), status=500) 
+        return api_error(str(e), status_code=500) 

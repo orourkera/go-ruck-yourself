@@ -124,7 +124,7 @@ class RuckSessionListResource(Resource):
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
                 
-            limit = request.args.get('limit', 50, type=int)  # Default to 50 sessions max
+            limit = request.args.get('limit', 20, type=int)  # Default to 20 sessions
             
             # Build cache key based on user and limit
             cache_key = f"ruck_session:{g.user.id}:list:{limit}"
@@ -143,7 +143,7 @@ class RuckSessionListResource(Resource):
                 .eq('user_id', g.user.id) \
                 .eq('status', 'completed') \
                 .order('completed_at', desc=True) \
-                .limit(min(limit, 100))  # Cap at 100 sessions max
+                .limit(min(limit, 50))  # Cap at 50 sessions max
             
             response = response_query.execute()
             sessions = response.data
