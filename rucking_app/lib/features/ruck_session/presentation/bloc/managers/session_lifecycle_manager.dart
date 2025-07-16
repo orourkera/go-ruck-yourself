@@ -65,6 +65,8 @@ class SessionLifecycleManager implements SessionManager {
       await _onSessionPaused(event);
     } else if (event is manager_events.SessionResumed) {
       await _onSessionResumed(event);
+    } else if (event is manager_events.SessionReset) {
+      await _onSessionReset(event);
     } else if (event is manager_events.TimerStarted) {
       await _onTimerStarted(event);
     } else if (event is manager_events.TimerStopped) {
@@ -335,6 +337,44 @@ class SessionLifecycleManager implements SessionManager {
   // Getters for other managers to access session info
   String? get activeSessionId => _activeSessionId;
   DateTime? get sessionStartTime => _sessionStartTime;
+  Future<void> _onSessionReset(manager_events.SessionReset event) async {
+    try {
+      AppLogger.info('[LIFECYCLE] Session reset requested');
+      
+      // Cancel any active timers
+      _ticker?.cancel();
+      _ticker = null;
+      
+      // Clear session identifiers and state
+      _activeSessionId = null;
+      _sessionStartTime = null;
+      
+      // Reset to initial state
+      _updateState(const SessionLifecycleState(
+        isActive: false,
+        sessionId: null,
+        startTime: null,
+        duration: Duration.zero,
+        totalPausedDuration: Duration.zero,
+        pausedAt: null,
+        ruckWeightKg: 0.0,
+        userWeightKg: 0.0,
+        errorMessage: null,
+        isSaving: false,
+        isLoading: false,
+        currentSession: null,
+      ));
+      
+      AppLogger.info('[LIFECYCLE] Session reset completed successfully');
+      
+    } catch (e) {
+      AppLogger.error('[LIFECYCLE] Error resetting session: $e');
+      _updateState(_currentState.copyWith(
+        errorMessage: 'Failed to reset session: $e',
+      ));
+    }
+  }
+
   bool get isSessionActive => _currentState.isActive;
   bool get isPaused => !_currentState.isActive && _activeSessionId != null;
   Duration get totalPausedDuration => _currentState.totalPausedDuration;

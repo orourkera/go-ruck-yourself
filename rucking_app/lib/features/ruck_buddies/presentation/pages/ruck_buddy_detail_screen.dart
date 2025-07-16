@@ -33,7 +33,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_event.dart';
+
 
 class RuckBuddyDetailScreen extends StatefulWidget {
   final RuckBuddy ruckBuddy;

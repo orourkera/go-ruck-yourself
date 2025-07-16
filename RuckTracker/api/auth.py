@@ -139,7 +139,8 @@ class SignUpResource(Resource):
                             user_insert_response = type('obj', (object,), {'data': [{'id': str(user_id), 'email': email, 'username': username}]})
                     else:
                         # Real error - delete auth user and return error
-                        logger.error(f"Real error creating user record for {user_id}: {db_error_message}")
+                        logger.critical(f"CRITICAL: Real error creating user record for {user_id}: {db_error_message}")
+                        logger.critical(f"CRITICAL: User signup failed - Error type: USER_CREATION_FAILED, User ID: {user_id}, Error: {db_error_message}")
                         try:
                             logger.warning(f"Attempting to delete auth user {user_id} due to user record creation failure.")
                             admin_supabase.auth.admin.delete_user(user_id)

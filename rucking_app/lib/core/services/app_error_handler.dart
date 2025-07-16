@@ -78,13 +78,10 @@ class AppErrorHandler {
       AppLogger.error('Failed to send error to Sentry: $sentryError');
     }
     
-    // Optionally send to backend for Papertrail (for critical operations)
+    // Backend error reporting disabled - endpoint not available
+    // TODO: Re-enable when backend has /errors/supabase endpoint
     if (sendToBackend) {
-      try {
-        await _sendToBackend(operation, error, context);
-      } catch (backendError) {
-        AppLogger.error('Failed to send error to backend: $backendError');
-      }
+      AppLogger.debug('Backend error reporting disabled (endpoint not available)');
     }
   }
   

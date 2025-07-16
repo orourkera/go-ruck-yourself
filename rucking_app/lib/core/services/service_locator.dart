@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/enhanced_api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
@@ -51,6 +52,8 @@ import 'package:rucking_app/features/events/presentation/bloc/events_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_comments_bloc.dart';
 import 'package:rucking_app/features/events/presentation/bloc/event_progress_bloc.dart';
 import 'package:rucking_app/core/services/feature_flags.dart';
+import 'package:rucking_app/core/services/dau_tracking_service.dart';
+import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_coordinator.dart';
 
 // Global service locator instance
@@ -58,6 +61,9 @@ final GetIt getIt = GetIt.instance;
 
 /// Sets up the service locator with all dependencies
 Future<void> setupServiceLocator() async {
+  print('🔧 [ServiceLocator] Starting service locator setup...');
+  
+  try {
   // External services
   final sharedPrefs = await SharedPreferences.getInstance();
   getIt.registerSingleton<SharedPreferences>(sharedPrefs);
@@ -81,6 +87,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<ApiClient>(apiClient);
   getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
   getIt.registerSingleton<AuthService>(AuthServiceImpl(getIt<ApiClient>(), getIt<StorageService>()));
+  getIt.registerSingleton<EnhancedApiClient>(EnhancedApiClient(apiClient));
   getIt.registerSingleton<AvatarService>(AvatarService(
     authService: getIt<AuthService>(),
     apiClient: getIt<ApiClient>(),
@@ -176,7 +183,18 @@ Future<void> setupServiceLocator() async {
     AppStartupService(getIt<ActiveSessionStorage>())
   );
   
+  // DAU tracking service
+  getIt.registerSingleton<DauTrackingService>(
+    DauTrackingService.instance
+  );
+  
+  // Firebase messaging service
+  getIt.registerSingleton<FirebaseMessagingService>(
+    FirebaseMessagingService()
+  );
+  
   // Blocs
+  print('🔧 [ServiceLocator] Registering AuthBloc...');
   getIt.registerLazySingleton<AuthBloc>(() => AuthBloc(getIt<AuthRepository>()));
   getIt.registerFactory<SessionHistoryBloc>(() => SessionHistoryBloc(
     sessionRepository: getIt<SessionRepository>(),
@@ -257,6 +275,14 @@ Future<void> setupServiceLocator() async {
   
   // Initialize Premium feature
   setupPremiumDependencies();
+  
+  print('🔧 [ServiceLocator] Service locator setup completed successfully!');
+  
+  } catch (e, stackTrace) {
+    print('🔧 [ServiceLocator] ERROR during setup: $e');
+    print('🔧 [ServiceLocator] Stack trace: $stackTrace');
+    rethrow;
+  }
 }
 
 /// Configures Dio with base options and interceptors
@@ -274,8 +300,13 @@ Dio _configureDio() {
     ),
   );
   
-  // Configure SSL certificate pinning
-  SslPinningService.setupSecureHttpClient(dio);
+  // Configure SSL certificate pinning (non-fatal)
+  try {
+    SslPinningService.setupSecureHttpClient(dio);
+  } catch (e) {
+    // If SSL pinning setup fails (e.g., missing certs while offline), log and continue with default security
+    print('[WARNING] SSL pinning setup failed: $e - continuing without pinning');
+  }
   
   // Add interceptors
   dio.interceptors.add(LogInterceptor(

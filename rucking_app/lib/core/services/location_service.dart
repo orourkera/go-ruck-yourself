@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart' show Color, BuildContext;
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
@@ -105,6 +106,8 @@ abstract class LocationService {
 
 /// Implementation of location service using Geolocator
 class LocationServiceImpl implements LocationService {
+  // Whether we have permission to start Android foreground location service
+  bool _canStartForegroundService = false;
   static const int _locationTimeoutSeconds = 30; // Location timeout detection
   static const int _stalenessCheckSeconds = 45; // Check for stale location updates
   
@@ -145,13 +148,17 @@ class LocationServiceImpl implements LocationService {
       if (currentPermission == LocationPermission.always || 
           currentPermission == LocationPermission.whileInUse) {
         AppLogger.info('Location permission already granted: $currentPermission');
-        return true;
+
+         if (Platform.isAndroid) {
+           _canStartForegroundService = true;
+         }
+         return true;
       }
       
       // Show prominent disclosure dialog first (required for Google Play compliance)
-      // Show on both platforms for better UX, but it's only required for Android
-      if (context != null) {
-        AppLogger.info('${Platform.isAndroid ? '[REQUIRED]' : '[UX]'} Showing location disclosure dialog...');
+      // Only show on Android - iOS has its own system permission flow
+      if (context != null && Platform.isAndroid) {
+        AppLogger.info('[REQUIRED] Showing location disclosure dialog...');
         final userConsent = await LocationDisclosureDialog.show(context);
         
         if (!userConsent) {
@@ -160,7 +167,7 @@ class LocationServiceImpl implements LocationService {
         }
         
         AppLogger.info('User accepted location disclosure, proceeding with system permission...');
-      } else {
+      } else if (context == null && Platform.isAndroid) {
         AppLogger.warning('No context provided for disclosure dialog, proceeding directly to system permission');
       }
       
@@ -170,6 +177,10 @@ class LocationServiceImpl implements LocationService {
       if (permission == LocationPermission.always || 
           permission == LocationPermission.whileInUse) {
         AppLogger.info('Location permission granted: $permission');
+
+         if (Platform.isAndroid) {
+           _canStartForegroundService = true;
+         }
         
         // Only on Android, also request battery optimization exemption
         // Do this separately to avoid dialog conflicts
@@ -234,6 +245,7 @@ class LocationServiceImpl implements LocationService {
   
   @override
   Stream<LocationPoint> startLocationTracking() {
+    
     AppLogger.info('Starting location tracking with enhanced Android protection...');
     _isTracking = true;
     _lastLocationUpdate = DateTime.now();
@@ -246,7 +258,7 @@ class LocationServiceImpl implements LocationService {
         accuracy: _currentConfig.accuracy,
         distanceFilter: _currentConfig.distanceFilter.toInt(),
         intervalDuration: const Duration(seconds: 5), // Force frequent updates
-        foregroundNotificationConfig: const ForegroundNotificationConfig(
+        foregroundNotificationConfig: _canStartForegroundService ? const ForegroundNotificationConfig(
           notificationTitle: 'Ruck in Progress',
           notificationText: 'Tracking your ruck session - tap to return to app',
           enableWakeLock: true, // Prevent CPU sleep
@@ -255,7 +267,7 @@ class LocationServiceImpl implements LocationService {
           notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
           setOngoing: true, // Prevents dismissal during active sessions
           color: Color.fromARGB(255, 255, 165, 0), // Orange color for high visibility
-        ),
+        ) : null,
       );
     } else if (Platform.isIOS) {
       locationSettings = AppleSettings(
@@ -494,7 +506,7 @@ class LocationServiceImpl implements LocationService {
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: _currentConfig.distanceFilter.toInt(),
         intervalDuration: const Duration(seconds: 5),
-        foregroundNotificationConfig: const ForegroundNotificationConfig(
+        foregroundNotificationConfig: _canStartForegroundService ? const ForegroundNotificationConfig(
           notificationTitle: 'Ruck in Progress',
           notificationText: 'GPS reconnected - tracking resumed',
           enableWakeLock: true,
@@ -502,7 +514,7 @@ class LocationServiceImpl implements LocationService {
           notificationChannelName: 'Ruck Session Tracking',
           notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
           setOngoing: true,
-        ),
+        ) : null,
       );
       
       final positionStream = Geolocator.getPositionStream(locationSettings: locationSettings);
@@ -745,6 +757,7 @@ class LocationServiceImpl implements LocationService {
   }
   
   /// Dispose of resources
+  
   void dispose() {
     // Safely dispose of all resources
     try {

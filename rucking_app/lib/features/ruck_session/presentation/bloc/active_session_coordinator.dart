@@ -230,6 +230,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         finalManagerEvent is manager_events.SessionStopRequested ||
         finalManagerEvent is manager_events.SessionPaused ||
         finalManagerEvent is manager_events.SessionResumed ||
+        finalManagerEvent is manager_events.SessionReset ||
         finalManagerEvent is manager_events.LocationUpdated ||
         finalManagerEvent is manager_events.BatchLocationUpdated) {
       await _locationManager.handleEvent(finalManagerEvent);
@@ -240,6 +241,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         finalManagerEvent is manager_events.SessionStopRequested ||
         finalManagerEvent is manager_events.SessionPaused ||
         finalManagerEvent is manager_events.SessionResumed ||
+        finalManagerEvent is manager_events.SessionReset ||
         finalManagerEvent is manager_events.HeartRateUpdated) {
       await _heartRateManager.handleEvent(finalManagerEvent);
     }
@@ -247,6 +249,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Route to photo manager
     if (finalManagerEvent is manager_events.SessionStartRequested ||
         finalManagerEvent is manager_events.SessionStopRequested ||
+        finalManagerEvent is manager_events.SessionReset ||
         finalManagerEvent is manager_events.PhotoAdded ||
         finalManagerEvent is manager_events.PhotoDeleted) {
       await _photoManager.handleEvent(finalManagerEvent);
@@ -255,6 +258,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Route to upload manager
     if (finalManagerEvent is manager_events.SessionStartRequested ||
         finalManagerEvent is manager_events.SessionStopRequested ||
+        finalManagerEvent is manager_events.SessionReset ||
         finalManagerEvent is manager_events.BatchLocationUpdated) {
       await _uploadManager.handleEvent(finalManagerEvent);
     }
@@ -264,6 +268,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         finalManagerEvent is manager_events.SessionStopRequested ||
         finalManagerEvent is manager_events.SessionPaused ||
         finalManagerEvent is manager_events.SessionResumed ||
+        finalManagerEvent is manager_events.SessionReset ||
         finalManagerEvent is manager_events.MemoryUpdated ||
         finalManagerEvent is manager_events.RestoreSessionRequested) {
       await _memoryManager.handleEvent(finalManagerEvent);
@@ -325,6 +330,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       return manager_events.RecoveryRequested(
         sessionId: sessionId,
       );
+    } else if (mainEvent is SessionReset) {
+      return const manager_events.SessionReset();
     }
     
     // Return null for unmapped events

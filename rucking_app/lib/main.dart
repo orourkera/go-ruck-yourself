@@ -153,6 +153,14 @@ Future<void> _runApp() async {
     // Continue anyway - essential services should still work
   }
   
+  // Debug: Check if AuthBloc is registered
+  print('🔍 [Main] Checking if AuthBloc is registered...');
+  if (getIt.isRegistered<AuthBloc>()) {
+    print('✅ [Main] AuthBloc is registered!');
+  } else {
+    print('❌ [Main] AuthBloc is NOT registered!');
+  }
+  
   // Request App Tracking Transparency authorization
   // This is required for iOS 14.5+ to comply with Apple's App Store guidelines
   try {
@@ -227,7 +235,15 @@ Future<void> _runApp() async {
   ]);
   
   // Trigger authentication check on the singleton AuthBloc instance
-  getIt<AuthBloc>().add(AuthCheckRequested());
+  print('🔍 [Main] Attempting to get AuthBloc...');
+  try {
+    final authBloc = getIt<AuthBloc>();
+    print('✅ [Main] Successfully got AuthBloc!');
+    authBloc.add(AuthCheckRequested());
+  } catch (e) {
+    print('❌ [Main] Failed to get AuthBloc: $e');
+    rethrow;
+  }
   
   runApp(
     MultiBlocProvider(

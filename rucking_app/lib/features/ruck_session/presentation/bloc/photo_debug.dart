@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
-import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_event.dart';
+
 
 /// This is a temporary diagnostic helper class to debug photo loading issues
 /// without dealing with the complex session_detail_screen.dart file

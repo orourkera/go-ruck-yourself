@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:app_links/app_links.dart';
 
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
+import 'package:rucking_app/core/services/dau_tracking_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -70,11 +71,14 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     // Initialize the lifecycle service
     _lifecycleService = getIt<AppLifecycleService>();
     _lifecycleService.initialize();
-    WidgetsBinding.instance?.addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
     
     // Initialize deep links
     _appLinks = AppLinks();
     _initDeepLinks();
+    
+    // Initialize DAU tracking service
+    getIt<DauTrackingService>().initialize();
   }
 
   void _initDeepLinks() {
@@ -273,7 +277,11 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     _lifecycleService.dispose();
-    WidgetsBinding.instance?.removeObserver(this);
+    WidgetsBinding.instance.removeObserver(this);
+    
+    // Clean up DAU tracking service
+    getIt<DauTrackingService>().dispose();
+    
     super.dispose();
   }
 

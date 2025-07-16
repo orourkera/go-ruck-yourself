@@ -13,17 +13,17 @@ class EnhancedApiClient {
   /// Enhanced GET request with automatic error handling
   Future<dynamic> get(
     String path, {
-    Map<String, dynamic>? queryParameters,
+    Map<String, dynamic>? queryParams,
     Map<String, String>? headers,
     String? operationName,
   }) async {
     try {
-      return await _apiClient.get(path, queryParameters: queryParameters, headers: headers);
+      return await _apiClient.get(path, queryParams: queryParams);
     } catch (e) {
       await _handleError('api_get', e, {
         'path': path,
         'operation': operationName ?? 'get_request',
-        'has_query_params': queryParameters?.isNotEmpty ?? false,
+        'has_query_params': queryParams?.isNotEmpty ?? false,
       });
       rethrow;
     }
@@ -37,7 +37,7 @@ class EnhancedApiClient {
     String? operationName,
   }) async {
     try {
-      return await _apiClient.post(path, data, headers: headers);
+      return await _apiClient.post(path, data);
     } catch (e) {
       await _handleError('api_post', e, {
         'path': path,
@@ -56,7 +56,7 @@ class EnhancedApiClient {
     String? operationName,
   }) async {
     try {
-      return await _apiClient.put(path, data, headers: headers);
+      return await _apiClient.put(path, data);
     } catch (e) {
       await _handleError('api_put', e, {
         'path': path,
@@ -75,7 +75,7 @@ class EnhancedApiClient {
     String? operationName,
   }) async {
     try {
-      return await _apiClient.patch(path, data, headers: headers);
+      return await _apiClient.patch(path, data);
     } catch (e) {
       await _handleError('api_patch', e, {
         'path': path,
@@ -93,7 +93,7 @@ class EnhancedApiClient {
     String? operationName,
   }) async {
     try {
-      return await _apiClient.delete(path, headers: headers);
+      return await _apiClient.delete(path);
     } catch (e) {
       await _handleError('api_delete', e, {
         'path': path,
@@ -103,31 +103,7 @@ class EnhancedApiClient {
     }
   }
 
-  /// Enhanced multipart POST request with automatic error handling
-  Future<dynamic> postMultipart(
-    String path, {
-    Map<String, String>? fields,
-    Map<String, dynamic>? files,
-    Map<String, String>? headers,
-    String? operationName,
-  }) async {
-    try {
-      return await _apiClient.postMultipart(
-        path,
-        fields: fields,
-        files: files,
-        headers: headers,
-      );
-    } catch (e) {
-      await _handleError('api_multipart_post', e, {
-        'path': path,
-        'operation': operationName ?? 'multipart_upload',
-        'has_fields': fields?.isNotEmpty ?? false,
-        'has_files': files?.isNotEmpty ?? false,
-      });
-      rethrow;
-    }
-  }
+
 
   /// Centralized error handling
   Future<void> _handleError(

@@ -182,16 +182,46 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     setState(() => _isSaving = true);
     
     try {
+      // Debug logging for completion payload values
+      print('[COMPLETION_DEBUG] Widget values:');
+      print('  duration: ${widget.duration}');
+      print('  duration.inSeconds: ${widget.duration.inSeconds}');
+      print('  ruckWeight: ${widget.ruckWeight}');
+      print('  completedAt: ${widget.completedAt}');
+      print('  completedAt.toIso8601String(): ${widget.completedAt.toIso8601String()}');
+      print('  distance: ${widget.distance}');
+      print('  caloriesBurned: ${widget.caloriesBurned}');
+      
       final completionData = {
         'rating': _rating,
         'perceived_exertion': _perceivedExertion,
-        'completed': true,
+        'status': 'completed',
         'notes': _notesController.text.trim(),
         'distance_km': widget.distance,
         'calories_burned': widget.caloriesBurned,
         'elevation_gain_m': widget.elevationGain,
         'elevation_loss_m': widget.elevationLoss,
+        'duration_seconds': widget.duration.inSeconds,
+        'ruck_weight_kg': widget.ruckWeight,
+        'completed_at': widget.completedAt.toIso8601String(),
       };
+      
+      print('[COMPLETION_DEBUG] Completion data before processing:');
+      print('  completionData: $completionData');
+      
+      // Calculate and include average pace if distance > 0
+      if (widget.distance > 0) {
+        final paceSecondsPerKm = widget.duration.inSeconds / widget.distance;
+        completionData['average_pace'] = paceSecondsPerKm;
+      }
+      
+      // Include heart rate data if available
+      if (widget.heartRateSamples != null && widget.heartRateSamples!.isNotEmpty) {
+        final heartRates = widget.heartRateSamples!.map((sample) => sample.bpm).toList();
+        completionData['avg_heart_rate'] = (heartRates.reduce((a, b) => a + b) / heartRates.length).round();
+        completionData['max_heart_rate'] = heartRates.reduce((a, b) => a > b ? a : b);
+        completionData['min_heart_rate'] = heartRates.reduce((a, b) => a < b ? a : b);
+      }
       
       // Include splits if available to preserve them during completion
       if (widget.splits != null && widget.splits!.isNotEmpty) {
@@ -204,8 +234,12 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           authState.user.allowRuckSharing : false;
       completionData['is_public'] = _shareSession ?? userAllowsSharing;
 
+      print('[COMPLETION_DEBUG] Final completion data being sent:');
+      print('  completionData: $completionData');
+      
       // Save session first - this is fast and immediate
-      await _apiClient.patch('/rucks/${widget.ruckId}', completionData);
+      // Use the dedicated completion endpoint which properly handles session completion
+      await _apiClient.postSessionCompletion('/rucks/${widget.ruckId}/complete', completionData);
       
       // Clear caches before checking achievements
       SessionRepository.clearSessionHistoryCache();
@@ -417,6 +451,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       });
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       _pendingSessionData = null;
+      
+      // Reset active session state AFTER navigation to prevent auto-start
+      Future.delayed(const Duration(milliseconds: 100), () {
+        GetIt.instance<ActiveSessionBloc>().add(SessionReset());
+      });
     }
   }
 
@@ -505,11 +544,15 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     
     // Now proceed with navigation and cleanup
     if (mounted) {
-      // Reset active session state
-      GetIt.instance<ActiveSessionBloc>().add(SessionReset());
-      
-      // Navigate to home
+      // Don't reset active session immediately - let the completion screen handle it
+      // Navigate to home without clearing session state to prevent auto-start
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      
+      // Reset active session state AFTER navigation to prevent auto-start
+      // Use a slight delay to ensure navigation completes first
+      Future.delayed(const Duration(milliseconds: 100), () {
+        GetIt.instance<ActiveSessionBloc>().add(SessionReset());
+      });
       
       // Upload photos in background if any are selected - using repository
       if (_selectedPhotos.isNotEmpty) {
