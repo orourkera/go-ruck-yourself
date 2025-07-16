@@ -296,35 +296,28 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                 ),
               ],
               
-              // Show message when user cannot view comments
+              // Show message if cannot view comments
               if (!canViewComments) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.lock_outline,
-                        color: Colors.grey.shade600,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Join this duel to view and participate in discussions',
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontSize: 14,
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lock, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Join the duel to view and add comments',
+                            style: TextStyle(color: AppColors.primary),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

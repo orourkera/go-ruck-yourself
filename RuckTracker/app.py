@@ -242,7 +242,7 @@ from .api.ruck_likes_resource import RuckLikesResource, RuckLikesBatchResource #
 from .api.ruck_comments_resource import RuckCommentsResource # Import for RuckCommentsResource
 from .api.notifications_resource import NotificationsResource, NotificationReadResource, ReadAllNotificationsResource # Import for Notification resources
 from .api.resources import UserResource # Import UserResource
-from .api.duels import DuelListResource, DuelResource, DuelJoinResource, DuelParticipantResource, DuelWithdrawResource, DuelCompletionCheckResource
+from .api.duels import DuelListResource, DuelResource, DuelJoinResource, DuelParticipantResource, DuelWithdrawResource, DuelCompletionCheckResource, DuelLeaderboardResource
 from .api.duel_participants import DuelParticipantProgressResource, DuelLeaderboardResource
 from .api.duel_stats import UserDuelStatsResource, DuelStatsLeaderboardResource, DuelAnalyticsResource
 from .api.duel_invitations import DuelInvitationListResource, DuelInvitationResource, SentInvitationsResource

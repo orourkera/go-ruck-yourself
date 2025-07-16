@@ -776,3 +776,42 @@ class DuelCompletionCheckResource(Resource):
                 'winner_id': None,
                 'tied_participants': len(winners)
             }
+
+class DuelLeaderboardResource(Resource):
+    @auth_required
+    def get(self, duel_id):
+        """Get duel leaderboard - sorted participants by progress"""
+        try:
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+            # Verify duel exists
+            duel_response = supabase.table('duels').select('id').eq('id', duel_id).execute()
+            if not duel_response.data:
+                return {'error': 'Duel not found'}, 404
+
+            # Get participants with progress, sorted descending by current_value
+            participants_response = supabase.table('duel_participants') \
+                .select('*, user_id(username, avatar_url)') \
+                .eq('duel_id', duel_id) \
+                .neq('status', 'withdrawn') \
+                .order('current_value', desc=True) \
+                .execute()
+
+            # Simplify the response - extract user info
+            leaderboard = []
+            for p in participants_response.data:
+                entry = {
+                    'participant_id': p['id'],
+                    'user_id': p['user_id'],
+                    'username': p['user_id'].get('username') if isinstance(p['user_id'], dict) else 'Unknown',
+                    'avatar_url': p['user_id'].get('avatar_url') if isinstance(p['user_id'], dict) else None,
+                    'current_value': p['current_value'],
+                    'status': p['status'],
+                    'joined_at': p['joined_at']
+                }
+                leaderboard.append(entry)
+
+            return {'leaderboard': leaderboard}
+        except Exception as e:
+            logging.error(f"Error in DuelLeaderboardResource.get: {str(e)}", exc_info=True)
+            return {'error': str(e)}, 500
