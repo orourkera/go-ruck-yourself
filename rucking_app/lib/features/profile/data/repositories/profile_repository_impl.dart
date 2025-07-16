@@ -11,13 +11,17 @@ class ProfileRepositoryImpl implements ProfileRepository {
   @override
   Future<UserProfile> getPublicProfile(String userId) async {
     final response = await apiClient.get('/users/$userId/profile');
-    return UserProfile.fromJson(response['user']);
+    final wrapper = response as Map<String, dynamic>;
+    final data = wrapper['data'] ?? wrapper; // API may wrap payload in a 'data' field
+    return UserProfile.fromJson(data['user'] as Map<String, dynamic>);
   }
 
   @override
   Future<UserProfileStats> getProfileStats(String userId) async {
     final response = await apiClient.get('/users/$userId/profile');
-    return UserProfileStats.fromJson(response['stats']);
+    final wrapper = response as Map<String, dynamic>;
+    final data = wrapper['data'] ?? wrapper;
+    return UserProfileStats.fromJson(data['stats'] as Map<String, dynamic>);
   }
 
   @override

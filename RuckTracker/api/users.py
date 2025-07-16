@@ -10,7 +10,7 @@ def get_public_profile(user_id):
         current_user_id = g.current_user['id'] if 'current_user' in g else None
         # Fetch basic profile fields. Some older databases may not yet have avatar_url or is_profile_private columns
         try:
-            user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, is_profile_private').eq('id', user_id).single().execute()
+            user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, prefer_metric, is_profile_private').eq('id', user_id).single().execute()
         except Exception as fetch_err:
             # If the requested columns do not exist (e.g. column does not exist error), retry with a reduced column list
             err_msg = str(fetch_err)
@@ -37,15 +37,39 @@ def get_public_profile(user_id):
                 'username': user['username'],
                 'avatarUrl': user.get('avatar_url'),
                 'createdAt': user['created_at'],
+                'preferMetric': user.get('prefer_metric', True),
                 'isFollowing': is_following,
                 'isFollowedBy': is_followed_by,
+                'isOwnProfile': is_own_profile,
                 'isPrivateProfile': user.get('is_profile_private', False)
             },
-            'stats': None,
+            'stats': {},
             'clubs': None,
             'recentRucks': None
         }
         if not is_private:
+            # Calculate follower/following counts first (used for stats no matter private)
+            try:
+                followers_count_res = (
+                    get_supabase_client()
+                    .table('user_follows')
+                    .select('count', count='exact')
+                    .eq('followed_id', user_id)
+                    .execute()
+                )
+                followers_count = followers_count_res.count or 0
+                following_count_res = (
+                    get_supabase_client()
+                    .table('user_follows')
+                    .select('count', count='exact')
+                    .eq('follower_id', user_id)
+                    .execute()
+                )
+                following_count = following_count_res.count or 0
+            except Exception:
+                followers_count = 0
+                following_count = 0
+
             # Safely fetch profile stats; fallback to empty dict on error
             try:
                 stats_res = (
@@ -55,7 +79,25 @@ def get_public_profile(user_id):
                     .eq('user_id', user_id)
                     .execute()
                 )
-                response['stats'] = stats_res.data[0] if stats_res.data else {}
+                raw_stats = stats_res.data[0] if stats_res.data else {}
+                # Convert snake_case keys to camelCase expected by frontend
+                stats = {
+                    'totalRucks': raw_stats.get('total_rucks'),
+                    'totalDistanceKm': raw_stats.get('total_distance_km'),
+                    'totalDurationSeconds': raw_stats.get('total_duration_seconds'),
+                    'totalElevationGainM': raw_stats.get('total_elevation_gain_m'),
+                    'totalCaloriesBurned': raw_stats.get('total_calories_burned'),
+                    'duelsWon': raw_stats.get('duels_won'),
+                    'duelsLost': raw_stats.get('duels_lost'),
+                    'eventsCompleted': raw_stats.get('events_completed'),
+                }
+                stats['followersCount'] = followers_count
+                stats['followingCount'] = following_count
+                # Provide distance in miles if user prefers imperial
+                prefer_metric = user.get('prefer_metric', True)
+                if not prefer_metric and stats.get('totalDistanceKm') is not None:
+                    stats['totalDistanceMi'] = round(stats['totalDistanceKm'] * 0.621371, 2)
+                response['stats'] = {k: (v if v is not None else 0) for k, v in stats.items()}
             except Exception:
                 response['stats'] = {}
 
@@ -74,10 +116,13 @@ def get_public_profile(user_id):
                     .execute()
                 )
                 response['clubs'] = [row['clubs'] for row in clubs_res.data] if clubs_res.data else []
+                # Add clubsCount into stats dict
+                response['stats']['clubsCount'] = len(response['clubs'])
             except Exception as clubs_err:
                 # Log but do not fail the entire profile request – just return no clubs.
                 print(f"[WARN] get_public_profile: failed to fetch clubs for user {user_id}: {clubs_err}")
                 response['clubs'] = []
+                response['stats']['clubsCount'] = 0
             try:
                 rucks_res = (
                     get_supabase_client()

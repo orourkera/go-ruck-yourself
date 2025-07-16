@@ -344,8 +344,9 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 
 # Ruck session endpoints (prefixed with /api)
 # Apply rate limit to RuckSessionListResource GET endpoint
-app.logger.info(f"Setting RuckSessionListResource rate limit to: 500 per hour")
-RuckSessionListResource.get = limiter.limit("500 per hour", key_func=get_user_id, override_defaults=True)(RuckSessionListResource.get)
+app.logger.info(f"Setting RuckSessionListResource rate limit to: 3000 per hour (50 per minute)")
+# Allow up to 50 requests per minute (3000 per hour) per user/IP
+RuckSessionListResource.get = limiter.limit("50 per minute", key_func=get_user_id, override_defaults=True)(RuckSessionListResource.get)
 api.add_resource(RuckSessionListResource, '/api/rucks')
 api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
 api.add_resource(RuckSessionStartResource, '/api/rucks/start')
