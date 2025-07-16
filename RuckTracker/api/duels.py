@@ -815,3 +815,110 @@ class DuelLeaderboardResource(Resource):
         except Exception as e:
             logging.error(f"Error in DuelLeaderboardResource.get: {str(e)}", exc_info=True)
             return {'error': str(e)}, 500
+
+@auth_required
+class DuelCommentsResource(Resource):
+    def get(self, duel_id):
+        """Get all comments for a duel - public access"""
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        # Get comments with user info, ordered by created_at descending
+        comments_response = supabase.table('duel_comments') \
+            .select('*, user:user_id(username, avatar_url)') \
+            .eq('duel_id', duel_id) \
+            .order('created_at', desc=True) \
+            .execute()
+
+        return {'data': comments_response.data or []}, 200
+
+    def post(self, duel_id):
+        """Add a new comment to the duel - requires participant"""
+        data = request.get_json()
+        content = data.get('content')
+        if not content:
+            return {'error': 'Content is required'}, 400
+
+        current_user_id = g.user.id
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        # Check if user is participant
+        is_participant = supabase.table('duel_participants') \
+            .select('id') \
+            .eq('duel_id', duel_id) \
+            .eq('user_id', current_user_id) \
+            .execute().data
+
+        if not is_participant:
+            return {'error': 'You must be a participant to add comments'}, 403
+
+        # Insert comment
+        insert_response = supabase.table('duel_comments') \
+            .insert({'duel_id': duel_id, 'user_id': current_user_id, 'content': content}) \
+            .execute()
+
+        if insert_response.data:
+            return {'data': insert_response.data[0]}, 201
+        return {'error': 'Failed to add comment'}, 500
+
+    def put(self, duel_id):
+        """Update a comment - requires owner and participant"""
+        data = request.get_json()
+        comment_id = data.get('comment_id')
+        content = data.get('content')
+        if not comment_id or not content:
+            return {'error': 'Comment ID and content are required'}, 400
+
+        current_user_id = g.user.id
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        # Check if user is participant and owns the comment
+        comment = supabase.table('duel_comments') \
+            .select('user_id') \
+            .eq('id', comment_id) \
+            .eq('duel_id', duel_id) \
+            .single() \
+            .execute().data
+
+        if not comment or comment['user_id'] != current_user_id:
+            return {'error': 'You can only edit your own comments'}, 403
+
+        # Update comment
+        update_response = supabase.table('duel_comments') \
+            .update({'content': content, 'updated_at': 'now()'}) \
+            .eq('id', comment_id) \
+            .execute()
+
+        if update_response.data:
+            return {'data': update_response.data[0]}, 200
+        return {'error': 'Failed to update comment'}, 500
+
+    def delete(self, duel_id):
+        """Delete a comment - requires owner and participant"""
+        data = request.get_json()
+        comment_id = data.get('comment_id')
+        if not comment_id:
+            return {'error': 'Comment ID is required'}, 400
+
+        current_user_id = g.user.id
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        # Check if user is participant and owns the comment
+        comment = supabase.table('duel_comments') \
+            .select('user_id') \
+            .eq('id', comment_id) \
+            .eq('duel_id', duel_id) \
+            .single() \
+            .execute().data
+
+        if not comment or comment['user_id'] != current_user_id:
+            return {'error': 'You can only delete your own comments'}, 403
+
+        # Delete comment
+        delete_response = supabase.table('duel_comments') \
+            .delete() \
+            .eq('id', comment_id) \
+            .execute()
+
+        if delete_response.data:
+            return {'success': True}, 200
+        return {'error': 'Failed to delete comment'}, 500

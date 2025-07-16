@@ -219,36 +219,58 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Comments header (only show if can view comments)
-              if (canViewComments) ...[
-                const SizedBox(height: 24),
-                // Comments header aligned with leaderboard cards
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.comment,
+              // Comments header (always show if comments exist or loading)
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.comment,
+                      color: AppColors.secondary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Comments',
+                      style: TextStyle(
+                        fontFamily: 'Bangers',
+                        fontSize: 18,
                         color: AppColors.secondary,
-                        size: 20,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Comments',
-                        style: TextStyle(
-                          fontFamily: 'Bangers',
-                          fontSize: 18,
-                          color: AppColors.secondary,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (state is DuelDetailLoading) Center(child: CircularProgressIndicator()),
+              if (comments.isNotEmpty) _buildCommentsList(comments),
+              // Message if not participant (after comments)
+              if (!canViewComments) ...[
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lock, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Join the duel to add comments',
+                            style: TextStyle(color: AppColors.primary),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                if (comments.isNotEmpty) _buildCommentsList(comments),
               ],
-              
-              // Comment input field (if not hidden and can view comments)
+              // Comment input only if participant and not hidden
               if (!widget.hideInput && canViewComments) ...[
                 Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0, bottom: 16.0),
@@ -292,32 +314,6 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                             ),
                       ),
                     ],
-                  ),
-                ),
-              ],
-              
-              // Show message if cannot view comments
-              if (!canViewComments) ...[
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(16.0),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.lock, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Join the duel to view and add comments',
-                            style: TextStyle(color: AppColors.primary),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ],

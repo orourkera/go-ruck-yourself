@@ -64,10 +64,12 @@ def get_public_profile(user_id):
             # simply return an empty list instead of falling back to the legacy name that is now
             # known to cause "could not find relationship" (PGRST200) errors.
             try:
+                # Embed the related club via the primary club_id foreign key. Specify the exact
+                # relationship name to avoid PostgREST ambiguity errors (PGRST201).
                 clubs_res = (
                     get_supabase_client()
                     .from_('club_memberships')
-                    .select('clubs(*)')
+                    .select('clubs!club_memberships_club_id_fkey(*)')
                     .eq('user_id', user_id)
                     .execute()
                 )
@@ -76,7 +78,6 @@ def get_public_profile(user_id):
                 # Log but do not fail the entire profile request – just return no clubs.
                 print(f"[WARN] get_public_profile: failed to fetch clubs for user {user_id}: {clubs_err}")
                 response['clubs'] = []
-            response['clubs'] = [cm['clubs'] for cm in clubs_res.data] if clubs_res.data else []
             try:
                 rucks_res = (
                     get_supabase_client()

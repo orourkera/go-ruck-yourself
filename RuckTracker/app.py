@@ -326,6 +326,9 @@ api.add_resource(UserAvatarUploadResource, '/api/auth/avatar')
 api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
 
 # Ruck session endpoints (prefixed with /api)
+# Apply rate limit to RuckSessionListResource GET endpoint
+app.logger.info(f"Setting RuckSessionListResource rate limit to: 500 per hour")
+RuckSessionListResource.get = limiter.limit("500 per hour", key_func=get_user_id, override_defaults=True)(RuckSessionListResource.get)
 api.add_resource(RuckSessionListResource, '/api/rucks')
 api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
 api.add_resource(RuckSessionStartResource, '/api/rucks/start')
