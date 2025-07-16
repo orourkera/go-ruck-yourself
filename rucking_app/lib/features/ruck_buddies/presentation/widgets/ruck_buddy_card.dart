@@ -665,64 +665,32 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       );
   }
 
-  Widget _buildAvatar(UserInfo? user) {
     // Increased size from 40 to 60 (50% larger)
     final double avatarSize = 60.0;
     final double borderRadius = 30.0; // Adjusted border radius
   
-    if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: InkWell(
-          onTap: () => Navigator.pushNamed(context, AppRoutes.publicProfile.replaceAll(':userId', user.id)),
-          child: CachedNetworkImage(
-            imageUrl: user.photoUrl!,
-            width: avatarSize,
-            height: avatarSize,
-            fit: BoxFit.cover,
-            cacheManager: ImageCacheManager.instance, // Add custom cache manager
-            placeholder: (context, url) => Container(
-              width: avatarSize,
-              height: avatarSize,
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-            errorWidget: (context, url, error) => Container(
-              width: avatarSize,
-              height: avatarSize,
-              padding: const EdgeInsets.all(4),
-              // No background color
-              child: Image.asset(
-                user.gender?.toLowerCase() == 'female' 
-                  ? 'assets/images/lady rucker profile.png'
-                  : 'assets/images/profile.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-        ),
-      );
-    } else {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: Container(
-          width: avatarSize,
-          height: avatarSize,
-          padding: const EdgeInsets.all(4),
-          // No background color
-          child: Image.asset(
-            user?.gender?.toLowerCase() == 'female' 
+    final Widget avatarImage;
+  if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
+    avatarImage = CachedNetworkImage(
+      imageUrl: user.photoUrl!,
+      width: avatarSize,
+      height: avatarSize,
+      fit: BoxFit.cover,
+      cacheManager: ImageCacheManager.instance,
+      placeholder: (context, url) => SizedBox(
+        width: avatarSize,
+        height: avatarSize,
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      errorWidget: (context, url, error) => Padding(
+        padding: const EdgeInsets.all(4),
+        child: Image.asset(
+          user.gender?.toLowerCase() == 'female'
               ? 'assets/images/lady rucker profile.png'
               : 'assets/images/profile.png',
-            fit: BoxFit.contain,
-          ),
+          fit: BoxFit.contain,
         ),
-      );
-    }  
-  }
-
-  String _formatCompletedDate(DateTime? completedAt) {
-    if (completedAt == null) return 'Unknown date';
-    return DateFormat('MMM d, yyyy • h:mm a').format(completedAt);
+      ),
   }
 
   Widget _buildStatTile({

@@ -46,8 +46,19 @@ def get_public_profile(user_id):
             'recentRucks': None
         }
         if not is_private:
-            stats_res = get_supabase_client().table('user_profile_stats').select('*').eq('user_id', user_id).execute()
-            response['stats'] = stats_res.data[0] if stats_res.data else {}
+            # Safely fetch profile stats; fallback to empty dict on error
+            try:
+                stats_res = (
+                    get_supabase_client()
+                    .table('user_profile_stats')
+                    .select('*')
+                    .eq('user_id', user_id)
+                    .execute()
+                )
+                response['stats'] = stats_res.data[0] if stats_res.data else {}
+            except Exception:
+                response['stats'] = {}
+
             # Fetch clubs the user belongs to. Prefer the correct 'club_memberships' table but fall back to legacy
             # 'club_members' name if needed for older databases.
             try:
@@ -72,8 +83,19 @@ def get_public_profile(user_id):
                 else:
                     raise
             response['clubs'] = [cm['clubs'] for cm in clubs_res.data] if clubs_res.data else []
-            rucks_res = get_supabase_client().table('ruck_sessions').select('*').eq('user_id', user_id).order('end_time', desc=True).limit(5).execute()
-            response['recentRucks'] = rucks_res.data or []
+            try:
+                rucks_res = (
+                    get_supabase_client()
+                    .table('ruck_session')
+                    .select('*')
+                    .eq('user_id', user_id)
+                    .order('end_time', desc=True)
+                    .limit(5)
+                    .execute()
+                )
+                response['recentRucks'] = rucks_res.data or []
+            except Exception:
+                response['recentRucks'] = []
         return api_response(response)
     except Exception as e:
         return api_error(str(e), status_code=500)
@@ -166,7 +188,7 @@ def get_following_feed():
         followed_ids = [f['followed_id'] for f in followed_res.data] if followed_res.data else []
         if not followed_ids: return api_response({'rucks': [], 'pagination': {'page': page, 'hasMore': False}})
         # Get recent rucks from followed users
-        rucks_res = get_supabase_client().table('ruck_sessions').select('*').in_('user_id', followed_ids).order('end_time', desc=True).range(offset, offset + per_page - 1).execute()
+        rucks_res = get_supabase_client().table('ruck_session').select('*').in_('user_id', followed_ids).order('end_time', desc=True).range(offset, offset + per_page - 1).execute()
         has_more = len(rucks_res.data or []) == per_page
         return api_response({'rucks': rucks_res.data or [], 'pagination': {'page': page, 'hasMore': has_more}})
     except Exception as e:
