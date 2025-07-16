@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 from RuckTracker.utils.api_response import api_response, api_error
-from RuckTracker.services.supabase_service import supabase_client
+from RuckTracker.supabase_client import supabase_client
 
 users_bp = Blueprint('users', __name__)
 
