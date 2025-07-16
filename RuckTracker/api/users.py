@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 from RuckTracker.utils.api_response import api_response, api_error
-from RuckTracker.supabase_client import supabase_client
+from RuckTracker.supabase_client import get_supabase_client
 
 users_bp = Blueprint('users', __name__)
 
@@ -8,7 +8,7 @@ users_bp = Blueprint('users', __name__)
 def get_public_profile(user_id):
     try:
         current_user_id = g.current_user['id'] if 'current_user' in g else None
-        user_res = supabase_client.table('user').select('id, username, avatar_url, created_at, is_profile_private').eq('id', user_id).single().execute()
+        user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, is_profile_private').eq('id', user_id).single().execute()
         if not user_res.data:
             return api_error('User not found', status=404)
         user = user_res.data
@@ -17,9 +17,9 @@ def get_public_profile(user_id):
         is_following = False
         is_followed_by = False
         if current_user_id:
-            follow_res = supabase_client.table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
+            follow_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
             is_following = bool(follow_res.data)
-            followed_by_res = supabase_client.table('user_follows').select('id').eq('follower_id', user_id).eq('followed_id', current_user_id).execute()
+            followed_by_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', user_id).eq('followed_id', current_user_id).execute()
             is_followed_by = bool(followed_by_res.data)
         response = {
             'user': {
@@ -36,11 +36,11 @@ def get_public_profile(user_id):
             'recentRucks': None
         }
         if not is_private:
-            stats_res = supabase_client.table('user_profile_stats').select('*').eq('user_id', user_id).single().execute()
+            stats_res = get_supabase_client().table('user_profile_stats').select('*').eq('user_id', user_id).single().execute()
             response['stats'] = stats_res.data or {}
-            clubs_res = supabase_client.from_('club_members').select('clubs(*)').eq('user_id', user_id).execute()
+            clubs_res = get_supabase_client().from_('club_members').select('clubs(*)').eq('user_id', user_id).execute()
             response['clubs'] = [cm['clubs'] for cm in clubs_res.data] if clubs_res.data else []
-            rucks_res = supabase_client.table('ruck_sessions').select('*').eq('user_id', user_id).order('end_time', desc=True).limit(5).execute()
+            rucks_res = get_supabase_client().table('ruck_sessions').select('*').eq('user_id', user_id).order('end_time', desc=True).limit(5).execute()
             response['recentRucks'] = rucks_res.data or []
         return api_response(response)
     except Exception as e:
@@ -53,12 +53,12 @@ def get_followers(user_id):
         page = int(request.args.get('page', 1))
         per_page = 20
         offset = (page - 1) * per_page
-        followers_res = supabase_client.table('user_follows').select('follower_id, created_at, user:follower_id(username, avatar_url)').eq('followed_id', user_id).order('created_at', desc=True).range(offset, offset + per_page - 1).execute()
+        followers_res = get_supabase_client().table('user_follows').select('follower_id, created_at, user:follower_id(username, avatar_url)').eq('followed_id', user_id).order('created_at', desc=True).range(offset, offset + per_page - 1).execute()
         followers = []
         for f in followers_res.data or []:
             is_following_back = False
             if current_user_id:
-                check_res = supabase_client.table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', f['follower_id']).execute()
+                check_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', f['follower_id']).execute()
                 is_following_back = bool(check_res.data)
             followers.append({
                 'id': f['follower_id'],
@@ -79,12 +79,12 @@ def get_following(user_id):
         page = int(request.args.get('page', 1))
         per_page = 20
         offset = (page - 1) * per_page
-        following_res = supabase_client.table('user_follows').select('followed_id, created_at, user:followed_id(username, avatar_url)').eq('follower_id', user_id).order('created_at', desc=True).range(offset, offset + per_page - 1).execute()
+        following_res = get_supabase_client().table('user_follows').select('followed_id, created_at, user:followed_id(username, avatar_url)').eq('follower_id', user_id).order('created_at', desc=True).range(offset, offset + per_page - 1).execute()
         following = []
         for f in following_res.data or []:
             is_following_back = False
             if current_user_id:
-                check_res = supabase_client.table('user_follows').select('id').eq('follower_id', f['followed_id']).eq('followed_id', current_user_id).execute()
+                check_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', f['followed_id']).eq('followed_id', current_user_id).execute()
                 is_following_back = bool(check_res.data)
             following.append({
                 'id': f['followed_id'],
@@ -102,9 +102,9 @@ def get_following(user_id):
 def follow_user(user_id):
     try:
         current_user_id = g.current_user['id']
-        insert_res = supabase_client.table('user_follows').insert({'follower_id': current_user_id, 'followed_id': user_id}).execute()
+        insert_res = get_supabase_client().table('user_follows').insert({'follower_id': current_user_id, 'followed_id': user_id}).execute()
         if insert_res.data:
-            count_res = supabase_client.table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
+            count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
             followers_count = count_res.data[0]['count'] if count_res.data else 0
             return api_response({'success': True, 'isFollowing': True, 'followersCount': followers_count})
         return api_error('Failed to follow', status=400)
@@ -115,8 +115,8 @@ def follow_user(user_id):
 def unfollow_user(user_id):
     try:
         current_user_id = g.current_user['id']
-        delete_res = supabase_client.table('user_follows').delete().eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
-        count_res = supabase_client.table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
+        delete_res = get_supabase_client().table('user_follows').delete().eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
+        count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
         followers_count = count_res.data[0]['count'] if count_res.data else 0
         return api_response({'success': True, 'isFollowing': False, 'followersCount': followers_count})
     except Exception as e:
@@ -130,11 +130,11 @@ def get_following_feed():
         per_page = 20
         offset = (page - 1) * per_page
         # Get followed users
-        followed_res = supabase_client.table('user_follows').select('followed_id').eq('follower_id', current_user_id).execute()
+        followed_res = get_supabase_client().table('user_follows').select('followed_id').eq('follower_id', current_user_id).execute()
         followed_ids = [f['followed_id'] for f in followed_res.data] if followed_res.data else []
         if not followed_ids: return api_response({'rucks': [], 'pagination': {'page': page, 'hasMore': False}})
         # Get recent rucks from followed users
-        rucks_res = supabase_client.table('ruck_sessions').select('*').in_('user_id', followed_ids).order('end_time', desc=True).range(offset, offset + per_page - 1).execute()
+        rucks_res = get_supabase_client().table('ruck_sessions').select('*').in_('user_id', followed_ids).order('end_time', desc=True).range(offset, offset + per_page - 1).execute()
         has_more = len(rucks_res.data or []) == per_page
         return api_response({'rucks': rucks_res.data or [], 'pagination': {'page': page, 'hasMore': has_more}})
     except Exception as e:
@@ -150,7 +150,7 @@ def update_privacy():
         if not isinstance(is_private, bool):
             return api_error('isPrivateProfile must be boolean', status=400)
         current_user_id = g.current_user['id']
-        update_res = supabase_client.table('user').update({'is_profile_private': is_private}).eq('id', current_user_id).execute()
+        update_res = get_supabase_client().table('user').update({'is_profile_private': is_private}).eq('id', current_user_id).execute()
         if update_res.data:
             return api_response({'success': True, 'isPrivateProfile': is_private})
         return api_error('Failed to update privacy', status=400)
