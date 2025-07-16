@@ -25,6 +25,20 @@ class UserProfileStats {
     required this.eventsCompleted,
   });
 
+  factory UserProfileStats.empty() => UserProfileStats(
+    totalRucks: 0,
+    totalDistanceKm: 0.0,
+    totalDurationSeconds: 0,
+    totalElevationGainM: 0.0,
+    totalCaloriesBurned: 0.0,
+    followersCount: 0,
+    followingCount: 0,
+    clubsCount: 0,
+    duelsWon: 0,
+    duelsLost: 0,
+    eventsCompleted: 0,
+  );
+
   factory UserProfileStats.fromJson(Map<String, dynamic> json) => UserProfileStats(
     totalRucks: json['totalRucks'] ?? 0,
     totalDistanceKm: (json['totalDistanceKm'] as num?)?.toDouble() ?? 0.0,

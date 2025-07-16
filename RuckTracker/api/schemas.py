@@ -11,8 +11,6 @@ class UserSchema(Schema):
     email = fields.Email(required=True)
     password = fields.Str(load_only=True, validate=validate.Length(min=8))
     weight_kg = fields.Float(validate=validate.Range(min=20, max=500))
-    # Accept camelCase from frontend
-    weightKg = fields.Float(attribute='weight_kg', data_key='weightKg', validate=validate.Range(min=20, max=500))
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 
