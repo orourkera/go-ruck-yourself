@@ -53,6 +53,33 @@ class RuckBuddyCard extends StatefulWidget {
 }
 
 class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveClientMixin {
+  /// Formats a completed date to a short, human-friendly string
+  ///
+  /// Logic:
+  /// • If `completedAt` is today – show the time (e.g. `3:42 PM`)
+  /// • If within the last 7 days – show the weekday (e.g. `Mon`)
+  /// • If within the current year – show `MMM d` (e.g. `Apr 5`)
+  /// • Otherwise – show `MMM d, y` (e.g. `Apr 5, 2023`)
+  String _formatCompletedDate(DateTime? completedAt) {
+    if (completedAt == null) return '';
+
+    final now = DateTime.now();
+    final difference = now.difference(completedAt);
+
+    if (now.year == completedAt.year && now.month == completedAt.month && now.day == completedAt.day) {
+      // Same day
+      return DateFormat('h:mm a').format(completedAt);
+    } else if (difference.inDays < 7) {
+      // Within the last week
+      return DateFormat('EEE').format(completedAt); // Mon, Tue, etc.
+    } else if (now.year == completedAt.year) {
+      // Earlier this year
+      return DateFormat('MMM d').format(completedAt); // Apr 5
+    } else {
+      // Previous years
+      return DateFormat('MMM d, y').format(completedAt); // Apr 5, 2023
+    }
+  }
   int? _likeCount;
   bool _isLiked = false;
   bool _isProcessingLike = false;
@@ -665,32 +692,63 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       );
   }
 
-    // Increased size from 40 to 60 (50% larger)
-    final double avatarSize = 60.0;
-    final double borderRadius = 30.0; // Adjusted border radius
-  
-    final Widget avatarImage;
-  if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
-    avatarImage = CachedNetworkImage(
-      imageUrl: user.photoUrl!,
-      width: avatarSize,
-      height: avatarSize,
-      fit: BoxFit.cover,
-      cacheManager: ImageCacheManager.instance,
-      placeholder: (context, url) => SizedBox(
+  // =============================
+  // Avatar builder
+  // =============================
+  Widget _buildAvatar(UserInfo? user) {
+    const double avatarSize = 60.0;
+    const double borderRadius = 30.0;
+
+    Widget image;
+    if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
+      image = CachedNetworkImage(
+        imageUrl: user.photoUrl!,
         width: avatarSize,
         height: avatarSize,
-        child: const Center(child: CircularProgressIndicator()),
-      ),
-      errorWidget: (context, url, error) => Padding(
+        fit: BoxFit.cover,
+        cacheManager: ImageCacheManager.instance,
+        placeholder: (context, url) => SizedBox(
+          width: avatarSize,
+          height: avatarSize,
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+        errorWidget: (context, url, error) => Padding(
+          padding: const EdgeInsets.all(4),
+          child: Image.asset(
+            user.gender?.toLowerCase() == 'female'
+                ? 'assets/images/lady rucker profile.png'
+                : 'assets/images/profile.png',
+            fit: BoxFit.contain,
+          ),
+        ),
+      );
+    } else {
+      image = Padding(
         padding: const EdgeInsets.all(4),
         child: Image.asset(
-          user.gender?.toLowerCase() == 'female'
+          user?.gender?.toLowerCase() == 'female'
               ? 'assets/images/lady rucker profile.png'
               : 'assets/images/profile.png',
+          width: avatarSize,
+          height: avatarSize,
           fit: BoxFit.contain,
         ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: InkWell(
+        onTap: () {
+          if (user == null) return;
+          Navigator.pushNamed(
+            context,
+            AppRoutes.publicProfile.replaceAll(':userId', user.id),
+          );
+        },
+        child: image,
       ),
+    );
   }
 
   Widget _buildStatTile({

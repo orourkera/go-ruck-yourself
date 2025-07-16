@@ -59,8 +59,10 @@ def get_public_profile(user_id):
             except Exception:
                 response['stats'] = {}
 
-            # Fetch clubs the user belongs to. Prefer the correct 'club_memberships' table but fall back to legacy
-            # 'club_members' name if needed for older databases.
+            # Fetch clubs the user belongs to.
+            # Prefer the correct 'club_memberships' table. If the table or relationship is missing
+            # simply return an empty list instead of falling back to the legacy name that is now
+            # known to cause "could not find relationship" (PGRST200) errors.
             try:
                 clubs_res = (
                     get_supabase_client()
@@ -69,19 +71,11 @@ def get_public_profile(user_id):
                     .eq('user_id', user_id)
                     .execute()
                 )
+                response['clubs'] = [row['clubs'] for row in clubs_res.data] if clubs_res.data else []
             except Exception as clubs_err:
-                err_msg = str(clubs_err)
-                # Supabase/PostgREST error for missing relationship or table will include hints like PGRST200.
-                if 'PGRST200' in err_msg or 'relationship' in err_msg or 'club_memberships' in err_msg:
-                    clubs_res = (
-                        get_supabase_client()
-                        .from_('club_members')
-                        .select('clubs(*)')
-                        .eq('user_id', user_id)
-                        .execute()
-                    )
-                else:
-                    raise
+                # Log but do not fail the entire profile request – just return no clubs.
+                print(f"[WARN] get_public_profile: failed to fetch clubs for user {user_id}: {clubs_err}")
+                response['clubs'] = []
             response['clubs'] = [cm['clubs'] for cm in clubs_res.data] if clubs_res.data else []
             try:
                 rucks_res = (
