@@ -445,8 +445,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       
       // Process sessions
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
-      List<dynamic> completedSessions = processedSessions
-          .where((session) => session is Map && session['status'] == 'completed')
+      final completedSessions = processedSessions
+          .where((s) => s.status == RuckStatus.completed && !s.isManual)
           .toList();
 
       // Process stats

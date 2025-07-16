@@ -21,6 +21,9 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/error_messages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'package:rucking_app/features/ruck_session/domain/ruck_session.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
+import 'package:rucking_app/features/ruck_session/domain/session_repository.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -64,6 +67,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   String? _eventTitle;
 
   late final VoidCallback _durationListener;
+
+  bool _isOfflineMode = false;
+  final TextEditingController _offlineDurationController = TextEditingController();
+  final TextEditingController _offlineDistanceController = TextEditingController();
+  final TextEditingController _offlineElevationGainController = TextEditingController();
+  final TextEditingController _offlineElevationLossController = TextEditingController();
 
   /// Loads preferences and last used values (ruck weight and duration)
   Future<void> _loadDefaults() async {
@@ -381,6 +390,78 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           }
         } 
     }
+  }
+
+  void _saveOfflineRuck() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() { _isCreating = true; });
+      try {
+        final authState = context.read<AuthBloc>().state;
+        if (authState is! Authenticated) throw Exception('Must be logged in');
+
+        double userWeightKg = double.tryParse(_userWeightController.text) ?? 70.0;
+        if (!_preferMetric) userWeightKg /= 2.20462;
+
+        final durationMin = int.parse(_offlineDurationController.text);
+        final duration = Duration(minutes: durationMin);
+        final distance = double.parse(_offlineDistanceController.text);
+        final distanceKm = _preferMetric ? distance : distance * 1.60934;
+        final paceMinPerKm = durationMin / distanceKm;
+        final calories = _calculateCalories(duration.inSeconds, distanceKm, _ruckWeight, userWeightKg);
+        final elevationGainM = double.tryParse(_offlineElevationGainController.text) ?? 0.0;
+        final elevationLossM = double.tryParse(_offlineElevationLossController.text) ?? 0.0;
+        if (!_preferMetric) {
+          elevationGainM *= 0.3048;
+          elevationLossM *= 0.3048;
+        }
+
+        final now = DateTime.now();
+        final session = RuckSession(
+          id: 'manual_${now.millisecondsSinceEpoch}',
+          startTime: now.subtract(duration),
+          endTime: now,
+          duration: duration,
+          distance: distanceKm,
+          elevationGain: elevationGainM,
+          elevationLoss: elevationLossM,
+          caloriesBurned: calories.toInt(),
+          averagePace: paceMinPerKm,
+          ruckWeightKg: _ruckWeight,
+          status: RuckStatus.completed,
+          isManual: true,
+        );
+
+        final repo = GetIt.I<SessionRepository>();
+        await repo.createManualSession(session.toJson());
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SessionCompleteScreen(
+              completedAt: now,
+              ruckId: session.id!,
+              duration: duration,
+              distance: distanceKm,
+              caloriesBurned: calories.toInt(),
+              elevationGain: elevationGainM,
+              elevationLoss: elevationLossM,
+              ruckWeight: _ruckWeight,
+            ),
+          ),
+        );
+      } catch (e) {
+        StyledSnackBar.showError(context: context, message: 'Failed to save offline ruck: $e');
+      } finally {
+        setState(() { _isCreating = false; });
+      }
+    }
+  }
+
+  double _calculateCalories(int durationSeconds, double distanceKm, double ruckWeightKg, double userWeightKg) {
+    final paceMinPerKm = (durationSeconds / 60) / distanceKm;
+    double metValue = paceMinPerKm <= 8 ? 8.0 : (paceMinPerKm <= 12 ? 6.5 : 5.0);
+    final timeHours = durationSeconds / 3600.0;
+    return metValue * (userWeightKg + ruckWeightKg) * timeHours;
   }
 
   String _getDisplayWeight() {
@@ -890,6 +971,38 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     if (!_isCreating) _createSession();
                   },
                 ),
+                if (_isOfflineMode) ...[
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _offlineDurationController,
+                    label: 'Ruck Duration (minutes)',
+                    hint: 'e.g. 45',
+                    keyboardType: TextInputType.number,
+                    validator: (value) => value?.isEmpty ?? true ? 'Duration is required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _offlineDistanceController,
+                    label: 'Distance (${_preferMetric ? 'km' : 'miles'})',
+                    hint: 'e.g. ${_preferMetric ? '5.0' : '3.1'}',
+                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) => value?.isEmpty ?? true ? 'Distance is required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _offlineElevationGainController,
+                    label: 'Elevation Gain (${_preferMetric ? 'meters' : 'feet'}) - Optional',
+                    hint: 'e.g. ${_preferMetric ? '100' : '328'}',
+                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _offlineElevationLossController,
+                    label: 'Elevation Loss (${_preferMetric ? 'meters' : 'feet'}) - Optional',
+                    hint: 'e.g. ${_preferMetric ? '100' : '328'}',
+                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 
                 // Start session button - orange and full width
@@ -898,7 +1011,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.play_arrow),
                     label: Text(
-                      'START SESSION', 
+                      _isOfflineMode ? 'SAVE OFFLINE RUCK' : 'START SESSION', 
                       style: AppTextStyles.labelLarge.copyWith( // button -> labelLarge
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -912,13 +1025,22 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: () {
-                      HapticFeedback.mediumImpact();
-                      if (_formKey.currentState!.validate()) {
-                        if (!_isCreating) _createSession();
-                      }
-                    },
+                    onPressed: _isOfflineMode ? _saveOfflineRuck : _createSession,
                   ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isOfflineMode = !_isOfflineMode;
+                      if (!_isOfflineMode) {
+                        _offlineDurationController.clear();
+                        _offlineDistanceController.clear();
+                        _offlineElevationGainController.clear();
+                        _offlineElevationLossController.clear();
+                      }
+                    });
+                  },
+                  child: Text(_isOfflineMode ? 'Cancel' : 'Record Offline Ruck', style: TextStyle(fontSize: 14, color: Colors.grey)),
                 ),
               ],
             ),

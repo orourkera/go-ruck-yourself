@@ -247,8 +247,29 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       await achievementRepository.clearCache();
       AppLogger.sessionCompletion('Cleared achievement cache after session completion');
 
-      // Check for achievements BEFORE navigation so modal shows correctly
-      await _checkAchievementsBeforeNavigation();
+      final localSession = RuckSession(
+        id: widget.ruckId,
+        startTime: widget.completedAt.subtract(widget.duration),
+        endTime: widget.completedAt,
+        duration: widget.duration,
+        distance: widget.distance,
+        caloriesBurned: widget.caloriesBurned,
+        elevationGain: widget.elevationGain,
+        elevationLoss: widget.elevationLoss,
+        averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 ? (widget.duration.inSeconds / widget.distance) : 0.0,
+        ruckWeightKg: widget.ruckWeight,
+        status: RuckStatus.completed,
+        heartRateSamples: widget.heartRateSamples,
+        splits: widget.splits,
+        isManual: false, // Set based on your logic, or pass from creation
+      );
+
+      if (!localSession.isManual) {
+        await _checkAchievementsBeforeNavigation();
+      } else {
+        // Navigate directly
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      }
       
     } catch (e) {
       StyledSnackBar.showError(context: context, message: 'Error saving session: $e');

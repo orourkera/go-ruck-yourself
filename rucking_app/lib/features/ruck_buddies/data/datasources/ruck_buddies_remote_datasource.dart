@@ -65,6 +65,7 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
         'page': (offset ~/ limit + 1).toString(), // Convert offset to page number
         'per_page': limit.toString(),
         'sort_by': sortBy,
+        'exclude_manual': 'true',  // Exclude manual sessions
       };
       
       // Add location data if available and we're using proximity filter

@@ -1202,4 +1202,15 @@ class SessionRepository {
     
     AppLogger.debug('[SESSION CACHE] Updated cache for modified session: $sessionId');
   }
+
+  Future<String> createManualSession(Map<String, dynamic> data) async {
+    data['is_manual'] = true;
+    try {
+      final response = await _apiClient.post('/rucks', data);
+      return response['id'].toString();
+    } catch (e) {
+      AppLogger.error('Failed to create manual session: $e');
+      rethrow;
+    }
+  }
 }

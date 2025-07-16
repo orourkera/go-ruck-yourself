@@ -43,6 +43,7 @@ class RuckSession {
     int? pausedDurationSeconds,
     List<SessionSplit>? splits,
     List<RuckPhoto>? photos,
+    bool? isManual,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -72,6 +73,7 @@ class RuckSession {
       pausedDurationSeconds: pausedDurationSeconds ?? this.pausedDurationSeconds,
       splits: splits ?? this.splits,
       photos: photos ?? this.photos,
+      isManual: isManual ?? this.isManual,
     );
   }
 
@@ -103,6 +105,7 @@ class RuckSession {
   final int? minHeartRate;
   final List<SessionSplit>? splits;
   final List<RuckPhoto>? photos;
+  final bool isManual;
 
   RuckSession({
     this.id,
@@ -132,6 +135,7 @@ class RuckSession {
     this.pausedDurationSeconds,
     this.splits,
     this.photos,
+    this.isManual = false,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -279,6 +283,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
                 .map((e) => RuckPhoto.fromJson(e as Map<String, dynamic>))
                 .toList()
             : null,
+        isManual: json['is_manual'] as bool? ?? false,
       );
     } catch (e) {
       AppLogger.error("Error parsing RuckSession from JSON: $e");
@@ -334,6 +339,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       'paused_duration_seconds': pausedDurationSeconds,
       'splits': splits?.map((e) => e.toJson()).toList(),
       'photos': photos?.map((e) => e.toJson()).toList(),
+      'is_manual': isManual,
     };
   }
 }
