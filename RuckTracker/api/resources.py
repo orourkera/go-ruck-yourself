@@ -34,43 +34,6 @@ class UserResource(Resource):
     def get(self, user_id):
         """Get a user by ID"""
         user = User.query.get_or_404(user_id)
-        
-        # Check if this is a profile endpoint request
-        if request.endpoint and 'profile' in request.endpoint:
-            # Calculate user stats for profile endpoint
-            from sqlalchemy import func
-            stats = db.session.query(
-                func.count(RuckSession.id).label('total_rucks'),
-                func.coalesce(func.sum(RuckSession.distance_km), 0).label('total_distance_km'),
-                func.coalesce(func.sum(RuckSession.duration_seconds), 0).label('total_duration_seconds'),
-                func.coalesce(func.sum(RuckSession.elevation_gain_m), 0).label('total_elevation_gain_m'),
-                func.coalesce(func.sum(RuckSession.calories_burned), 0).label('total_calories_burned')
-            ).filter_by(user_id=user_id, status='completed').first()
-            
-            # Get social stats (placeholder - implement when social features are added)
-            social_stats = {
-                'followersCount': 0,
-                'followingCount': 0,
-                'clubsCount': 0,
-                'duelsWon': 0,
-                'duelsLost': 0,
-                'eventsCompleted': 0
-            }
-            
-            user_stats = {
-                'totalRucks': stats.total_rucks or 0,
-                'totalDistanceKm': float(stats.total_distance_km or 0),
-                'totalDurationSeconds': stats.total_duration_seconds or 0,
-                'totalElevationGainM': float(stats.total_elevation_gain_m or 0),
-                'totalCaloriesBurned': float(stats.total_calories_burned or 0),
-                **social_stats
-            }
-            
-            return {
-                "user": user.to_dict(),
-                "stats": user_stats
-            }, 200
-        
         return {"user": user.to_dict()}, 200
     
     def put(self, user_id):

@@ -205,6 +205,10 @@ app.register_blueprint(event_progress_bp, url_prefix='/api')
 from RuckTracker.api.cache_monitor import cache_monitor_bp
 app.register_blueprint(cache_monitor_bp)
 
+# Import and register users blueprint
+from RuckTracker.api.users import users_bp
+app.register_blueprint(users_bp, url_prefix='/api/users')
+
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (
     RuckSessionListResource, 
@@ -317,7 +321,6 @@ api.add_resource(UserProfileResource, '/api/auth/profile', '/api/users/profile')
 api.add_resource(UserAvatarUploadResource, '/api/auth/avatar')
 
 api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
-api.add_resource(UserResource, '/api/users/<string:user_id>/profile') # Add public profile endpoint
 
 # Ruck session endpoints (prefixed with /api)
 api.add_resource(RuckSessionListResource, '/api/rucks')
