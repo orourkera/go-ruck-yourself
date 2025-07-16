@@ -18,9 +18,12 @@ from .services.redis_cache_service import get_cache_service # Add Redis cache se
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure logging - Use appropriate level based on environment
-log_level = logging.INFO
-if os.environ.get("FLASK_ENV") == "development":
+# Configure logging - default to WARNING to suppress info/debug noise.
+# Set VERBOSE_LOGS=true env var to restore INFO level in staging/dev.
+log_level = logging.WARNING
+if os.environ.get("VERBOSE_LOGS") == "true":
+    log_level = logging.INFO
+elif os.environ.get("FLASK_ENV") == "development":
     log_level = logging.DEBUG
 
 # Configure logging to ensure all errors are captured
