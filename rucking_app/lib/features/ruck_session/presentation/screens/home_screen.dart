@@ -1204,16 +1204,92 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                             ),
                           );
                         } else {
-                          // Render placeholder for manual
-                          return Container(
-                            height: 220,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Center(child: Text('Manual Ruck - No Route')),
-                          );
+                           // Render session card without map for manual rucks
+                           return Container(
+                             margin: const EdgeInsets.only(bottom: 12),
+                             padding: const EdgeInsets.all(16),
+                             decoration: BoxDecoration(
+                               color: Theme.of(context).cardColor,
+                               borderRadius: BorderRadius.circular(10),
+                               boxShadow: [
+                                 BoxShadow(
+                                   color: Colors.black.withOpacity(0.05),
+                                   blurRadius: 4,
+                                   offset: const Offset(0, 2),
+                                 ),
+                               ],
+                             ),
+                             child: Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: [
+                                 Row(
+                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                   children: [
+                                     Text(
+                                       formattedDate,
+                                       style: AppTextStyles.titleMedium.copyWith(
+                                         fontWeight: FontWeight.bold,
+                                         color: Theme.of(context).brightness == Brightness.dark
+                                             ? const Color(0xFF728C69)
+                                             : AppColors.textDark,
+                                       ),
+                                     ),
+                                     Text(
+                                       durationText,
+                                       style: AppTextStyles.bodyMedium.copyWith(
+                                         color: Theme.of(context).brightness == Brightness.dark
+                                             ? const Color(0xFF728C69)
+                                             : AppColors.textDarkSecondary,
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                                 const SizedBox(height: 8),
+                                 const Divider(height: 24),
+                                 Row(
+                                   children: [
+                                     // Left column
+                                     Expanded(
+                                       child: Column(
+                                         children: [
+                                           _buildSessionStat(
+                                             Icons.straighten,
+                                             distanceValue,
+                                             label: 'Distance',
+                                           ),
+                                           const SizedBox(height: 16),
+                                           _buildSessionStat(
+                                             Icons.local_fire_department,
+                                             '$calories cal',
+                                             label: 'Calories',
+                                           ),
+                                         ],
+                                       ),
+                                     ),
+                                     const SizedBox(width: 24),
+                                     // Right column
+                                     Expanded(
+                                       child: Column(
+                                         children: [
+                                           _buildSessionStat(
+                                             Icons.timer,
+                                             paceDisplay,
+                                             label: 'Pace',
+                                           ),
+                                           const SizedBox(height: 16),
+                                           _buildSessionStat(
+                                             Icons.landscape,
+                                             elevationDisplay,
+                                             label: 'Elevation',
+                                           ),
+                                         ],
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               ],
+                             ),
+                           );
                         }
                       },
                     ),

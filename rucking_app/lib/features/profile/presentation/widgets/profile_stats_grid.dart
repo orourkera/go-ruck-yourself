@@ -20,16 +20,16 @@ class ProfileStatsGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
       children: [
-        _buildStatCard('Total Rucks', stats.totalRucks.toString()),
-        _buildStatCard('Distance (km)', stats.totalDistanceKm.toStringAsFixed(1)),
-        _buildStatCard('Followers', stats.followersCount.toString(), onTap: onFollowersPressed),
-        _buildStatCard('Following', stats.followingCount.toString(), onTap: onFollowingPressed),
+        _buildStatCard(context, 'Total Rucks', stats.totalRucks.toString()),
+        _buildStatCard(context, 'Distance (km)', stats.totalDistanceKm.toStringAsFixed(1)),
+        _buildStatCard(context, 'Followers', stats.followersCount.toString(), onTap: onFollowersPressed),
+        _buildStatCard(context, 'Following', stats.followingCount.toString(), onTap: onFollowingPressed),
         // Add more stats as needed
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, {VoidCallback? onTap}) {
+  Widget _buildStatCard(BuildContext context, String label, String value, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Card(

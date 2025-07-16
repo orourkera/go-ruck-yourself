@@ -379,7 +379,7 @@ class RuckLikesBatchResource(Resource):
         try:
             # Get all likes for the requested rucks
             likes_response = supabase.table('ruck_likes') \
-                                   .select('ruck_id, user_id, created_at, users(first_name, last_name)') \
+                                   .select('ruck_id, user_id, created_at') \
                                    .in_('ruck_id', ruck_ids) \
                                    .execute()
             

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/profile/domain/entities/user_profile.dart';
-import 'package:rucking_app/shared/widgets/follow_button.dart';
+import 'package:rucking_app/features/profile/presentation/widgets/follow_button.dart';
 
 class ProfileHeader extends StatelessWidget {
   final UserProfile profile;

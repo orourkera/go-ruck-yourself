@@ -50,6 +50,7 @@ import 'package:rucking_app/features/events/presentation/screens/create_event_sc
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/notification_settings_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/public_profile_screen.dart';
+import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/screens/followers_screen.dart';
 
 /// Main application widget
@@ -724,10 +725,20 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           ),
                         );
                       default:
+                        // Handle dynamic public profile route: /profile/<userId>
+                        if (settings.name != null && settings.name!.startsWith('/profile/')) {
+                          final userId = settings.name!.substring('/profile/'.length);
+                          return MaterialPageRoute(
+                            builder: (_) => BlocProvider<PublicProfileBloc>(
+                              create: (_) => getIt<PublicProfileBloc>()..add(LoadPublicProfile(userId)),
+                              child: PublicProfileScreen(userId: userId),
+                            ),
+                          );
+                        }
                         debugPrint('Unknown route: ${settings.name}');
                         return MaterialPageRoute(
                           builder: (_) => Scaffold(
-                            appBar: AppBar(title: Text('Error')),
+                            appBar: AppBar(title: const Text('Error')),
                             body: Center(child: Text('Route not found: ${settings.name}')),
                           ),
                         );

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/widgets/profile_header.dart';
 import 'package:rucking_app/features/profile/presentation/widgets/profile_stats_grid.dart';
+import 'package:rucking_app/features/profile/domain/entities/user_profile_stats.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   final String userId;
@@ -42,7 +43,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                 children: [
                   ProfileHeader(profile: state.profile, isOwnProfile: false),
                   if (!state.profile.isPrivateProfile) ...[
-                    ProfileStatsGrid(stats: state.stats ?? UserProfileStats(/* defaults */)),
+                    ProfileStatsGrid(stats: state.stats ?? UserProfileStats.fromJson({})),
                     TabBar(controller: _tabController, tabs: [Tab(text: 'Stats'), Tab(text: 'Clubs'), Tab(text: 'Recent')]),
                     SizedBox(
                       height: 300,

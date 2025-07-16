@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/profile/domain/entities/social_user.dart';
-import 'package:rucking_app/shared/widgets/follow_button.dart';
+import 'package:rucking_app/features/profile/presentation/widgets/follow_button.dart';
 
 class SocialUserTile extends StatelessWidget {
   final SocialUser user;
