@@ -547,47 +547,8 @@ def auth_callback():
         <div class="container">
             <h2>🎒 RuckTracker</h2>
             <div class="spinner"></div>
-            <p>Redirecting to the RuckTracker app...</p>
-            <p><small>If the app doesn't open automatically, <a href="#" id="manual-link">click here</a></small></p>
-        </div>
-        
-        <script>
-            // Extract tokens from URL fragment (Supabase sends tokens after #)
-            function getTokensFromFragment() {{
-                const fragment = window.location.hash.substring(1); // Remove #
-                const params = new URLSearchParams(fragment);
-                return {{
-                    access_token: params.get('access_token'),
-                    refresh_token: params.get('refresh_token'),
-                    type: params.get('type'),
-                    expires_in: params.get('expires_in')
-                }};
-            }}
-            
-            // Extract tokens from query parameters (fallback)
-            function getTokensFromQuery() {{
-                const params = new URLSearchParams(window.location.search);
-                return {{
-                    access_token: params.get('access_token'),
-                    refresh_token: params.get('refresh_token'),
-                    type: params.get('type'),
-                    expires_in: params.get('expires_in')
-                }};
-            }}
-            
-            // Build mobile app URL with tokens
-            function buildMobileUrl() {{
-                let tokens = getTokensFromFragment();
-                if (!tokens.access_token) {{
-                    tokens = getTokensFromQuery();
-                }}
-                
-                console.log('Extracted tokens:', tokens);
-                
-                let mobileUrl = 'com.getrucky.app://auth/callback';
-                
-                if (tokens.access_token) {{
-                    mobileUrl += '?access_token=' + encodeURIComponent(tokens.access_token);
+
+bileUrl += '?access_token=' + encodeURIComponent(tokens.access_token);
                     if (tokens.type) {{
                         mobileUrl += '&type=' + encodeURIComponent(tokens.type);
                     }}
