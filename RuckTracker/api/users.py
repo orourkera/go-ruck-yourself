@@ -48,7 +48,29 @@ def get_public_profile(user_id):
         if not is_private:
             stats_res = get_supabase_client().table('user_profile_stats').select('*').eq('user_id', user_id).execute()
             response['stats'] = stats_res.data[0] if stats_res.data else {}
-            clubs_res = get_supabase_client().from_('club_members').select('clubs(*)').eq('user_id', user_id).execute()
+            # Fetch clubs the user belongs to. Prefer the correct 'club_memberships' table but fall back to legacy
+            # 'club_members' name if needed for older databases.
+            try:
+                clubs_res = (
+                    get_supabase_client()
+                    .from_('club_memberships')
+                    .select('clubs(*)')
+                    .eq('user_id', user_id)
+                    .execute()
+                )
+            except Exception as clubs_err:
+                err_msg = str(clubs_err)
+                # Supabase/PostgREST error for missing relationship or table will include hints like PGRST200.
+                if 'PGRST200' in err_msg or 'relationship' in err_msg or 'club_memberships' in err_msg:
+                    clubs_res = (
+                        get_supabase_client()
+                        .from_('club_members')
+                        .select('clubs(*)')
+                        .eq('user_id', user_id)
+                        .execute()
+                    )
+                else:
+                    raise
             response['clubs'] = [cm['clubs'] for cm in clubs_res.data] if clubs_res.data else []
             rucks_res = get_supabase_client().table('ruck_sessions').select('*').eq('user_id', user_id).order('end_time', desc=True).limit(5).execute()
             response['recentRucks'] = rucks_res.data or []

@@ -173,7 +173,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     });
     
     // Listen for session state changes
-    final bloc = context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>();
+    final bloc = context.read<ActiveSessionBloc>();
     bloc.stream.listen((state) {
       if (state is ActiveSessionRunning && !sessionRunning) {
         // When session first starts running, mark it
@@ -218,8 +218,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
             TextButton(
               onPressed: () {
                 // Emit a final Tick event to ensure state is up to date before ending session
-                context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(const Tick());
-                context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(const SessionCompleted());
+                context.read<ActiveSessionBloc>().add(const Tick());
+                context.read<ActiveSessionBloc>().add(const SessionCompleted());
                 Navigator.of(dialogContext).pop();
               },
               child: const Text('End Session'),
@@ -357,12 +357,12 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         // The countdown completion will trigger this later
                       } else if (state is ActiveSessionRunning 
                                 && uiInitialized 
-                                && context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().state is ActiveSessionInitial) {
+                                && context.read<ActiveSessionBloc>().state is ActiveSessionInitial) {
                         // This case is to handle if the session somehow reverts to Initial AFTER UI is initialized
                         // and a session was running. This might indicate a need to restart the session logic.
                         // This specific log and condition might need review based on actual app flow.
                         AppLogger.warning('Session was running, UI initialized, but BLoC reset to Initial. Re-triggering SessionStarted.');
-                        context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(SessionStarted(
+                        context.read<ActiveSessionBloc>().add(SessionStarted(
                                 ruckWeightKg: widget.args.ruckWeight,
                                 userWeightKg: widget.args.userWeightKg, // Added missing parameter
                                 notes: widget.args.notes,
@@ -389,7 +389,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (mounted) { // Ensure widget is still mounted
                              AppLogger.info('UI Initialized, starting session with args: ${widget.args.ruckWeight}kg, ${widget.args.plannedDuration}s');
-                             context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(SessionStarted(
+                             context.read<ActiveSessionBloc>().add(SessionStarted(
                                   ruckWeightKg: widget.args.ruckWeight,
                                   userWeightKg: widget.args.userWeightKg,
                                   notes: widget.args.notes,
@@ -456,7 +456,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   ElevatedButton(
                                     onPressed: () {
                                       // Try to restart the session
-                                      context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(SessionStarted(
+                                      context.read<ActiveSessionBloc>().add(SessionStarted(
                                         ruckWeightKg: widget.args.ruckWeight,
                                         userWeightKg: widget.args.userWeightKg,
                                         notes: widget.args.notes,
@@ -578,7 +578,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               // Stats overlay or spinner
                               Padding(
                                 padding: const EdgeInsets.all(16.0), // This was the padding inside the Expanded
-                                child: BlocBuilder<Bloc<ActiveSessionEvent, ActiveSessionState>, ActiveSessionState>(
+                                child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
                                   key: const ValueKey('stats_overlay_builder'),
                                   buildWhen: (prev, curr) {
                                     if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
@@ -643,7 +643,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               // Controls at bottom
                               Padding(
                                 padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 10.0, top: 4.0),
-                                child: BlocBuilder<Bloc<ActiveSessionEvent, ActiveSessionState>, ActiveSessionState>(
+                                child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
                                   buildWhen: (prev, curr) {
                                     // Rebuild when the state type changes (e.g. Initial -> Running) or when
                                     // the paused flag toggles within a running session.
@@ -660,9 +660,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       onTogglePause: () {
                                         if (state is! ActiveSessionRunning) return; // Ignore if not running
                                         if (isPaused) {
-                                          context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(const SessionResumed(source: SessionActionSource.ui));
+                                          context.read<ActiveSessionBloc>().add(const SessionResumed(source: SessionActionSource.ui));
                                         } else {
-                                          context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(const SessionPaused(source: SessionActionSource.ui));
+                                          context.read<ActiveSessionBloc>().add(const SessionPaused(source: SessionActionSource.ui));
                                         }
                                       },
                                       onEndSession: () {
