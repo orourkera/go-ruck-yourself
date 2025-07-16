@@ -160,16 +160,7 @@ def rate_limit_resource(resource, limit):
     resource.dispatch_request = wrapped_dispatch_request
     return resource
 
-# Increase rate limit for user profile endpoint
-try:
-    view_key = 'users.get_public_profile'
-    if view_key in app.view_functions:
-        app.logger.info("Setting get_public_profile rate limit to 300 per hour")
-        app.view_functions[view_key] = limiter.limit("300 per hour", override_defaults=True)(app.view_functions[view_key])
-    else:
-        app.logger.warning(f"View function {view_key} not found when applying rate limit")
-except Exception as e:
-    app.logger.error(f"Failed to set rate limit for get_public_profile: {e}")
+
 
 # Apply rate limiting to Flask-RESTful endpoints - using higher defaults
 # Individual resources can have their own specific limits applied via rate_limit_resource
@@ -222,6 +213,17 @@ app.register_blueprint(cache_monitor_bp)
 # Import and register users blueprint
 from RuckTracker.api.users import users_bp
 app.register_blueprint(users_bp, url_prefix='/api/users')
+
+# Ensure higher rate limit for user public profile endpoint now that blueprint is registered
+try:
+    view_key = 'users.get_public_profile'
+    if view_key in app.view_functions:
+        app.logger.info("Setting get_public_profile rate limit to: 300 per hour")
+        app.view_functions[view_key] = limiter.limit("300 per hour", override_defaults=True)(app.view_functions[view_key])
+    else:
+        app.logger.warning(f"View function {view_key} not found when applying rate limit (post-registration)")
+except Exception as e:
+    app.logger.error(f"Failed to set rate limit for get_public_profile (post-registration): {e}")
 
 # Import API resources after initializing db to avoid circular imports
 from .api.ruck import (

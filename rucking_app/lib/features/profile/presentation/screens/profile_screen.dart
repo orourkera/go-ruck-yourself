@@ -39,6 +39,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const double kgToLbs = 2.20462;
   static const double cmToInches = 0.393701;
 
+  Widget _buildCountColumn(BuildContext context, {required String label, required int count, VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            count.toString(),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -132,7 +148,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const SizedBox(height: 20),
-                        // Avatar section with upload functionality
+                        // Avatar + follower/following counts row
+                        BlocProvider<PublicProfileBloc>(
+                          create: (_) => getIt<PublicProfileBloc>()..add(LoadPublicProfile(user.userId)),
+                          child: BlocBuilder<PublicProfileBloc, PublicProfileState>(
+                            builder: (context, pState) {
+                              int followers = 0;
+                              int following = 0;
+                              if (pState is PublicProfileLoaded) {
+                                followers = pState.stats?.followersCount ?? 0;
+                                following = pState.stats?.followingCount ?? 0;
+                              }
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Editable avatar
+                                  BlocListener<ProfileBloc, ProfileState>(
+                                    listener: (context, profileState) {
+                                      if (profileState is AvatarUploadSuccess) {
+                                        StyledSnackBar.showSuccess(
+                                          context: context,
+                                          message: 'Avatar updated successfully!',
+                                        );
+                                      } else if (profileState is AvatarUploadFailure) {
+                                        StyledSnackBar.showError(
+                                          context: context,
+                                          message: 'Failed to upload avatar: \\${profileState.error}',
+                                        );
+                                      }
+                                    },
+                                    child: BlocBuilder<ProfileBloc, ProfileState>(
+                                      builder: (context, profileState) {
+                                        return EditableUserAvatar(
+                                          avatarUrl: user.avatarUrl,
+                                          username: user.username,
+                                          size: 100,
+                                          isLoading: profileState is AvatarUploading,
+                                          onEditPressed: () async {
+                                            final imageFile = await ImagePickerUtils.pickProfileImage(context);
+                                            if (imageFile != null && mounted) {
+                                              context.read<ProfileBloc>().add(UploadAvatar(imageFile));
+                                            }
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 24),
+                                  Expanded(
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _buildCountColumn(context, label: 'Followers', count: followers, onTap: () {
+                                          Navigator.pushNamed(context, '/profile/${user.userId}/followers');
+                                        }),
+                                        _buildCountColumn(context, label: 'Following', count: following, onTap: () {
+                                          Navigator.pushNamed(context, '/profile/${user.userId}/following');
+                                        }),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16)
                         BlocListener<ProfileBloc, ProfileState>(
                           listener: (context, profileState) {
                             if (profileState is AvatarUploadSuccess) {
@@ -159,11 +240,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   if (imageFile != null && mounted) {
                                     context.read<ProfileBloc>().add(UploadAvatar(imageFile));
                                   }
-                                },
-                              );
-                            },
-                          ),
-                        ),
                         const SizedBox(height: 16),
                         Text(
                           user.username,

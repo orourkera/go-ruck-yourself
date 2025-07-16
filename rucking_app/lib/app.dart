@@ -475,7 +475,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           if (userId.isNotEmpty) {
                             return MaterialPageRoute(builder: (_) {
                               final authState = BlocProvider.of<AuthBloc>(_).state;
-                              final currentUserId = authState is Authenticated ? authState.user.id : '';
+                              final currentUserId = authState is Authenticated ? authState.user.userId : '';
                               if (userId == currentUserId) {
                                 return const ProfileScreen();
                               }
