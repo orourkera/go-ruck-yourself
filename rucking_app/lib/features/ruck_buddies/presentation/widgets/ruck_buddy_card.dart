@@ -34,6 +34,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dar
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'dart:developer' as developer;
+import 'package:rucking_app/core/navigation/app_routes.dart';
 
 class RuckBuddyCard extends StatefulWidget {
   final RuckBuddy ruckBuddy;
@@ -672,27 +673,30 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
-        child: CachedNetworkImage(
-          imageUrl: user.photoUrl!,
-          width: avatarSize,
-          height: avatarSize,
-          fit: BoxFit.cover,
-          cacheManager: ImageCacheManager.instance, // Add custom cache manager
-          placeholder: (context, url) => Container(
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(context, AppRoutes.publicProfile.replaceAll(':userId', user.id)),
+          child: CachedNetworkImage(
+            imageUrl: user.photoUrl!,
             width: avatarSize,
             height: avatarSize,
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-          errorWidget: (context, url, error) => Container(
-            width: avatarSize,
-            height: avatarSize,
-            padding: const EdgeInsets.all(4),
-            // No background color
-            child: Image.asset(
-              user.gender?.toLowerCase() == 'female' 
-                ? 'assets/images/lady rucker profile.png'
-                : 'assets/images/profile.png',
-              fit: BoxFit.contain,
+            fit: BoxFit.cover,
+            cacheManager: ImageCacheManager.instance, // Add custom cache manager
+            placeholder: (context, url) => Container(
+              width: avatarSize,
+              height: avatarSize,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+            errorWidget: (context, url, error) => Container(
+              width: avatarSize,
+              height: avatarSize,
+              padding: const EdgeInsets.all(4),
+              // No background color
+              child: Image.asset(
+                user.gender?.toLowerCase() == 'female' 
+                  ? 'assets/images/lady rucker profile.png'
+                  : 'assets/images/profile.png',
+                fit: BoxFit.contain,
+              ),
             ),
           ),
         ),

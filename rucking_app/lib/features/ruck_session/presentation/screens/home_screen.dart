@@ -1010,254 +1010,447 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                               LatLng(40.424, -3.676),
                             ];
                           }
-                          if (routePoints.isNotEmpty &amp;&amp; (session['is_manual'] ?? false) != true) {
-  return GestureDetector(
-    onTap: () {
-      try {
-        final sessionModel = RuckSession.fromJson(session);
-        Navigator.of(context).push&lt;bool&gt;(
-          MaterialPageRoute(
-            builder: (context) =&gt; SessionDetailScreen(session: sessionModel),
-          ),
-        ).then((refreshNeeded) {
-          if (refreshNeeded == true) {
-            _fetchFromNetwork();
-          }
-        });
-      } catch (e) {
-      }
-    },
-    child: Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
-      color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Theme.of(context).cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: Theme.of(context).brightness == Brightness.dark 
-            ? BorderSide(color: Theme.of(context).primaryColor, width: 1)
-            : BorderSide.none,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // MAP PREVIEW
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                height: 220,
-                width: double.infinity,
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
-                    initialZoom: routePoints.isNotEmpty ? _getFitZoom(routePoints) : 15.0,
-                    minZoom: 3.0,
-                    maxZoom: 18.0,
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.none,
-                    ),
-                  ),
-                  children: [
-                    SafeTileLayer(
-                      style: 'stamen_terrain',
-                      retinaMode: MediaQuery.of(context).devicePixelRatio &gt; 1.0,
-                      onTileError: () {
-                        AppLogger.warning('Map tile loading error in home screen');
+                          if (routePoints.isNotEmpty && (session['is_manual'] ?? false) != true) {
+                            // Render map
+                            return GestureDetector(
+                              onTap: () {
+                                try {
+                                  final sessionModel = RuckSession.fromJson(session);
+                                  // Navigate to detail screen and handle the result
+                                  Navigator.of(context).push<bool>(
+                                    MaterialPageRoute(
+                                      builder: (context) => SessionDetailScreen(session: sessionModel),
+                                    ),
+                                  ).then((refreshNeeded) {
+                                    // If returned with true (session deleted), refresh the data
+                                    if (refreshNeeded == true) {
+                                      _fetchFromNetwork();
+                                    }
+                                  });
+                                } catch (e) {
+                                  // Ignore errors
+                                }
+                              },
+                              child: Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              elevation: 1,
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Theme.of(context).cardColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: Theme.of(context).brightness == Brightness.dark 
+                                    ? BorderSide(color: Theme.of(context).primaryColor, width: 1)
+                                    : BorderSide.none,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // MAP PREVIEW
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: SizedBox(
+                                        height: 220, // Increased size to match ruck buddies
+                                        width: double.infinity,
+                                        child: FlutterMap(
+                                          options: MapOptions(
+                                            initialCenter: routePoints.isNotEmpty ? _getRouteCenter(routePoints) : LatLng(40.421, -3.678),
+                                            initialZoom: routePoints.isNotEmpty ? _getFitZoom(routePoints) : 15.0,
+                                            minZoom: 3.0,
+                                            maxZoom: 18.0,
+                                            interactionOptions: const InteractionOptions(
+                                              flags: InteractiveFlag.none, // Disable interactions for preview
+                                            ),
+                                          ),
+                                          children: [
+                                            SafeTileLayer(
+                                              style: 'stamen_terrain',
+                                              retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
+                                              onTileError: () {
+                                                AppLogger.warning('Map tile loading error in home screen');
+                                              },
+                                            ),
+                                            PolylineLayer(
+                                              polylines: () {
+                                                // TODO: Privacy clipping not working properly - temporarily disabled
+                                                // Split route into privacy segments for visual indication
+                                                // final privacySegments = RoutePrivacyUtils.splitRouteForPrivacy(
+                                                //   routePoints,
+                                                //   preferMetric: preferMetric,
+                                                // );
+
+                                                List<Polyline> polylines = [];
+
+                                                // TODO: Temporarily show full route instead of privacy segments
+                                                // Add private start segment (dark gray)
+                                                // if (privacySegments.privateStartSegment.isNotEmpty) {
+                                                //   polylines.add(Polyline(
+                                                //     points: privacySegments.privateStartSegment,
+                                                //     color: Colors.grey.shade800,
+                                                //     strokeWidth: 3,
+                                                //   ));
+                                                // }
+
+                                                // Add visible middle segment (orange)
+                                                // if (privacySegments.visibleMiddleSegment.isNotEmpty) {
+                                                //   polylines.add(Polyline(
+                                                //     points: privacySegments.visibleMiddleSegment,
+                                                //     color: AppColors.secondary,
+                                                //     strokeWidth: 4,
+                                                //   ));
+                                                // }
+
+                                                // Add private end segment (dark gray)
+                                                // if (privacySegments.privateEndSegment.isNotEmpty) {
+                                                //   polylines.add(Polyline(
+                                                //     points: privacySegments.privateEndSegment,
+                                                //     color: Colors.grey.shade800,
+                                                //     strokeWidth: 3,
+                                                //   ));
+                                                // }
+
+                                                // Show full route without privacy clipping
+                                                polylines.add(Polyline(
+                                                  points: routePoints,
+                                                  color: AppColors.secondary,
+                                                  strokeWidth: 4,
+                                                ));
+
+                                                // Fallback: if no segments were created, show the full route
+                                                // if (polylines.isEmpty) {
+                                                //   polylines.add(Polyline(
+                                                //     points: routePoints,
+                                                //     color: AppColors.secondary,
+                                                //     strokeWidth: 4,
+                                                //   ));
+                                                // }
+                                                return polylines;
+                                              }(),
+                                            ),
+                                            
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          formattedDate,
+                                          style: AppTextStyles.titleMedium.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+                                          ),
+                                        ),
+                                        Text(
+                                          durationText,
+                                          style: AppTextStyles.bodyMedium.copyWith(
+                                            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Divider(height: 24),
+                                    
+                                    // Stats grid (2x2) - matches Ruck Buddies layout
+                                    Row(
+                                      children: [
+                                        // Left column
+                                        Expanded(
+                                          child: Column(
+                                            children: [
+                                              _buildSessionStat(
+                                                Icons.straighten,
+                                                distanceValue,
+                                                label: 'Distance',
+                                              ),
+                                              const SizedBox(height: 16),
+                                              _buildSessionStat(
+                                                Icons.local_fire_department,
+                                                '$calories cal',
+                                                label: 'Calories',
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        
+                                        const SizedBox(width: 24),
+                                        
+                                        // Right column
+                                        Expanded(
+                                          child: Column(
+                                            children: [
+                                              _buildSessionStat(
+                                                Icons.timer,
+                                                paceDisplay,
+                                                label: 'Pace',
+                                              ),
+                                              const SizedBox(height: 16),
+                                              _buildSessionStat(
+                                                Icons.landscape,
+                                                elevationDisplay,
+                                                label: 'Elevation',
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        } else {
+                          // Render placeholder for manual
+                          return Container(
+                            height: 220,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Center(child: Text('Manual Ruck - No Route')),
+                          );
+                        }
                       },
                     ),
-                    PolylineLayer(
-                      polylines: () {
-                        List&lt;Polyline&gt; polylines = [];
-                        polylines.add(Polyline(
-                          points: routePoints,
-                          color: AppColors.secondary,
-                          strokeWidth: 4,
-                        ));
-                        return polylines;
-                      }(),
+                
+                // View all button
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: () {
+                      // Find the parent HomeScreen widget and update its state
+                      final _HomeScreenState homeState = context.findAncestorStateOfType<_HomeScreenState>()!;
+                      homeState.setState(() {
+                        homeState._selectedIndex = 1; // Switch to history tab
+                      });
+                    },
+                    child: Text(
+                      'View All Sessions',
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: Theme.of(context).primaryColor,
+                      ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  formattedDate,
-                  style: AppTextStyles.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
-                  ),
-                ),
-                Text(
-                  durationText,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            const Divider(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildSessionStat(
-                        Icons.straighten,
-                        distanceValue,
-                        label: 'Distance',
-                      ),
-                      const SizedBox(height: 16),
-                      _buildSessionStat(
-                        Icons.local_fire_department,
-                        '$calories cal',
-                        label: 'Calories',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildSessionStat(
-                        Icons.timer,
-                        paceDisplay,
-                        label: 'Pace',
-                      ),
-                      const SizedBox(height: 16),
-                      _buildSessionStat(
-                        Icons.landscape,
-                        elevationDisplay,
-                        label: 'Elevation',
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-} else {
-  return GestureDetector(
-    onTap: () {
-      try {
-        final sessionModel = RuckSession.fromJson(session);
-        Navigator.of(context).push&lt;bool&gt;(
-          MaterialPageRoute(
-            builder: (context) =&gt; SessionDetailScreen(session: sessionModel),
           ),
-        ).then((refreshNeeded) {
-          if (refreshNeeded == true) {
-            _fetchFromNetwork();
-          }
-        });
-      } catch (e) {
-      }
-    },
-    child: Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
-      color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Theme.of(context).cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: Theme.of(context).brightness == Brightness.dark 
-            ? BorderSide(color: Theme.of(context).primaryColor, width: 1)
-            : BorderSide.none,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Placeholder for manual session
-            Container(
-              height: 220,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  'Manual Ruck - No Route',
-                  style: AppTextStyles.bodyLarge.copyWith(
+        ),
+      ), // Closes SafeArea
+    ), // Closes Scaffold
+  ); // Closes BlocListener
+  } // Closes build method
+
+  /// Builds a statistics item for the quick stats section
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: Colors.white,
+          size: 20,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: AppTextStyles.titleLarge.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: Colors.white.withOpacity(0.8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Builds a session stat item - updated to match ruck buddies style
+  Widget _buildSessionStat(IconData icon, String value, {String? label}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: Theme.of(context).primaryColor,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (label != null)
+                Text(
+                  label,
+                  style: AppTextStyles.bodySmall.copyWith(
                     color: Colors.grey[600],
                   ),
                 ),
+              Text(
+                value,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  formattedDate,
-                  style: AppTextStyles.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
-                  ),
-                ),
-                Text(
-                  durationText,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Divider(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildSessionStat(
-                        Icons.straighten,
-                        distanceValue,
-                        label: 'Distance',
-                      ),
-                      const SizedBox(height: 16),
-                      _buildSessionStat(
-                        Icons.local_fire_department,
-                        '$calories cal',
-                        label: 'Calories',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildSessionStat(
-                        Icons.timer,
-                        paceDisplay,
-                        label: 'Pace',
-                      ),
-                      const SizedBox(height: 16),
-                      _buildSessionStat(
-                        Icons.landscape,
-                        elevationDisplay,
-                        label: 'Elevation',
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
+  /// Builds a small circular header action icon
+  Widget _buildHeaderAction({required Widget icon, required VoidCallback onTap}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isDarkMode ? Colors.black : Theme.of(context).cardColor,
+          shape: BoxShape.circle,
+          border: null,
+          boxShadow: isDarkMode ? null : [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
+        child: Center(child: icon),
       ),
-    ),
-  );
-}
+    );
+  }
+
+  /// Returns profile icon widget for header based on user gender (lady mode)
+  Widget _buildProfileHeaderIcon() {
+    String? gender;
+    try {
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        gender = (authBloc.state as Authenticated).user.gender;
+      }
+    } catch (_) {
+      // If AuthBloc not available, fall back to default icon
+    }
+
+    final String iconPath = (gender == 'female')
+        ? 'assets/images/lady rucker profile.png'
+        : 'assets/images/profile.png';
+    return Image.asset(iconPath, width: 30, height: 30);
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return '${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds';
+  }
+
+  /// Preload images from recent sessions for better perceived performance
+  Future<void> _preloadSessionImages(List<dynamic> sessions) async {
+    if (sessions.isEmpty) return;
+    
+    try {
+      // Extract profile picture URLs from session data
+      final profileUrls = <String>[];
+      final photoUrls = <String>[];
+      
+      for (final sessionData in sessions) {
+        if (sessionData is Map<String, dynamic>) {
+          // Check for user profile picture
+          final user = sessionData['user'];
+          if (user is Map<String, dynamic>) {
+            final profilePic = user['profile_picture'];
+            if (profilePic is String && profilePic.isNotEmpty) {
+              profileUrls.add(profilePic);
+            }
+          }
+          
+          // Check for session photos
+          final photos = sessionData['photos'];
+          if (photos is List && photos.isNotEmpty) {
+            final firstPhoto = photos.first;
+            if (firstPhoto is String && firstPhoto.isNotEmpty) {
+              photoUrls.add(firstPhoto);
+            }
+          }
+        }
+      }
+      
+      // Preload in background - don't block UI
+      if (profileUrls.isNotEmpty) {
+        unawaited(ImageCacheManager.preloadProfilePictures(profileUrls.toSet().toList()));
+      }
+      if (photoUrls.isNotEmpty) {
+        unawaited(ImageCacheManager.preloadSessionPhotos(photoUrls));
+      }
+      
+      developer.log('[HOME_DEBUG] Started preloading ${profileUrls.length} profile pics and ${photoUrls.length} session photos');
+    } catch (e) {
+      developer.log('[HOME_DEBUG] Error preloading images: $e');
+    }
+  }
+
+  Future<void> _requestEarlyPermissions() async {
+    if (!mounted) return;
+    
+    try {
+      // Always request location permissions for all platforms
+      final locationService = GetIt.instance<LocationService>();
+      final hasLocationPermission = await locationService.hasLocationPermission();
+      
+      if (!hasLocationPermission) {
+        AppLogger.info('[HOME] Requesting location permissions early...');
+        await locationService.requestLocationPermission(context: context);
+      }
+      
+      // Only request health permissions for Android users
+      // iOS users get health permissions during registration flow
+      if (Theme.of(context).platform != TargetPlatform.iOS) {
+        try {
+          final healthService = GetIt.instance<HealthService>();
+          final isHealthAvailable = await healthService.isHealthDataAvailable();
+          
+          if (isHealthAvailable) {
+            AppLogger.info('[HOME] Requesting health permissions early for Android...');
+            await healthService.requestAuthorization();
+          }
+        } catch (e) {
+          AppLogger.warning('[HOME] Failed to request health permissions early: $e');
+          // Don't block app startup if health permission fails
+        }
+      }
+      
+      // Request battery optimization permissions for Android (with modal)
+      if (Theme.of(context).platform == TargetPlatform.android) {
+        try {
+          await BatteryOptimizationService.ensureBackgroundExecutionPermissions(context: context);
+        } catch (e) {
+          AppLogger.warning('[HOME] Failed to check battery optimization early: $e');
+          // Don't block app startup if battery optimization check fails
+        }
+      }
+      
+      AppLogger.info('[HOME] Early permission requests completed');
+    } catch (e) {
+      AppLogger.error('[HOME] Error during early permission requests: $e');
+      // Don't crash the app if permission requests fail
+    }
+  }
+} // Closes _HomeTabState class

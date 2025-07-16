@@ -5,6 +5,7 @@ import '../../domain/entities/duel.dart';
 import '../../domain/entities/duel_participant.dart';
 import '../../data/models/duel_participant_model.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/core/navigation/app_routes.dart';
 
 class DuelCard extends StatelessWidget {
   final Duel duel;

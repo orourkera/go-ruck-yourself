@@ -49,6 +49,8 @@ import 'package:rucking_app/features/events/presentation/screens/event_detail_sc
 import 'package:rucking_app/features/events/presentation/screens/create_event_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/notification_settings_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/public_profile_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/followers_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -466,9 +468,30 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           builder: (_) => const AchievementsHubScreen(),
                         );
                       case '/profile':
-                        return MaterialPageRoute(
-                          builder: (_) => const ProfileScreen(),
-                        );
+                        if (settings.name?.startsWith('/profile/') == true) {
+                          final path = settings.name ?? '';
+                          final userId = path.split('/').last;
+                          if (userId.isNotEmpty) {
+                            return MaterialPageRoute(builder: (_) => PublicProfileScreen(userId: userId));
+                          }
+                        }
+                        break;
+                      case '/followers':
+                        if (settings.name?.startsWith('/profile/') == true && settings.name?.endsWith('/followers') == true) {
+                          final path = settings.name ?? '';
+                          final parts = path.split('/');
+                          final userId = parts.length > 2 ? parts[2] : '';
+                          return MaterialPageRoute(builder: (_) => FollowersScreen(userId: userId, title: 'Followers', isFollowersPage: true));
+                        }
+                        break;
+                      case '/following':
+                        if (settings.name?.startsWith('/profile/') == true && settings.name?.endsWith('/following') == true) {
+                          final path = settings.name ?? '';
+                          final parts = path.split('/');
+                          final userId = parts.length > 2 ? parts[2] : '';
+                          return MaterialPageRoute(builder: (_) => FollowersScreen(userId: userId, title: 'Following', isFollowersPage: false));
+                        }
+                        break;
                       case '/notification_settings':
                         return MaterialPageRoute(
                           builder: (_) => const NotificationSettingsScreen(),
@@ -701,6 +724,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           ),
                         );
                       default:
+                        debugPrint('Unknown route: ${settings.name}');
                         return MaterialPageRoute(
                           builder: (_) => Scaffold(
                             appBar: AppBar(title: Text('Error')),

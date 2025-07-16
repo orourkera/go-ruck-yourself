@@ -16,6 +16,8 @@ import 'package:rucking_app/shared/widgets/empty_state.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 
+enum RuckBuddiesFilter { ALL, FOLLOWING_ONLY, RECENT, NEARBY }
+
 class RuckBuddiesScreen extends StatefulWidget {
   const RuckBuddiesScreen({Key? key}) : super(key: key);
 
@@ -86,6 +88,8 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
     // Load more when user scrolls to 80% of the list
     return currentScroll >= (maxScroll * 0.8);
   }
+
+  RuckBuddiesFilter _selectedFilter = RuckBuddiesFilter.ALL;
 
   @override
   Widget build(BuildContext context) {

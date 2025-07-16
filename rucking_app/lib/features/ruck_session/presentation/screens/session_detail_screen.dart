@@ -522,7 +522,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
               ),
 
               // Map Section
-              if (!widget.session.isManual && widget.session.locationPoints != null && widget.session.locationPoints!.isNotEmpty)
+              if (widget.session.locationPoints != null && widget.session.locationPoints!.isNotEmpty && !widget.session.isManual)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                   child: _SessionRouteMap(session: widget.session),
