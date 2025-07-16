@@ -36,8 +36,8 @@ def get_public_profile(user_id):
             'recentRucks': None
         }
         if not is_private:
-            stats_res = get_supabase_client().table('user_profile_stats').select('*').eq('user_id', user_id).single().execute()
-            response['stats'] = stats_res.data or {}
+            stats_res = get_supabase_client().table('user_profile_stats').select('*').eq('user_id', user_id).execute()
+            response['stats'] = stats_res.data[0] if stats_res.data else {}
             clubs_res = get_supabase_client().from_('club_members').select('clubs(*)').eq('user_id', user_id).execute()
             response['clubs'] = [cm['clubs'] for cm in clubs_res.data] if clubs_res.data else []
             rucks_res = get_supabase_client().table('ruck_sessions').select('*').eq('user_id', user_id).order('end_time', desc=True).limit(5).execute()
