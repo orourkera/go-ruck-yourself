@@ -576,14 +576,14 @@ class UserProfileResource(Resource):
         
         try:
             data = request.get_json() or {}
-        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
-        camel_to_snake = {
-            'weightKg': 'weight_kg',
-            'isMetric': 'prefer_metric',
-            'heightCm': 'height_cm',
-            'avatarUrl': 'avatar_url'
-        }
-        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
+            # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+            camel_to_snake = {
+                'weightKg': 'weight_kg',
+                'isMetric': 'prefer_metric',
+                'heightCm': 'height_cm',
+                'avatarUrl': 'avatar_url'
+            }
+            data = {camel_to_snake.get(k, k): v for k, v in data.items()}
             
             # Check if user record already exists
             existing_user = User.query.filter_by(id=g.user.id).first()
@@ -594,8 +594,8 @@ class UserProfileResource(Resource):
                     existing_user.username = data['username']
                 if 'email' in data:
                     existing_user.email = data['email']
-                if 'is_metric' in data:
-                    existing_user.prefer_metric = data['is_metric']
+                if 'prefer_metric' in data:
+                    existing_user.prefer_metric = data['prefer_metric']
                 if 'weight_kg' in data:
                     existing_user.weight_kg = data['weight_kg']
                 if 'height_cm' in data:
