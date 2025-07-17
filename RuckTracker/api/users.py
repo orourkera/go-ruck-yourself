@@ -232,13 +232,60 @@ def get_following(user_id):
 def follow_user(user_id):
     try:
         current_user_id = g.current_user['id']
-        insert_res = get_supabase_client().table('user_follows').insert({'follower_id': current_user_id, 'followed_id': user_id}).execute()
-        if insert_res.data:
-            count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
-            followers_count = count_res.data[0]['count'] if count_res.data else 0
-            return jsonify({'success': True, 'isFollowing': True, 'followersCount': followers_count})
-        return api_error('Failed to follow', status_code=400)
+        
+        # Check if user is trying to follow themselves
+        if current_user_id == user_id:
+            return api_error('Cannot follow yourself', status_code=400)
+        
+        # Check if target user exists and if their profile is private
+        # Handle both column names in case of migration timing issues
+        try:
+            user_res = get_supabase_client().table('user').select('id, is_profile_private').eq('id', user_id).single().execute()
+        except Exception as e:
+            # If is_profile_private column doesn't exist, try the old column name
+            if 'column' in str(e).lower() and 'is_profile_private' in str(e):
+                try:
+                    user_res = get_supabase_client().table('user').select('id, is_private_profile').eq('id', user_id).single().execute()
+                    # Map old column name to new one for consistency
+                    if user_res.data:
+                        user_res.data['is_profile_private'] = user_res.data.get('is_private_profile', False)
+                except Exception:
+                    # If both column names fail, assume user exists but privacy column is missing (default to public)
+                    user_res = get_supabase_client().table('user').select('id').eq('id', user_id).single().execute()
+                    if user_res.data:
+                        user_res.data['is_profile_private'] = False
+            else:
+                raise e
+        
+        if not user_res.data:
+            return api_error('User not found', status_code=404)
+        
+        target_user = user_res.data
+        if target_user.get('is_profile_private', False):
+            return api_error('Cannot follow private profiles', status_code=403)
+        
+        # Check if already following
+        existing_follow = get_supabase_client().table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
+        if existing_follow.data:
+            return api_error('Already following this user', status_code=400)
+        
+        # Insert the follow relationship
+        try:
+            insert_res = get_supabase_client().table('user_follows').insert({'follower_id': current_user_id, 'followed_id': user_id}).execute()
+            if insert_res.data:
+                count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
+                followers_count = count_res.data[0]['count'] if count_res.data else 0
+                return jsonify({'success': True, 'isFollowing': True, 'followersCount': followers_count})
+            return api_error('Failed to follow', status_code=400)
+        except Exception as insert_error:
+            # Log the exact error for debugging
+            print(f"[ERROR] Follow insert failed: {str(insert_error)}")
+            # Check if it's an RLS policy error
+            if 'policy' in str(insert_error).lower() or 'permission' in str(insert_error).lower():
+                return api_error('Permission denied - this may be due to profile privacy settings', status_code=403)
+            raise insert_error
     except Exception as e:
+        print(f"[ERROR] Follow endpoint error: {str(e)}")
         return api_error(str(e), status_code=500)
 
 @users_bp.route('/<uuid:user_id>/follow', methods=['DELETE'])

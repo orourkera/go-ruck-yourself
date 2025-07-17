@@ -236,19 +236,154 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
 
   Widget _buildRecentTab(List<dynamic>? recentRucks) {
     if (recentRucks == null || recentRucks.isEmpty) {
-      return Center(child: Text('No recent rucks'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.directions_run, size: 48, color: Colors.grey[400]),
+            SizedBox(height: 16),
+            Text('No recent rucks', style: AppTextStyles.bodyMedium.copyWith(color: Colors.grey[600])),
+          ],
+        ),
+      );
     }
     
     return ListView.builder(
+      padding: EdgeInsets.all(16),
       itemCount: recentRucks.length,
       itemBuilder: (context, index) {
         final ruck = recentRucks[index];
-        return ListTile(
-          title: Text('Ruck ${index + 1}'),
-          subtitle: Text('${ruck.distanceKm?.toStringAsFixed(1) ?? '0.0'} km'),
-          trailing: Text('${ruck.durationSeconds != null ? (ruck.durationSeconds! / 60).toStringAsFixed(0) : '0'} min'),
+        return Card(
+          margin: EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _formatRuckTitle(ruck['end_time'] ?? ruck['created_at']),
+                      style: AppTextStyles.titleLarge,
+                    ),
+                    if (ruck['power_points'] != null)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${ruck['power_points'].toStringAsFixed(0)} PP',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildRuckStat(
+                        Icons.straighten,
+                        _formatDistance(ruck['distance_km']),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildRuckStat(
+                        Icons.timer,
+                        _formatDuration(ruck['duration_seconds']),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildRuckStat(
+                        Icons.trending_up,
+                        _formatElevation(ruck['elevation_gain_m']),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildRuckStat(
+                        Icons.local_fire_department,
+                        _formatCalories(ruck['calories_burned']),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
+  }
+
+  Widget _buildRuckStat(IconData icon, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[600]),
+        SizedBox(width: 6),
+        Text(value, style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[700])),
+      ],
+    );
+  }
+
+  String _formatRuckTitle(String? dateTime) {
+    if (dateTime == null) return 'Ruck Session';
+    try {
+      final date = DateTime.parse(dateTime);
+      final now = DateTime.now();
+      final difference = now.difference(date).inDays;
+      
+      if (difference == 0) return 'Today';
+      if (difference == 1) return 'Yesterday';
+      if (difference < 7) return '${difference} days ago';
+      
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return 'Ruck Session';
+    }
+  }
+
+  String _formatDistance(dynamic distance) {
+    if (distance == null) return '0.0 km';
+    final distanceKm = distance is double ? distance : double.tryParse(distance.toString()) ?? 0.0;
+    
+    // TODO: Use user's unit preference when available
+    return '${distanceKm.toStringAsFixed(1)} km';
+  }
+
+  String _formatDuration(dynamic duration) {
+    if (duration == null) return '0 min';
+    final durationSeconds = duration is int ? duration : int.tryParse(duration.toString()) ?? 0;
+    
+    final hours = durationSeconds ~/ 3600;
+    final minutes = (durationSeconds % 3600) ~/ 60;
+    
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else {
+      return '${minutes}m';
+    }
+  }
+
+  String _formatElevation(dynamic elevation) {
+    if (elevation == null) return '0 m';
+    final elevationM = elevation is double ? elevation : double.tryParse(elevation.toString()) ?? 0.0;
+    return '${elevationM.toStringAsFixed(0)} m';
+  }
+
+  String _formatCalories(dynamic calories) {
+    if (calories == null) return '0 cal';
+    final caloriesValue = calories is double ? calories : double.tryParse(calories.toString()) ?? 0.0;
+    return '${caloriesValue.toStringAsFixed(0)} cal';
   }
 } 
