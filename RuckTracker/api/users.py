@@ -27,9 +27,10 @@ def get_public_profile(user_id):
         is_following = False
         is_followed_by = False
         if current_user_id:
-            follow_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            follow_res = supabase.table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
             is_following = bool(follow_res.data)
-            followed_by_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', str(user_id)).eq('followed_id', str(current_user_id)).execute()
+            followed_by_res = supabase.table('user_follows').select('id').eq('follower_id', str(user_id)).eq('followed_id', str(current_user_id)).execute()
             is_followed_by = bool(followed_by_res.data)
         response = {
             'user': {
@@ -51,8 +52,9 @@ def get_public_profile(user_id):
         if not is_private:
             # Calculate follower/following counts first (used for stats no matter private)
             try:
+                supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
                 followers_count_res = (
-                    get_supabase_client()
+                    supabase
                     .table('user_follows')
                     .select('id')
                     .eq('followed_id', str(user_id))
@@ -60,7 +62,7 @@ def get_public_profile(user_id):
                 )
                 followers_count = len(followers_count_res.data or [])
                 following_count_res = (
-                    get_supabase_client()
+                    supabase
                     .table('user_follows')
                     .select('id')
                     .eq('follower_id', str(user_id))
@@ -166,7 +168,7 @@ def get_public_profile(user_id):
                     .select('*')
                     .eq('user_id', str(user_id))
                     .eq('status', 'completed')
-                    .order('end_time', desc=True)
+                    .order('completed_at', desc=True)
                     .limit(5)
                     .execute()
                 )
@@ -267,13 +269,16 @@ def follow_user(user_id):
             return api_error('Cannot follow private profiles', status_code=403)
         
         # Check if already following
-        existing_follow = get_supabase_client().table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+        existing_follow = supabase.table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
         if existing_follow.data:
             return api_error('Already following this user', status_code=400)
         
         # Insert the follow relationship
         try:
-            insert_res = get_supabase_client().table('user_follows').insert({'follower_id': str(current_user_id), 'followed_id': str(user_id)}).execute()
+            # Use authenticated client to respect RLS policies
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            insert_res = supabase.table('user_follows').insert({'follower_id': str(current_user_id), 'followed_id': str(user_id)}).execute()
             if insert_res.data:
                 count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', str(user_id)).execute()
                 followers_count = count_res.data[0]['count'] if count_res.data else 0
@@ -294,7 +299,9 @@ def follow_user(user_id):
 def unfollow_user(user_id):
     try:
         current_user_id = g.user.id
-        delete_res = get_supabase_client().table('user_follows').delete().eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
+        # Use authenticated client to respect RLS policies
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+        delete_res = supabase.table('user_follows').delete().eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
         count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', str(user_id)).execute()
         followers_count = count_res.data[0]['count'] if count_res.data else 0
         return jsonify({'success': True, 'isFollowing': False, 'followersCount': followers_count})
