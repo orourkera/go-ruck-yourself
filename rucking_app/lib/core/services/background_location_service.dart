@@ -77,8 +77,14 @@ class BackgroundLocationService {
         await channel.invokeMethod('stopTracking');
         debugPrint('Background location tracking stopped');
       } on PlatformException catch (e) {
+        // Handle specific background service restriction errors
+        if (e.code == 'error' && e.message?.contains('BackgroundServiceStartNotAllowedException') == true) {
+          debugPrint('Background service restriction - cannot stop service while in background');
+          // Don't rethrow - this is expected behavior on Android 8.0+
+          return;
+        }
         debugPrint('Failed to stop background tracking: ${e.message}');
-        rethrow;
+        // Don't rethrow - prevent app crashes from background service issues
       } catch (e) {
         debugPrint('Unexpected error stopping background tracking: $e');
         // Don't rethrow - this prevents app crashes from background service issues

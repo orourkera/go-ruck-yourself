@@ -446,7 +446,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       // Process sessions
       List<dynamic> processedSessions = _processSessionResponse(sessionsResponse);
       final completedSessions = processedSessions
-          .where((dynamic s) => s is Map<String, dynamic> && s['status'] == 'completed')
+          .where((dynamic s) => s is Map<String, dynamic> && s.containsKey('status') && s['status'] == 'completed')
           .toList();
 
       // Process stats
@@ -473,17 +473,22 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       // Preload images for better UX
       await _preloadSessionImages(completedSessions.take(5).toList());
     } catch (e, stack) {
-      // Enhanced error handling with Sentry
-      await AppErrorHandler.handleError(
-        'home_screen_data_fetch',
-        e,
-        context: {
-          'screen': 'home',
-          'was_manual_refresh': _isRefreshing,
-          'is_loading': _isLoading,
-        },
-        sendToBackend: true,
-      );
+      // Enhanced error handling with Sentry - wrapped to prevent secondary errors
+      try {
+        await AppErrorHandler.handleError(
+          'home_screen_data_fetch',
+          e,
+          context: {
+            'screen': 'home',
+            'was_manual_refresh': _isRefreshing,
+            'is_loading': _isLoading,
+          },
+          sendToBackend: true,
+        );
+      } catch (errorHandlerException) {
+        // If error reporting fails, log it but don't crash the app
+        print('Error reporting failed: $errorHandlerException');
+      }
       
       if (!mounted) return;
       

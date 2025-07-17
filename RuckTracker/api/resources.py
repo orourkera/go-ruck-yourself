@@ -73,6 +73,57 @@ class UserResource(Resource):
         db.session.commit()
         return {"user": user.to_dict()}, 200
     
+    def patch(self, user_id):
+        """Partially update user fields. Primarily used for `last_active_at` pings from the mobile app.
+
+        Currently the mobile app sends
+        {
+          "last_active_at": "2025-07-17T08:06:12.123Z"
+        }
+        via PATCH /users/{id} to record that the user opened the app. Historically this triggered a
+        405 (Method Not Allowed) because the backend only implemented GET, PUT and DELETE.  
+
+        We purposefully keep the implementation extremely lightweight: if `last_active_at` is
+        provided we simply update the built-in `updated_at` column for the user (no need for a
+        dedicated column) which is already indexed and available for analytics.  
+        Any other recognised user fields will also be mapped and updated using the same camel →
+        snake conversion used in `put()`.
+        """
+        user = User.query.get_or_404(user_id)
+        data = request.get_json() or {}
+
+        # Map camelCase keys coming from Flutter to snake_case columns
+        camel_to_snake = {
+            'weightKg': 'weight_kg',
+            'isMetric': 'prefer_metric',
+            'heightCm': 'height_cm',
+            'avatarUrl': 'avatar_url',
+            'lastActiveAt': 'last_active_at',  # not a real column but accepted in payload
+        }
+        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
+
+        # Handle last_active_at specially – we just bump updated_at for now
+        if 'last_active_at' in data:
+            try:
+                # Parse ISO8601 – datetime.fromisoformat handles microseconds & timezone info
+                ts = datetime.fromisoformat(data['last_active_at'].replace('Z', '+00:00'))
+                user.updated_at = ts
+            except Exception:
+                # If parsing fails just use current UTC time (fail-safe)
+                user.updated_at = datetime.utcnow()
+
+        # For any other provided fields reuse the same logic as PUT but without validation
+        allowed_simple_fields = {
+            'username', 'email', 'weight_kg', 'prefer_metric', 'height_cm',
+            'avatar_url', 'is_profile_private'
+        }
+        for key in allowed_simple_fields:
+            if key in data:
+                setattr(user, key, data[key])
+
+        db.session.commit()
+        return {"user": user.to_dict()}, 200
+
     def delete(self, user_id):
         """Delete a user and all associated data from Supabase and local DB"""
         # Authorization check: Ensure the authenticated user matches the user_id being deleted

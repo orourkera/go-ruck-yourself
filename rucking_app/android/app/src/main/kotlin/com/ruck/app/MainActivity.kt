@@ -130,9 +130,35 @@ class MainActivity : FlutterActivity() {
     }
     
     private fun stopLocationService() {
-        val intent = Intent(this, LocationTrackingService::class.java)
-        intent.action = LocationTrackingService.ACTION_STOP_TRACKING
-        startService(intent)
+        try {
+            val intent = Intent(this, LocationTrackingService::class.java)
+            intent.action = LocationTrackingService.ACTION_STOP_TRACKING
+            
+            // Check if we can start the service (app must be in foreground)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Android 8.0+ background service restrictions
+                try {
+                    startService(intent)
+                    android.util.Log.d("MainActivity", "Stop tracking service started successfully")
+                } catch (e: IllegalStateException) {
+                    android.util.Log.w("MainActivity", "Cannot start stop service in background, stopping directly")
+                    // Fallback: stop service directly
+                    stopService(intent)
+                }
+            } else {
+                // Pre-Android 8.0 - no restrictions
+                startService(intent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error stopping location service: ${e.message}", e)
+            // Fallback: try to stop service directly
+            try {
+                val intent = Intent(this, LocationTrackingService::class.java)
+                stopService(intent)
+            } catch (fallbackError: Exception) {
+                android.util.Log.e("MainActivity", "Fallback stop service also failed: ${fallbackError.message}", fallbackError)
+            }
+        }
     }
     
     private fun isLocationServiceActive(): Boolean {

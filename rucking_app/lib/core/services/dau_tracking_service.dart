@@ -102,7 +102,7 @@ class DauTrackingService with WidgetsBindingObserver {
       final user = await _authService.getCurrentUser();
       if (user == null) return false;
       
-      await _apiClient.put(
+      await _apiClient.patch(
         '/users/${user.userId}',
         {'last_active_at': DateTime.now().toUtc().toIso8601String()},
         operationName: 'update_last_active',

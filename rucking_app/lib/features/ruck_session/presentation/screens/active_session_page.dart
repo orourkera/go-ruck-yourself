@@ -371,8 +371,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                 initialLocation: widget.args.initialCenter == null 
                                     ? null 
                                     : LocationPoint(
-                                        latitude: widget.args.initialCenter!.latitude,
-                                        longitude: widget.args.initialCenter!.longitude,
+                                        latitude: widget.args.initialCenter?.latitude ?? 0.0,
+                                        longitude: widget.args.initialCenter?.longitude ?? 0.0,
                                         timestamp: DateTime.now().toUtc(),
                                         elevation: 0.0, // Added default
                                         accuracy: 0.0, // Added default
@@ -398,8 +398,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   initialLocation: widget.args.initialCenter == null 
                                     ? null 
                                     : LocationPoint(
-                                        latitude: widget.args.initialCenter!.latitude,
-                                        longitude: widget.args.initialCenter!.longitude,
+                                        latitude: widget.args.initialCenter?.latitude ?? 0.0,
+                                        longitude: widget.args.initialCenter?.longitude ?? 0.0,
                                         timestamp: DateTime.now().toUtc(),
                                         elevation: 0.0, // Added default
                                         accuracy: 0.0, // Added default

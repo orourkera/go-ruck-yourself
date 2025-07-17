@@ -634,8 +634,13 @@ class LocationServiceImpl implements LocationService {
       AppLogger.debug('Safe to ignore - staleness check timer cancellation: $e');
     }
     
-    // Stop background location service
-    await BackgroundLocationService.stopBackgroundTracking();
+    // Stop background location service with error handling
+    try {
+      await BackgroundLocationService.stopBackgroundTracking();
+    } catch (e) {
+      // Log but don't crash - background service stop failures are common
+      AppLogger.warning('Background service stop failed (safe to ignore): $e');
+    }
     
     // Clear tracking state
     _lastLocationUpdate = null;

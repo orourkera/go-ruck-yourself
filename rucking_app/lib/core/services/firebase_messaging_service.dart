@@ -244,15 +244,20 @@ class FirebaseMessagingService {
       print('🔔 Device token registered successfully with backend');
     } catch (e) {
       // Monitor device token registration failures (affects push notification delivery)
-      await AppErrorHandler.handleError(
-        'firebase_token_registration',
-        e,
-        context: {
-          'token_length': token.length,
-          'platform': Platform.isAndroid ? 'android' : 'ios',
-          'has_auth': GetIt.instance.isRegistered<ApiClient>(),
-        },
-      );
+      try {
+        await AppErrorHandler.handleError(
+          'firebase_token_registration',
+          e,
+          context: {
+            'token_length': token.length,
+            'platform': Platform.isAndroid ? 'android' : 'ios',
+            'has_auth': GetIt.instance.isRegistered<ApiClient>(),
+          },
+        );
+      } catch (errorHandlerException) {
+        // If error reporting fails, log it but don't crash the app
+        print('Error reporting failed during Firebase token registration: $errorHandlerException');
+      }
       
       print('❌ Failed to register device token: $e');
       // Don't throw - we want Firebase to still work even if backend registration fails

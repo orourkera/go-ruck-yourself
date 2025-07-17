@@ -516,7 +516,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo fetching');
+      AppLogger.warning('No coordinator available for photo fetching, creating coordinator');
+      
+      // Create coordinator if it doesn't exist
+      _coordinator = _createCoordinator();
+      _setupCoordinatorSubscription();
+      
+      // Now delegate to the newly created coordinator
+      _coordinator!.add(event);
     }
   }
 
@@ -528,7 +535,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo uploading');
+      AppLogger.warning('No coordinator available for photo uploading, creating coordinator');
+      
+      // Create coordinator if it doesn't exist
+      _coordinator = _createCoordinator();
+      _setupCoordinatorSubscription();
+      
+      // Now delegate to the newly created coordinator
+      _coordinator!.add(event);
     }
   }
 
@@ -540,7 +554,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo deletion');
+      AppLogger.warning('No coordinator available for photo deletion, creating coordinator');
+      
+      // Create coordinator if it doesn't exist
+      _coordinator = _createCoordinator();
+      _setupCoordinatorSubscription();
+      
+      // Now delegate to the newly created coordinator
+      _coordinator!.add(event);
     }
   }
 
@@ -558,7 +579,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo capture');
+      AppLogger.warning('No coordinator available for photo taking, creating coordinator');
+      
+      // Create coordinator if it doesn't exist
+      _coordinator = _createCoordinator();
+      _setupCoordinatorSubscription();
+      
+      // Now delegate to the newly created coordinator
+      _coordinator!.add(event);
     }
   }
 
@@ -569,7 +597,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo picking');
+      AppLogger.warning('No coordinator available for photo picking, creating coordinator');
+      
+      // Create coordinator if it doesn't exist
+      _coordinator = _createCoordinator();
+      _setupCoordinatorSubscription();
+      
+      // Now delegate to the newly created coordinator
+      _coordinator!.add(event);
     }
   }
   

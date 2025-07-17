@@ -158,17 +158,22 @@ class SocialRepository {
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
       
-      // Enhanced error handling with Sentry
-      await AppErrorHandler.handleError(
-        'social_add_like',
-        e,
-        context: {
-          'ruck_id': ruckId,
-          'operation': 'add_like',
-        },
-        userId: (await _authService.getCurrentUser())?.userId,
-        sendToBackend: true,
-      );
+      // Enhanced error handling with Sentry - wrapped to prevent secondary errors
+      try {
+        await AppErrorHandler.handleError(
+          'social_add_like',
+          e,
+          context: {
+            'ruck_id': ruckId,
+            'operation': 'add_like',
+          },
+          userId: (await _authService.getCurrentUser())?.userId,
+          sendToBackend: true,
+        );
+      } catch (errorHandlerException) {
+        // If error reporting fails, log it but don't crash the app
+        print('Error reporting failed during social add like: $errorHandlerException');
+      }
       
       throw ServerException(message: 'Failed to add like: $e');
     }

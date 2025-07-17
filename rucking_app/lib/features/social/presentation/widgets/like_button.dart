@@ -7,8 +7,8 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 
 /// A button widget for liking/unliking ruck sessions
 class RuckLikeButton extends StatefulWidget {
-  /// ID of the ruck session
-  final int ruckId;
+  /// ID of the ruck session (nullable to handle missing data)
+  final int? ruckId;
   
   /// Initial like count (optional)
   final int initialLikeCount;
@@ -31,7 +31,7 @@ class RuckLikeButton extends StatefulWidget {
   /// Creates a like button for ruck sessions
   const RuckLikeButton({
     Key? key,
-    required this.ruckId,
+    this.ruckId,
     this.initialLikeCount = 0,
     this.initialIsLiked = false,
     this.showCount = true,
@@ -96,11 +96,21 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
       _animationController.forward(from: 0.0);
     }
     
-    context.read<SocialBloc>().add(ToggleRuckLike(widget.ruckId));
+    // Add null check to prevent TypeError when ruckId is null
+    if (widget.ruckId != null) {
+      context.read<SocialBloc>().add(ToggleRuckLike(widget.ruckId!));
+    } else {
+      print('Warning: Attempted to like a ruck session with null ruckId');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Don't render the widget if ruckId is null
+    if (widget.ruckId == null) {
+      return const SizedBox.shrink();
+    }
+    
     return BlocConsumer<SocialBloc, SocialState>(
       listenWhen: (previous, current) {
         // Listen only for states related to likes
