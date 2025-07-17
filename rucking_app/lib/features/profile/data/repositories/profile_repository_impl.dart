@@ -26,14 +26,44 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   @override
   Future<List<SocialUser>> getFollowers(String userId, {int page = 1}) async {
-    final response = await apiClient.get('/users/$userId/followers?page=$page');
-    return (response['followers'] as List).map((e) => SocialUser.fromJson(e)).toList();
+    try {
+      final response = await apiClient.get('/users/$userId/followers?page=$page');
+      print('Followers API response: $response');
+      final followers = response['followers'] as List?;
+      if (followers == null) {
+        print('Followers is null, returning empty list');
+        return [];
+      }
+      print('Followers data: $followers');
+      return followers.map((e) {
+        print('Processing follower: $e');
+        return SocialUser.fromJson(e as Map<String, dynamic>);
+      }).toList();
+    } catch (e) {
+      print('Error in getFollowers: $e');
+      rethrow;
+    }
   }
 
   @override
   Future<List<SocialUser>> getFollowing(String userId, {int page = 1}) async {
-    final response = await apiClient.get('/users/$userId/following?page=$page');
-    return (response['following'] as List).map((e) => SocialUser.fromJson(e)).toList();
+    try {
+      final response = await apiClient.get('/users/$userId/following?page=$page');
+      print('Following API response: $response');
+      final following = response['following'] as List?;
+      if (following == null) {
+        print('Following is null, returning empty list');
+        return [];
+      }
+      print('Following data: $following');
+      return following.map((e) {
+        print('Processing following: $e');
+        return SocialUser.fromJson(e as Map<String, dynamic>);
+      }).toList();
+    } catch (e) {
+      print('Error in getFollowing: $e');
+      rethrow;
+    }
   }
 
   @override
