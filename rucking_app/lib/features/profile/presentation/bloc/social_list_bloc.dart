@@ -28,38 +28,41 @@ class SocialListError extends SocialListState {
 
 class SocialListBloc extends Bloc<SocialListEvent, SocialListState> {
   final ProfileRepository repository;
-  SocialListBloc(this.repository) : super(SocialListInitial());
+  
+  SocialListBloc(this.repository) : super(SocialListInitial()) {
+    on<LoadSocialList>(_onLoadSocialList);
+    on<ToggleFollowUser>(_onToggleFollowUser);
+  }
 
-  @override
-  Stream<SocialListState> mapEventToState(SocialListEvent event) async* {
-    if (event is LoadSocialList) {
-      yield SocialListLoading();
+  Future<void> _onLoadSocialList(LoadSocialList event, Emitter<SocialListState> emit) async {
+    emit(SocialListLoading());
+    try {
+      final users = event.isFollowersPage
+          ? await repository.getFollowers(event.userId)
+          : await repository.getFollowing(event.userId);
+      emit(SocialListLoaded(users: users, hasMore: users.length == 20));  // Assuming per_page=20
+    } catch (e) {
+      emit(SocialListError(e.toString()));
+    }
+  }
+
+  Future<void> _onToggleFollowUser(ToggleFollowUser event, Emitter<SocialListState> emit) async {
+    if (state is SocialListLoaded) {
+      final current = state as SocialListLoaded;
+      emit(SocialListLoading());
       try {
-        final users = event.isFollowersPage
-            ? await repository.getFollowers(event.userId)
-            : await repository.getFollowing(event.userId);
-        yield SocialListLoaded(users: users, hasMore: users.length == 20);  // Assuming per_page=20
-      } catch (e) {
-        yield SocialListError(e.toString());
-      }
-    } else if (event is ToggleFollowUser) {
-      if (state is SocialListLoaded) {
-        final current = state as SocialListLoaded;
-        yield SocialListLoading();
-        try {
-          final targetUser = current.users.firstWhere((u) => u.id == event.userId);
-          final success = targetUser.isFollowing
-              ? await repository.unfollowUser(event.userId)
-              : await repository.followUser(event.userId);
-          if (success) {
-            final updatedUsers = current.users.map((u) => u.id == event.userId ? u.copyWith(isFollowing: !u.isFollowing) : u).toList();
-            yield SocialListLoaded(users: updatedUsers, hasMore: current.hasMore);
-          } else {
-            yield SocialListError('Follow toggle failed');
-          }
-        } catch (e) {
-          yield SocialListError(e.toString());
+        final targetUser = current.users.firstWhere((u) => u.id == event.userId);
+        final success = targetUser.isFollowing
+            ? await repository.unfollowUser(event.userId)
+            : await repository.followUser(event.userId);
+        if (success) {
+          final updatedUsers = current.users.map((u) => u.id == event.userId ? u.copyWith(isFollowing: !u.isFollowing) : u).toList();
+          emit(SocialListLoaded(users: updatedUsers, hasMore: current.hasMore));
+        } else {
+          emit(SocialListError('Follow toggle failed'));
         }
+      } catch (e) {
+        emit(SocialListError(e.toString()));
       }
     }
   }
