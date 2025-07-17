@@ -235,24 +235,24 @@ def follow_user(user_id):
         current_user_id = g.user.id
         
         # Check if user is trying to follow themselves
-        if current_user_id == user_id:
+        if str(current_user_id) == str(user_id):
             return api_error('Cannot follow yourself', status_code=400)
         
         # Check if target user exists and if their profile is private
         # Handle both column names in case of migration timing issues
         try:
-            user_res = get_supabase_client().table('user').select('id, is_profile_private').eq('id', user_id).single().execute()
+            user_res = get_supabase_client().table('user').select('id, is_profile_private').eq('id', str(user_id)).single().execute()
         except Exception as e:
             # If is_profile_private column doesn't exist, try the old column name
             if 'column' in str(e).lower() and 'is_profile_private' in str(e):
                 try:
-                    user_res = get_supabase_client().table('user').select('id, is_private_profile').eq('id', user_id).single().execute()
+                    user_res = get_supabase_client().table('user').select('id, is_private_profile').eq('id', str(user_id)).single().execute()
                     # Map old column name to new one for consistency
                     if user_res.data:
                         user_res.data['is_profile_private'] = user_res.data.get('is_private_profile', False)
                 except Exception:
                     # If both column names fail, assume user exists but privacy column is missing (default to public)
-                    user_res = get_supabase_client().table('user').select('id').eq('id', user_id).single().execute()
+                    user_res = get_supabase_client().table('user').select('id').eq('id', str(user_id)).single().execute()
                     if user_res.data:
                         user_res.data['is_profile_private'] = False
             else:
@@ -266,15 +266,15 @@ def follow_user(user_id):
             return api_error('Cannot follow private profiles', status_code=403)
         
         # Check if already following
-        existing_follow = get_supabase_client().table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
+        existing_follow = get_supabase_client().table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
         if existing_follow.data:
             return api_error('Already following this user', status_code=400)
         
         # Insert the follow relationship
         try:
-            insert_res = get_supabase_client().table('user_follows').insert({'follower_id': current_user_id, 'followed_id': user_id}).execute()
+            insert_res = get_supabase_client().table('user_follows').insert({'follower_id': str(current_user_id), 'followed_id': str(user_id)}).execute()
             if insert_res.data:
-                count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
+                count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', str(user_id)).execute()
                 followers_count = count_res.data[0]['count'] if count_res.data else 0
                 return jsonify({'success': True, 'isFollowing': True, 'followersCount': followers_count})
             return api_error('Failed to follow', status_code=400)
@@ -293,8 +293,8 @@ def follow_user(user_id):
 def unfollow_user(user_id):
     try:
         current_user_id = g.user.id
-        delete_res = get_supabase_client().table('user_follows').delete().eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
-        count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
+        delete_res = get_supabase_client().table('user_follows').delete().eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
+        count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', str(user_id)).execute()
         followers_count = count_res.data[0]['count'] if count_res.data else 0
         return jsonify({'success': True, 'isFollowing': False, 'followersCount': followers_count})
     except Exception as e:

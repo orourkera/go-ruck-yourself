@@ -28,6 +28,7 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/create_se
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
+import 'package:rucking_app/features/profile/presentation/bloc/social_list_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
