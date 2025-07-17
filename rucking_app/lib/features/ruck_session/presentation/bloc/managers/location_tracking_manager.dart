@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../../core/services/api_client.dart';
+import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/location_service.dart';
 import '../../../../../core/services/watch_service.dart';
 import '../../../../../core/utils/app_logger.dart';
@@ -25,6 +26,7 @@ class LocationTrackingManager implements SessionManager {
   final TerrainTracker _terrainTracker;
   final ApiClient _apiClient;
   final WatchService _watchService;
+  final AuthService _authService;
   
   final StreamController<LocationTrackingState> _stateController;
   LocationTrackingState _currentState;
@@ -68,11 +70,13 @@ class LocationTrackingManager implements SessionManager {
     required TerrainTracker terrainTracker,
     required ApiClient apiClient,
     required WatchService watchService,
+    required AuthService authService,
   })  : _locationService = locationService,
         _splitTrackingService = splitTrackingService,
         _terrainTracker = terrainTracker,
         _apiClient = apiClient,
         _watchService = watchService,
+        _authService = authService,
         _stateController = StreamController<LocationTrackingState>.broadcast(),
         _currentState = const LocationTrackingState();
 
@@ -96,6 +100,8 @@ class LocationTrackingManager implements SessionManager {
       await _onLocationUpdated(event);
     } else if (event is BatchLocationUpdated) {
       await _onBatchLocationUpdated(event);
+    } else if (event is MemoryPressureDetected) {
+      await _onMemoryPressureDetected(event);
     }
   }
 
@@ -182,6 +188,22 @@ class LocationTrackingManager implements SessionManager {
     _updateWatchWithSessionData(_currentState);
     
     AppLogger.info('[LOCATION_MANAGER] Location tracking resumed');
+  }
+  
+  /// Handle memory pressure detection by triggering aggressive cleanup
+  Future<void> _onMemoryPressureDetected(MemoryPressureDetected event) async {
+    AppLogger.error('[LOCATION_MANAGER] MEMORY_PRESSURE: ${event.memoryUsageMb}MB detected, triggering aggressive cleanup');
+    
+    // Trigger aggressive memory cleanup
+    _manageMemoryPressure();
+    
+    // Force upload of pending data
+    _triggerAggressiveDataOffload();
+    
+    // Trigger garbage collection
+    _triggerGarbageCollection();
+    
+    AppLogger.info('[LOCATION_MANAGER] MEMORY_PRESSURE: Aggressive cleanup completed');
   }
 
   Future<void> _onLocationUpdated(LocationUpdated event) async {
@@ -529,10 +551,19 @@ class LocationTrackingManager implements SessionManager {
     
     _locationService.stopLocationTracking();
     
-    // Upload any remaining pending points
+    // Upload any remaining pending points BEFORE clearing session ID
     if (_pendingLocationPoints.isNotEmpty && _activeSessionId != null) {
-      await _processBatchUpload();
+      try {
+        await _processBatchUpload();
+      } catch (e) {
+        AppLogger.warning('[LOCATION_MANAGER] Failed to upload final batch during stop: $e');
+      }
     }
+    
+    // CRITICAL: Clear session ID to prevent further uploads
+    _activeSessionId = null;
+    
+    AppLogger.info('[LOCATION_MANAGER] Location tracking fully stopped, session ID cleared');
   }
 
   void _startWatchdog() {
@@ -623,10 +654,10 @@ class LocationTrackingManager implements SessionManager {
   
   /// Send current session metrics to watch for display
   void _updateWatchWithSessionData(LocationTrackingState state) {
-    if (_activeSessionId == null || _isPaused) return;
+    if (_activeSessionId == null) return; // Allow updates when paused to show pause state
     
     try {
-      // Calculate session duration
+      // Calculate session duration from start time
       final duration = _sessionStartTime != null 
           ? DateTime.now().difference(_sessionStartTime!)
           : Duration.zero;
@@ -635,12 +666,43 @@ class LocationTrackingManager implements SessionManager {
       final hoursElapsed = duration.inMinutes / 60.0;
       final estimatedCalories = (hoursElapsed * 400).round(); // 400 cal/hour average
       
-      // Use current altitude as basic elevation data
-      final elevationGain = state.altitude > 0 ? state.altitude : 0.0;
-      final elevationLoss = 0.0; // TODO: Calculate from terrain segments
+      // Use current altitude for elevation (TODO: implement proper elevation gain/loss tracking)
+      double elevationGain = 0.0;
+      double elevationLoss = 0.0;
       
-      // Send to watch
-      _watchService.updateSessionOnWatch(
+      // TODO: Implement proper elevation gain/loss calculation
+      // TerrainSegment doesn't track elevation changes, only surface types
+      // For now, we'll use a basic approach with location points
+      
+      // Get user's metric preference
+      _sendWatchUpdateWithUserPreferences(
+        state: state,
+        duration: duration,
+        estimatedCalories: estimatedCalories,
+        elevationGain: elevationGain,
+        elevationLoss: elevationLoss,
+      );
+      
+    } catch (e) {
+      AppLogger.error('[LOCATION_MANAGER] Error updating watch with session data: $e');
+    }
+  }
+
+  /// Send watch update with user's metric preferences
+  Future<void> _sendWatchUpdateWithUserPreferences({
+    required LocationTrackingState state,
+    required Duration duration,
+    required int estimatedCalories,
+    required double elevationGain,
+    required double elevationLoss,
+  }) async {
+    try {
+      // Get user's metric preference
+      final user = await _authService.getCurrentUser();
+      final isMetric = user?.preferMetric ?? true; // Default to metric
+      
+      // Send to watch with user's preference
+      await _watchService.updateSessionOnWatch(
         distance: state.totalDistance,
         duration: duration,
         pace: state.currentPace,
@@ -648,13 +710,30 @@ class LocationTrackingManager implements SessionManager {
         calories: estimatedCalories.toDouble(),
         elevationGain: elevationGain,
         elevationLoss: elevationLoss,
-        isMetric: true, // TODO: Get from user preferences
+        isMetric: isMetric,
       );
       
-      AppLogger.debug('[LOCATION_MANAGER] WATCH_UPDATE: Sent session data to watch - Distance: ${state.totalDistance.toStringAsFixed(2)}km, Duration: ${duration.inMinutes}min, Pace: ${state.currentPace.toStringAsFixed(2)}min/km');
+      AppLogger.debug('[LOCATION_MANAGER] WATCH_UPDATE: Sent session data to watch - Distance: ${state.totalDistance.toStringAsFixed(2)}km, Duration: ${duration.inMinutes}min, Pace: ${state.currentPace.toStringAsFixed(2)}min/km, Metric: $isMetric');
       
     } catch (e) {
-      AppLogger.error('[LOCATION_MANAGER] Error updating watch with session data: $e');
+      AppLogger.error('[LOCATION_MANAGER] Error sending watch update with user preferences: $e');
+      
+      // Fallback: send without user preference (defaults to metric)
+      try {
+        await _watchService.updateSessionOnWatch(
+          distance: state.totalDistance,
+          duration: duration,
+          pace: state.currentPace,
+          isPaused: _isPaused,
+          calories: estimatedCalories.toDouble(),
+          elevationGain: elevationGain,
+          elevationLoss: elevationLoss,
+          isMetric: true, // Fallback to metric
+        );
+        AppLogger.debug('[LOCATION_MANAGER] WATCH_UPDATE: Sent fallback session data to watch (metric)');
+      } catch (fallbackError) {
+        AppLogger.error('[LOCATION_MANAGER] Fallback watch update also failed: $fallbackError');
+      }
     }
   }
 

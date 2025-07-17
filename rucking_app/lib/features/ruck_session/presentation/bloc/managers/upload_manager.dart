@@ -51,6 +51,8 @@ class UploadManager implements SessionManager {
       await _onSessionStopped(event);
     } else if (event is BatchLocationUpdated) {
       await _onBatchLocationUpdated(event);
+    } else if (event is MemoryPressureDetected) {
+      await _onMemoryPressureDetected(event);
     }
   }
 
@@ -104,6 +106,19 @@ class UploadManager implements SessionManager {
     ));
     
     AppLogger.debug('[UPLOAD_MANAGER] Added location batch to queue. Pending: ${_uploadQueue.length}');
+  }
+  
+  /// Handle memory pressure detection by triggering aggressive upload
+  Future<void> _onMemoryPressureDetected(MemoryPressureDetected event) async {
+    AppLogger.error('[UPLOAD_MANAGER] MEMORY_PRESSURE: ${event.memoryUsageMb}MB detected, triggering aggressive upload');
+    
+    // Trigger immediate upload of all pending data
+    await _processUploadQueue();
+    
+    // Trigger aggressive offline data processing
+    await _loadOfflineData();
+    
+    AppLogger.info('[UPLOAD_MANAGER] MEMORY_PRESSURE: Aggressive upload completed');
   }
 
   void _startUploadTimer() {

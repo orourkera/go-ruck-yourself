@@ -255,6 +255,54 @@ class LocationServiceImpl implements LocationService {
   Stream<LocationPoint> startLocationTracking() {
     
     AppLogger.info('Starting location tracking with enhanced Android protection...');
+    
+    // Check permissions before starting tracking to prevent kCLErrorDomain error 1
+    _checkPermissionsAndStartTracking();
+    
+    return _locationController.stream;
+  }
+  
+  /// Checks permissions and starts tracking, handling permission errors gracefully
+  Future<void> _checkPermissionsAndStartTracking() async {
+    try {
+      // Check if we have location permissions
+      final hasPermission = await hasLocationPermission();
+      if (!hasPermission) {
+        AppLogger.warning('Location permission not granted - cannot start tracking');
+        
+        // Emit a user-friendly error to the stream
+        _locationController.addError(
+          PositionUpdateException(
+            'Location permission required. Please enable location services in Settings.'
+          )
+        );
+        return;
+      }
+      
+      // Check if location services are enabled
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        AppLogger.warning('Location services disabled - cannot start tracking');
+        
+        // Emit a user-friendly error to the stream
+        _locationController.addError(
+          PositionUpdateException(
+            'Location services are disabled. Please enable location services in Settings.'
+          )
+        );
+        return;
+      }
+      
+      AppLogger.info('Location permissions verified - starting position stream');
+      _startLocationStream();
+    } catch (e) {
+      AppLogger.error('Error checking permissions before starting location tracking', exception: e);
+      _locationController.addError(e);
+    }
+  }
+  
+  /// Starts the actual location stream after permissions are verified
+  void _startLocationStream() {
     _isTracking = true;
     _lastLocationUpdate = DateTime.now();
     
@@ -373,9 +421,12 @@ class LocationServiceImpl implements LocationService {
           Timer(const Duration(seconds: 30), () async {
             if (!_isTracking) {
               final hasPermission = await hasLocationPermission();
-              if (hasPermission) {
+              final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+              if (hasPermission && serviceEnabled) {
                 AppLogger.info('Permission restored – resuming location tracking');
-                startLocationTracking();
+                _checkPermissionsAndStartTracking();
+              } else {
+                AppLogger.info('Permission/service still not available after retry');
               }
             }
           });
@@ -452,8 +503,6 @@ class LocationServiceImpl implements LocationService {
     _batchTimer = Timer.periodic(Duration(seconds: _currentConfig.batchInterval), (timer) {
       _sendBatchUpdate();
     });
-    
-    return _locationController.stream;
   }
   
   /// Start monitoring for stale location updates and restart if needed

@@ -98,6 +98,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     on<SessionReset>(_onSessionReset);
     on<BatchLocationUpdated>(_onBatchLocationUpdated);
     on<StateAggregationRequested>(_onStateAggregationRequested);
+    on<MemoryPressureDetected>(_onMemoryPressureDetected);
     
     AppLogger.info('[COORDINATOR] ActiveSessionCoordinator initialized');
   }
@@ -119,6 +120,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       terrainTracker: _terrainTracker,
       apiClient: _apiClient,
       watchService: _watchService,
+      authService: _authService,
     );
     
     // Initialize heart rate manager
@@ -143,6 +145,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Initialize memory manager
     _memoryManager = MemoryManager(
       storageService: _storageService,
+    );
+    
+    // Initialize memory pressure manager
+    _memoryPressureManager = MemoryPressureManager(
+      locationService: _locationService,
     );
     
     // Subscribe to lifecycle manager state changes
@@ -625,6 +632,31 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     emit(_currentAggregatedState);
   }
   
+  /// Handle memory pressure detection
+  Future<void> _onMemoryPressureDetected(
+    MemoryPressureDetected event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.warning('[COORDINATOR] Memory pressure detected');
+    
+    // Create manager event with memory usage information
+    final managerEvent = manager_events.MemoryPressureDetected(
+      memoryUsageMb: 0.0, // TODO: Get actual memory usage
+      timestamp: DateTime.now(),
+    );
+    
+    // Delegate to memory pressure manager if available
+    await _memoryPressureManager.handleEvent(managerEvent);
+    
+    // Trigger aggressive memory management in all managers
+    await _locationManager.handleEvent(managerEvent);
+    await _heartRateManager.handleEvent(managerEvent);
+    await _uploadManager.handleEvent(managerEvent);
+    
+    // Log memory pressure for diagnostics
+    AppLogger.error('[COORDINATOR] MEMORY_PRESSURE: ${managerEvent.memoryUsageMb}MB detected, triggering aggressive cleanup');
+  }
+  
   @override
   Future<void> close() async {
     AppLogger.info('[COORDINATOR] Closing ActiveSessionCoordinator');
@@ -641,6 +673,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     await _photoManager.dispose();
     await _uploadManager.dispose();
     await _memoryManager.dispose();
+    await _memoryPressureManager.dispose();
     
     return super.close();
   }

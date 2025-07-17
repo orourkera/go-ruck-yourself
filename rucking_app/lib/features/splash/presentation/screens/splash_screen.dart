@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/first_launch_service.dart';
@@ -205,6 +207,17 @@ class _SplashScreenState extends State<SplashScreen> {
     debugPrint('[Splash] Attempting to load image: $currentPath (attempt ${currentIndex + 1}/${imagePaths.length})');
     
     try {
+      // Special handling for GIF files to prevent native crashes
+      if (currentPath.endsWith('.gif')) {
+        // Skip GIF loading on devices where it's unsafe
+        if (_shouldAvoidGifLoading()) {
+          debugPrint('[Splash] Skipping GIF loading for safety, trying next fallback');
+          return _tryLoadImage(imagePaths, currentIndex + 1);
+        }
+        
+        return _buildSafeGifImage(currentPath, imagePaths, currentIndex);
+      }
+      
       return Image.asset(
         currentPath,
         width: 200,
@@ -227,6 +240,58 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
   
+  /// Checks if we should avoid GIF loading on this device to prevent crashes
+  bool _shouldAvoidGifLoading() {
+    // Always avoid GIF in release mode on Android to prevent native crashes
+    if (!kDebugMode && Platform.isAndroid) {
+      debugPrint('[Splash] Avoiding GIF loading on Android release build');
+      return true;
+    }
+    
+    // Additional safety checks can be added here
+    // (e.g., device model, available memory, etc.)
+    
+    return false;
+  }
+
+  /// Builds a GIF image with safer memory management to prevent native crashes
+  Widget _buildSafeGifImage(String gifPath, List<String> imagePaths, int currentIndex) {
+    debugPrint('[Splash] Attempting to load GIF with safe memory management: $gifPath');
+    
+    try {
+      // Use a Container to limit memory usage and add disposal handling
+      return Container(
+        width: 200,
+        height: 200,
+        child: Image.asset(
+          gifPath,
+          width: 200,
+          height: 200,
+          fit: BoxFit.contain,
+          // Add memory management
+          gaplessPlayback: false, // Disable gapless playback to reduce memory usage
+          errorBuilder: (context, error, stackTrace) {
+            debugPrint('[Splash] GIF load failed: $error');
+            
+            // Log GIF-specific crash context
+            _logSplashCrashContext(gifPath, error, stackTrace ?? StackTrace.current, currentIndex);
+            
+            // Skip GIF and try next fallback immediately
+            return _tryLoadImage(imagePaths, currentIndex + 1);
+          },
+        ),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[Splash] Critical GIF error: $e');
+      
+      // Log comprehensive crash context for GIF
+      _logSplashCrashContext(gifPath, e, stackTrace, currentIndex);
+      
+      // Skip GIF and try next fallback
+      return _tryLoadImage(imagePaths, currentIndex + 1);
+    }
+  }
+
   /// Logs detailed context for splash screen crashes to help with debugging
   void _logSplashCrashContext(String imagePath, dynamic error, StackTrace stackTrace, int attemptIndex) {
     try {

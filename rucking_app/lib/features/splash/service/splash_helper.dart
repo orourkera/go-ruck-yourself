@@ -32,19 +32,20 @@ class SplashHelper {
   
   /// Returns the appropriate splash image path with fallback options
   /// Provides multiple fallback assets to prevent crashes
+  /// Prioritizes static images over GIF to prevent native crashes
   static String getSplashImagePath(bool isLadyMode) {
-    // Primary: Try GIF first for animated splash
-    if (_assetExists('assets/images/splash.gif')) {
-      return 'assets/images/splash.gif';
-    }
-    
-    // Fallback 1: App icon PNG
+    // Primary: Try static PNG first for stability
     if (_assetExists('assets/images/app_icon.png')) {
       return 'assets/images/app_icon.png';
     }
     
-    // Fallback 2: Generic launcher icon
-    return 'assets/launcher/icon.png';
+    // Fallback 1: Generic launcher icon
+    if (_assetExists('assets/launcher/icon.png')) {
+      return 'assets/launcher/icon.png';
+    }
+    
+    // Fallback 2: GIF (last resort due to crash risk)
+    return 'assets/images/splash.gif';
   }
   
   /// Checks if an asset exists in the bundle
@@ -60,11 +61,12 @@ class SplashHelper {
   }
   
   /// Gets a list of fallback image paths in order of preference
+  /// Prioritizes static images over GIF to prevent native crashes
   static List<String> getFallbackImagePaths() {
     return [
-      'assets/images/splash.gif',
-      'assets/images/app_icon.png',
-      'assets/launcher/icon.png',
+      'assets/images/app_icon.png',      // Static PNG - safer
+      'assets/launcher/icon.png',        // Static PNG - safer
+      'assets/images/splash.gif',        // GIF - higher crash risk, use as last resort
     ];
   }
   

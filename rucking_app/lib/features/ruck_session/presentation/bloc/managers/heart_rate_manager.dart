@@ -70,6 +70,8 @@ class HeartRateManager implements SessionManager {
       await _onSessionResumed(event);
     } else if (event is HeartRateUpdated) {
       await _onHeartRateUpdated(event);
+    } else if (event is MemoryPressureDetected) {
+      await _onMemoryPressureDetected(event);
     }
   }
 
@@ -128,6 +130,22 @@ class HeartRateManager implements SessionManager {
 
   Future<void> _onSessionResumed(SessionResumed event) async {
     AppLogger.info('[HEART_RATE_MANAGER] Session resumed');
+  }
+  
+  /// Handle memory pressure detection by triggering aggressive cleanup
+  Future<void> _onMemoryPressureDetected(MemoryPressureDetected event) async {
+    AppLogger.error('[HEART_RATE_MANAGER] MEMORY_PRESSURE: ${event.memoryUsageMb}MB detected, triggering aggressive cleanup');
+    
+    // Trigger aggressive memory cleanup
+    _manageHeartRateMemoryPressure();
+    
+    // Force upload of pending data
+    _triggerHeartRateUploadIfNeeded();
+    
+    // Trigger garbage collection
+    _triggerGarbageCollection();
+    
+    AppLogger.info('[HEART_RATE_MANAGER] MEMORY_PRESSURE: Aggressive cleanup completed');
   }
 
   Future<void> _onHeartRateUpdated(HeartRateUpdated event) async {
