@@ -266,12 +266,12 @@ from .api.duel_comments import DuelCommentsResource
 from .api.device_tokens import DeviceTokenResource
 from .api.test_notification import TestNotificationResource
 
-# Apply rate limiting to SignInResource
-rate_limit_resource(SignInResource, "5 per minute")
-
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
 app.logger.info("Setting RefreshTokenResource rate limit to: 30 per minute")
 rate_limit_resource(RefreshTokenResource, "30 per minute")
+
+# Note: Removed overly restrictive SignInResource rate limit (was 5 per minute)
+# SignInResource now uses default limits: 10000 per day, 2000 per hour
 
 # Apply higher rate limit to UserProfileResource for normal profile operations
 app.logger.info("Setting UserProfileResource rate limit to: 1000 per hour")
