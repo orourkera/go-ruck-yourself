@@ -118,6 +118,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       splitTrackingService: _splitTrackingService,
       terrainTracker: _terrainTracker,
       apiClient: _apiClient,
+      watchService: _watchService,
     );
     
     // Initialize heart rate manager

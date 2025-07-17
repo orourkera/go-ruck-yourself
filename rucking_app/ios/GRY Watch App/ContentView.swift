@@ -27,7 +27,7 @@ struct ContentView: View {
             } else {
                 VStack(spacing: 10) {
                     HStack {
-                        Text("GRY")
+                        Text("Ruck")
                             .font(.system(size: 26, weight: .regular))
                             .foregroundColor(.green)
                             .fixedSize(horizontal: true, vertical: false) // Prevent text truncation
