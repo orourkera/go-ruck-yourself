@@ -29,11 +29,20 @@ class ProfileRepositoryImpl implements ProfileRepository {
     try {
       final response = await apiClient.get('/users/$userId/followers?page=$page');
       print('Followers API response: $response');
-      final followers = response['followers'] as List?;
+      
+      // Handle the wrapped response structure
+      final data = response['data'] as Map<String, dynamic>?;
+      if (data == null) {
+        print('Data is null, returning empty list');
+        return [];
+      }
+      
+      final followers = data['followers'] as List?;
       if (followers == null) {
         print('Followers is null, returning empty list');
         return [];
       }
+      
       print('Followers data: $followers');
       return followers.map((e) {
         print('Processing follower: $e');
@@ -50,11 +59,20 @@ class ProfileRepositoryImpl implements ProfileRepository {
     try {
       final response = await apiClient.get('/users/$userId/following?page=$page');
       print('Following API response: $response');
-      final following = response['following'] as List?;
+      
+      // Handle the wrapped response structure
+      final data = response['data'] as Map<String, dynamic>?;
+      if (data == null) {
+        print('Data is null, returning empty list');
+        return [];
+      }
+      
+      final following = data['following'] as List?;
       if (following == null) {
         print('Following is null, returning empty list');
         return [];
       }
+      
       print('Following data: $following');
       return following.map((e) {
         print('Processing following: $e');
