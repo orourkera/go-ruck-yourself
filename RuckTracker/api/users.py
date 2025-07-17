@@ -7,7 +7,7 @@ users_bp = Blueprint('users', __name__)
 @users_bp.route('/<uuid:user_id>/profile', methods=['GET'])
 def get_public_profile(user_id):
     try:
-        current_user_id = g.current_user['id'] if 'current_user' in g else None
+        current_user_id = g.user.id if hasattr(g, 'user') and g.user else None
         # Fetch basic profile fields. Some older databases may not yet have avatar_url or is_profile_private columns
         try:
             user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, prefer_metric, is_profile_private, gender').eq('id', user_id).single().execute()
@@ -179,7 +179,7 @@ def get_public_profile(user_id):
 @users_bp.route('/<uuid:user_id>/followers', methods=['GET'])
 def get_followers(user_id):
     try:
-        current_user_id = g.current_user['id'] if 'current_user' in g else None
+        current_user_id = g.user.id if hasattr(g, 'user') and g.user else None
         page = int(request.args.get('page', 1))
         per_page = 20
         offset = (page - 1) * per_page
@@ -205,7 +205,7 @@ def get_followers(user_id):
 @users_bp.route('/<uuid:user_id>/following', methods=['GET'])
 def get_following(user_id):
     try:
-        current_user_id = g.current_user['id'] if 'current_user' in g else None
+        current_user_id = g.user.id if hasattr(g, 'user') and g.user else None
         page = int(request.args.get('page', 1))
         per_page = 20
         offset = (page - 1) * per_page
@@ -231,7 +231,7 @@ def get_following(user_id):
 @users_bp.route('/<uuid:user_id>/follow', methods=['POST'])
 def follow_user(user_id):
     try:
-        current_user_id = g.current_user['id']
+        current_user_id = g.user.id
         
         # Check if user is trying to follow themselves
         if current_user_id == user_id:
@@ -291,7 +291,7 @@ def follow_user(user_id):
 @users_bp.route('/<uuid:user_id>/follow', methods=['DELETE'])
 def unfollow_user(user_id):
     try:
-        current_user_id = g.current_user['id']
+        current_user_id = g.user.id
         delete_res = get_supabase_client().table('user_follows').delete().eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
         count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', user_id).execute()
         followers_count = count_res.data[0]['count'] if count_res.data else 0
@@ -302,7 +302,7 @@ def unfollow_user(user_id):
 @users_bp.route('/social/following-feed', methods=['GET'])
 def get_following_feed():
     try:
-        current_user_id = g.current_user['id']
+        current_user_id = g.user.id
         page = int(request.args.get('page', 1))
         per_page = 20
         offset = (page - 1) * per_page
@@ -328,7 +328,7 @@ def update_privacy():
         if not isinstance(is_private, bool):
             return api_error('isPrivateProfile must be boolean', status_code=400)
 
-        current_user_id = g.current_user['id']
+        current_user_id = g.user.id
 
         # Try to update the correct column name first. If that fails because the
         # column does not exist (older DB), fall back to the legacy name.

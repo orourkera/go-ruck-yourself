@@ -30,8 +30,8 @@ class ProfileStatsGrid extends StatelessWidget {
       children: [
         _buildStatCard(context, 'Total Rucks', stats.totalRucks.toString()),
         _buildStatCard(context, 'Distance ($distanceUnit)', distanceValue.toStringAsFixed(1)),
-        _buildStatCard(context, 'Followers', stats.followersCount.toString(), onTap: onFollowersPressed),
-        _buildStatCard(context, 'Following', stats.followingCount.toString(), onTap: onFollowingPressed),
+        _buildStatCard(context, 'Total Calories', stats.totalCaloriesBurned.toStringAsFixed(0)),
+        _buildStatCard(context, 'Total Elevation', '${stats.totalElevationGainM.toStringAsFixed(0)} m'),
         // Add more stats as needed
       ],
     );

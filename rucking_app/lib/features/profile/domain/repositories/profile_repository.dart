@@ -31,4 +31,10 @@ abstract class ProfileRepository {
   /// Current user unfollows the target user. Returns `true` if the request
   /// succeeded on the backend.
   Future<bool> unfollowUser(String userId);
+
+  /// Returns a list of recent ruck sessions for the given user.
+  Future<List<dynamic>> getRecentRucks(String userId);
+
+  /// Returns a list of clubs that the given user belongs to.
+  Future<List<dynamic>> getUserClubs(String userId);
 }

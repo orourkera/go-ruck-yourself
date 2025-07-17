@@ -3,8 +3,6 @@ import 'package:equatable/equatable.dart';
 import 'package:rucking_app/features/profile/domain/repositories/profile_repository.dart';
 import 'package:rucking_app/features/profile/domain/entities/user_profile.dart';
 import 'package:rucking_app/features/profile/domain/entities/user_profile_stats.dart';
-import 'package:rucking_app/features/clubs/domain/models/club.dart';
-import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 
 part 'public_profile_event.dart';
 part 'public_profile_state.dart';
@@ -22,9 +20,11 @@ class PublicProfileBloc extends Bloc<PublicProfileEvent, PublicProfileState> {
     try {
       final profile = await repository.getPublicProfile(event.userId);
       final stats = profile.isPrivateProfile ? null : await repository.getProfileStats(event.userId);
-      // Assuming methods to fetch clubs and rucks
-      final clubs = profile.isPrivateProfile ? null : <Club>[];  // Implement fetch
-      final recentRucks = profile.isPrivateProfile ? null : <RuckSession>[];  // Implement fetch
+      
+      // Fetch clubs and recent rucks if profile is not private
+      final clubs = profile.isPrivateProfile ? null : await repository.getUserClubs(event.userId);
+      final recentRucks = profile.isPrivateProfile ? null : await repository.getRecentRucks(event.userId);
+      
       emit(PublicProfileLoaded(
         profile: profile,
         stats: stats ?? UserProfileStats.empty(),

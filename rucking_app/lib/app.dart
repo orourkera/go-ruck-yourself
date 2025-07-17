@@ -492,7 +492,10 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           final path = settings.name ?? '';
                           final parts = path.split('/');
                           final userId = parts.length > 2 ? parts[2] : '';
-                          return MaterialPageRoute(builder: (_) => FollowersScreen(userId: userId, title: 'Followers', isFollowersPage: true));
+                          return MaterialPageRoute(builder: (_) => BlocProvider<SocialListBloc>(
+                            create: (_) => getIt<SocialListBloc>(),
+                            child: FollowersScreen(userId: userId, title: 'Followers', isFollowersPage: true),
+                          ));
                         }
                         break;
                       case '/following':
@@ -500,7 +503,10 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           final path = settings.name ?? '';
                           final parts = path.split('/');
                           final userId = parts.length > 2 ? parts[2] : '';
-                          return MaterialPageRoute(builder: (_) => FollowersScreen(userId: userId, title: 'Following', isFollowersPage: false));
+                          return MaterialPageRoute(builder: (_) => BlocProvider<SocialListBloc>(
+                            create: (_) => getIt<SocialListBloc>(),
+                            child: FollowersScreen(userId: userId, title: 'Following', isFollowersPage: false),
+                          ));
                         }
                         break;
                       case '/notification_settings':

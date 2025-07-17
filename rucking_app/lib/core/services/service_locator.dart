@@ -58,6 +58,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:rucking_app/features/profile/domain/repositories/profile_repository.dart';
 import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
+import 'package:rucking_app/features/profile/presentation/bloc/social_list_bloc.dart';
 
 // Global service locator instance
 final GetIt getIt = GetIt.instance;
@@ -259,6 +260,9 @@ Future<void> setupServiceLocator() async {
 
   // Public profile bloc
   getIt.registerFactory<PublicProfileBloc>(() => PublicProfileBloc(getIt<ProfileRepository>()));
+  
+  // Social list bloc for followers/following
+  getIt.registerFactory<SocialListBloc>(() => SocialListBloc(getIt<ProfileRepository>()));
 
   // Initialize Ruck Buddies feature
   initRuckBuddiesFeature(getIt);

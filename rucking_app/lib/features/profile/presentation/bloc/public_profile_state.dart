@@ -15,8 +15,8 @@ class PublicProfileLoaded extends PublicProfileState {
   final UserProfile profile;
   final UserProfileStats stats;
   final bool isFollowing;
-  final List<Club>? clubs;
-  final List<RuckSession>? recentRucks;
+  final List<dynamic>? clubs;
+  final List<dynamic>? recentRucks;
 
   const PublicProfileLoaded({
     required this.profile,

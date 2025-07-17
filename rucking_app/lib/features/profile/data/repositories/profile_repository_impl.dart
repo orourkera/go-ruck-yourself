@@ -47,4 +47,20 @@ class ProfileRepositoryImpl implements ProfileRepository {
     final response = await apiClient.delete('/users/$userId/follow');
     return response['success'] ?? false;
   }
+
+  @override
+  Future<List<dynamic>> getRecentRucks(String userId) async {
+    final response = await apiClient.get('/users/$userId/profile');
+    final wrapper = response as Map<String, dynamic>;
+    final data = wrapper['data'] ?? wrapper;
+    return (data['recentRucks'] as List?) ?? [];
+  }
+
+  @override
+  Future<List<dynamic>> getUserClubs(String userId) async {
+    final response = await apiClient.get('/users/$userId/profile');
+    final wrapper = response as Map<String, dynamic>;
+    final data = wrapper['data'] ?? wrapper;
+    return (data['clubs'] as List?) ?? [];
+  }
 } 
