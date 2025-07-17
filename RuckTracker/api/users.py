@@ -10,26 +10,26 @@ def get_public_profile(user_id):
         current_user_id = g.user.id if hasattr(g, 'user') and g.user else None
         # Fetch basic profile fields. Some older databases may not yet have avatar_url or is_profile_private columns
         try:
-            user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, prefer_metric, is_profile_private, gender').eq('id', user_id).single().execute()
+            user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, prefer_metric, is_profile_private, gender').eq('id', str(user_id)).single().execute()
         except Exception as fetch_err:
             # If the requested columns do not exist (e.g. column does not exist error), retry with a reduced column list
             err_msg = str(fetch_err)
             if '42703' in err_msg or 'column' in err_msg and ('avatar_url' in err_msg or 'is_profile_private' in err_msg):
-                user_res = get_supabase_client().table('user').select('id, username, created_at').eq('id', user_id).single().execute()
+                user_res = get_supabase_client().table('user').select('id, username, created_at').eq('id', str(user_id)).single().execute()
             else:
                 raise
 
         if not user_res.data:
             return api_error('User not found', status_code=404)
         user = user_res.data
-        is_own_profile = current_user_id == user_id
+        is_own_profile = str(current_user_id) == str(user_id)
         is_private = user.get('is_profile_private', False) and not is_own_profile
         is_following = False
         is_followed_by = False
         if current_user_id:
-            follow_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', user_id).execute()
+            follow_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
             is_following = bool(follow_res.data)
-            followed_by_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', user_id).eq('followed_id', current_user_id).execute()
+            followed_by_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', str(user_id)).eq('followed_id', str(current_user_id)).execute()
             is_followed_by = bool(followed_by_res.data)
         response = {
             'user': {
@@ -55,7 +55,7 @@ def get_public_profile(user_id):
                     get_supabase_client()
                     .table('user_follows')
                     .select('id')
-                    .eq('followed_id', user_id)
+                    .eq('followed_id', str(user_id))
                     .execute()
                 )
                 followers_count = len(followers_count_res.data or [])
@@ -63,7 +63,7 @@ def get_public_profile(user_id):
                     get_supabase_client()
                     .table('user_follows')
                     .select('id')
-                    .eq('follower_id', user_id)
+                    .eq('follower_id', str(user_id))
                     .execute()
                 )
                 following_count = len(following_count_res.data or [])
@@ -78,7 +78,7 @@ def get_public_profile(user_id):
                     get_supabase_client()
                     .table('ruck_session')
                     .select('distance_km, duration_seconds, calories_burned, elevation_gain_m, power_points')
-                    .eq('user_id', user_id)
+                    .eq('user_id', str(user_id))
                     .eq('status', 'completed')
                     .execute()
                 )
@@ -100,7 +100,7 @@ def get_public_profile(user_id):
                         get_supabase_client()
                         .table('user_duel_stats')
                         .select('duels_won, duels_lost')
-                        .eq('user_id', user_id)
+                        .eq('user_id', str(user_id))
                         .execute()
                     )
                     if duel_stats_res.data:
@@ -150,7 +150,7 @@ def get_public_profile(user_id):
             # known to cause "could not find relationship" (PGRST200) errors.
             try:
                 admin_client = get_supabase_client()
-                clubs_res = admin_client.from_('club_memberships').select('clubs(*)').eq('user_id', user_id).execute()
+                clubs_res = admin_client.from_('club_memberships').select('clubs(*)').eq('user_id', str(user_id)).execute()
                 response['clubs'] = [row['clubs'] for row in clubs_res.data] if clubs_res.data else []
                 # Add clubsCount into stats dict
                 response['stats']['clubsCount'] = len(response['clubs'])
@@ -164,14 +164,15 @@ def get_public_profile(user_id):
                     get_supabase_client()
                     .table('ruck_session')
                     .select('*')
-                    .eq('user_id', user_id)
+                    .eq('user_id', str(user_id))
                     .eq('status', 'completed')
                     .order('end_time', desc=True)
                     .limit(5)
                     .execute()
                 )
                 response['recentRucks'] = rucks_res.data or []
-            except Exception:
+            except Exception as e:
+                print(f"[ERROR] Failed to fetch recent rucks for user {user_id}: {e}")
                 response['recentRucks'] = []
         return api_response(response)
     except Exception as e:
