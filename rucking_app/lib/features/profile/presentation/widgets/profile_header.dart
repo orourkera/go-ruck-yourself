@@ -21,13 +21,18 @@ class ProfileHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
-            radius: 50,
-            backgroundImage: profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
+          Center(
+            child: CircleAvatar(
+              radius: 50,
+              backgroundImage: profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
+            ),
           ),
           SizedBox(height: 8),
-          Text(profile.username, style: Theme.of(context).textTheme.headlineMedium),
+          Center(
+            child: Text(profile.username, style: Theme.of(context).textTheme.headlineMedium),
+          ),
           if (profile.isPrivateProfile && !isOwnProfile)
             Text('This profile is private', style: TextStyle(color: Colors.grey)),
           if (!isOwnProfile) ...[

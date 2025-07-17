@@ -33,6 +33,9 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_viewer.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/profile/presentation/screens/public_profile_screen.dart';
+import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
+import 'package:rucking_app/core/services/service_locator.dart';
 
 
 class RuckBuddyDetailScreen extends StatefulWidget {
@@ -669,32 +672,66 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
-                      // Gender-appropriate avatar
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
+                      // Gender-appropriate avatar - tappable to view public profile
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => BlocProvider(
+                                create: (context) => getIt<PublicProfileBloc>(),
+                                child: PublicProfileScreen(
+                                  userId: displayBuddy.user.id,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                         child: Container(
                           width: 60,
                           height: 60,
-                          padding: const EdgeInsets.all(4),
-                          child: displayBuddy.user?.photoUrl != null && displayBuddy.user!.photoUrl!.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: displayBuddy.user!.photoUrl!,
-                                cacheManager: ImageCacheManager.instance,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                                errorWidget: (context, url, error) => Image.asset(
-                                  displayBuddy.user?.gender?.toLowerCase() == 'female' 
-                                    ? 'assets/images/lady rucker profile.png'
-                                    : 'assets/images/profile.png',
-                                  fit: BoxFit.contain,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.grey[300]!,
+                              width: 2,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 28,
+                            backgroundColor: Colors.grey[200],
+                            child: displayBuddy.user?.photoUrl != null && displayBuddy.user!.photoUrl!.isNotEmpty
+                              ? ClipOval(
+                                  child: CachedNetworkImage(
+                                    imageUrl: displayBuddy.user!.photoUrl!,
+                                    cacheManager: ImageCacheManager.instance,
+                                    fit: BoxFit.cover,
+                                    width: 56,
+                                    height: 56,
+                                    placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                                    errorWidget: (context, url, error) => ClipOval(
+                                      child: Image.asset(
+                                        displayBuddy.user?.gender?.toLowerCase() == 'female' 
+                                          ? 'assets/images/lady rucker profile.png'
+                                          : 'assets/images/profile.png',
+                                        fit: BoxFit.cover,
+                                        width: 56,
+                                        height: 56,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : ClipOval(
+                                  child: Image.asset(
+                                    displayBuddy.user?.gender?.toLowerCase() == 'female' 
+                                      ? 'assets/images/lady rucker profile.png'
+                                      : 'assets/images/profile.png',
+                                    fit: BoxFit.cover,
+                                    width: 56,
+                                    height: 56,
+                                  ),
                                 ),
-                              )
-                            : Image.asset(
-                                displayBuddy.user?.gender?.toLowerCase() == 'female' 
-                                  ? 'assets/images/lady rucker profile.png'
-                                  : 'assets/images/profile.png',
-                                fit: BoxFit.contain,
-                              ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),

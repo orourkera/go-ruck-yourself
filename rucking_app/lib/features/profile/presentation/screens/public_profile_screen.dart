@@ -8,6 +8,8 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/widgets/user_avatar.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/features/profile/presentation/widgets/profile_skeleton.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   final String userId;
@@ -39,7 +41,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
       appBar: AppBar(title: Text('Profile')),
       body: BlocBuilder<PublicProfileBloc, PublicProfileState>(
         builder: (context, state) {
-          if (state is PublicProfileLoading) return Center(child: CircularProgressIndicator());
+          if (state is PublicProfileLoading) return ProfileSkeleton();
           if (state is PublicProfileError) return Center(child: Text(state.message));
           if (state is PublicProfileLoaded) {
             return SingleChildScrollView(
@@ -109,7 +111,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                           minimumSize: const Size(double.infinity, 44),
                         ),
                         child: Text(
-                          state.isFollowing ? 'Following' : 'Follow',
+                          state.isFollowing ? 'Unfollow' : 'Follow',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -122,6 +124,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                           bool preferMetric = true; // Default to metric
                           if (authState is Authenticated) {
                             preferMetric = authState.user.preferMetric;
+                            print('DEBUG: User preferMetric = $preferMetric');
+                          } else {
+                            print('DEBUG: User not authenticated, defaulting to metric');
                           }
                           return ProfileStatsGrid(
                             stats: state.stats ?? UserProfileStats.empty(),
@@ -188,15 +193,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
   Widget _buildStatsTab(UserProfileStats? stats) {
     if (stats == null) return Center(child: Text('No stats available'));
     
+    // Get current user's metric preference from AuthBloc
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    print('DEBUG: _buildStatsTab preferMetric = $preferMetric');
+    
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           _buildStatRow('Total Rucks', stats.totalRucks.toString()),
-          _buildStatRow('Total Distance', '${stats.totalDistanceKm.toStringAsFixed(1)} km'),
-          _buildStatRow('Total Duration', '${(stats.totalDurationSeconds / 3600).toStringAsFixed(1)} hours'),
-          _buildStatRow('Calories Burned', stats.totalCaloriesBurned.toStringAsFixed(0)),
-          _buildStatRow('Elevation Gain', '${stats.totalElevationGainM.toStringAsFixed(0)} m'),
+          _buildStatRow('Total Distance', MeasurementUtils.formatDistance(stats.totalDistanceKm, metric: preferMetric)),
+          _buildStatRow('Total Duration', MeasurementUtils.formatDuration(Duration(seconds: stats.totalDurationSeconds))),
+          _buildStatRow('Calories Burned', MeasurementUtils.formatCalories(stats.totalCaloriesBurned.toInt())),
+          _buildStatRow('Elevation Gain', MeasurementUtils.formatSingleElevation(stats.totalElevationGainM, metric: preferMetric)),
           _buildStatRow('Duels Won', stats.duelsWon.toString()),
           _buildStatRow('Events Completed', stats.eventsCompleted.toString()),
         ],
@@ -354,36 +364,39 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
   }
 
   String _formatDistance(dynamic distance) {
-    if (distance == null) return '0.0 km';
+    if (distance == null) return MeasurementUtils.formatDistance(0.0, metric: true);
     final distanceKm = distance is double ? distance : double.tryParse(distance.toString()) ?? 0.0;
     
-    // TODO: Use user's unit preference when available
-    return '${distanceKm.toStringAsFixed(1)} km';
+    // Get current user's metric preference from AuthBloc
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    print('DEBUG: _formatDistance preferMetric = $preferMetric for distance $distanceKm');
+    
+    return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 
   String _formatDuration(dynamic duration) {
-    if (duration == null) return '0 min';
+    if (duration == null) return MeasurementUtils.formatDuration(Duration.zero);
     final durationSeconds = duration is int ? duration : int.tryParse(duration.toString()) ?? 0;
     
-    final hours = durationSeconds ~/ 3600;
-    final minutes = (durationSeconds % 3600) ~/ 60;
-    
-    if (hours > 0) {
-      return '${hours}h ${minutes}m';
-    } else {
-      return '${minutes}m';
-    }
+    return MeasurementUtils.formatDuration(Duration(seconds: durationSeconds));
   }
 
   String _formatElevation(dynamic elevation) {
-    if (elevation == null) return '0 m';
+    if (elevation == null) return MeasurementUtils.formatSingleElevation(0.0, metric: true);
     final elevationM = elevation is double ? elevation : double.tryParse(elevation.toString()) ?? 0.0;
-    return '${elevationM.toStringAsFixed(0)} m';
+    
+    // Get current user's metric preference from AuthBloc
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    print('DEBUG: _formatElevation preferMetric = $preferMetric for elevation $elevationM');
+    
+    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
   }
 
   String _formatCalories(dynamic calories) {
-    if (calories == null) return '0 cal';
+    if (calories == null) return '${MeasurementUtils.formatCalories(0)} cal';
     final caloriesValue = calories is double ? calories : double.tryParse(calories.toString()) ?? 0.0;
-    return '${caloriesValue.toStringAsFixed(0)} cal';
+    return '${MeasurementUtils.formatCalories(caloriesValue.toInt())} cal';
   }
 } 

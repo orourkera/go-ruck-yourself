@@ -43,7 +43,7 @@ void main() async {
     (options) {
       options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
       options.environment = dotenv.env['SENTRY_ENVIRONMENT'] ?? 'production';
-      options.release = '2.5.5+42';
+      options.release = '2.8.0+65';
       
       // Performance Monitoring
       options.tracesSampleRate = 0.1; // 10% of transactions for performance monitoring
@@ -68,7 +68,7 @@ void main() async {
   Sentry.configureScope((scope) => scope
     ..setTag('platform', 'flutter')
     ..setTag('app', 'rucking_app')
-    ..setTag('version', '2.5.5+42')
+    ..setTag('version', '2.8.0+65')
   );
 }
 

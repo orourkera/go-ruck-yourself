@@ -79,7 +79,9 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
     
     // Check like status on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SocialBloc>().add(CheckUserLikeStatus(widget.ruckId));
+      if (widget.ruckId != null) {
+        context.read<SocialBloc>().add(CheckUserLikeStatus(widget.ruckId!));
+      }
     });
   }
 

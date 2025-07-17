@@ -66,7 +66,7 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       
       // Early return if ruckId is null - cannot process like toggle
       if (ruckId == null) {
-        emit(LikeActionError('Cannot toggle like: Invalid session ID', null));
+        emit(LikeActionError('Cannot toggle like: Invalid session ID', -1));
         return;
       }
       
@@ -105,7 +105,7 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       ));
       
     } catch (e) {
-      emit(LikeActionError('Error updating like status: $e', event.ruckId));
+      emit(LikeActionError('Error updating like status: $e', event.ruckId ?? -1));
     }
   }
 

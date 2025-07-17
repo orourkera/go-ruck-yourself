@@ -106,7 +106,7 @@ if redis_url.startswith('rediss://'):  # Heroku Redis uses rediss:// for SSL
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["2000 per day", "500 per hour"],
+    default_limits=["10000 per day", "2000 per hour"],  # Increased from 500/hour to 2000/hour
     storage_uri=redis_url,
     strategy="fixed-window",
     swallow_errors=True
@@ -348,12 +348,30 @@ def get_user_id():
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.split("Bearer ")[1]
         try:
-            supabase = get_supabase_client(user_jwt=token)
-            user_response = supabase.auth.get_user(token)
-            if user_response and hasattr(user_response, 'user') and user_response.user:
-                return f"user_{user_response.user.id}"
+            # Decode JWT token locally to extract user ID (avoid additional API calls)
+            import base64
+            import json
+            
+            # JWT tokens have 3 parts separated by dots: header.payload.signature
+            # We only need the payload which contains the user ID
+            parts = token.split('.')
+            if len(parts) >= 2:
+                # Add padding if needed for base64 decoding
+                payload = parts[1]
+                payload += '=' * (4 - len(payload) % 4)
+                
+                # Decode the payload
+                decoded_payload = base64.urlsafe_b64decode(payload)
+                payload_data = json.loads(decoded_payload.decode('utf-8'))
+                
+                # Extract user ID from JWT payload
+                user_id = payload_data.get('sub')  # 'sub' is the standard JWT claim for user ID
+                if user_id:
+                    return f"user_{user_id}"
+                    
         except Exception as e:
-            app.logger.error(f"Error determining user ID for rate limiting: {e}")
+            app.logger.error(f"Error decoding JWT for rate limiting: {e}")
+    
     # Fallback to IP address if JWT missing/invalid
     return get_remote_address()
 

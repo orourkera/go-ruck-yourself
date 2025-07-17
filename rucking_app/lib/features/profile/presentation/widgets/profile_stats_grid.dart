@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/profile/domain/entities/user_profile_stats.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
 
 class ProfileStatsGrid extends StatelessWidget {
   final UserProfileStats stats;
@@ -17,38 +18,70 @@ class ProfileStatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Convert distance based on user preference
-    final distanceValue = preferMetric 
-        ? stats.totalDistanceKm 
-        : stats.totalDistanceKm * 0.621371; // Convert km to miles
-    final distanceUnit = preferMetric ? 'km' : 'mi';
-    
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
       children: [
-        _buildStatCard(context, 'Total Rucks', stats.totalRucks.toString()),
-        _buildStatCard(context, 'Distance ($distanceUnit)', distanceValue.toStringAsFixed(1)),
-        _buildStatCard(context, 'Total Calories', stats.totalCaloriesBurned.toStringAsFixed(0)),
-        _buildStatCard(context, 'Total Elevation', '${stats.totalElevationGainM.toStringAsFixed(0)} m'),
-        // Add more stats as needed
+        _buildStatCard(
+          context,
+          icon: Icons.sports_mma,
+          title: 'Total Rucks',
+          value: stats.totalRucks.toString(),
+        ),
+        _buildStatCard(
+          context,
+          icon: Icons.straighten,
+          title: 'Distance',
+          value: MeasurementUtils.formatDistance(stats.totalDistanceKm, metric: preferMetric),
+        ),
+        _buildStatCard(
+          context,
+          icon: Icons.local_fire_department,
+          title: 'Calories',
+          value: MeasurementUtils.formatCalories(stats.totalCaloriesBurned.toInt()),
+        ),
+        _buildStatCard(
+          context,
+          icon: Icons.terrain,
+          title: 'Elevation',
+          value: MeasurementUtils.formatSingleElevation(stats.totalElevationGainM, metric: preferMetric),
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String label, String value, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Card(
+  Widget _buildStatCard(BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(value, style: Theme.of(context).textTheme.headlineMedium),
-            Text(label),
+            Icon(
+              icon,
+              color: Theme.of(context).primaryColor,
+              size: 24,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
     );
   }
-} 
+}

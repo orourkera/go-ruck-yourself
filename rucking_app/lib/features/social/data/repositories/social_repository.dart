@@ -225,12 +225,12 @@ class SocialRepository {
           _likeCacheTimestamps[ruckId] = DateTime.now();
         }
         
-        return success;
+        return;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 404) {
         clearRuckCache(ruckId.toString());
-        return true; // Return true since like already doesn't exist
+        return; // Return since like already doesn't exist
       } else {
         throw ServerException(
             message: 'Failed to remove like: ${response.statusCode} - ${response.body}');

@@ -23,6 +23,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   bool _isLoadingWeekly = true;
   bool _isLoadingMonthly = true;
   bool _isLoadingYearly = true;
+  bool _hasLoadedData = false; // Track if data has been loaded
   
   Map<String, dynamic> _weeklyStats = {};
   Map<String, dynamic> _monthlyStats = {};
@@ -32,7 +33,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _fetchStatistics();
+    // Don't fetch data immediately - use lazy loading when user actually views this tab
   }
   
   @override
