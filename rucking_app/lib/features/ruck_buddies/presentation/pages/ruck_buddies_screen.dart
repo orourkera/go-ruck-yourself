@@ -186,19 +186,33 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                     final isLoadingMore = state.isLoadingMore;
                     
                     if (ruckBuddies.isEmpty) {
-                      return EmptyState(
-                        title: 'No Ruck Buddies Yet',
-                        message: 'Be the first to share your rucks with the community!',
-                        // TODO: Update with actual sharing instructions
-                        action: ElevatedButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Sharing feature coming soon!'))
-                            );
-                          },
-                          child: const Text('Share Your Rucks'),
-                        ),
-                      );
+                      // Show different empty state based on current filter
+                      if (state.filter == 'following') {
+                        return EmptyState(
+                          title: 'No Buddy Rucks Yet',
+                          message: 'Start following other ruckers to see their recent activities here!',
+                          action: ElevatedButton(
+                            onPressed: () {
+                              // Switch to "Closest" filter to discover people to follow
+                              context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent(filter: 'closest'));
+                            },
+                            child: const Text('Discover Ruckers'),
+                          ),
+                        );
+                      } else {
+                        return EmptyState(
+                          title: 'No Ruck Buddies Yet',
+                          message: 'Be the first to share your rucks with the community!',
+                          action: ElevatedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Sharing feature coming soon!'))
+                              );
+                            },
+                            child: const Text('Share Your Rucks'),
+                          ),
+                        );
+                      }
                     }
                     
                     return _buildRuckBuddiesList(ruckBuddies, isLoadingMore);

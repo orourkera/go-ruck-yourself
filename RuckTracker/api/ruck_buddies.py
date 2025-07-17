@@ -230,13 +230,17 @@ def get_ruck_buddies():
     # Get sort_by parameter (this matches what the frontend sends)
     sort_by = request.args.get('sort_by', 'proximity_asc')
     
+    # Get following_only parameter for "My Buddies" filter
+    following_only = request.args.get('following_only', 'false').lower() == 'true'
+    
     # Get latitude and longitude for proximity sorting
     latitude = request.args.get('latitude', type=float)
     longitude = request.args.get('longitude', type=float)
     
     # Build cache key based on query parameters (excluding current user for privacy)
     lat_lon_str = f"{latitude:.3f}_{longitude:.3f}" if latitude and longitude else "no_location"
-    cache_key = f"ruck_buddies:{sort_by}:{page}:{per_page}:{lat_lon_str}"
+    following_str = "following" if following_only else "all"
+    cache_key = f"ruck_buddies:{sort_by}:{page}:{per_page}:{lat_lon_str}:{following_str}"
     
     # Try to get cached response first
     cached_response = cache_get(cache_key)
@@ -286,7 +290,28 @@ def get_ruck_buddies():
         .eq('is_public', True) \
         .eq('user.allow_ruck_sharing', True) \
         .neq('user_id', g.user.id) \
-        .gt('duration_seconds', 180)  # Exclude rucks shorter than 3 minutes (180 seconds)
+        .gt('duration_seconds', 180)
+    
+    # If following_only is true, filter to only show rucks from users the current user follows
+    if following_only:
+        # Get list of users the current user follows
+        followed_users_res = supabase.table('user_follows').select('followed_id').eq('follower_id', g.user.id).execute()
+        followed_user_ids = [f['followed_id'] for f in followed_users_res.data] if followed_users_res.data else []
+        
+        if not followed_user_ids:
+            # If user isn't following anyone, return empty result
+            return jsonify({
+                'ruck_sessions': [],
+                'meta': {
+                    'count': 0,
+                    'per_page': per_page,
+                    'page': page,
+                    'sort_by': sort_by
+                }
+            }), 200
+        
+        # Filter to only include rucks from followed users
+        query = query.in_('user_id', followed_user_ids)  # Exclude rucks shorter than 3 minutes (180 seconds)
     
     # Apply sorting and pagination
     query = query.order(order_by).limit(per_page).offset(offset)

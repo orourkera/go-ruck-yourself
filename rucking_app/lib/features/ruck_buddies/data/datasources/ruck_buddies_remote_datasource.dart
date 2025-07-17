@@ -42,7 +42,13 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
     try {
       // Convert filter to the sort_by parameter format expected by API
       String sortBy;
+      bool followingOnly = false;
+      
       switch (filter) {
+        case 'following':
+          sortBy = 'proximity_asc'; // Default sort for following
+          followingOnly = true;
+          break;
         case 'calories':
           sortBy = 'calories_desc';
           break;
@@ -66,6 +72,7 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
         'per_page': limit.toString(),
         'sort_by': sortBy,
         'exclude_manual': 'true',  // Exclude manual sessions
+        'following_only': followingOnly.toString(),
       };
       
       // Add location data if available and we're using proximity filter

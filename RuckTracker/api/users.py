@@ -165,6 +165,7 @@ def get_public_profile(user_id):
                     .table('ruck_session')
                     .select('*')
                     .eq('user_id', user_id)
+                    .eq('status', 'completed')
                     .order('end_time', desc=True)
                     .limit(5)
                     .execute()

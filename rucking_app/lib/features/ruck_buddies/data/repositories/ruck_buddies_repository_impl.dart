@@ -27,7 +27,8 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
     required int limit,
     required int offset,
   }) {
-    return '${filter}_${latitude?.toStringAsFixed(3) ?? 'null'}_${longitude?.toStringAsFixed(3) ?? 'null'}_${limit}_$offset';
+    final followingStr = filter == 'following' ? 'following' : 'all';
+    return '${filter}_${latitude?.toStringAsFixed(3) ?? 'null'}_${longitude?.toStringAsFixed(3) ?? 'null'}_${limit}_${offset}_$followingStr';
   }
 
   @override
