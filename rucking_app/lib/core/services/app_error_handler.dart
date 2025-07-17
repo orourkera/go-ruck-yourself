@@ -43,37 +43,81 @@ class AppErrorHandler {
         break;
     }
     
-    // Send to Sentry with rich context
+    // Send to Sentry with appropriate level based on severity
     try {
-      await Sentry.captureException(
-        error,
-        stackTrace: StackTrace.current,
-        withScope: (scope) {
-          // Add operation context
-          scope.setTag('operation_category', _getOperationCategory(operation));
-          scope.setTag('operation_name', operation);
-          
-          // Add user context if available
-          if (userId != null) {
-            scope.setUser(SentryUser(id: userId));
-          }
-          
-          // Add custom context as tags
-          if (context != null) {
-            for (final entry in context.entries) {
-              scope.setTag('context_${entry.key}', entry.value.toString());
+      // Only send exceptions for error/fatal levels, use messages for warnings/info/debug
+      if (severity == ErrorSeverity.error || severity == ErrorSeverity.fatal) {
+        await Sentry.captureException(
+          error,
+          stackTrace: StackTrace.current,
+          withScope: (scope) {
+            // Add operation context
+            scope.setTag('operation_category', _getOperationCategory(operation));
+            scope.setTag('operation_name', operation);
+            scope.setTag('severity', severity.toString());
+            
+            // Add user context if available
+            if (userId != null) {
+              scope.setUser(SentryUser(id: userId));
             }
-          }
-          
-          // Add breadcrumb for debugging
-          scope.addBreadcrumb(Breadcrumb(
-            message: 'Supabase $operation attempted',
-            category: 'supabase',
-            level: SentryLevel.info,
-            data: context ?? {},
-          ));
-        },
-      );
+            
+            // Add custom context as tags
+            if (context != null) {
+              for (final entry in context.entries) {
+                scope.setTag('context_${entry.key}', entry.value.toString());
+              }
+            }
+            
+            // Add breadcrumb for debugging
+            scope.addBreadcrumb(Breadcrumb(
+              message: 'Supabase $operation attempted',
+              category: 'supabase',
+              level: SentryLevel.info,
+              data: context ?? {},
+            ));
+          },
+        );
+      } else {
+        // Send warnings/info/debug as messages, not exceptions
+        final sentryLevel = switch (severity) {
+          ErrorSeverity.debug => SentryLevel.debug,
+          ErrorSeverity.info => SentryLevel.info,
+          ErrorSeverity.warning => SentryLevel.warning,
+          ErrorSeverity.error => SentryLevel.error, // Shouldn't reach here
+          ErrorSeverity.fatal => SentryLevel.fatal, // Shouldn't reach here
+        };
+        
+        await Sentry.captureMessage(
+          logMessage,
+          level: sentryLevel,
+          withScope: (scope) {
+            // Add operation context
+            scope.setTag('operation_category', _getOperationCategory(operation));
+            scope.setTag('operation_name', operation);
+            scope.setTag('severity', severity.toString());
+            
+            // Add user context if available
+            if (userId != null) {
+              scope.setUser(SentryUser(id: userId));
+            }
+            
+            // Add custom context as tags
+            if (context != null) {
+              for (final entry in context.entries) {
+                scope.setTag('context_${entry.key}', entry.value.toString());
+              }
+            }
+            
+            // Add breadcrumb for debugging
+            scope.addBreadcrumb(Breadcrumb(
+              message: 'Supabase $operation attempted',
+              category: 'supabase',
+              level: SentryLevel.info,
+              data: context ?? {},
+            ));
+          },
+        );
+      }
     } catch (sentryError) {
       AppLogger.error('Failed to send error to Sentry: $sentryError');
     }

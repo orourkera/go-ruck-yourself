@@ -210,7 +210,7 @@ def sample_route_points(location_points, target_distance_between_points_m=75):
 def get_ruck_buddies():
     """
     Get public ruck sessions from other users.
-    Filters by is_public = true and user.allow_ruck_sharing = true.
+    Filters by is_public = true. Individual sessions can be shared even when the user's global allow_ruck_sharing setting is false.
     
     Query params:
     - page: Page number (default: 1)
@@ -275,7 +275,7 @@ def get_ruck_buddies():
     supabase = get_supabase_client(g.access_token if hasattr(g, 'access_token') else None)
 
     # Base query getting public ruck sessions that aren't from the current user
-    # Also join with users table to get user display info and check allow_ruck_sharing
+    # Also join with users table to get user display info
     # Include social data (likes, comments) to avoid separate API calls
     query = supabase.table('ruck_session') \
         .select(
@@ -288,7 +288,6 @@ def get_ruck_buddies():
             ' comments:ruck_comments!ruck_comments_ruck_id_fkey(id,user_id,content,created_at)'
         ) \
         .eq('is_public', True) \
-        .eq('user.allow_ruck_sharing', True) \
         .neq('user_id', g.user.id) \
         .gt('duration_seconds', 180)
     

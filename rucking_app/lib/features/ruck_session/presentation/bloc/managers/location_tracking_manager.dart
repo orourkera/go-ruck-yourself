@@ -102,6 +102,8 @@ class LocationTrackingManager implements SessionManager {
       await _onBatchLocationUpdated(event);
     } else if (event is MemoryPressureDetected) {
       await _onMemoryPressureDetected(event);
+    } else if (event is Tick) {
+      await _onTick(event);
     }
   }
 
@@ -204,6 +206,16 @@ class LocationTrackingManager implements SessionManager {
     _triggerGarbageCollection();
     
     AppLogger.info('[LOCATION_MANAGER] MEMORY_PRESSURE: Aggressive cleanup completed');
+  }
+
+  /// Handle timer tick events to update watch display every second
+  Future<void> _onTick(Tick event) async {
+    if (_activeSessionId == null) return;
+    
+    // Update watch with current timer - this ensures the watch timer counts up live
+    // even when there are no location updates
+    final currentState = _currentState;
+    _updateWatchWithSessionData(currentState);
   }
 
   Future<void> _onLocationUpdated(LocationUpdated event) async {

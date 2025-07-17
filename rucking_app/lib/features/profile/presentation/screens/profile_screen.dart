@@ -304,6 +304,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                             const Divider(),
+                            _buildSettingItem(
+                              icon: Icons.share_outlined,
+                              label: 'Allow Ruck Sharing',
+                              trailing: Switch(
+                                value: user.allowRuckSharing,
+                                activeColor: isDark 
+                                    ? const Color(0xFF728C69)
+                                    : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                onChanged: (value) {
+                                  context.read<AuthBloc>().add(
+                                    AuthUpdateProfileRequested(
+                                      allowRuckSharing: value,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const Divider(),
                             _buildClickableItem(
                               icon: Icons.notifications_outlined,
                               label: 'Notification Settings',

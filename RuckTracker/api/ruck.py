@@ -417,7 +417,7 @@ class RuckSessionResource(Resource):
             if not is_own_session:
                 # If not the user's own session, check if it's a public session
                 response = supabase.table('ruck_session') \
-                    .select('*, user:user_id(allow_ruck_sharing)') \
+                    .select('*') \
                     .eq('id', ruck_id) \
                     .eq('is_public', True) \
                     .execute()
@@ -426,11 +426,6 @@ class RuckSessionResource(Resource):
                     return {'message': 'Session not found'}, 404
                     
                 session = response.data[0]
-                
-                # Check if the session owner allows sharing
-                user_data = session.get('user')
-                if not user_data or not user_data.get('allow_ruck_sharing', False):
-                    return {'message': 'Session not found'}, 404
             else:
                 session = response.data[0]
             

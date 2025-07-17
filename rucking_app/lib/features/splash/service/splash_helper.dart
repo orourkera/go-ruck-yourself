@@ -31,21 +31,19 @@ class SplashHelper {
   }
   
   /// Returns the appropriate splash image path with fallback options
-  /// Provides multiple fallback assets to prevent crashes
-  /// Prioritizes static images over GIF to prevent native crashes
+  /// Prioritizes animated GIF but provides fallbacks for older Android devices
   static String getSplashImagePath(bool isLadyMode) {
-    // Primary: Try static PNG first for stability
-    if (_assetExists('assets/images/app_icon.png')) {
-      return 'assets/images/app_icon.png';
-    }
-    
-    // Fallback 1: Generic launcher icon
-    if (_assetExists('assets/launcher/icon.png')) {
-      return 'assets/launcher/icon.png';
-    }
-    
-    // Fallback 2: GIF (last resort due to crash risk)
+    // Primary: Use animated GIF as requested
     return 'assets/images/splash.gif';
+  }
+  
+  /// Returns fallback image paths for older Android devices that can't handle GIFs
+  static List<String> getFallbackImagePaths() {
+    return [
+      'assets/images/splash.gif',     // Try GIF first
+      'assets/images/app_icon.png',   // Fallback to static PNG
+      'assets/launcher/icon.png',     // Final fallback
+    ];
   }
   
   /// Checks if an asset exists in the bundle
@@ -60,15 +58,7 @@ class SplashHelper {
     }
   }
   
-  /// Gets a list of fallback image paths in order of preference
-  /// Prioritizes static images over GIF to prevent native crashes
-  static List<String> getFallbackImagePaths() {
-    return [
-      'assets/images/app_icon.png',      // Static PNG - safer
-      'assets/launcher/icon.png',        // Static PNG - safer
-      'assets/images/splash.gif',        // GIF - higher crash risk, use as last resort
-    ];
-  }
+
   
   /// Gets the unified background color for splash screen
   /// No longer depends on gender - uses the same color for all users

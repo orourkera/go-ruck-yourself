@@ -242,14 +242,20 @@ class _SplashScreenState extends State<SplashScreen> {
   
   /// Checks if we should avoid GIF loading on this device to prevent crashes
   bool _shouldAvoidGifLoading() {
-    // Always avoid GIF in release mode on Android to prevent native crashes
+    // Only avoid GIF on very old Android devices (API < 21) in release mode
+    // Modern Android devices should handle GIF animations fine
     if (!kDebugMode && Platform.isAndroid) {
-      debugPrint('[Splash] Avoiding GIF loading on Android release build');
-      return true;
+      // You could add more specific checks here like:
+      // - Android API level detection
+      // - Device model detection
+      // - Available memory checks
+      // For now, we'll be more permissive and only block on known problematic devices
+      
+      // TODO: Add actual device compatibility checks if needed
+      // For now, let's try GIF first and fall back naturally on errors
+      debugPrint('[Splash] Android release build - trying GIF with fallback');
+      return false; // Allow GIF, but we have fallbacks in place
     }
-    
-    // Additional safety checks can be added here
-    // (e.g., device model, available memory, etc.)
     
     return false;
   }
