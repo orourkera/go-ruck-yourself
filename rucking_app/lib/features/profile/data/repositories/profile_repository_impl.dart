@@ -26,62 +26,30 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
   @override
   Future<List<SocialUser>> getFollowers(String userId, {int page = 1}) async {
-    try {
-      final response = await apiClient.get('/users/$userId/followers?page=$page');
-      print('Followers API response: $response');
-      
-      // Handle the wrapped response structure
-      final data = response['data'] as Map<String, dynamic>?;
-      if (data == null) {
-        print('Data is null, returning empty list');
-        return [];
-      }
-      
-      final followers = data['followers'] as List?;
-      if (followers == null) {
-        print('Followers is null, returning empty list');
-        return [];
-      }
-      
-      print('Followers data: $followers');
-      return followers.map((e) {
-        print('Processing follower: $e');
-        return SocialUser.fromJson(e as Map<String, dynamic>);
-      }).toList();
-    } catch (e) {
-      print('Error in getFollowers: $e');
-      rethrow;
-    }
+    final response = await apiClient.get('/users/$userId/followers?page=$page');
+    
+    // Handle the wrapped response structure
+    final data = response['data'] as Map<String, dynamic>?;
+    if (data == null) return [];
+    
+    final followers = data['followers'] as List?;
+    if (followers == null) return [];
+    
+    return followers.map((e) => SocialUser.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   @override
   Future<List<SocialUser>> getFollowing(String userId, {int page = 1}) async {
-    try {
-      final response = await apiClient.get('/users/$userId/following?page=$page');
-      print('Following API response: $response');
-      
-      // Handle the wrapped response structure
-      final data = response['data'] as Map<String, dynamic>?;
-      if (data == null) {
-        print('Data is null, returning empty list');
-        return [];
-      }
-      
-      final following = data['following'] as List?;
-      if (following == null) {
-        print('Following is null, returning empty list');
-        return [];
-      }
-      
-      print('Following data: $following');
-      return following.map((e) {
-        print('Processing following: $e');
-        return SocialUser.fromJson(e as Map<String, dynamic>);
-      }).toList();
-    } catch (e) {
-      print('Error in getFollowing: $e');
-      rethrow;
-    }
+    final response = await apiClient.get('/users/$userId/following?page=$page');
+    
+    // Handle the wrapped response structure
+    final data = response['data'] as Map<String, dynamic>?;
+    if (data == null) return [];
+    
+    final following = data['following'] as List?;
+    if (following == null) return [];
+    
+    return following.map((e) => SocialUser.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   @override

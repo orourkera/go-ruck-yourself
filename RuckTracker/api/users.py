@@ -217,15 +217,24 @@ def get_following(user_id):
         following_res = get_supabase_client().table('user_follows').select('followed_id, created_at, user:followed_id(username, avatar_url)').eq('follower_id', user_id).order('created_at', desc=True).range(offset, offset + per_page - 1).execute()
         following = []
         for f in following_res.data or []:
-            is_following_back = False
+            # For the "following" list, we need to check if the current user is following this person
+            # If viewing own following list, isFollowing should be true (since they're in the following list)
+            # If viewing someone else's following list, check if current user follows this person
+            is_following = False
             if current_user_id:
-                check_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', f['followed_id']).eq('followed_id', current_user_id).execute()
-                is_following_back = bool(check_res.data)
+                if str(current_user_id) == str(user_id):
+                    # Viewing own following list - by definition, we're following all these people
+                    is_following = True
+                else:
+                    # Viewing someone else's following list - check if current user follows this person
+                    check_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', f['followed_id']).execute()
+                    is_following = bool(check_res.data)
+            
             following.append({
                 'id': f['followed_id'],
                 'username': f['user']['username'],
                 'avatarUrl': f['user']['avatar_url'],
-                'isFollowing': is_following_back,
+                'isFollowing': is_following,
                 'followedAt': f['created_at']
             })
         has_more = len(following) == per_page
