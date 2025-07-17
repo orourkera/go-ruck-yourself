@@ -58,16 +58,16 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- Send notification to the followed user
     INSERT INTO notifications (
-        user_id,
+        recipient_id,
+        sender_id,
         type,
-        title,
-        body,
+        message,
         data,
         created_at
     ) VALUES (
         NEW.followed_id,
-        'NEW_FOLLOWER',
-        'New Follower',
+        NEW.follower_id,
+        'new_follower',
         (SELECT username FROM "user" WHERE id = NEW.follower_id) || ' started following you',
         json_build_object('followerId', NEW.follower_id),
         NOW()

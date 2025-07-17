@@ -152,6 +152,7 @@ def get_public_profile(user_id):
             # known to cause "could not find relationship" (PGRST200) errors.
             try:
                 admin_client = get_supabase_client()
+                # Now that duplicate foreign key is removed, we can use simple syntax
                 clubs_res = admin_client.from_('club_memberships').select('clubs(*)').eq('user_id', str(user_id)).execute()
                 response['clubs'] = [row['clubs'] for row in clubs_res.data] if clubs_res.data else []
                 # Add clubsCount into stats dict
@@ -280,8 +281,8 @@ def follow_user(user_id):
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             insert_res = supabase.table('user_follows').insert({'follower_id': str(current_user_id), 'followed_id': str(user_id)}).execute()
             if insert_res.data:
-                count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', str(user_id)).execute()
-                followers_count = count_res.data[0]['count'] if count_res.data else 0
+                count_res = get_supabase_client().table('user_follows').select('id').eq('followed_id', str(user_id)).execute()
+                followers_count = len(count_res.data) if count_res.data else 0
                 return jsonify({'success': True, 'isFollowing': True, 'followersCount': followers_count})
             return api_error('Failed to follow', status_code=400)
         except Exception as insert_error:
@@ -302,8 +303,8 @@ def unfollow_user(user_id):
         # Use authenticated client to respect RLS policies
         supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
         delete_res = supabase.table('user_follows').delete().eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
-        count_res = get_supabase_client().table('user_follows').select('count(*)').eq('followed_id', str(user_id)).execute()
-        followers_count = count_res.data[0]['count'] if count_res.data else 0
+        count_res = get_supabase_client().table('user_follows').select('id').eq('followed_id', str(user_id)).execute()
+        followers_count = len(count_res.data) if count_res.data else 0
         return jsonify({'success': True, 'isFollowing': False, 'followersCount': followers_count})
     except Exception as e:
         return api_error(str(e), status_code=500)

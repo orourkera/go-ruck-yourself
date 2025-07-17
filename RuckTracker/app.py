@@ -106,7 +106,7 @@ if redis_url.startswith('rediss://'):  # Heroku Redis uses rediss:// for SSL
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["2000 per day", "500 per hour"],
     storage_uri=redis_url,
     strategy="fixed-window",
     swallow_errors=True
@@ -361,9 +361,9 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 
 # Ruck session endpoints (prefixed with /api)
 # Apply rate limit to RuckSessionListResource GET endpoint
-app.logger.info(f"Setting RuckSessionListResource rate limit to: 3000 per hour (50 per minute)")
-# Allow up to 50 requests per minute (3000 per hour) per user/IP
-RuckSessionListResource.get = limiter.limit("50 per minute", key_func=get_user_id, override_defaults=True)(RuckSessionListResource.get)
+app.logger.info(f"Setting RuckSessionListResource rate limit to: 6000 per hour (100 per minute)")
+# Allow up to 100 requests per minute (6000 per hour) per user/IP
+RuckSessionListResource.get = limiter.limit("100 per minute", key_func=get_user_id, override_defaults=True)(RuckSessionListResource.get)
 api.add_resource(RuckSessionListResource, '/api/rucks')
 api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
 api.add_resource(RuckSessionStartResource, '/api/rucks/start')
@@ -384,7 +384,12 @@ except AttributeError as e:
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')
 api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
-# Stats Endpoints
+# Stats Endpoints with higher rate limits
+app.logger.info("Setting stats resources rate limit to: 2000 per hour")
+rate_limit_resource(WeeklyStatsResource, "2000 per hour")
+rate_limit_resource(MonthlyStatsResource, "2000 per hour") 
+rate_limit_resource(YearlyStatsResource, "2000 per hour")
+
 api.add_resource(WeeklyStatsResource, '/api/stats/weekly', '/api/statistics/weekly')
 api.add_resource(MonthlyStatsResource, '/api/stats/monthly', '/api/statistics/monthly')
 api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/yearly')
