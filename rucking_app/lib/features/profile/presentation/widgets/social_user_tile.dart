@@ -8,12 +8,14 @@ class SocialUserTile extends StatelessWidget {
   final SocialUser user;
   final VoidCallback? onFollowPressed;
   final VoidCallback? onTap;
+  final bool showFollowButton;
 
   const SocialUserTile({
     Key? key,
     required this.user,
     this.onFollowPressed,
     this.onTap,
+    this.showFollowButton = true,
   }) : super(key: key);
 
   @override
@@ -39,10 +41,10 @@ class SocialUserTile extends StatelessWidget {
         ),
       ),
       subtitle: Text('Followed since $formattedDate'),
-      trailing: FollowButton(
+      trailing: showFollowButton ? FollowButton(
         isFollowing: user.isFollowing,
         onPressed: onFollowPressed ?? () {},
-      ),
+      ) : null,
       onTap: onTap,
     );
   }

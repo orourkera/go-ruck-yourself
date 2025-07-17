@@ -36,6 +36,7 @@ class _FollowersScreenState extends State<FollowersScreen> {
                 return SocialUserTile(
                   user: state.users[index],
                   onFollowPressed: () => context.read<SocialListBloc>().add(ToggleFollowUser(state.users[index].id)),
+                  showFollowButton: !widget.isFollowersPage, // Hide follow button on followers page
                 );
               },
             );
