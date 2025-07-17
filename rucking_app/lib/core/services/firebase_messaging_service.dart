@@ -73,16 +73,7 @@ class FirebaseMessagingService {
         }
       }
       
-      // Clear any existing token first to prevent accumulation
-      try {
-        await _firebaseMessaging.deleteToken();
-        print('🔔 Cleared existing FCM token');
-        await Future.delayed(const Duration(seconds: 1)); // Small delay after deletion
-      } catch (e) {
-        print('⚠️ Failed to clear existing token (may not exist): $e');
-      }
-      
-      // Get new token with retry logic and proper timeout
+      // Get FCM token with retry logic and proper timeout
       _deviceToken = await _getTokenWithRetry();
       
       if (_deviceToken == null) {
@@ -117,8 +108,8 @@ class FirebaseMessagingService {
         return;
       }
       
-      // Send token to backend (non-blocking)
-      _registerDeviceToken(_deviceToken!).catchError((e) {
+      // Send token to backend only if user is authenticated (non-blocking)
+      _registerDeviceTokenIfAuthenticated(_deviceToken!).catchError((e) {
         print('⚠️ Device token registration failed: $e');
       });
       
@@ -126,7 +117,7 @@ class FirebaseMessagingService {
       _firebaseMessaging.onTokenRefresh.listen((newToken) async {
         print('🔔 FCM Token refreshed: $newToken');
         _deviceToken = newToken;
-        _registerDeviceToken(newToken).catchError((e) {
+        _registerDeviceTokenIfAuthenticated(newToken).catchError((e) {
           print('⚠️ Token refresh registration failed: $e');
         });
       });
@@ -264,6 +255,26 @@ class FirebaseMessagingService {
     }
   }
 
+  /// Register device token with backend only if user is authenticated
+  Future<void> _registerDeviceTokenIfAuthenticated(String token) async {
+    try {
+      final authBloc = GetIt.I<AuthBloc>();
+      final currentState = authBloc.state;
+      
+      if (currentState is Authenticated) {
+        print('🔔 User is authenticated, registering device token...');
+        await _registerDeviceToken(token);
+      } else {
+        print('⚠️ User not authenticated, skipping device token registration');
+        print('🔔 Token will be registered after user authentication');
+      }
+    } catch (e) {
+      print('⚠️ Error checking authentication for token registration: $e');
+      // Fallback to attempt registration anyway
+      await _registerDeviceToken(token);
+    }
+  }
+
   /// Get unique device identifier
   Future<String> _getDeviceId() async {
     // TODO: Implement device ID generation
@@ -276,6 +287,12 @@ class FirebaseMessagingService {
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         print('🔔 FCM token request attempt $attempt/$maxAttempts');
+        
+        // On iOS, verify APNS token is still available
+        if (Platform.isIOS) {
+          final apnsToken = await _firebaseMessaging.getAPNSToken();
+          print('🔔 APNS token check: ${apnsToken != null ? "Available" : "Not available"}');
+        }
         
         final token = await _firebaseMessaging.getToken().timeout(
           const Duration(seconds: 20),
@@ -786,10 +803,13 @@ class FirebaseMessagingService {
   }
 
   /// Manually register device token after authentication
-  /// No-op since token registration now happens immediately during initialization
   Future<void> registerTokenAfterAuth() async {
-    // Token registration now happens immediately during initialization
-    // This method is kept for backward compatibility
+    if (_deviceToken != null) {
+      print('🔔 Registering device token after authentication...');
+      await _registerDeviceToken(_deviceToken!);
+    } else {
+      print('⚠️ No device token available to register after authentication');
+    }
   }
 
   /// Background message handler (must be top-level function)

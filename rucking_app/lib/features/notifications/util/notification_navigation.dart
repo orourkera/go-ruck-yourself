@@ -7,6 +7,7 @@ import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart
 import 'package:rucking_app/features/duels/presentation/screens/duel_detail_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/public_profile_screen.dart';
 
 /// Helper class for handling notification-related navigation
 class NotificationNavigation {
@@ -106,7 +107,17 @@ class NotificationNavigation {
         }
         break;
       case NotificationType.follow:
-        // Handle follow notifications when user profiles are implemented
+        // Navigate to the follower's public profile page
+        final followerId = notification.data!['follower_id']?.toString() ?? 
+                           notification.data!['user_id']?.toString();
+        if (followerId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PublicProfileScreen(userId: followerId),
+            ),
+          );
+        }
         break;
       case NotificationType.system:
         // Handle system notifications
