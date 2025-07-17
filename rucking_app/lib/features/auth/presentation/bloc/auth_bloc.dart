@@ -105,15 +105,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
     } catch (e) {
-      // Monitor authentication failures
-      await AppErrorHandler.handleCriticalError(
-        'auth_login_email',
-        e,
-        context: {
-          'email': event.email,
-          'has_password': event.password.isNotEmpty,
-        },
-      );
+      // Monitor authentication failures - wrapped to prevent secondary errors
+      try {
+        await AppErrorHandler.handleCriticalError(
+          'auth_login_email',
+          e,
+          context: {
+            'email': event.email,
+            'has_password': event.password.isNotEmpty,
+          },
+        );
+      } catch (errorHandlerException) {
+        // If error reporting fails, log it but don't crash the app
+        print('Error reporting failed during authentication: $errorHandlerException');
+      }
       emit(AuthError('Login failed: $e'));
     }
   }
@@ -256,14 +261,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       emit(Unauthenticated());
     } catch (e) {
-      // Monitor logout failures (critical for app lifecycle)
-      await AppErrorHandler.handleCriticalError(
-        'auth_logout',
-        e,
-        context: {
-          'services_stopped': true,
-        },
-      );
+      // Monitor logout failures (critical for app lifecycle) - wrapped to prevent secondary errors
+      try {
+        await AppErrorHandler.handleCriticalError(
+          'auth_logout',
+          e,
+          context: {
+            'services_stopped': true,
+          },
+        );
+      } catch (errorHandlerException) {
+        // If error reporting fails, log it but don't crash the app
+        print('Error reporting failed during logout: $errorHandlerException');
+      }
       emit(AuthError('Logout failed: $e'));
     }
   }

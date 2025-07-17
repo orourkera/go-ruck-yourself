@@ -613,7 +613,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
-      _coordinator!.add(event);
+      try {
+        AppLogger.debug('Attempting to delegate LoadSessionForViewing to coordinator');
+        _coordinator!.add(event);
+      } catch (e) {
+        AppLogger.error('Failed to delegate LoadSessionForViewing to coordinator: $e');
+        // Fallback to prevent UI breakage
+        emit(SessionSummaryGenerated(
+          session: event.session,
+          photos: event.session.photos ?? [],
+          isPhotosLoading: false,
+        ));
+      }
     } else {
       AppLogger.warning('No coordinator available for session loading');
       // Fallback to prevent UI breakage

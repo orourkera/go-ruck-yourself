@@ -363,16 +363,29 @@ class SessionRepository {
       AppLogger.info('Successfully deleted session: $sessionId. Response: $response');
       return true;
     } catch (e) {
-      // Enhanced error handling with Sentry
-      await AppErrorHandler.handleError(
-        'session_delete',
-        e,
-        context: {
-          'session_id': sessionId,
-        },
-        userId: await getCurrentUserId(),
-        sendToBackend: true,
-      );
+      // Enhanced error handling with Sentry - wrapped to prevent secondary errors
+      try {
+        String? userId;
+        try {
+          userId = await getCurrentUserId();
+        } catch (userIdError) {
+          // If getting user ID fails, proceed with error reporting without it
+          print('Could not get current user ID for error reporting: $userIdError');
+        }
+        
+        await AppErrorHandler.handleError(
+          'session_delete',
+          e,
+          context: {
+            'session_id': sessionId,
+          },
+          userId: userId,
+          sendToBackend: true,
+        );
+      } catch (errorHandlerException) {
+        // If error reporting fails, log it but don't crash the app
+        print('Error reporting failed during session deletion: $errorHandlerException');
+      }
       return false;
     }
   }

@@ -25,8 +25,8 @@ class SocialRepository {
   static const int _cacheExpirationSeconds = 300; // 5 minutes cache
   
   // Getters for cached data - these provide immediate access to cached values without network calls
-  bool? getCachedLikeStatus(int ruckId) => _likeStatusCache[ruckId];
-  int? getCachedLikeCount(int ruckId) => _likeCountCache[ruckId];
+  bool? getCachedLikeStatus(int? ruckId) => ruckId == null ? null : _likeStatusCache[ruckId];
+  int? getCachedLikeCount(int? ruckId) => ruckId == null ? null : _likeCountCache[ruckId];
   List<RuckComment>? getCachedComments(String ruckId) => _commentsCache[ruckId];
 
   /// Clear cached comments for a specific ruck to force refresh
@@ -50,7 +50,11 @@ class SocialRepository {
   }
 
   /// Update cache with initial values from UI to ensure consistency
-  void updateCacheWithInitialValues(int ruckId, bool isLiked, int likeCount) {
+  void updateCacheWithInitialValues(int? ruckId, bool isLiked, int likeCount) {
+    // Early validation - prevent null ruckId from causing TypeError
+    if (ruckId == null) {
+      return; // Cannot update cache with null ruckId
+    }
     _likeStatusCache[ruckId] = isLiked;
     _likeCountCache[ruckId] = likeCount;
     _likeCacheTimestamps[ruckId] = DateTime.now();
@@ -75,7 +79,11 @@ class SocialRepository {
   }
 
   /// Get likes for a specific ruck session
-  Future<List<RuckLike>> getRuckLikes(int ruckId) async {
+  Future<List<RuckLike>> getRuckLikes(int? ruckId) async {
+    // Early validation - prevent null ruckId from causing TypeError
+    if (ruckId == null) {
+      throw ArgumentError('Cannot get likes: ruckId is null');
+    }
     try {
       final token = await _authToken;
       if (token == null) {
@@ -116,7 +124,11 @@ class SocialRepository {
 
   /// Add a like to a ruck session
   /// Updates the cache with the new like status
-  Future<RuckLike> addRuckLike(int ruckId) async {
+  Future<RuckLike> addRuckLike(int? ruckId) async {
+    // Early validation - prevent null ruckId from causing TypeError
+    if (ruckId == null) {
+      throw ArgumentError('Cannot add like: ruckId is null');
+    }
     try {
       final token = await _authToken;
       if (token == null) {
@@ -180,8 +192,12 @@ class SocialRepository {
   }
 
   /// Remove a like from a ruck session
-  /// Updates the cache with the new unlike status
-  Future<bool> removeRuckLike(int ruckId) async {
+  /// Updates the cache with the new like status
+  Future<void> removeRuckLike(int? ruckId) async {
+    // Early validation - prevent null ruckId from causing TypeError
+    if (ruckId == null) {
+      throw ArgumentError('Cannot remove like: ruckId is null');
+    }
     try {
       final token = await _authToken;
       if (token == null) {
@@ -229,7 +245,11 @@ class SocialRepository {
   /// Uses caching to reduce API calls. If the cache is invalid, it fetches
   /// fresh data for both the user's like status and the total like count for the ruck,
   /// updating the respective caches.
-  Future<bool> hasUserLikedRuck(int ruckId) async {
+  Future<bool> hasUserLikedRuck(int? ruckId) async {
+    // Early validation - prevent null ruckId from causing TypeError
+    if (ruckId == null) {
+      return false; // Cannot have liked a null ruck
+    }
     // Check cache first if it's valid
     if (_isValidCache(ruckId)) {
       return _likeStatusCache[ruckId] ?? false;

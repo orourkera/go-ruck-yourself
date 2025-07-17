@@ -62,7 +62,13 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     try {
-      final int ruckId = event.ruckId;
+      final int? ruckId = event.ruckId;
+      
+      // Early return if ruckId is null - cannot process like toggle
+      if (ruckId == null) {
+        emit(LikeActionError('Cannot toggle like: Invalid session ID', null));
+        return;
+      }
       
       // Get current user
       final authState = _authBloc.state;

@@ -201,15 +201,19 @@ class LocationServiceImpl implements LocationService {
       AppLogger.info('Location permission denied: $permission');
       return false;
     } catch (e) {
-      // Monitor location permission failures (critical for fitness tracking)
-      await AppErrorHandler.handleCriticalError(
-        'location_permission_request',
-        e,
-        context: {
-          'has_context': context != null,
-          'platform': Platform.isAndroid ? 'android' : 'ios',
-        },
-      );
+      // Monitor location permission failures (critical for fitness tracking) - wrapped to prevent secondary errors
+      try {
+        await AppErrorHandler.handleCriticalError(
+          'location_permission_request',
+          e,
+          context: {
+            'has_context': context != null,
+            'platform': Platform.isAndroid ? 'android' : 'ios',
+          },
+        );
+      } catch (errorHandlerException) {
+        AppLogger.error('Error reporting failed during location permission request: $errorHandlerException');
+      }
       AppLogger.error('Error requesting location permissions', exception: e);
       return false;
     }
@@ -230,14 +234,18 @@ class LocationServiceImpl implements LocationService {
         timestamp: DateTime.now(),
       );
     } catch (e) {
-      // Monitor location retrieval failures (critical for fitness tracking)
-      await AppErrorHandler.handleError(
-        'location_current_position',
-        e,
-        context: {
-          'platform': Platform.isAndroid ? 'android' : 'ios',
-        },
-      );
+      // Monitor location retrieval failures (critical for fitness tracking) - wrapped to prevent secondary errors
+      try {
+        await AppErrorHandler.handleError(
+          'location_current_position',
+          e,
+          context: {
+            'platform': Platform.isAndroid ? 'android' : 'ios',
+          },
+        );
+      } catch (errorHandlerException) {
+        AppLogger.error('Error reporting failed during location retrieval: $errorHandlerException');
+      }
       AppLogger.error('Failed to get current location: $e');
       return null;
     }
@@ -372,30 +380,38 @@ class LocationServiceImpl implements LocationService {
             }
           });
 
-          // Still report to Crashlytics, but as warning not error
-          await AppErrorHandler.handleError(
-            'location_permission_denied',
-            error,
-            context: {
-              'is_tracking': _isTracking,
-              'platform': Platform.isAndroid ? 'android' : 'ios',
-            },
-            severity: ErrorSeverity.warning,
-          );
+          // Still report to Crashlytics, but as warning not error - wrapped to prevent secondary errors
+          try {
+            await AppErrorHandler.handleError(
+              'location_permission_denied',
+              error,
+              context: {
+                'is_tracking': _isTracking,
+                'platform': Platform.isAndroid ? 'android' : 'ios',
+              },
+              severity: ErrorSeverity.warning,
+            );
+          } catch (errorHandlerException) {
+            AppLogger.error('Error reporting failed during location permission denial: $errorHandlerException');
+          }
           return; // Skip the generic critical-error flow below
         }
 
-        // Other errors – keep existing critical flow
-        await AppErrorHandler.handleError(
-          'location_tracking_stream',
-          error,
-          context: {
-            'is_tracking': _isTracking,
-            'batch_size': _locationBatch.length,
-            'last_update': _lastLocationUpdate?.toIso8601String(),
-            'platform': Platform.isAndroid ? 'android' : 'ios',
-          },
-        );
+        // Other errors – keep existing critical flow - wrapped to prevent secondary errors
+        try {
+          await AppErrorHandler.handleError(
+            'location_tracking_stream',
+            error,
+            context: {
+              'is_tracking': _isTracking,
+              'batch_size': _locationBatch.length,
+              'last_update': _lastLocationUpdate?.toIso8601String(),
+              'platform': Platform.isAndroid ? 'android' : 'ios',
+            },
+          );
+        } catch (errorHandlerException) {
+          AppLogger.error('Error reporting failed during location tracking stream error: $errorHandlerException');
+        }
         AppLogger.error('Location service error', exception: error);
         _locationController.addError(error);
 
@@ -413,15 +429,19 @@ class LocationServiceImpl implements LocationService {
     
     // Integrate with background location service
     BackgroundLocationService.startBackgroundTracking().catchError((error) async {
-      // Monitor background location service failures (critical for session tracking)
-      await AppErrorHandler.handleCriticalError(
-        'location_background_service',
-        error,
-        context: {
-          'platform': Platform.isAndroid ? 'android' : 'ios',
-          'is_tracking': _isTracking,
-        },
-      );
+      // Monitor background location service failures (critical for session tracking) - wrapped to prevent secondary errors
+      try {
+        await AppErrorHandler.handleCriticalError(
+          'location_background_service',
+          error,
+          context: {
+            'platform': Platform.isAndroid ? 'android' : 'ios',
+            'is_tracking': _isTracking,
+          },
+        );
+      } catch (errorHandlerException) {
+        AppLogger.error('Error reporting failed during background location service error: $errorHandlerException');
+      }
       AppLogger.error('Failed to start background service', exception: error);
     });
     

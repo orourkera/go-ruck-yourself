@@ -431,12 +431,17 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                             // Use haptic feedback for better UX
                                             HapticFeedback.heavyImpact();
                                             
-                                            // Important: Use the singleton instance from GetIt
-                                            final socialBloc = getIt<SocialBloc>();
-                                            socialBloc.add(ToggleRuckLike(ruckId));
-                                            
-                                            // Log for debugging
-                                            AppLogger.debug('[SOCIAL_DEBUG] SessionDetailScreen: Like toggled for ruckId $ruckId');
+                                            // Ensure ruckId is not null before dispatching event
+                                            if (ruckId != null) {
+                                              // Important: Use the singleton instance from GetIt
+                                              final socialBloc = getIt<SocialBloc>();
+                                              socialBloc.add(ToggleRuckLike(ruckId));
+                                              
+                                              // Log for debugging
+                                              AppLogger.debug('[SOCIAL_DEBUG] SessionDetailScreen: Like toggled for ruckId $ruckId');
+                                            } else {
+                                              AppLogger.warning('[SOCIAL_DEBUG] SessionDetailScreen: Cannot toggle like - ruckId is null');
+                                            }
                                           },
                                           borderRadius: BorderRadius.circular(10),
                                           child: Padding(

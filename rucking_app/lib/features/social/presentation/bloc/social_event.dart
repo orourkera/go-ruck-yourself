@@ -20,7 +20,7 @@ class LoadRuckLikes extends SocialEvent {
 
 /// Event to toggle like status on a ruck session
 class ToggleRuckLike extends SocialEvent {
-  final int ruckId;
+  final int? ruckId;
 
   const ToggleRuckLike(this.ruckId);
 

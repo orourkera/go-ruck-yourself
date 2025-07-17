@@ -41,8 +41,16 @@ class LocationTrackingManager implements SessionManager {
   DateTime? _sessionStartTime;
   bool _isPaused = false;
   
-  // List of captured terrain segments for current session
+  // Terrain tracking
   final List<TerrainSegment> _terrainSegments = [];
+  
+  // Memory optimization constants
+  static const int _maxLocationPoints = 1000; // Keep last 1000 location points
+  static const int _maxTerrainSegments = 500; // Keep last 500 terrain segments
+  static const int _minLocationPointsToKeep = 100; // Always keep at least 100 points for UI calculations
+  
+  // Track successful uploads to avoid data loss
+  int _lastUploadedLocationIndex = 0;
 
   LocationTrackingManager({
     required LocationService locationService,
@@ -89,6 +97,7 @@ class LocationTrackingManager implements SessionManager {
     _terrainSegments.clear();
     _pendingLocationPoints.clear();
     _validLocationCount = 0;
+    _lastUploadedLocationIndex = 0; // Reset upload tracking
     
     // Check location permission
     final hasLocationAccess = await _locationService.hasLocationPermission();
@@ -118,6 +127,7 @@ class LocationTrackingManager implements SessionManager {
     _locationPoints.clear();
     _terrainSegments.clear();
     _pendingLocationPoints.clear();
+    _lastUploadedLocationIndex = 0; // Reset upload tracking
     
     _updateState(const LocationTrackingState());
   }
@@ -161,6 +171,9 @@ class LocationTrackingManager implements SessionManager {
     );
     
     _locationPoints.add(newPoint);
+    
+    // Check if we need to trim location points (only after successful uploads)
+    _trimLocationPointsIfNeeded();
 
   // Terrain tracking – attempt to capture a segment between the last point and this one
   if (_locationPoints.length >= 2) {
@@ -173,6 +186,13 @@ class LocationTrackingManager implements SessionManager {
         );
         if (segment != null) {
           _terrainSegments.add(segment);
+          
+          // Memory optimization: Keep only the last N terrain segments
+          if (_terrainSegments.length > _maxTerrainSegments) {
+            _terrainSegments.removeAt(0);
+            AppLogger.debug('[LOCATION_MANAGER] Trimmed terrain segments to ${_terrainSegments.length} (memory optimization)');
+          }
+          
           AppLogger.debug('[LOCATION_MANAGER] Captured terrain segment ${segment.surfaceType} for ${(segment.distanceKm * 1000).toStringAsFixed(1)}m');
         }
       }
@@ -237,9 +257,42 @@ class LocationTrackingManager implements SessionManager {
         _activeSessionId!,
         event.locationPoints.map<Map<String, dynamic>>((LocationPoint p) => p.toJson()).toList(),
       );
-      AppLogger.info('[LOCATION_MANAGER] Successfully uploaded ${event.locationPoints.length} location points');
+      
+      // Track successful upload for memory optimization
+      _lastUploadedLocationIndex += event.locationPoints.length;
+      AppLogger.info('[LOCATION_MANAGER] Successfully uploaded ${event.locationPoints.length} location points. Total uploaded: $_lastUploadedLocationIndex');
+      
+      // Now we can safely trim location points
+      _trimLocationPointsIfNeeded();
     } catch (e) {
       AppLogger.warning('[LOCATION_MANAGER] Failed to upload location batch: $e');
+      // Don't update _lastUploadedLocationIndex on failure - keep points in memory
+    }
+  }
+
+  /// Safely trim location points only after successful database uploads
+  void _trimLocationPointsIfNeeded() {
+    // Only trim if we have more than max points and we have successfully uploaded some
+    if (_locationPoints.length > _maxLocationPoints && _lastUploadedLocationIndex > 0) {
+      final pointsToRemove = _locationPoints.length - _maxLocationPoints;
+      final safePointsToRemove = pointsToRemove.clamp(0, _lastUploadedLocationIndex);
+      
+      if (safePointsToRemove > 0) {
+        // Remove from the beginning (oldest points that have been uploaded)
+        _locationPoints.removeRange(0, safePointsToRemove);
+        _lastUploadedLocationIndex -= safePointsToRemove;
+        
+        AppLogger.debug('[LOCATION_MANAGER] Trimmed $safePointsToRemove location points (memory optimization). '
+            'Remaining: ${_locationPoints.length}, Uploaded index: $_lastUploadedLocationIndex');
+      }
+    }
+    
+    // Also trim terrain segments if needed
+    if (_terrainSegments.length > _maxTerrainSegments) {
+      final segmentsToRemove = _terrainSegments.length - _maxTerrainSegments;
+      _terrainSegments.removeRange(0, segmentsToRemove);
+      AppLogger.debug('[LOCATION_MANAGER] Trimmed $segmentsToRemove terrain segments (memory optimization). '
+          'Remaining: ${_terrainSegments.length}');
     }
   }
 

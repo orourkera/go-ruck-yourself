@@ -41,15 +41,20 @@ class MemoryMonitorService {
           'platform': Platform.isIOS ? 'iOS' : 'Android',
         }.toString());
         
-        // Send to error handler for tracking
-        AppErrorHandler.handleCriticalError(
-          'critical_memory_usage',
-          Exception('Memory usage at ${memoryUsageMb.toStringAsFixed(1)}MB'),
-          context: {
-            'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
-            'platform': Platform.isIOS ? 'iOS' : 'Android',
-          },
-        );
+        // Send to error handler for tracking - wrapped to prevent secondary errors
+        try {
+          AppErrorHandler.handleCriticalError(
+            'critical_memory_usage',
+            Exception('Memory usage at ${memoryUsageMb.toStringAsFixed(1)}MB'),
+            context: {
+              'memory_usage_mb': memoryUsageMb.toStringAsFixed(1),
+              'platform': Platform.isIOS ? 'iOS' : 'Android',
+            },
+          );
+        } catch (errorHandlerException) {
+          // If error reporting fails, log it but don't crash monitoring
+          AppLogger.error('Error reporting failed during memory monitoring: $errorHandlerException');
+        }
         
       } else if (memoryUsageMb > _warningThresholdMb) {
         AppLogger.warning('High memory usage detected: ${memoryUsageMb.toStringAsFixed(1)}MB');
