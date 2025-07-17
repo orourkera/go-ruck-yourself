@@ -269,6 +269,10 @@ from .api.test_notification import TestNotificationResource
 # Apply rate limiting to SignInResource
 rate_limit_resource(SignInResource, "5 per minute")
 
+# Apply higher rate limit to UserProfileResource for normal profile operations
+app.logger.info("Setting UserProfileResource rate limit to: 1000 per hour")
+rate_limit_resource(UserProfileResource, "1000 per hour")
+
 # User authentication middleware
 @app.before_request
 def load_user():

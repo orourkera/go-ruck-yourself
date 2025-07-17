@@ -1009,7 +1009,7 @@ class SessionRepository {
   Future<String?> getCurrentUserId() async {
     try {
       // Try to get the user profile from API
-      final response = await _apiClient.get('/api/me');
+                final response = await _apiClient.get('/users/profile');
       if (response != null && response['id'] != null) {
         return response['id'].toString();
       }

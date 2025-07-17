@@ -113,7 +113,7 @@ class AuthServiceImpl implements AuthService {
   // Profile request cache to avoid rapid successive calls
   static Future<User>? _profileRequestCache;
   static DateTime? _lastProfileRequest;
-  static const Duration _profileCacheDuration = Duration(seconds: 5);
+  static const Duration _profileCacheDuration = Duration(seconds: 30); // Increased from 5 to 30 seconds
 
   AuthServiceImpl(this._apiClient, this._storageService) {
     _googleSignIn = GoogleSignIn(

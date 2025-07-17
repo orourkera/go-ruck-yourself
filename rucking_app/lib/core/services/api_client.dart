@@ -459,7 +459,7 @@ class ApiClient {
     try {
       // Ensure the token is available before making the request
       // The generic 'get' method will handle adding the auth token to headers if configured
-      final response = await get('/api/me'); 
+      final response = await get('/users/profile'); 
       // Assuming response is a Map<String, dynamic> representing the user
       return UserInfo.fromJson(response as Map<String, dynamic>);
     } catch (e) {
