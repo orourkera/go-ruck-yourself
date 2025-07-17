@@ -470,46 +470,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           builder: (_) => const AchievementsHubScreen(),
                         );
                       case '/profile':
-                        if (settings.name?.startsWith('/profile/') == true) {
-                          final path = settings.name ?? '';
-                          final userId = path.split('/').last;
-                          if (userId.isNotEmpty) {
-                            return MaterialPageRoute(builder: (_) {
-                              final authState = BlocProvider.of<AuthBloc>(_).state;
-                              final currentUserId = authState is Authenticated ? authState.user.userId : '';
-                              if (userId == currentUserId) {
-                                return const ProfileScreen();
-                              }
-                              return BlocProvider<PublicProfileBloc>(
-                                  create: (_) => getIt<PublicProfileBloc>()..add(LoadPublicProfile(userId)),
-                                  child: PublicProfileScreen(userId: userId),
-                                );
-                            });
-                          }
-                        }
-                        break;
-                      case '/followers':
-                        if (settings.name?.startsWith('/profile/') == true && settings.name?.endsWith('/followers') == true) {
-                          final path = settings.name ?? '';
-                          final parts = path.split('/');
-                          final userId = parts.length > 2 ? parts[2] : '';
-                          return MaterialPageRoute(builder: (_) => BlocProvider<SocialListBloc>(
-                            create: (_) => getIt<SocialListBloc>(),
-                            child: FollowersScreen(userId: userId, title: 'Followers', isFollowersPage: true),
-                          ));
-                        }
-                        break;
-                      case '/following':
-                        if (settings.name?.startsWith('/profile/') == true && settings.name?.endsWith('/following') == true) {
-                          final path = settings.name ?? '';
-                          final parts = path.split('/');
-                          final userId = parts.length > 2 ? parts[2] : '';
-                          return MaterialPageRoute(builder: (_) => BlocProvider<SocialListBloc>(
-                            create: (_) => getIt<SocialListBloc>(),
-                            child: FollowersScreen(userId: userId, title: 'Following', isFollowersPage: false),
-                          ));
-                        }
-                        break;
+                        return MaterialPageRoute(builder: (_) => const ProfileScreen());
                       case '/notification_settings':
                         return MaterialPageRoute(
                           builder: (_) => const NotificationSettingsScreen(),
@@ -742,15 +703,51 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           ),
                         );
                       default:
-                        // Handle dynamic public profile route: /profile/<userId>
-                        if (settings.name != null && settings.name!.startsWith('/profile/')) {
-                          final userId = settings.name!.substring('/profile/'.length);
-                          return MaterialPageRoute(
-                            builder: (_) => BlocProvider<PublicProfileBloc>(
-                              create: (_) => getIt<PublicProfileBloc>()..add(LoadPublicProfile(userId)),
-                              child: PublicProfileScreen(userId: userId),
-                            ),
-                          );
+                        // Handle dynamic routes
+                        if (settings.name != null) {
+                          final path = settings.name!;
+                          
+                          // Handle followers route: /profile/<userId>/followers
+                          if (path.startsWith('/profile/') && path.endsWith('/followers')) {
+                            final parts = path.split('/');
+                            final userId = parts.length > 2 ? parts[2] : '';
+                            if (userId.isNotEmpty) {
+                              return MaterialPageRoute(builder: (_) => BlocProvider<SocialListBloc>(
+                                create: (_) => getIt<SocialListBloc>(),
+                                child: FollowersScreen(userId: userId, title: 'Followers', isFollowersPage: true),
+                              ));
+                            }
+                          }
+                          
+                          // Handle following route: /profile/<userId>/following
+                          if (path.startsWith('/profile/') && path.endsWith('/following')) {
+                            final parts = path.split('/');
+                            final userId = parts.length > 2 ? parts[2] : '';
+                            if (userId.isNotEmpty) {
+                              return MaterialPageRoute(builder: (_) => BlocProvider<SocialListBloc>(
+                                create: (_) => getIt<SocialListBloc>(),
+                                child: FollowersScreen(userId: userId, title: 'Following', isFollowersPage: false),
+                              ));
+                            }
+                          }
+                          
+                          // Handle public profile route: /profile/<userId>
+                          if (path.startsWith('/profile/') && !path.contains('/followers') && !path.contains('/following')) {
+                            final userId = path.substring('/profile/'.length);
+                            if (userId.isNotEmpty) {
+                              return MaterialPageRoute(builder: (_) {
+                                final authState = BlocProvider.of<AuthBloc>(context).state;
+                                final currentUserId = authState is Authenticated ? authState.user.userId : '';
+                                if (userId == currentUserId) {
+                                  return const ProfileScreen();
+                                }
+                                return BlocProvider<PublicProfileBloc>(
+                                    create: (_) => getIt<PublicProfileBloc>()..add(LoadPublicProfile(userId)),
+                                    child: PublicProfileScreen(userId: userId),
+                                  );
+                              });
+                            }
+                          }
                         }
                         debugPrint('Unknown route: ${settings.name}');
                         return MaterialPageRoute(
