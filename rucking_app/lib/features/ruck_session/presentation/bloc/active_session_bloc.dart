@@ -192,6 +192,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       watchService: _watchService,
       storageService: GetIt.I<StorageService>(),
       apiClient: _apiClient,
+      connectivityService: _connectivityService,
       splitTrackingService: _splitTrackingService,
       terrainTracker: _terrainTracker,
       heartRateService: _heartRateService,
@@ -510,20 +511,33 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   Future<void> _onFetchSessionPhotosRequested(
     FetchSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
-    AppLogger.debug('Fetching session photos through coordinator');
+    AppLogger.debug('Fetching session photos for ruck ID: ${event.ruckId}');
     
-    // Delegate to coordinator if it exists
-    if (_coordinator != null) {
-      _coordinator!.add(event);
-    } else {
-      AppLogger.warning('No coordinator available for photo fetching, creating coordinator');
+    try {
+      // Fetch photos directly from the repository
+      final photos = await _sessionRepository.getSessionPhotos(event.ruckId);
       
-      // Create coordinator if it doesn't exist
-      _coordinator = _createCoordinator();
-      _setupCoordinatorSubscription();
+      // Update the current state with the fetched photos
+      final currentState = state;
+      if (currentState is ActiveSessionRunning) {
+        emit(currentState.copyWith(photos: photos));
+      } 
       
-      // Now delegate to the newly created coordinator
-      _coordinator!.add(event);
+      AppLogger.debug('Successfully fetched ${photos.length} photos for ruck ${event.ruckId}');
+    } catch (e, stackTrace) {
+      AppLogger.error('Failed to fetch session photos for ruck ${event.ruckId}', exception: e);
+      
+      // Log to Sentry for debugging
+      await AppErrorHandler.handleError(
+        'Fetch session photos',
+        e,
+        context: {
+          'ruck_id': event.ruckId,
+          'current_state': state.runtimeType.toString(),
+          'stack_trace': stackTrace.toString(),
+        },
+        severity: ErrorSeverity.error,
+      );
     }
   }
 

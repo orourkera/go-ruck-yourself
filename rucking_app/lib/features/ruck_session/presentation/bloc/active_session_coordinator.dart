@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
@@ -33,6 +35,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   final WatchService _watchService;
   final StorageService _storageService;
   final ApiClient _apiClient;
+  final ConnectivityService _connectivityService;
   final SplitTrackingService _splitTrackingService;
   final TerrainTracker _terrainTracker;
   final HeartRateService _heartRateService;
@@ -65,6 +68,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     required WatchService watchService,
     required StorageService storageService,
     required ApiClient apiClient,
+    required ConnectivityService connectivityService,
     required SplitTrackingService splitTrackingService,
     required TerrainTracker terrainTracker,
     required HeartRateService heartRateService,
@@ -74,6 +78,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         _watchService = watchService,
         _storageService = storageService,
         _apiClient = apiClient,
+        _connectivityService = connectivityService,
         _splitTrackingService = splitTrackingService,
         _terrainTracker = terrainTracker,
         _heartRateService = heartRateService,
@@ -97,6 +102,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     on<SessionRecoveryRequested>(_onSessionRecoveryRequested);
     on<SessionReset>(_onSessionReset);
     on<BatchLocationUpdated>(_onBatchLocationUpdated);
+    on<HeartRateBatchUploadRequested>(_onHeartRateBatchUploadRequested);
     on<StateAggregationRequested>(_onStateAggregationRequested);
     on<MemoryPressureDetected>(_onMemoryPressureDetected);
     
@@ -111,6 +117,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       watchService: _watchService,
       storageService: _storageService,
       apiClient: _apiClient,
+      connectivityService: _connectivityService,
     );
     
     // Initialize location manager
@@ -428,6 +435,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         ruckWeightKg: ruckWeightKg,
       );
       
+      // Update watch with calculated values from coordinator
+      _locationManager.updateWatchWithCalculatedValues(
+        calories: calories.round(),
+        elevationGain: _locationManager.elevationGain,
+        elevationLoss: _locationManager.elevationLoss,
+      );
+      
       _currentAggregatedState = ActiveSessionRunning(
         sessionId: lifecycleState.sessionId!,
         locationPoints: locationPoints,
@@ -477,13 +491,79 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   }) {
     if (distanceKm <= 0 || duration.inMinutes <= 0) return 0.0;
     
-    // MET value for rucking (approximation)
-    const baseMET = 8.0;
-    final totalWeightKg = userWeightKg + ruckWeightKg;
+    // Get elevation data from location manager
+    final elevationGain = _locationManager.elevationGain;
+    final elevationLoss = _locationManager.elevationLoss;
     
-    // Calories = MET * weight(kg) * time(hours)
-    final hours = duration.inMinutes / 60.0;
-    return baseMET * totalWeightKg * hours;
+    // Calculate terrain multiplier from terrain segments
+    final terrainMultiplier = _calculateTerrainMultiplier();
+    
+    // Get user's gender from auth service for more accurate calculation
+    String? gender;
+    try {
+      // This is async but we'll use a fallback for now
+      // TODO: Consider making this method async to get user's gender
+      gender = null; // Will use default calculation
+    } catch (e) {
+      AppLogger.warning('[COORDINATOR] Could not get user gender for calorie calculation: $e');
+    }
+    
+    // Use MetCalculator for sophisticated calorie calculation
+    final calories = MetCalculator.calculateRuckingCalories(
+      userWeightKg: userWeightKg,
+      ruckWeightKg: ruckWeightKg,
+      distanceKm: distanceKm,
+      elapsedSeconds: duration.inSeconds,
+      elevationGain: elevationGain,
+      elevationLoss: elevationLoss,
+      gender: gender,
+      terrainMultiplier: terrainMultiplier,
+    );
+    
+    AppLogger.debug('[COORDINATOR] CALORIE_CALCULATION: '
+        'distance=${distanceKm.toStringAsFixed(2)}km, '
+        'duration=${duration.inMinutes.toStringAsFixed(1)}min, '
+        'userWeight=${userWeightKg.toStringAsFixed(1)}kg, '
+        'ruckWeight=${ruckWeightKg.toStringAsFixed(1)}kg, '
+        'elevationGain=${elevationGain.toStringAsFixed(1)}m, '
+        'elevationLoss=${elevationLoss.toStringAsFixed(1)}m, '
+        'terrainMultiplier=${terrainMultiplier.toStringAsFixed(2)}x, '
+        'finalCalories=${calories.toStringAsFixed(0)}');
+    
+    return calories;
+  }
+  
+  /// Calculates the aggregate terrain multiplier based on terrain segments
+  /// Uses distance-weighted average of energy multipliers
+  double _calculateTerrainMultiplier() {
+    final terrainSegments = _locationManager.terrainSegments;
+    
+    if (terrainSegments.isEmpty) {
+      // No terrain data available, use default multiplier
+      return 1.0;
+    }
+    
+    double totalDistance = 0.0;
+    double weightedMultiplier = 0.0;
+    
+    for (final segment in terrainSegments) {
+      final segmentDistance = segment.distanceKm;
+      totalDistance += segmentDistance;
+      weightedMultiplier += segment.energyMultiplier * segmentDistance;
+    }
+    
+    if (totalDistance <= 0) {
+      return 1.0;
+    }
+    
+    final avgMultiplier = weightedMultiplier / totalDistance;
+    
+    AppLogger.debug('[COORDINATOR] TERRAIN_MULTIPLIER: '
+        'segments=${terrainSegments.length}, '
+        'totalDistance=${totalDistance.toStringAsFixed(2)}km, '
+        'avgMultiplier=${avgMultiplier.toStringAsFixed(2)}x');
+    
+    return avgMultiplier;
   }
   
   // Event handlers that delegate to managers
@@ -620,6 +700,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   
   Future<void> _onBatchLocationUpdated(
     BatchLocationUpdated event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    await _routeEventToManagers(event);
+  }
+  
+  Future<void> _onHeartRateBatchUploadRequested(
+    HeartRateBatchUploadRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
     await _routeEventToManagers(event);

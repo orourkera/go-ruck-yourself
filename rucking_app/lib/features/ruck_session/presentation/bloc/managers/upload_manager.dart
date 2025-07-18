@@ -25,7 +25,17 @@ class UploadManager implements SessionManager {
   bool _isProcessing = false;
   Timer? _uploadTimer;
   
+  // Sophisticated upload tracking
+  bool _isBatchUploadInProgress = false;
+  DateTime? _lastUploadTime;
+  Duration _batchUploadInterval = const Duration(minutes: 2);
+  int _uploadSuccessCount = 0;
+  int _uploadFailureCount = 0;
+  final Map<String, int> _uploadStats = {};
+  
   static const int _maxRetries = 3;
+  static const int _maxQueueSize = 100;
+  static const Duration _uploadTimeout = Duration(seconds: 30);
   
   UploadManager({
     required SessionRepository sessionRepository,
@@ -51,6 +61,8 @@ class UploadManager implements SessionManager {
       await _onSessionStopped(event);
     } else if (event is BatchLocationUpdated) {
       await _onBatchLocationUpdated(event);
+    } else if (event is HeartRateBatchUploadRequested) {
+      await _onHeartRateBatchUploadRequested(event);
     } else if (event is MemoryPressureDetected) {
       await _onMemoryPressureDetected(event);
     }
@@ -59,8 +71,14 @@ class UploadManager implements SessionManager {
   Future<void> _onSessionStarted(SessionStartRequested event) async {
     _activeSessionId = event.sessionId;
     
-    // Start upload timer
-    _startUploadTimer();
+    // Start sophisticated batch upload timer
+    _startSophisticatedUploadTimer();
+    
+    // Reset upload statistics
+    _uploadSuccessCount = 0;
+    _uploadFailureCount = 0;
+    _uploadStats.clear();
+    _isBatchUploadInProgress = false;
     
     _updateState(_currentState.copyWith(
       pendingLocationPoints: 0,
@@ -71,6 +89,8 @@ class UploadManager implements SessionManager {
     
     // Check for any pending offline uploads
     await _loadOfflineData();
+    
+    AppLogger.info('[UPLOAD_MANAGER] Sophisticated batch upload system started for session: $_activeSessionId');
   }
 
   Future<void> _onSessionStopped(SessionStopRequested event) async {
@@ -108,7 +128,34 @@ class UploadManager implements SessionManager {
     AppLogger.debug('[UPLOAD_MANAGER] Added location batch to queue. Pending: ${_uploadQueue.length}');
   }
   
-  /// Handle memory pressure detection by triggering aggressive upload
+  Future<void> _onHeartRateBatchUploadRequested(HeartRateBatchUploadRequested event) async {
+    if (_activeSessionId == null || _activeSessionId!.startsWith('offline_')) {
+      // Save offline for later sync
+      AppLogger.debug('[UPLOAD_MANAGER] Offline session, skipping heart rate upload');
+      return;
+    }
+    
+    // Convert heart rate samples to uploadable format
+    final heartRateData = event.samples.map((sample) => {
+      'bpm': sample.bpm,
+      'timestamp': sample.timestamp.toIso8601String(),
+      'session_id': _activeSessionId,
+    }).toList();
+    
+    // Add to upload queue
+    _uploadQueue.add({
+      'type': 'heart_rate_batch',
+      'data': heartRateData,
+      'retries': 0,
+    });
+    
+    _updateState(_currentState.copyWith(
+      pendingHeartRateSamples: _uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length,
+    ));
+    
+    AppLogger.debug('[UPLOAD_MANAGER] Added heart rate batch to queue. Pending HR batches: ${_uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length}');
+  }
+
   Future<void> _onMemoryPressureDetected(MemoryPressureDetected event) async {
     AppLogger.error('[UPLOAD_MANAGER] MEMORY_PRESSURE: ${event.memoryUsageMb}MB detected, triggering aggressive upload');
     
@@ -121,11 +168,112 @@ class UploadManager implements SessionManager {
     AppLogger.info('[UPLOAD_MANAGER] MEMORY_PRESSURE: Aggressive upload completed');
   }
 
-  void _startUploadTimer() {
+  void _startSophisticatedUploadTimer() {
     _uploadTimer?.cancel();
-    _uploadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      _processUploadQueue();
+    _uploadTimer = Timer.periodic(_batchUploadInterval, (timer) async {
+      if (_isBatchUploadInProgress) {
+        AppLogger.debug('[UPLOAD_MANAGER] Batch upload already in progress, skipping...');
+        return;
+      }
+      
+      if (_uploadQueue.isEmpty) {
+        AppLogger.debug('[UPLOAD_MANAGER] No uploads pending, skipping batch upload');
+        return;
+      }
+      
+      await _processBatchUploadWithProgress();
     });
+    
+    AppLogger.info('[UPLOAD_MANAGER] Sophisticated batch upload timer started - '
+        'uploading every ${_batchUploadInterval.inMinutes} minutes');
+  }
+  
+  /// Process batch upload with sophisticated progress tracking
+  Future<void> _processBatchUploadWithProgress() async {
+    if (_isBatchUploadInProgress) return;
+    
+    _isBatchUploadInProgress = true;
+    final batchStartTime = DateTime.now();
+    final initialQueueSize = _uploadQueue.length;
+    
+    AppLogger.info('[UPLOAD_MANAGER] Starting batch upload - ${initialQueueSize} items in queue');
+    
+    _updateState(_currentState.copyWith(
+      isUploading: true,
+      errorMessage: null,
+    ));
+    
+    try {
+      int successCount = 0;
+      int failureCount = 0;
+      
+      // Process uploads in batches of 10 for better performance
+      while (_uploadQueue.isNotEmpty && successCount + failureCount < initialQueueSize) {
+        final batchToProcess = <Map<String, dynamic>>[];
+        
+        // Take up to 10 items from queue
+        for (int i = 0; i < 10 && _uploadQueue.isNotEmpty; i++) {
+          batchToProcess.add(_uploadQueue.removeFirst());
+        }
+        
+        // Process this batch
+        for (final upload in batchToProcess) {
+          try {
+            await _processUploadItem(upload);
+            successCount++;
+            _uploadSuccessCount++;
+            
+            // Update statistics
+            final uploadType = upload['type'] as String;
+            _uploadStats[uploadType] = (_uploadStats[uploadType] ?? 0) + 1;
+            
+          } catch (e) {
+            failureCount++;
+            _uploadFailureCount++;
+            
+            // Handle upload failure
+            await _handleUploadFailure(upload, e);
+            
+            AppLogger.warning('[UPLOAD_MANAGER] Upload failed: $e');
+          }
+        }
+        
+        // Update progress
+        _updateState(_currentState.copyWith(
+          pendingLocationPoints: _uploadQueue.length,
+          isUploading: _uploadQueue.isNotEmpty,
+        ));
+        
+        // Small delay between batches to prevent overwhelming the server
+        if (_uploadQueue.isNotEmpty) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+      }
+      
+      final batchDuration = DateTime.now().difference(batchStartTime);
+      _lastUploadTime = DateTime.now();
+      
+      AppLogger.info('[UPLOAD_MANAGER] Batch upload completed - '
+          'Success: $successCount, Failures: $failureCount, '
+          'Duration: ${batchDuration.inSeconds}s, '
+          'Total Success: $_uploadSuccessCount, Total Failures: $_uploadFailureCount');
+      
+      _updateState(_currentState.copyWith(
+        isUploading: false,
+        pendingLocationPoints: _uploadQueue.length,
+        errorMessage: failureCount > 0 ? '$failureCount uploads failed' : null,
+      ));
+      
+    } catch (e) {
+      AppLogger.error('[UPLOAD_MANAGER] Batch upload process failed: $e');
+      
+      _updateState(_currentState.copyWith(
+        isUploading: false,
+        errorMessage: 'Batch upload failed: $e',
+      ));
+    } finally {
+      _isBatchUploadInProgress = false;
+    }
   }
 
   Future<void> _processUploadQueue() async {
@@ -138,27 +286,46 @@ class UploadManager implements SessionManager {
       final upload = _uploadQueue.removeFirst();
       
       try {
-        // Note: The API currently doesn't support live batch uploads
-        // This is a placeholder for future implementation
-        // For now, data will be uploaded on session completion
+        // Process different upload types with actual server calls
+        final uploadType = upload['type'] as String;
+        final uploadData = upload['data'];
         
-        AppLogger.debug('[UPLOAD_MANAGER] Queued upload processed: ${upload['type']}');
+        AppLogger.info('[UPLOAD_MANAGER] Processing ${uploadType} upload for session $_activeSessionId');
+        
+        switch (uploadType) {
+          case 'location_batch':
+            await _uploadLocationBatch(uploadData as List<LocationPoint>);
+            break;
+          case 'heart_rate_batch':
+            await _uploadHeartRateBatch(uploadData as List<Map<String, dynamic>>);
+            break;
+          case 'terrain_segments':
+            await _uploadTerrainSegments(uploadData as List<Map<String, dynamic>>);
+            break;
+          default:
+            AppLogger.warning('[UPLOAD_MANAGER] Unknown upload type: $uploadType');
+        }
+        
+        AppLogger.info('[UPLOAD_MANAGER] Successfully uploaded ${uploadType} batch');
         
         _updateState(_currentState.copyWith(
           lastUploadTime: DateTime.now(),
+          errorMessage: null,
         ));
         
       } catch (e) {
-        AppLogger.error('[UPLOAD_MANAGER] Upload failed: $e');
+        AppLogger.error('[UPLOAD_MANAGER] Upload failed for ${upload['type']}: $e');
         
         // Retry logic
         upload['retries'] = (upload['retries'] ?? 0) + 1;
         
         if (upload['retries'] < _maxRetries) {
           _uploadQueue.add(upload); // Re-add to queue
+          AppLogger.info('[UPLOAD_MANAGER] Retrying upload (${upload['retries']}/$_maxRetries)');
         } else {
           // Save failed upload for manual retry later
           await _saveFailedUpload(upload);
+          AppLogger.warning('[UPLOAD_MANAGER] Max retries exceeded, saving for later: ${upload['type']}');
         }
         
         _updateState(_currentState.copyWith(
@@ -291,9 +458,147 @@ class UploadManager implements SessionManager {
     }
   }
 
+  /// Upload location batch to server
+  Future<void> _uploadLocationBatch(List<LocationPoint> locations) async {
+    if (_activeSessionId == null || locations.isEmpty) return;
+    
+    AppLogger.info('[UPLOAD_MANAGER] Uploading ${locations.length} location points');
+    
+    final locationData = locations.map((point) => point.toJson()).toList();
+    
+    await _apiClient.post('/rucks/$_activeSessionId/location-batch', {
+      'location_points': locationData,
+      'batch_timestamp': DateTime.now().toIso8601String(),
+    });
+    
+    AppLogger.info('[UPLOAD_MANAGER] Location batch uploaded successfully');
+  }
+  
+  /// Upload heart rate batch to server
+  Future<void> _uploadHeartRateBatch(List<Map<String, dynamic>> heartRateData) async {
+    if (_activeSessionId == null || heartRateData.isEmpty) return;
+    
+    AppLogger.info('[UPLOAD_MANAGER] Uploading ${heartRateData.length} heart rate samples');
+    
+    await _apiClient.post('/rucks/$_activeSessionId/heart-rate-batch', {
+      'heart_rate_samples': heartRateData,
+      'batch_timestamp': DateTime.now().toIso8601String(),
+    });
+    
+    AppLogger.info('[UPLOAD_MANAGER] Heart rate batch uploaded successfully');
+  }
+  
+  /// Upload terrain segments to server
+  Future<void> _uploadTerrainSegments(List<Map<String, dynamic>> terrainData) async {
+    if (_activeSessionId == null || terrainData.isEmpty) return;
+    
+    AppLogger.info('[UPLOAD_MANAGER] Uploading ${terrainData.length} terrain segments');
+    
+    await _apiClient.post('/rucks/$_activeSessionId/terrain-batch', {
+      'terrain_segments': terrainData,
+      'batch_timestamp': DateTime.now().toIso8601String(),
+    });
+    
+    AppLogger.info('[UPLOAD_MANAGER] Terrain batch uploaded successfully');
+  }
+
   void _updateState(UploadState newState) {
     _currentState = newState;
     _stateController.add(newState);
+  }
+
+  /// Process individual upload item with timeout
+  Future<void> _processUploadItem(Map<String, dynamic> uploadItem) async {
+    final uploadType = uploadItem['type'] as String;
+    final data = uploadItem['data'];
+    
+    switch (uploadType) {
+      case 'location_batch':
+        await _uploadLocationBatch(data as List<LocationPoint>)
+            .timeout(_uploadTimeout);
+        break;
+      case 'heart_rate_batch':
+        await _uploadHeartRateBatch(data as List<Map<String, dynamic>>)
+            .timeout(_uploadTimeout);
+        break;
+      case 'terrain_batch':
+        await _uploadTerrainSegments(data as List<Map<String, dynamic>>)
+            .timeout(_uploadTimeout);
+        break;
+      default:
+        throw Exception('Unknown upload type: $uploadType');
+    }
+  }
+  
+  /// Handle upload failure with retry logic
+  Future<void> _handleUploadFailure(Map<String, dynamic> uploadItem, dynamic error) async {
+    final retries = (uploadItem['retries'] as int? ?? 0) + 1;
+    
+    if (retries < _maxRetries) {
+      // Retry the upload
+      uploadItem['retries'] = retries;
+      _uploadQueue.add(uploadItem);
+      
+      AppLogger.warning('[UPLOAD_MANAGER] Upload failed, retrying (attempt $retries/$_maxRetries): $error');
+    } else {
+      // Save for later retry
+      await _saveFailedUpload(uploadItem);
+      
+      AppLogger.error('[UPLOAD_MANAGER] Upload failed after $_maxRetries attempts, saving for later: $error');
+    }
+  }
+  
+  /// Get upload statistics
+  Map<String, dynamic> getUploadStats() {
+    return {
+      'successCount': _uploadSuccessCount,
+      'failureCount': _uploadFailureCount,
+      'pendingUploads': _uploadQueue.length,
+      'isUploading': _isBatchUploadInProgress,
+      'lastUploadTime': _lastUploadTime?.toIso8601String(),
+      'uploadsByType': Map.from(_uploadStats),
+      'batchUploadInterval': _batchUploadInterval.inMinutes,
+    };
+  }
+  
+  /// Update batch upload interval for performance optimization
+  void updateBatchUploadInterval(Duration newInterval) {
+    if (newInterval != _batchUploadInterval) {
+      _batchUploadInterval = newInterval;
+      
+      // Restart timer with new interval
+      if (_uploadTimer != null) {
+        _startSophisticatedUploadTimer();
+      }
+      
+      AppLogger.info('[UPLOAD_MANAGER] Batch upload interval updated to ${newInterval.inMinutes} minutes');
+    }
+  }
+  
+  /// Force immediate batch upload
+  Future<void> forceUpload() async {
+    if (_uploadQueue.isEmpty) {
+      AppLogger.debug('[UPLOAD_MANAGER] No uploads to force');
+      return;
+    }
+    
+    AppLogger.info('[UPLOAD_MANAGER] Forcing immediate batch upload');
+    await _processBatchUploadWithProgress();
+  }
+  
+  /// Check if upload queue is getting too large
+  bool _isQueueOverloaded() {
+    return _uploadQueue.length > _maxQueueSize;
+  }
+  
+  /// Handle queue overload by processing oldest uploads
+  Future<void> _handleQueueOverload() async {
+    if (!_isQueueOverloaded()) return;
+    
+    AppLogger.warning('[UPLOAD_MANAGER] Upload queue overloaded (${_uploadQueue.length} items), '
+        'forcing immediate upload');
+    
+    await _processBatchUploadWithProgress();
   }
 
   @override
@@ -306,6 +611,8 @@ class UploadManager implements SessionManager {
   // Getters for coordinator
   int get pendingUploads => _uploadQueue.length;
   bool get isUploading => _currentState.isUploading;
+  bool get isBatchUploadInProgress => _isBatchUploadInProgress;
+  Map<String, dynamic> get uploadStats => getUploadStats();
 }
 
 /// Represents a task in the upload queue

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' as math;
 
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
@@ -15,6 +16,7 @@ import '../../../domain/models/session_split.dart';
 import '../../../domain/services/split_tracking_service.dart';
 import '../../../../../core/services/terrain_tracker.dart';
 import '../../../../../core/utils/location_validator.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/location_validation_service.dart';
 import '../events/session_events.dart';
 import '../models/manager_states.dart';
 import 'session_manager.dart';
@@ -27,6 +29,7 @@ class LocationTrackingManager implements SessionManager {
   final ApiClient _apiClient;
   final WatchService _watchService;
   final AuthService _authService;
+  final LocationValidationService _validationService = LocationValidationService();
   
   final StreamController<LocationTrackingState> _stateController;
   LocationTrackingState _currentState;
@@ -37,10 +40,27 @@ class LocationTrackingManager implements SessionManager {
   final Queue<LocationPoint> _pendingLocationPoints = Queue();
   final Queue<TerrainSegment> _pendingTerrainSegments = Queue();
   
-  DateTime? _lastLocationTimestamp = DateTime.now();
+  // Internal state
+  LocationPoint? _lastValidLocation;
+  LocationPoint? _lastRecordedLocation;
+  DateTime? _lastLocationTimestamp;
   int _validLocationCount = 0;
+  double _totalDistance = 0.0;
+  double _elevationGain = 0.0;
+  double _elevationLoss = 0.0;
   Timer? _batchUploadTimer;
   Timer? _watchdogTimer;
+  
+  // Pace calculation optimization
+  int _paceTickCounter = 0;
+  double? _cachedCurrentPace;
+  double? _cachedAveragePace;
+  DateTime? _lastPaceCalculation;
+  
+  // Timer coordination
+  bool _isWatchdogActive = false;
+  DateTime? _watchdogStartTime;
+  int _watchdogRestartCount = 0;
   
   // Session info from lifecycle manager
   String? _activeSessionId;
@@ -119,15 +139,28 @@ class LocationTrackingManager implements SessionManager {
     _pendingTerrainSegments.clear();
     _validLocationCount = 0;
     _lastUploadedLocationIndex = 0; // Reset upload tracking
+    _lastValidLocation = null; // Reset validation state
+    
+    // Reset comprehensive validation service
+    _validationService.reset();
     
     // CRITICAL FIX: Force garbage collection after clearing large lists
     _triggerGarbageCollection();
     
-    AppLogger.info('[LOCATION_MANAGER] MEMORY_RESET: Session started, all lists cleared and GC triggered');
+    AppLogger.info('[LOCATION_MANAGER] MEMORY_RESET: Session started, all lists cleared and validation reset');
     
-    // Check location permission
-    final hasLocationAccess = await _locationService.hasLocationPermission();
-    
+    // Check location permission with request fallback (like version 2.5)
+    bool hasLocationAccess = await _locationService.hasLocationPermission();
+    if (!hasLocationAccess) {
+      AppLogger.info('[LOCATION_MANAGER] Requesting location permission...');
+      hasLocationAccess = await _locationService.requestLocationPermission();
+    }
+  
+    if (!hasLocationAccess) {
+      AppLogger.warning('[LOCATION_MANAGER] Location permission denied - starting session in offline mode (no GPS tracking)');
+      // Don't fail the session - allow offline mode for indoor rucks, airplanes, etc.
+    }
+  
     _updateState(_currentState.copyWith(
       locations: [],
       totalDistance: 0.0,
@@ -137,11 +170,11 @@ class LocationTrackingManager implements SessionManager {
       altitude: 0.0,
       isTracking: hasLocationAccess,
     ));
-    
+  
     if (hasLocationAccess) {
       await _startLocationTracking();
     } else {
-      AppLogger.warning('[LOCATION_MANAGER] No location permission, tracking disabled');
+      AppLogger.warning('[LOCATION_MANAGER] No location permission, session continues in offline mode');
     }
   }
 
@@ -212,10 +245,9 @@ class LocationTrackingManager implements SessionManager {
   Future<void> _onTick(Tick event) async {
     if (_activeSessionId == null) return;
     
-    // Update watch with current timer - this ensures the watch timer counts up live
-    // even when there are no location updates
-    final currentState = _currentState;
-    _updateWatchWithSessionData(currentState);
+    // NOTE: Watch timer updates now handled by coordinator
+    // The coordinator aggregates state and updates watch with proper calculated values
+    // This tick event is still needed for other timer-based functionality
   }
 
   Future<void> _onLocationUpdated(LocationUpdated event) async {
@@ -223,14 +255,6 @@ class LocationTrackingManager implements SessionManager {
     
     final position = event.position;
     _lastLocationTimestamp = DateTime.now();
-    
-    // Validate location
-    if (!LocationValidator.isValidPosition(position)) {
-      AppLogger.warning('[LOCATION_MANAGER] Invalid location: ${position.latitude}, ${position.longitude}');
-      return;
-    }
-    
-    _validLocationCount++;
     
     // Create location point
     final newPoint = LocationPoint(
@@ -241,6 +265,18 @@ class LocationTrackingManager implements SessionManager {
       timestamp: DateTime.now().toUtc(),
       speed: position.speed,
     );
+    
+    // Use comprehensive validation from version 2.5
+    final validationResult = _validationService.validateLocationPoint(newPoint, _lastValidLocation);
+    
+    if (!(validationResult['isValid'] as bool? ?? false)) {
+      final String message = validationResult['message'] as String? ?? 'Validation failed';
+      AppLogger.warning('[LOCATION_MANAGER] Location validation failed: $message');
+      return;
+    }
+    
+    _validLocationCount++;
+    _lastValidLocation = newPoint;
     
     // Add to location points
     _locationPoints.add(newPoint);
@@ -273,12 +309,29 @@ class LocationTrackingManager implements SessionManager {
         AppLogger.error('[LOCATION_MANAGER] Error capturing terrain segment: $e');
       }
     }
-    
-    // Calculate metrics
-    final newDistance = _calculateTotalDistance();
-    final newPace = _calculateCurrentPace(position.speed);
+    // Calculate metrics with comprehensive distance filtering
+    final newDistance = _calculateTotalDistanceWithValidation();
+    final newPace = _calculateCurrentPace(position.speed ?? 0.0);
     final newAveragePace = _calculateAveragePace(newDistance);
-    final elevationData = _calculateElevation();
+    
+    // Calculate elevation gain/loss for this segment using validation service (like version 2.5)
+    double elevationGain = 0.0;
+    double elevationLoss = 0.0;
+    if (_locationPoints.length >= 2) {
+      final prevPoint = _locationPoints[_locationPoints.length - 2];
+      final elevationResult = _validationService.validateElevationChange(
+        prevPoint,
+        newPoint,
+        minChangeMeters: 2.0, // Filter out GPS noise smaller than 2m (version 2.5 logic)
+      );
+      elevationGain = elevationResult['gain']!;
+      elevationLoss = elevationResult['loss']!;
+    }
+    
+    // Update cumulative elevation (add this segment's elevation to current totals)
+    final currentElevationData = _calculateElevationGain();
+    final newElevationGain = (currentElevationData['gain'] ?? 0.0) + elevationGain;
+    final newElevationLoss = (currentElevationData['loss'] ?? 0.0) + elevationLoss;
     
     // Update splits
     if (_sessionStartTime != null) {
@@ -287,7 +340,7 @@ class LocationTrackingManager implements SessionManager {
         sessionStartTime: _sessionStartTime!,
         elapsedSeconds: DateTime.now().difference(_sessionStartTime!).inSeconds,
         isPaused: _isPaused,
-        currentElevationGain: elevationData.gain,
+        currentElevationGain: newElevationGain,
       );
     }
     
@@ -319,6 +372,9 @@ class LocationTrackingManager implements SessionManager {
       averagePace: newAveragePace,
       currentSpeed: position.speed,
       altitude: position.altitude,
+      isGpsReady: _validLocationCount > 5, // GPS ready state from version 2.5
+      elevationGain: newElevationGain,
+      elevationLoss: newElevationLoss,
     ));
   }
 
@@ -523,9 +579,12 @@ class LocationTrackingManager implements SessionManager {
           handleEvent(LocationUpdated(position: position));
         },
         onError: (error) {
-          AppLogger.error('[LOCATION_MANAGER] Location stream error: $error');
+          AppLogger.warning('[LOCATION_MANAGER] Location tracking error (continuing session without GPS): $error');
+          // Don't stop the session - continue in offline mode without location updates
+          // This allows users to ruck indoors, on airplanes, or in poor GPS areas
           _updateState(_currentState.copyWith(
-            errorMessage: 'Location tracking error: $error',
+            isTracking: false,
+            errorMessage: 'GPS unavailable - session continues in offline mode',
           ));
         },
       );
@@ -578,17 +637,75 @@ class LocationTrackingManager implements SessionManager {
     AppLogger.info('[LOCATION_MANAGER] Location tracking fully stopped, session ID cleared');
   }
 
+  /// Start sophisticated watchdog timer to monitor GPS health
   void _startWatchdog() {
     _watchdogTimer?.cancel();
+    _isWatchdogActive = true;
+    _watchdogStartTime = DateTime.now();
+    _watchdogRestartCount = 0;
+    
     _watchdogTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (_lastLocationTimestamp != null && DateTime.now().difference(_lastLocationTimestamp!).inSeconds > 60 && 
-          _validLocationCount > 0) {
-        AppLogger.warning('[LOCATION_MANAGER] Watchdog: No valid location for 60s. Restarting location service.');
-        _locationService.stopLocationTracking();
-        _startLocationTracking();
-        _lastLocationTimestamp = DateTime.now();
+      if (!_isWatchdogActive) return;
+      
+      final now = DateTime.now();
+      final timeSinceLastLocation = _lastLocationTimestamp != null 
+          ? now.difference(_lastLocationTimestamp!).inSeconds
+          : 0;
+      
+      // Only restart if we've had valid locations before and haven't received any for 60s
+      if (timeSinceLastLocation > 60 && _validLocationCount > 0) {
+        _watchdogRestartCount++;
+        
+        AppLogger.warning('[LOCATION] Watchdog: No valid location for ${timeSinceLastLocation}s. '
+            'Restarting location service (attempt $_watchdogRestartCount).');
+        
+        // Adaptive restart strategy
+        if (_watchdogRestartCount <= 3) {
+          // Normal restart for first 3 attempts
+          _locationService.stopLocationTracking();
+          _startLocationTracking();
+          _lastLocationTimestamp = now;
+        } else if (_watchdogRestartCount <= 6) {
+          // Request high accuracy for next 3 attempts
+          AppLogger.info('[LOCATION] Watchdog: Requesting high accuracy mode');
+          _locationService.stopLocationTracking();
+          _startLocationTracking();
+          _lastLocationTimestamp = now;
+        } else {
+          // Give up and switch to offline mode
+          AppLogger.error('[LOCATION] Watchdog: GPS restart failed after 6 attempts. '
+              'Switching to offline mode.');
+          _stopWatchdog();
+          
+          // Emit offline state
+          _updateState(_currentState.copyWith(
+            isGpsReady: false,
+            errorMessage: 'GPS unavailable - session continues in offline mode',
+          ));
+          
+          // Clear error message after 5 seconds
+          Timer(const Duration(seconds: 5), () {
+            _updateState(_currentState.copyWith(
+              errorMessage: null,
+            ));
+          });
+        }
+      }
+      
+      // Reset restart counter if we've been getting good locations
+      if (timeSinceLastLocation < 30 && _watchdogRestartCount > 0) {
+        _watchdogRestartCount = 0;
+        AppLogger.info('[LOCATION] Watchdog: GPS health restored, reset restart counter');
       }
     });
+  }
+  
+  /// Stop watchdog timer
+  void _stopWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    _isWatchdogActive = false;
+    _watchdogStartTime = null;
   }
 
   Future<void> _processBatchUpload() async {
@@ -604,42 +721,205 @@ class LocationTrackingManager implements SessionManager {
   }
 
   double _calculateTotalDistance() {
-    if (_locationPoints.length < 2) return 0.0;
+  if (_locationPoints.length < 2) return 0.0;
+  
+  double totalDistance = 0.0;
+  for (int i = 1; i < _locationPoints.length; i++) {
+    final distance = Geolocator.distanceBetween(
+      _locationPoints[i - 1].latitude,
+      _locationPoints[i - 1].longitude,
+      _locationPoints[i].latitude,
+      _locationPoints[i].longitude,
+    );
     
-    double totalDistance = 0.0;
-    for (int i = 1; i < _locationPoints.length; i++) {
-      final distance = Geolocator.distanceBetween(
-        _locationPoints[i - 1].latitude,
-        _locationPoints[i - 1].longitude,
-        _locationPoints[i].latitude,
-        _locationPoints[i].longitude,
-      );
+    // Only count movement greater than 5 meters to filter GPS drift
+    // This matches the system-level filtering we had in version 2.5
+    if (distance >= 5.0) {
       totalDistance += distance;
     }
-    
-    return totalDistance / 1000; // Convert to km
   }
+  
+  return totalDistance / 1000; // Convert to km
+}
+
+/// Calculate total distance with comprehensive validation and filtering
+/// This includes initial distance tracking and movement filtering from version 2.5
+double _calculateTotalDistanceWithValidation() {
+  if (_locationPoints.length < 2) return 0.0;
+  
+  // Only start counting distance after reaching initial distance threshold
+  // This prevents GPS noise from accumulating at the start
+  if (!_validationService.isInitialDistanceReached) {
+    return 0.0;
+  }
+  
+  double totalDistance = 0.0;
+  
+  // Find the index where we reached the initial distance threshold
+  double cumulativeDistance = 0.0;
+  int startIndex = 1;
+  
+  for (int i = 1; i < _locationPoints.length; i++) {
+    final distance = Geolocator.distanceBetween(
+      _locationPoints[i - 1].latitude,
+      _locationPoints[i - 1].longitude,
+      _locationPoints[i].latitude,
+      _locationPoints[i].longitude,
+    );
+    
+    cumulativeDistance += distance;
+    
+    // Start counting after initial distance threshold
+    if (cumulativeDistance >= LocationValidationService.minInitialDistanceMeters) {
+      startIndex = i;
+      break;
+    }
+  }
+  
+  // Count distance from the start index onward with movement filtering
+  for (int i = startIndex; i < _locationPoints.length; i++) {
+    final distance = Geolocator.distanceBetween(
+      _locationPoints[i - 1].latitude,
+      _locationPoints[i - 1].longitude,
+      _locationPoints[i].latitude,
+      _locationPoints[i].longitude,
+    );
+    
+    // Only count movement greater than 5 meters to filter GPS drift
+    // This matches the system-level filtering we had in version 2.5
+    if (distance >= 5.0) {
+      totalDistance += distance;
+    }
+  }
+  
+  return totalDistance / 1000; // Convert to km
+}  
 
   double _calculateCurrentPace(double speedMs) {
-    if (speedMs <= 0.1) return 0.0; // Very slow or stationary
+    // Only recalculate pace every 5 seconds for performance optimization
+    final now = DateTime.now();
+    if (_cachedCurrentPace != null && _lastPaceCalculation != null) {
+      final timeSinceLastCalc = now.difference(_lastPaceCalculation!).inSeconds;
+      if (timeSinceLastCalc < 5) {
+        return _cachedCurrentPace!;
+      }
+    }
     
-    final speedKmh = speedMs * 3.6;
-    if (speedKmh <= 0.5) return 0.0; // Below walking threshold
+    double pace = 0.0;
     
-    return 60 / speedKmh; // min/km
+    // For more reliable pace calculation, use distance-based method for slow speeds
+    // GPS speed is often inaccurate for walking/rucking speeds
+    
+    // Method 1: Try GPS speed first (for faster movement)
+    if (speedMs > 1.0) { // > 3.6 km/h, GPS speed is more reliable
+      final speedKmh = speedMs * 3.6;
+      pace = 3600 / speedKmh; // seconds/km
+    }
+    // Method 2: Calculate from recent distance (for slower movement)
+    else if (_locationPoints.length >= 2) {
+      final lastPoint = _locationPoints[_locationPoints.length - 1];
+      final prevPoint = _locationPoints[_locationPoints.length - 2];
+      
+      final distanceKm = Geolocator.distanceBetween(
+        prevPoint.latitude,
+        prevPoint.longitude,
+        lastPoint.latitude,
+        lastPoint.longitude,
+      ) / 1000; // Convert to km
+      
+      final timeSeconds = lastPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
+      
+      if (timeSeconds > 0 && distanceKm > 0) {
+        final speedKmh = (distanceKm / timeSeconds) * 3600;
+        if (speedKmh > 0.5) { // Must be above walking threshold
+          pace = 3600 / speedKmh; // seconds/km
+        }
+      }
+    }
+    // Method 3: Fallback to GPS speed with lower thresholds
+    else if (speedMs > 0.1) {
+      final speedKmh = speedMs * 3.6;
+      if (speedKmh > 0.3) { // Lower threshold for fallback
+        pace = 3600 / speedKmh; // seconds/km
+      }
+    }
+    
+    // Cache the result with timestamp
+    _cachedCurrentPace = pace;
+    _lastPaceCalculation = now;
+    
+    return pace;
   }
 
-  double _calculateAveragePace(double distanceKm) {
-    if (distanceKm <= 0 || _sessionStartTime == null) return 0.0;
+  /// Calculate average pace based on total distance and elapsed time
+  double _calculateAveragePace(double totalDistanceKm) {
+    // Use cached value if available and recent
+    final now = DateTime.now();
+    if (_cachedAveragePace != null && _lastPaceCalculation != null) {
+      final timeSinceLastCalc = now.difference(_lastPaceCalculation!).inSeconds;
+      if (timeSinceLastCalc < 5) {
+        return _cachedAveragePace!;
+      }
+    }
     
-    final elapsedMinutes = DateTime.now().difference(_sessionStartTime!).inMinutes;
-    if (elapsedMinutes <= 0) return 0.0;
+    double averagePace = 0.0;
     
-    return elapsedMinutes / distanceKm;
+    if (_sessionStartTime != null && totalDistanceKm > 0.01) {
+      // Calculate elapsed time in hours
+      final elapsedTime = DateTime.now().difference(_sessionStartTime!).inMilliseconds / 1000.0;
+      final elapsedHours = elapsedTime / 3600.0;
+      
+      if (elapsedHours > 0) {
+        // Calculate speed in km/h
+        final averageSpeedKmh = totalDistanceKm / elapsedHours;
+        
+        // Convert to pace (seconds per km)
+        if (averageSpeedKmh > 0.1) {
+          averagePace = 3600 / averageSpeedKmh;
+        }
+      }
+    }
+    
+    // Cache the result
+    _cachedAveragePace = averagePace;
+    
+    return averagePace;
   }
 
-  ({double gain, double loss}) _calculateElevation() {
-    if (_locationPoints.length < 2) return (gain: 0.0, loss: 0.0);
+  /// Invalidate pace caches when location data changes significantly
+  void _invalidatePaceCache() {
+    _cachedCurrentPace = null;
+    _cachedAveragePace = null;
+    _lastPaceCalculation = null;
+  }
+  
+  /// Calculate distance between two GPS coordinates using Haversine formula
+  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371000; // Earth's radius in meters
+    
+    final double lat1Rad = _degreesToRadians(lat1);
+    final double lat2Rad = _degreesToRadians(lat2);
+    final double deltaLatRad = _degreesToRadians(lat2 - lat1);
+    final double deltaLonRad = _degreesToRadians(lon2 - lon1);
+    
+    final double a = math.sin(deltaLatRad / 2) * math.sin(deltaLatRad / 2) +
+        math.cos(lat1Rad) * math.cos(lat2Rad) *
+        math.sin(deltaLonRad / 2) * math.sin(deltaLonRad / 2);
+    
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    
+    return earthRadius * c / 1000; // Convert to kilometers
+  }
+  
+  /// Convert degrees to radians
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
+  }
+
+  Map<String, double> _calculateElevation() {
+    if (_locationPoints.length < 2) {
+      return {'gain': 0.0, 'loss': 0.0};
+    }
     
     double gain = 0.0;
     double loss = 0.0;
@@ -653,38 +933,59 @@ class LocationTrackingManager implements SessionManager {
       }
     }
     
-    return (gain: gain, loss: loss);
+    return {'gain': gain, 'loss': loss};
   }
 
   void _updateState(LocationTrackingState newState) {
     _currentState = newState;
     _stateController.add(newState);
     
-    // CRITICAL FIX: Send session data to watch for display
-    _updateWatchWithSessionData(newState);
+    // NOTE: Watch updates now handled by coordinator with proper calculated values
+    // The coordinator calls updateWatchWithCalculatedValues() with accurate calories/elevation
+  }
+  
+  /// Public method for coordinator to update watch with calculated values
+  void updateWatchWithCalculatedValues({
+    required int calories,
+    required double elevationGain,
+    required double elevationLoss,
+  }) {
+    _updateWatchWithSessionData(
+      _currentState,
+      caloriesFromCoordinator: calories,
+      elevationGainFromCoordinator: elevationGain,
+      elevationLossFromCoordinator: elevationLoss,
+    );
   }
   
   /// Send current session metrics to watch for display
-  void _updateWatchWithSessionData(LocationTrackingState state) {
-    if (_activeSessionId == null) return; // Allow updates when paused to show pause state
-    
+  void _updateWatchWithSessionData(LocationTrackingState state, {
+    int? caloriesFromCoordinator,
+    double? elevationGainFromCoordinator,
+    double? elevationLossFromCoordinator,
+  }) {
+    // Note: activeSessionId check is done in callers (_onTick, etc.)
     try {
       // Calculate session duration from start time
       final duration = _sessionStartTime != null 
           ? DateTime.now().difference(_sessionStartTime!)
           : Duration.zero;
       
-      // Calculate calories (rough estimation: 300-500 calories per hour of rucking)
-      final hoursElapsed = duration.inMinutes / 60.0;
-      final estimatedCalories = (hoursElapsed * 400).round(); // 400 cal/hour average
+      // Use values from coordinator if provided, otherwise calculate locally
+      final elevationData = _calculateElevation();
+      final elevationGain = elevationGainFromCoordinator ?? elevationData['gain'] ?? 0.0;
+      final elevationLoss = elevationLossFromCoordinator ?? elevationData['loss'] ?? 0.0;
       
-      // Use current altitude for elevation (TODO: implement proper elevation gain/loss tracking)
-      double elevationGain = 0.0;
-      double elevationLoss = 0.0;
+      // Use calories from coordinator if provided, otherwise fall back to simple calculation
+      final estimatedCalories = caloriesFromCoordinator ?? (duration.inMinutes * 400 / 60).round();
       
-      // TODO: Implement proper elevation gain/loss calculation
-      // TerrainSegment doesn't track elevation changes, only surface types
-      // For now, we'll use a basic approach with location points
+      AppLogger.debug('[LOCATION_MANAGER] WATCH_DATA: '
+          'distance=${state.totalDistance.toStringAsFixed(2)}km, '
+          'duration=${duration.inMinutes.toStringAsFixed(1)}min, '
+          'pace=${state.currentPace.toStringAsFixed(1)}s/km, '
+          'calories=${estimatedCalories}cal, '
+          'elevation_gain=${elevationGain.toStringAsFixed(1)}m, '
+          'elevation_loss=${elevationLoss.toStringAsFixed(1)}m');
       
       // Get user's metric preference
       _sendWatchUpdateWithUserPreferences(

@@ -96,6 +96,9 @@ class LocationTrackingState extends SessionManagerState {
   final double currentSpeed;
   final double altitude;
   final bool isTracking;
+  final bool isGpsReady;
+  final double elevationGain;
+  final double elevationLoss;
   final String? errorMessage;
 
   const LocationTrackingState({
@@ -107,6 +110,9 @@ class LocationTrackingState extends SessionManagerState {
     this.currentSpeed = 0.0,
     this.altitude = 0.0,
     this.isTracking = false,
+    this.isGpsReady = false,
+    this.elevationGain = 0.0,
+    this.elevationLoss = 0.0,
     this.errorMessage,
   });
 
@@ -119,6 +125,9 @@ class LocationTrackingState extends SessionManagerState {
     double? currentSpeed,
     double? altitude,
     bool? isTracking,
+    bool? isGpsReady,
+    double? elevationGain,
+    double? elevationLoss,
     String? errorMessage,
   }) {
     return LocationTrackingState(
@@ -130,6 +139,9 @@ class LocationTrackingState extends SessionManagerState {
       currentSpeed: currentSpeed ?? this.currentSpeed,
       altitude: altitude ?? this.altitude,
       isTracking: isTracking ?? this.isTracking,
+      isGpsReady: isGpsReady ?? this.isGpsReady,
+      elevationGain: elevationGain ?? this.elevationGain,
+      elevationLoss: elevationLoss ?? this.elevationLoss,
       errorMessage: errorMessage,
     );
   }
@@ -144,6 +156,9 @@ class LocationTrackingState extends SessionManagerState {
         currentSpeed,
         altitude,
         isTracking,
+        isGpsReady,
+        elevationGain,
+        elevationLoss,
         errorMessage,
       ];
 }

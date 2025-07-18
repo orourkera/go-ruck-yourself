@@ -83,12 +83,8 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         let minutes = Int(paceValue) / 60
         let seconds = Int(paceValue) % 60
         
-        // Get user's preferred unit (metric or imperial)
-        // If we can't determine the preference, default to metric (km)
-        let unit = self.isMetric ? "km" : "mi"
-        
-        // Format as MM:SS/unit
-        return String(format: "%d:%02d/%@", minutes, seconds, unit)
+        // Format as MM:SS (no unit since label will indicate it's pace)
+        return String(format: "%d:%02d", minutes, seconds)
     }
     
     func startSession() {
@@ -533,6 +529,16 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             self.isMetric = isMetricValue
         } else {
             print("[DEBUG] No isMetric found in nested metrics")
+        }
+        
+        // Update timer/duration when present (for realtime tick updates)
+        if let duration = metrics["duration"] as? String {
+            self.status = duration
+        } else if let durationSeconds = metrics["durationSeconds"] as? Double {
+            // Convert seconds to MM:SS format
+            let minutes = Int(durationSeconds) / 60
+            let seconds = Int(durationSeconds) % 60
+            self.status = String(format: "%02d:%02d", minutes, seconds)
         }
         
         // Update paused state when present

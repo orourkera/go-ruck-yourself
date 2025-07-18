@@ -216,6 +216,7 @@ Future<void> setupServiceLocator() async {
     watchService: getIt<WatchService>(),
     storageService: getIt<StorageService>(),
     apiClient: getIt<ApiClient>(),
+    connectivityService: getIt<ConnectivityService>(),
     splitTrackingService: getIt<SplitTrackingService>(),
     terrainTracker: getIt<TerrainTracker>(),
     heartRateService: getIt<HeartRateService>(),

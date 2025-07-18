@@ -369,18 +369,25 @@ class HeartRateManager implements SessionManager {
     }
   }
   
-  /// Process heart rate upload queue (similar to location points)
+  /// Process heart rate upload queue
+  /// Note: Heart rate uploads are now handled by the ActiveSessionBloc which
+  /// periodically sends HeartRateBatchUploadRequested events to the coordinator.
+  /// This method is kept for compatibility but mainly handles local state.
   void _processHeartRateUploadQueue() {
     if (_pendingHeartRateUploads.isEmpty || _activeSessionId == null) return;
     
     final batch = _pendingHeartRateUploads.toList();
     _pendingHeartRateUploads.clear();
     
-    AppLogger.info('[HEART_RATE_MANAGER] UPLOAD_QUEUE: Processing batch of ${batch.length} heart rate samples');
+    AppLogger.info('[HEART_RATE_MANAGER] UPLOAD_QUEUE: Processing batch of ${batch.length} heart rate samples (local state only)');
     
-    // TODO: Implement HeartRateDataUpload event or integrate with existing upload system
-    // For now, simulate successful upload
+    // Mark as uploaded locally - actual server upload is handled by ActiveSessionBloc
     _onHeartRateUploadSuccess(batch.length);
+    
+    // Update tracking indices
+    _lastUploadedSampleIndex = _heartRateSamples.length;
+    
+    AppLogger.info('[HEART_RATE_MANAGER] Heart rate batch marked as processed locally');
   }
   
   /// Handle successful heart rate upload

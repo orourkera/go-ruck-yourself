@@ -322,11 +322,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       }
       
       // Log memory pressure event for monitoring
-      AppLogger.critical('System memory pressure detected', exception: {
-        'platform': Platform.isAndroid ? 'android' : 'ios',
-        'has_active_session': activeSessionBloc != null,
-        'timestamp': DateTime.now().toIso8601String(),
-      }.toString());
+      AppLogger.warning('System memory pressure detected - triggering cleanup - Platform: ${Platform.isAndroid ? 'android' : 'ios'}, Has active session: ${activeSessionBloc != null}, Timestamp: ${DateTime.now().toIso8601String()}');
       
     } catch (e) {
       print('❌ Error handling memory pressure: $e');
