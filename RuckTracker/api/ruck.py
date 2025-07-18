@@ -169,30 +169,32 @@ class RuckSessionListResource(Resource):
                 for session_id in session_ids:
                     logger.info(f"[ROUTE_DEBUG] Processing session {session_id}")
                     
-                    # Intelligent sampling using Postgres RPC to keep route quality while capping memory
-                    count_resp = supabase.table('location_point') \
-                        .select('id', count='exact') \
+                    # Optimized approach: Try to fetch limited points first to avoid expensive COUNT query
+                    # This avoids the slow COUNT(*) operation that was causing 3-4 second delays
+                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Fetching first {MAX_POINTS_PER_SESSION + 1} points to determine size")
+                    
+                    # First, try to get up to MAX_POINTS_PER_SESSION + 1 points to check if we need sampling
+                    initial_query = supabase.table('location_point') \
+                        .select('session_id,latitude,longitude,timestamp') \
                         .eq('session_id', int(session_id)) \
+                        .order('timestamp') \
+                        .limit(MAX_POINTS_PER_SESSION + 1) \
                         .execute()
-
-                    total_points = count_resp.count or 0
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id} has {total_points} location points in database")
-
-                    if total_points <= MAX_POINTS_PER_SESSION:
-                        # Small sessions – return all points
-                        logger.info(f"[ROUTE_DEBUG] Session {session_id}: Using direct query (≤{MAX_POINTS_PER_SESSION} points)")
-                        session_locations = supabase.table('location_point') \
-                            .select('session_id,latitude,longitude,timestamp') \
-                            .eq('session_id', int(session_id)) \
-                            .order('timestamp') \
-                            .execute()
+                    
+                    if not initial_query.data:
+                        logger.warning(f"[ROUTE_DEBUG] Session {session_id}: No location data returned from query")
+                        session_locations = initial_query
+                    elif len(initial_query.data) <= MAX_POINTS_PER_SESSION:
+                        # Small sessions – use all points we fetched
+                        logger.info(f"[ROUTE_DEBUG] Session {session_id}: Using direct query ({len(initial_query.data)} points)")
+                        session_locations = initial_query
                     else:
-                        # Large sessions – sample via RPC
-                        interval = max(1, total_points // MAX_POINTS_PER_SESSION)
-                        logger.info(f"[ROUTE_DEBUG] Session {session_id}: Using RPC sampling (interval={interval}, target={MAX_POINTS_PER_SESSION} points)")
+                        # Large sessions – need to sample, but first get a rough count efficiently
+                        logger.info(f"[ROUTE_DEBUG] Session {session_id}: Large session detected, using RPC sampling")
+                        # Use RPC with a reasonable default interval since we know it's >MAX_POINTS_PER_SESSION
                         session_locations = supabase.rpc('get_sampled_route_points', {
                             'p_session_id': int(session_id),
-                            'p_interval': interval,
+                            'p_interval': 3,  # Default sampling interval for large sessions
                             'p_max_points': MAX_POINTS_PER_SESSION
                         }).execute()
                     

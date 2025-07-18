@@ -9,6 +9,7 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
+import 'package:rucking_app/core/services/memory_monitor_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
@@ -105,6 +106,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     on<HeartRateBatchUploadRequested>(_onHeartRateBatchUploadRequested);
     on<StateAggregationRequested>(_onStateAggregationRequested);
     on<MemoryPressureDetected>(_onMemoryPressureDetected);
+    on<manager_events.TerrainSegmentUpload>(_onTerrainSegmentUpload);
     
     AppLogger.info('[COORDINATOR] ActiveSessionCoordinator initialized');
   }
@@ -727,8 +729,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     AppLogger.warning('[COORDINATOR] Memory pressure detected');
     
     // Create manager event with memory usage information
+    final memoryInfo = MemoryMonitorService.getCurrentMemoryInfo();
+    final actualMemoryUsageMb = memoryInfo['memory_usage_mb'] as double;
+    
     final managerEvent = manager_events.MemoryPressureDetected(
-      memoryUsageMb: 0.0, // TODO: Get actual memory usage
+      memoryUsageMb: actualMemoryUsageMb,
       timestamp: DateTime.now(),
     );
     
@@ -742,6 +747,61 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     
     // Log memory pressure for diagnostics
     AppLogger.error('[COORDINATOR] MEMORY_PRESSURE: ${managerEvent.memoryUsageMb}MB detected, triggering aggressive cleanup');
+  }
+  
+  /// Handle terrain segment upload
+  Future<void> _onTerrainSegmentUpload(
+    manager_events.TerrainSegmentUpload event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('[COORDINATOR] Processing terrain segment upload for session ${event.sessionId}');
+    
+    try {
+      // Upload terrain segments via API client
+      final response = await _apiClient.post('/terrain/segments', {
+        'session_id': event.sessionId,
+        'terrain_segments': event.terrainSegments,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        AppLogger.info('[COORDINATOR] TERRAIN_UPLOAD: Successfully uploaded ${event.terrainSegments.length} terrain segments');
+        
+        // Notify managers of successful upload
+        final successEvent = manager_events.MemoryUpdated(
+          key: 'terrain_upload_success',
+          value: {
+            'uploaded_count': event.terrainSegments.length,
+            'session_id': event.sessionId,
+            'timestamp': DateTime.now().toIso8601String(),
+          },
+          immediate: true,
+        );
+        
+        await _locationManager.handleEvent(successEvent);
+        await _memoryManager.handleEvent(successEvent);
+        
+      } else {
+        throw Exception('Upload failed with status ${response.statusCode}');
+      }
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] TERRAIN_UPLOAD: Failed to upload terrain segments: $e');
+      
+      // Notify managers of upload failure for retry logic
+      final failureEvent = manager_events.MemoryUpdated(
+        key: 'terrain_upload_failure',
+        value: {
+          'error': e.toString(),
+          'segment_count': event.terrainSegments.length,
+          'session_id': event.sessionId,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+        immediate: true,
+      );
+      
+      await _locationManager.handleEvent(failureEvent);
+      await _memoryManager.handleEvent(failureEvent);
+    }
   }
   
   @override

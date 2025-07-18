@@ -7,6 +7,7 @@ import 'package:app_links/app_links.dart';
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/dau_tracking_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/services/navigation_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
@@ -77,6 +78,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     _lifecycleService = getIt<AppLifecycleService>();
     _lifecycleService.initialize();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Initialize global navigation service
+    NavigationService.instance.setNavigatorKey(_navigatorKey);
     
     // Initialize deep links
     _appLinks = AppLinks();

@@ -5,13 +5,13 @@ import 'package:rucking_app/core/models/location_point.dart';
 /// Provides validation logic for ruck sessions
 class LocationValidationService {
   // Thresholds
-  static const double minInitialDistanceMeters = 10.0; // 10 meters for faster stats display
+  static const double minInitialDistanceMeters = 50.0; // 50 meters threshold before starting distance tracking
   static const double maxSpeedKmh = 25.0; // 25 km/h max speed (walking/light jogging)
   static const Duration maxSpeedDuration = Duration(minutes: 1); // 1 minute max over speed
   static const double minMovingSpeedKmh = 0.5; // 0.5 km/h min speed to be considered moving
   static const Duration idleDuration = Duration(minutes: 1); // 1 minute without movement to auto-pause
   static const Duration longIdleDuration = Duration(minutes: 2); // 2 minutes idle to suggest ending session
-  static const double maxPositionJumpMeters = 50.0; // 50 meters max jump in position
+  static const double maxPositionJumpMeters = 20.0; // 20 meters max jump in position (throw out points greater than this)
   static const Duration maxPositionJumpDuration = Duration(seconds: 5); // 5 seconds between location points
   static const double minGpsAccuracyMeters = 20.0; // 20 meters minimum GPS accuracy
   static const double minCaloriesPerHour = 300.0; // 300 calories minimum per hour

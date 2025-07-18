@@ -17,6 +17,7 @@ import '../../../domain/services/split_tracking_service.dart';
 import '../../../../../core/services/terrain_tracker.dart';
 import '../../../../../core/utils/location_validator.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/location_validation_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
 import '../events/session_events.dart';
 import '../models/manager_states.dart';
 import 'session_manager.dart';
@@ -30,6 +31,7 @@ class LocationTrackingManager implements SessionManager {
   final WatchService _watchService;
   final AuthService _authService;
   final LocationValidationService _validationService = LocationValidationService();
+  final SessionValidationService _sessionValidationService = SessionValidationService();
   
   final StreamController<LocationTrackingState> _stateController;
   LocationTrackingState _currentState;
@@ -56,6 +58,10 @@ class LocationTrackingManager implements SessionManager {
   double? _cachedCurrentPace;
   double? _cachedAveragePace;
   DateTime? _lastPaceCalculation;
+  
+  // Pace smoothing (version 2.5 logic)
+  final List<double> _recentPaces = [];
+  static const int _maxRecentPaces = 10; // Keep last 10 pace values for smoothing
   
   // Timer coordination
   bool _isWatchdogActive = false;
@@ -141,8 +147,15 @@ class LocationTrackingManager implements SessionManager {
     _lastUploadedLocationIndex = 0; // Reset upload tracking
     _lastValidLocation = null; // Reset validation state
     
+    // Reset pace smoothing state (version 2.5)
+    _recentPaces.clear();
+    _cachedCurrentPace = null;
+    _cachedAveragePace = null;
+    _lastPaceCalculation = null;
+    
     // Reset comprehensive validation service
     _validationService.reset();
+    _sessionValidationService.reset();
     
     // CRITICAL FIX: Force garbage collection after clearing large lists
     _triggerGarbageCollection();
@@ -314,15 +327,16 @@ class LocationTrackingManager implements SessionManager {
     final newPace = _calculateCurrentPace(position.speed ?? 0.0);
     final newAveragePace = _calculateAveragePace(newDistance);
     
-    // Calculate elevation gain/loss for this segment using validation service (like version 2.5)
+    // Calculate elevation gain/loss using sophisticated iOS/Android platform-specific processing
     double elevationGain = 0.0;
     double elevationLoss = 0.0;
     if (_locationPoints.length >= 2) {
       final prevPoint = _locationPoints[_locationPoints.length - 2];
-      final elevationResult = _validationService.validateElevationChange(
+      final elevationResult = _sessionValidationService.validateElevationChange(
         prevPoint,
         newPoint,
-        minChangeMeters: 2.0, // Filter out GPS noise smaller than 2m (version 2.5 logic)
+        // Uses platform-specific thresholds: iOS=0.5m (barometric+GPS), Android=1.0m (GPS only)
+        // Includes sophisticated iOS/Android processing for accuracy and noise filtering
       );
       elevationGain = elevationResult['gain']!;
       elevationLoss = elevationResult['loss']!;
@@ -532,9 +546,19 @@ class LocationTrackingManager implements SessionManager {
     
     AppLogger.info('[LOCATION_MANAGER] TERRAIN_UPLOAD_QUEUE: Processing batch of ${batch.length} terrain segments');
     
-    // TODO: Implement TerrainSegmentUpload event or integrate with existing upload system
-    // For now, simulate successful upload
-    _onTerrainSegmentUploadSuccess(batch.length);
+    // Emit TerrainSegmentUpload event to coordinator for actual upload
+    if (_activeSessionId != null) {
+      final uploadEvent = manager_events.TerrainSegmentUpload(
+        terrainSegments: batch,
+        sessionId: _activeSessionId!,
+      );
+      
+      // Notify coordinator to handle the upload
+      _eventBus.add(uploadEvent);
+      AppLogger.info('[LOCATION_MANAGER] TERRAIN_UPLOAD: Emitted upload event for ${batch.length} segments');
+    } else {
+      AppLogger.warning('[LOCATION_MANAGER] TERRAIN_UPLOAD: No active session ID, cannot upload terrain segments');
+    }
   }
   
   /// Handle successful terrain segment upload
@@ -796,60 +820,75 @@ double _calculateTotalDistanceWithValidation() {
 }  
 
   double _calculateCurrentPace(double speedMs) {
-    // Only recalculate pace every 5 seconds for performance optimization
-    final now = DateTime.now();
-    if (_cachedCurrentPace != null && _lastPaceCalculation != null) {
-      final timeSinceLastCalc = now.difference(_lastPaceCalculation!).inSeconds;
-      if (timeSinceLastCalc < 5) {
-        return _cachedCurrentPace!;
-      }
+  // Only recalculate pace every 5 seconds for performance optimization
+  final now = DateTime.now();
+  if (_cachedCurrentPace != null && _lastPaceCalculation != null) {
+    final timeSinceLastCalc = now.difference(_lastPaceCalculation!).inSeconds;
+    if (timeSinceLastCalc < 5) {
+      return _cachedCurrentPace!;
     }
-    
-    double pace = 0.0;
-    
-    // For more reliable pace calculation, use distance-based method for slow speeds
-    // GPS speed is often inaccurate for walking/rucking speeds
-    
-    // Method 1: Try GPS speed first (for faster movement)
-    if (speedMs > 1.0) { // > 3.6 km/h, GPS speed is more reliable
-      final speedKmh = speedMs * 3.6;
-      pace = 3600 / speedKmh; // seconds/km
-    }
-    // Method 2: Calculate from recent distance (for slower movement)
-    else if (_locationPoints.length >= 2) {
-      final lastPoint = _locationPoints[_locationPoints.length - 1];
-      final prevPoint = _locationPoints[_locationPoints.length - 2];
-      
-      final distanceKm = Geolocator.distanceBetween(
-        prevPoint.latitude,
-        prevPoint.longitude,
-        lastPoint.latitude,
-        lastPoint.longitude,
-      ) / 1000; // Convert to km
-      
-      final timeSeconds = lastPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
-      
-      if (timeSeconds > 0 && distanceKm > 0) {
-        final speedKmh = (distanceKm / timeSeconds) * 3600;
-        if (speedKmh > 0.5) { // Must be above walking threshold
-          pace = 3600 / speedKmh; // seconds/km
-        }
-      }
-    }
-    // Method 3: Fallback to GPS speed with lower thresholds
-    else if (speedMs > 0.1) {
-      final speedKmh = speedMs * 3.6;
-      if (speedKmh > 0.3) { // Lower threshold for fallback
-        pace = 3600 / speedKmh; // seconds/km
-      }
-    }
-    
-    // Cache the result with timestamp
-    _cachedCurrentPace = pace;
-    _lastPaceCalculation = now;
-    
-    return pace;
   }
+  
+  double rawPace = 0.0;
+  
+  // For more reliable pace calculation, use distance-based method for slow speeds
+  // GPS speed is often inaccurate for walking/rucking speeds
+  
+  // Method 1: Try GPS speed first (for faster movement)
+  if (speedMs > 1.0) { // > 3.6 km/h, GPS speed is more reliable
+    final speedKmh = speedMs * 3.6;
+    rawPace = 3600 / speedKmh; // seconds/km
+  }
+  // Method 2: Calculate from recent distance (for slower movement)
+  else if (_locationPoints.length >= 2) {
+    final lastPoint = _locationPoints[_locationPoints.length - 1];
+    final prevPoint = _locationPoints[_locationPoints.length - 2];
+    
+    final distanceKm = Geolocator.distanceBetween(
+      prevPoint.latitude,
+      prevPoint.longitude,
+      lastPoint.latitude,
+      lastPoint.longitude,
+    ) / 1000; // Convert to km
+    
+    final timeSeconds = lastPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
+    
+    if (timeSeconds > 0 && distanceKm > 0) {
+      final speedKmh = (distanceKm / timeSeconds) * 3600;
+      if (speedKmh > 0.5) { // Must be above walking threshold
+        rawPace = 3600 / speedKmh; // seconds/km
+      }
+    }
+  }
+  // Method 3: Fallback to GPS speed with lower thresholds
+  else if (speedMs > 0.1) {
+    final speedKmh = speedMs * 3.6;
+    if (speedKmh > 0.3) { // Lower threshold for fallback
+      rawPace = 3600 / speedKmh; // seconds/km
+    }
+  }
+  
+  // VERSION 2.5 PACE SMOOTHING: Add to recent paces and apply smoothing
+  if (rawPace > 0) {
+    _recentPaces.add(rawPace);
+    
+    // Keep only the most recent pace values
+    if (_recentPaces.length > _maxRecentPaces) {
+      _recentPaces.removeAt(0);
+    }
+    
+    // Apply smoothing if we have enough data points
+    if (_recentPaces.length >= 3) {
+      rawPace = _sessionValidationService.getSmoothedPace(rawPace, _recentPaces);
+    }
+  }
+  
+  // Cache the result with timestamp
+  _cachedCurrentPace = rawPace;
+  _lastPaceCalculation = now;
+  
+  return rawPace;
+}  
 
   /// Calculate average pace based on total distance and elapsed time
   double _calculateAveragePace(double totalDistanceKm) {

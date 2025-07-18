@@ -9,11 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
+import 'package:rucking_app/core/services/navigation_service.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import '../../features/notifications/util/notification_navigation.dart';
 import '../../features/notifications/domain/entities/app_notification.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
-import '../services/api_client.dart';
-import '../services/app_error_handler.dart';
 
 /// Service for handling Firebase Cloud Messaging (FCM) push notifications
 class FirebaseMessagingService {
@@ -277,9 +280,26 @@ class FirebaseMessagingService {
 
   /// Get unique device identifier
   Future<String> _getDeviceId() async {
-    // TODO: Implement device ID generation
-    // You might want to use device_info_plus package
-    return 'device_${DateTime.now().millisecondsSinceEpoch}';
+    try {
+      final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
+      
+      if (Platform.isIOS) {
+        final IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
+        // Use identifierForVendor as unique device identifier
+        return 'ios_${iosInfo.identifierForVendor ?? 'unknown_${DateTime.now().millisecondsSinceEpoch}'}';
+      } else if (Platform.isAndroid) {
+        final AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
+        // Use androidId as unique device identifier
+        return 'android_${androidInfo.id ?? 'unknown_${DateTime.now().millisecondsSinceEpoch}'}';
+      } else {
+        // Fallback for other platforms
+        return 'platform_${Platform.operatingSystem}_${DateTime.now().millisecondsSinceEpoch}';
+      }
+    } catch (e) {
+      AppLogger.warning('[FIREBASE_MESSAGING] Failed to get device ID: $e');
+      // Fallback to timestamp-based ID if device info fails
+      return 'fallback_${DateTime.now().millisecondsSinceEpoch}';
+    }
   }
   
   /// Get FCM token with retry logic to handle TOO_MANY_REGISTRATIONS
@@ -421,9 +441,8 @@ class FirebaseMessagingService {
 
   /// Get current navigator context
   BuildContext? _getNavigatorContext() {
-    // TODO: Implement proper navigation context retrieval
-    // You might need to use a global key or navigation service
-    return null;
+    // Use the global navigation service to get the current context
+    return NavigationService.instance.context;
   }
 
   /// Get current FCM token

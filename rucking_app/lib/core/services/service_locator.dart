@@ -297,9 +297,9 @@ Dio _configureDio() {
   final Dio dio = Dio(
     BaseOptions(
       baseUrl: AppConfig.apiBaseUrl, // Use AppConfig for environment switching
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 8), // Reduced from 15s to 8s for better UX
+      sendTimeout: const Duration(seconds: 10),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
