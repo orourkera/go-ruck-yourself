@@ -231,7 +231,7 @@ class LocationServiceImpl implements LocationService {
         longitude: position.longitude,
         elevation: position.altitude,
         accuracy: position.accuracy,
-        timestamp: DateTime.now(),
+        timestamp: position.timestamp,
       );
     } catch (e) {
       // Monitor location retrieval failures (critical for fitness tracking) - wrapped to prevent secondary errors
@@ -597,11 +597,8 @@ class LocationServiceImpl implements LocationService {
             longitude: position.longitude,
             elevation: position.altitude,
             accuracy: position.accuracy,
-            timestamp: DateTime.now(),
+            timestamp: position.timestamp,
           );
-          
-          // Log elevation data for debugging iOS vs Android differences
-          AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
           
           _locationBatch.add(locationPoint);
           _locationController.add(locationPoint); // For UI updates (distance, elevation, map)

@@ -379,7 +379,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                   value: 'share',
                   child: Row(
                     children: [
-                      Icon(Icons.share, size: 20),
+                      Icon(Icons.share, size: 20, color: Colors.grey.shade700),
                       SizedBox(width: 12),
                       Text('Share session'),
                     ],
@@ -389,7 +389,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                   value: 'edit',
                   child: Row(
                     children: [
-                      Icon(Icons.edit, size: 20),
+                      Icon(Icons.edit, size: 20, color: Colors.grey.shade700),
                       SizedBox(width: 12),
                       Text('Edit session'),
                     ],
