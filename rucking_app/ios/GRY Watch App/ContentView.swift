@@ -23,7 +23,7 @@ struct ContentView: View {
         ZStack {
             // Main content
             if sessionManager.isSessionActive {
-                self.activeSessionView // Call the extracted view
+                CompactWorkoutView()
             } else {
                 VStack(spacing: 10) {
                     HStack {

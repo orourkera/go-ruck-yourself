@@ -375,7 +375,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 }
               },
               itemBuilder: (BuildContext context) => [
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: 'share',
                   child: Row(
                     children: [
@@ -385,7 +385,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     ],
                   ),
                 ),
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: 'edit',
                   child: Row(
                     children: [
@@ -395,7 +395,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     ],
                   ),
                 ),
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: 'delete',
                   child: Row(
                     children: [
