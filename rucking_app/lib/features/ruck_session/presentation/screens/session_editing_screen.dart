@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:get_it/get_it.dart';
 
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
@@ -10,6 +11,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -392,6 +394,62 @@ class _SessionEditingScreenState extends State<SessionEditingScreen>
   void _saveEditedSession() async {
     if (_previewSession == null) return;
     
+    // Show confirmation dialog first
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: const Text(
+          'Confirm Session Edit',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This will permanently trim your session and remove the following data, rucker:',
+              style: TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '• ${(widget.originalSession.distance - _previewSession!.distance).toStringAsFixed(2)}km of distance',
+              style: TextStyle(color: Colors.red.shade300),
+            ),
+            Text(
+              '• ${widget.originalSession.duration.inMinutes - _previewSession!.duration.inMinutes} minutes of activity',
+              style: TextStyle(color: Colors.red.shade300),
+            ),
+            Text(
+              '• ${widget.originalSession.caloriesBurned - _previewSession!.caloriesBurned} calories burned',
+              style: TextStyle(color: Colors.red.shade300),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red.shade300,
+            ),
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+    
+    // If user didn't confirm, return early
+    if (confirmed != true) return;
+    
     try {
       // Show loading dialog
       showDialog(
@@ -402,11 +460,14 @@ class _SessionEditingScreenState extends State<SessionEditingScreen>
         ),
       );
       
-      // TODO: Implement session update API call
-      // context.read<SessionBloc>().add(UpdateSession(_previewSession!));
+      // Make actual API call to update session
+      AppLogger.info('[SESSION_EDITING] Making API call to update session ${_previewSession!.id}');
+      final sessionRepository = GetIt.instance<SessionRepository>();
+      final updatedSession = await sessionRepository.updateSession(_previewSession!);
       
-      // For now, just simulate success
-      await Future.delayed(const Duration(seconds: 1));
+      // Update the preview session with the backend response
+      _previewSession = updatedSession;
+      AppLogger.info('[SESSION_EDITING] Successfully updated session ${updatedSession.id}');
       
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog

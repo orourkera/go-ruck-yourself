@@ -1164,7 +1164,7 @@ class RuckSessionEditResource(Resource):
             
             # Verify session exists and belongs to user
             session_resp = supabase.table('ruck_session') \
-                .select('id,user_id,status,start_time') \
+                .select('id,user_id,status,started_at') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .execute()
@@ -1182,7 +1182,7 @@ class RuckSessionEditResource(Resource):
                 return {'message': f'Invalid end_time format: {str(e)}'}, 400
             
             # Validate end time is after start time
-            start_time = datetime.fromisoformat(session_data['start_time'].replace('Z', '+00:00'))
+            start_time = datetime.fromisoformat(session_data['started_at'].replace('Z', '+00:00'))
             if new_end_time <= start_time:
                 return {'message': 'End time must be after start time'}, 400
             
@@ -1190,13 +1190,13 @@ class RuckSessionEditResource(Resource):
             
             # Update session with new metrics
             session_updates = {
-                'end_time': data['end_time'],
+                'completed_at': data['end_time'],
                 'duration_seconds': data['duration_seconds'],
                 'distance_km': data['distance_km'],
                 'elevation_gain_m': data['elevation_gain_m'],
                 'elevation_loss_m': data['elevation_loss_m'],
                 'calories_burned': data.get('calories_burned'),
-                'average_pace_min_per_km': data.get('average_pace_min_per_km'),
+                'average_pace': data.get('average_pace_min_per_km'),
                 'avg_heart_rate': data.get('avg_heart_rate'),
                 'max_heart_rate': data.get('max_heart_rate'),
                 'min_heart_rate': data.get('min_heart_rate'),
@@ -1231,10 +1231,8 @@ class RuckSessionEditResource(Resource):
                             'session_id': ruck_id,
                             'latitude': point.get('latitude'),
                             'longitude': point.get('longitude'),
-                            'elevation': point.get('elevation'),
-                            'timestamp': point.get('timestamp'),
-                            'accuracy': point.get('accuracy'),
-                            'speed': point.get('speed')
+                            'altitude': point.get('elevation'),
+                            'timestamp': point.get('timestamp')
                         })
                 
                 if location_rows:
@@ -1292,7 +1290,7 @@ class RuckSessionEditResource(Resource):
                             'split_duration_seconds': split.get('split_duration_seconds'),
                             'total_distance_km': split.get('total_distance_km'),
                             'total_duration_seconds': split.get('total_duration_seconds'),
-                            'timestamp': split.get('timestamp')
+                            'split_timestamp': split.get('timestamp')
                         })
                 
                 if split_rows:
