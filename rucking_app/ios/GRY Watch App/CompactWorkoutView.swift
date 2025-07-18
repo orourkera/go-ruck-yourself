@@ -27,7 +27,7 @@ struct CompactWorkoutView: View {
 
                 // Heart-rate row with heart glyph
                 metricRow(value: sessionManager.heartRateText,
-                          symbol: Image(systemName: "heart.fill").foregroundColor(.red),
+                          symbol: AnyView(Image(systemName: "heart.fill").foregroundColor(.red)),
                           labelLines: [" ", " "]) // No label text – glyph suffices
 
                 // Average pace
@@ -59,7 +59,7 @@ struct CompactWorkoutView: View {
 
     // Helper that builds a two-line metric row
     private func metricRow(value: String,
-                           symbol: Image? = nil,
+                           symbol: AnyView? = nil,
                            labelLines: [String]) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(value)

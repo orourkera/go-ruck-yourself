@@ -1509,11 +1509,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         
         // Update the session data in the current screen
         if (mounted) {
-          setState(() {
-            // The session data will be updated through the navigation result
-            // For now, we'll just show the success message
-            // TODO: Update widget.session with the new data
-          });
+          // Force a full refresh by navigating back to the same route
+          Navigator.of(context).pushReplacementNamed(
+            '/session_detail',
+            arguments: result, // Use the updated session from editing
+          );
         }
       }
     } catch (e) {

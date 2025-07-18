@@ -452,6 +452,7 @@ class RuckSessionResource(Resource):
                     'p_max_points': MAX_POINTS_FOR_DETAIL
                 }).execute()
             
+            logger.info(f"[SESSION_DETAIL] Location response for session {ruck_id}: {len(locations_resp.data) if locations_resp.data else 0} points (total in DB: {total_points})")
             logger.debug(f"Location response data for session {ruck_id}: {len(locations_resp.data) if locations_resp.data else 0} points")
             
             if locations_resp.data:
@@ -1219,7 +1220,7 @@ class RuckSessionEditResource(Resource):
                 .gte('timestamp', data['end_time']) \
                 .execute()
             
-            logger.info(f"Deleted location points after {data['end_time']} for session {ruck_id}")
+            logger.info(f"Deleted location points after {data['end_time']} for session {ruck_id}: {len(delete_locs_resp.data) if delete_locs_resp.data else 'unknown'} points deleted")
             
             # Delete heart rate samples after the new end time
             delete_hr_resp = supabase.table('heart_rate_sample') \
@@ -1239,8 +1240,10 @@ class RuckSessionEditResource(Resource):
             
             logger.info(f"Deleted splits after {data['end_time']} for session {ruck_id}")
             
-            # Clear cache for this user's sessions
+            # Clear cache for this user's sessions and location data
             cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            cache_delete_pattern(f"location_points:{ruck_id}:*")
+            cache_delete_pattern(f"session_details:{ruck_id}:*")
             
             logger.info(f"Successfully edited session {ruck_id}")
             
