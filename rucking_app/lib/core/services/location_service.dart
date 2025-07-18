@@ -357,7 +357,7 @@ class LocationServiceImpl implements LocationService {
           longitude: position.longitude,
           elevation: position.altitude,
           accuracy: position.accuracy,
-          timestamp: DateTime.now(),
+          timestamp: position.timestamp,
         );
         
         // Log elevation data for debugging iOS vs Android differences
@@ -631,7 +631,7 @@ class LocationServiceImpl implements LocationService {
           longitude: position.longitude,
           elevation: position.altitude,
           accuracy: position.accuracy,
-          timestamp: DateTime.now(),
+          timestamp: position.timestamp,
         );
         
         // Log elevation data for debugging iOS vs Android differences
@@ -800,7 +800,7 @@ class LocationServiceImpl implements LocationService {
               longitude: position.longitude,
               elevation: position.altitude,
               accuracy: position.accuracy,
-              timestamp: DateTime.now(),
+              timestamp: position.timestamp,
             );
             
             _locationBatch.add(locationPoint);

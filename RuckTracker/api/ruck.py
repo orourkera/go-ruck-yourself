@@ -1247,7 +1247,7 @@ class RuckSessionEditResource(Resource):
             return {
                 'message': 'Session updated successfully',
                 'session_id': ruck_id,
-                'updated_at': session_updates['updated_at']
+                'updated_at': update_resp.data[0]['updated_at'] if update_resp and update_resp.data else None
             }, 200
             
         except Exception as e:
