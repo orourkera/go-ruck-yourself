@@ -813,9 +813,9 @@ class RuckSessionCompleteResource(Resource):
                 update_data['average_pace'] = server_calculated_pace
 
             if 'start_time' in data:
-                update_data['start_time'] = data['start_time']
+                update_data['started_at'] = data['start_time']
             if 'end_time' in data: # Keep this for now, though completed_at should be primary
-                update_data['end_time'] = data['end_time']
+                update_data['completed_at'] = data['end_time']
             if 'final_average_pace' in data: # Client-sent pace (legacy key), overrides server calc
                 update_data['average_pace'] = data['final_average_pace']
             if 'average_pace' in data:     # Client-sent pace (current key), overrides server calc / legacy key
