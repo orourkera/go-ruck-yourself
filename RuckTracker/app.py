@@ -234,6 +234,7 @@ from .api.ruck import (
     RuckSessionResumeResource,
     RuckSessionCompleteResource,
     RuckSessionLocationResource,
+    RuckSessionEditResource,
     # RuckSessionDetailResource # Commented out - not found in api.ruck.py
 )
     
@@ -404,6 +405,9 @@ except AttributeError as e:
 
 # Now register the resource with modified methods
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')
+api.add_resource(RuckSessionEditResource, '/api/rucks/<int:ruck_id>/edit')
+
+# Heart rate sample upload resource
 api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
 # Stats Endpoints with higher rate limits

@@ -357,17 +357,55 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           ),
           foregroundColor: Colors.white,
           actions: [
-            // Share session button
-            IconButton(
-              icon: const Icon(Icons.share),
-              tooltip: 'Share session',
-              onPressed: () => _shareSession(context),
-            ),
-            // Delete session button
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete session',
-              onPressed: () => _showDeleteConfirmationDialog(context),
+            // Three-dot menu with session actions
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More options',
+              onSelected: (String value) {
+                switch (value) {
+                  case 'share':
+                    _shareSession(context);
+                    break;
+                  case 'edit':
+                    _editSession(context);
+                    break;
+                  case 'delete':
+                    _showDeleteConfirmationDialog(context);
+                    break;
+                }
+              },
+              itemBuilder: (BuildContext context) => [
+                const PopupMenuItem<String>(
+                  value: 'share',
+                  child: Row(
+                    children: [
+                      Icon(Icons.share, size: 20),
+                      SizedBox(width: 12),
+                      Text('Share session'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 20),
+                      SizedBox(width: 12),
+                      Text('Edit session'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                      SizedBox(width: 12),
+                      Text('Delete session', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1444,6 +1482,50 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         message: 'Error taking photo: $e',
         duration: const Duration(seconds: 3),
       );
+    }
+  }
+
+  /// Navigate to session editing screen
+  void _editSession(BuildContext context) async {
+    try {
+      AppLogger.info('[SESSION_DETAIL] Opening session editing screen for session ${widget.session.id}');
+      
+      // Navigate to session editing screen
+      final result = await Navigator.of(context).pushNamed(
+        '/session_edit',
+        arguments: widget.session,
+      );
+      
+      // If the session was edited, update the UI
+      if (result is RuckSession) {
+        AppLogger.info('[SESSION_DETAIL] Session was edited, updating UI');
+        
+        // Show success message
+        StyledSnackBar.showSuccess(
+          context: context,
+          message: 'Session updated successfully!',
+          animationStyle: SnackBarAnimationStyle.slideUpBounce,
+        );
+        
+        // Update the session data in the current screen
+        if (mounted) {
+          setState(() {
+            // The session data will be updated through the navigation result
+            // For now, we'll just show the success message
+            // TODO: Update widget.session with the new data
+          });
+        }
+      }
+    } catch (e) {
+      AppLogger.error('[SESSION_DETAIL] Error opening session editing screen', exception: e);
+      
+      if (mounted) {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Error opening session editor. Please try again.',
+          animationStyle: SnackBarAnimationStyle.slideFromTop,
+        );
+      }
     }
   }
 }

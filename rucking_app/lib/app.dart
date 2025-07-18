@@ -25,6 +25,7 @@ import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/session_editing_screen.dart';
 import 'package:rucking_app/shared/theme/dynamic_theme.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddies_screen.dart';
@@ -668,6 +669,23 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           builder: (_) => CreateSessionScreen(
                             eventId: eventId,
                             eventTitle: eventTitle,
+                          ),
+                        );
+                      
+                      // Session editing route
+                      case '/session_edit':
+                        final session = settings.arguments as RuckSession?;
+                        if (session != null) {
+                          return MaterialPageRoute(
+                            builder: (_) => SessionEditingScreen(
+                              originalSession: session,
+                            ),
+                          );
+                        }
+                        return MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(title: const Text('Error')),
+                            body: const Center(child: Text('Missing session data')),
                           ),
                         );
                       

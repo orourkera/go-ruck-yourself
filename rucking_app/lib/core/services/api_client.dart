@@ -292,7 +292,8 @@ class ApiClient {
       // Require token for /rucks/*, /users/*, /achievements/*, and /duels/* endpoints, EXCEPT for /users/register
       bool requiresAuth = ((endpoint.startsWith('/rucks') || endpoint.startsWith('/users/') || endpoint.startsWith('/achievements/') || endpoint.startsWith('/duels/')) && 
                         endpoint != '/users/register') ||
-                        endpoint.startsWith('/duel-'); // Also include /duel-invitations, /duel-stats endpoints
+                        endpoint.startsWith('/duel-') ||
+                        endpoint == '/device-token'; // Ensure device token registration is authenticated
       // Explicitly do not set auth token for /auth/refresh endpoint
       bool excludeAuth = endpoint == '/auth/refresh';
                           

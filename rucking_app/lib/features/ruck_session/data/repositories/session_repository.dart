@@ -390,6 +390,81 @@ class SessionRepository {
     }
   }
   
+  /// Update a ruck session with edited data (e.g., session trimming/editing)
+  /// 
+  /// Takes a RuckSession object and updates it in the backend database
+  /// This includes updating session metrics and removing extraneous data points
+  /// Returns the updated session if successful, throws exception on failure
+  Future<RuckSession> updateSession(RuckSession updatedSession) async {
+    try {
+      AppLogger.info('[SESSION_EDIT] Updating session ${updatedSession.id}');
+      
+      // Verify sessionId is not empty
+      if (updatedSession.id?.isEmpty ?? true) {
+        throw ApiException('Session ID is empty or null');
+      }
+      
+      // Prepare the update payload
+      final updatePayload = {
+        'end_time': updatedSession.endTime.toIso8601String(),
+        'duration_seconds': updatedSession.duration.inSeconds,
+        'distance_km': updatedSession.distance,
+        'elevation_gain_m': updatedSession.elevationGain,
+        'elevation_loss_m': updatedSession.elevationLoss,
+        'calories_burned': updatedSession.caloriesBurned,
+        'average_pace_min_per_km': updatedSession.averagePace,
+        'avg_heart_rate': updatedSession.avgHeartRate,
+        'max_heart_rate': updatedSession.maxHeartRate,
+        'min_heart_rate': updatedSession.minHeartRate,
+        'location_points': updatedSession.locationPoints,
+        'heart_rate_samples': updatedSession.heartRateSamples?.map((sample) => {
+          'timestamp': sample.timestamp.toIso8601String(),
+          'heart_rate': sample.bpm,
+        }).toList(),
+        'splits': updatedSession.splits?.map((split) => {
+          'split_number': split.splitNumber,
+          'split_distance_km': split.splitDistance,
+          'split_duration_seconds': split.splitDurationSeconds,
+          'total_distance_km': split.totalDistance,
+          'total_duration_seconds': split.totalDurationSeconds,
+          'timestamp': split.timestamp.toIso8601String(),
+        }).toList(),
+      };
+      
+      // Make the API call to update the session
+      final response = await _apiClient.put('/rucks/${updatedSession.id}/edit', updatePayload);
+      
+      if (response != null) {
+        AppLogger.info('[SESSION_EDIT] Session updated successfully');
+        
+        // Update the local cache with the new session data
+        updateSessionCache(updatedSession.id!, updatedSession);
+        
+        // Also clear session history cache to ensure it gets refreshed
+        clearSessionHistoryCache();
+        
+        return updatedSession;
+      } else {
+        throw ApiException('Failed to update session: empty response');
+      }
+      
+    } catch (e) {
+      AppLogger.error('[SESSION_EDIT] Error updating session ${updatedSession.id}', exception: e);
+      
+      // Handle specific error cases
+      if (e.toString().contains('404')) {
+        throw ApiException('Session not found or already deleted');
+      } else if (e.toString().contains('403')) {
+        throw ApiException('Not authorized to edit this session');
+      } else if (e.toString().contains('400')) {
+        throw ApiException('Invalid session data provided');
+      }
+      
+      // Re-throw the original error for other cases
+      rethrow;
+    }
+  }
+  
   /// Upload photos for a ruck session
   /// 
   /// Takes a list of photo files and uploads them to the backend API,

@@ -1141,7 +1141,182 @@ class RuckSessionLocationResource(Resource):
             
         except Exception as e:
             logger.error(f"Error adding location points for ruck session {ruck_id}: {e}")
-            return {'message': f"Error uploading location points: {str(e)}"}, 500
+            return {'message': f'Error uploading location points: {str(e)}'}, 500
+
+class RuckSessionEditResource(Resource):
+    def put(self, ruck_id):
+        """Edit a ruck session - trim/crop session by removing data after new end time"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            
+            data = request.get_json()
+            if not data:
+                return {'message': 'No data provided'}, 400
+            
+            # Validate required fields
+            required_fields = ['end_time', 'duration_seconds', 'distance_km', 'elevation_gain_m', 'elevation_loss_m']
+            for field in required_fields:
+                if field not in data:
+                    return {'message': f'Missing required field: {field}'}, 400
+            
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Verify session exists and belongs to user
+            session_resp = supabase.table('ruck_session') \
+                .select('id,user_id,status,start_time') \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+            
+            if not session_resp.data:
+                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
+                return {'message': 'Session not found or access denied'}, 404
+            
+            session_data = session_resp.data[0]
+            
+            # Parse the new end time
+            try:
+                new_end_time = datetime.fromisoformat(data['end_time'].replace('Z', '+00:00'))
+            except ValueError as e:
+                return {'message': f'Invalid end_time format: {str(e)}'}, 400
+            
+            # Validate end time is after start time
+            start_time = datetime.fromisoformat(session_data['start_time'].replace('Z', '+00:00'))
+            if new_end_time <= start_time:
+                return {'message': 'End time must be after start time'}, 400
+            
+            logger.info(f"Editing session {ruck_id} - new end time: {new_end_time}")
+            
+            # Update session with new metrics
+            session_updates = {
+                'end_time': data['end_time'],
+                'duration_seconds': data['duration_seconds'],
+                'distance_km': data['distance_km'],
+                'elevation_gain_m': data['elevation_gain_m'],
+                'elevation_loss_m': data['elevation_loss_m'],
+                'calories_burned': data.get('calories_burned'),
+                'average_pace_min_per_km': data.get('average_pace_min_per_km'),
+                'avg_heart_rate': data.get('avg_heart_rate'),
+                'max_heart_rate': data.get('max_heart_rate'),
+                'min_heart_rate': data.get('min_heart_rate'),
+                'updated_at': datetime.utcnow().isoformat()
+            }
+            
+            # Update the session
+            update_resp = supabase.table('ruck_session') \
+                .update(session_updates) \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+            
+            if not update_resp.data:
+                return {'message': 'Failed to update session'}, 500
+            
+            # Delete location points after the new end time
+            if 'location_points' in data and data['location_points']:
+                # First, delete all existing location points for this session
+                delete_locations_resp = supabase.table('location_point') \
+                    .delete() \
+                    .eq('session_id', ruck_id) \
+                    .execute()
+                
+                logger.info(f"Deleted existing location points for session {ruck_id}")
+                
+                # Insert the new (filtered) location points
+                location_rows = []
+                for point in data['location_points']:
+                    if isinstance(point, dict):
+                        location_rows.append({
+                            'session_id': ruck_id,
+                            'latitude': point.get('latitude'),
+                            'longitude': point.get('longitude'),
+                            'elevation': point.get('elevation'),
+                            'timestamp': point.get('timestamp'),
+                            'accuracy': point.get('accuracy'),
+                            'speed': point.get('speed')
+                        })
+                
+                if location_rows:
+                    insert_locations_resp = supabase.table('location_point') \
+                        .insert(location_rows) \
+                        .execute()
+                    
+                    logger.info(f"Inserted {len(location_rows)} filtered location points for session {ruck_id}")
+            
+            # Delete heart rate samples after the new end time
+            if 'heart_rate_samples' in data and data['heart_rate_samples']:
+                # Delete all existing heart rate samples for this session
+                delete_hr_resp = supabase.table('heart_rate_sample') \
+                    .delete() \
+                    .eq('session_id', ruck_id) \
+                    .execute()
+                
+                logger.info(f"Deleted existing heart rate samples for session {ruck_id}")
+                
+                # Insert the new (filtered) heart rate samples
+                hr_rows = []
+                for sample in data['heart_rate_samples']:
+                    if isinstance(sample, dict):
+                        hr_rows.append({
+                            'session_id': ruck_id,
+                            'timestamp': sample.get('timestamp'),
+                            'bpm': sample.get('heart_rate')
+                        })
+                
+                if hr_rows:
+                    insert_hr_resp = supabase.table('heart_rate_sample') \
+                        .insert(hr_rows) \
+                        .execute()
+                    
+                    logger.info(f"Inserted {len(hr_rows)} filtered heart rate samples for session {ruck_id}")
+            
+            # Delete splits after the new end time
+            if 'splits' in data and data['splits']:
+                # Delete all existing splits for this session
+                delete_splits_resp = supabase.table('session_splits') \
+                    .delete() \
+                    .eq('session_id', ruck_id) \
+                    .execute()
+                
+                logger.info(f"Deleted existing splits for session {ruck_id}")
+                
+                # Insert the new (filtered) splits
+                split_rows = []
+                for split in data['splits']:
+                    if isinstance(split, dict):
+                        split_rows.append({
+                            'session_id': ruck_id,
+                            'split_number': split.get('split_number'),
+                            'split_distance_km': split.get('split_distance_km'),
+                            'split_duration_seconds': split.get('split_duration_seconds'),
+                            'total_distance_km': split.get('total_distance_km'),
+                            'total_duration_seconds': split.get('total_duration_seconds'),
+                            'timestamp': split.get('timestamp')
+                        })
+                
+                if split_rows:
+                    insert_splits_resp = supabase.table('session_splits') \
+                        .insert(split_rows) \
+                        .execute()
+                    
+                    logger.info(f"Inserted {len(split_rows)} filtered splits for session {ruck_id}")
+            
+            # Clear cache for this user's sessions
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            
+            logger.info(f"Successfully edited session {ruck_id}")
+            
+            return {
+                'message': 'Session updated successfully',
+                'session_id': ruck_id,
+                'updated_at': session_updates['updated_at']
+            }, 200
+            
+        except Exception as e:
+            logger.error(f"Error editing session {ruck_id}: {e}")
+            return {'message': f'Error editing session: {str(e)}'}, 500
+
 
 class HeartRateSampleUploadResource(Resource):
     def get(self, ruck_id):
