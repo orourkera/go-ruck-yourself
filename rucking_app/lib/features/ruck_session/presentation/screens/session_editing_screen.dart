@@ -192,13 +192,16 @@ class _SessionEditingScreenState extends State<SessionEditingScreen>
         if (_timelinePosition >= 1.0) {
           // Ensure we keep ALL points when at the end
           pointsToKeep = _originalLocationPoints.length;
+          print('🔍 [SESSION_EDITING] Timeline position >= 1.0, keeping ALL ${pointsToKeep} points');
         } else {
           // Use ceiling to ensure we don't under-filter
           pointsToKeep = (_originalLocationPoints.length * _timelinePosition).ceil();
+          print('🔍 [SESSION_EDITING] Timeline position ${_timelinePosition}, calculated ${pointsToKeep} points to keep');
         }
         filteredLocationPoints = _originalLocationPoints.take(pointsToKeep).toList();
-        print(' [SESSION_EDITING] Using position-based filtering (invalid timestamps)');
-        print(' [SESSION_EDITING] Keeping ${pointsToKeep} out of ${_originalLocationPoints.length} points');
+        print('🔍 [SESSION_EDITING] Using position-based filtering (invalid timestamps)');
+        print('🔍 [SESSION_EDITING] Keeping ${pointsToKeep} out of ${_originalLocationPoints.length} points');
+        print('🔍 [SESSION_EDITING] Actual filtered points: ${filteredLocationPoints.length}');
       }
         
       // Debug timestamp filtering
@@ -232,18 +235,26 @@ class _SessionEditingScreenState extends State<SessionEditingScreen>
           .toList();
 
       // Recalculate session metrics
-      final originalDistance = _calculateDistance(_originalLocationPoints);
+      // Use original session distance as baseline instead of recalculating
+      final originalDistance = widget.originalSession.distance;
       final newDistance = _calculateDistance(filteredLocationPoints);
       
+      // Scale the new distance proportionally if we're not at 100%
+      final scaledDistance = _timelinePosition >= 1.0 
+          ? originalDistance
+          : (originalDistance * _timelinePosition);
+      
       // Debug distance calculation with print statements
-      print(' [SESSION_EDITING] === DISTANCE CALCULATION DEBUG ===');
-      print(' [SESSION_EDITING] Timeline position: $_timelinePosition (${(_timelinePosition * 100).toStringAsFixed(1)}%)');
-      print(' [SESSION_EDITING] Original points: ${_originalLocationPoints.length}, Original distance: ${originalDistance.toStringAsFixed(3)}km');
-      print(' [SESSION_EDITING] Filtered points: ${filteredLocationPoints.length}, Filtered distance: ${newDistance.toStringAsFixed(3)}km');
-      print(' [SESSION_EDITING] Points filtered out: ${_originalLocationPoints.length - filteredLocationPoints.length}');
-      print(' [SESSION_EDITING] Expected time reduction: ${(100 - (_timelinePosition * 100)).toStringAsFixed(1)}%');
-      print(' [SESSION_EDITING] Actual distance reduction: ${((originalDistance - newDistance) / originalDistance * 100).toStringAsFixed(1)}%');
-      print(' [SESSION_EDITING] Distance difference: ${(originalDistance - newDistance).toStringAsFixed(3)}km');
+      print('🔧 [SESSION_EDITING] === DISTANCE CALCULATION DEBUG ===');
+      print('🔧 [SESSION_EDITING] Timeline position: $_timelinePosition (${(_timelinePosition * 100).toStringAsFixed(1)}%)');
+      print('🔧 [SESSION_EDITING] Original stored distance: ${originalDistance.toStringAsFixed(3)}km');
+      print('🔧 [SESSION_EDITING] Calculated distance from points: ${newDistance.toStringAsFixed(3)}km');
+      print('🔧 [SESSION_EDITING] Scaled distance (final): ${scaledDistance.toStringAsFixed(3)}km');
+      print('🔧 [SESSION_EDITING] Points filtered out: ${_originalLocationPoints.length - filteredLocationPoints.length}');
+      print('🔧 [SESSION_EDITING] Expected time reduction: ${(100 - (_timelinePosition * 100)).toStringAsFixed(1)}%');
+      print('🔧 [SESSION_EDITING] Actual distance reduction: ${((originalDistance - scaledDistance) / originalDistance * 100).toStringAsFixed(1)}%');
+      print('🔧 [SESSION_EDITING] Distance difference: ${(originalDistance - scaledDistance).toStringAsFixed(3)}km');
+      print('🔧 [SESSION_EDITING] Using original distance as baseline: ${(_timelinePosition >= 1.0) ? "YES" : "NO"}');
       
       AppLogger.debug('[SESSION_EDITING] Calculated distance: ${newDistance.toStringAsFixed(3)}km from ${filteredLocationPoints.length} points');
       final newElevationGain = _calculateElevationGain(filteredLocationPoints);
@@ -255,14 +266,21 @@ class _SessionEditingScreenState extends State<SessionEditingScreen>
       AppLogger.debug('[SESSION_EDITING] Calories calculation: original=${widget.originalSession.caloriesBurned}, new=${newCalories}, cutoff duration=${cutoffDuration.inMinutes}min vs original=${totalDuration.inMinutes}min');
       
       AppLogger.debug('[SESSION_EDITING] Timeline position: $_timelinePosition, Original duration: ${widget.originalSession.duration.inMinutes}min, Cutoff duration: ${cutoffDuration.inMinutes}min, Original calories: ${widget.originalSession.caloriesBurned}, New calories: $newCalories');
+      
+      // Calculate remaining metrics
       final newAveragePace = _calculateAveragePace(newDistance, cutoffDuration);
       final newHeartRateStats = _calculateHeartRateStats(filteredHeartRateSamples);
 
-      // Create preview session
+      // Debug preview session creation
+      print('🔧 [SESSION_EDITING] === PREVIEW SESSION CREATION ===');
+      print('🔧 [SESSION_EDITING] About to create preview session with distance: ${scaledDistance.toStringAsFixed(3)}km');
+      print('🔧 [SESSION_EDITING] Original session distance: ${widget.originalSession.distance.toStringAsFixed(3)}km');
+      
+      // Create updated session with new metrics
       _previewSession = widget.originalSession.copyWith(
         endTime: cutoffTime,
         duration: cutoffDuration,
-        distance: newDistance,
+        distance: scaledDistance,
         elevationGain: newElevationGain,
         elevationLoss: newElevationLoss,
         caloriesBurned: newCalories,
@@ -273,8 +291,12 @@ class _SessionEditingScreenState extends State<SessionEditingScreen>
         minHeartRate: newHeartRateStats['min'],
         splits: filteredSplits,
       );
+      
+      // Debug the created preview session
+      print('🔧 [SESSION_EDITING] Created preview session with distance: ${_previewSession!.distance.toStringAsFixed(3)}km');
+      print('🔧 [SESSION_EDITING] Preview session calories: ${_previewSession!.caloriesBurned}');
 
-      AppLogger.debug('[SESSION_EDITING] Updated preview: ${filteredLocationPoints.length} points, ${newDistance.toStringAsFixed(2)}km');
+      AppLogger.debug('[SESSION_EDITING] Updated preview: ${filteredLocationPoints.length} points, ${scaledDistance.toStringAsFixed(2)}km');
     } catch (e) {
       AppLogger.error('[SESSION_EDITING] Error calculating preview session', exception: e);
     }
