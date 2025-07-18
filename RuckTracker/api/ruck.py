@@ -1199,8 +1199,7 @@ class RuckSessionEditResource(Resource):
                 'average_pace': data.get('average_pace_min_per_km'),
                 'avg_heart_rate': data.get('avg_heart_rate'),
                 'max_heart_rate': data.get('max_heart_rate'),
-                'min_heart_rate': data.get('min_heart_rate'),
-                'updated_at': datetime.utcnow().isoformat()
+                'min_heart_rate': data.get('min_heart_rate')
             }
             
             # Update the session
