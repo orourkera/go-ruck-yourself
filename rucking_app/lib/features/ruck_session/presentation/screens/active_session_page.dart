@@ -232,6 +232,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the bloc instance to avoid context issues with nested providers
+    final activeSessionBloc = context.read<ActiveSessionBloc>();
+    
     return Scaffold(
       body: Stack(
         children: [
@@ -579,6 +582,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               Padding(
                                 padding: const EdgeInsets.all(16.0), // This was the padding inside the Expanded
                                 child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                                  bloc: activeSessionBloc, // Provide the bloc instance
                                   key: const ValueKey('stats_overlay_builder'),
                                   buildWhen: (prev, curr) {
                                     if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
@@ -644,6 +648,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               Padding(
                                 padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 10.0, top: 4.0),
                                 child: BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                                  bloc: activeSessionBloc, // Provide the bloc instance
                                   buildWhen: (prev, curr) {
                                     // Rebuild when the state type changes (e.g. Initial -> Running) or when
                                     // the paused flag toggles within a running session.
