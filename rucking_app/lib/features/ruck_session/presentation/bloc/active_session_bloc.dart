@@ -517,13 +517,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Fetch photos directly from the repository
       final photos = await _sessionRepository.getSessionPhotos(event.ruckId);
       
-      // Update the current state with the fetched photos
+      // Emit SessionPhotosLoadedForId state so UI can listen for it
+      emit(SessionPhotosLoadedForId(
+        sessionId: event.ruckId.toString(),
+        photos: photos,
+      ));
+      
+      // Also update the current state with the fetched photos if it's a running session
       final currentState = state;
       if (currentState is ActiveSessionRunning) {
         emit(currentState.copyWith(photos: photos));
-      } 
+      }
       
-      AppLogger.debug('Successfully fetched ${photos.length} photos for ruck ${event.ruckId}');
+      AppLogger.debug('Successfully fetched ${photos.length} photos for ruck ${event.ruckId}, emitted SessionPhotosLoadedForId state');
     } catch (e, stackTrace) {
       AppLogger.error('Failed to fetch session photos for ruck ${event.ruckId}', exception: e);
       

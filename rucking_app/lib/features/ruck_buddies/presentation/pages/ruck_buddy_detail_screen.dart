@@ -538,8 +538,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         ? (authBloc.state as Authenticated).user.preferMetric
         : false;
 
-    return BlocListener<Bloc<ActiveSessionEvent, ActiveSessionState>, ActiveSessionState>(
-      bloc: GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>(),
+    return BlocListener<ActiveSessionBloc, ActiveSessionState>(
+      bloc: context.read<ActiveSessionBloc>(),
       listenWhen: (previous, current) {
         // Helper function to get photos from any state type that might contain them
         List<dynamic> getPhotosFromState(ActiveSessionState state) {
