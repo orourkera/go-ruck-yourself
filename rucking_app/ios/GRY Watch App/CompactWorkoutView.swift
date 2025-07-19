@@ -24,7 +24,7 @@ struct CompactWorkoutView: View {
                         .foregroundColor(.green)
                     Spacer()
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, 0)
                 
                 // Elapsed time – large and yellow
                 Text(sessionManager.statusText)
@@ -51,7 +51,7 @@ struct CompactWorkoutView: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 4)
         }
     }
 
@@ -59,7 +59,7 @@ struct CompactWorkoutView: View {
     private func metricRow(value: String,
                            symbol: AnyView? = nil,
                            labelLines: [String]) -> some View {
-        HStack(alignment: .center, spacing: 4) {
+        HStack(alignment: .center, spacing: 2) {
             Text(value)
                 .font(.system(size: 30, weight: .regular, design: .default))
                 .foregroundColor(.white)

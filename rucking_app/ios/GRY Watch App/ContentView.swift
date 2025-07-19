@@ -114,7 +114,7 @@ struct ContentView: View {
     // Extracted view for active session UI
     private var activeSessionView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
                 // Full-width timer container - ensure it takes full width
                 HStack {
                     Spacer()
@@ -136,7 +136,7 @@ struct ContentView: View {
                     .padding(.bottom, 5) // Add some padding below pace
 
                 // 2x2 Grid for metrics - with larger cells
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 2) {
                     // Distance - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
                         Text(sessionManager.isMetric ? "DISTANCE" : "DISTANCE")
@@ -151,7 +151,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, minHeight: 70)
                     .background(Color.black.opacity(0.1))
                     .cornerRadius(8)
-                    .padding(3)
+                    .padding(1)
                     
                     // Heart Rate - Full-size Metric Box (moved into grid)
                     VStack(alignment: .center, spacing: 2) {
@@ -172,7 +172,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, minHeight: 70)
                     .background(Color.black.opacity(0.1))
                     .cornerRadius(8)
-                    .padding(3)
+                    .padding(1)
                     
                     // Calories - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
@@ -189,7 +189,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, minHeight: 70)
                     .background(Color.black.opacity(0.1))
                     .cornerRadius(8)
-                    .padding(3)
+                    .padding(1)
                     
                     // Elevation - Full-size Metric Box
                     VStack(alignment: .center, spacing: 2) {
@@ -206,12 +206,12 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, minHeight: 70)
                     .background(Color.black.opacity(0.1))
                     .cornerRadius(8)
-                    .padding(3)
+                    .padding(1)
                 }
-                .padding(.top, 5)
+                .padding(.top, 2)
                 
                 // Control buttons section (Heart rate display removed from here)
-                VStack(spacing: 10) {
+                VStack(spacing: 2) {
                     // Play/Pause button (only shown if session is active)
                     if sessionManager.isSessionActive {
                         Button(action: {
@@ -234,9 +234,9 @@ struct ContentView: View {
                         .buttonStyle(PlainButtonStyle())
                     }
                 }
-                .padding(.top, 5)
+                .padding(.top, 2)
             }
-            .padding(12)
+            .padding(6)
         }
     }
 }
