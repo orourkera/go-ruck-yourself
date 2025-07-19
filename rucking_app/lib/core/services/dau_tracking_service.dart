@@ -29,14 +29,20 @@ class DauTrackingService with WidgetsBindingObserver {
   Future<void> initialize() async {
     AppLogger.info('Initializing DAU tracking service');
     
-    // Register as lifecycle observer
     WidgetsBinding.instance.addObserver(this);
+    
+    // Small delay to ensure authentication is ready
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    AppLogger.debug('DAU tracking - Starting initialization');
     
     // Send any pending updates from previous app sessions
     await _sendPendingUpdate();
     
     // Track initial app open
     await _trackAppOpen();
+    
+    AppLogger.debug('DAU tracking - Initialization complete');
   }
   
   /// Clean up resources
@@ -100,7 +106,18 @@ class DauTrackingService with WidgetsBindingObserver {
   Future<bool> _sendLastActiveUpdate() async {
     try {
       final user = await _authService.getCurrentUser();
-      if (user == null) return false;
+      if (user == null) {
+        AppLogger.debug('DAU tracking - No authenticated user, skipping update');
+        return false;
+      }
+      
+      // Additional validation - check if user has valid userId
+      if (user.userId.isEmpty) {
+        AppLogger.warning('DAU tracking - User has empty userId, skipping update');
+        return false;
+      }
+      
+      AppLogger.debug('DAU tracking - Sending update for user: ${user.userId}');
       
       await _apiClient.patch(
         '/users/${user.userId}',
@@ -112,7 +129,14 @@ class DauTrackingService with WidgetsBindingObserver {
       return true;
       
     } catch (e) {
-      AppLogger.warning('Failed to update last_active_at: $e');
+      // More detailed error logging
+      if (e.toString().contains('ServerException')) {
+        AppLogger.error('DAU tracking - Server error (likely auth/permissions): $e');
+      } else if (e.toString().contains('TimeoutException')) {
+        AppLogger.warning('DAU tracking - Request timeout: $e');
+      } else {
+        AppLogger.warning('DAU tracking - Failed to update last_active_at: $e');
+      }
       return false;
     }
   }

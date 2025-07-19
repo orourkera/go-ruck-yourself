@@ -66,24 +66,22 @@ class ActiveSessionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // If an ActiveSessionBloc is already provided higher up in the widget tree
-    // (e.g. by the CountdownPage for pre-loading), reuse that instead of creating
-    // a new one. This ensures the session continues seamlessly once the
-    // countdown finishes and avoids restarting any logic inside the bloc.
+    // Try to use existing ActiveSessionBloc from the main app first
+    // If not available, create a new one (for direct navigation scenarios)
+    // Use context.read instead of BlocProvider.of to avoid exceptions
 
     ActiveSessionBloc? existingBloc;
     try {
-      existingBloc = BlocProvider.of<ActiveSessionBloc>(context, listen: false);
+      existingBloc = context.read<ActiveSessionBloc>();
     } catch (_) {
+      // No existing bloc in context - we'll create a new one
       existingBloc = null;
     }
 
-    // Get GetIt instance first so it's available regardless of which path we take
     final locator = GetIt.I;
     
     if (existingBloc != null) {
-      // Bloc already exists – simply build the view.
-      // Also provide HealthBloc for the session complete screen
+      // Bloc exists in context - just provide HealthBloc
       return BlocProvider<HealthBloc>(
         create: (_) => HealthBloc(
           healthService: locator<HealthService>(),
@@ -95,8 +93,7 @@ class ActiveSessionPage extends StatelessWidget {
       );
     }
 
-    // No existing bloc – create a fresh one (e.g. when user lands here
-    // directly without going through the countdown page).
+    // No existing bloc - create a fresh one for direct navigation
     return MultiBlocProvider(
       providers: [
         BlocProvider(

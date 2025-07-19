@@ -160,17 +160,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       if (fullSession != null) {
         Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => MultiBlocProvider(
-              providers: [
-                BlocProvider<ActiveSessionBloc>.value(
-                  value: GetIt.instance<ActiveSessionBloc>(),
-                ),
-                BlocProvider<SocialBloc>.value(
-                  value: GetIt.instance<SocialBloc>(),
-                ),
-              ],
-              child: SessionDetailScreen(session: fullSession),
-            ),
+            builder: (context) => SessionDetailScreen(session: fullSession),
           ),
         ).then((refreshNeeded) {
           // If returned with true (session deleted), refresh the data

@@ -70,6 +70,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     super.initState();
     AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState called.');
     
+    // Reset photo loading flag for fresh screen instance
+    _photosLoadAttemptedForThisSession = false;
+    
     // Debug log heart rate data in the initial session
     AppLogger.debug('[HEARTRATE DEBUG] Initial session heart rate data:');
     AppLogger.debug('[HEARTRATE DEBUG] Has heartRateSamples: ${widget.session.heartRateSamples != null}');
@@ -98,7 +101,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       
       if (needsHeartRate || needsLocationPoints) {
         AppLogger.debug('[SESSION DETAIL] Loading full session data - heart rate missing: $needsHeartRate, location points missing: $needsLocationPoints');
-        GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(LoadSessionForViewing(
+        context.read<ActiveSessionBloc>().add(LoadSessionForViewing(
           sessionId: widget.session.id!, 
           session: widget.session
         ));
@@ -151,7 +154,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
         return;
       }
-      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      final activeSessionBloc = context.read<ActiveSessionBloc>();
       activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
     } else {
       AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
@@ -165,7 +168,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
         return;
       }
-      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      final activeSessionBloc = context.read<ActiveSessionBloc>();
       // Clear the current photos from the BLoC state before fetching new ones
       AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Attempting to add ClearSessionPhotos for session ${widget.session.id}');
       activeSessionBloc.add(ClearSessionPhotos(ruckId: widget.session.id!));
@@ -211,7 +214,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       // Request a fresh photo fetch
       if (mounted && widget.session.id != null) {
         // Get direct access to the bloc
-        final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+        final activeSessionBloc = context.read<ActiveSessionBloc>();
         activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
       }
     });
@@ -282,7 +285,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+    final activeSessionBloc = context.read<ActiveSessionBloc>();
     
     // Get user preferences for metric/imperial
     final authState = context.read<AuthBloc>().state;
@@ -622,6 +625,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                   } else if (state is SessionSummaryGenerated) {
                     photos = state.photos;
                     isPhotosLoading = state.isPhotosLoading;
+                  } else if (state is SessionPhotosLoadedForId && state.sessionId == widget.session.id.toString()) {
+                    photos = state.photos;
+                    isPhotosLoading = false;
                   }
                   
                   // Improved URL extraction with better handling of potential nulls - works for both state types
@@ -688,7 +694,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             onDeleteRequest: (index) {
                               if (photos.length > index) {
                                 final photoToDelete = photos[index];
-                                context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(
+                                activeSessionBloc.add(
                                   DeleteSessionPhotoRequested(
                                     sessionId: widget.session.id!,
                                     photo: photoToDelete,
@@ -706,7 +712,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 AppLogger.info('[PHOTO_DEBUG] Session Detail: Preparing to dispatch UploadSessionPhotosRequested event with ${photos.length} photos');
                                 AppLogger.info('[PHOTO_DEBUG] Session ID: ${widget.session.id!}');
                                 
-                                final bloc = context.read<Bloc<ActiveSessionEvent, ActiveSessionState>>();
+                                final bloc = activeSessionBloc;
                                 AppLogger.info('[PHOTO_DEBUG] ActiveSessionBloc instance: ${bloc.hashCode}, Current state: ${bloc.state.runtimeType}');
                                 
                                 bloc.add(
@@ -1130,7 +1136,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       // Get session photos for potential background and photo selection
       String? backgroundImageUrl;
       List<String> sessionPhotos = [];
-      final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
+      final activeSessionState = context.read<ActiveSessionBloc>().state;
       
       // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
       List<RuckPhoto> availablePhotos = [];
@@ -1183,7 +1189,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       
       // Get session photos for potential background
       String? backgroundImageUrl;
-      final activeSessionState = GetIt.instance<ActiveSessionBloc>().state;
+      final activeSessionState = context.read<ActiveSessionBloc>().state;
       
       // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
       List<RuckPhoto> availablePhotos = [];
@@ -1373,7 +1379,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         // This avoids any issues with context being disposed
         try {
           // Get the bloc directly from the service locator
-          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+          final activeSessionBloc = context.read<ActiveSessionBloc>();
           
           // Upload the photos
           activeSessionBloc.add(
@@ -1451,7 +1457,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         // This avoids any issues with context being disposed
         try {
           // Get the bloc directly from the service locator
-          final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+          final activeSessionBloc = context.read<ActiveSessionBloc>();
           
           // Upload the photo
           activeSessionBloc.add(
