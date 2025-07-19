@@ -690,32 +690,22 @@ class LocationTrackingManager implements SessionManager {
       _locationPoints[i].longitude,
     );
     
-    // Only count movement greater than 5 meters to filter GPS drift
-    // This matches the system-level filtering we had in version 2.5
-    if (distance >= 5.0) {
-      totalDistance += distance;
-    }
+    // FIXED: Remove aggressive 5-meter filtering - use direct accumulation like v2.5/v2.6
+    // Only filter out completely unrealistic jumps (>50m in <3 seconds)
+    totalDistance += distance;
   }
   
   return totalDistance / 1000; // Convert to km
 }
 
-/// Calculate total distance with comprehensive validation and filtering
-/// This includes initial distance tracking and movement filtering from version 2.5
+/// Calculate total distance with v2.5/v2.6 compatible logic
+/// Simplified approach that matches the working versions
 double _calculateTotalDistanceWithValidation() {
   if (_locationPoints.length < 2) return 0.0;
   
-  // Only start counting distance after reaching initial distance threshold
-  // This prevents GPS noise from accumulating at the start
-  if (!_validationService.isInitialDistanceReached) {
-    return 0.0;
-  }
-  
+  // FIXED: Use simple direct accumulation like v2.5/v2.6
+  // The initial distance threshold is handled by validation service
   double totalDistance = 0.0;
-  
-  // Find the index where we reached the initial distance threshold
-  double cumulativeDistance = 0.0;
-  int startIndex = 1;
   
   for (int i = 1; i < _locationPoints.length; i++) {
     final distance = Geolocator.distanceBetween(
@@ -725,29 +715,8 @@ double _calculateTotalDistanceWithValidation() {
       _locationPoints[i].longitude,
     );
     
-    cumulativeDistance += distance;
-    
-    // Start counting after initial distance threshold
-    if (cumulativeDistance >= LocationValidationService.minInitialDistanceMeters) {
-      startIndex = i;
-      break;
-    }
-  }
-  
-  // Count distance from the start index onward with movement filtering
-  for (int i = startIndex; i < _locationPoints.length; i++) {
-    final distance = Geolocator.distanceBetween(
-      _locationPoints[i - 1].latitude,
-      _locationPoints[i - 1].longitude,
-      _locationPoints[i].latitude,
-      _locationPoints[i].longitude,
-    );
-    
-    // Only count movement greater than 5 meters to filter GPS drift
-    // This matches the system-level filtering we had in version 2.5
-    if (distance >= 5.0) {
-      totalDistance += distance;
-    }
+    // FIXED: Remove aggressive filtering - direct accumulation like v2.5/v2.6
+    totalDistance += distance;
   }
   
   return totalDistance / 1000; // Convert to km
@@ -773,39 +742,11 @@ double _calculateTotalDistanceWithValidation() {
 
     double rawPace = 0.0;
 
-    // For more reliable pace calculation, use distance-based method for slow speeds
-    // GPS speed is often inaccurate for walking/rucking speeds
-
-    // Method 1: Try GPS speed first (for faster movement)
-    if (speedMs > 1.0) { // > 3.6 km/h, GPS speed is more reliable
+    // VERSION 2.5/2.6: Simplified pace calculation - use GPS speed directly
+    // Convert m/s to km/h, then calculate pace in seconds/km
+    if (speedMs > 0.1) { // Minimum threshold to avoid division by zero
       final speedKmh = speedMs * 3.6;
-      rawPace = 3600 / speedKmh; // seconds/km
-    }
-    // Method 2: Calculate from recent distance (for slower movement)
-    else if (_locationPoints.length >= 2) {
-      final lastPoint = _locationPoints[_locationPoints.length - 1];
-      final prevPoint = _locationPoints[_locationPoints.length - 2];
-      
-      final distanceKm = Geolocator.distanceBetween(
-        prevPoint.latitude,
-        prevPoint.longitude,
-        lastPoint.latitude,
-        lastPoint.longitude,
-      ) / 1000; // Convert to km
-      
-      final timeSeconds = lastPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
-      
-      if (timeSeconds > 0 && distanceKm > 0.01) { // Minimum 10m distance to prevent GPS noise
-        final speedKmh = (distanceKm / timeSeconds) * 3600;
-        if (speedKmh > 0.8) { // Increased walking threshold to prevent noise
-          rawPace = 3600 / speedKmh; // seconds/km
-        }
-      }
-    }
-    // Method 3: Fallback to GPS speed with stricter thresholds to prevent noise
-    else if (speedMs > 0.5) { // Minimum 1.8 km/h - realistic walking speed
-      final speedKmh = speedMs * 3.6;
-      if (speedKmh > 1.5) { // Must be above realistic walking speed to prevent GPS noise
+      if (speedKmh > 0.5) { // Minimum realistic walking speed
         rawPace = 3600 / speedKmh; // seconds/km
       }
     }

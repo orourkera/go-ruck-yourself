@@ -756,12 +756,12 @@ def get_user_device_tokens(user_ids: List[str]) -> List[str]:
             logger.error(f"❌ CRITICAL: No device token records found in database for users: {user_ids}")
             
             # Let's check if these users exist at all
-            user_check = admin_client.table('profiles').select('id, username').in_('id', user_ids).execute()
+            user_check = admin_client.table('public.user').select('id, username').in_('id', user_ids).execute()
             if user_check.data:
-                logger.info(f"✅ Users exist in profiles table: {[(u['id'], u.get('username')) for u in user_check.data]}")
+                logger.info(f"✅ Users exist in user table: {[(u['id'], u.get('username')) for u in user_check.data]}")
                 logger.error(f"❌ But they have no device tokens registered!")
             else:
-                logger.error(f"❌ Users don't exist in profiles table: {user_ids}")
+                logger.error(f"❌ Users don't exist in user table: {user_ids}")
             
             return []
             

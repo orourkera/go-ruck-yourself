@@ -134,7 +134,7 @@ class RuckCommentsResource(Resource):
             
         # Get user display info from the profile table
         try:
-            profile_response = supabase.table('profiles') \
+            profile_response = supabase.table('public.user') \
                                       .select('username, avatar_url') \
                                       .eq('id', user_id) \
                                       .execute()

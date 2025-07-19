@@ -609,6 +609,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
               // Photo Gallery Section - only shown when there are photos
               BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                bloc: activeSessionBloc, // Provide the bloc instance
                 builder: (context, state) {
                   List<String> photoUrls = [];
                   bool isPhotosLoading = false;
@@ -865,6 +866,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                               
                             // Heart rate graph
                             BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                              bloc: activeSessionBloc, // Provide the bloc instance
                               buildWhen: (previous, current) {
                                 if (current is SessionSummaryGenerated) {
                                   return current.session.heartRateSamples != null;

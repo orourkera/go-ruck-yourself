@@ -455,9 +455,9 @@ class CheckSessionAchievementsResource(Resource):
         
             elif criteria_type == 'time_of_day':
                 # Check early bird / night owl achievements
-                start_time = session.get('start_time')
-                if start_time:
-                    dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                started_at = session.get('started_at')
+                if started_at:
+                    dt = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
                     hour = dt.hour
                     
                     if 'before_hour' in criteria:
@@ -602,8 +602,8 @@ class CheckSessionAchievementsResource(Resource):
         try:
             # Get sessions ordered by date
             response = supabase.table('ruck_session').select(
-                'start_time'
-            ).eq('user_id', user_id).eq('status', 'completed').order('start_time', desc=True).execute()
+                'started_at'
+            ).eq('user_id', user_id).eq('status', 'completed').order('started_at', desc=True).execute()
             
             if not response.data:
                 return 0
@@ -612,7 +612,7 @@ class CheckSessionAchievementsResource(Resource):
             current_date = datetime.utcnow().date()
             
             for session in response.data:
-                session_date = datetime.fromisoformat(session['start_time'].replace('Z', '+00:00')).date()
+                session_date = datetime.fromisoformat(session['started_at'].replace('Z', '+00:00')).date()
                 if session_date == current_date:
                     streak += 1
                     current_date -= timedelta(days=1)
@@ -629,8 +629,8 @@ class CheckSessionAchievementsResource(Resource):
         try:
             # Get sessions grouped by week
             response = supabase.table('ruck_session').select(
-                'start_time'
-            ).eq('user_id', user_id).eq('status', 'completed').order('start_time', desc=True).execute()
+                'started_at'
+            ).eq('user_id', user_id).eq('status', 'completed').order('started_at', desc=True).execute()
             
             if not response.data:
                 return 0
@@ -638,7 +638,7 @@ class CheckSessionAchievementsResource(Resource):
             # Group by week
             weeks_with_rucks = set()
             for session in response.data:
-                session_date = datetime.fromisoformat(session['start_time'].replace('Z', '+00:00')).date()
+                session_date = datetime.fromisoformat(session['started_at'].replace('Z', '+00:00')).date()
                 week_start = session_date - timedelta(days=session_date.weekday())
                 weeks_with_rucks.add(week_start)
             
@@ -660,15 +660,15 @@ class CheckSessionAchievementsResource(Resource):
         try:
             # Get weekend sessions (Saturday = 5, Sunday = 6)
             response = supabase.table('ruck_session').select(
-                'start_time'
-            ).eq('user_id', user_id).eq('status', 'completed').order('start_time', desc=True).execute()
+                'started_at'
+            ).eq('user_id', user_id).eq('status', 'completed').order('started_at', desc=True).execute()
             
             if not response.data:
                 return 0
             
             weekends_with_rucks = set()
             for session in response.data:
-                session_date = datetime.fromisoformat(session['start_time'].replace('Z', '+00:00')).date()
+                session_date = datetime.fromisoformat(session['started_at'].replace('Z', '+00:00')).date()
                 if session_date.weekday() >= 5:  # Saturday or Sunday
                     # Get the Saturday of this weekend
                     weekend_start = session_date - timedelta(days=session_date.weekday() - 5)
@@ -695,8 +695,8 @@ class CheckSessionAchievementsResource(Resource):
             months_ago = datetime.utcnow().replace(day=1) - timedelta(days=target_months * 31)
             
             response = supabase.table('ruck_session').select(
-                'start_time'
-            ).eq('user_id', user_id).eq('status', 'completed').gte('start_time', months_ago.isoformat()).execute()
+                'started_at'
+            ).eq('user_id', user_id).eq('status', 'completed').gte('started_at', months_ago.isoformat()).execute()
             
             if not response.data:
                 return False
@@ -704,7 +704,7 @@ class CheckSessionAchievementsResource(Resource):
             # Group by month
             month_counts = {}
             for session in response.data:
-                session_date = datetime.fromisoformat(session['start_time'].replace('Z', '+00:00')).date()
+                session_date = datetime.fromisoformat(session['started_at'].replace('Z', '+00:00')).date()
                 month_key = (session_date.year, session_date.month)
                 month_counts[month_key] = month_counts.get(month_key, 0) + 1
             
@@ -739,15 +739,22 @@ class CheckSessionAchievementsResource(Resource):
     def _check_pace_consistency(self, supabase, user_id: str, variance_threshold: float) -> bool:
         """Check pace consistency across sessions"""
         try:
-            # Get recent sessions
+            # Get recent sessions with duration and distance to calculate pace
             response = supabase.table('ruck_session').select(
-                'pace_seconds_per_km'
+                'duration_seconds, distance_km'
             ).eq('user_id', user_id).eq('status', 'completed').limit(10).execute()
             
             if not response.data or len(response.data) < 3:
                 return False
             
-            paces = [s['pace_seconds_per_km'] for s in response.data if s.get('pace_seconds_per_km')]
+            paces = []
+            for session in response.data:
+                duration = session.get('duration_seconds')
+                distance = session.get('distance_km')
+                if duration and distance:
+                    pace = duration / distance
+                    paces.append(pace)
+            
             if len(paces) < 3:
                 return False
             
@@ -765,11 +772,9 @@ class CheckSessionAchievementsResource(Resource):
     def _count_user_photos(self, supabase, user_id: str) -> int:
         """Count total photos uploaded by user"""
         try:
-            response = supabase.rpc('count', {
-                'table_name': 'ruck_photos',
-                'conditions': f"user_id = '{user_id}'"
-            }).execute()
-            return response.data or 0
+            # Use direct table query instead of missing RPC function
+            response = supabase.table('ruck_photos').select('id', count='exact').eq('user_id', user_id).execute()
+            return response.count or 0
         except Exception as e:
             logger.error(f"Error counting user photos: {str(e)}")
             return 0

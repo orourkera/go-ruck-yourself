@@ -57,7 +57,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
   ///
   /// Logic:
   /// • If `completedAt` is today – show the time (e.g. `3:42 PM`)
-  /// • If within the last 7 days – show the weekday (e.g. `Mon`)
+  /// • If within the last 7 days – show the date (e.g. `Jul 18`)
   /// • If within the current year – show `MMM d` (e.g. `Apr 5`)
   /// • Otherwise – show `MMM d, y` (e.g. `Apr 5, 2023`)
   String _formatCompletedDate(DateTime? completedAt) {
@@ -70,8 +70,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       // Same day
       return DateFormat('h:mm a').format(completedAt);
     } else if (difference.inDays < 7) {
-      // Within the last week
-      return DateFormat('EEE').format(completedAt); // Mon, Tue, etc.
+      // Within the last week - show actual date instead of weekday
+      return DateFormat('MMM d').format(completedAt); // Jul 18, etc.
     } else if (now.year == completedAt.year) {
       // Earlier this year
       return DateFormat('MMM d').format(completedAt); // Apr 5

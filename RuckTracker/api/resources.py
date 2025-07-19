@@ -89,40 +89,82 @@ class UserResource(Resource):
         Any other recognised user fields will also be mapped and updated using the same camel →
         snake conversion used in `put()`.
         """
-        user = User.query.get_or_404(user_id)
-        data = request.get_json() or {}
+        try:
+            # Use Supabase instead of SQLAlchemy to avoid 504 timeouts
+            # Import here to avoid circular imports
+            from ..supabase_client import get_supabase_client
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # First check if user exists
+            user_check = supabase.table('user').select('id, username, email').eq('id', str(user_id)).execute()
+            if not user_check.data:
+                return {'error': 'User not found'}, 404
+                
+            data = request.get_json() or {}
+            logger.info(f"PATCH /users/{user_id} - Received data: {data}")
 
-        # Map camelCase keys coming from Flutter to snake_case columns
-        camel_to_snake = {
-            'weightKg': 'weight_kg',
-            'isMetric': 'prefer_metric',
-            'heightCm': 'height_cm',
-            'avatarUrl': 'avatar_url',
-            'lastActiveAt': 'last_active_at',  # not a real column but accepted in payload
-        }
-        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
+            # Map camelCase keys coming from Flutter to snake_case columns
+            camel_to_snake = {
+                'weightKg': 'weight_kg',
+                'isMetric': 'prefer_metric',
+                'heightCm': 'height_cm',
+                'avatarUrl': 'avatar_url',
+                'lastActiveAt': 'last_active_at',  # not a real column but accepted in payload
+            }
+            data = {camel_to_snake.get(k, k): v for k, v in data.items()}
 
-        # Handle last_active_at specially – we just bump updated_at for now
-        if 'last_active_at' in data:
-            try:
-                # Parse ISO8601 – datetime.fromisoformat handles microseconds & timezone info
-                ts = datetime.fromisoformat(data['last_active_at'].replace('Z', '+00:00'))
-                user.updated_at = ts
-            except Exception:
-                # If parsing fails just use current UTC time (fail-safe)
-                user.updated_at = datetime.utcnow()
+            # Prepare update data
+            update_data = {}
+            
+            # Handle last_active_at specially – we just bump updated_at for now
+            if 'last_active_at' in data:
+                try:
+                    # Parse ISO8601 – datetime.fromisoformat handles microseconds & timezone info
+                    ts = datetime.fromisoformat(data['last_active_at'].replace('Z', '+00:00'))
+                    update_data['updated_at'] = ts.isoformat()
+                    logger.info(f"Updated last_active_at for user {user_id} to {ts}")
+                except Exception as e:
+                    # If parsing fails just use current UTC time (fail-safe)
+                    update_data['updated_at'] = datetime.utcnow().isoformat()
+                    logger.warning(f"Failed to parse last_active_at, using current time: {e}")
 
-        # For any other provided fields reuse the same logic as PUT but without validation
-        allowed_simple_fields = {
-            'username', 'email', 'weight_kg', 'prefer_metric', 'height_cm',
-            'avatar_url', 'is_profile_private'
-        }
-        for key in allowed_simple_fields:
-            if key in data:
-                setattr(user, key, data[key])
+            # For any other provided fields reuse the same logic as PUT but without validation
+            allowed_simple_fields = {
+                'username', 'email', 'weight_kg', 'prefer_metric', 'height_cm',
+                'avatar_url', 'is_profile_private'
+            }
+            for key in allowed_simple_fields:
+                if key in data:
+                    update_data[key] = data[key]
 
-        db.session.commit()
-        return {"user": user.to_dict()}, 200
+            # Update user in Supabase
+            if update_data:
+                result = supabase.table('user').update(update_data).eq('id', str(user_id)).execute()
+                if result.data:
+                    user_data = result.data[0]
+                    logger.info(f"Successfully updated user {user_id}")
+                    return {"user": {
+                        'id': user_data.get('id'),
+                        'username': user_data.get('username'),
+                        'email': user_data.get('email'),
+                        'weight_kg': user_data.get('weight_kg'),
+                        'height_cm': user_data.get('height_cm'),
+                        'gender': user_data.get('gender'),
+                        'prefer_metric': user_data.get('prefer_metric', True),
+                        'avatarUrl': user_data.get('avatar_url'),
+                        'isPrivateProfile': user_data.get('is_profile_private', False),
+                        'updated_at': user_data.get('updated_at')
+                    }}, 200
+                else:
+                    logger.error(f"No data returned from user update for {user_id}")
+                    return {'error': 'Update failed'}, 400
+            else:
+                logger.info(f"No valid update data provided for user {user_id}")
+                return {'error': 'No valid update data provided'}, 400
+                
+        except Exception as e:
+            logger.error(f"Error updating user {user_id}: {str(e)}", exc_info=True)
+            return {'error': f'Internal server error: {str(e)}'}, 500
 
     def delete(self, user_id):
         """Delete a user and all associated data from Supabase and local DB"""
