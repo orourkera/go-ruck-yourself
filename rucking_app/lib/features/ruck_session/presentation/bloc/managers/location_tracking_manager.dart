@@ -40,7 +40,7 @@ class LocationTrackingManager implements SessionManager {
   StreamSubscription<LocationPoint>? _locationSubscription;
   final List<LocationPoint> _locationPoints = [];
   final Queue<LocationPoint> _pendingLocationPoints = Queue();
-  final Queue<TerrainSegment> _pendingTerrainSegments = Queue();
+
   
   // Internal state
   LocationPoint? _lastValidLocation;
@@ -142,7 +142,7 @@ class LocationTrackingManager implements SessionManager {
     _locationPoints.clear();
     _terrainSegments.clear();
     _pendingLocationPoints.clear();
-    _pendingTerrainSegments.clear();
+
     _validLocationCount = 0;
     _lastUploadedLocationIndex = 0; // Reset upload tracking
     _lastValidLocation = null; // Reset validation state
@@ -203,7 +203,7 @@ class LocationTrackingManager implements SessionManager {
     _locationPoints.clear();
     _terrainSegments.clear();
     _pendingLocationPoints.clear();
-    _pendingTerrainSegments.clear();
+
     _lastUploadedLocationIndex = 0;
     _lastUploadedTerrainIndex = 0;
     _validLocationCount = 0;
@@ -309,8 +309,7 @@ class LocationTrackingManager implements SessionManager {
           if (segment != null) {
             _terrainSegments.add(segment);
             
-            // CRITICAL FIX: Trigger terrain segment upload for crash resilience
-            _triggerTerrainSegmentUploadIfNeeded();
+            // Terrain segments stored locally (upload functionality removed)
             
             // Manage terrain segments with proper upload tracking
             if (_terrainSegments.length > _maxTerrainSegments && _lastUploadedTerrainIndex > 50) {
@@ -432,8 +431,8 @@ class LocationTrackingManager implements SessionManager {
     if (_terrainSegments.length > _maxTerrainSegments && _lastUploadedTerrainIndex > 50) {
       _trimUploadedTerrainSegments();
     } else if (_terrainSegments.length > _maxTerrainSegments) {
-      // If no uploads have occurred yet, trigger upload to prevent memory leak
-      _triggerTerrainSegmentUploadIfNeeded();
+      // If no uploads have occurred yet, trim segments to prevent memory leak
+      _trimUploadedTerrainSegments();
     }
   }
   
@@ -500,72 +499,7 @@ class LocationTrackingManager implements SessionManager {
     }
   }
   
-  /// Trigger terrain segment upload if threshold reached (crash resilience)
-  void _triggerTerrainSegmentUploadIfNeeded() {
-    final unuploadedSegments = _terrainSegments.length - _lastUploadedTerrainIndex;
-    
-    // Upload terrain segments every 100 segments (less frequent than location points)
-    if (unuploadedSegments >= 100) {
-      AppLogger.info('[LOCATION_MANAGER] TERRAIN_UPLOAD_TRIGGER: ${unuploadedSegments} unuploaded terrain segments, triggering upload');
-      _triggerImmediateTerrainSegmentUpload();
-    }
-  }
-  
-  /// Trigger immediate terrain segment upload to database
-  void _triggerImmediateTerrainSegmentUpload() {
-    if (_activeSessionId == null) return;
-    
-    try {
-      final unuploadedSegments = _terrainSegments.length - _lastUploadedTerrainIndex;
-      if (unuploadedSegments <= 0) return;
-      
-      final batchEndIndex = _terrainSegments.length; // Upload all unuploaded segments
-      final segmentsToUpload = _terrainSegments.sublist(_lastUploadedTerrainIndex, batchEndIndex);
-      
-      // Add to upload queue
-      for (final segment in segmentsToUpload) {
-        _pendingTerrainSegments.add(segment);
-      }
-      
-      // Process upload queue
-      _processTerrainSegmentUploadQueue();
-      
-      AppLogger.info('[LOCATION_MANAGER] TERRAIN_UPLOAD: Queued ${segmentsToUpload.length} terrain segments for upload');
-      
-    } catch (e) {
-      AppLogger.error('[LOCATION_MANAGER] Error during immediate terrain segment upload: $e');
-    }
-  }
-  
-  /// Process terrain segment upload queue
-  void _processTerrainSegmentUploadQueue() {
-    if (_pendingTerrainSegments.isEmpty || _activeSessionId == null) return;
-    
-    final batch = _pendingTerrainSegments.toList();
-    _pendingTerrainSegments.clear();
-    
-    AppLogger.info('[LOCATION_MANAGER] TERRAIN_UPLOAD_QUEUE: Processing batch of ${batch.length} terrain segments');
-    
-    // Emit TerrainSegmentUpload event to coordinator for actual upload
-    if (_activeSessionId != null) {
-      final uploadEvent = manager_events.TerrainSegmentUpload(
-        terrainSegments: batch,
-        sessionId: _activeSessionId!,
-      );
-      
-      // Notify coordinator to handle the upload
-      _eventBus.add(uploadEvent);
-      AppLogger.info('[LOCATION_MANAGER] TERRAIN_UPLOAD: Emitted upload event for ${batch.length} segments');
-    } else {
-      AppLogger.warning('[LOCATION_MANAGER] TERRAIN_UPLOAD: No active session ID, cannot upload terrain segments');
-    }
-  }
-  
-  /// Handle successful terrain segment upload
-  void _onTerrainSegmentUploadSuccess(int uploadedCount) {
-    _lastUploadedTerrainIndex += uploadedCount;
-    AppLogger.info('[LOCATION_MANAGER] TERRAIN_UPLOAD_SUCCESS: ${uploadedCount} terrain segments uploaded successfully');
-  }
+
   
   /// Trigger garbage collection to free memory immediately
   void _triggerGarbageCollection() {

@@ -106,7 +106,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     on<HeartRateBatchUploadRequested>(_onHeartRateBatchUploadRequested);
     on<StateAggregationRequested>(_onStateAggregationRequested);
     on<MemoryPressureDetected>(_onMemoryPressureDetected);
-    // Terrain segment upload is handled by managers directly
     
     AppLogger.info('[COORDINATOR] ActiveSessionCoordinator initialized');
   }

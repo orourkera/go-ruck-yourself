@@ -132,20 +132,6 @@ class BatchLocationUpdated extends ActiveSessionEvent {
   List<Object?> get props => [locationPoints];
 }
 
-/// Terrain events
-class TerrainSegmentUpload extends ActiveSessionEvent {
-  final List<Map<String, dynamic>> terrainSegments;
-  final String sessionId;
-  
-  const TerrainSegmentUpload({
-    required this.terrainSegments,
-    required this.sessionId,
-  });
-  
-  @override
-  List<Object?> get props => [terrainSegments, sessionId];
-}
-
 /// Heart rate events
 class HeartRateUpdated extends ActiveSessionEvent {
   final int heartRate;
