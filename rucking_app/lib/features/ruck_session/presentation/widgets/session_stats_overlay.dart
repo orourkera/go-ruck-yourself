@@ -27,6 +27,8 @@ class SessionStatsOverlay extends StatelessWidget {
     return '$h:$m:$s';
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     if (!useCardLayout) {

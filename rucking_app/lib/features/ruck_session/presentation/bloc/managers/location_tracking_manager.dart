@@ -820,75 +820,83 @@ double _calculateTotalDistanceWithValidation() {
 }  
 
   double _calculateCurrentPace(double speedMs) {
-  // Only recalculate pace every 5 seconds for performance optimization
-  final now = DateTime.now();
-  if (_cachedCurrentPace != null && _lastPaceCalculation != null) {
-    final timeSinceLastCalc = now.difference(_lastPaceCalculation!).inSeconds;
-    if (timeSinceLastCalc < 5) {
-      return _cachedCurrentPace!;
+    // VERSION 2.5: Don't show pace for the first minute of the session
+    if (_sessionStartTime != null) {
+      final elapsedTime = DateTime.now().difference(_sessionStartTime!);
+      if (elapsedTime.inSeconds < 60) {
+        return 0.0; // No pace for first minute
+      }
     }
-  }
-  
-  double rawPace = 0.0;
-  
-  // For more reliable pace calculation, use distance-based method for slow speeds
-  // GPS speed is often inaccurate for walking/rucking speeds
-  
-  // Method 1: Try GPS speed first (for faster movement)
-  if (speedMs > 1.0) { // > 3.6 km/h, GPS speed is more reliable
-    final speedKmh = speedMs * 3.6;
-    rawPace = 3600 / speedKmh; // seconds/km
-  }
-  // Method 2: Calculate from recent distance (for slower movement)
-  else if (_locationPoints.length >= 2) {
-    final lastPoint = _locationPoints[_locationPoints.length - 1];
-    final prevPoint = _locationPoints[_locationPoints.length - 2];
-    
-    final distanceKm = Geolocator.distanceBetween(
-      prevPoint.latitude,
-      prevPoint.longitude,
-      lastPoint.latitude,
-      lastPoint.longitude,
-    ) / 1000; // Convert to km
-    
-    final timeSeconds = lastPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
-    
-    if (timeSeconds > 0 && distanceKm > 0) {
-      final speedKmh = (distanceKm / timeSeconds) * 3600;
-      if (speedKmh > 0.5) { // Must be above walking threshold
+
+    // Only recalculate pace every 5 seconds for performance optimization
+    final now = DateTime.now();
+    if (_cachedCurrentPace != null && _lastPaceCalculation != null) {
+      final timeSinceLastCalc = now.difference(_lastPaceCalculation!).inSeconds;
+      if (timeSinceLastCalc < 5) {
+        return _cachedCurrentPace!;
+      }
+    }
+
+    double rawPace = 0.0;
+
+    // For more reliable pace calculation, use distance-based method for slow speeds
+    // GPS speed is often inaccurate for walking/rucking speeds
+
+    // Method 1: Try GPS speed first (for faster movement)
+    if (speedMs > 1.0) { // > 3.6 km/h, GPS speed is more reliable
+      final speedKmh = speedMs * 3.6;
+      rawPace = 3600 / speedKmh; // seconds/km
+    }
+    // Method 2: Calculate from recent distance (for slower movement)
+    else if (_locationPoints.length >= 2) {
+      final lastPoint = _locationPoints[_locationPoints.length - 1];
+      final prevPoint = _locationPoints[_locationPoints.length - 2];
+      
+      final distanceKm = Geolocator.distanceBetween(
+        prevPoint.latitude,
+        prevPoint.longitude,
+        lastPoint.latitude,
+        lastPoint.longitude,
+      ) / 1000; // Convert to km
+      
+      final timeSeconds = lastPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
+      
+      if (timeSeconds > 0 && distanceKm > 0.01) { // Minimum 10m distance to prevent GPS noise
+        final speedKmh = (distanceKm / timeSeconds) * 3600;
+        if (speedKmh > 0.8) { // Increased walking threshold to prevent noise
+          rawPace = 3600 / speedKmh; // seconds/km
+        }
+      }
+    }
+    // Method 3: Fallback to GPS speed with stricter thresholds to prevent noise
+    else if (speedMs > 0.5) { // Minimum 1.8 km/h - realistic walking speed
+      final speedKmh = speedMs * 3.6;
+      if (speedKmh > 1.5) { // Must be above realistic walking speed to prevent GPS noise
         rawPace = 3600 / speedKmh; // seconds/km
       }
     }
-  }
-  // Method 3: Fallback to GPS speed with lower thresholds
-  else if (speedMs > 0.1) {
-    final speedKmh = speedMs * 3.6;
-    if (speedKmh > 0.3) { // Lower threshold for fallback
-      rawPace = 3600 / speedKmh; // seconds/km
+
+    // VERSION 2.5 PACE SMOOTHING: Add to recent paces and apply smoothing
+    if (rawPace > 0) {
+      _recentPaces.add(rawPace);
+      
+      // Keep only the most recent pace values
+      if (_recentPaces.length > _maxRecentPaces) {
+        _recentPaces.removeAt(0);
+      }
+      
+      // Apply smoothing if we have enough data points
+      if (_recentPaces.length >= 3) {
+        rawPace = _sessionValidationService.getSmoothedPace(rawPace, _recentPaces);
+      }
     }
-  }
-  
-  // VERSION 2.5 PACE SMOOTHING: Add to recent paces and apply smoothing
-  if (rawPace > 0) {
-    _recentPaces.add(rawPace);
-    
-    // Keep only the most recent pace values
-    if (_recentPaces.length > _maxRecentPaces) {
-      _recentPaces.removeAt(0);
-    }
-    
-    // Apply smoothing if we have enough data points
-    if (_recentPaces.length >= 3) {
-      rawPace = _sessionValidationService.getSmoothedPace(rawPace, _recentPaces);
-    }
-  }
-  
-  // Cache the result with timestamp
-  _cachedCurrentPace = rawPace;
-  _lastPaceCalculation = now;
-  
-  return rawPace;
-}  
+
+    // Cache the result with timestamp
+    _cachedCurrentPace = rawPace;
+    _lastPaceCalculation = now;
+
+    return rawPace;
+  }  
 
   /// Calculate average pace based on total distance and elapsed time
   double _calculateAveragePace(double totalDistanceKm) {
@@ -902,6 +910,14 @@ double _calculateTotalDistanceWithValidation() {
     }
     
     double averagePace = 0.0;
+    
+    // VERSION 2.5: Don't show average pace for the first minute of the session
+    if (_sessionStartTime != null) {
+      final elapsedTime = DateTime.now().difference(_sessionStartTime!);
+      if (elapsedTime.inSeconds < 60) {
+        return 0.0; // No average pace for first minute
+      }
+    }
     
     if (_sessionStartTime != null && totalDistanceKm > 0.01) {
       // Calculate elapsed time in hours
