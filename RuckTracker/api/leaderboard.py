@@ -21,6 +21,7 @@ class LeaderboardResource(Resource):
     
     def get(self):
         """Get leaderboard data with sorting, pagination, and search"""
+        print("🔥🔥🔥 LEADERBOARD API CALLED - DEBUG TEST 🔥🔥🔥")
         try:
             # Get authenticated user
             if not hasattr(g, 'user') or g.user is None:
