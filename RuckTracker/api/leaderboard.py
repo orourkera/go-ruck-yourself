@@ -194,10 +194,10 @@ class LeaderboardResource(Resource):
                     if ruck.get('completed_at'):  # Only count completed rucks
                         stats = user_stats[user_id]['stats']
                         stats['rucks'] += 1
-                        stats['distanceKm'] += ruck.get('distance_km', 0.0)
-                        stats['elevationGainMeters'] += ruck.get('elevation_gain_m', 0.0)
-                        stats['caloriesBurned'] += ruck.get('calories_burned', 0)
-                        stats['powerPoints'] += ruck.get('power_points', 0.0)
+                        stats['distanceKm'] += ruck.get('distance_km') or 0.0
+                        stats['elevationGainMeters'] += ruck.get('elevation_gain_m') or 0.0
+                        stats['caloriesBurned'] += ruck.get('calories_burned') or 0
+                        stats['powerPoints'] += ruck.get('power_points') or 0.0
             
             # Filter out users with zero completed rucks - only show active ruckers!
             active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
@@ -366,10 +366,10 @@ class LeaderboardMyRankResource(Resource):
                     if ruck.get('completed_at'):  # Only count completed rucks
                         stats = user_stats[user_id]['stats']
                         stats['rucks'] += 1
-                        stats['distanceKm'] += ruck.get('distance_km', 0.0)
-                        stats['elevationGainMeters'] += ruck.get('elevation_gain_m', 0.0)
-                        stats['caloriesBurned'] += ruck.get('calories_burned', 0)
-                        stats['powerPoints'] += ruck.get('power_points', 0.0)
+                        stats['distanceKm'] += ruck.get('distance_km') or 0.0
+                        stats['elevationGainMeters'] += ruck.get('elevation_gain_m') or 0.0
+                        stats['caloriesBurned'] += ruck.get('calories_burned') or 0
+                        stats['powerPoints'] += ruck.get('power_points') or 0.0
             
             # Filter out users with zero completed rucks - consistent with main leaderboard
             active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
