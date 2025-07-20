@@ -56,13 +56,13 @@ class LeaderboardResource(Resource):
             
             # Build the query - this is where the magic happens!
             # CRITICAL: Filter out users who disabled public ruck sharing
-            query = supabase.table('users').select('''
+            query = supabase.table('user').select('''
                 id,
                 username,
                 avatar_url,
                 created_at,
                 public,
-                ruck_session!inner(
+                ruck_session!ruck_session_user_id_fkey(
                     id,
                     distance_km,
                     elevation_gain_m,
@@ -253,14 +253,15 @@ class LeaderboardMyRankResource(Resource):
             logger.info(f"[DEBUG] My-rank using admin client: {type(supabase)}")
             
             # Build the query - users with public ruck sharing enabled only
-            query = supabase.table('users').select('''
+            query = supabase.table('user').select('''
                 id,
                 username,
-                ruck_session!inner(
+                ruck_session!ruck_session_user_id_fkey(
                     power_points,
                     distance_km,
                     completed_at,
-                    status
+                    elevation_gain_m,
+                    calories_burned
                 )
             ''')  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
             
