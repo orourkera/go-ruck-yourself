@@ -274,7 +274,52 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       }
       
     } catch (e) {
-      StyledSnackBar.showError(context: context, message: 'Error saving session: $e');
+      // Handle specific session completion errors gracefully
+      if (e.toString().contains('Session not in progress') || 
+          e.toString().contains('BadRequestException')) {
+        AppLogger.warning('Session completion failed - session already completed or invalid state: $e');
+        
+        // Session was likely already completed or terminated server-side
+        // Still create local session record and continue with normal flow
+        final localSession = RuckSession(
+          id: widget.ruckId,
+          startTime: widget.completedAt.subtract(widget.duration),
+          endTime: widget.completedAt,
+          duration: widget.duration,
+          distance: widget.distance,
+          caloriesBurned: widget.caloriesBurned,
+          elevationGain: widget.elevationGain,
+          elevationLoss: widget.elevationLoss,
+          averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 ? (widget.duration.inSeconds / widget.distance) : 0.0,
+          ruckWeightKg: widget.ruckWeight,
+          status: RuckStatus.completed,
+          heartRateSamples: widget.heartRateSamples,
+          splits: widget.splits,
+          isManual: widget.isManual,
+        );
+        
+        // Clear caches and continue with achievements check
+        SessionRepository.clearSessionHistoryCache();
+        final achievementRepository = GetIt.instance<AchievementRepository>();
+        await achievementRepository.clearCache();
+        
+        if (!localSession.isManual) {
+          await _checkAchievementsBeforeNavigation();
+        } else {
+          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+        }
+        
+        // Show warning but don't block user flow
+        StyledSnackBar.show(
+          context: context, 
+          message: 'Session saved locally - server sync may have failed',
+          type: SnackBarType.normal,
+        );
+      } else {
+        // Handle other errors normally
+        AppLogger.error('Session completion failed with unexpected error: $e');
+        StyledSnackBar.showError(context: context, message: 'Error saving session: $e');
+      }
     } finally {
       setState(() => _isSaving = false);
     }

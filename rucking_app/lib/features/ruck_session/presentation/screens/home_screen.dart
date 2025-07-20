@@ -19,6 +19,7 @@ import 'package:rucking_app/features/notifications/presentation/pages/notificati
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
+import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
@@ -494,15 +495,100 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       
       final wasManualRefresh = _isRefreshing;
       
-      setState(() {
-        _isLoading = false;
-        _isRefreshing = false;
+      // Handle network errors gracefully
+      if (e.toString().contains('NetworkException') || e.toString().contains('No internet connection')) {
+        // Network error - show user-friendly message and keep cached data
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+          // Don't clear cached sessions on network error
+        });
         
         if (wasManualRefresh) {
-          _recentSessions = [];
+          // Show offline message with retry option for manual refresh attempts
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('No internet connection - showing cached data'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'RETRY',
+                textColor: Colors.white,
+                onPressed: () => _retryWhenConnected(),
+              ),
+            ),
+          );
         }
-      });
+      } else {
+        // Other errors - handle normally
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+          
+          if (wasManualRefresh) {
+            _recentSessions = [];
+          }
+        });
+        
+        // Show error message for non-network errors
+        if (wasManualRefresh) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading data: ${e.toString()}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
     }
+  }
+
+  /// Retry data fetch when network connectivity is restored
+  Future<void> _retryWhenConnected() async {
+    final connectivityService = GetIt.instance<ConnectivityService>();
+    
+    // Check if already connected
+    if (await connectivityService.isConnected()) {
+      _loadData();
+      return;
+    }
+    
+    // Wait for connectivity to be restored
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Waiting for internet connection...'),
+        backgroundColor: Colors.blue,
+        duration: Duration(seconds: 2),
+      ),
+    );
+    
+    // Listen for connectivity changes
+    StreamSubscription<bool>? connectivitySubscription;
+    connectivitySubscription = connectivityService.connectivityStream.listen((isConnected) {
+      if (isConnected) {
+        connectivitySubscription?.cancel();
+        
+        // Small delay to ensure connection is stable
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _loadData();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Connection restored - refreshing data'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        });
+      }
+    });
+    
+    // Cancel subscription after 30 seconds to avoid memory leaks
+    Future.delayed(const Duration(seconds: 30), () {
+      connectivitySubscription?.cancel();
+    });
   }
 
   /// Legacy method for backward compatibility

@@ -589,24 +589,64 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     AppLogger.info('[COORDINATOR] Pausing session first');
     add(const SessionPaused());
     
-    AppLogger.info('[COORDINATOR] Routing event to managers');
-    await _routeEventToManagers(event);
-    
-    AppLogger.info('[COORDINATOR] Lifecycle state after: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
-    
-    // Aggregate and emit the completed state
-    AppLogger.info('[COORDINATOR] Aggregating state');
-    _aggregateAndEmitState();
-    AppLogger.info('[COORDINATOR] New aggregated state: ${_currentAggregatedState.runtimeType}');
-    
-    if (_currentAggregatedState is ActiveSessionCompleted) {
-      final completedState = _currentAggregatedState as ActiveSessionCompleted;
-      AppLogger.info('[COORDINATOR] Session completed successfully: sessionId=${completedState.sessionId}, distance=${completedState.finalDistanceKm}km, duration=${completedState.finalDurationSeconds}s');
+    try {
+      AppLogger.info('[COORDINATOR] Routing event to managers');
+      await _routeEventToManagers(event);
+      
+      AppLogger.info('[COORDINATOR] Lifecycle state after: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
+      
+      // Aggregate and emit the completed state
+      AppLogger.info('[COORDINATOR] Aggregating state');
+      _aggregateAndEmitState();
+      AppLogger.info('[COORDINATOR] New aggregated state: ${_currentAggregatedState.runtimeType}');
+      
+      if (_currentAggregatedState is ActiveSessionCompleted) {
+        final completedState = _currentAggregatedState as ActiveSessionCompleted;
+        AppLogger.info('[COORDINATOR] Session completed successfully: sessionId=${completedState.sessionId}, distance=${completedState.finalDistanceKm}km, duration=${completedState.finalDurationSeconds}s');
+      }
+      
+      AppLogger.info('[COORDINATOR] Emitting completed state');
+      emit(_currentAggregatedState);
+      AppLogger.info('[COORDINATOR] Session completion process finished');
+      
+    } catch (e) {
+      // Handle session completion errors gracefully
+      if (e.toString().contains('Session not in progress') || 
+          e.toString().contains('BadRequestException')) {
+        AppLogger.warning('[COORDINATOR] Session completion failed - session already completed or invalid state: $e');
+        
+        // Force completion state even if server-side completion failed
+        _aggregateAndEmitState();
+        
+        // If we don't have a completed state, create one
+        if (!(_currentAggregatedState is ActiveSessionCompleted)) {
+          final sessionId = _lifecycleManager.currentState.sessionId ?? 'unknown';
+          emit(ActiveSessionCompleted(
+            sessionId: sessionId,
+            finalDistanceKm: 0.0,
+            finalDurationSeconds: 0,
+            finalCalories: 0,
+            elevationGain: 0.0,
+            elevationLoss: 0.0,
+            averagePace: 0.0,
+            route: [],
+            heartRateSamples: [],
+            sessionPhotos: [],
+            splits: [],
+            completedAt: DateTime.now(),
+            ruckWeightKg: 0.0,
+          ));
+        } else {
+          emit(_currentAggregatedState);
+        }
+        
+        AppLogger.info('[COORDINATOR] Session completion recovered from server sync error');
+      } else {
+        // Handle other errors by emitting failure state
+        AppLogger.error('[COORDINATOR] Session completion failed with unexpected error: $e');
+        emit(ActiveSessionFailure(errorMessage: 'Session completion failed: $e'));
+      }
     }
-    
-    AppLogger.info('[COORDINATOR] Emitting completed state');
-    emit(_currentAggregatedState);
-    AppLogger.info('[COORDINATOR] Session completion process finished');
   }
   
   Future<void> _onSessionPaused(

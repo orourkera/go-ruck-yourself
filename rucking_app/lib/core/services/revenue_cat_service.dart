@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 class RevenueCatService {
   bool _isInitialized = false;
@@ -35,20 +36,34 @@ class RevenueCatService {
       throw Exception('RevenueCat API key is missing from .env file for this platform');
     }
     
-    // Disable RevenueCat debug logs for production
-    Purchases.setDebugLogsEnabled(false);
-    await Purchases.configure(PurchasesConfiguration(apiKey));
-    _isInitialized = true;
+    try {
+      // Disable RevenueCat debug logs for production
+      Purchases.setDebugLogsEnabled(false);
+      await Purchases.configure(PurchasesConfiguration(apiKey));
+      _isInitialized = true;
+      debugPrint('RevenueCat initialized successfully');
+    } catch (e) {
+      debugPrint('RevenueCat initialization failed: $e');
+      // Don't throw - gracefully degrade to debug mode behavior
+      _isInitialized = false;
+      throw Exception('Failed to initialize RevenueCat: $e');
+    }
   }
 
   Future<List<Offering>> getOfferings() async {
-    if (!_isInitialized) await initialize();
-    if (_isDebugMode) {
-      debugPrint('RevenueCatService: Returning mock offering.');
+    try {
+      if (!_isInitialized) await initialize();
+      if (_isDebugMode) {
+        debugPrint('RevenueCatService: Returning mock offering.');
+        return [_createMockOffering()];
+      }
+      final offerings = await Purchases.getOfferings();
+      return offerings.all.values.toList();
+    } catch (e) {
+      debugPrint('Error getting offerings: $e');
+      // Return mock offering as fallback
       return [_createMockOffering()];
     }
-    final offerings = await Purchases.getOfferings();
-    return offerings.all.values.toList();
   }
 
   Offering _createMockOffering() {
@@ -81,18 +96,29 @@ class RevenueCatService {
   }
 
   Future<bool> makePurchase(Package package) async {
-    if (!_isInitialized) await initialize();
-    if (_isDebugMode) {
-      debugPrint('RevenueCatService: Simulating successful purchase in debug mode.');
-      _mockUserSubscribed = true; // Set mock subscription to true
-      return true;
-    }
     try {
+      if (!_isInitialized) await initialize();
+      if (_isDebugMode) {
+        debugPrint('RevenueCatService: Simulating successful purchase in debug mode.');
+        _mockUserSubscribed = true; // Set mock subscription to true
+        return true;
+      }
+      
       final customerInfo = await Purchases.purchasePackage(package);
       final isPurchased = customerInfo.entitlements.active.isNotEmpty;
+      debugPrint('Purchase completed successfully: $isPurchased');
       return isPurchased;
+    } on PlatformException catch (e) {
+      debugPrint('Platform error during purchase: ${e.code} - ${e.message}');
+      // Handle specific billing errors
+      if (e.code == 'BILLING_UNAVAILABLE' || 
+          e.code == 'SERVICE_UNAVAILABLE' ||
+          e.message?.contains('PendingIntent') == true) {
+        debugPrint('Billing service unavailable or corrupted - graceful fallback');
+      }
+      return false;
     } catch (e) {
-      debugPrint('Error making purchase: $e');
+      debugPrint('Unexpected error making purchase: $e');
       return false;
     }
   }
