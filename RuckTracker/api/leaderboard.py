@@ -306,6 +306,43 @@ class LeaderboardMyRankResource(Resource):
             if not response.data:
                 return {'rank': None}
             
+            # Check if embed worked for my-rank query too
+            has_ruck_session_data = False
+            if response.data and len(response.data) > 0:
+                first_user = response.data[0]
+                has_ruck_session_data = 'ruck_session' in first_user
+                logger.info(f"[DEBUG] My-rank first user has ruck_session data: {has_ruck_session_data}")
+            
+            # If embed failed, fall back to manual approach for my-rank too
+            if not has_ruck_session_data:
+                logger.info("[DEBUG] My-rank embed failed, using manual approach")
+                
+                # Get user IDs for manual session query
+                user_ids = [user['id'] for user in response.data]
+                
+                # Query ruck sessions separately
+                sessions_query = supabase.table('ruck_session').select(
+                    'id, user_id, power_points, distance_km, completed_at, '
+                    'elevation_gain_m, calories_burned'
+                ).in_('user_id', user_ids)
+                
+                sessions_response = sessions_query.execute()
+                logger.info(f"[DEBUG] My-rank manual sessions query returned: {len(sessions_response.data)} sessions")
+                
+                # Group sessions by user_id
+                sessions_by_user = {}
+                for session in sessions_response.data:
+                    user_id = session['user_id']
+                    if user_id not in sessions_by_user:
+                        sessions_by_user[user_id] = []
+                    sessions_by_user[user_id].append(session)
+                
+                # Attach sessions to users
+                for user in response.data:
+                    user['ruck_session'] = sessions_by_user.get(user['id'], [])
+                
+                logger.info(f"[DEBUG] My-rank manual approach complete - users now have ruck_session data")
+            
             # Aggregate stats for all users
             user_stats = {}
             
