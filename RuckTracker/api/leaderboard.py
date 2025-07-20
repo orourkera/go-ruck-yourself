@@ -8,7 +8,7 @@ from datetime import datetime
 from flask import request, g
 from flask_restful import Resource
 from supabase import Client
-from ..supabase_client import get_supabase_client
+from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..services.redis_cache_service import get_cache_service
 
 logger = logging.getLogger(__name__)
@@ -48,8 +48,8 @@ class LeaderboardResource(Resource):
                 logger.info(f"Returning cached leaderboard data for key: {cache_key}")
                 return cached_result
             
-            # Get Supabase client
-            supabase: Client = get_supabase_client()
+            # Get Supabase admin client to bypass RLS for public leaderboard data
+            supabase: Client = get_supabase_admin_client()
             
             # Build the query - this is where the magic happens!
             # CRITICAL: Filter out users who disabled public ruck sharing
@@ -70,26 +70,16 @@ class LeaderboardResource(Resource):
                     status,
                     waypoints
                 )
-            ''')  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
+            ''').eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
             
             # Add search filter if provided
             if search:
                 query = query.ilike('username', f'%{search}%')
             
             # Execute the query
-            print(f"EXECUTING QUERY WITH SEARCH: {search}")
             response = query.execute()
-            print(f"QUERY RESPONSE: count={len(response.data) if response.data else 0}")
-            if response.data:
-                print(f"FIRST USER: {response.data[0] if response.data else 'None'}")
             
             if not response.data:
-                print("NO DATA RETURNED - debugging query")
-                # Try a simpler query to debug
-                simple_response = supabase.table('users').select('id, username, allow_ruck_sharing').limit(5).execute()
-                print(f"SIMPLE USERS QUERY: {len(simple_response.data) if simple_response.data else 0} users")
-                if simple_response.data:
-                    print(f"SAMPLE USERS: {simple_response.data[:2]}")
                 return {'users': [], 'total': 0}
             
             # Process and aggregate user data
@@ -234,8 +224,8 @@ class LeaderboardMyRankResource(Resource):
             if cached_rank is not None:
                 return {'rank': cached_rank}
             
-            # Get Supabase client
-            supabase: Client = get_supabase_client()
+            # Get Supabase admin client to bypass RLS for public leaderboard data
+            supabase: Client = get_supabase_admin_client()
             
             # Get all users with their aggregated stats (same logic as main leaderboard)
             response = supabase.table('users').select('''
