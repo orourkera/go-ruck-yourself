@@ -70,9 +70,12 @@ class LeaderboardRepository {
         },
       );
 
-      return response.data['rank'] as int?;
+      // Handle response correctly - it might be direct JSON or wrapped
+      final jsonData = response is Map<String, dynamic> ? response : response.data;
+      return jsonData['rank'] as int?;
     } catch (e) {
       // User might not be on leaderboard yet
+      debugPrint('[LEADERBOARD] Failed to get user rank: $e');
       return null;
     }
   }

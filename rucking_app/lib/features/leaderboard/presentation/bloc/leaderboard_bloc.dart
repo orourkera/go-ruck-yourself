@@ -39,23 +39,31 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     LoadLeaderboard event,
     Emitter<LeaderboardState> emit,
   ) async {
+    print('🔍 BLOC: Starting to load leaderboard...');
     emit(const LeaderboardLoading());
+    print('🔍 BLOC: Emitted LeaderboardLoading state');
 
     try {
+      print('🔍 BLOC: About to call repository.getLeaderboard...');
       final response = await repository.getLeaderboard(
         sortBy: _currentSortBy,
         ascending: _currentAscending,
-        limit: _pageSize,
+        // Remove limit to get ALL users instead of pagination
+        limit: 999999,  // High limit to get all users
         offset: 0,
       );
+      print('🔍 BLOC: Repository returned ${response.users.length} users');
 
       // Get current user rank
+      print('🔍 BLOC: Getting current user rank...');
       final currentUserRank = await _getCurrentUserRank();
+      print('🔍 BLOC: Current user rank: $currentUserRank');
 
       _currentUsers = response.users;
       _hasMore = response.hasMore;
       _currentOffset = response.users.length;
 
+      print('🔍 BLOC: About to emit LeaderboardLoaded state with ${response.users.length} users');
       emit(LeaderboardLoaded(
         users: response.users,
         sortBy: _currentSortBy,
@@ -65,7 +73,10 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         currentUserRank: currentUserRank,
         activeRuckersCount: response.activeRuckersCount,
       ));
+      print('🔍 BLOC: Successfully emitted LeaderboardLoaded state!');
     } catch (e) {
+      print('🔍 BLOC: ERROR in _onLoadLeaderboard: $e');
+      print('🔍 BLOC: Error type: ${e.runtimeType}');
       emit(LeaderboardError(message: 'Well I\'ll be! Failed to load leaderboard: $e'));
     }
   }

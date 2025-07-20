@@ -236,7 +236,7 @@ class LeaderboardResource(Resource):
             # Cache the result for 5 minutes
             cache_service.set(cache_key, result, expire_seconds=300)
             
-            logger.info(f"Leaderboard query successful: {len(paginated_users)} users returned")
+            logger.info(f"Leaderboard query successful: {len(users_list)} users returned")
             return result
             
         except Exception as e:
