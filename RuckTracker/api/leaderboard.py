@@ -50,6 +50,7 @@ class LeaderboardResource(Resource):
             
             # Get Supabase admin client to bypass RLS for public leaderboard data
             supabase: Client = get_supabase_admin_client()
+            logger.info(f"[DEBUG] Using admin client: {type(supabase)}")
             
             # Build the query - this is where the magic happens!
             # CRITICAL: Filter out users who disabled public ruck sharing
@@ -67,8 +68,7 @@ class LeaderboardResource(Resource):
                     power_points,
                     completed_at,
                     started_at,
-                    status,
-                    waypoints
+                    status
                 )
             ''').eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
             
@@ -77,7 +77,9 @@ class LeaderboardResource(Resource):
                 query = query.ilike('username', f'%{search}%')
             
             # Execute the query
+            logger.info(f"[DEBUG] Executing leaderboard query with admin client...")
             response = query.execute()
+            logger.info(f"[DEBUG] Query response count: {len(response.data) if response.data else 0}")
             
             if not response.data:
                 return {'users': [], 'total': 0}
@@ -226,18 +228,23 @@ class LeaderboardMyRankResource(Resource):
             
             # Get Supabase admin client to bypass RLS for public leaderboard data
             supabase: Client = get_supabase_admin_client()
+            logger.info(f"[DEBUG] My-rank using admin client: {type(supabase)}")
             
-            # Get all users with their aggregated stats (same logic as main leaderboard)
-            response = supabase.table('users').select('''
+            # Build the query - users with public ruck sharing enabled only
+            query = supabase.table('users').select('''
                 id,
+                username,
                 ruck_session!inner(
-                    distance_km,
-                    elevation_gain_meters,
-                    calories_burned,
                     power_points,
-                    completed_at
+                    distance_km,
+                    completed_at,
+                    status
                 )
-            ''').execute()  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER
+            ''').eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
+            
+            logger.info(f"[DEBUG] Executing my-rank query with admin client...")
+            response = query.execute()
+            logger.info(f"[DEBUG] My-rank query response count: {len(response.data) if response.data else 0}")
             
             if not response.data:
                 return {'rank': None}

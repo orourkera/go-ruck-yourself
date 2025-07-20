@@ -8,6 +8,7 @@ import '../widgets/power_points_modal.dart';
 import '../widgets/leaderboard_table.dart';
 import '../widgets/leaderboard_header.dart';
 import '../widgets/live_rucking_indicator.dart';
+import '../widgets/leaderboard_skeleton.dart';
 import '../../data/models/leaderboard_user_model.dart';
 import '../../../../shared/widgets/styled_snackbar.dart';
 
@@ -219,18 +220,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return const SizedBox.shrink();
   }
 
-  /// Loading state prettier than morning dew
+  /// Loading state prettier than morning dew - now with fancy skeleton loading!
   Widget _buildLoadingState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Loading leaderboard...'),
-        ],
-      ),
-    );
+    return const LeaderboardSkeleton();
   }
 
   /// Error state that won't make you madder than a wet hen

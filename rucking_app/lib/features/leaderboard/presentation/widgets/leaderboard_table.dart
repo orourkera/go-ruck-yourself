@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/models/leaderboard_user_model.dart';
 import 'leaderboard_row.dart';
+import 'leaderboard_skeleton.dart';
 
 /// Well ain't this something! This table shows all them ruckers in a fancy list
 class LeaderboardTable extends StatelessWidget {
@@ -43,30 +44,8 @@ class LeaderboardTable extends StatelessWidget {
     );
   }
 
-  /// Loading indicator prettier than a summer sunset
+  /// Loading indicator prettier than a summer sunset - now with skeleton shimmer!
   Widget _buildLoadingMoreIndicator() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Loading more ruckers...',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return const LeaderboardLoadingMoreSkeleton();
   }
 }
