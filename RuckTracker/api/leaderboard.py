@@ -176,7 +176,7 @@ class LeaderboardResource(Resource):
             }
             
             # Cache the result for 5 minutes
-            cache_service.set(cache_key, result, expire=300)
+            cache_service.set(cache_key, result, expire_seconds=300)
             
             logger.info(f"Leaderboard query successful: {len(paginated_users)} users returned")
             return result
@@ -290,7 +290,7 @@ class LeaderboardMyRankResource(Resource):
                     break
             
             # Cache the result for 2 minutes
-            cache_service.set(cache_key, user_rank, expire=120)
+            cache_service.set(cache_key, user_rank, expire_seconds=120)
             
             return {'rank': user_rank}
             

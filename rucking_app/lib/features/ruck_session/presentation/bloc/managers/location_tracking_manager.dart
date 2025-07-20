@@ -742,12 +742,21 @@ double _calculateTotalDistanceWithValidation() {
 
     double rawPace = 0.0;
 
-    // VERSION 2.5/2.6: Simplified pace calculation - use GPS speed directly
-    // Convert m/s to km/h, then calculate pace in seconds/km
-    if (speedMs > 0.1) { // Minimum threshold to avoid division by zero
-      final speedKmh = speedMs * 3.6;
-      if (speedKmh > 0.5) { // Minimum realistic walking speed
-        rawPace = 3600 / speedKmh; // seconds/km
+    // VERSION 2.6: Simple distance-based calculation between last two GPS points
+    if (_locationPoints.length >= 2) {
+      final lastPoint = _locationPoints.last;
+      final secondLastPoint = _locationPoints[_locationPoints.length - 2];
+      
+      final distance = _haversineDistance(
+        secondLastPoint.latitude, secondLastPoint.longitude,
+        lastPoint.latitude, lastPoint.longitude,
+      );
+      
+      final timeDiff = lastPoint.timestamp.difference(secondLastPoint.timestamp).inSeconds;
+      if (timeDiff > 0 && distance > 0) {
+        // Calculate pace in seconds per km (convert from minutes per km)
+        final paceMinutesPerKm = (timeDiff / 60) / (distance / 1000);
+        rawPace = paceMinutesPerKm * 60; // Convert to seconds per km
       }
     }
 
@@ -1020,4 +1029,27 @@ double _calculateTotalDistanceWithValidation() {
   List<SessionSplit> get splits => _splitTrackingService.getSplits()
       .map((splitData) => SessionSplit.fromJson(splitData))
       .toList();
+  
+  /// Calculate distance between two GPS coordinates using Haversine formula
+  /// Returns distance in kilometers
+  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadiusKm = 6371.0;
+    
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLon = _degreesToRadians(lon2 - lon1);
+    
+    final double a = 
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+        math.cos(_degreesToRadians(lat2)) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+        
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    
+    return earthRadiusKm * c;
+  }
+  
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
+  }
 }

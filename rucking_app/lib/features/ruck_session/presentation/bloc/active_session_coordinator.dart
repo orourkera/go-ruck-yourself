@@ -454,8 +454,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         elevationGain: _locationManager.elevationGain,
         elevationLoss: _locationManager.elevationLoss,
         isPaused: _lifecycleManager.isPaused,
-        // Use average pace for a more stable pace display
-        pace: locationState.averagePace,
+        pace: locationState.currentPace,
         originalSessionStartTimeUtc: lifecycleState.startTime ?? DateTime.now(),
         totalPausedDuration: _lifecycleManager.totalPausedDuration,
         heartRateSamples: _heartRateManager.heartRateSampleObjects,
