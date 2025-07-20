@@ -56,23 +56,27 @@ class LeaderboardResource(Resource):
             
             # Build the query - this is where the magic happens!
             # CRITICAL: Filter out users who disabled public ruck sharing
-            query = supabase.table('user').select('''
-                id,
-                username,
-                avatar_url,
-                created_at,
-                public,
-                ruck_session!ruck_session_user_id_fkey(
+            query = (
+                supabase.table('user').select(
+                    '''
                     id,
-                    distance_km,
-                    elevation_gain_m,
-                    calories_burned,
-                    power_points,
-                    completed_at,
-                    started_at,
-                    status
+                    username,
+                    avatar_url,
+                    created_at,
+                    ruck_session(
+                        id,
+                        distance_km,
+                        elevation_gain_m,
+                        calories_burned,
+                        power_points,
+                        completed_at,
+                        started_at,
+                        status
+                    )
+                    '''
                 )
-            ''')  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
+                .eq('allow_ruck_sharing', True)  # Enforce privacy filter
+            )
             
             # Add search filter if provided
             if search:
@@ -133,17 +137,8 @@ class LeaderboardResource(Resource):
                         latest_ruck = max(ruck_sessions, 
                                         key=lambda x: x['completed_at'] if x['completed_at'] else '1900-01-01')
                     
-                    location = "Unknown Location"
-                    if latest_ruck and latest_ruck.get('waypoints'):
-                        # Get the last waypoint for location
-                        waypoints = latest_ruck['waypoints']
-                        if waypoints and len(waypoints) > 0:
-                            last_waypoint = waypoints[-1]
-                            if 'location_name' in last_waypoint:
-                                location = last_waypoint['location_name']
-                            elif 'latitude' in last_waypoint and 'longitude' in last_waypoint:
-                                # Could implement reverse geocoding here if needed
-                                location = f"{last_waypoint['latitude']:.3f}, {last_waypoint['longitude']:.3f}"
+                    # Location extraction removed – `waypoints` not selected anymore.
+                    location = None
                     
                     user_stats[user_id] = {
                         'id': user_id,
@@ -253,17 +248,22 @@ class LeaderboardMyRankResource(Resource):
             logger.info(f"[DEBUG] My-rank using admin client: {type(supabase)}")
             
             # Build the query - users with public ruck sharing enabled only
-            query = supabase.table('user').select('''
-                id,
-                username,
-                ruck_session!ruck_session_user_id_fkey(
-                    power_points,
-                    distance_km,
-                    completed_at,
-                    elevation_gain_m,
-                    calories_burned
+            query = (
+                supabase.table('user').select(
+                    '''
+                    id,
+                    username,
+                    ruck_session(
+                        power_points,
+                        distance_km,
+                        completed_at,
+                        elevation_gain_m,
+                        calories_burned
+                    )
+                    '''
                 )
-            ''')  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
+                .eq('allow_ruck_sharing', True)  # Enforce privacy filter
+            )
             
             logger.info(f"[DEBUG] Executing my-rank query with admin client...")
             response = query.execute()
