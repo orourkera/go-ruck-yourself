@@ -70,16 +70,26 @@ class LeaderboardResource(Resource):
                     status,
                     waypoints
                 )
-            ''').eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
+            ''')  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
             
             # Add search filter if provided
             if search:
                 query = query.ilike('username', f'%{search}%')
             
             # Execute the query
+            print(f"EXECUTING QUERY WITH SEARCH: {search}")
             response = query.execute()
+            print(f"QUERY RESPONSE: count={len(response.data) if response.data else 0}")
+            if response.data:
+                print(f"FIRST USER: {response.data[0] if response.data else 'None'}")
             
             if not response.data:
+                print("NO DATA RETURNED - debugging query")
+                # Try a simpler query to debug
+                simple_response = supabase.table('users').select('id, username, allow_ruck_sharing').limit(5).execute()
+                print(f"SIMPLE USERS QUERY: {len(simple_response.data) if simple_response.data else 0} users")
+                if simple_response.data:
+                    print(f"SAMPLE USERS: {simple_response.data[:2]}")
                 return {'users': [], 'total': 0}
             
             # Process and aggregate user data
@@ -237,7 +247,7 @@ class LeaderboardMyRankResource(Resource):
                     power_points,
                     completed_at
                 )
-            ''').eq('allow_ruck_sharing', True).execute()  # PRIVACY FILTER
+            ''').execute()  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER
             
             if not response.data:
                 return {'rank': None}
