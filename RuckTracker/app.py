@@ -266,6 +266,7 @@ from .api.duel_invitations import DuelInvitationListResource, DuelInvitationReso
 from .api.duel_comments import DuelCommentsResource
 from .api.device_tokens import DeviceTokenResource
 from .api.test_notification import TestNotificationResource
+from .api.leaderboard import LeaderboardResource, LeaderboardMyRankResource
 
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
 app.logger.info("Setting RefreshTokenResource rate limit to: 30 per minute")
@@ -494,6 +495,10 @@ api.add_resource(DuelCommentsResource, '/api/duels/<string:duel_id>/comments')
 # Device Token Endpoints
 api.add_resource(DeviceTokenResource, '/api/device-token')
 api.add_resource(TestNotificationResource, '/api/test-notification')
+
+# Leaderboard Endpoints
+api.add_resource(LeaderboardResource, '/api/leaderboard')
+api.add_resource(LeaderboardMyRankResource, '/api/leaderboard/my-rank')
 
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource
