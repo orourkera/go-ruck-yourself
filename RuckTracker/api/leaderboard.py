@@ -66,6 +66,8 @@ class LeaderboardResource(Resource):
                     calories_burned,
                     power_points,
                     completed_at,
+                    started_at,
+                    status,
                     waypoints
                 )
             ''').eq('public.Allow_Ruck_Sharing', True)  # PRIVACY FILTER - CRITICAL!
@@ -82,11 +84,22 @@ class LeaderboardResource(Resource):
             
             # Process and aggregate user data
             user_stats = {}
+            active_ruckers_count = 0
             
             for user_data in response.data:
                 user_id = user_data['id']
                 
                 if user_id not in user_stats:
+                    # Check if user is currently rucking (has active session)
+                    is_currently_rucking = False
+                    for ruck in user_data['ruck_sessions']:
+                        if ruck.get('status') in ['in_progress', 'paused'] and not ruck.get('completed_at'):
+                            is_currently_rucking = True
+                            break
+                    
+                    if is_currently_rucking:
+                        active_ruckers_count += 1
+                    
                     # Get the user's most recent location from their latest ruck
                     latest_ruck = None
                     if user_data['ruck_sessions']:
@@ -110,7 +123,7 @@ class LeaderboardResource(Resource):
                         'username': user_data['username'],
                         'avatarUrl': user_data.get('avatar_url'),
                         'location': location,
-                        'isRucking': False,  # TODO: Implement real-time status
+                        'isRucking': is_currently_rucking,
                         'stats': {
                             'rucks': 0,
                             'distanceKm': 0.0,
@@ -155,7 +168,8 @@ class LeaderboardResource(Resource):
             result = {
                 'users': paginated_users,
                 'total': total_users,
-                'hasMore': offset + limit < total_users
+                'hasMore': offset + limit < total_users,
+                'activeRuckersCount': active_ruckers_count
             }
             
             # Cache the result for 5 minutes

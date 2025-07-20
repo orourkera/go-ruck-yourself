@@ -46,6 +46,7 @@ class LeaderboardLoaded extends LeaderboardState {
   final String? searchQuery;
   final DateTime lastUpdated;
   final int? currentUserRank;
+  final int activeRuckersCount;
 
   const LeaderboardLoaded({
     required this.users,
@@ -55,6 +56,7 @@ class LeaderboardLoaded extends LeaderboardState {
     this.searchQuery,
     required this.lastUpdated,
     this.currentUserRank,
+    this.activeRuckersCount = 0,
   });
 
   /// Copy this state slicker than a whistle
@@ -66,6 +68,7 @@ class LeaderboardLoaded extends LeaderboardState {
     String? searchQuery,
     DateTime? lastUpdated,
     int? currentUserRank,
+    int? activeRuckersCount,
   }) {
     return LeaderboardLoaded(
       users: users ?? this.users,
@@ -75,6 +78,7 @@ class LeaderboardLoaded extends LeaderboardState {
       searchQuery: searchQuery ?? this.searchQuery,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       currentUserRank: currentUserRank ?? this.currentUserRank,
+      activeRuckersCount: activeRuckersCount ?? this.activeRuckersCount,
     );
   }
 
@@ -87,6 +91,7 @@ class LeaderboardLoaded extends LeaderboardState {
         searchQuery,
         lastUpdated,
         currentUserRank,
+        activeRuckersCount,
       ];
 }
 
@@ -99,6 +104,7 @@ class LeaderboardUpdating extends LeaderboardState {
   final String? searchQuery;
   final DateTime lastUpdated;
   final int? currentUserRank;
+  final int activeRuckersCount;
   final String updateType; // 'rank_change', 'new_ruck', 'user_started'
   final String? affectedUserId;
 
@@ -110,6 +116,7 @@ class LeaderboardUpdating extends LeaderboardState {
     this.searchQuery,
     required this.lastUpdated,
     this.currentUserRank,
+    this.activeRuckersCount = 0,
     required this.updateType,
     this.affectedUserId,
   });
@@ -123,6 +130,7 @@ class LeaderboardUpdating extends LeaderboardState {
         searchQuery,
         lastUpdated,
         currentUserRank,
+        activeRuckersCount,
         updateType,
         affectedUserId,
       ];

@@ -42,7 +42,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     emit(const LeaderboardLoading());
 
     try {
-      final users = await repository.getLeaderboard(
+      final response = await repository.getLeaderboard(
         sortBy: _currentSortBy,
         ascending: _currentAscending,
         limit: _pageSize,
@@ -52,17 +52,18 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
       // Get current user rank
       final currentUserRank = await _getCurrentUserRank();
 
-      _currentUsers = users;
-      _hasMore = users.length >= _pageSize;
-      _currentOffset = users.length;
+      _currentUsers = response.users;
+      _hasMore = response.hasMore;
+      _currentOffset = response.users.length;
 
       emit(LeaderboardLoaded(
-        users: users,
+        users: response.users,
         sortBy: _currentSortBy,
         ascending: _currentAscending,
-        hasMore: _hasMore,
+        hasMore: response.hasMore,
         lastUpdated: DateTime.now(),
         currentUserRank: currentUserRank,
+        activeRuckersCount: response.activeRuckersCount,
       ));
     } catch (e) {
       emit(LeaderboardError(message: 'Well I\'ll be! Failed to load leaderboard: $e'));

@@ -1,4 +1,5 @@
 import '../models/leaderboard_user_model.dart';
+import '../models/leaderboard_response_model.dart';
 import '../../../../core/services/api_client.dart';
 
 /// Well I'll be hornswoggled! This repository fetches leaderboard data slicker than a greased pig
@@ -13,11 +14,12 @@ class LeaderboardRepository {
   /// Returns a list of users and their stats, sorted by the specified criteria
   /// 
   /// 🔒 PRIVACY NOTE: Backend MUST filter out users with Allow_Ruck_Sharing = false
-  /// This repository assumes the backend handles privacy filtering at the query level
-  Future<List<LeaderboardUserModel>> getLeaderboard({
+  /// Get leaderboard data with sorting, pagination, and search
+  /// CRITICAL: Backend filters users with Allow_Ruck_Sharing = false for privacy
+  Future<LeaderboardResponseModel> getLeaderboard({
     String sortBy = 'powerPoints',
     bool ascending = false,
-    int limit = 100,
+    int limit = 50,
     int offset = 0,
     String? searchQuery,
   }) async {
@@ -39,11 +41,7 @@ class LeaderboardRepository {
         queryParams: queryParams,
       );
 
-      final List<dynamic> usersJson = response.data['users'] ?? [];
-      
-      return usersJson
-          .map((userJson) => LeaderboardUserModel.fromJson(userJson))
-          .toList();
+      return LeaderboardResponseModel.fromJson(response.data);
     } catch (e) {
       throw Exception('Failed to fetch leaderboard: $e');
     }
