@@ -39,6 +39,7 @@ import 'package:rucking_app/features/notifications/di/notification_injection_con
 import 'package:rucking_app/features/achievements/di/achievement_injection_container.dart';
 import 'package:rucking_app/features/premium/di/premium_injection_container.dart';
 import 'package:rucking_app/features/duels/di/duels_injection_container.dart';
+import 'package:rucking_app/features/leaderboard/di/leaderboard_injection_container.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
@@ -279,6 +280,9 @@ Future<void> setupServiceLocator() async {
   
   // Initialize Duels feature
   initDuelsFeature(getIt);
+  
+  // Initialize Leaderboard feature
+  await initLeaderboardDependencies();
   
   // Initialize Premium feature
   setupPremiumDependencies();

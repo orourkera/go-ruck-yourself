@@ -44,7 +44,7 @@ import 'package:rucking_app/core/services/app_startup_service.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/events_screen.dart';
-import 'package:rucking_app/features/duels/presentation/screens/duels_list_screen.dart';
+import 'package:rucking_app/features/leaderboard/presentation/screens/leaderboard_screen.dart';
 import 'package:rucking_app/shared/utils/route_privacy_utils.dart';
 import 'package:rucking_app/core/services/duel_completion_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
@@ -168,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       featureName: 'Ruck Buddies',
       child: RuckBuddiesScreen(),
     ),
-    const DuelsListScreen(),
+    const LeaderboardScreen(),
     const EventsScreen(),
   ];
   
@@ -242,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               width: 48,
               height: 48,
             ),
-            label: 'Duels',
+            label: 'Leaderboard',
           ),
           BottomNavigationBarItem(
             icon: Image.asset(
