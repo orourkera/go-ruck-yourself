@@ -91,16 +91,50 @@ class LeaderboardResource(Resource):
                 response = query.execute()
                 print(f"🔍 Query executed! Response received: {type(response)}")
                 logger.info(f"[DEBUG] Query executed successfully")
-                logger.info(f"[DEBUG] Response type: {type(response)}")
-                logger.info(f"[DEBUG] Response data type: {type(response.data)}")
+                
+                # Check if embed worked
+                has_ruck_session_data = False
+                if response.data and len(response.data) > 0:
+                    first_user = response.data[0]
+                    has_ruck_session_data = 'ruck_session' in first_user
+                    print(f"🔍 First user has ruck_session data: {has_ruck_session_data}")
+                    if has_ruck_session_data:
+                        print(f"🔍 First user ruck_session count: {len(first_user['ruck_session'])}")
+                    else:
+                        print(f"🔍 First user keys: {list(first_user.keys())}")
+                
+                # If embed failed, fall back to manual approach
+                if not has_ruck_session_data:
+                    print("🔍 EMBED FAILED - USING MANUAL QUERY APPROACH")
+                    logger.info("[DEBUG] Embed failed, using manual approach")
+                    
+                    # Get user IDs for manual session query
+                    user_ids = [user['id'] for user in response.data]
+                    
+                    # Query ruck sessions separately
+                    sessions_query = supabase.table('ruck_session').select(
+                        'id, user_id, distance_km, elevation_gain_m, calories_burned, '
+                        'power_points, completed_at, started_at, status'
+                    ).in_('user_id', user_ids)
+                    
+                    sessions_response = sessions_query.execute()
+                    print(f"🔍 Manual sessions query returned: {len(sessions_response.data)} sessions")
+                    
+                    # Group sessions by user_id
+                    sessions_by_user = {}
+                    for session in sessions_response.data:
+                        user_id = session['user_id']
+                        if user_id not in sessions_by_user:
+                            sessions_by_user[user_id] = []
+                        sessions_by_user[user_id].append(session)
+                    
+                    # Attach sessions to users
+                    for user in response.data:
+                        user['ruck_session'] = sessions_by_user.get(user['id'], [])
+                    
+                    print(f"🔍 Manual approach complete - users now have ruck_session data")
+                
                 print(f"🔍 Response data count: {len(response.data) if response.data else 0}")
-                logger.info(f"[DEBUG] Query response count: {len(response.data) if response.data else 0}")
-                if response.data:
-                    print(f"🔍 First row sample: {response.data[0] if len(response.data) > 0 else 'None'}")
-                    logger.info(f"[DEBUG] First row sample: {response.data[0] if len(response.data) > 0 else 'None'}")
-                else:
-                    print("🔍 NO DATA RETURNED FROM QUERY")
-                    logger.info(f"[DEBUG] No data returned from query")
             except Exception as e:
                 print(f"🔍 QUERY EXECUTION FAILED: {str(e)}")
                 logger.error(f"[DEBUG] Query execution failed: {str(e)}")
