@@ -89,7 +89,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
       _currentOffset = 0;
       _hasMore = true;
 
-      final users = await repository.getLeaderboard(
+      final response = await repository.getLeaderboard(
         sortBy: _currentSortBy,
         ascending: _currentAscending,
         limit: _pageSize,
@@ -99,18 +99,19 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
 
       final currentUserRank = await _getCurrentUserRank();
 
-      _currentUsers = users;
-      _hasMore = users.length >= _pageSize;
-      _currentOffset = users.length;
+      _currentUsers = response.users;
+      _hasMore = response.hasMore;
+      _currentOffset = response.users.length;
 
       emit(LeaderboardLoaded(
-        users: users,
+        users: response.users,
         sortBy: _currentSortBy,
         ascending: _currentAscending,
-        hasMore: _hasMore,
+        hasMore: response.hasMore,
         searchQuery: _currentSearchQuery,
         lastUpdated: DateTime.now(),
         currentUserRank: currentUserRank,
+        activeRuckersCount: response.activeRuckersCount,
       ));
     } catch (e) {
       emit(LeaderboardError(
@@ -136,7 +137,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
       _currentOffset = 0;
       _hasMore = true;
 
-      final users = await repository.getLeaderboard(
+      final response = await repository.getLeaderboard(
         sortBy: event.sortBy,
         ascending: event.ascending,
         limit: _pageSize,
@@ -146,18 +147,19 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
 
       final currentUserRank = await _getCurrentUserRank();
 
-      _currentUsers = users;
-      _hasMore = users.length >= _pageSize;
-      _currentOffset = users.length;
+      _currentUsers = response.users;
+      _hasMore = response.hasMore;
+      _currentOffset = response.users.length;
 
       emit(LeaderboardLoaded(
-        users: users,
+        users: response.users,
         sortBy: event.sortBy,
         ascending: event.ascending,
-        hasMore: _hasMore,
+        hasMore: response.hasMore,
         searchQuery: _currentSearchQuery,
         lastUpdated: DateTime.now(),
         currentUserRank: currentUserRank,
+        activeRuckersCount: response.activeRuckersCount,
       ));
     } catch (e) {
       emit(LeaderboardError(

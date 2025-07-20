@@ -7,6 +7,7 @@ import '../bloc/leaderboard_state.dart';
 import '../widgets/power_points_modal.dart';
 import '../widgets/leaderboard_table.dart';
 import '../widgets/leaderboard_header.dart';
+import '../widgets/live_rucking_indicator.dart';
 import '../../data/models/leaderboard_user_model.dart';
 import '../../../../shared/widgets/styled_snackbar.dart';
 
@@ -81,6 +82,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             children: [
               // Header with search and controls
               _buildHeader(),
+              
+              // Live rucking indicator
+              BlocBuilder<LeaderboardBloc, LeaderboardState>(
+                builder: (context, state) {
+                  int activeCount = 0;
+                  if (state is LeaderboardLoaded) {
+                    // Count users who are currently rucking
+                    activeCount = state.users.where((user) => user.isCurrentlyRucking).length;
+                  }
+                  return LiveRuckingIndicator(activeRuckersCount: activeCount);
+                },
+              ),
               
               // Main leaderboard content
               Expanded(

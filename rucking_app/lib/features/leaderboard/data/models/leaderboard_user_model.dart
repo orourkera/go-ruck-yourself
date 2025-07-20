@@ -27,17 +27,17 @@ class LeaderboardUserModel extends Equatable {
   /// Hot diggity dog! Create from JSON like mama's apple pie
   factory LeaderboardUserModel.fromJson(Map<String, dynamic> json) {
     return LeaderboardUserModel(
-      userId: json['user_id'] as String,
+      userId: json['id'] as String,
       username: json['username'] as String,
-      avatarUrl: json['avatar_url'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
       gender: json['gender'] as String?,
-      stats: LeaderboardStatsModel.fromJson(json),
+      stats: LeaderboardStatsModel.fromJson(json['stats'] ?? {}),
       lastRuckDate: json['last_ruck_date'] != null 
           ? DateTime.parse(json['last_ruck_date'] as String)
           : null,
-      lastRuckLocation: json['last_ruck_location'] as String?,
+      lastRuckLocation: json['location'] as String?,
       isCurrentUser: json['is_current_user'] as bool? ?? false,
-      isCurrentlyRucking: json['is_currently_rucking'] as bool? ?? false,
+      isCurrentlyRucking: json['isCurrentlyRucking'] as bool? ?? false,
     );
   }
 
@@ -126,13 +126,13 @@ class LeaderboardStatsModel extends Equatable {
     }
 
     return LeaderboardStatsModel(
-      totalRucks: safeParseNum(json['total_rucks'])?.toInt() ?? 0,
-      distanceKm: safeParseNum(json['total_distance_km'])?.toDouble() ?? 0.0,
-      elevationGainMeters: safeParseNum(json['total_elevation_gain_meters'])?.toDouble() ?? 0.0,
-      caloriesBurned: safeParseNum(json['total_calories_burned'])?.toDouble() ?? 0.0,
-      powerPoints: safeParseNum(json['total_power_points'])?.toDouble() ?? 0.0,
-      averageDistanceKm: safeParseNum(json['average_distance_km'])?.toDouble() ?? 0.0,
-      averagePaceMinKm: safeParseNum(json['average_pace_min_km'])?.toDouble() ?? 0.0,
+      totalRucks: safeParseNum(json['rucks'])?.toInt() ?? 0,
+      distanceKm: safeParseNum(json['distanceKm'])?.toDouble() ?? 0.0,
+      elevationGainMeters: safeParseNum(json['elevationGainMeters'])?.toDouble() ?? 0.0,
+      caloriesBurned: safeParseNum(json['caloriesBurned'])?.toDouble() ?? 0.0,
+      powerPoints: safeParseNum(json['powerPoints'])?.toDouble() ?? 0.0,
+      averageDistanceKm: safeParseNum(json['averageDistanceKm'])?.toDouble() ?? 0.0,
+      averagePaceMinKm: safeParseNum(json['averagePaceMinKm'])?.toDouble() ?? 0.0,
     );
   }
 

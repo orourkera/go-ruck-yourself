@@ -123,7 +123,7 @@ class LeaderboardResource(Resource):
                         'username': user_data['username'],
                         'avatarUrl': user_data.get('avatar_url'),
                         'location': location,
-                        'isRucking': is_currently_rucking,
+                        'isCurrentlyRucking': is_currently_rucking,
                         'stats': {
                             'rucks': 0,
                             'distanceKm': 0.0,

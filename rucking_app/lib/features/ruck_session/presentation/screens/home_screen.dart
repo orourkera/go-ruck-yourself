@@ -242,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               width: 48,
               height: 48,
             ),
-            label: 'Leaderboard',
+            label: 'Ruckers',
           ),
           BottomNavigationBarItem(
             icon: Image.asset(
