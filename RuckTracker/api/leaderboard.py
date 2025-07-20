@@ -21,6 +21,7 @@ class LeaderboardResource(Resource):
     
     def get(self):
         """Get leaderboard data with sorting, pagination, and search"""
+        print("🚀🚀🚀 LEADERBOARD METHOD START - VERY FIRST LINE 🚀🚀🚀")
         print("🔥🔥🔥 LEADERBOARD API CALLED - DEBUG TEST 🔥🔥🔥")
         try:
             # Get authenticated user
