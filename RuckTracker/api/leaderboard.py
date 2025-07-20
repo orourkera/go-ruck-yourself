@@ -146,8 +146,14 @@ class LeaderboardResource(Resource):
                         stats['caloriesBurned'] += ruck.get('calories_burned', 0)
                         stats['powerPoints'] += ruck.get('power_points', 0.0)
             
+            # Filter out users with zero completed rucks - only show active ruckers!
+            active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
+                                if stats['stats']['rucks'] > 0}
+            
+            logger.info(f"Filtered leaderboard: {len(user_stats)} total users -> {len(active_user_stats)} active ruckers")
+            
             # Convert to list and sort
-            users_list = list(user_stats.values())
+            users_list = list(active_user_stats.values())
             
             # Sort the results
             sort_key_map = {
@@ -264,12 +270,16 @@ class LeaderboardMyRankResource(Resource):
                         stats['caloriesBurned'] += ruck.get('calories_burned', 0)
                         stats['powerPoints'] += ruck.get('power_points', 0.0)
             
-            # Check if current user has any stats
-            if current_user_id not in user_stats:
-                return {'rank': None}  # User not on leaderboard
+            # Filter out users with zero completed rucks - consistent with main leaderboard
+            active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
+                                if stats['stats']['rucks'] > 0}
+            
+            # Check if current user has any completed rucks
+            if current_user_id not in active_user_stats:
+                return {'rank': None}  # User not on leaderboard (no completed rucks)
             
             # Convert to list and sort
-            users_list = list(user_stats.values())
+            users_list = list(active_user_stats.values())
             
             # Sort the results
             sort_key_map = {

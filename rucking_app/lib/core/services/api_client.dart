@@ -8,6 +8,7 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:jwt_decode/jwt_decode.dart';
 
 /// Client for handling API requests to the backend
 class ApiClient {
@@ -222,25 +223,50 @@ class ApiClient {
   Future<bool> _ensureAuthToken() async {
     // Check if the token is already set in the Dio instance
     if (_dio.options.headers.containsKey('Authorization')) {
-      // Verify the token format to catch potential corruption
+      // Verify the token format and expiration
       String authHeader = _dio.options.headers['Authorization'] as String;
       if (authHeader.startsWith('Bearer ') && authHeader.length > 10) {
-        return true;
+        final tokenPart = authHeader.substring(7); // Remove 'Bearer ' prefix
+        
+        // Check if token is expired
+        try {
+          if (Jwt.isExpired(tokenPart)) {
+            debugPrint('[API] Current token is expired, clearing and refreshing');
+            _dio.options.headers.remove('Authorization');
+          } else {
+            // Token is valid and not expired
+            return true;
+          }
+        } catch (e) {
+          // Invalid token format, clear it
+          debugPrint('[API] Invalid JWT token format detected, clearing: $e');
+          _dio.options.headers.remove('Authorization');
+        }
+      } else {
+        // Invalid header format, clear it and try again
+        debugPrint('[API] Invalid auth header format detected, clearing');
+        _dio.options.headers.remove('Authorization');
       }
-      // Invalid header format, clear it and try again
-      debugPrint('[API] Invalid auth header format detected, clearing');
-      _dio.options.headers.remove('Authorization');
     }
     
-    // If not set or invalid, try to get it from storage
+    // If not set or invalid/expired, try to get it from storage
     final token = await _storageService.getSecureString(AppConfig.tokenKey);
     if (token != null && token.isNotEmpty) {
-      // Set the token in the Dio instance
-      setAuthToken(token);
-      return true;
+      // Validate the token from storage before using it
+      try {
+        if (!Jwt.isExpired(token)) {
+          // Token is valid and not expired, set it
+          setAuthToken(token);
+          return true;
+        } else {
+          debugPrint('[API] Stored token is expired, attempting refresh');
+        }
+      } catch (e) {
+        debugPrint('[API] Invalid stored JWT token: $e');
+      }
     }
     
-    // No token in storage, try to refresh it as a last resort
+    // No valid token in storage, try to refresh it
     final newToken = await refreshToken();
     if (newToken != null && newToken.isNotEmpty) {
       return true; // refreshToken already sets the auth header

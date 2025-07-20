@@ -169,9 +169,21 @@ class RuckSessionListResource(Resource):
                 for session_id in session_ids:
                     logger.info(f"[ROUTE_DEBUG] Processing session {session_id}")
                     
+                    # OPTIMIZATION: Quick check for any location data to avoid expensive queries
+                    # Use LIMIT 1 to quickly determine if session has location data
+                    has_location_query = supabase.table('location_point') \
+                        .select('session_id') \
+                        .eq('session_id', int(session_id)) \
+                        .limit(1) \
+                        .execute()
+                    
+                    if not has_location_query.data:
+                        logger.warning(f"[ROUTE_DEBUG] Session {session_id}: No location data found")
+                        continue  # Skip expensive queries for sessions with no location data
+                    
                     # Optimized approach: Try to fetch limited points first to avoid expensive COUNT query
                     # This avoids the slow COUNT(*) operation that was causing 3-4 second delays
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Fetching first {MAX_POINTS_PER_SESSION + 1} points to determine size")
+                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Has location data, fetching points")
                     
                     # First, try to get up to MAX_POINTS_PER_SESSION + 1 points to check if we need sampling
                     initial_query = supabase.table('location_point') \
@@ -183,8 +195,10 @@ class RuckSessionListResource(Resource):
                     
                     if not initial_query.data:
                         logger.warning(f"[ROUTE_DEBUG] Session {session_id}: No location data returned from query")
-                        session_locations = initial_query
-                    elif len(initial_query.data) <= MAX_POINTS_PER_SESSION:
+                        continue  # Skip processing
+                    
+                    # Determine which data to use based on session size
+                    if len(initial_query.data) <= MAX_POINTS_PER_SESSION:
                         # Small sessions – use all points we fetched
                         logger.info(f"[ROUTE_DEBUG] Session {session_id}: Using direct query ({len(initial_query.data)} points)")
                         session_locations = initial_query

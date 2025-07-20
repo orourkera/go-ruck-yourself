@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/leaderboard_user_model.dart';
 import '../models/leaderboard_response_model.dart';
 import '../../../../core/services/api_client.dart';
@@ -40,8 +41,20 @@ class LeaderboardRepository {
         '/leaderboard',
         queryParams: queryParams,
       );
-
-      return LeaderboardResponseModel.fromJson(response.data);
+    
+    // Debug logging
+    debugPrint('[LEADERBOARD] Raw API response type: ${response.runtimeType}');
+    debugPrint('[LEADERBOARD] Raw API response: ${response.toString().length > 500 ? '${response.toString().substring(0, 500)}...' : response.toString()}');
+    
+    // The response is already the parsed JSON data from ApiClient.get()
+    final jsonData = response is Map<String, dynamic> ? response : response.data;
+    debugPrint('[LEADERBOARD] Parsed JSON data type: ${jsonData.runtimeType}');
+    debugPrint('[LEADERBOARD] JSON keys: ${jsonData is Map ? jsonData.keys.toList() : 'Not a Map'}');
+    
+    final result = LeaderboardResponseModel.fromJson(jsonData);
+    debugPrint('[LEADERBOARD] Parsed ${result.users.length} users successfully');
+    
+    return result;
     } catch (e) {
       throw Exception('Failed to fetch leaderboard: $e');
     }
