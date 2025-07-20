@@ -59,7 +59,7 @@ class LeaderboardResource(Resource):
                 avatar_url,
                 created_at,
                 public,
-                ruck_sessions!inner(
+                ruck_session!inner(
                     id,
                     distance_km,
                     elevation_gain_meters,
@@ -90,9 +90,12 @@ class LeaderboardResource(Resource):
                 user_id = user_data['id']
                 
                 if user_id not in user_stats:
+                    # Get ruck sessions safely (might be missing if user has no sessions)
+                    ruck_sessions = user_data.get('ruck_session', [])
+                    
                     # Check if user is currently rucking (has active session)
                     is_currently_rucking = False
-                    for ruck in user_data['ruck_sessions']:
+                    for ruck in ruck_sessions:
                         if ruck.get('status') in ['in_progress', 'paused'] and not ruck.get('completed_at'):
                             is_currently_rucking = True
                             break
@@ -102,8 +105,8 @@ class LeaderboardResource(Resource):
                     
                     # Get the user's most recent location from their latest ruck
                     latest_ruck = None
-                    if user_data['ruck_sessions']:
-                        latest_ruck = max(user_data['ruck_sessions'], 
+                    if ruck_sessions:
+                        latest_ruck = max(ruck_sessions, 
                                         key=lambda x: x['completed_at'] if x['completed_at'] else '1900-01-01')
                     
                     location = "Unknown Location"
@@ -134,7 +137,7 @@ class LeaderboardResource(Resource):
                     }
                 
                 # Aggregate completed ruck sessions only
-                for ruck in user_data['ruck_sessions']:
+                for ruck in user_data.get('ruck_session', []):
                     if ruck.get('completed_at'):  # Only count completed rucks
                         stats = user_stats[user_id]['stats']
                         stats['rucks'] += 1
@@ -221,7 +224,7 @@ class LeaderboardMyRankResource(Resource):
             # Get all users with their aggregated stats (same logic as main leaderboard)
             response = supabase.table('users').select('''
                 id,
-                ruck_sessions!inner(
+                ruck_session!inner(
                     distance_km,
                     elevation_gain_meters,
                     calories_burned,
@@ -252,7 +255,7 @@ class LeaderboardMyRankResource(Resource):
                     }
                 
                 # Aggregate completed ruck sessions only
-                for ruck in user_data['ruck_sessions']:
+                for ruck in user_data.get('ruck_session', []):
                     if ruck.get('completed_at'):  # Only count completed rucks
                         stats = user_stats[user_id]['stats']
                         stats['rucks'] += 1
