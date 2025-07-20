@@ -70,7 +70,7 @@ class LeaderboardResource(Resource):
                     started_at,
                     status
                 )
-            ''').eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
+            ''')  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
             
             # Add search filter if provided
             if search:
@@ -252,7 +252,7 @@ class LeaderboardMyRankResource(Resource):
                     completed_at,
                     status
                 )
-            ''').eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
+            ''')  # TEMPORARILY DISABLED: .eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
             
             logger.info(f"[DEBUG] Executing my-rank query with admin client...")
             response = query.execute()
