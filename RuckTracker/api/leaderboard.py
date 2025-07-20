@@ -63,7 +63,7 @@ class LeaderboardResource(Resource):
                 ruck_session!inner(
                     id,
                     distance_km,
-                    elevation_gain_meters,
+                    elevation_gain_m,
                     calories_burned,
                     power_points,
                     completed_at,
@@ -78,8 +78,20 @@ class LeaderboardResource(Resource):
             
             # Execute the query
             logger.info(f"[DEBUG] Executing leaderboard query with admin client...")
-            response = query.execute()
-            logger.info(f"[DEBUG] Query response count: {len(response.data) if response.data else 0}")
+            try:
+                response = query.execute()
+                logger.info(f"[DEBUG] Query executed successfully")
+                logger.info(f"[DEBUG] Response type: {type(response)}")
+                logger.info(f"[DEBUG] Response data type: {type(response.data)}")
+                logger.info(f"[DEBUG] Query response count: {len(response.data) if response.data else 0}")
+                if response.data:
+                    logger.info(f"[DEBUG] First row sample: {response.data[0] if len(response.data) > 0 else 'None'}")
+                else:
+                    logger.info(f"[DEBUG] No data returned from query")
+            except Exception as e:
+                logger.error(f"[DEBUG] Query execution failed: {str(e)}")
+                logger.error(f"[DEBUG] Query error type: {type(e)}")
+                return {'users': [], 'total': 0, 'hasMore': False, 'activeRuckersCount': 0}
             
             if not response.data:
                 return {'users': [], 'total': 0}
@@ -144,7 +156,7 @@ class LeaderboardResource(Resource):
                         stats = user_stats[user_id]['stats']
                         stats['rucks'] += 1
                         stats['distanceKm'] += ruck.get('distance_km', 0.0)
-                        stats['elevationGainMeters'] += ruck.get('elevation_gain_meters', 0.0)
+                        stats['elevationGainMeters'] += ruck.get('elevation_gain_m', 0.0)
                         stats['caloriesBurned'] += ruck.get('calories_burned', 0)
                         stats['powerPoints'] += ruck.get('power_points', 0.0)
             
@@ -273,7 +285,7 @@ class LeaderboardMyRankResource(Resource):
                         stats = user_stats[user_id]['stats']
                         stats['rucks'] += 1
                         stats['distanceKm'] += ruck.get('distance_km', 0.0)
-                        stats['elevationGainMeters'] += ruck.get('elevation_gain_meters', 0.0)
+                        stats['elevationGainMeters'] += ruck.get('elevation_gain_m', 0.0)
                         stats['caloriesBurned'] += ruck.get('calories_burned', 0)
                         stats['powerPoints'] += ruck.get('power_points', 0.0)
             
