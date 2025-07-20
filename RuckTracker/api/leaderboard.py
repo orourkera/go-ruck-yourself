@@ -79,18 +79,26 @@ class LeaderboardResource(Resource):
                 query = query.ilike('username', f'%{search}%')
             
             # Execute the query
+            print("🔍 ABOUT TO EXECUTE SUPABASE QUERY")
             logger.info(f"[DEBUG] Executing leaderboard query with admin client...")
+            print(f"🔍 Query object type: {type(query)}")
             try:
+                print("🔍 Calling query.execute()...")
                 response = query.execute()
+                print(f"🔍 Query executed! Response received: {type(response)}")
                 logger.info(f"[DEBUG] Query executed successfully")
                 logger.info(f"[DEBUG] Response type: {type(response)}")
                 logger.info(f"[DEBUG] Response data type: {type(response.data)}")
+                print(f"🔍 Response data count: {len(response.data) if response.data else 0}")
                 logger.info(f"[DEBUG] Query response count: {len(response.data) if response.data else 0}")
                 if response.data:
+                    print(f"🔍 First row sample: {response.data[0] if len(response.data) > 0 else 'None'}")
                     logger.info(f"[DEBUG] First row sample: {response.data[0] if len(response.data) > 0 else 'None'}")
                 else:
+                    print("🔍 NO DATA RETURNED FROM QUERY")
                     logger.info(f"[DEBUG] No data returned from query")
             except Exception as e:
+                print(f"🔍 QUERY EXECUTION FAILED: {str(e)}")
                 logger.error(f"[DEBUG] Query execution failed: {str(e)}")
                 logger.error(f"[DEBUG] Query error type: {type(e)}")
                 return {'users': [], 'total': 0, 'hasMore': False, 'activeRuckersCount': 0}
