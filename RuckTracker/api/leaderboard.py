@@ -223,14 +223,13 @@ class LeaderboardResource(Resource):
             for i, user in enumerate(users_list):
                 user['rank'] = i + 1
             
-            # Apply pagination
+            # Return ALL users (no pagination)
             total_users = len(users_list)
-            paginated_users = users_list[offset:offset + limit]
             
             result = {
-                'users': paginated_users,
+                'users': users_list,  # Return all users, not paginated
                 'total': total_users,
-                'hasMore': offset + limit < total_users,
+                'hasMore': False,  # No more pages since we return everything
                 'activeRuckersCount': active_ruckers_count
             }
             
