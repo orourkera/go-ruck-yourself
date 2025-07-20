@@ -37,7 +37,7 @@ class LeaderboardRepository {
       }
 
       final response = await apiClient.get(
-        '/api/leaderboard',
+        '/leaderboard',
         queryParams: queryParams,
       );
 
@@ -51,7 +51,7 @@ class LeaderboardRepository {
   Future<int?> getCurrentUserRank({String sortBy = 'powerPoints'}) async {
     try {
       final response = await apiClient.get(
-        '/api/leaderboard/my-rank',
+        '/leaderboard/my-rank',
         queryParams: {
           'sort_by': _mapSortField(sortBy),
         },

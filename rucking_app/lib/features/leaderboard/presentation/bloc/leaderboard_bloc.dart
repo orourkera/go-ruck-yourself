@@ -183,7 +183,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
       _currentOffset = 0;
       _hasMore = true;
 
-      final users = await repository.getLeaderboard(
+      final response = await repository.getLeaderboard(
         sortBy: _currentSortBy,
         ascending: _currentAscending,
         limit: _pageSize,
@@ -193,18 +193,19 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
 
       final currentUserRank = await _getCurrentUserRank();
 
-      _currentUsers = users;
-      _hasMore = users.length >= _pageSize;
-      _currentOffset = users.length;
+      _currentUsers = response.users;
+      _hasMore = response.users.length >= _pageSize;
+      _currentOffset = response.users.length;
 
       emit(LeaderboardLoaded(
-        users: users,
+        users: response.users,
         sortBy: _currentSortBy,
         ascending: _currentAscending,
         hasMore: _hasMore,
         searchQuery: _currentSearchQuery,
         lastUpdated: DateTime.now(),
         currentUserRank: currentUserRank,
+        activeRuckersCount: response.activeRuckersCount,
       ));
     } catch (e) {
       emit(LeaderboardError(message: 'Well I\'ll be! Failed to search leaderboard: $e'));
@@ -229,7 +230,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     ));
 
     try {
-      final newUsers = await repository.getLeaderboard(
+      final response = await repository.getLeaderboard(
         sortBy: _currentSortBy,
         ascending: _currentAscending,
         limit: _pageSize,
@@ -237,9 +238,9 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         searchQuery: _currentSearchQuery,
       );
 
-      _currentUsers.addAll(newUsers);
-      _hasMore = newUsers.length >= _pageSize;
-      _currentOffset += newUsers.length;
+      _currentUsers.addAll(response.users);
+      _hasMore = response.users.length >= _pageSize;
+      _currentOffset += response.users.length;
 
       emit(LeaderboardLoaded(
         users: List.from(_currentUsers),
@@ -249,6 +250,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         searchQuery: currentState.searchQuery,
         lastUpdated: DateTime.now(),
         currentUserRank: currentState.currentUserRank,
+        activeRuckersCount: response.activeRuckersCount,
       ));
     } catch (e) {
       emit(LeaderboardError(

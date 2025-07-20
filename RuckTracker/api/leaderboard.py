@@ -70,7 +70,7 @@ class LeaderboardResource(Resource):
                     status,
                     waypoints
                 )
-            ''').eq('public.Allow_Ruck_Sharing', True)  # PRIVACY FILTER - CRITICAL!
+            ''').eq('allow_ruck_sharing', True)  # PRIVACY FILTER - CRITICAL!
             
             # Add search filter if provided
             if search:
@@ -228,7 +228,7 @@ class LeaderboardMyRankResource(Resource):
                     power_points,
                     completed_at
                 )
-            ''').eq('public.Allow_Ruck_Sharing', True).execute()  # PRIVACY FILTER
+            ''').eq('allow_ruck_sharing', True).execute()  # PRIVACY FILTER
             
             if not response.data:
                 return {'rank': None}
