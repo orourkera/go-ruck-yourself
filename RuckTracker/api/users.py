@@ -6,8 +6,11 @@ users_bp = Blueprint('users', __name__)
 
 @users_bp.route('/<uuid:user_id>/profile', methods=['GET'])
 def get_public_profile(user_id):
+    import time
+    start_time = time.time()
     try:
         current_user_id = g.user.id if hasattr(g, 'user') and g.user else None
+        logger.info(f"[PROFILE_PERF] get_public_profile: Started for user {user_id}, current_user: {current_user_id}")
         # Fetch basic profile fields. Some older databases may not yet have avatar_url or is_profile_private columns
         try:
             user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, prefer_metric, is_profile_private, gender').eq('id', str(user_id)).single().execute()
@@ -27,11 +30,14 @@ def get_public_profile(user_id):
         is_following = False
         is_followed_by = False
         if current_user_id:
+            follow_start = time.time()
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             follow_res = supabase.table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
             is_following = bool(follow_res.data)
             followed_by_res = supabase.table('user_follows').select('id').eq('follower_id', str(user_id)).eq('followed_id', str(current_user_id)).execute()
             is_followed_by = bool(followed_by_res.data)
+            follow_time = time.time() - follow_start
+            logger.info(f"[PROFILE_PERF] Follow queries took {follow_time*1000:.2f}ms")
         response = {
             'user': {
                 'id': user['id'],
@@ -52,6 +58,7 @@ def get_public_profile(user_id):
         if not is_private:
             # Calculate follower/following counts first (used for stats no matter private)
             try:
+                follower_count_start = time.time()
                 supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
                 followers_count_res = (
                     supabase
@@ -69,12 +76,15 @@ def get_public_profile(user_id):
                     .execute()
                 )
                 following_count = len(following_count_res.data or [])
+                follower_count_time = time.time() - follower_count_start
+                logger.info(f"[PROFILE_PERF] Follower count queries took {follower_count_time*1000:.2f}ms")
             except Exception:
                 followers_count = 0
                 following_count = 0
 
             # Calculate stats directly from ruck_session table instead of user_profile_stats
             try:
+                sessions_start = time.time()
                 # Get completed sessions for this user
                 sessions_res = (
                     get_supabase_client()
@@ -86,6 +96,8 @@ def get_public_profile(user_id):
                 )
                 
                 sessions = sessions_res.data or []
+                sessions_time = time.time() - sessions_start
+                logger.info(f"[PROFILE_PERF] Sessions query took {sessions_time*1000:.2f}ms, found {len(sessions)} sessions")
                 
                 # Calculate aggregated stats from sessions
                 total_rucks = len(sessions)
@@ -177,8 +189,12 @@ def get_public_profile(user_id):
             except Exception as e:
                 print(f"[ERROR] Failed to fetch recent rucks for user {user_id}: {e}")
                 response['recentRucks'] = []
+        total_time = time.time() - start_time
+        logger.info(f"[PROFILE_PERF] get_public_profile: Completed in {total_time*1000:.2f}ms total")
         return api_response(response)
     except Exception as e:
+        error_time = time.time() - start_time
+        logger.error(f"[PROFILE_PERF] get_public_profile: ERROR after {error_time*1000:.2f}ms: {str(e)}")
         return api_error(str(e), status_code=500)
 
 @users_bp.route('/<uuid:user_id>/followers', methods=['GET'])
