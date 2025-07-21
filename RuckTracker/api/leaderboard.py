@@ -4,7 +4,7 @@ Well I'll be jiggered! This here's the leaderboard API, slicker than a greased p
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from flask import request, g
 from flask_restful import Resource
 from supabase import Client
