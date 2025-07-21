@@ -6,6 +6,7 @@ import logging
 from flask import Blueprint, request, jsonify, g
 from flask_restful import Resource, Api
 from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
+from RuckTracker.services.redis_cache_service import cache_get, cache_set
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from ..services.push_notification_service import PushNotificationService, get_user_device_tokens
@@ -17,14 +18,25 @@ class AchievementsResource(Resource):
     
     def get(self):
         try:
-            # Use admin client since achievements are public data
-            supabase = get_supabase_admin_client()
-            
             # Get unit preference from query parameters
             unit_preference = request.args.get('unit_preference', 'metric')  # default to metric
             
-            # Base query for active achievements
-            query = supabase.table('achievements').select('*').eq('is_active', True)
+            # Check cache first
+            cache_key = f"achievements:all:{unit_preference}"
+            cached_response = cache_get(cache_key)
+            if cached_response:
+                return {
+                    'status': 'success',
+                    'achievements': cached_response
+                }, 200
+            
+            # Use admin client since achievements are public data
+            supabase = get_supabase_admin_client()
+            
+            # Base query for active achievements - only select fields needed by frontend
+            query = supabase.table('achievements').select(
+                'id, achievement_key, name, description, category, tier, target_value, unit, icon_name, power_points, created_at'
+            ).eq('is_active', True)
             
             # Filter by unit preference: include universal (null) achievements and user's preferred unit
             if unit_preference in ['metric', 'standard']:
@@ -36,11 +48,15 @@ class AchievementsResource(Resource):
                 response = query.execute()
             
             if response.data:
+                # Cache for 30 minutes since achievements don't change often
+                cache_set(cache_key, response.data, 1800)
                 return {
                     'status': 'success',
                     'achievements': response.data
                 }, 200
             else:
+                # Cache empty result for shorter time
+                cache_set(cache_key, [], 300)
                 return {
                     'status': 'success',
                     'achievements': []
@@ -911,22 +927,35 @@ class RecentAchievementsResource(Resource):
     
     def get(self):
         try:
-            # Get the user's JWT token from the request context
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            
             # Get recent achievements from the last 7 days
             since_date = (datetime.utcnow() - timedelta(days=7)).isoformat()
             
+            # Check cache first - cache by date to ensure fresh data
+            cache_key = f"achievements:recent:{since_date[:10]}"  # Cache by date (YYYY-MM-DD)
+            cached_response = cache_get(cache_key)
+            if cached_response:
+                return {
+                    'status': 'success',
+                    'recent_achievements': cached_response
+                }, 200
+            
+            # Get the user's JWT token from the request context
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
             response = supabase.table('user_achievements').select(
-                '*, achievements(*)'
+                'earned_at, metadata, user_id, achievements(name, description, tier, category, icon_name, achievement_key)'
             ).gte('earned_at', since_date).order('earned_at', desc=True).limit(50).execute()
             
             if response.data:
+                # Cache for 10 minutes since recent achievements change frequently
+                cache_set(cache_key, response.data, 600)
                 return {
                     'status': 'success',
                     'recent_achievements': response.data
                 }, 200
             else:
+                # Cache empty result for shorter time
+                cache_set(cache_key, [], 300)
                 return {
                     'status': 'success',
                     'recent_achievements': []

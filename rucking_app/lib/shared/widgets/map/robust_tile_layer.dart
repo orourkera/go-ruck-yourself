@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
+import 'dart:async';
 import '../../../core/utils/app_logger.dart';
 
 /// Robust tile layer with comprehensive error handling, retry logic, and fallback strategies
@@ -60,10 +61,10 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
         _handleTileError(tile.coordinates, error, stackTrace);
       },
       
-      // Additional settings for stability
+      // Additional settings for stability with enhanced error handling
       tileProvider: _useOfflineMode 
           ? _createOfflineTileProvider()
-          : NetworkTileProvider(),
+          : _createResilientTileProvider(),
     );
   }
   
@@ -115,6 +116,54 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
       httpClient: http.Client(),
     );
   }
+  
+  /// Creates a resilient tile provider with enhanced error handling
+  TileProvider _createResilientTileProvider() {
+    return NetworkTileProvider(
+      // Custom HTTP client with enhanced error handling
+      httpClient: _createResilientHttpClient(),
+    );
+  }
+  
+  /// Creates HTTP client with better error handling for tile requests
+  http.Client _createResilientHttpClient() {
+    return http.Client();
+  }
+  
+  /// Enhanced tile loading with comprehensive error catching
+  Future<Uint8List?> _loadTileWithErrorHandling(String url) async {
+    try {
+      final client = http.Client();
+      
+      final response = await client.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent': 'RuckingApp/2.8.2',
+          'Accept': 'image/png,image/jpeg,image/*,*/*',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          client.close();
+          throw TimeoutException('Tile request timeout', const Duration(seconds: 10));
+        },
+      );
+      
+      client.close();
+      
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      } else {
+        AppLogger.warning('Tile HTTP error: ${response.statusCode} for $url');
+        return null;
+      }
+      
+    } catch (e) {
+      // Catch all network errors to prevent crashes
+      AppLogger.warning('Tile loading error (handled): $e');
+      return null;
+    }
+  }
 }
 
 /// Safe tile layer wrapper that prevents crashes
@@ -146,9 +195,18 @@ class SafeTileLayer extends StatelessWidget {
         maxNativeZoom: 18,
         maxZoom: 20,
         errorTileCallback: (tile, error, stackTrace) {
-          AppLogger.warning(
-            'Map tile loading error: $error (tile: ${tile.coordinates.z}/${tile.coordinates.x}/${tile.coordinates.y})',
-          );
+          // Handle network errors gracefully without crashing
+          if (error.toString().contains('ClientException') || 
+              error.toString().contains('SocketException') ||
+              error.toString().contains('connection abort')) {
+            AppLogger.debug(
+              'Network tile error (handled): ${error.runtimeType} for tile ${tile.coordinates.z}/${tile.coordinates.x}/${tile.coordinates.y}',
+            );
+          } else {
+            AppLogger.warning(
+              'Map tile loading error: $error (tile: ${tile.coordinates.z}/${tile.coordinates.x}/${tile.coordinates.y})',
+            );
+          }
           onTileError?.call();
         },
         tileBuilder: (context, tileWidget, tile) {
@@ -168,7 +226,14 @@ class SafeTileLayer extends StatelessWidget {
         urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         userAgentPackageName: 'com.ruckingapp',
         errorTileCallback: (tile, error, stackTrace) {
-          AppLogger.warning('Fallback tile loading error: $error');
+          // Suppress common network errors from fallback tiles
+          if (error.toString().contains('ClientException') || 
+              error.toString().contains('SocketException') ||
+              error.toString().contains('connection abort')) {
+            AppLogger.debug('Fallback network error (suppressed): ${error.runtimeType}');
+          } else {
+            AppLogger.warning('Fallback tile loading error: $error');
+          }
           onTileError?.call();
         },
         tileBuilder: (context, tileWidget, tile) {

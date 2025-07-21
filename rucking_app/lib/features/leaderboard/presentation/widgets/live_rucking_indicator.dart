@@ -71,7 +71,7 @@ class _LiveRuckingIndicatorState extends State<LiveRuckingIndicator>
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.green.withOpacity(_blinkAnimation.value * 0.2),
+            color: Colors.green.withOpacity(_blinkAnimation.value), // Fade from transparent to fully opaque
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: Colors.green.withOpacity(_blinkAnimation.value),
@@ -84,27 +84,21 @@ class _LiveRuckingIndicatorState extends State<LiveRuckingIndicator>
               Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(_blinkAnimation.value),
+                decoration: const BoxDecoration(
+                  color: Colors.white, // White dot for contrast
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 widget.activeRuckersCount == 1
-                    ? '1 person rucking now'
-                    : '${widget.activeRuckersCount} people rucking now',
-                style: TextStyle(
-                  color: Colors.green.withOpacity(_blinkAnimation.value),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
+                    ? '1 rucker rucking now!'
+                    : '${widget.activeRuckersCount} ruckers rucking now!',
+                style: const TextStyle(
+                  color: Colors.white, // White text for contrast against green background
+                  fontFamily: 'Bangers', // Use Bangers font
+                  fontSize: 14, // Slightly bigger for Bangers font
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.directions_walk,
-                size: 16,
-                color: Colors.green.withOpacity(_blinkAnimation.value),
               ),
             ],
           ),

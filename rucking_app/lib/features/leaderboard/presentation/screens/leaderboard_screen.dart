@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -23,21 +24,31 @@ class LeaderboardScreen extends StatefulWidget {
 class _LeaderboardScreenState extends State<LeaderboardScreen>
     with TickerProviderStateMixin {
   late final ScrollController _scrollController;
-  late final ScrollController _horizontalScrollController;
+  late final ScrollController _horizontalScrollController; // For header
+  late final ScrollController _tableHorizontalScrollController; // For table rows
   late final TextEditingController _searchController;
   late final AnimationController _refreshAnimationController;
   late final AnimationController _updateAnimationController;
+  Timer? _realTimeUpdateTimer;
 
-  String _currentSortBy = 'powerPoints';
+  String _currentSortBy = 'distanceKm'; // Default sort by distance
   bool _currentAscending = false;
   bool _isSearching = false;
+  bool _isUpdatingScroll = false; // Prevent infinite loops
+  
+  // Shared horizontal scroll offset using ValueNotifier
+  late ValueNotifier<double> _horizontalScrollNotifier;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
     _horizontalScrollController = ScrollController();
+    _horizontalScrollNotifier = ValueNotifier(0.0);
     _searchController = TextEditingController();
+    
+    // Set up horizontal scroll sync listeners
+    _setupScrollSync();
     _refreshAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -50,9 +61,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     // Listen for scroll to load more users
     _scrollController.addListener(_onScroll);
 
+    // Set up real-time updates every 15 seconds
+    _realTimeUpdateTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      // Only update if not currently loading to avoid conflicts
+      final currentState = context.read<LeaderboardBloc>().state;
+      if (currentState is! LeaderboardLoading && 
+          currentState is! LeaderboardLoadingMore) {
+        context.read<LeaderboardBloc>().add(const RefreshLeaderboard());
+      }
+    });
+
     // Load initial data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<LeaderboardBloc>().add(const LoadLeaderboard());
+    });
+  }
+
+  /// Set up bidirectional scroll sync using ValueNotifier
+  void _setupScrollSync() {
+    // Header scrolls → update shared offset
+    _horizontalScrollController.addListener(() {
+      if (!_isUpdatingScroll) {
+        _horizontalScrollNotifier.value = _horizontalScrollController.offset;
+      }
     });
   }
 
@@ -60,9 +91,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   void dispose() {
     _scrollController.dispose();
     _horizontalScrollController.dispose();
+    _horizontalScrollNotifier.dispose();
     _searchController.dispose();
     _refreshAnimationController.dispose();
     _updateAnimationController.dispose();
+    _realTimeUpdateTimer?.cancel(); // Cancel the timer
     super.dispose();
   }
 
@@ -80,38 +113,55 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
-          child: Column(
+          child: Stack(
             children: [
-              // Header with search and controls
-              _buildHeader(),
-              
-              // Live rucking indicator
-              BlocBuilder<LeaderboardBloc, LeaderboardState>(
-                builder: (context, state) {
-                  int activeCount = 0;
-                  if (state is LeaderboardLoaded) {
-                    // Use backend-provided activeRuckersCount
-                    activeCount = state.activeRuckersCount;
-                  }
-                  return LiveRuckingIndicator(activeRuckersCount: activeCount);
-                },
+              // Main content
+              Column(
+                children: [
+                  // Header with search and controls
+                  _buildHeader(),
+                  
+                  // Main leaderboard content
+                  Expanded(
+                    child: BlocConsumer<LeaderboardBloc, LeaderboardState>(
+                      listener: _handleStateChanges,
+                      builder: (context, state) {
+                        return RefreshIndicator(
+                          onRefresh: () async {
+                            context.read<LeaderboardBloc>().add(const RefreshLeaderboard());
+                            _refreshAnimationController.forward().then((_) {
+                              _refreshAnimationController.reset();
+                            });
+                          },
+                          child: _buildContent(state),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
               
-              // Main leaderboard content
-              Expanded(
-                child: BlocConsumer<LeaderboardBloc, LeaderboardState>(
-                  listener: _handleStateChanges,
-                  builder: (context, state) {
-                    return RefreshIndicator(
-                      onRefresh: () async {
-                        context.read<LeaderboardBloc>().add(const RefreshLeaderboard());
-                        _refreshAnimationController.forward().then((_) {
-                          _refreshAnimationController.reset();
-                        });
-                      },
-                      child: _buildContent(state),
-                    );
-                  },
+              // Floating live rucking indicator - positioned over nav bar
+              Positioned(
+                bottom: 60, // Much closer to nav bar
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: BlocBuilder<LeaderboardBloc, LeaderboardState>(
+                    builder: (context, state) {
+                      int activeCount = 0;
+                      if (state is LeaderboardLoaded) {
+                        // Use backend-provided activeRuckersCount
+                        activeCount = state.activeRuckersCount;
+                      }
+                      return activeCount > 0 
+                        ? Transform.scale(
+                            scale: 1.5, // Make it 50% bigger
+                            child: LiveRuckingIndicator(activeRuckersCount: activeCount),
+                          )
+                        : const SizedBox.shrink(); // Hide when no active ruckers
+                    },
+                  ),
                 ),
               ),
             ],
@@ -128,7 +178,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withOpacity(0.05)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -288,95 +340,175 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       return _buildEmptyState();
     }
 
-    return Column(
-      children: [
-        // Fixed header section (rank + user)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              // Fixed header labels
-              SizedBox(
-                width: 190, // 40 rank + 150 user
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 40,
-                      child: Text('#', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    ),
-                    const SizedBox(
-                      width: 150,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Text('USER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+    return SingleChildScrollView(
+      controller: _scrollController,
+      child: Row(
+        children: [
+          // FIXED LEFT TABLE - Header + Rank + User columns
+          SizedBox(
+            width: 212, // 180px content (40px rank + 140px user) + 32px horizontal padding
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Fixed header
+                Container(
+                  height: 56, // Increased header height
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Theme.of(context).dividerColor.withOpacity(0.3),
+                        width: 1,
                       ),
                     ),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 40,
+                        child: Text('#', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                      const SizedBox(
+                        width: 140, // Fixed 140px for rucker column (-20px smaller)
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('RUCKER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Fixed data rows
+                ...users.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final user = entry.value;
+                  final rank = index + 1;
+                  
+                  return Container(
+                    height: 80, // Increased 1px more
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _getRowColor(context, user, rank, isUpdating && user.isCurrentlyRucking),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomLeft: Radius.circular(8),
+                      ),
+                      border: user.isCurrentUser 
+                          ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                          : null,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          bottomLeft: Radius.circular(8),
+                        ),
+                        onTap: () => _navigateToProfile(context, user),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            children: [
+                              _buildRankColumn(rank),
+                              _buildUserColumn(context, user),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+                
+                // Loading indicator
+                if (isLoadingMore)
+                  Container(
+                    height: 80, // Match row height
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+              ],
+            ),
+          ),
+          
+          // SCROLLABLE RIGHT TABLE - Header + Stats columns
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _horizontalScrollController,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: 532, // Updated: 500px columns (80+100+100+100+120) + 32px padding
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Scrollable header
+                    Container(
+                      height: 56, // Match left header height
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Theme.of(context).dividerColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          _buildHeaderColumn('RUCKS', 'totalRucks', 80),
+                          _buildHeaderColumn('DISTANCE', 'distanceKm', 100),
+                          _buildHeaderColumn('ELEVATION', 'elevationGainMeters', 100),
+                          _buildHeaderColumn('CALORIES', 'caloriesBurned', 100),
+                          _buildPowerPointsHeader(120), // Shrunk down from 280 to 120px
+                        ],
+                      ),
+                    ),
+                    // Scrollable data rows
+                    ...users.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final user = entry.value;
+                      
+                      return Container(
+                        height: 80, // Match left row height
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _getRowColor(context, user, index + 1, isUpdating && user.isCurrentlyRucking),
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                          border: user.isCurrentUser 
+                              ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                              : null,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            children: [
+                              _buildStatColumn(user.stats.totalRucks.toString(), width: 80),
+                              _buildStatColumn(_formatDistance(user.stats.distanceKm), width: 100),
+                              _buildStatColumn(_formatElevation(user.stats.elevationGainMeters), width: 100),
+                              _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()), width: 100),
+                              _buildStatColumn(_formatPowerPoints(user.stats.powerPoints), width: 120, isPowerPoints: true), // Shrunk down from 280 to 120px
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    
+                    // Loading indicator
+                    if (isLoadingMore)
+                      Container(
+                        height: 80, // Match row height
+                        child: const Center(child: Text('Loading...', style: TextStyle(fontSize: 12))),
+                      ),
                   ],
                 ),
               ),
-              // Horizontal scrollable stats headers
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _horizontalScrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: 480, // total stats width
-                    child: Row(
-                      children: [
-                        _buildHeaderColumn('RUCKS', 'totalRucks', 80),
-                        _buildHeaderColumn('DISTANCE', 'distanceKm', 100),
-                        _buildHeaderColumn('ELEVATION', 'elevationGainMeters', 100),
-                        _buildHeaderColumn('CALORIES', 'caloriesBurned', 100),
-                        _buildPowerPointsHeader(100),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-        
-        // User list with synchronized horizontal scrolling
-        Expanded(
-          child: Row(
-            children: [
-              // Fixed user info column
-              SizedBox(
-                width: 190,
-                child: LeaderboardTable(
-                  users: users,
-                  scrollController: _scrollController,
-                  horizontalScrollController: null,
-                  isLoadingMore: isLoadingMore,
-                  hasMore: hasMore,
-                  isUpdating: isUpdating,
-                  showOnlyFixed: true,
-                ),
-              ),
-              // Scrollable stats columns
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _horizontalScrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: 480,
-                    child: LeaderboardTable(
-                      users: users,
-                      scrollController: _scrollController,
-                      horizontalScrollController: null,
-                      isLoadingMore: isLoadingMore,
-                      hasMore: hasMore,
-                      isUpdating: isUpdating,
-                      showOnlyStats: true,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -417,8 +549,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   Widget _buildHeaderColumn(String title, String sortBy, double width) {
     final isCurrentSort = _currentSortBy == sortBy;
     final color = isCurrentSort 
-        ? Theme.of(context).primaryColor 
-        : Colors.grey.shade600;
+      ? Theme.of(context).primaryColor 
+      : Theme.of(context).brightness == Brightness.dark
+          ? Colors.grey.shade300
+          : Colors.grey.shade600;
 
     return SizedBox(
       width: width,
@@ -445,7 +579,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (isCurrentSort) ..[
+              if (isCurrentSort) ...[
                 const SizedBox(width: 4),
                 Icon(
                   _currentAscending ? Icons.arrow_upward : Icons.arrow_downward,
@@ -469,49 +603,60 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
     return SizedBox(
       width: width,
-      child: GestureDetector(
-        onTap: () {
-          // Tap to explain power points
-          PowerPointsModal.show(context);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.amber.withOpacity(0.1),
-                Colors.amber.withOpacity(0.05),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.amber.withOpacity(0.1),
+              Colors.amber.withOpacity(0.05),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('💪', style: TextStyle(fontSize: 12)),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  'POWER',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: color,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // PP text - tappable for sorting
+            GestureDetector(
+              onTap: () {
+                // Sort by power points 
+                final newAscending = isCurrentSort ? !_currentAscending : false;
+                _sort('powerPoints', newAscending);
+              },
+              child: Text(
+                'PP',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: color,
                 ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(width: 2),
+            ),
+            if (isCurrentSort) ...[
+              const SizedBox(width: 4),
               Icon(
-                Icons.info_outline,
+                _currentAscending ? Icons.arrow_upward : Icons.arrow_downward,
                 size: 12,
                 color: color,
               ),
             ],
-          ),
+            const SizedBox(width: 4),
+            // Question mark - separate tap for modal
+            GestureDetector(
+              onTap: () {
+                PowerPointsModal.show(context);
+              },
+              child: Icon(
+                Icons.help_outline, // Question mark icon
+                size: 14,
+                color: color,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -519,6 +664,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   /// Handle state changes like a good ranch hand
   void _handleStateChanges(BuildContext context, LeaderboardState state) {
+    // Sync sort state with bloc state
+    if (state is LeaderboardLoaded) {
+      _currentSortBy = state.sortBy;
+      _currentAscending = state.ascending;
+    }
+    
     if (state is LeaderboardError) {
       StyledSnackBar.show(
         context: context,
@@ -531,5 +682,285 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         _updateAnimationController.reset();
       });
     }
+  }
+
+  /// Build rank column with fancy medals for top 3
+  Widget _buildRankColumn(int rank) {
+    return SizedBox(
+      width: 40,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center, // Center vertically in the row
+        children: [
+          if (rank <= 3)
+            Text(
+              _getRankEmoji(rank),
+              style: const TextStyle(fontSize: 20),
+            ),
+          Text(
+            rank.toString(),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: rank <= 3 ? _getMedalColor(rank) : null,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build user column with avatar and username
+  Widget _buildUserColumn(BuildContext context, LeaderboardUserModel user) {
+    return SizedBox(
+      width: 140, // Fixed 140px for rucker column (-20px smaller)
+      child: ClipRect( // Clip any overflow
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Avatar with live indicator
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: user.avatarUrl?.isNotEmpty == true
+                          ? Image.network(
+                              user.avatarUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Image.asset(
+                                  user.gender == 'female' 
+                                      ? 'assets/images/lady rucker profile.png'
+                                      : 'assets/images/profile.png',
+                                  fit: BoxFit.cover,
+                                );
+                              },
+                            )
+                          : Image.asset(
+                              user.gender == 'female' 
+                                  ? 'assets/images/lady rucker profile.png'
+                                  : 'assets/images/profile.png',
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                  ),
+                  if (user.isCurrentlyRucking)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              // Username and rucking status in column
+              Flexible(
+                child: Container(
+                  width: 80, // Much smaller to prevent overflow
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Username with FORCED truncation
+                      Text(
+                        user.username,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                      // "Rucking now!" text for currently rucking users
+                      if (user.isCurrentlyRucking)
+                        Text(
+                          'Rucking now!',
+                          style: TextStyle(
+                            fontFamily: 'Bangers',
+                            fontSize: 10,
+                            color: Theme.of(context).brightness == Brightness.dark 
+                                ? Colors.lightGreen.shade300 
+                                : Colors.green.shade700,
+                            height: 0.8, // Reduce line height to save space
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build stat column
+  Widget _buildStatColumn(String value, {required double width, bool isPowerPoints = false}) {
+    return SizedBox(
+      width: width,
+      child: Text(
+        value,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isPowerPoints ? FontWeight.bold : FontWeight.normal,
+          color: isPowerPoints ? Colors.amber.shade700 : null,
+        ),
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  /// Helper methods for medals and formatting
+  String _getRankEmoji(int rank) {
+    switch (rank) {
+      case 1:
+        return '🥇';
+      case 2:
+        return '🥈';
+      case 3:
+        return '🥉';
+      default:
+        return '';
+    }
+  }
+
+  Color? _getMedalColor(int rank) {
+    switch (rank) {
+      case 1:
+        return Colors.amber;
+      case 2:
+        return Colors.grey.shade400;
+      case 3:
+        return Colors.brown.shade400;
+      default:
+        return null;
+    }
+  }
+
+  String _formatDistance(double distanceKm) {
+    if (distanceKm >= 1000) {
+      return '${(distanceKm / 1000).toStringAsFixed(1)}k';
+    }
+    return distanceKm.toStringAsFixed(1);
+  }
+
+  String _formatElevation(double elevationM) {
+    if (elevationM >= 1000) {
+      return '${(elevationM / 1000).toStringAsFixed(1)}k';
+    }
+    return elevationM.round().toString();
+  }
+
+  String _formatCalories(int calories) {
+    if (calories >= 1000) {
+      return '${(calories / 1000).toStringAsFixed(1)}k';
+    }
+    return calories.toString();
+  }
+
+  String _formatPowerPoints(double powerPoints) {
+    if (powerPoints >= 1000000) {
+      return '${(powerPoints / 1000000).toStringAsFixed(1)}M';
+    } else if (powerPoints >= 1000) {
+      return '${(powerPoints / 1000).toStringAsFixed(1)}k';
+    } else {
+      return powerPoints.toStringAsFixed(0);
+    }
+  }
+
+  /// Get row background color
+  Color _getRowColor(BuildContext context, LeaderboardUserModel user, int rank, bool isUpdating) {
+    if (user.isCurrentlyRucking) {
+      // HIGHEST PRIORITY: Always highlight currently rucking users with prominent green
+      return isUpdating 
+        ? Colors.green.withOpacity(0.35) // Very strong green during updates
+        : Colors.green.withOpacity(0.25); // Much more visible green always
+    } else if (user.isCurrentUser) {
+      return Theme.of(context).primaryColor.withOpacity(0.05);
+    } else if (rank <= 3) {
+      final medalColor = _getMedalColor(rank);
+      return medalColor != null ? medalColor.withOpacity(0.05) : Theme.of(context).cardColor;
+    } else if (isUpdating) {
+      return Colors.blue.withOpacity(0.08); // Subtle blue highlight for general updates
+    }
+    return Theme.of(context).cardColor;
+  }
+
+  /// Build avatar with clean display
+  Widget _buildAvatar(LeaderboardUserModel user) {
+    final hasAvatar = user.avatarUrl != null && user.avatarUrl!.isNotEmpty;
+
+    Widget avatarWidget;
+    if (hasAvatar) {
+      avatarWidget = ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.network(
+          user.avatarUrl!,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+        ),
+      );
+    } else {
+      String assetPath = (user.gender == 'female')
+          ? 'assets/images/lady rucker profile.png'
+          : 'assets/images/profile.png';
+      avatarWidget = ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.asset(
+          assetPath,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        avatarWidget,
+        if (user.isCurrentlyRucking)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Theme.of(context).scaffoldBackgroundColor
+                      : Colors.white, 
+                  width: 2
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Navigate to user's public profile
+  void _navigateToProfile(BuildContext context, LeaderboardUserModel user) {
+    Navigator.pushNamed(context, '/profile/${user.userId}');
   }
 }

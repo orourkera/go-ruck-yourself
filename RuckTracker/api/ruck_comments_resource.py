@@ -33,21 +33,25 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Token length: {len(g.access_token) if g.access_token else 'None'}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
 
-        # Get comments for the ruck
+        # Get comments for the ruck with user info in single query
         try:
-            query_result = supabase.from_('ruck_comments').select('id, ruck_id, user_id, user_display_name, content, created_at, updated_at').eq('ruck_id', ruck_id).order('created_at', desc=True).execute()
-            query_result_users = supabase.from_('user').select('id, avatar_url').execute()
+            # Use JOIN to get comments with user avatar in single query
+            query_result = supabase.from_('ruck_comments').select(
+                'id, ruck_id, user_id, user_display_name, content, created_at, updated_at, user:user_id(avatar_url)'
+            ).eq('ruck_id', ruck_id).order('created_at', desc=True).execute()
             
             if hasattr(query_result, 'error') and query_result.error:
                 logger.error(f"RuckCommentsResource: Supabase query error: {query_result.error}")
                 return build_api_response(success=False, error="Failed to fetch comments from database.", status_code=500)
 
             comments = query_result.data
-            users = query_result_users.data
             
+            # Flatten user data for easier frontend consumption
             for comment in comments:
-                user = next((user for user in users if user['id'] == comment['user_id']), None)
-                comment['user_avatar_url'] = user.get('avatar_url') if user else None
+                user_data = comment.get('user')
+                comment['user_avatar_url'] = user_data.get('avatar_url') if user_data else None
+                # Remove nested user object to keep response clean
+                comment.pop('user', None)
 
             return build_api_response(data=comments, status_code=200)
             

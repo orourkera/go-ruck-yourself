@@ -10,6 +10,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/social/presentation/bloc/social_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
@@ -26,6 +27,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:rucking_app/core/services/session_recovery_service.dart';
 import 'package:rucking_app/core/services/memory_monitor_service.dart';
+import 'package:rucking_app/core/services/active_session_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -162,16 +165,8 @@ Future<void> _runApp() async {
     print('❌ [Main] AuthBloc is NOT registered!');
   }
   
-  // Request App Tracking Transparency authorization
-  // This is required for iOS 14.5+ to comply with Apple's App Store guidelines
-  try {
-    // Show tracking authorization dialog
-    // It's best to delay showing the authorization request until the app is fully launched
-    await Future.delayed(const Duration(milliseconds: 200));
-    await TrackingTransparencyService.requestTrackingAuthorization();
-  } catch (e) {
-    AppLogger.error('Error requesting tracking authorization: $e');
-  }
+  // Request App Tracking Transparency authorization will be done after UI is loaded
+  // This prevents the prompt from appearing before the app UI is ready
   
   // REMOVED: Automatic location permission request at startup to prevent conflicts
   // Location permissions will be requested only when actually needed (e.g., starting a session)
@@ -246,6 +241,11 @@ Future<void> _runApp() async {
     rethrow;
   }
   
+  // 🔄 Session Recovery - DISABLED (was causing app hangs)
+  // TODO: Implement session persistence safely in the future
+  print('📝 [Main] Session recovery disabled for stability');
+  
+  // Run the app
   runApp(
     MultiBlocProvider(
       providers: [
@@ -253,24 +253,19 @@ Future<void> _runApp() async {
           create: (context) => getIt<AuthBloc>(),
         ),
         BlocProvider<SessionBloc>(
-          create: (context) {
-            return getIt<SessionBloc>();
-          },
+          create: (context) => getIt<SessionBloc>(),
+        ),
+        BlocProvider<ActiveSessionBloc>(
+          create: (context) => getIt<ActiveSessionBloc>(),
         ),
         BlocProvider<SocialBloc>(
-          create: (context) {
-            return getIt<SocialBloc>();
-          },
+          create: (context) => getIt<SocialBloc>(),
         ),
         BlocProvider<AchievementBloc>(
-          create: (context) {
-            return getIt<AchievementBloc>();
-          },
+          create: (context) => getIt<AchievementBloc>(),
         ),
         BlocProvider<PremiumBloc>(
-          create: (context) {
-            return getIt<PremiumBloc>();
-          },
+          create: (context) => getIt<PremiumBloc>(),
         ),
         // Duels feature BLoCs
         BlocProvider<DuelListBloc>(
@@ -295,6 +290,20 @@ Future<void> _runApp() async {
       child: RuckingApp(),
     ),
   );
+  
+  // 🚨 CRITICAL: Request App Tracking Transparency AFTER UI is loaded
+  // This ensures the ATT prompt appears properly for App Store Review
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    try {
+      AppLogger.info('[Main] App UI loaded, requesting ATT authorization...');
+      // Delay to ensure the app is fully visible and interactive
+      await Future.delayed(const Duration(milliseconds: 3000)); // Increased for iOS 18 compatibility
+      final hasPermission = await TrackingTransparencyService.requestTrackingAuthorization();
+      AppLogger.info('[Main] ATT authorization result: $hasPermission');
+    } catch (e) {
+      AppLogger.error('[Main] Error requesting tracking authorization: $e');
+    }
+  });
 }
 
 /// Custom BlocObserver for debugging

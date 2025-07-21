@@ -9,7 +9,7 @@ const double _kFixedPaneWidth = 190; // 40 rank + 150 user
 class LeaderboardTable extends StatelessWidget {
   final List<LeaderboardUserModel> users;
   final ScrollController scrollController;
-  final ScrollController? horizontalScrollController;
+  final ValueNotifier<double>? horizontalScrollNotifier;
   final bool isLoadingMore;
   final bool hasMore;
   final bool isUpdating;
@@ -20,7 +20,7 @@ class LeaderboardTable extends StatelessWidget {
     Key? key,
     required this.users,
     required this.scrollController,
-    this.horizontalScrollController,
+    this.horizontalScrollNotifier,
     required this.isLoadingMore,
     required this.hasMore,
     this.isUpdating = false,
@@ -108,7 +108,7 @@ class LeaderboardTable extends StatelessWidget {
       // Only show stats columns
       return Row(
         children: [
-          _buildStatColumn(user.stats.totalRucks.toString(), width: 80),
+          _buildStatColumn(user.stats.totalRucks.toString(), width: 80, isRucks: true),
           _buildStatColumn(_formatDistance(user.stats.distanceKm), width: 100),
           _buildStatColumn(_formatElevation(user.stats.elevationGainMeters), width: 100),
           _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()), width: 100),
@@ -130,16 +130,15 @@ class LeaderboardTable extends StatelessWidget {
             ),
           ),
           
-          // SCROLLABLE STATS SECTION
+          // STATS SECTION - let's keep it simple for now
           Expanded(
             child: SingleChildScrollView(
-              controller: horizontalScrollController,
               scrollDirection: Axis.horizontal,
               child: SizedBox(
                 width: 480, // total width of stats columns (80 + 4*100)
                 child: Row(
                   children: [
-                    _buildStatColumn(user.stats.totalRucks.toString(), width: 80),
+                    _buildStatColumn(user.stats.totalRucks.toString(), width: 80, isRucks: true),
                     _buildStatColumn(_formatDistance(user.stats.distanceKm), width: 100),
                     _buildStatColumn(_formatElevation(user.stats.elevationGainMeters), width: 100),
                     _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()), width: 100),
@@ -169,7 +168,7 @@ class LeaderboardTable extends StatelessWidget {
             rank.toString(),
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              fontSize: 13,
+              fontSize: 16, // Increased from 13 to match stat columns
               color: rank <= 3 ? _getMedalColor(rank) : null,
             ),
             textAlign: TextAlign.center,
@@ -197,7 +196,7 @@ class LeaderboardTable extends StatelessWidget {
                     user.username,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: 16, // Increased from 14 to match other elements
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -281,14 +280,14 @@ class LeaderboardTable extends StatelessWidget {
   }
 
   /// Build stat column
-  Widget _buildStatColumn(String value, {required double width, bool isPowerPoints = false}) {
+  Widget _buildStatColumn(String value, {required double width, bool isPowerPoints = false, bool isRucks = false}) {
     return SizedBox(
       width: width,
       child: Text(
         value,
         style: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
+          fontWeight: isRucks ? FontWeight.w900 : FontWeight.w600, // Extra bold for rucks
+          fontSize: 16, // Increased from 13 to make values bigger
           color: isPowerPoints ? Colors.amber.shade700 : null,
         ),
         textAlign: TextAlign.center,

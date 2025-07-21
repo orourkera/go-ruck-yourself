@@ -237,8 +237,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
       itemBuilder: (context, index) {
         final club = clubs[index];
         return ListTile(
-          title: Text(club.name ?? 'Unknown Club'),
-          subtitle: Text('${club.memberCount ?? 0} members'),
+          title: Text(club['name']?.toString() ?? 'Unknown Club'),
+          subtitle: Text('${club['memberCount'] ?? club['member_count'] ?? 0} members'),
         );
       },
     );

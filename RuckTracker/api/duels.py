@@ -114,52 +114,54 @@ class DuelListResource(Resource):
             duels_response = query.execute()
             logging.info(f"Found {len(duels_response.data)} duels after filtering")
             
-            # Get participants for each duel and enrich with creator info
+            # OPTIMIZED: Batch all queries to avoid N+1 problem
             result = []
+            if not duels_response.data:
+                return {'duels': result}, 200
+            
+            duel_ids = [duel['id'] for duel in duels_response.data]
+            creator_ids = list(set([duel['creator_id'] for duel in duels_response.data]))
+            
+            # Single query to get all creator usernames
+            creators_query = supabase.table('user').select('id, username').in_('id', creator_ids)
+            creators_response = creators_query.execute()
+            creators_dict = {creator['id']: creator['username'] for creator in creators_response.data}
+            
+            # Single query to get all participants for all duels
+            participants_query = supabase.table('duel_participants').select(
+                '*, user:user_id(username, email, avatar_url)'
+            ).in_('duel_id', duel_ids).neq('status', 'withdrawn').order('duel_id, current_value', desc=True)
+            participants_response = participants_query.execute()
+            
+            # Group participants by duel_id
+            participants_by_duel = {}
+            for participant in participants_response.data:
+                duel_id = participant['duel_id']
+                if duel_id not in participants_by_duel:
+                    participants_by_duel[duel_id] = []
+                
+                # Flatten user data
+                participant_data = dict(participant)
+                user_data = participant.get('user', {})
+                participant_data['username'] = user_data.get('username', 'Unknown User')
+                participant_data['email'] = user_data.get('email')
+                participant_data['avatar_url'] = user_data.get('avatar_url')
+                
+                # Set role based on whether this participant is the creator
+                duel = next(d for d in duels_response.data if d['id'] == duel_id)
+                if participant['user_id'] == duel['creator_id']:
+                    participant_data['role'] = 'Creator'
+                else:
+                    participant_data['role'] = 'Participant'
+                
+                # Remove nested user object
+                participant_data.pop('user', None)
+                participants_by_duel[duel_id].append(participant_data)
+            
+            # Build final result
             for duel in duels_response.data:
-                # Get creator username
-                creator_query = supabase.table('user').select('username').eq('id', duel['creator_id'])
-                creator_response = creator_query.execute()
-                creator_username = creator_response.data[0]['username'] if creator_response.data else 'Unknown'
-                
-                # Get participants for this duel (exclude withdrawn)
-                participants_query = supabase.table('duel_participants').select('*').eq('duel_id', duel['id']).neq('status', 'withdrawn').order('current_value', desc=True)
-                participants_response = participants_query.execute()
-                
-                # Enrich participants with user info (username, email, avatar_url)
-                enriched_participants = []
-                for participant in participants_response.data:
-                    user_query = supabase.table('user').select('username, email, avatar_url').eq('id', participant['user_id'])
-                    user_response = user_query.execute()
-                    if user_response.data:
-                        participant_data = dict(participant)
-                        user_data = user_response.data[0]
-                        participant_data['username'] = user_data['username']
-                        participant_data['email'] = user_data['email']
-                        participant_data['avatar_url'] = user_data.get('avatar_url')
-                        
-                        # Set role based on whether this participant is the creator
-                        if participant['user_id'] == duel['creator_id']:
-                            participant_data['role'] = 'Creator'
-                        else:
-                            participant_data['role'] = 'Participant'
-                        
-                        enriched_participants.append(participant_data)
-                    else:
-                        # Fallback if user not found
-                        participant_data = dict(participant)
-                        participant_data['username'] = 'Unknown User'
-                        participant_data['email'] = None
-                        participant_data['avatar_url'] = None
-                        
-                        # Set role based on whether this participant is the creator
-                        if participant['user_id'] == duel['creator_id']:
-                            participant_data['role'] = 'Creator'
-                        else:
-                            participant_data['role'] = 'Participant'
-                        
-                        enriched_participants.append(participant_data)
-                
+                creator_username = creators_dict.get(duel['creator_id'], 'Unknown')
+                enriched_participants = participants_by_duel.get(duel['id'], [])
                 duel_data = dict(duel)
                 duel_data['creator_username'] = creator_username
                 duel_data['participants'] = enriched_participants

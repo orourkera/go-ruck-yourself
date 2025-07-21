@@ -27,8 +27,8 @@ class LeaderboardRepository {
     try {
       // Build query parameters like stacking hay bales
       final queryParams = <String, String>{
-        'sort_by': _mapSortField(sortBy),
-        'order': ascending ? 'asc' : 'desc',
+        'sortBy': _mapSortField(sortBy), // Backend expects 'sortBy', not 'sort_by'
+        'ascending': ascending.toString(), // Backend expects 'ascending', not 'order'
         'limit': limit.toString(),
         'offset': offset.toString(),
       };
@@ -82,23 +82,20 @@ class LeaderboardRepository {
 
   /// Map Flutter field names to backend field names like translating pig latin
   String _mapSortField(String sortBy) {
+    // Backend expects: 'powerPoints', 'rucks', 'distance', 'elevation', 'calories'
     switch (sortBy) {
       case 'totalRucks':
-        return 'total_rucks';
+        return 'rucks';
       case 'distanceKm':
-        return 'total_distance_km';
+        return 'distance';
       case 'elevationGainMeters':
-        return 'total_elevation_gain_meters';
+        return 'elevation';
       case 'caloriesBurned':
-        return 'total_calories_burned';
+        return 'calories';
       case 'powerPoints':
-        return 'total_power_points';
-      case 'averageDistanceKm':
-        return 'average_distance_km';
-      case 'averagePaceMinKm':
-        return 'average_pace_min_km';
+        return 'powerPoints';
       default:
-        return 'total_power_points'; // Default to power points
+        return 'powerPoints'; // Default to power points
     }
   }
 }
