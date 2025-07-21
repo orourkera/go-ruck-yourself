@@ -33,11 +33,11 @@ class RuckCommentsResource(Resource):
             logger.error(f"RuckCommentsResource: Token length: {len(g.access_token) if g.access_token else 'None'}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
 
-        # Get comments for the ruck with user info in single query
+        # Get comments for the ruck using separate queries (leaderboard pattern)
         try:
-            # Use JOIN to get comments with user avatar in single query
+            # First, get the comments
             query_result = supabase.from_('ruck_comments').select(
-                'id, ruck_id, user_id, user_display_name, content, created_at, updated_at, user:user_id(avatar_url)'
+                'id, ruck_id, user_id, user_display_name, content, created_at, updated_at'
             ).eq('ruck_id', ruck_id).order('created_at', desc=True).execute()
             
             if hasattr(query_result, 'error') and query_result.error:
@@ -46,12 +46,23 @@ class RuckCommentsResource(Resource):
 
             comments = query_result.data
             
-            # Flatten user data for easier frontend consumption
-            for comment in comments:
-                user_data = comment.get('user')
-                comment['user_avatar_url'] = user_data.get('avatar_url') if user_data else None
-                # Remove nested user object to keep response clean
-                comment.pop('user', None)
+            # If we have comments, get user avatar data separately
+            if comments:
+                # Get unique user IDs
+                user_ids = list(set(comment['user_id'] for comment in comments))
+                
+                # Query users separately
+                users_query = supabase.from_('users').select(
+                    'id, avatar_url'
+                ).in_('id', user_ids).execute()
+                
+                # Create user lookup dict
+                users_lookup = {user['id']: user for user in users_query.data}
+                
+                # Add user avatar to comments
+                for comment in comments:
+                    user_data = users_lookup.get(comment['user_id'])
+                    comment['user_avatar_url'] = user_data.get('avatar_url') if user_data else None
 
             return build_api_response(data=comments, status_code=200)
             
