@@ -64,7 +64,10 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
       _currentOffset = response.users.length;
 
       print('🔍 BLOC: About to emit LeaderboardLoaded state with ${response.users.length} users');
-      emit(LeaderboardLoaded(
+      print('🔍 BLOC: Data check - users: ${response.users.length}, currentUserRank: $currentUserRank, activeRuckersCount: ${response.activeRuckersCount}');
+      print('🔍 BLOC: Creating LeaderboardLoaded state...');
+      
+      final loadedState = LeaderboardLoaded(
         users: response.users,
         sortBy: _currentSortBy,
         ascending: _currentAscending,
@@ -72,7 +75,10 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         lastUpdated: DateTime.now(),
         currentUserRank: currentUserRank,
         activeRuckersCount: response.activeRuckersCount,
-      ));
+      );
+      print('🔍 BLOC: LeaderboardLoaded state created successfully');
+      
+      emit(loadedState);
       print('🔍 BLOC: Successfully emitted LeaderboardLoaded state!');
     } catch (e) {
       print('🔍 BLOC: ERROR in _onLoadLeaderboard: $e');

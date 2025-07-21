@@ -156,14 +156,37 @@ class LeaderboardResource(Resource):
                     ruck_sessions = user_data.get('ruck_session', [])
                     
                     # Check if user is currently rucking (has active session)
+                    # Only count sessions that are recent (within last 4 hours) to avoid old stuck sessions
                     is_currently_rucking = False
+                    from datetime import datetime, timedelta
+                    cutoff_time = datetime.utcnow() - timedelta(hours=4)
+                    
                     for ruck in ruck_sessions:
                         if ruck.get('status') in ['in_progress', 'paused'] and not ruck.get('completed_at'):
-                            is_currently_rucking = True
-                            break
+                            # Check if session was created/started recently (within 24 hours)
+                            # Use created_at if available, otherwise use started_at
+                            timestamp = ruck.get('created_at') or ruck.get('started_at')
+                            if timestamp:
+                                try:
+                                    # Handle both with and without 'Z' suffix
+                                    if timestamp.endswith('Z'):
+                                        session_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                    elif '+' in timestamp or timestamp.endswith('+00'):
+                                        session_time = datetime.fromisoformat(timestamp)
+                                    else:
+                                        # Assume UTC if no timezone info
+                                        session_time = datetime.fromisoformat(timestamp + '+00:00')
+                                    
+                                    if session_time > cutoff_time:
+                                        is_currently_rucking = True
+                                        break
+                                except (ValueError, AttributeError):
+                                    # If we can't parse the timestamp, skip this session
+                                    pass
                     
                     if is_currently_rucking:
                         active_ruckers_count += 1
+                        logger.info(f"Active rucker found: user {user_id[:8]}... - session within 4 hours")
                     
                     # Get the user's most recent location from their latest ruck
                     latest_ruck = None

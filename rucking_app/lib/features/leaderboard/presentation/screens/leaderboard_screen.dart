@@ -74,9 +74,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => GetIt.instance<LeaderboardBloc>(),
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: Column(
@@ -89,8 +87,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 builder: (context, state) {
                   int activeCount = 0;
                   if (state is LeaderboardLoaded) {
-                    // Count users who are currently rucking
-                    activeCount = state.users.where((user) => user.isCurrentlyRucking).length;
+                    // Use backend-provided activeRuckersCount
+                    activeCount = state.activeRuckersCount;
                   }
                   return LiveRuckingIndicator(activeRuckersCount: activeCount);
                 },
@@ -116,7 +114,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             ],
           ),
         ),
-      ),
     );
   }
 

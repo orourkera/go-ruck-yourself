@@ -22,7 +22,11 @@ class LeaderboardTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width * 1.5, // Make it wider
+        child: ListView.builder(
       controller: scrollController,
       padding: const EdgeInsets.only(bottom: 80), // Space for loading indicator
       itemCount: users.length + (isLoadingMore ? 1 : 0),
@@ -41,6 +45,8 @@ class LeaderboardTable extends StatelessWidget {
           isUpdating: isUpdating && user.isCurrentlyRucking,
         );
       },
+        ),
+      ),
     );
   }
 

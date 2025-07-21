@@ -31,17 +31,17 @@
 		<integer>1</integer>
 	</array>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Go Rucky Yourself reads your health data to track your heart rate during ruck sessions, which helps calculate calorie burn more accurately.</string>
+	<string>Ruck reads your health data to track your heart rate during ruck sessions, which helps calculate calorie burn more accurately.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Go Rucky Yourself saves your ruck sessions as workouts in Apple Health, including distance, time, calories burned, and elevation data to help you track your fitness progress.</string>
+	<string>Ruck saves your ruck sessions as workouts in Apple Health, including distance, time, calories burned, and elevation data to help you track your fitness progress.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Go Rucky Yourself uses your location to track your routes, calculate distance, pace and elevation during ruck sessions. Background location is used when tracking an active session.</string>
+	<string>Ruck uses your location to track your routes, calculate distance, pace and elevation during ruck sessions. Background location is used when tracking an active session.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>This app needs background location access to track your rucking sessions even when the app is in the background.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Go Rucky Yourself needs your location to track your routes, calculate distance, pace and elevation during ruck sessions. Your location data is only used while the app is in use.</string>
+	<string>Ruck needs your location to track your routes, calculate distance, pace and elevation during ruck sessions. Your location data is only used while the app is in use.</string>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>Your data will be used to provide you with a better and personalized rucking experience and to help improve our features.</string>
+	<string>Ruck uses tracking to personalize your rucking experience by showing you relevant content and targeted advertisements. For example, we may show you ads for rucking gear based on your fitness activities, or suggest training programs tailored to your workout history. This helps us provide better recommendations and keep the app free to use.</string>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>This app uses notifications to keep you updated on ruck activities, comments, likes, and duel updates.</string>
 	<key>NSUserNotificationCriticalAlertsUsageDescription</key>
@@ -72,11 +72,11 @@
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Go Rucky Yourself needs access to your camera to capture photos of your ruck sessions to share with the community.</string>
+	<string>Ruck needs access to your camera to capture photos of your ruck sessions to share with the community.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Go Rucky Yourself needs access to your photo library to select photos of your ruck sessions to share with the community.</string>
+	<string>Ruck needs access to your photo library to select photos of your ruck sessions to share with the community.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Go Rucky Yourself needs permission to save photos to your photo library.</string>
+	<string>Ruck needs permission to save photos to your photo library.</string>
 	<key>GIDClientID</key>
 	<string>966278977337-l132nm2pas6ifl0kc3oh9977icfja6au.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>

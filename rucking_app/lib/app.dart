@@ -38,6 +38,7 @@ import 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/features/achievements/presentation/screens/achievements_hub_screen.dart';
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
+import 'package:rucking_app/features/leaderboard/presentation/bloc/leaderboard_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/screens/post_session_upsell_screen.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duels_list_screen.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duel_detail_screen.dart';
@@ -381,6 +382,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         ),
         BlocProvider<AchievementBloc>(
           create: (context) => getIt<AchievementBloc>(),
+        ),
+        BlocProvider<LeaderboardBloc>(
+          create: (context) => getIt<LeaderboardBloc>(),
         ),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(

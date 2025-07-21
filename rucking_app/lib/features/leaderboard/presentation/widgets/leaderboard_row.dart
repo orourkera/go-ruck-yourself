@@ -143,8 +143,8 @@ class LeaderboardRow extends StatelessWidget {
 
   /// Build user column with avatar and name
   Widget _buildUserColumn(BuildContext context) {
-    return Expanded(
-      flex: 3,
+    return SizedBox(
+      width: 140, // Fixed width for user column
       child: Padding(
         padding: const EdgeInsets.only(left: 8),
         child: Row(
@@ -231,8 +231,9 @@ class LeaderboardRow extends StatelessWidget {
     int flex = 1,
     bool isPowerPoints = false,
   }) {
-    return Expanded(
-      flex: flex,
+    double width = flex == 1 ? 50.0 : 80.0; // Base width and wider for multi-flex columns
+    return SizedBox(
+      width: width,
       child: Text(
         value,
         style: TextStyle(
@@ -288,12 +289,9 @@ class LeaderboardRow extends StatelessWidget {
 
   /// Navigate to user's public profile
   void _navigateToProfile(BuildContext context) {
-    // TODO: Navigate to public profile screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('View ${user.username}\'s profile'),
-        duration: const Duration(seconds: 1),
-      ),
+    Navigator.pushNamed(
+      context,
+      '/profile/${user.id}',
     );
   }
 
