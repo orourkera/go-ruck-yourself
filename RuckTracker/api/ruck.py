@@ -1202,7 +1202,8 @@ class RuckSessionLocationResource(Resource):
             if not insert_resp.data:
                 return {'message': 'Failed to insert location points'}, 500
                 
-            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            # Note: No need to invalidate session cache for location points
+            # Session data (distance, duration, etc.) is calculated separately
             return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
             
         except Exception as e:
