@@ -274,30 +274,30 @@ class RuckSessionListResource(Resource):
                     
                     # Process all location points after loop completes
                     logger.info(f"[ROUTE_DEBUG] Total fetched: {len(all_location_points)} location points for {len(session_ids)} sessions")
-                
-                # Group location points by session_id
-                for loc in all_location_points:
-                    session_id = loc['session_id']
-                    if session_id not in locations_by_session:
-                        locations_by_session[session_id] = []
                     
-                    # Ensure the location data contains latitude and longitude
-                    if 'latitude' in loc and 'longitude' in loc:
-                        try:
-                            # Convert numeric values if needed
-                            lat = float(loc['latitude']) if loc['latitude'] is not None else None
-                            lng = float(loc['longitude']) if loc['longitude'] is not None else None
-                            
-                            if lat is not None and lng is not None:
-                                locations_by_session[session_id].append({
-                                    'lat': lat,
-                                    'lng': lng
-                                })
-                        except (ValueError, TypeError):
-                            logger.warning(f"[ROUTE_DEBUG] Invalid lat/lng in location point: {loc}")
-                            continue
-                    else:
-                        logger.warning(f"[ROUTE_DEBUG] Location point missing lat/lng: {loc}")
+                    # Group location points by session_id (only for original approach)
+                    for loc in all_location_points:
+                        session_id = loc['session_id']
+                        if session_id not in locations_by_session:
+                            locations_by_session[session_id] = []
+                        
+                        # Ensure the location data contains latitude and longitude
+                        if 'latitude' in loc and 'longitude' in loc:
+                            try:
+                                # Convert numeric values if needed
+                                lat = float(loc['latitude']) if loc['latitude'] is not None else None
+                                lng = float(loc['longitude']) if loc['longitude'] is not None else None
+                                
+                                if lat is not None and lng is not None:
+                                    locations_by_session[session_id].append({
+                                        'lat': lat,
+                                        'lng': lng
+                                    })
+                            except (ValueError, TypeError):
+                                logger.warning(f"[ROUTE_DEBUG] Invalid lat/lng in location point: {loc}")
+                                continue
+                        else:
+                            logger.warning(f"[ROUTE_DEBUG] Location point missing lat/lng: {loc}")
                 
                 logger.info(f"[ROUTE_DEBUG] Grouped into {len(locations_by_session)} sessions with location data")
                 for session_id, points in locations_by_session.items():
