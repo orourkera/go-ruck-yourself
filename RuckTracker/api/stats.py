@@ -104,23 +104,31 @@ def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at
 class WeeklyStatsResource(Resource):
     def get(self):
         """Get aggregated stats for the current week."""
+        logger.info(f"[STATS_PERF] WeeklyStatsResource.get called for user_id={getattr(g, 'user', {}).get('id', 'unknown')}")
+        
         if not hasattr(g, 'user') or g.user is None:
+            logger.warning("[STATS_PERF] WeeklyStatsResource: User not authenticated")
             return {'message': 'User not authenticated'}, 401
 
         try:
+            logger.info("[STATS_PERF] WeeklyStatsResource: Starting date calculations")
             today = datetime.now(timezone.utc)
             start_dt, end_dt = get_week_range(today)
             date_range_str = f"{start_dt.strftime('%b %d')} - {end_dt.strftime('%b %d, %Y')}"
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Date range calculated: {date_range_str}")
 
             cache_key = f"weekly_stats:{g.user.id}:{start_iso}:{end_iso}"
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Checking cache with key: {cache_key}")
             cached_response = cache_get(cache_key)
             if cached_response:
+                logger.info("[STATS_PERF] WeeklyStatsResource: Returning cached response")
                 return {'data': cached_response}, 200
 
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Executing query for user {g.user.id} from {start_iso} to {end_iso}")
             response = supabase.table('ruck_session') \
                 .select('distance_km, duration_seconds, calories_burned, completed_at') \
                 .eq('user_id', g.user.id) \
@@ -128,6 +136,7 @@ class WeeklyStatsResource(Resource):
                 .lte('completed_at', end_iso) \
                 .eq('status', 'completed') \
                 .execute()
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Query completed, got {len(response.data) if response.data else 0} sessions")
 
             if response.data is None:
                  logger.error(f"Supabase query error for weekly stats: {getattr(response, 'error', 'Unknown error')}")
