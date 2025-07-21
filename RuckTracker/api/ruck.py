@@ -169,46 +169,49 @@ class RuckSessionListResource(Resource):
             
             try:
                 if USE_BATCH_LOCATIONS:
-                    logger.info("[OPTIMIZATION] Using batched location fetching")
-                    # NEW BATCHED APPROACH - Much faster!
+                    logger.info("[OPTIMIZATION] Using SMART batched location fetching")
+                    
                     if session_ids:
-                        # Single query to check which sessions have location data
-                        sessions_with_locations_query = supabase.table('location_point') \
-                            .select('session_id') \
+                        # SMART BATCHING: Get limited points for all sessions in one query
+                        # Enough points for long rucks (20km+) but capped for performance
+                        max_total_points = len(session_ids) * 150  # ~150 points per session max
+                        
+                        logger.info(f"[OPTIMIZATION] Fetching up to {max_total_points} total points for {len(session_ids)} sessions")
+                        
+                        # Single query to get limited location points for ALL sessions
+                        all_locations_query = supabase.table('location_point') \
+                            .select('session_id, latitude, longitude') \
                             .in_('session_id', session_ids) \
-                            .limit(1) \
+                            .order('session_id, timestamp') \
+                            .limit(max_total_points) \
                             .execute()
                         
-                        sessions_with_locations = list(set([item['session_id'] for item in sessions_with_locations_query.data])) if sessions_with_locations_query.data else []
-                        
-                        if sessions_with_locations:
-                            logger.info(f"[OPTIMIZATION] Found {len(sessions_with_locations)} sessions with location data")
+                        if all_locations_query.data:
+                            logger.info(f"[OPTIMIZATION] Retrieved {len(all_locations_query.data)} location points total")
                             
-                            # Batch query to get location points for all sessions
-                            all_locations_query = supabase.table('location_point') \
-                                .select('session_id, latitude, longitude, timestamp') \
-                                .in_('session_id', sessions_with_locations) \
-                                .order('session_id, timestamp') \
-                                .execute()
-                            
-                            # Group locations by session_id and apply sampling
-                            for location in all_locations_query.data or []:
+                            # Group and limit points per session
+                            points_per_session = {}
+                            for location in all_locations_query.data:
                                 session_id = location['session_id']
-                                if session_id not in locations_by_session:
+                                
+                                # Initialize counters
+                                if session_id not in points_per_session:
+                                    points_per_session[session_id] = 0
                                     locations_by_session[session_id] = []
                                 
-                                # Apply sampling - only keep every Nth point if session is getting large
-                                current_count = len(locations_by_session[session_id])
-                                if current_count < MAX_POINTS_PER_SESSION:
-                                    locations_by_session[session_id].append({
-                                        'lat': float(location['latitude']) if location['latitude'] is not None else None,
-                                        'lng': float(location['longitude']) if location['longitude'] is not None else None,
-                                        'timestamp': location.get('timestamp')
-                                    })
+                                # Limit to reasonable number of points per session for route plotting
+                                # 120 points is enough for detailed long routes while staying fast
+                                if points_per_session[session_id] < 120:  # Max 120 points per route
+                                    if location['latitude'] is not None and location['longitude'] is not None:
+                                        locations_by_session[session_id].append({
+                                            'lat': float(location['latitude']),
+                                            'lng': float(location['longitude'])
+                                        })
+                                        points_per_session[session_id] += 1
                             
-                            logger.info(f"[OPTIMIZATION] Batched approach completed. Sessions with locations: {len(locations_by_session)}")
+                            logger.info(f"[OPTIMIZATION] Processed {len(locations_by_session)} sessions with location data")
                         else:
-                            logger.info("[OPTIMIZATION] No sessions with location data found")
+                            logger.info(f"[OPTIMIZATION] No location points found for any sessions")
                 else:
                     logger.info("[ROUTE_DEBUG] Using original location fetching approach")
                     # ORIGINAL APPROACH - Keep existing logic for safety
