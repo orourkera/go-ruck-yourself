@@ -29,26 +29,44 @@ class RuckPhotosResource(Resource):
         Expects 'ruck_id' as a query parameter.
         The user must be authenticated.
         """
+        start_time = time.time()
+        logger.info(f"RuckPhotosResource.get: Starting request processing")
+        
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
             logger.warning("RuckPhotosResource: Missing or invalid Authorization header.")
             return build_api_response(success=False, error="Unauthorized", status_code=401)
         
         token = auth_header.split("Bearer ")[1]
+        logger.debug(f"RuckPhotosResource: Token extracted, length: {len(token)}")
 
         # Initialize Supabase client with the user's token to respect RLS
+        auth_start_time = time.time()
         try:
+            logger.debug("RuckPhotosResource: Initializing Supabase client")
             supabase = get_supabase_client(user_jwt=token)
+            client_init_time = time.time() - auth_start_time
+            logger.info(f"RuckPhotosResource: Supabase client initialization took {client_init_time*1000:.2f}ms")
+            
+            logger.debug("RuckPhotosResource: Validating user token")
+            token_validation_start = time.time()
             user_response = supabase.auth.get_user(token)
+            token_validation_time = time.time() - token_validation_start
+            logger.info(f"RuckPhotosResource: JWT token validation took {token_validation_time*1000:.2f}ms")
+            
             if not user_response.user:
                 logger.warning("RuckPhotosResource: Invalid token or user not found.")
                 return build_api_response(success=False, error="Invalid token or user not found.", status_code=401)
-            # logger.debug(f"RuckPhotosResource: Authenticated user {user_response.user.id}")
+            
+            total_auth_time = time.time() - auth_start_time
+            logger.info(f"RuckPhotosResource: Total authentication took {total_auth_time*1000:.2f}ms for user {user_response.user.id}")
         except Exception as e:
-            logger.error(f"RuckPhotosResource: Error during Supabase client initialization or user auth: {e}")
+            auth_error_time = time.time() - auth_start_time
+            logger.error(f"RuckPhotosResource: Error during authentication ({auth_error_time*1000:.2f}ms): {e}")
             return build_api_response(success=False, error="Authentication error.", status_code=500)
 
         ruck_id_str = request.args.get('ruck_id')
+        logger.debug(f"RuckPhotosResource: Processing ruck_id parameter: {ruck_id_str}")
 
         if not ruck_id_str:
             logger.info("RuckPhotosResource: Missing ruck_id query parameter.")
@@ -61,7 +79,9 @@ class RuckPhotosResource(Resource):
             return build_api_response(success=False, error="Invalid ruck_id format, must be an integer.", status_code=400)
 
         try:
-            logger.debug(f"RuckPhotosResource: Fetching photos for ruck_id: {ruck_id}")
+            logger.info(f"RuckPhotosResource: Starting database query for ruck_id: {ruck_id}")
+            query_start_time = time.time()
+            
             # Ensure the select statement matches the RuckPhoto model fields in Dart
             # Expected: id, ruckId, userId, url, thumbnailUrl, createdAt, filename, originalFilename, contentType, size
             query_result = supabase.table('ruck_photos') \
@@ -69,19 +89,28 @@ class RuckPhotosResource(Resource):
                                    .eq('ruck_id', ruck_id) \
                                    .execute()
             
+            query_time = time.time() - query_start_time
+            logger.info(f"RuckPhotosResource: Database query took {query_time*1000:.2f}ms")
+            
             if hasattr(query_result, 'error') and query_result.error:
-                logger.error(f"RuckPhotosResource: Supabase query error: {query_result.error}")
+                logger.error(f"RuckPhotosResource: Supabase query error after {query_time*1000:.2f}ms: {query_result.error}")
                 return build_api_response(success=False, error="Failed to fetch photos from database.", status_code=500)
 
+            result_count = len(query_result.data) if query_result.data else 0
+            total_time = time.time() - start_time
+            
             if query_result.data:
-                logger.debug(f"RuckPhotosResource: Found {len(query_result.data)} photos for ruck_id: {ruck_id}")
+                logger.info(f"RuckPhotosResource: SUCCESS - Found {result_count} photos for ruck_id {ruck_id} in {total_time*1000:.2f}ms total")
+                logger.debug(f"RuckPhotosResource: Performance breakdown - Auth: {total_auth_time*1000:.2f}ms, Query: {query_time*1000:.2f}ms, Total: {total_time*1000:.2f}ms")
                 return build_api_response(data=query_result.data, status_code=200)
             else:
-                logger.debug(f"RuckPhotosResource: No photos found for ruck_id: {ruck_id}")
+                logger.info(f"RuckPhotosResource: SUCCESS - No photos found for ruck_id {ruck_id} in {total_time*1000:.2f}ms total")
+                logger.debug(f"RuckPhotosResource: Performance breakdown - Auth: {total_auth_time*1000:.2f}ms, Query: {query_time*1000:.2f}ms, Total: {total_time*1000:.2f}ms")
                 return build_api_response(data=[], status_code=200)
 
         except Exception as e:
-            logger.error(f"RuckPhotosResource: Error fetching ruck photos from database: {e}", exc_info=True)
+            error_time = time.time() - start_time
+            logger.error(f"RuckPhotosResource: Database error after {error_time*1000:.2f}ms: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while fetching photos.", status_code=500)
             
     def post(self):

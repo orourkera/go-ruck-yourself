@@ -180,7 +180,7 @@ class RuckSessionListResource(Resource):
                         
                         # Single query to get limited location points for ALL sessions
                         all_locations_query = supabase.table('location_point') \
-                            .select('session_id, latitude, longitude') \
+                            .select('session_id, latitude, longitude, timestamp') \
                             .in_('session_id', session_ids) \
                             .order('session_id, timestamp') \
                             .limit(max_total_points) \

@@ -2,6 +2,7 @@
 Clubs API endpoints for club management and membership
 """
 import logging
+import time
 from flask import Blueprint, request, g, jsonify
 from flask_restful import Api, Resource
 from RuckTracker.api.auth import auth_required, get_user_id
@@ -23,6 +24,9 @@ class ClubListResource(Resource):
     @auth_required
     def get(self):
         """List clubs with optional search and filtering"""
+        start_time = time.time()
+        logger.info(f"ClubListResource.get: Starting request processing")
+        
         try:
             current_user_id = get_user_id()
             logger.info(f"Fetching clubs for user: {current_user_id}")
@@ -71,9 +75,46 @@ class ClubListResource(Resource):
             user_club_ids = {membership['club_id'] for membership in user_memberships.data} if user_memberships.data else set()
             logger.info(f"User is member of {len(user_club_ids)} clubs")
             
+            # OPTIMIZATION: Get all member counts and user memberships in batch queries
+            # instead of N+1 individual queries per club
+            
+            # Get all club IDs that we need to process
+            club_ids = [club['id'] for club in result.data]
+            
+            # Batch query for member counts for all clubs
+            member_counts = {}
+            if club_ids:
+                member_count_query = admin_client.table('club_memberships')\
+                    .select('club_id')\
+                    .eq('status', 'approved')\
+                    .in_('club_id', club_ids)\
+                    .execute()
+                
+                # Count members per club
+                for membership in member_count_query.data:
+                    club_id = membership['club_id']
+                    member_counts[club_id] = member_counts.get(club_id, 0) + 1
+            
+            # Batch query for current user's memberships in all these clubs  
+            user_memberships_batch = {}
+            if club_ids:
+                user_membership_query = admin_client.table('club_memberships')\
+                    .select('club_id, role, status')\
+                    .eq('user_id', current_user_id)\
+                    .in_('club_id', club_ids)\
+                    .execute()
+                
+                for membership in user_membership_query.data:
+                    user_memberships_batch[membership['club_id']] = {
+                        'role': membership['role'],
+                        'status': membership['status']
+                    }
+            
+            logger.info(f"Batch queries completed - member counts for {len(member_counts)} clubs, user memberships for {len(user_memberships_batch)} clubs")
+            
             clubs = []
             for i, club in enumerate(result.data):
-                logger.info(f"Processing club {i+1}/{len(result.data)}: {club.get('name', 'Unknown')}")
+                logger.debug(f"Processing club {i+1}/{len(result.data)}: {club.get('name', 'Unknown')}")
                 
                 # Apply RLS policy manually: show only public clubs OR clubs user is member of
                 is_public_club = club.get('is_public', False)
@@ -81,42 +122,28 @@ class ClubListResource(Resource):
                 
                 # If user_clubs_only is true, only show clubs the user is a member of
                 if user_clubs_only and not is_user_member:
-                    logger.info(f"Skipping club {club['id']} - user_clubs_only=true and user not member")
                     continue
                 
                 # Apply RLS policy: show only public clubs OR clubs user is member of
                 if not (is_public_club or is_user_member):
-                    logger.info(f"Skipping club {club['id']} - not public and user not member")
                     continue
                 
-                # Get member count
-                try:
-                    member_count_result = admin_client.table('club_memberships').select('id', count='exact').eq('club_id', club['id']).eq('status', 'approved').execute()
-                    member_count = member_count_result.count
-                    logger.info(f"Club {club['id']} has {member_count} members")
-                except Exception as member_error:
-                    logger.error(f"Error getting member count for club {club['id']}: {member_error}")
-                    member_count = 0
+                # Get member count from batch result
+                member_count = member_counts.get(club['id'], 0)
                 
-                # Check if current user is member/admin
-                try:
-                    user_membership = admin_client.table('club_memberships').select('role, status').eq('club_id', club['id']).eq('user_id', current_user_id).execute()
-                    user_role = user_membership.data[0]['role'] if user_membership.data else None
-                    user_status = user_membership.data[0]['status'] if user_membership.data else None
+                # Get user membership from batch result
+                user_membership_data = user_memberships_batch.get(club['id'])
+                user_role = user_membership_data['role'] if user_membership_data else None
+                user_status = user_membership_data['status'] if user_membership_data else None
 
-                    # Ensure only designated club admin is treated as 'admin'
-                    if user_role == 'admin' and club['admin_user_id'] != current_user_id:
-                        logger.warning(
-                            f"User {current_user_id} has admin role in memberships table for club {club['id']} "
-                            f"but is NOT the designated admin_user_id ({club['admin_user_id']}). Downgrading role to 'member'."
-                        )
-                        user_role = 'member'
-                    logger.info(f"User membership for club {club['id']}: role={user_role}, status={user_status}")
-                except Exception as membership_error:
-                    logger.error(f"Error getting user membership for club {club['id']}: {membership_error}")
-                    user_role = None
-                    user_status = None
-                
+                # Ensure only designated club admin is treated as 'admin'
+                if user_role == 'admin' and club['admin_user_id'] != current_user_id:
+                    logger.warning(
+                        f"User {current_user_id} has admin role in memberships table for club {club['id']} "
+                        f"but is NOT the designated admin_user_id ({club['admin_user_id']}). Downgrading role to 'member'."
+                    )
+                    user_role = 'member'
+                    
                 club_data = {
                     'id': club['id'],
                     'name': club['name'],
