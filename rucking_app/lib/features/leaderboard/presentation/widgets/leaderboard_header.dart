@@ -6,6 +6,7 @@ class LeaderboardHeader extends StatelessWidget {
   final bool ascending;
   final Function(String, bool) onSort;
   final VoidCallback onPowerPointsTap;
+  final ScrollController? horizontalScrollController;
 
   const LeaderboardHeader({
     Key? key,
@@ -13,6 +14,7 @@ class LeaderboardHeader extends StatelessWidget {
     required this.ascending,
     required this.onSort,
     required this.onPowerPointsTap,
+    this.horizontalScrollController,
   }) : super(key: key);
 
   @override
@@ -30,61 +32,39 @@ class LeaderboardHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // FIXED COLUMNS
           // Rank column
           SizedBox(
             width: 40,
-            child: Text(
-              '#',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            child: Text('#', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey.shade600), textAlign: TextAlign.center),
           ),
           
           // User column (not sortable)
-          const Expanded(
-            flex: 3,
+          SizedBox(
+            width: 150,
             child: Padding(
-              padding: EdgeInsets.only(left: 8),
-              child: Text(
-                'USER',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text('USER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey.shade600)),
             ),
           ),
           
-          // Sortable stat columns
-          _buildSortableColumn(
-            context,
-            'RUCKS',
-            'totalRucks',
-            flex: 1,
+          // SCROLLABLE STATS
+          Flexible(
+            child: SingleChildScrollView(
+              controller: horizontalScrollController,
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                children: [
+                  _buildSortableColumn(context, 'RUCKS', 'totalRucks', width: 80),
+                  _buildSortableColumn(context, 'DISTANCE', 'distanceKm', width: 100),
+                  _buildSortableColumn(context, 'ELEVATION', 'elevationGainMeters', width: 100),
+                  _buildSortableColumn(context, 'CALORIES', 'caloriesBurned', width: 100),
+                  _buildPowerPointsColumn(context),
+                ],
+              ),
+            ),
           ),
-          _buildSortableColumn(
-            context,
-            'DISTANCE',
-            'distanceKm',
-            flex: 2,
-          ),
-          _buildSortableColumn(
-            context,
-            'ELEVATION',
-            'elevationGainMeters',
-            flex: 2,
-          ),
-          _buildSortableColumn(
-            context,
-            'CALORIES',
-            'caloriesBurned',
-            flex: 2,
-          ),
-          _buildPowerPointsColumn(context),
         ],
       ),
     );
@@ -95,15 +75,15 @@ class LeaderboardHeader extends StatelessWidget {
     BuildContext context,
     String title,
     String field, {
-    int flex = 1,
+    double width = 60.0,
   }) {
     final isActive = sortBy == field;
     final textColor = isActive 
         ? Theme.of(context).primaryColor 
         : Colors.grey.shade600;
 
-    return Expanded(
-      flex: flex,
+    return SizedBox(
+      width: width,
       child: GestureDetector(
         onTap: () {
           // If same column, toggle direction; otherwise, default to descending
@@ -144,8 +124,8 @@ class LeaderboardHeader extends StatelessWidget {
         ? Theme.of(context).primaryColor 
         : Colors.grey.shade600;
 
-    return Expanded(
-      flex: 2,
+    return SizedBox(
+      width: 100,
       child: GestureDetector(
         onTap: () {
           // If same column, toggle direction; otherwise, default to descending

@@ -200,6 +200,7 @@ class LeaderboardResource(Resource):
                         'id': user_id,
                         'username': user_data['username'],
                         'avatarUrl': user_data.get('avatar_url'),
+                        'gender': user_data.get('gender'),
                         'location': location,
                         'isCurrentlyRucking': is_currently_rucking,
                         'stats': {

@@ -9,11 +9,15 @@ class PowerPointsModal extends StatelessWidget {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        constraints: BoxConstraints(
+          maxWidth: 400,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // Header - prettier than a peach
             Row(
               children: [
@@ -218,7 +222,8 @@ class PowerPointsModal extends StatelessWidget {
                 ),
               ],
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -23,6 +23,7 @@ class LeaderboardScreen extends StatefulWidget {
 class _LeaderboardScreenState extends State<LeaderboardScreen>
     with TickerProviderStateMixin {
   late final ScrollController _scrollController;
+  late final ScrollController _horizontalScrollController;
   late final TextEditingController _searchController;
   late final AnimationController _refreshAnimationController;
   late final AnimationController _updateAnimationController;
@@ -35,6 +36,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _horizontalScrollController = ScrollController();
     _searchController = TextEditingController();
     _refreshAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
@@ -57,6 +59,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   @override
   void dispose() {
     _scrollController.dispose();
+    _horizontalScrollController.dispose();
     _searchController.dispose();
     _refreshAnimationController.dispose();
     _updateAnimationController.dispose();
@@ -287,22 +290,90 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
     return Column(
       children: [
-        // Table header
-        LeaderboardHeader(
-          sortBy: _currentSortBy,
-          ascending: _currentAscending,
-          onSort: _handleSort,
-          onPowerPointsTap: () => PowerPointsModal.show(context),
+        // Fixed header section (rank + user)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              // Fixed header labels
+              SizedBox(
+                width: 190, // 40 rank + 150 user
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 40,
+                      child: Text('#', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                    const SizedBox(
+                      width: 150,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('USER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Horizontal scrollable stats headers
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _horizontalScrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: 480, // total stats width
+                    child: Row(
+                      children: [
+                        _buildHeaderColumn('RUCKS', 'totalRucks', 80),
+                        _buildHeaderColumn('DISTANCE', 'distanceKm', 100),
+                        _buildHeaderColumn('ELEVATION', 'elevationGainMeters', 100),
+                        _buildHeaderColumn('CALORIES', 'caloriesBurned', 100),
+                        _buildPowerPointsHeader(100),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         
-        // User list
+        // User list with synchronized horizontal scrolling
         Expanded(
-          child: LeaderboardTable(
-            users: users,
-            scrollController: _scrollController,
-            isLoadingMore: isLoadingMore,
-            hasMore: hasMore,
-            isUpdating: isUpdating,
+          child: Row(
+            children: [
+              // Fixed user info column
+              SizedBox(
+                width: 190,
+                child: LeaderboardTable(
+                  users: users,
+                  scrollController: _scrollController,
+                  horizontalScrollController: null,
+                  isLoadingMore: isLoadingMore,
+                  hasMore: hasMore,
+                  isUpdating: isUpdating,
+                  showOnlyFixed: true,
+                ),
+              ),
+              // Scrollable stats columns
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _horizontalScrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: 480,
+                    child: LeaderboardTable(
+                      users: users,
+                      scrollController: _scrollController,
+                      horizontalScrollController: null,
+                      isLoadingMore: isLoadingMore,
+                      hasMore: hasMore,
+                      isUpdating: isUpdating,
+                      showOnlyStats: true,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -337,14 +408,112 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   /// Handle sorting like organizing a barn
-  void _handleSort(String sortBy, bool ascending) {
-    setState(() {
-      _currentSortBy = sortBy;
-      _currentAscending = ascending;
-    });
-    
-    context.read<LeaderboardBloc>().add(
-      SortLeaderboard(sortBy: sortBy, ascending: ascending),
+  void _sort(String sortBy, bool ascending) {
+    // Dispatch event to BLoC to handle sorting
+    context.read<LeaderboardBloc>().add(SortLeaderboard(sortBy: sortBy, ascending: ascending));
+  }
+
+  /// Build sortable header column
+  Widget _buildHeaderColumn(String title, String sortBy, double width) {
+    final isCurrentSort = _currentSortBy == sortBy;
+    final color = isCurrentSort 
+        ? Theme.of(context).primaryColor 
+        : Colors.grey.shade600;
+
+    return SizedBox(
+      width: width,
+      child: GestureDetector(
+        onTap: () {
+          // If same column, toggle direction; otherwise, default to descending
+          final newAscending = isCurrentSort ? !_currentAscending : false;
+          _sort(sortBy, newAscending);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: color,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isCurrentSort) ..[
+                const SizedBox(width: 4),
+                Icon(
+                  _currentAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                  size: 12,
+                  color: color,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build power points header with special styling
+  Widget _buildPowerPointsHeader(double width) {
+    final isCurrentSort = _currentSortBy == 'powerPoints';
+    final color = isCurrentSort 
+        ? Colors.amber.shade700 
+        : Colors.amber.shade700;
+
+    return SizedBox(
+      width: width,
+      child: GestureDetector(
+        onTap: () {
+          // Tap to explain power points
+          PowerPointsModal.show(context);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.amber.withOpacity(0.1),
+                Colors.amber.withOpacity(0.05),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('💪', style: TextStyle(fontSize: 12)),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  'POWER',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: color,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.info_outline,
+                size: 12,
+                color: color,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

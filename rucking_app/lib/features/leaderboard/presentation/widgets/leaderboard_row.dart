@@ -20,7 +20,7 @@ class LeaderboardRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
         color: _getRowColor(context),
         borderRadius: BorderRadius.circular(8),
@@ -46,39 +46,46 @@ class LeaderboardRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           onTap: () => _navigateToProfile(context),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Column(
               children: [
-                // Main row with stats
                 Row(
                   children: [
-                    // Rank with medal
+                    // FIXED COLUMNS
                     _buildRankColumn(),
-                    
-                    // User info
                     _buildUserColumn(context),
-                    
-                    // Stats columns
-                    _buildStatColumn(
-                      user.stats.totalRucks.toString(),
-                      flex: 1,
-                    ),
-                    _buildStatColumn(
-                      MeasurementUtils.formatDistance(user.stats.distanceKm, metric: true),
-                      flex: 2,
-                    ),
-                    _buildStatColumn(
-                      MeasurementUtils.formatElevation(user.stats.elevationGainMeters, 0.0, metric: true),
-                      flex: 2,
-                    ),
-                    _buildStatColumn(
-                      MeasurementUtils.formatCalories(user.stats.caloriesBurned.round()),
-                      flex: 2,
-                    ),
-                    _buildStatColumn(
-                      _formatPowerPoints(user.stats.powerPoints),
-                      flex: 2,
-                      isPowerPoints: true,
+
+                    // SCROLLABLE STATS
+                    Flexible(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const ClampingScrollPhysics(),
+                        child: Row(
+                          children: [
+                            _buildStatColumn(
+                              user.stats.totalRucks.toString(),
+                              width: 80,
+                            ),
+                            _buildStatColumn(
+                              MeasurementUtils.formatDistance(user.stats.distanceKm, metric: true),
+                              width: 100,
+                            ),
+                            _buildStatColumn(
+                              MeasurementUtils.formatElevation(user.stats.elevationGainMeters, 0.0, metric: true),
+                              width: 100,
+                            ),
+                            _buildStatColumn(
+                              MeasurementUtils.formatCalories(user.stats.caloriesBurned.round()),
+                              width: 100,
+                            ),
+                            _buildStatColumn(
+                              _formatPowerPoints(user.stats.powerPoints),
+                              width: 100,
+                              isPowerPoints: true,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -141,42 +148,70 @@ class LeaderboardRow extends StatelessWidget {
     );
   }
 
+  /// Build the avatar, with a default if not provided
+  Widget _buildAvatar() {
+    final hasAvatar = user.avatarUrl != null && user.avatarUrl!.isNotEmpty;
+
+    Widget avatarWidget;
+    if (hasAvatar) {
+      avatarWidget = ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.network(
+          user.avatarUrl!,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+        ),
+      );
+    } else {
+      String assetPath = (user.gender == 'female')
+          ? 'assets/images/lady rucker profile.png'
+          : 'assets/images/profile.png';
+      avatarWidget = ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.asset(
+          assetPath,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        avatarWidget,
+        if (user.isCurrentlyRucking)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white,
+                  width: 2,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   /// Build user column with avatar and name
   Widget _buildUserColumn(BuildContext context) {
     return SizedBox(
-      width: 140, // Fixed width for user column
+      width: 150, // Adjusted user column width
       child: Padding(
-        padding: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           children: [
             // Avatar
-            Stack(
-              children: [
-                UserAvatar(
-                  avatarUrl: user.avatarUrl,
-                  username: user.username,
-                  size: 36,
-                ),
-                // Live indicator for currently rucking
-                if (user.isCurrentlyRucking)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            _buildAvatar(),
             const SizedBox(width: 12),
             
             // Username and live status
@@ -185,7 +220,7 @@ class LeaderboardRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '@${user.username}',
+                    user.username,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -228,10 +263,9 @@ class LeaderboardRow extends StatelessWidget {
   /// Build stat column
   Widget _buildStatColumn(
     String value, {
-    int flex = 1,
+    double width = 60.0, // Default width
     bool isPowerPoints = false,
   }) {
-    double width = flex == 1 ? 50.0 : 80.0; // Base width and wider for multi-flex columns
     return SizedBox(
       width: width,
       child: Text(
