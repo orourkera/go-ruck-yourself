@@ -291,7 +291,7 @@ class LeaderboardRow extends StatelessWidget {
   void _navigateToProfile(BuildContext context) {
     Navigator.pushNamed(
       context,
-      '/profile/${user.id}',
+      '/profile/${user.userId}',
     );
   }
 

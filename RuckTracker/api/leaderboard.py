@@ -158,8 +158,7 @@ class LeaderboardResource(Resource):
                     # Check if user is currently rucking (has active session)
                     # Only count sessions that are recent (within last 4 hours) to avoid old stuck sessions
                     is_currently_rucking = False
-                    from datetime import datetime, timedelta
-                    cutoff_time = datetime.utcnow() - timedelta(hours=4)
+                    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=4)
                     
                     for ruck in ruck_sessions:
                         if ruck.get('status') in ['in_progress', 'paused'] and not ruck.get('completed_at'):
