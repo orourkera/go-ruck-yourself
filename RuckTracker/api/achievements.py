@@ -35,7 +35,7 @@ class AchievementsResource(Resource):
             
             # Base query for active achievements - only select fields needed by frontend
             query = supabase.table('achievements').select(
-                'id, achievement_key, name, description, category, tier, target_value, unit, icon_name, power_points, created_at'
+                'id, achievement_key, name, description, category, tier, criteria, icon_name, is_active, created_at, updated_at, unit_preference'
             ).eq('is_active', True)
             
             # Filter by unit preference: include universal (null) achievements and user's preferred unit
