@@ -40,8 +40,15 @@ class NotificationsResource(Resource):
             # Get Supabase client
             supabase_client = get_supabase_admin_client()
             
-            # Query notifications from Supabase - sort by newest first
-            response = supabase_client.table('notifications').select('*').eq('recipient_id', user_id).order('created_at', desc=True).execute()
+            # Get pagination parameters
+            page = int(request.args.get('page', 1))
+            limit = min(int(request.args.get('limit', 50)), 100)  # Cap at 100
+            offset = (page - 1) * limit
+            
+            # Query notifications from Supabase - only select needed fields with pagination
+            response = supabase_client.table('notifications').select(
+                'id, type, message, data, is_read, read_at, created_at, sender_id, duel_id, event_id, club_id'
+            ).eq('recipient_id', user_id).order('created_at', desc=True).range(offset, offset + limit - 1).execute()
             
             if hasattr(response, 'error') and response.error:
                 logger.error(f"Error fetching notifications: {response.error}")
@@ -49,10 +56,13 @@ class NotificationsResource(Resource):
                 
             notifications = response.data
             
-            # Format the response
+            # Format the response with pagination info
             return jsonify({
                 "notifications": notifications,
-                "count": len(notifications)
+                "count": len(notifications),
+                "page": page,
+                "limit": limit,
+                "has_more": len(notifications) == limit
             })
             
         except Exception as e:

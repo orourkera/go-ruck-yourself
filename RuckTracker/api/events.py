@@ -74,35 +74,61 @@ class EventsListResource(Resource):
             # Execute query
             result = query.execute()
             
+            if not result.data:
+                return {'events': [], 'total': 0}, 200
+            
+            event_ids = [event['id'] for event in result.data]
+            club_ids = list(set(event.get('club_id') for event in result.data if event.get('club_id')))
+            
+            # Batch query 1: Get all participant counts at once
+            participant_counts = {}
+            if event_ids:
+                # Get participant counts grouped by event_id
+                participant_result = admin_client.table('event_participants').select(
+                    'event_id', count='exact'
+                ).in_('event_id', event_ids).eq('status', 'approved').execute()
+                
+                # Since Supabase doesn't group by event_id in count queries, we need to get all participants
+                all_participants = admin_client.table('event_participants').select(
+                    'event_id'
+                ).in_('event_id', event_ids).eq('status', 'approved').execute()
+                
+                # Count participants per event
+                for participant in all_participants.data:
+                    event_id = participant['event_id']
+                    participant_counts[event_id] = participant_counts.get(event_id, 0) + 1
+            
+            # Batch query 2: Get user's participation status for all events
+            user_participations = {}
+            if current_user_id and event_ids:
+                participation_result = admin_client.table('event_participants').select(
+                    'event_id, status'
+                ).in_('event_id', event_ids).eq('user_id', current_user_id).execute()
+                
+                for participation in participation_result.data:
+                    user_participations[participation['event_id']] = participation['status']
+            
+            # Batch query 3: Get all club info at once
+            clubs_data = {}
+            if club_ids:
+                clubs_result = admin_client.table('clubs').select(
+                    'id, name, logo_url'
+                ).in_('id', club_ids).execute()
+                
+                for club in clubs_result.data:
+                    clubs_data[club['id']] = club
+            
+            # Build enriched events list
             events = []
             for event in result.data:
-                logger.info(f"Processing event: {event['id']}")
-                
-                # Get participant count
-                participant_count_result = admin_client.table('event_participants').select('id', count='exact').eq('event_id', event['id']).eq('status', 'approved').execute()
-                participant_count = participant_count_result.count or 0
-                
-                # Check user's participation status
-                user_participation = None
-                if current_user_id:
-                    participation_result = admin_client.table('event_participants').select('status').eq('event_id', event['id']).eq('user_id', current_user_id).execute()
-                    user_participation = participation_result.data[0]['status'] if participation_result.data else None
-                
-                # Enrich with club data if applicable
-                hosting_club_data = None
-                if event.get('club_id'):
-                    try:
-                        club_result = admin_client.table('clubs').select('id, name, logo_url').eq('id', event['club_id']).execute()
-                        hosting_club_data = club_result.data[0] if club_result.data else None
-                    except Exception as club_fetch_error:
-                        logger.error(f"Error fetching club data for event {event['id']}: {club_fetch_error}")
+                event_id = event['id']
                 
                 event_data = {
                     **event,
-                    'participant_count': participant_count,
-                    'user_participation_status': user_participation,
+                    'participant_count': participant_counts.get(event_id, 0),
+                    'user_participation_status': user_participations.get(event_id),
                     'is_creator': event['creator_user_id'] == current_user_id,
-                    'hosting_club': hosting_club_data  # Map clubs field to hosting_club for frontend
+                    'hosting_club': clubs_data.get(event.get('club_id'))
                 }
                 
                 events.append(event_data)
