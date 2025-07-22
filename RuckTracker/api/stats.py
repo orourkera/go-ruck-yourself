@@ -105,7 +105,7 @@ def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at
 class WeeklyStatsResource(Resource):
     def get(self):
         """Get aggregated stats for the current week."""
-        logger.info(f"[STATS_PERF] WeeklyStatsResource.get called for user_id={getattr(g, 'user', {}).get('id', 'unknown')}")
+        logger.info(f"[STATS_PERF] WeeklyStatsResource.get called for user_id={g.user.id if hasattr(g, 'user') else 'unknown'}")
         
         if not hasattr(g, 'user') or g.user is None:
             logger.warning("[STATS_PERF] WeeklyStatsResource: User not authenticated")
@@ -162,7 +162,7 @@ class MonthlyStatsResource(Resource):
     def get(self):
         """Get aggregated stats for the current month."""
         start_time = time.time()
-        logger.info(f"[STATS_PERF] MonthlyStatsResource.get called for user_id={getattr(g, 'user', {}).get('id', 'unknown')}")
+        logger.info(f"[STATS_PERF] MonthlyStatsResource.get called for user_id={getattr(g.user, 'id', 'unknown') if hasattr(g, 'user') else 'unknown'}")
         
         if not hasattr(g, 'user') or g.user is None:
             logger.warning("[STATS_PERF] MonthlyStatsResource: User not authenticated")
