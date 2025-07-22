@@ -16,6 +16,12 @@ enum ErrorSeverity {
 class AppErrorHandler {
   static final _apiClient = GetIt.instance<ApiClient>();
   
+  // Simple rate limiting for Sentry to prevent quota exhaustion
+  static DateTime? _lastSentryError;
+  static int _sentryErrorCount = 0;
+  static const int _maxSentryErrorsPerHour = 50;
+  static const Duration _sentryRateLimitWindow = Duration(hours: 1);
+  
   /// Handle ANY app error with comprehensive logging and monitoring
   static Future<void> handleError(
     String operation,
@@ -43,8 +49,22 @@ class AppErrorHandler {
         break;
     }
     
+    // Check Sentry rate limiting before sending
+    final now = DateTime.now();
+    if (_lastSentryError == null || now.difference(_lastSentryError!) > _sentryRateLimitWindow) {
+      // Reset counter after time window
+      _sentryErrorCount = 0;
+      _lastSentryError = now;
+    }
+    
+    if (_sentryErrorCount >= _maxSentryErrorsPerHour) {
+      AppLogger.warning('Sentry rate limit reached ($_maxSentryErrorsPerHour errors/hour) - skipping error report for: $operation');
+      return;
+    }
+    
     // Send to Sentry with appropriate level based on severity
     try {
+      _sentryErrorCount++; // Increment counter before sending
       // Only send exceptions for error/fatal levels, use messages for warnings/info/debug
       if (severity == ErrorSeverity.error || severity == ErrorSeverity.fatal) {
         await Sentry.captureException(
@@ -119,7 +139,18 @@ class AppErrorHandler {
         );
       }
     } catch (sentryError) {
-      AppLogger.error('Failed to send error to Sentry: $sentryError');
+      // Handle Sentry rate limiting and API errors gracefully
+      final errorString = sentryError.toString();
+      if (errorString.contains('rate') || errorString.contains('limit') || errorString.contains('429') || errorString.contains('quota')) {
+        AppLogger.warning('Sentry rate limit reached - error reporting temporarily disabled: $sentryError');
+      } else if (errorString.contains('ApiException') || errorString.contains('network')) {
+        AppLogger.warning('Sentry network error - error reporting failed: $sentryError');
+      } else {
+        AppLogger.error('Failed to send error to Sentry: $sentryError');
+      }
+      
+      // Don't propagate Sentry errors - they're secondary issues
+      // The original error is already logged locally above
     }
     
     // Backend error reporting disabled - endpoint not available

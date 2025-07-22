@@ -120,7 +120,7 @@ else:
     limiter = Limiter(
         get_remote_address,
         app=app,
-        default_limits=["10000 per day", "2000 per hour"],  # Normal production limits
+        default_limits=["50000 per day", "20000 per hour"],  # Very generous limits for active users
         storage_uri=redis_url,
         strategy="fixed-window",
         swallow_errors=True
@@ -299,8 +299,8 @@ from .api.test_notification import TestNotificationResource
 from .api.leaderboard import LeaderboardResource, LeaderboardMyRankResource
 
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
-app.logger.info("Setting RefreshTokenResource rate limit to: 30 per minute")
-rate_limit_resource(RefreshTokenResource, "30 per minute")
+app.logger.info("RefreshTokenResource: Using default rate limits (20000/hour)")
+# rate_limit_resource(RefreshTokenResource, "30 per minute")  # Disabled - too restrictive
 
 # Note: Removed overly restrictive SignInResource rate limit (was 5 per minute)
 # SignInResource now uses default limits: 10000 per day, 2000 per hour
@@ -415,9 +415,9 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 
 # Ruck session endpoints (prefixed with /api)
 # Apply rate limit to RuckSessionListResource GET endpoint
-app.logger.info(f"Setting RuckSessionListResource rate limit to: 6000 per hour (100 per minute)")
-# Allow up to 100 requests per minute (6000 per hour) per user/IP
-RuckSessionListResource.get = conditional_rate_limit("100 per minute", key_func=get_user_id)(RuckSessionListResource.get)
+app.logger.info(f"Setting RuckSessionListResource rate limit to: 18000 per hour (300 per minute)")
+# Allow up to 300 requests per minute (18000 per hour) per user/IP - very generous for home screen
+RuckSessionListResource.get = conditional_rate_limit("300 per minute", key_func=get_user_id)(RuckSessionListResource.get)
 api.add_resource(RuckSessionListResource, '/api/rucks')
 api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
 api.add_resource(RuckSessionStartResource, '/api/rucks/start')

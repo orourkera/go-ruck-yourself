@@ -1091,26 +1091,57 @@ class SessionRepository {
     }
   }
   
-  /// Get the current authenticated user's ID
+  // Cache the user ID to avoid repeated API calls
+  String? _cachedUserId;
+  DateTime? _userIdCacheTime;
+  static const Duration _userIdCacheDuration = Duration(minutes: 30);
+
+  /// Get the current authenticated user's ID with caching
   /// 
-  /// This checks for the user ID from API or session data
+  /// This checks for cached ID first, then API, then SharedPreferences
   Future<String?> getCurrentUserId() async {
     try {
-      // Try to get the user profile from API
-                final response = await _apiClient.get('/users/profile');
-      if (response != null && response['id'] != null) {
-        return response['id'].toString();
+      // Check if we have a valid cached user ID
+      if (_cachedUserId != null && 
+          _userIdCacheTime != null && 
+          DateTime.now().difference(_userIdCacheTime!).abs() < _userIdCacheDuration) {
+        return _cachedUserId;
       }
       
-      // Fallback: try to get from shared preferences (if stored during login)
+      // Try to get from SharedPreferences first (faster than API call)
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('user_id');
+      String? userId = prefs.getString('user_id');
+      
+      // If SharedPreferences doesn't have it, try API (last resort)
+      if (userId == null) {
+        final response = await _apiClient.get('/users/profile');
+        if (response != null && response['id'] != null) {
+          userId = response['id'].toString();
+          // Store in SharedPreferences for next time
+          await prefs.setString('user_id', userId);
+        }
+      }
+      
+      // Cache the result if we found one
+      if (userId != null) {
+        _cachedUserId = userId;
+        _userIdCacheTime = DateTime.now();
+      }
+      
+      return userId;
     } catch (e) {
       AppLogger.error('Error getting current user ID: $e');
-      return null;
+      // Try to return cached value even if API fails
+      return _cachedUserId;
     }
   }
-  
+
+  /// Clear the cached user ID (call on logout)
+  void clearUserIdCache() {
+    _cachedUserId = null;
+    _userIdCacheTime = null;
+  }
+
   /// Delete a photo
   /// 
   /// Takes a RuckPhoto object and deletes it using the backend API

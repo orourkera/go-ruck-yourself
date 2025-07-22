@@ -7,6 +7,7 @@ import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Screen for displaying statistics and analytics
 class StatisticsScreen extends StatefulWidget {
@@ -32,12 +33,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
+    AppLogger.info('[STATS_SCREEN] Initializing StatisticsScreen');
     _tabController = TabController(length: 3, vsync: this);
+    AppLogger.info('[STATS_SCREEN] TabController created with 3 tabs');
     // Don't fetch data immediately - use lazy loading when user actually views this tab
   }
   
   @override
   void dispose() {
+    AppLogger.info('[STATS_SCREEN] Disposing StatisticsScreen');
     final route = ModalRoute.of(context);
     if (route is PageRoute) {
       final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
@@ -49,9 +53,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   
   /// Fetch statistics data from API
   Future<void> _fetchStatistics() async {
+    AppLogger.info('[STATS_SCREEN] Starting to fetch statistics data');
+    
     try {
       // Fetch weekly stats
+      AppLogger.info('[STATS_SCREEN] Fetching weekly stats from /stats/weekly');
       final weeklyResponse = await _apiClient.get('/stats/weekly');
+      AppLogger.info('[STATS_SCREEN] Weekly stats API response: ${weeklyResponse?.runtimeType}');
       
       // Process weekly stats
       Map<String, dynamic> weeklyStats = {};
@@ -65,14 +73,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       }
       
       if (mounted) {
+        AppLogger.info('[STATS_SCREEN] Processing weekly stats - keys: ${weeklyStats.keys.toList()}');
         setState(() {
           _weeklyStats = weeklyStats;
           _isLoadingWeekly = false;
         });
+        AppLogger.info('[STATS_SCREEN] Weekly stats loaded successfully');
+      } else {
+        AppLogger.warning('[STATS_SCREEN] Widget not mounted when weekly stats returned');
       }
       
       // Fetch monthly stats
+      AppLogger.info('[STATS_SCREEN] Fetching monthly stats from /stats/monthly');
       final monthlyResponse = await _apiClient.get('/stats/monthly');
+      AppLogger.info('[STATS_SCREEN] Monthly stats API response: ${monthlyResponse?.runtimeType}');
       
       // Process monthly stats
       Map<String, dynamic> monthlyStats = {};
@@ -87,14 +101,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       
       // Update state with monthly stats
       if (mounted) {
+        AppLogger.info('[STATS_SCREEN] Processing monthly stats - keys: ${monthlyStats.keys.toList()}');
         setState(() {
           _monthlyStats = monthlyStats;
           _isLoadingMonthly = false;
         });
+        AppLogger.info('[STATS_SCREEN] Monthly stats loaded successfully');
+      } else {
+        AppLogger.warning('[STATS_SCREEN] Widget not mounted when monthly stats returned');
       }
       
       // Fetch yearly stats
+      AppLogger.info('[STATS_SCREEN] Fetching yearly stats from /stats/yearly');
       final yearlyResponse = await _apiClient.get('/stats/yearly');
+      AppLogger.info('[STATS_SCREEN] Yearly stats API response: ${yearlyResponse?.runtimeType}');
       
       // Process yearly stats
       Map<String, dynamic> yearlyStats = {};
@@ -109,30 +129,41 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       
       // Update state with yearly stats
       if (mounted) {
+        AppLogger.info('[STATS_SCREEN] Processing yearly stats - keys: ${yearlyStats.keys.toList()}');
         setState(() {
           _yearlyStats = yearlyStats;
           _isLoadingYearly = false;
         });
+        AppLogger.info('[STATS_SCREEN] All statistics loaded successfully!');
+      } else {
+        AppLogger.warning('[STATS_SCREEN] Widget not mounted when yearly stats returned');
       }
       
     } catch (e) {
-    // Enhanced error handling with Sentry
-    await AppErrorHandler.handleError(
-      'statistics_fetch',
-      e,
-      context: {
-        'screen': 'statistics',
+      AppLogger.error('[STATS_SCREEN] Error fetching statistics: $e');
+      AppLogger.error('[STATS_SCREEN] Stack trace: ${StackTrace.current}');
+      
+      // Enhanced error handling with Sentry
+      await AppErrorHandler.handleError(
+        'statistics_fetch',
+        e,
+        context: {
+          'screen': 'statistics',
         'current_tab': _tabController.index,
       },
       sendToBackend: true,
     );
     
     if (mounted) {
+      AppLogger.error('[STATS_SCREEN] Setting error states - stopping all loading indicators');
       setState(() {
         _isLoadingWeekly = false;
         _isLoadingMonthly = false;
         _isLoadingYearly = false;
       });
+      AppLogger.info('[STATS_SCREEN] Error states set successfully');
+    } else {
+      AppLogger.warning('[STATS_SCREEN] Widget not mounted when handling error');
     }
     }
   }
@@ -140,21 +171,30 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final route = ModalRoute.of(context);
-    if (route is PageRoute) {
-      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
-      routeObserver?.subscribe(this, route);
+    AppLogger.info('[STATS_SCREEN] didChangeDependencies called - hasLoadedData: $_hasLoadedData');
+    
+    // Only fetch data when the screen is actually visited and if not already loaded
+    if (!_hasLoadedData) {
+      AppLogger.info('[STATS_SCREEN] Data not loaded yet, fetching statistics...');
+      _fetchStatistics();
+      _hasLoadedData = true;
+    } else {
+      AppLogger.info('[STATS_SCREEN] Data already loaded, skipping fetch');
     }
   }
 
   @override
   void didPopNext() {
+    AppLogger.info('[STATS_SCREEN] didPopNext called - returning to statistics screen');
     // Called when returning to this screen
     _fetchStatistics();
   }
   
   @override
   Widget build(BuildContext context) {
+    AppLogger.info('[STATS_SCREEN] Building StatisticsScreen - loading states: weekly=$_isLoadingWeekly, monthly=$_isLoadingMonthly, yearly=$_isLoadingYearly');
+    AppLogger.info('[STATS_SCREEN] Data states: weeklyEmpty=${_weeklyStats.isEmpty}, monthlyEmpty=${_monthlyStats.isEmpty}, yearlyEmpty=${_yearlyStats.isEmpty}');
+    
     // Get user's metric preference
     bool preferMetric = true;
     final authState = context.read<AuthBloc>().state;
@@ -189,36 +229,63 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
               children: [
                 // Weekly tab
                 _isLoadingWeekly
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Builder(builder: (context) {
+                        AppLogger.info('[STATS_SCREEN] Showing weekly loading indicator');
+                        return const Center(child: CircularProgressIndicator());
+                      })
                     : _weeklyStats.isEmpty
-                        ? const _EmptyStatsWidget(timeframe: 'weekly')
-                        : _StatsContentWidget(
-                            stats: _weeklyStats,
-                            timeframe: 'weekly',
-                            preferMetric: preferMetric,
-                          ),
+                        ? Builder(builder: (context) {
+                            AppLogger.info('[STATS_SCREEN] Showing weekly empty state');
+                            return const _EmptyStatsWidget(timeframe: 'weekly');
+                          })
+                        : Builder(builder: (context) {
+                            AppLogger.info('[STATS_SCREEN] Showing weekly stats content');
+                            return _StatsContentWidget(
+                              stats: _weeklyStats,
+                              timeframe: 'weekly',
+                              preferMetric: preferMetric,
+                            );
+                          }),
                 
                 // Monthly tab
                 _isLoadingMonthly
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Builder(builder: (context) {
+                        AppLogger.info('[STATS_SCREEN] Showing monthly loading indicator');
+                        return const Center(child: CircularProgressIndicator());
+                      })
                     : _monthlyStats.isEmpty
-                        ? const _EmptyStatsWidget(timeframe: 'monthly')
-                        : _StatsContentWidget(
-                            stats: _monthlyStats,
-                            timeframe: 'monthly',
-                            preferMetric: preferMetric,
-                          ),
+                        ? Builder(builder: (context) {
+                            AppLogger.info('[STATS_SCREEN] Showing monthly empty state');
+                            return const _EmptyStatsWidget(timeframe: 'monthly');
+                          })
+                        : Builder(builder: (context) {
+                            AppLogger.info('[STATS_SCREEN] Showing monthly stats content');
+                            return _StatsContentWidget(
+                              stats: _monthlyStats,
+                              timeframe: 'monthly',
+                              preferMetric: preferMetric,
+                            );
+                          }),
                 
                 // Yearly tab
                 _isLoadingYearly
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Builder(builder: (context) {
+                        AppLogger.info('[STATS_SCREEN] Showing yearly loading indicator');
+                        return const Center(child: CircularProgressIndicator());
+                      })
                     : _yearlyStats.isEmpty
-                        ? const _EmptyStatsWidget(timeframe: 'yearly')
-                        : _StatsContentWidget(
-                            stats: _yearlyStats,
-                            timeframe: 'yearly',
-                            preferMetric: preferMetric,
-                          ),
+                        ? Builder(builder: (context) {
+                            AppLogger.info('[STATS_SCREEN] Showing yearly empty state');
+                            return const _EmptyStatsWidget(timeframe: 'yearly');
+                          })
+                        : Builder(builder: (context) {
+                            AppLogger.info('[STATS_SCREEN] Showing yearly stats content');
+                            return _StatsContentWidget(
+                              stats: _yearlyStats,
+                              timeframe: 'yearly',
+                              preferMetric: preferMetric,
+                            );
+                          }),
               ],
             ),
           ),

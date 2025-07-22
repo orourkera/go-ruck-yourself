@@ -301,9 +301,9 @@ Dio _configureDio() {
   final Dio dio = Dio(
     BaseOptions(
       baseUrl: AppConfig.apiBaseUrl, // Use AppConfig for environment switching
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 8), // Reduced from 15s to 8s for better UX
-      sendTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 15), // Increased for poor network conditions
+      receiveTimeout: const Duration(seconds: 30), // Increased from 8s to 30s for server load and slow networks
+      sendTimeout: const Duration(seconds: 15), // Increased for large uploads
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

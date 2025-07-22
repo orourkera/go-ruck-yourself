@@ -6,6 +6,7 @@ import '../bloc/duel_stats/duel_stats_state.dart';
 import '../widgets/user_stats_card.dart';
 import '../widgets/stats_leaderboard_widget.dart';
 import '../../../../shared/theme/app_colors.dart';
+import '../../../../core/utils/app_logger.dart';
 
 class DuelStatsScreen extends StatefulWidget {
   const DuelStatsScreen({super.key});
@@ -20,7 +21,9 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
   @override
   void initState() {
     super.initState();
+    AppLogger.info('[DUEL_STATS_SCREEN] Initializing DuelStatsScreen');
     _tabController = TabController(length: 4, vsync: this);
+    AppLogger.info('[DUEL_STATS_SCREEN] Triggering LoadUserDuelStats event');
     context.read<DuelStatsBloc>().add(const LoadUserDuelStats());
   }
 
@@ -50,11 +53,15 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
       ),
       body: BlocBuilder<DuelStatsBloc, DuelStatsState>(
         builder: (context, state) {
+          AppLogger.info('[DUEL_STATS_SCREEN] BlocBuilder state: ${state.runtimeType}');
+          
           if (state is DuelStatsLoading) {
+            AppLogger.info('[DUEL_STATS_SCREEN] Showing loading indicator');
             return const Center(
               child: CircularProgressIndicator(),
             );
           } else if (state is DuelStatsError) {
+            AppLogger.error('[DUEL_STATS_SCREEN] Showing error state: ${state.message}');
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -81,10 +88,24 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
               ),
             );
           } else if (state is UserDuelStatsLoaded) {
+            AppLogger.info('[DUEL_STATS_SCREEN] Showing loaded stats content');
             return _buildStatsContent(state);
+          } else if (state is DuelStatsLeaderboardLoaded) {
+            AppLogger.info('[DUEL_STATS_SCREEN] Got leaderboard-only state');
+            return const Center(
+              child: Text('Leaderboard loaded but no user stats'),
+            );
+          } else if (state is DuelStatsLeaderboardError) {
+            AppLogger.error('[DUEL_STATS_SCREEN] Leaderboard error: ${state.message}');
+            return Center(
+              child: Text('Leaderboard error: ${state.message}'),
+            );
           }
           
-          return const SizedBox.shrink();
+          AppLogger.warning('[DUEL_STATS_SCREEN] Unknown state: ${state.runtimeType}');
+          return const Center(
+            child: Text('Unknown state'),
+          );
         },
       ),
     );
