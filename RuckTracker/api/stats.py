@@ -1,4 +1,5 @@
 import logging
+import time
 from flask import g, jsonify
 from flask_restful import Resource
 from datetime import datetime, timedelta, timezone
@@ -160,23 +161,32 @@ class WeeklyStatsResource(Resource):
 class MonthlyStatsResource(Resource):
     def get(self):
         """Get aggregated stats for the current month."""
+        start_time = time.time()
+        logger.info(f"[STATS_PERF] MonthlyStatsResource.get called for user_id={getattr(g, 'user', {}).get('id', 'unknown')}")
+        
         if not hasattr(g, 'user') or g.user is None:
+            logger.warning("[STATS_PERF] MonthlyStatsResource: User not authenticated")
             return {'message': 'User not authenticated'}, 401
 
         try:
+            logger.info("[STATS_PERF] MonthlyStatsResource: Starting date calculations")
             today = datetime.now(timezone.utc)
             start_dt, end_dt = get_month_range(today)
             date_range_str = today.strftime('%B %Y')
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
+            logger.info(f"[STATS_PERF] MonthlyStatsResource: Date range calculated: {date_range_str}")
 
             cache_key = f"monthly_stats:{g.user.id}:{start_iso}:{end_iso}"
+            logger.info(f"[STATS_PERF] MonthlyStatsResource: Checking cache with key: {cache_key}")
             cached_response = cache_get(cache_key)
             if cached_response:
+                logger.info("[STATS_PERF] MonthlyStatsResource: Returning cached response")
                 return {'data': cached_response}, 200
 
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            logger.info(f"[STATS_PERF] MonthlyStatsResource: Executing query for user {g.user.id} from {start_iso} to {end_iso}")
             response = supabase.table('ruck_session') \
                 .select('distance_km, duration_seconds, calories_burned, completed_at') \
                 .eq('user_id', g.user.id) \
@@ -184,6 +194,7 @@ class MonthlyStatsResource(Resource):
                 .lte('completed_at', end_iso) \
                 .eq('status', 'completed') \
                 .execute()
+            logger.info(f"[STATS_PERF] MonthlyStatsResource: Query completed, got {len(response.data) if response.data else 0} sessions")
 
             if response.data is None:
                  logger.error(f"Supabase query error for monthly stats: {getattr(response, 'error', 'Unknown error')}")

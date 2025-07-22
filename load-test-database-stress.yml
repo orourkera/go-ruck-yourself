@@ -1,0 +1,105 @@
+config:
+  target: 'https://getrucky.com'
+  phases:
+    # Database write stress test - focus on location_point inserts
+    - duration: 60
+      arrivalRate: 5
+      name: "Location Insert Stress Test"
+    # Peak database load
+    - duration: 120
+      arrivalRate: 10
+      name: "Peak Database Writes"
+  defaults:
+    headers:
+      Authorization: 'Bearer {{ $env.BEARER_TOKEN }}'
+      User-Agent: 'Ruck-DB-Stress-Test/1.0'  
+      Content-Type: 'application/json'
+  processor: "./load-test-active-functions.js"
+
+scenarios:
+  - name: "High-Frequency Location Writes"
+    weight: 80
+    flow:
+      # Start session
+      - post:
+          url: "/api/rucks"
+          json:
+            weight_kg: 80
+            ruck_weight_kg: 25
+          capture:
+            - json: "$.data.id"
+              as: "session_id"
+      - think: 1
+      
+      # Stress test: Very frequent location posts
+      - loop:
+          - function: "generateLocationBatch"
+          - post:
+              url: "/api/rucks/{{ session_id }}/location"
+              json:
+                points: "{{ locationBatch }}"
+          - think: "{{ $randomInt(2, 5) }}"  # Very frequent (2-5 seconds)
+        count: 50  # Many writes
+      
+      # Complete session
+      - post:
+          url: "/api/rucks/{{ session_id }}/complete"
+          json:
+            distance_km: "{{ $randomFloat(10, 25) }}"
+            weight_kg: 80
+            ruck_weight_kg: 25
+            calories_burned: "{{ $randomInt(800, 1500) }}"
+            rating: 4
+            is_public: true
+
+  - name: "Batch Location Insert Test"
+    weight: 20
+    flow:
+      # Test large batch inserts
+      - post:
+          url: "/api/rucks"
+          json:
+            weight_kg: 70
+            ruck_weight_kg: 15
+          capture:
+            - json: "$.data.id"
+              as: "session_id"
+      
+      # Send fewer requests but with larger batches
+      - loop:
+          - post:
+              url: "/api/rucks/{{ session_id }}/location"
+              json:
+                points:
+                  - latitude: 40.7831
+                    longitude: -73.9656
+                    elevation_meters: 45
+                    timestamp: "2025-07-22T08:00:00Z"
+                  - latitude: 40.7833
+                    longitude: -73.9658
+                    elevation_meters: 47
+                    timestamp: "2025-07-22T08:00:30Z"
+                  - latitude: 40.7835
+                    longitude: -73.9660
+                    elevation_meters: 49
+                    timestamp: "2025-07-22T08:01:00Z"
+                  - latitude: 40.7837
+                    longitude: -73.9662
+                    elevation_meters: 51
+                    timestamp: "2025-07-22T08:01:30Z"
+                  - latitude: 40.7839
+                    longitude: -73.9664
+                    elevation_meters: 53
+                    timestamp: "2025-07-22T08:02:00Z"
+          - think: 10
+        count: 20
+      
+      # Complete
+      - post:
+          url: "/api/rucks/{{ session_id }}/complete"
+          json:
+            distance_km: 12.5
+            weight_kg: 70
+            ruck_weight_kg: 15
+            calories_burned: 750
+            rating: 5

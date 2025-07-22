@@ -1,0 +1,34 @@
+config:
+  target: 'https://getrucky.com'
+  phases:
+    # Quick 2-minute test
+    - duration: 60
+      arrivalRate: 5
+      name: "Light Load"
+    - duration: 60  
+      arrivalRate: 15
+      name: "Medium Load"
+  defaults:
+    headers:
+      Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Ikh0c3B6akIva0IxVnhQbmUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3pteGFwa2x2cmJhZnV3aGtlZmhmLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI5Zjg0MmNjMS1iOGY1LTQ1ODctYmFkMC03M2JjZjMwM2MxODMiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzUzMjkyNjE3LCJpYXQiOjE3NTMxNzI2MTcsImVtYWlsIjoibGFkeUBydWNrZXIuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJlbWFpbCI6ImxhZHlAcnVja2VyLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaG9uZV92ZXJpZmllZCI6ZmFsc2UsInN1YiI6IjlmODQyY2MxLWI4ZjUtNDU4Ny1iYWQwLTczYmNmMzAzYzE4MyJ9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzUzMTcyNjE3fV0sInNlc3Npb25faWQiOiJmNWY1ZjAwMy0zYzgzLTQ0ZjctODJmYS00Y2E1OTNkYTI3MzYiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.NI4gZ0d4PcfkqPwqte7ktinHYUwnXtXytgvgMqQAWLs'
+      User-Agent: 'Ruck-Quick-Test/1.0'
+
+scenarios:
+  - name: "Core Endpoints Test"
+    weight: 100
+    flow:
+      - get:
+          url: "/api/stats/monthly"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/api/rucks?limit=20"
+          expect:
+            - statusCode: 200  
+      - think: 2
+      - get:
+          url: "/api/leaderboard?limit=50"
+          expect:
+            - statusCode: 200
+      - think: 3

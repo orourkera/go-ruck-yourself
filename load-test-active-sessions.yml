@@ -1,0 +1,135 @@
+config:
+  target: 'https://getrucky.com'
+  phases:
+    # Warm-up - few users starting sessions
+    - duration: 60
+      arrivalRate: 1
+      name: "Warm-up: Start Sessions"
+    # Active rucking phase - users posting location data
+    - duration: 300  # 5 minutes of active rucking
+      arrivalRate: 3
+      name: "Active Rucking: Location Posts"
+    # Peak activity - more concurrent active sessions
+    - duration: 180  # 3 minutes peak
+      arrivalRate: 6
+      name: "Peak Activity: Heavy Location Data"
+    # Session completion phase
+    - duration: 120  # 2 minutes to complete sessions
+      arrivalRate: 2
+      name: "Completion: Save Sessions"
+  defaults:
+    headers:
+      Authorization: 'Bearer {{ $processEnvironment.BEARER_TOKEN }}'
+      User-Agent: 'Ruck-Active-Session-Test/1.0'
+      Content-Type: 'application/json'
+  processor: "./load-test-active-functions.js"
+
+scenarios:
+  - name: "Complete Ruck Session Journey"
+    weight: 70
+    flow:
+      # 1. Start a new ruck session
+      - post:
+          url: "/api/rucks"
+          json:
+            weight_kg: "{{ $randomInt(60, 100) }}"
+            ruck_weight_kg: "{{ $randomInt(10, 30) }}"
+          capture:
+            - json: "$.data.id"
+              as: "session_id"
+      - think: 2
+      
+      # 2. Simulate 20-30 location points over time (like a real ruck)
+      - loop:
+          - post:
+              url: "/api/rucks/{{ session_id }}/location"
+              json:
+                points: "{{ generateLocationBatch() }}"
+          - think: "{{ $randomInt(10, 20) }}"  # 10-20 seconds between location batches
+        count: "{{ $randomInt(20, 30) }}"  # 20-30 location updates
+      
+      # 3. Complete the session with final data
+      - post:
+          url: "/api/rucks/{{ session_id }}/complete"
+          json:
+            distance_km: "{{ $randomFloat(3, 15) }}"
+            weight_kg: "{{ $randomInt(60, 100) }}"
+            ruck_weight_kg: "{{ $randomInt(10, 30) }}"
+            calories_burned: "{{ $randomInt(300, 800) }}"
+            elevation_gain_m: "{{ $randomInt(0, 200) }}"
+            elevation_loss_m: "{{ $randomInt(0, 200) }}"
+            rating: "{{ $randomInt(3, 5) }}"
+            perceived_exertion: "{{ $randomInt(5, 10) }}"
+            is_public: true
+            notes: "Load test ruck session"
+
+  - name: "Quick Session (Short Ruck)"
+    weight: 20
+    flow:
+      # Start session
+      - post:
+          url: "/api/rucks" 
+          json:
+            weight_kg: "{{ $randomInt(60, 100) }}"
+            ruck_weight_kg: "{{ $randomInt(10, 20) }}"
+          capture:
+            - json: "$.data.id"
+              as: "session_id"
+      - think: 1
+      
+      # Just 5-10 location points (short ruck)
+      - loop:
+          - post:
+              url: "/api/rucks/{{ session_id }}/location"
+              json:
+                points: "{{ generateLocationBatch() }}"
+          - think: "{{ $randomInt(15, 25) }}"
+        count: "{{ $randomInt(5, 10) }}"
+      
+      # Complete quickly
+      - post:
+          url: "/api/rucks/{{ session_id }}/complete"
+          json:
+            distance_km: "{{ $randomFloat(1, 5) }}"
+            weight_kg: "{{ $randomInt(60, 100) }}"
+            ruck_weight_kg: "{{ $randomInt(10, 20) }}"
+            calories_burned: "{{ $randomInt(150, 400) }}"
+            rating: "{{ $randomInt(3, 5) }}"
+            is_public: false
+
+  - name: "Location Data Heavy (GPS Tracking Test)"
+    weight: 10
+    flow:
+      # Start session
+      - post:
+          url: "/api/rucks"
+          json:
+            weight_kg: 75
+            ruck_weight_kg: 20
+          capture:
+            - json: "$.data.id"
+              as: "session_id"
+      - think: 1
+      
+      # Simulate very active GPS tracking (high frequency location posts)
+      - loop:
+          - post:
+              url: "/api/rucks/{{ session_id }}/location"
+              json:
+                points: "{{ generateLocationBatch(10) }}"  # 10 points per batch
+          - think: "{{ $randomInt(5, 10) }}"  # Very frequent updates
+        count: 40  # Many location updates
+      
+      # Complete the intensive session
+      - post:
+          url: "/api/rucks/{{ session_id }}/complete"
+          json:
+            distance_km: "{{ $randomFloat(8, 20) }}"
+            weight_kg: 75
+            ruck_weight_kg: 20
+            calories_burned: "{{ $randomInt(600, 1200) }}"
+            elevation_gain_m: "{{ $randomInt(100, 500) }}"
+            rating: "{{ $randomInt(4, 5) }}"
+            perceived_exertion: "{{ $randomInt(7, 10) }}"
+            is_public: true
+            notes: "High-intensity GPS tracking test session"

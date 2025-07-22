@@ -103,14 +103,28 @@ redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 if redis_url.startswith('rediss://'):  # Heroku Redis uses rediss:// for SSL
     redis_url += '?ssl_cert_reqs=none'
 
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["10000 per day", "2000 per hour"],  # Increased from 500/hour to 2000/hour
-    storage_uri=redis_url,
-    strategy="fixed-window",
-    swallow_errors=True
-)
+# Feature flag for load testing - disable/increase rate limits
+LOAD_TESTING_MODE = os.environ.get('DISABLE_RATE_LIMITING', 'false').lower() == 'true'
+
+if LOAD_TESTING_MODE:
+    app.logger.warning("🚨 LOAD TESTING MODE: Rate limiting is DISABLED")
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=[],  # No default limits in load testing mode
+        storage_uri=redis_url,
+        strategy="fixed-window",
+        swallow_errors=True
+    )
+else:
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=["10000 per day", "2000 per hour"],  # Normal production limits
+        storage_uri=redis_url,
+        strategy="fixed-window",
+        swallow_errors=True
+    )
 limiter.init_app(app)
 
 # Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
@@ -134,18 +148,22 @@ app.logger.info(" Automatic memory profiler initialized - available at /api/syst
 
 # Apply rate limit to specific HTTP methods
 app.logger.info("Setting HeartRateSampleUploadResource rate limit to: 3600 per hour")
-HeartRateSampleUploadResource.get = limiter.limit("3600 per hour", override_defaults=True)(HeartRateSampleUploadResource.get)
-HeartRateSampleUploadResource.post = limiter.limit("3600 per hour", override_defaults=True)(HeartRateSampleUploadResource.post)
+HeartRateSampleUploadResource.get = conditional_rate_limit("3600 per hour")(HeartRateSampleUploadResource.get)
+HeartRateSampleUploadResource.post = conditional_rate_limit("3600 per hour")(HeartRateSampleUploadResource.post)
 
 # Define custom rate limits for specific endpoints
 @app.route("/api/auth/register", methods=["POST"])
-@limiter.limit("3 per hour")
+@conditional_rate_limit("3 per hour")
 def register_endpoint():
     # This just defines the rate limit, actual implementation is elsewhere
     pass
 
 # Use a decorator function to apply rate limiting to resources
 def rate_limit_resource(resource, limit):
+    if LOAD_TESTING_MODE:
+        logger.info(f"SKIPPING rate limit for {resource.__name__} due to LOAD_TESTING_MODE")
+        return resource
+    
     logger.info(f"Applying rate limit: {limit} to resource: {resource.__name__}")
     
     # Store the original dispatch_request method
@@ -159,6 +177,19 @@ def rate_limit_resource(resource, limit):
     # Replace the original method with our wrapped version
     resource.dispatch_request = wrapped_dispatch_request
     return resource
+
+# Helper function to conditionally apply rate limits based on load testing mode
+def conditional_rate_limit(limit_string, key_func=None, override_defaults=True):
+    """Returns a rate limiter decorator or a no-op decorator based on LOAD_TESTING_MODE"""
+    if LOAD_TESTING_MODE:
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
+    else:
+        if key_func:
+            return limiter.limit(limit_string, key_func=key_func, override_defaults=override_defaults)
+        else:
+            return limiter.limit(limit_string, override_defaults=override_defaults)
 
 
 
@@ -387,7 +418,7 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 # Apply rate limit to RuckSessionListResource GET endpoint
 app.logger.info(f"Setting RuckSessionListResource rate limit to: 6000 per hour (100 per minute)")
 # Allow up to 100 requests per minute (6000 per hour) per user/IP
-RuckSessionListResource.get = limiter.limit("100 per minute", key_func=get_user_id, override_defaults=True)(RuckSessionListResource.get)
+RuckSessionListResource.get = conditional_rate_limit("100 per minute", key_func=get_user_id)(RuckSessionListResource.get)
 api.add_resource(RuckSessionListResource, '/api/rucks')
 api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
 api.add_resource(RuckSessionStartResource, '/api/rucks/start')
@@ -398,7 +429,7 @@ api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete
 app.logger.info(f"Setting RuckSessionLocationResource rate limit to: 3600 per hour")
 # Directly patch the RuckSessionLocationResource methods with only the post method (no get method)
 try:
-    RuckSessionLocationResource.post = limiter.limit("3600 per hour", override_defaults=True)(RuckSessionLocationResource.post)
+    RuckSessionLocationResource.post = conditional_rate_limit("3600 per hour")(RuckSessionLocationResource.post)
     app.logger.info(f"Successfully applied rate limit to RuckSessionLocationResource.post")
 except AttributeError as e:
     app.logger.error(f"Failed to apply rate limit to RuckSessionLocationResource: {e}")
@@ -411,8 +442,11 @@ api.add_resource(RuckSessionEditResource, '/api/rucks/<int:ruck_id>/edit')
 # Heart rate sample upload resource
 api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
-# Stats Endpoints with higher rate limits
-app.logger.info("Setting stats resources rate limit to: 2000 per hour")
+# Stats Endpoints with rate limits (or disabled in load testing mode)
+if LOAD_TESTING_MODE:
+    app.logger.info("Stats resources: Rate limiting DISABLED for load testing")
+else:
+    app.logger.info("Setting stats resources rate limit to: 2000 per hour")
 rate_limit_resource(WeeklyStatsResource, "2000 per hour")
 rate_limit_resource(MonthlyStatsResource, "2000 per hour") 
 rate_limit_resource(YearlyStatsResource, "2000 per hour")
@@ -425,8 +459,8 @@ api.add_resource(YearlyStatsResource, '/api/stats/yearly', '/api/statistics/year
 
 # Set up rate limiting for photo uploads - 100 requests per minute per user
 app.logger.info(f"Setting RuckPhotosResource rate limit to: 100 per minute per user")
-RuckPhotosResource.get = limiter.limit("100 per minute", key_func=get_user_id, override_defaults=True)(RuckPhotosResource.get)
-RuckPhotosResource.post = limiter.limit("100 per minute", key_func=get_user_id, override_defaults=True)(RuckPhotosResource.post)
+RuckPhotosResource.get = conditional_rate_limit("100 per minute", key_func=get_user_id)(RuckPhotosResource.get)
+RuckPhotosResource.post = conditional_rate_limit("100 per minute", key_func=get_user_id)(RuckPhotosResource.post)
 
 # Now register the resource with modified methods
 api.add_resource(RuckPhotosResource, '/api/ruck-photos')
@@ -434,25 +468,25 @@ api.add_resource(RuckPhotosResource, '/api/ruck-photos')
 # Ruck Likes Endpoints
 app.logger.info(f"Setting RuckLikesResource rate limit to: 2000 per minute")
 # Directly patch the RuckLikesResource methods with the limiter decorator
-RuckLikesResource.get = limiter.limit("2000 per minute", override_defaults=True)(RuckLikesResource.get)
-RuckLikesResource.post = limiter.limit("2000 per minute", override_defaults=True)(RuckLikesResource.post)
-RuckLikesResource.delete = limiter.limit("2000 per minute", override_defaults=True)(RuckLikesResource.delete)
+RuckLikesResource.get = conditional_rate_limit("2000 per minute")(RuckLikesResource.get)
+RuckLikesResource.post = conditional_rate_limit("2000 per minute")(RuckLikesResource.post)
+RuckLikesResource.delete = conditional_rate_limit("2000 per minute")(RuckLikesResource.delete)
 
 # Now register the resource with modified methods
 api.add_resource(RuckLikesResource, '/api/ruck-likes', '/api/ruck-likes/check')
 
 # Ruck Likes Batch Endpoints
 app.logger.info(f"Setting RuckLikesBatchResource rate limit to: 100 per minute")
-RuckLikesBatchResource.get = limiter.limit("100 per minute", override_defaults=True)(RuckLikesBatchResource.get)
+RuckLikesBatchResource.get = conditional_rate_limit("100 per minute")(RuckLikesBatchResource.get)
 api.add_resource(RuckLikesBatchResource, '/api/ruck-likes/batch')
 
 # Ruck Comments Endpoints
 app.logger.info(f"Setting RuckCommentsResource rate limit to: 500 per minute")
 # Directly patch the RuckCommentsResource methods with the limiter decorator
-RuckCommentsResource.get = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.get)
-RuckCommentsResource.post = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.post)
-RuckCommentsResource.put = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.put)
-RuckCommentsResource.delete = limiter.limit("500 per minute", override_defaults=True)(RuckCommentsResource.delete)
+RuckCommentsResource.get = conditional_rate_limit("500 per minute")(RuckCommentsResource.get)
+RuckCommentsResource.post = conditional_rate_limit("500 per minute")(RuckCommentsResource.post)
+RuckCommentsResource.put = conditional_rate_limit("500 per minute")(RuckCommentsResource.put)
+RuckCommentsResource.delete = conditional_rate_limit("500 per minute")(RuckCommentsResource.delete)
 
 # Now register the resource with modified methods
 api.add_resource(RuckCommentsResource, '/api/rucks/<int:ruck_id>/comments')
@@ -460,7 +494,7 @@ api.add_resource(RuckCommentsResource, '/api/rucks/<int:ruck_id>/comments')
 # Register notification resources with higher rate limits
 app.logger.info(f"Setting NotificationsResource rate limit to: 4000 per hour")
 # Apply higher rate limit to notification endpoints - only for GET method (POST doesn't exist)
-NotificationsResource.get = limiter.limit("4000 per hour", override_defaults=True)(NotificationsResource.get)
+NotificationsResource.get = conditional_rate_limit("4000 per hour")(NotificationsResource.get)
 
 # Register notification resources
 api.add_resource(NotificationsResource, '/api/notifications')
@@ -653,7 +687,7 @@ bileUrl += '?access_token=' + encodeURIComponent(tokens.access_token);
     return html_content
 
 @app.route('/api/auth/password-reset-confirm', methods=['POST'])
-@limiter.limit("5 per minute")
+@conditional_rate_limit("5 per minute")
 def password_reset_confirm():
     """
     Confirm password reset with new password.

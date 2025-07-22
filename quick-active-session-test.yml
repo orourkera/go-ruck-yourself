@@ -1,0 +1,57 @@
+config:
+  target: 'https://getrucky.com'
+  phases:
+    # Quick 3-minute test of active session workflow
+    - duration: 180
+      arrivalRate: 2
+      name: "Quick Active Session Test"
+  defaults:
+    headers:
+      Authorization: 'Bearer {{ $env.BEARER_TOKEN }}'
+      User-Agent: 'Ruck-Quick-Active-Test/1.0'
+      Content-Type: 'application/json'
+  processor: "./load-test-active-functions.js"
+
+scenarios:
+  - name: "Mini Ruck Session"
+    weight: 100
+    flow:
+      # 1. Start session
+      - function: "generateSessionDuration"
+      - post:
+          url: "/api/rucks"
+          json:
+            weight_kg: 75
+            ruck_weight_kg: 20
+          expect:
+            - statusCode: [200, 201]
+          capture:
+            - json: "$.data.id"
+              as: "session_id"
+      - think: 2
+      
+      # 2. Post 3-5 location batches (simulate short ruck)
+      - loop:
+          - function: "generateLocationBatch"
+          - post:
+              url: "/api/rucks/{{ session_id }}/location"
+              json:
+                points: "{{ locationBatch }}"
+              expect:
+                - statusCode: [200, 201]
+          - think: "{{ $randomInt(8, 15) }}"  # 8-15 seconds between updates
+        count: "{{ $randomInt(3, 5) }}"
+      
+      # 3. Complete session
+      - post:
+          url: "/api/rucks/{{ session_id }}/complete"
+          json:
+            distance_km: "{{ $randomFloat(2, 6) }}"
+            weight_kg: 75
+            ruck_weight_kg: 20
+            calories_burned: "{{ $randomInt(200, 500) }}"
+            rating: "{{ $randomInt(3, 5) }}"
+            is_public: false
+            notes: "Quick load test session"
+          expect:
+            - statusCode: [200, 201]

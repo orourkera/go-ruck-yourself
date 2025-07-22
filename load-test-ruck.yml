@@ -1,0 +1,123 @@
+config:
+  target: 'https://getrucky.com'
+  phases:
+    # Warm-up phase
+    - duration: 30
+      arrivalRate: 2
+      name: "Warm-up"
+    # Baseline load
+    - duration: 120  
+      arrivalRate: 5
+      name: "Baseline Load"
+    # Moderate load
+    - duration: 180
+      arrivalRate: 10
+      name: "Moderate Load" 
+    # High load test
+    - duration: 120
+      arrivalRate: 20
+      name: "High Load"
+    # Cool down
+    - duration: 60
+      arrivalRate: 2
+      name: "Cool Down"
+  defaults:
+    headers:
+      Authorization: 'Bearer {{ $processEnvironment.BEARER_TOKEN }}'
+      User-Agent: 'Ruck-Load-Test/1.0'
+  processor: "./load-test-functions.js"
+
+scenarios:
+  - name: "Typical User Journey"
+    weight: 60
+    flow:
+      # Home screen loads monthly stats
+      - get:
+          url: "/api/stats/monthly"
+          capture:
+            - json: "$.data.total_sessions"
+              as: "total_sessions"
+      - think: 2
+      
+      # Load recent rucks 
+      - get:
+          url: "/api/rucks?limit=20"
+          capture:
+            - json: "$.data[0].id"
+              as: "first_ruck_id"
+      - think: 3
+      
+      # Check leaderboard occasionally
+      - get:
+          url: "/api/leaderboard?limit=50"
+      - think: 5
+
+  - name: "Power User Journey"
+    weight: 25
+    flow:
+      # Check all stats
+      - get:
+          url: "/api/stats/weekly"
+      - think: 1
+      - get:
+          url: "/api/stats/monthly"  
+      - think: 1
+      - get:
+          url: "/api/stats/yearly"
+      - think: 2
+      
+      # Load more rucks
+      - get:
+          url: "/api/rucks?limit=50"
+          capture:
+            - json: "$.data[0].id"
+              as: "ruck_id"
+      - think: 3
+      
+      # View specific ruck details
+      - get:
+          url: "/api/rucks/{{ ruck_id }}"
+          ifTrue: "ruck_id"
+      - think: 5
+      
+      # Check leaderboard position
+      - get:
+          url: "/api/leaderboard?limit=100"
+      - think: 2
+
+  - name: "Social User Journey"
+    weight: 15
+    flow:
+      # Focus on social features
+      - get:
+          url: "/api/leaderboard?sortBy=powerPoints&limit=100"
+      - think: 3
+      
+      # Check user profiles (simulate browsing top users)
+      - function: "getRandomUserId"
+      - get:
+          url: "/api/users/{{ userId }}/profile"
+          capture:
+            - json: "$.data.user.id"
+              as: "viewed_user_id"
+      - think: 4
+      
+      # Load rucks list
+      - get:
+          url: "/api/rucks?limit=10"
+      - think: 6
+
+  - name: "API Health Check"
+    weight: 5
+    flow:
+      # Basic health monitoring
+      - get:
+          url: "/api/stats/monthly"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data"
+      - get:
+          url: "/api/rucks?limit=5"  
+          expect:
+            - statusCode: 200
+            - hasProperty: "data"
