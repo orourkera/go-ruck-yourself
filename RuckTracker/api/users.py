@@ -1,6 +1,9 @@
 from flask import Blueprint, request, jsonify, g
 from RuckTracker.utils.api_response import api_response, api_error
 from RuckTracker.supabase_client import get_supabase_client
+import logging
+
+logger = logging.getLogger(__name__)
 
 users_bp = Blueprint('users', __name__)
 
