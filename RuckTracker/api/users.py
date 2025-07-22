@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, g
 from RuckTracker.utils.api_response import api_response, api_error
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
+from RuckTracker.services.redis_cache_service import cache_get, cache_set
 import logging
 
 logger = logging.getLogger(__name__)
@@ -91,65 +92,82 @@ def get_public_profile(user_id):
 
             # Calculate stats directly from ruck_session table instead of user_profile_stats
             try:
-                sessions_start = time.time()
-                # Get completed sessions for this user
-                sessions_res = (
-                    get_supabase_client()
-                    .table('ruck_session')
-                    .select('distance_km, duration_seconds, calories_burned, elevation_gain_m, power_points')
-                    .eq('user_id', str(user_id))
-                    .eq('status', 'completed')
-                    .execute()
-                )
-                
-                sessions = sessions_res.data or []
-                sessions_time = time.time() - sessions_start
-                logger.info(f"[PROFILE_PERF] Sessions query took {sessions_time*1000:.2f}ms, found {len(sessions)} sessions")
-                
-                # Calculate aggregated stats from sessions
-                total_rucks = len(sessions)
-                total_distance_km = sum(s.get('distance_km', 0) or 0 for s in sessions)
-                total_duration_seconds = sum(s.get('duration_seconds', 0) or 0 for s in sessions)
-                total_elevation_gain_m = sum(s.get('elevation_gain_m', 0) or 0 for s in sessions)
-                total_calories_burned = sum(s.get('calories_burned', 0) or 0 for s in sessions)
-                
-                # Get duel stats
-                duels_won = 0
-                duels_lost = 0
-                try:
-                    duel_stats_res = (
+                cache_key = f"user_lifetime_stats:{user_id}"
+                cached_stats = cache_get(cache_key)
+                if cached_stats:
+                    total_rucks = cached_stats['total_rucks']
+                    total_distance_km = cached_stats['total_distance_km']
+                    total_duration_seconds = cached_stats['total_duration_seconds']
+                    total_elevation_gain_m = cached_stats['total_elevation_gain_m']
+                    total_calories_burned = cached_stats['total_calories_burned']
+                    logger.info(f"[PROFILE_PERF] Using cached stats for user {user_id}")
+                else:
+                    sessions_start = time.time()
+                    # Get completed sessions for this user
+                    sessions_res = (
                         get_supabase_client()
-                        .table('user_duel_stats')
-                        .select('duels_won, duels_lost')
+                        .table('ruck_session')
+                        .select('distance_km, duration_seconds, calories_burned, elevation_gain_m, power_points')
                         .eq('user_id', str(user_id))
+                        .eq('status', 'completed')
                         .execute()
                     )
-                    if duel_stats_res.data:
-                        duels_won = duel_stats_res.data[0].get('duels_won', 0)
-                        duels_lost = duel_stats_res.data[0].get('duels_lost', 0)
-                except Exception:
-                    pass
-                
-                # Convert to camelCase for frontend
-                stats = {
-                    'totalRucks': total_rucks,
-                    'totalDistanceKm': total_distance_km,
-                    'totalDurationSeconds': total_duration_seconds,
-                    'totalElevationGainM': total_elevation_gain_m,
-                    'totalCaloriesBurned': total_calories_burned,
-                    'duelsWon': duels_won,
-                    'duelsLost': duels_lost,
-                    'eventsCompleted': 0,  # TODO: Implement when events are added
-                    'followersCount': followers_count,
-                    'followingCount': following_count,
-                }
-                
-                # Provide distance in miles if user prefers imperial
-                prefer_metric = user.get('prefer_metric', True)
-                if not prefer_metric and stats.get('totalDistanceKm') is not None:
-                    stats['totalDistanceMi'] = round(stats['totalDistanceKm'] * 0.621371, 2)
-                
-                response['stats'] = stats
+                    
+                    sessions = sessions_res.data or []
+                    sessions_time = time.time() - sessions_start
+                    logger.info(f"[PROFILE_PERF] Sessions query took {sessions_time*1000:.2f}ms, found {len(sessions)} sessions")
+                    
+                    # Calculate aggregated stats from sessions
+                    total_rucks = len(sessions)
+                    total_distance_km = sum(s.get('distance_km', 0) or 0 for s in sessions)
+                    total_duration_seconds = sum(s.get('duration_seconds', 0) or 0 for s in sessions)
+                    total_elevation_gain_m = sum(s.get('elevation_gain_m', 0) or 0 for s in sessions)
+                    total_calories_burned = sum(s.get('calories_burned', 0) or 0 for s in sessions)
+                    
+                    # Get duel stats
+                    duels_won = 0
+                    duels_lost = 0
+                    try:
+                        duel_stats_res = (
+                            get_supabase_client()
+                            .table('user_duel_stats')
+                            .select('duels_won, duels_lost')
+                            .eq('user_id', str(user_id))
+                            .execute()
+                        )
+                        if duel_stats_res.data:
+                            duels_won = duel_stats_res.data[0].get('duels_won', 0)
+                            duels_lost = duel_stats_res.data[0].get('duels_lost', 0)
+                    except Exception:
+                        pass
+                    
+                    # Convert to camelCase for frontend
+                    stats = {
+                        'totalRucks': total_rucks,
+                        'totalDistanceKm': total_distance_km,
+                        'totalDurationSeconds': total_duration_seconds,
+                        'totalElevationGainM': total_elevation_gain_m,
+                        'totalCaloriesBurned': total_calories_burned,
+                        'duelsWon': duels_won,
+                        'duelsLost': duels_lost,
+                        'eventsCompleted': 0,  # TODO: Implement when events are added
+                        'followersCount': followers_count,
+                        'followingCount': following_count,
+                    }
+                    
+                    # Provide distance in miles if user prefers imperial
+                    prefer_metric = user.get('prefer_metric', True)
+                    if not prefer_metric and stats.get('totalDistanceKm') is not None:
+                        stats['totalDistanceMi'] = round(stats['totalDistanceKm'] * 0.621371, 2)
+                    
+                    response['stats'] = stats
+                    cache_set(cache_key, {
+                        'total_rucks': total_rucks,
+                        'total_distance_km': total_distance_km,
+                        'total_duration_seconds': total_duration_seconds,
+                        'total_elevation_gain_m': total_elevation_gain_m,
+                        'total_calories_burned': total_calories_burned
+                    }, 3600)
             except Exception as e:
                 print(f"[ERROR] Failed to calculate stats for user {user_id}: {e}")
                 response['stats'] = {
@@ -182,17 +200,24 @@ def get_public_profile(user_id):
                 response['clubs'] = []
                 response['stats']['clubsCount'] = 0
             try:
-                rucks_res = (
-                    get_supabase_client()
-                    .table('ruck_session')
-                    .select('*')
-                    .eq('user_id', str(user_id))
-                    .eq('status', 'completed')
-                    .order('completed_at', desc=True)
-                    .limit(5)
-                    .execute()
-                )
-                response['recentRucks'] = rucks_res.data or []
+                cache_key = f"user_recent_rucks:{user_id}"
+                cached_recent = cache_get(cache_key)
+                if cached_recent:
+                    response['recentRucks'] = cached_recent
+                    logger.info(f"[PROFILE_PERF] Using cached recent rucks for user {user_id}")
+                else:
+                    rucks_res = (
+                        get_supabase_client()
+                        .table('ruck_session')
+                        .select('*')
+                        .eq('user_id', str(user_id))
+                        .eq('status', 'completed')
+                        .order('completed_at', desc=True)
+                        .limit(5)
+                        .execute()
+                    )
+                    response['recentRucks'] = rucks_res.data or []
+                    cache_set(cache_key, response['recentRucks'], 3600)
             except Exception as e:
                 print(f"[ERROR] Failed to fetch recent rucks for user {user_id}: {e}")
                 response['recentRucks'] = []

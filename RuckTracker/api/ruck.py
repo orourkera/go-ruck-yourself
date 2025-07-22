@@ -1122,6 +1122,8 @@ class RuckSessionCompleteResource(Resource):
             cache_delete_pattern(f"weekly_stats:{g.user.id}:*")
             cache_delete_pattern(f"monthly_stats:{g.user.id}:*")
             cache_delete_pattern(f"yearly_stats:{g.user.id}:*")
+            cache_delete_pattern(f"user_lifetime_stats:{g.user.id}")
+            cache_delete_pattern(f"user_recent_rucks:{g.user.id}")
             
             # Fetch and include splits data in the response
             try:
