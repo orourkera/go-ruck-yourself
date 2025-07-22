@@ -358,7 +358,10 @@ class PushNotificationService:
         data = {
             'type': 'new_follower',
             'follower_id': follower_id,
-            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+            'follower_name': follower_name,
+            'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+            'route': '/profile',
+            'user_id': follower_id  # Navigate to follower's profile
         }
         
         return self.send_notification(

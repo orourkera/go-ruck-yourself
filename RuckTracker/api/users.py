@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, g
 from RuckTracker.utils.api_response import api_response, api_error
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
-from RuckTracker.services.redis_cache_service import cache_get, cache_set
+from RuckTracker.services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,218 +19,70 @@ def get_public_profile(user_id):
     try:
         current_user_id = g.user.id if hasattr(g, 'user') and g.user else None
         logger.info(f"[PROFILE_PERF] get_public_profile: Started for user {user_id}, current_user: {current_user_id}")
-        # Fetch basic profile fields. Some older databases may not yet have avatar_url or is_profile_private columns
-        try:
-            user_res = get_supabase_client().table('user').select('id, username, avatar_url, created_at, prefer_metric, is_profile_private, gender').eq('id', str(user_id)).single().execute()
-        except Exception as fetch_err:
-            # If the requested columns do not exist (e.g. column does not exist error), retry with a reduced column list
-            err_msg = str(fetch_err)
-            if '42703' in err_msg or 'column' in err_msg and ('avatar_url' in err_msg or 'is_profile_private' in err_msg):
-                user_res = get_supabase_client().table('user').select('id, username, created_at').eq('id', str(user_id)).single().execute()
-            else:
-                raise
-
-        if not user_res.data:
-            return api_error('User not found', status_code=404)
-        user = user_res.data
-        is_own_profile = str(current_user_id) == str(user_id)
-        is_private = user.get('is_profile_private', False) and not is_own_profile
-        is_following = False
-        is_followed_by = False
-        followers_count = 0
-        following_count = 0
-        
-        # Optimized: Batch all follow-related queries with PostgreSQL count()
-        follow_start = time.time()
         supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-        
-        try:
-            # Use Supabase SELECT count() - only select id column for maximum efficiency
-            followers_count_res = supabase.table('user_follows').select('id', count='exact').eq('followed_id', str(user_id)).execute()
-            followers_count = followers_count_res.count or 0
-            
-            following_count_res = supabase.table('user_follows').select('id', count='exact').eq('follower_id', str(user_id)).execute()
-            following_count = following_count_res.count or 0
-            
-        except Exception as e:
-            logger.warning(f"[PROFILE_PERF] Count queries failed: {e}")
-            followers_count = 0
-            following_count = 0
-        
-        # Check follow relationships only if user is logged in
-        if current_user_id:
-            try:
-                follow_res = supabase.table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
-                is_following = bool(follow_res.data)
-                
-                followed_by_res = supabase.table('user_follows').select('id').eq('follower_id', str(user_id)).eq('followed_id', str(current_user_id)).execute()
-                is_followed_by = bool(followed_by_res.data)
-            except Exception:
-                is_following = False
-                is_followed_by = False
-        
-        follow_time = time.time() - follow_start
-        logger.info(f"[PROFILE_PERF] All follow queries took {follow_time*1000:.2f}ms (followers: {followers_count}, following: {following_count})")
+
+        cache_key = f'user_profile:{user_id}:{current_user_id or "anon"}'
+        cached_profile = cache_get(cache_key)
+        if cached_profile:
+            logger.info(f"[PROFILE_PERF] Cache hit for profile {user_id}")
+            return api_response(cached_profile)
+
+        query_start = time.time()
+        profile_resp = supabase.rpc('get_user_profile', {'p_user_id': str(user_id), 'p_current_user_id': str(current_user_id) if current_user_id else None}).execute()
+        query_time = time.time() - query_start
+        logger.info(f"[PROFILE_PERF] Profile RPC took {query_time*1000:.2f}ms")
+
+        if not profile_resp.data:
+            return api_error('User not found', status_code=404)
+
+        profile_data = profile_resp.data[0]
+
+        is_own_profile = current_user_id is not None and str(current_user_id) == str(profile_data['id'])
+        is_private = profile_data.get('is_profile_private', False) and not is_own_profile
+
         response = {
             'user': {
-                'id': user['id'],
-                'username': user['username'],
-                'avatarUrl': user.get('avatar_url'),
-                'createdAt': user['created_at'],
-                'preferMetric': user.get('prefer_metric', True),
-                'isFollowing': is_following,
-                'isFollowedBy': is_followed_by,
+                'id': profile_data['id'],
+                'username': profile_data['username'],
+                'avatarUrl': profile_data.get('avatar_url'),
+                'createdAt': profile_data['created_at'],
+                'preferMetric': profile_data.get('prefer_metric', True),
+                'isFollowing': profile_data.get('is_following', False),
+                'isFollowedBy': profile_data.get('is_followed_by', False),
                 'isOwnProfile': is_own_profile,
-                'isPrivateProfile': user.get('is_profile_private', False),
-                'gender': user.get('gender')
+                'isPrivateProfile': profile_data.get('is_profile_private', False),
+                'gender': profile_data.get('gender')
             },
             'stats': {},
             'clubs': None,
             'recentRucks': None
         }
+
         if not is_private:
+            stats = {
+                'totalRucks': profile_data.get('total_rucks', 0),
+                'totalDistanceKm': profile_data.get('total_distance_km', 0.0),
+                'totalDurationSeconds': profile_data.get('total_duration_seconds', 0),
+                'totalElevationGainM': profile_data.get('total_elevation_gain_m', 0.0),
+                'totalCaloriesBurned': profile_data.get('total_calories_burned', 0),
+                'duelsWon': profile_data.get('duels_won', 0),
+                'duelsLost': profile_data.get('duels_lost', 0),
+                'eventsCompleted': profile_data.get('events_completed', 0),
+                'followersCount': profile_data.get('followers_count', 0),
+                'followingCount': profile_data.get('following_count', 0),
+                'clubsCount': len(profile_data.get('clubs', []))
+            }
 
-            # Calculate stats directly from ruck_session table instead of user_profile_stats
-            try:
-                cache_key = f"user_lifetime_stats:{user_id}"
-                cached_stats = cache_get(cache_key)
-                if cached_stats:
-                    total_rucks = cached_stats['total_rucks']
-                    total_distance_km = cached_stats['total_distance_km']
-                    total_duration_seconds = cached_stats['total_duration_seconds']
-                    total_elevation_gain_m = cached_stats['total_elevation_gain_m']
-                    total_calories_burned = cached_stats['total_calories_burned']
-                    logger.info(f"[PROFILE_PERF] Using cached stats for user {user_id}")
-                else:
-                    sessions_start = time.time()
-                    stats_res = (
-                        get_supabase_client()
-                        .table('ruck_session')
-                        .select(
-                            'count(*) as total_rucks, '
-                            'sum(distance_km) as total_distance_km, '
-                            'sum(duration_seconds) as total_duration_seconds, '
-                            'sum(elevation_gain_m) as total_elevation_gain_m, '
-                            'sum(calories_burned) as total_calories_burned'
-                        )
-                        .eq('user_id', str(user_id))
-                        .eq('status', 'completed')
-                        .execute()
-                    )
-                    if stats_res.data and stats_res.data[0]:
-                        agg_data = stats_res.data[0]
-                        total_rucks = agg_data['total_rucks'] or 0
-                        total_distance_km = agg_data['total_distance_km'] or 0.0
-                        total_duration_seconds = agg_data['total_duration_seconds'] or 0
-                        total_elevation_gain_m = agg_data['total_elevation_gain_m'] or 0.0
-                        total_calories_burned = agg_data['total_calories_burned'] or 0
-                    else:
-                        total_rucks = 0
-                        total_distance_km = 0.0
-                        total_duration_seconds = 0
-                        total_elevation_gain_m = 0.0
-                        total_calories_burned = 0
-                    sessions_time = time.time() - sessions_start
-                    logger.info(f"[PROFILE_PERF] Aggregated stats query took {sessions_time*1000:.2f}ms for user {user_id}")
+            prefer_metric = profile_data.get('prefer_metric', True)
+            if not prefer_metric and stats.get('totalDistanceKm') is not None:
+                stats['totalDistanceMi'] = round(stats['totalDistanceKm'] * 0.621371, 2)
 
-                    cache_set(cache_key, {
-                        'total_rucks': total_rucks,
-                        'total_distance_km': total_distance_km,
-                        'total_duration_seconds': total_duration_seconds,
-                        'total_elevation_gain_m': total_elevation_gain_m,
-                        'total_calories_burned': total_calories_burned
-                    }, 3600)
+            response['stats'] = stats
+            response['clubs'] = profile_data.get('clubs', [])
+            response['recentRucks'] = profile_data.get('recent_rucks', [])
 
-                    # Get duel stats
-                    duels_won = 0
-                    duels_lost = 0
-                    try:
-                        duel_stats_res = (
-                            get_supabase_client()
-                            .table('user_duel_stats')
-                            .select('duels_won, duels_lost')
-                            .eq('user_id', str(user_id))
-                            .execute()
-                        )
-                        if duel_stats_res.data:
-                            duels_won = duel_stats_res.data[0].get('duels_won', 0)
-                            duels_lost = duel_stats_res.data[0].get('duels_lost', 0)
-                    except Exception:
-                        pass
-                    
-                    # Convert to camelCase for frontend
-                    stats = {
-                        'totalRucks': total_rucks,
-                        'totalDistanceKm': total_distance_km,
-                        'totalDurationSeconds': total_duration_seconds,
-                        'totalElevationGainM': total_elevation_gain_m,
-                        'totalCaloriesBurned': total_calories_burned,
-                        'duelsWon': duels_won,
-                        'duelsLost': duels_lost,
-                        'eventsCompleted': 0,  # TODO: Implement when events are added
-                        'followersCount': followers_count,
-                        'followingCount': following_count,
-                    }
-                    
-                    # Provide distance in miles if user prefers imperial
-                    prefer_metric = user.get('prefer_metric', True)
-                    if not prefer_metric and stats.get('totalDistanceKm') is not None:
-                        stats['totalDistanceMi'] = round(stats['totalDistanceKm'] * 0.621371, 2)
-                    
-                    response['stats'] = stats
-            except Exception as e:
-                print(f"[ERROR] Failed to calculate stats for user {user_id}: {e}")
-                response['stats'] = {
-                    'totalRucks': 0,
-                    'totalDistanceKm': 0,
-                    'totalDurationSeconds': 0,
-                    'totalElevationGainM': 0,
-                    'totalCaloriesBurned': 0,
-                    'duelsWon': 0,
-                    'duelsLost': 0,
-                    'eventsCompleted': 0,
-                    'followersCount': followers_count,
-                    'followingCount': following_count,
-                }
+        cache_set(cache_key, response, 3600)
 
-            # Fetch clubs the user belongs to.
-            # Prefer the correct 'club_memberships' table. If the table or relationship is missing
-            # simply return an empty list instead of falling back to the legacy name that is now
-            # known to cause "could not find relationship" (PGRST200) errors.
-            try:
-                admin_client = get_supabase_client()
-                # Now that duplicate foreign key is removed, we can use simple syntax
-                clubs_res = admin_client.from_('club_memberships').select('clubs(*)').eq('user_id', str(user_id)).execute()
-                response['clubs'] = [row['clubs'] for row in clubs_res.data] if clubs_res.data else []
-                # Add clubsCount into stats dict
-                response['stats']['clubsCount'] = len(response['clubs'])
-            except Exception as clubs_err:
-                # Log but do not fail the entire profile request – just return no clubs.
-                print(f"[WARN] get_public_profile: failed to fetch clubs for user {user_id}: {clubs_err}")
-                response['clubs'] = []
-                response['stats']['clubsCount'] = 0
-            try:
-                cache_key = f"user_recent_rucks:{user_id}"
-                cached_recent = cache_get(cache_key)
-                if cached_recent:
-                    response['recentRucks'] = cached_recent
-                    logger.info(f"[PROFILE_PERF] Using cached recent rucks for user {user_id}")
-                else:
-                    rucks_res = (
-                        get_supabase_client()
-                        .table('ruck_session')
-                        .select('*')
-                        .eq('user_id', str(user_id))
-                        .eq('status', 'completed')
-                        .order('completed_at', desc=True)
-                        .limit(5)
-                        .execute()
-                    )
-                    response['recentRucks'] = rucks_res.data or []
-                    cache_set(cache_key, response['recentRucks'], 3600)
-            except Exception as e:
-                print(f"[ERROR] Failed to fetch recent rucks for user {user_id}: {e}")
-                response['recentRucks'] = []
         total_time = time.time() - start_time
         logger.info(f"[PROFILE_PERF] get_public_profile: Completed in {total_time*1000:.2f}ms total")
         return api_response(response)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
@@ -120,22 +121,28 @@ class AppLifecycleService with WidgetsBindingObserver {
   
   /// Handle app going to background/paused
   void _handleAppPaused() {
-    AppLogger.info('App paused - pausing background services');
+    AppLogger.info('App paused - enabling background session protection');
     
     try {
-      // Pause notification polling to reduce background activity
-      _notificationBloc?.pausePolling();
-      
-      // Don't stop active session services, but reduce their frequency
-      // Active sessions need to continue for workout tracking
       final activeState = _activeSessionBloc?.state;
       if (activeState is ActiveSessionRunning) {
-        AppLogger.info('Active session detected - maintaining minimal background services');
-        // Session continues but we could reduce update frequency here if needed
-      } else {
-        // No active session - can pause more aggressively
-        AppLogger.info('No active session - pausing all non-essential services');
+        AppLogger.info('🏃 Active session - CONTINUES RECORDING in background');
+        
+        // ONLY crash protection - session NEVER auto-pauses
+        // Force immediate session state save in case of crash/termination
+        try {
+          AppLogger.info('💾 CRASH PROTECTION: Force-saving session state');
+          _activeSessionBloc?.add(const SessionPersistenceRequested(immediate: true));
+          
+          AppLogger.info('✅ Session will continue recording in background indefinitely');
+          
+        } catch (persistError) {
+          AppLogger.error('❌ Failed to save session state: $persistError');
+        }
       }
+      
+      // Pause notification polling to reduce background activity
+      _notificationBloc?.pausePolling();
       
       // Force garbage collection
       SystemChannels.platform.invokeMethod('SystemNavigator.routeUpdated');
@@ -147,24 +154,21 @@ class AppLifecycleService with WidgetsBindingObserver {
   
   /// Handle app returning to foreground
   void _handleAppResumed() {
-    AppLogger.info('App resumed - resuming background services');
+    AppLogger.info('App resumed - restoring foreground services');
     
     try {
-      // Only resume notification polling if user is authenticated
+      final activeState = _activeSessionBloc?.state;
+      if (activeState is ActiveSessionRunning) {
+        AppLogger.info('🏃 Active session continued perfectly in background');
+        // Session never stopped - just log success
+      }
+      
+      // Resume notification polling if user is authenticated
       final authState = _authBloc?.state;
       if (_notificationBloc != null && authState is Authenticated) {
         AppLogger.info('User authenticated - resuming notification polling');
         _notificationBloc!.add(const NotificationsRequested());
-        _notificationBloc!.resumePolling(interval: const Duration(seconds: 30)); // More frequent polling
-      } else {
-        AppLogger.info('User not authenticated - skipping notification polling resume');
-      }
-      
-      // Check if we need to recover any services
-      final activeState = _activeSessionBloc?.state;
-      if (activeState is ActiveSessionRunning) {
-        AppLogger.info('Active session detected - ensuring all services are running');
-        // Could trigger a session recovery check here if needed
+        _notificationBloc!.resumePolling(interval: const Duration(seconds: 30));
       }
       
     } catch (e) {
@@ -181,10 +185,29 @@ class AppLifecycleService with WidgetsBindingObserver {
   
   /// Handle app being detached (usually during termination)
   void _handleAppDetached() {
-    AppLogger.info('App detached - cleaning up resources');
+    AppLogger.warning('🚨 CRITICAL: App being detached/terminated - emergency session cleanup');
     
     try {
-      // Ensure any pending data is saved
+      // EMERGENCY: App is about to die - we have very limited time
+      final activeState = _activeSessionBloc?.state;
+      if (activeState is ActiveSessionRunning) {
+        AppLogger.error('⚠️ ORPHANED SESSION RISK: Active session during app termination!');
+        
+        // Immediately mark session as cancelled/paused - don't wait for async processing
+        // This is our last chance to prevent orphaned sessions
+        try {
+          // Force immediate session cancellation
+          _activeSessionBloc?.add(const SessionCancelled(reason: 'App terminated unexpectedly'));
+          
+          // Also try to persist the cancellation immediately (may not complete)
+          AppLogger.info('🆘 Emergency: Attempting immediate session cancellation');
+          
+        } catch (emergencyError) {
+          AppLogger.error('❌ CRITICAL: Emergency session cleanup failed: $emergencyError');
+        }
+      }
+      
+      // Try generic cleanup as backup (but may not complete)
       _activeSessionBloc?.add(const SessionCleanupRequested());
       
     } catch (e) {

@@ -406,14 +406,16 @@ class SessionLifecycleManager implements SessionManager {
   bool get isPaused => !_currentState.isActive && _activeSessionId != null;
   Duration get totalPausedDuration => _currentState.totalPausedDuration;
 
-  /// Start session persistence timer for autosave
+  /// Start session persistence timer for autosave - 30s for crash protection
   void _startSessionPersistenceTimer() {
     _sessionPersistenceTimer?.cancel();
-    _sessionPersistenceTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    _sessionPersistenceTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (_currentState.isActive) {
         _persistSessionInBackground();
       }
     });
+    
+    AppLogger.info('[LIFECYCLE] 🛡️ Crash protection: Session autosave every 30 seconds');
   }
 
   /// Persist session data in background
