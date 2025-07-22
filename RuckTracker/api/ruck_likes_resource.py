@@ -6,6 +6,8 @@ from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.utils.api_response import build_api_response
 from RuckTracker.api.auth import auth_required
 from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
+from RuckTracker.services.redis_cache_service import cache_get, cache_set
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +157,8 @@ class RuckLikesResource(Resource):
             logger.info(f"RuckLikesResource: Invalid ruck_id format: {ruck_id}")
             return build_api_response(success=False, error="Invalid ruck_id format, must be an integer.", status_code=400)
             
+        start_time = time.time()
+
         # Check if the ruck exists
         try:
             ruck_query = supabase.table('ruck_session') \
@@ -168,7 +172,10 @@ class RuckLikesResource(Resource):
         except Exception as e:
             logger.error(f"RuckLikesResource: Error verifying ruck session: {e}")
             return build_api_response(success=False, error="Error verifying ruck session", status_code=500)
-            
+
+        logger.info(f"[LIKE_PERF] Ruck exists check took {(time.time() - start_time)*1000:.2f}ms")
+        check_time = time.time()
+
         # Check if the user has already liked this ruck
         try:
             existing_like = supabase.table('ruck_likes') \
@@ -187,7 +194,10 @@ class RuckLikesResource(Resource):
         except Exception as e:
             logger.error(f"RuckLikesResource: Error checking existing like: {e}")
             return build_api_response(success=False, error="Error checking existing like", status_code=500)
-            
+
+        logger.info(f"[LIKE_PERF] Existing like check took {(time.time() - check_time)*1000:.2f}ms")
+        insert_start = time.time()
+
         # Add the like
         try:
             # Simplified approach: don't query user table for profile info
@@ -235,7 +245,15 @@ class RuckLikesResource(Resource):
                     
                     # Send push notification
                     logger.info(f"🔔 PUSH NOTIFICATION: Using global push service")
-                    device_tokens = get_user_device_tokens([ruck_owner_id])
+                    cache_key = f'user_device_tokens:{ruck_owner_id}'
+                    cached_tokens = cache_get(cache_key)
+                    if cached_tokens:
+                        device_tokens = cached_tokens
+                        logger.info(f"[LIKE_PERF] Using cached device tokens for {ruck_owner_id}")
+                    else:
+                        device_tokens = get_user_device_tokens([ruck_owner_id])
+                        cache_set(cache_key, device_tokens, 3600)
+                    
                     logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens: {device_tokens}")
                     
                     if device_tokens:
@@ -261,6 +279,13 @@ class RuckLikesResource(Resource):
         except Exception as e:
             logger.error(f"RuckLikesResource: Error adding like: {e}", exc_info=True)
             return build_api_response(success=False, error="An error occurred while adding like.", status_code=500)
+
+        logger.info(f"[LIKE_PERF] Like insert took {(time.time() - insert_start)*1000:.2f}ms")
+        notif_start = time.time()
+
+        logger.info(f"[LIKE_PERF] Notification section took {(time.time() - notif_start)*1000:.2f}ms")
+        total_time = time.time() - start_time
+        logger.info(f"[LIKE_PERF] Total like request took {total_time*1000:.2f}ms")
     
     @auth_required
     def delete(self):

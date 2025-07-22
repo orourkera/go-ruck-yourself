@@ -103,27 +103,44 @@ def get_public_profile(user_id):
                     logger.info(f"[PROFILE_PERF] Using cached stats for user {user_id}")
                 else:
                     sessions_start = time.time()
-                    # Get completed sessions for this user
-                    sessions_res = (
+                    stats_res = (
                         get_supabase_client()
                         .table('ruck_session')
-                        .select('distance_km, duration_seconds, calories_burned, elevation_gain_m, power_points')
+                        .select(
+                            'count(*) as total_rucks, '
+                            'sum(distance_km) as total_distance_km, '
+                            'sum(duration_seconds) as total_duration_seconds, '
+                            'sum(elevation_gain_m) as total_elevation_gain_m, '
+                            'sum(calories_burned) as total_calories_burned'
+                        )
                         .eq('user_id', str(user_id))
                         .eq('status', 'completed')
                         .execute()
                     )
-                    
-                    sessions = sessions_res.data or []
+                    if stats_res.data and stats_res.data[0]:
+                        agg_data = stats_res.data[0]
+                        total_rucks = agg_data['total_rucks'] or 0
+                        total_distance_km = agg_data['total_distance_km'] or 0.0
+                        total_duration_seconds = agg_data['total_duration_seconds'] or 0
+                        total_elevation_gain_m = agg_data['total_elevation_gain_m'] or 0.0
+                        total_calories_burned = agg_data['total_calories_burned'] or 0
+                    else:
+                        total_rucks = 0
+                        total_distance_km = 0.0
+                        total_duration_seconds = 0
+                        total_elevation_gain_m = 0.0
+                        total_calories_burned = 0
                     sessions_time = time.time() - sessions_start
-                    logger.info(f"[PROFILE_PERF] Sessions query took {sessions_time*1000:.2f}ms, found {len(sessions)} sessions")
-                    
-                    # Calculate aggregated stats from sessions
-                    total_rucks = len(sessions)
-                    total_distance_km = sum(s.get('distance_km', 0) or 0 for s in sessions)
-                    total_duration_seconds = sum(s.get('duration_seconds', 0) or 0 for s in sessions)
-                    total_elevation_gain_m = sum(s.get('elevation_gain_m', 0) or 0 for s in sessions)
-                    total_calories_burned = sum(s.get('calories_burned', 0) or 0 for s in sessions)
-                    
+                    logger.info(f"[PROFILE_PERF] Aggregated stats query took {sessions_time*1000:.2f}ms for user {user_id}")
+
+                    cache_set(cache_key, {
+                        'total_rucks': total_rucks,
+                        'total_distance_km': total_distance_km,
+                        'total_duration_seconds': total_duration_seconds,
+                        'total_elevation_gain_m': total_elevation_gain_m,
+                        'total_calories_burned': total_calories_burned
+                    }, 3600)
+
                     # Get duel stats
                     duels_won = 0
                     duels_lost = 0
@@ -161,13 +178,6 @@ def get_public_profile(user_id):
                         stats['totalDistanceMi'] = round(stats['totalDistanceKm'] * 0.621371, 2)
                     
                     response['stats'] = stats
-                    cache_set(cache_key, {
-                        'total_rucks': total_rucks,
-                        'total_distance_km': total_distance_km,
-                        'total_duration_seconds': total_duration_seconds,
-                        'total_elevation_gain_m': total_elevation_gain_m,
-                        'total_calories_burned': total_calories_burned
-                    }, 3600)
             except Exception as e:
                 print(f"[ERROR] Failed to calculate stats for user {user_id}: {e}")
                 response['stats'] = {
