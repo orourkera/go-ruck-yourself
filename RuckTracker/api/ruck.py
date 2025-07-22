@@ -160,153 +160,26 @@ class RuckSessionListResource(Resource):
             
             # Fetch route data with intelligent sampling (preserve full route shape)
             locations_by_session = {}
-            MAX_POINTS_PER_SESSION = 100  # Reduced for better performance
-            
-            logger.info(f"[ROUTE_DEBUG] Starting to fetch location points for {len(session_ids)} sessions")
-            
-            # Feature flag for batched location fetching optimization
-            USE_BATCH_LOCATIONS = os.getenv('USE_BATCH_LOCATIONS', 'false').lower() == 'true'
-            
-            try:
-                if USE_BATCH_LOCATIONS:
-                    logger.info("[OPTIMIZATION] Using SMART batched location fetching")
-                    
-                    if session_ids:
-                        # SMART BATCHING: Get limited points for all sessions in one query
-                        # Enough points for long rucks (20km+) but capped for performance
-                        max_total_points = len(session_ids) * 150  # ~150 points per session max
-                        
-                        logger.info(f"[OPTIMIZATION] Fetching up to {max_total_points} total points for {len(session_ids)} sessions")
-                        
-                        # Single query to get limited location points for ALL sessions
-                        all_locations_query = supabase.table('location_point') \
-                            .select('session_id, latitude, longitude, timestamp') \
-                            .in_('session_id', session_ids) \
-                            .order('session_id, timestamp') \
-                            .limit(max_total_points) \
-                            .execute()
-                        
-                        if all_locations_query.data:
-                            logger.info(f"[OPTIMIZATION] Retrieved {len(all_locations_query.data)} location points total")
-                            
-                            # Group and limit points per session
-                            points_per_session = {}
-                            for location in all_locations_query.data:
-                                session_id = location['session_id']
-                                
-                                # Initialize counters
-                                if session_id not in points_per_session:
-                                    points_per_session[session_id] = 0
-                                    locations_by_session[session_id] = []
-                                
-                                # Limit to reasonable number of points per session for route plotting
-                                # 120 points is enough for detailed long routes while staying fast
-                                if points_per_session[session_id] < 120:  # Max 120 points per route
-                                    if location['latitude'] is not None and location['longitude'] is not None:
-                                        locations_by_session[session_id].append({
-                                            'lat': float(location['latitude']),
-                                            'lng': float(location['longitude'])
-                                        })
-                                        points_per_session[session_id] += 1
-                            
-                            logger.info(f"[OPTIMIZATION] Processed {len(locations_by_session)} sessions with location data")
-                        else:
-                            logger.info(f"[OPTIMIZATION] No location points found for any sessions")
+            for session_id in session_ids:
+                cache_key = f"session_points:{session_id}"
+                cached_points = cache_get(cache_key)
+                if cached_points:
+                    locations_by_session[session_id] = cached_points
+                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Cache hit with {len(cached_points)} points")
                 else:
-                    logger.info("[ROUTE_DEBUG] Using original location fetching approach")
-                    # ORIGINAL APPROACH - Keep existing logic for safety
-                    all_location_points = []
-                    
-                    for session_id in session_ids:
-                        logger.info(f"[ROUTE_DEBUG] Processing session {session_id}")
-                        
-                        # OPTIMIZATION: Quick check for any location data to avoid expensive queries
-                        # Use LIMIT 1 to quickly determine if session has location data
-                        has_location_query = supabase.table('location_point') \
-                            .select('session_id') \
-                            .eq('session_id', int(session_id)) \
-                            .limit(1) \
-                            .execute()
-                        
-                        if not has_location_query.data:
-                            logger.warning(f"[ROUTE_DEBUG] Session {session_id}: No location data found")
-                            continue  # Skip expensive queries for sessions with no location data
-                        
-                        # Optimized approach: Try to fetch limited points first to avoid expensive COUNT query
-                        # This avoids the slow COUNT(*) operation that was causing 3-4 second delays
-                        logger.info(f"[ROUTE_DEBUG] Session {session_id}: Has location data, fetching points")
-                        
-                        # First, try to get up to MAX_POINTS_PER_SESSION + 1 points to check if we need sampling
-                        initial_query = supabase.table('location_point') \
-                            .select('session_id,latitude,longitude,timestamp') \
-                            .eq('session_id', int(session_id)) \
-                            .order('timestamp') \
-                            .limit(MAX_POINTS_PER_SESSION + 1) \
-                            .execute()
-                        
-                        if not initial_query.data:
-                            logger.warning(f"[ROUTE_DEBUG] Session {session_id}: No location data returned from query")
-                            continue  # Skip processing
-                        
-                        # Determine which data to use based on session size
-                        if len(initial_query.data) <= MAX_POINTS_PER_SESSION:
-                            # Small sessions – use all points we fetched
-                            logger.info(f"[ROUTE_DEBUG] Session {session_id}: Using direct query ({len(initial_query.data)} points)")
-                            session_locations = initial_query
+                    try:
+                        points_resp = supabase.rpc('get_simplified_route', {'p_session_id': int(session_id), 'p_tolerance': 0.0001}).execute()
+                        if points_resp.data:
+                            processed_points = [{'lat': float(p['lat']), 'lng': float(p['lng'])} for p in points_resp.data]
+                            locations_by_session[session_id] = processed_points
+                            cache_set(cache_key, processed_points, 3600)
+                            logger.info(f"[ROUTE_DEBUG] Session {session_id}: Fetched and cached {len(processed_points)} simplified points")
                         else:
-                            # Large sessions – need to sample, but first get a rough count efficiently
-                            logger.info(f"[ROUTE_DEBUG] Session {session_id}: Large session detected, using RPC sampling")
-                            # Use RPC with a reasonable default interval since we know it's >MAX_POINTS_PER_SESSION
-                            session_locations = supabase.rpc('get_sampled_route_points', {
-                                'p_session_id': int(session_id),
-                                'p_interval': 3,  # Default sampling interval for large sessions
-                                'p_max_points': MAX_POINTS_PER_SESSION
-                            }).execute()
-                        
-                        fetched_points = len(session_locations.data) if session_locations.data else 0
-                        logger.info(f"[ROUTE_DEBUG] Session {session_id}: Fetched {fetched_points} location points from query")
-                        
-                        if session_locations.data:
-                            all_location_points.extend(session_locations.data)
-                            logger.info(f"[ROUTE_DEBUG] Session {session_id}: Added {fetched_points} points to all_location_points")
-                        else:
-                            logger.warning(f"[ROUTE_DEBUG] Session {session_id}: No location data returned from query")
-                    
-                    # Process all location points after loop completes
-                    logger.info(f"[ROUTE_DEBUG] Total fetched: {len(all_location_points)} location points for {len(session_ids)} sessions")
-                    
-                    # Group location points by session_id (only for original approach)
-                    for loc in all_location_points:
-                        session_id = loc['session_id']
-                        if session_id not in locations_by_session:
                             locations_by_session[session_id] = []
-                        
-                        # Ensure the location data contains latitude and longitude
-                        if 'latitude' in loc and 'longitude' in loc:
-                            try:
-                                # Convert numeric values if needed
-                                lat = float(loc['latitude']) if loc['latitude'] is not None else None
-                                lng = float(loc['longitude']) if loc['longitude'] is not None else None
-                                
-                                if lat is not None and lng is not None:
-                                    locations_by_session[session_id].append({
-                                        'lat': lat,
-                                        'lng': lng
-                                    })
-                            except (ValueError, TypeError):
-                                logger.warning(f"[ROUTE_DEBUG] Invalid lat/lng in location point: {loc}")
-                                continue
-                        else:
-                            logger.warning(f"[ROUTE_DEBUG] Location point missing lat/lng: {loc}")
-                
-                logger.info(f"[ROUTE_DEBUG] Grouped into {len(locations_by_session)} sessions with location data")
-                for session_id, points in locations_by_session.items():
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: {len(points)} valid points after processing")
-            
-            except Exception as e:
-                logger.error(f"[ROUTE_DEBUG] ERROR: Failed to fetch location points: {e}")
-                locations_by_session = {}
-            
+                    except Exception as e:
+                        logger.error(f"[ROUTE_DEBUG] RPC failed for {session_id}: {e}")
+                        locations_by_session[session_id] = []
+
             # Batch fetch splits for all sessions (splits are small, safe to fetch)
             splits_by_session = {}
             try:
@@ -498,62 +371,36 @@ class RuckSessionResource(Resource):
                 session = response.data[0]
             
             # Fetch location points with intelligent sampling
-            MAX_POINTS_FOR_DETAIL = 500
-            count_resp = supabase.table('location_point') \
-                .select('id', count='exact') \
-                .eq('session_id', ruck_id) \
-                .execute()
-
-            total_points = count_resp.count or 0
-
-            if total_points <= MAX_POINTS_FOR_DETAIL:
-                locations_resp = supabase.table('location_point') \
-                    .select('latitude,longitude,timestamp') \
-                    .eq('session_id', ruck_id) \
-                    .order('timestamp') \
-                    .execute()
+            cache_key = f"session_points:{ruck_id}"
+            cached_points = cache_get(cache_key)
+            if cached_points:
+                location_points = cached_points
+                logger.info(f"[SESSION_DETAIL] Cache hit for {ruck_id}: {len(location_points)} points")
             else:
-                interval = max(1, total_points // MAX_POINTS_FOR_DETAIL)
-                locations_resp = supabase.rpc('get_sampled_route_points', {
-                    'p_session_id': int(ruck_id),
-                    'p_interval': interval,
-                    'p_max_points': MAX_POINTS_FOR_DETAIL
-                }).execute()
-            
-            logger.info(f"[SESSION_DETAIL] Location response for session {ruck_id}: {len(locations_resp.data) if locations_resp.data else 0} points (total in DB: {total_points})")
-            logger.debug(f"Location response data for session {ruck_id}: {len(locations_resp.data) if locations_resp.data else 0} points")
-            
-            if locations_resp.data:
-                # Convert location points to the expected format
-                # Accept both latitude/longitude or lat/lng keys (RPC may return either format)
-                location_points = []
-                for loc in locations_resp.data:
-                    lat_val = loc.get('latitude', loc.get('lat'))
-                    lng_val = loc.get('longitude', loc.get('lng'))
-                    if lat_val is None or lng_val is None:
-                        logger.debug(f"[ROUTE_PARSE] Skipping location with missing coords: {loc}")
-                        continue
-                    location_points.append({
-                        'lat': float(lat_val),
-                        'lng': float(lng_val),
-                        'timestamp': loc.get('timestamp', loc.get('point_time', ''))
-                    })
-                
-                # Apply privacy clipping if this is not the user's own session
-                if not is_own_session:
-                    original_count = len(location_points)
-                    location_points = clip_route_for_privacy(location_points)
-                    logger.debug(f"[PRIVACY_DEBUG] Session {ruck_id} viewed by user {g.user.id}: Original points: {original_count}, Clipped points: {len(location_points)}")
-                else:
-                    logger.debug(f"[PRIVACY_DEBUG] Session {ruck_id} viewed by owner {g.user.id}: No clipping applied")
-                
-                # Attach both 'route' (legacy) and 'location_points' (for frontend compatibility)
-                session['route'] = location_points
-                session['location_points'] = location_points
-            else:
-                session['route'] = []
-                session['location_points'] = []
-            
+                try:
+                    if is_own_session:
+                        points_resp = supabase.rpc('get_simplified_route', {'p_session_id': int(ruck_id), 'p_tolerance': 0.0001}).execute()
+                    else:
+                        points_resp = supabase.rpc('get_clipped_simplified_route', {'p_session_id': int(ruck_id), 'p_privacy_distance': 200.0, 'p_max_points': 500}).execute()
+                    if points_resp.data:
+                        location_points = [{'lat': float(p['lat']), 'lng': float(p['lng']), 'timestamp': p['timestamp']} for p in points_resp.data]
+                        if is_own_session:  # Cache unclipped for own sessions
+                            cache_set(cache_key, location_points, 3600)
+                        logger.info(f"[SESSION_DETAIL] Fetched {len(location_points)} points via RPC for {ruck_id}")
+                    else:
+                        location_points = []
+                except Exception as e:
+                    logger.error(f"[SESSION_DETAIL] RPC failed for {ruck_id}: {e}")
+                    location_points = []  # Fallback: use old query logic here if needed
+
+            if location_points and not is_own_session:
+                original_count = len(location_points)
+                location_points = clip_route_for_privacy(location_points)
+                logger.debug(f"[PRIVACY_DEBUG] Clipped from {original_count} to {len(location_points)}")
+
+            session['route'] = location_points
+            session['location_points'] = location_points
+
             # Fetch splits data (for all sessions - public sessions should also show splits)
             try:
                 splits_resp = supabase.table('session_splits') \
@@ -1291,7 +1138,7 @@ class RuckSessionEditResource(Resource):
                 .gte('timestamp', data['end_time']) \
                 .execute()
             
-            logger.info(f"Deleted location points after {data['end_time']} for session {ruck_id}: {len(delete_locs_resp.data) if delete_locs_resp.data else 'unknown'} points deleted")
+            logger.info(f"Deleted location points after {data['end_time']} for session {ruck_id}: {len(delete_locations_resp.data) if delete_locations_resp.data else 'unknown'} points deleted")
             
             # Delete heart rate samples after the new end time
             delete_hr_resp = supabase.table('heart_rate_sample') \
