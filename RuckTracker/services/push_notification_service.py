@@ -208,13 +208,21 @@ class PushNotificationService:
             logger.info(f"📱 Sending notification {i+1}/{len(device_tokens)} to token: {token[:20]}...")
             
             try:
+                # Convert all data values to strings (Firebase requirement)
+                string_data = {}
+                if notification_data:
+                    for key, value in notification_data.items():
+                        string_data[key] = str(value)
+                
+                logger.info(f"📦 Notification data payload: {string_data}")
+                
                 # Create message using Firebase Admin SDK
                 message = messaging.Message(
                     notification=messaging.Notification(
                         title=title,
                         body=body,
                     ),
-                    data=notification_data or {},
+                    data=string_data,
                     token=token,
                     android=messaging.AndroidConfig(
                         notification=messaging.AndroidNotification(
