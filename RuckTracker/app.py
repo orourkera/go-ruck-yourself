@@ -127,6 +127,19 @@ else:
     )
 limiter.init_app(app)
 
+# Helper function to conditionally apply rate limits based on load testing mode
+def conditional_rate_limit(limit_string, key_func=None, override_defaults=True):
+    """Returns a rate limiter decorator or a no-op decorator based on LOAD_TESTING_MODE"""
+    if LOAD_TESTING_MODE:
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
+    else:
+        if key_func:
+            return limiter.limit(limit_string, key_func=key_func, override_defaults=override_defaults)
+        else:
+            return limiter.limit(limit_string, override_defaults=override_defaults)
+
 # Import and rate-limit HeartRateSampleUploadResource AFTER limiter is ready to avoid circular import
 from RuckTracker.api.ruck import HeartRateSampleUploadResource
 
@@ -177,20 +190,6 @@ def rate_limit_resource(resource, limit):
     # Replace the original method with our wrapped version
     resource.dispatch_request = wrapped_dispatch_request
     return resource
-
-# Helper function to conditionally apply rate limits based on load testing mode
-def conditional_rate_limit(limit_string, key_func=None, override_defaults=True):
-    """Returns a rate limiter decorator or a no-op decorator based on LOAD_TESTING_MODE"""
-    if LOAD_TESTING_MODE:
-        def no_op_decorator(func):
-            return func
-        return no_op_decorator
-    else:
-        if key_func:
-            return limiter.limit(limit_string, key_func=key_func, override_defaults=override_defaults)
-        else:
-            return limiter.limit(limit_string, override_defaults=override_defaults)
-
 
 
 # Apply rate limiting to Flask-RESTful endpoints - using higher defaults
