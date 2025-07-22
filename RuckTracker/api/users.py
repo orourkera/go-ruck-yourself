@@ -36,15 +36,40 @@ def get_public_profile(user_id):
         is_private = user.get('is_profile_private', False) and not is_own_profile
         is_following = False
         is_followed_by = False
+        followers_count = 0
+        following_count = 0
+        
+        # Optimized: Batch all follow-related queries with PostgreSQL count()
+        follow_start = time.time()
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+        
+        try:
+            # Use Supabase SELECT count() - only select id column for maximum efficiency
+            followers_count_res = supabase.table('user_follows').select('id', count='exact').eq('followed_id', str(user_id)).execute()
+            followers_count = followers_count_res.count or 0
+            
+            following_count_res = supabase.table('user_follows').select('id', count='exact').eq('follower_id', str(user_id)).execute()
+            following_count = following_count_res.count or 0
+            
+        except Exception as e:
+            logger.warning(f"[PROFILE_PERF] Count queries failed: {e}")
+            followers_count = 0
+            following_count = 0
+        
+        # Check follow relationships only if user is logged in
         if current_user_id:
-            follow_start = time.time()
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            follow_res = supabase.table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
-            is_following = bool(follow_res.data)
-            followed_by_res = supabase.table('user_follows').select('id').eq('follower_id', str(user_id)).eq('followed_id', str(current_user_id)).execute()
-            is_followed_by = bool(followed_by_res.data)
-            follow_time = time.time() - follow_start
-            logger.info(f"[PROFILE_PERF] Follow queries took {follow_time*1000:.2f}ms")
+            try:
+                follow_res = supabase.table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
+                is_following = bool(follow_res.data)
+                
+                followed_by_res = supabase.table('user_follows').select('id').eq('follower_id', str(user_id)).eq('followed_id', str(current_user_id)).execute()
+                is_followed_by = bool(followed_by_res.data)
+            except Exception:
+                is_following = False
+                is_followed_by = False
+        
+        follow_time = time.time() - follow_start
+        logger.info(f"[PROFILE_PERF] All follow queries took {follow_time*1000:.2f}ms (followers: {followers_count}, following: {following_count})")
         response = {
             'user': {
                 'id': user['id'],
@@ -63,31 +88,6 @@ def get_public_profile(user_id):
             'recentRucks': None
         }
         if not is_private:
-            # Calculate follower/following counts first (used for stats no matter private)
-            try:
-                follower_count_start = time.time()
-                supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-                followers_count_res = (
-                    supabase
-                    .table('user_follows')
-                    .select('id')
-                    .eq('followed_id', str(user_id))
-                    .execute()
-                )
-                followers_count = len(followers_count_res.data or [])
-                following_count_res = (
-                    supabase
-                    .table('user_follows')
-                    .select('id')
-                    .eq('follower_id', str(user_id))
-                    .execute()
-                )
-                following_count = len(following_count_res.data or [])
-                follower_count_time = time.time() - follower_count_start
-                logger.info(f"[PROFILE_PERF] Follower count queries took {follower_count_time*1000:.2f}ms")
-            except Exception:
-                followers_count = 0
-                following_count = 0
 
             # Calculate stats directly from ruck_session table instead of user_profile_stats
             try:
