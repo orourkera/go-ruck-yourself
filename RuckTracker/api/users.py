@@ -1,9 +1,13 @@
 from flask import Blueprint, request, jsonify, g
 from RuckTracker.utils.api_response import api_response, api_error
 from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Initialize push notification service
+push_service = PushNotificationService()
 
 users_bp = Blueprint('users', __name__)
 
@@ -309,6 +313,35 @@ def follow_user(user_id):
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             insert_res = supabase.table('user_follows').insert({'follower_id': str(current_user_id), 'followed_id': str(user_id)}).execute()
             if insert_res.data:
+                # Send push notification to the followed user
+                try:
+                    logger.info(f"🔔 PUSH NOTIFICATION: Starting new follower push notification for user {user_id}")
+                    
+                    # Get follower's username
+                    follower_response = supabase.table('user').select('username').eq('id', str(current_user_id)).execute()
+                    follower_name = follower_response.data[0]['username'] if follower_response.data else 'Someone'
+                    
+                    logger.info(f"🔔 PUSH NOTIFICATION: Sending to followed user {user_id}, from follower {follower_name}")
+                    
+                    # Get device tokens for the followed user
+                    device_tokens = get_user_device_tokens([str(user_id)])
+                    logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens: {device_tokens}")
+                    
+                    if device_tokens:
+                        logger.info(f"🔔 PUSH NOTIFICATION: Calling send_new_follower_notification...")
+                        result = push_service.send_new_follower_notification(
+                            device_tokens=device_tokens,
+                            follower_name=follower_name,
+                            follower_id=str(current_user_id)
+                        )
+                        logger.info(f"🔔 PUSH NOTIFICATION: New follower notification sent successfully, result: {result}")
+                    else:
+                        logger.warning(f"🔔 PUSH NOTIFICATION: No device tokens found for user {user_id}")
+                        
+                except Exception as e:
+                    logger.error(f"🔔 PUSH NOTIFICATION: Failed to send new follower notification: {e}", exc_info=True)
+                    # Don't fail the follow if notification fails
+                
                 count_res = get_supabase_client().table('user_follows').select('id').eq('followed_id', str(user_id)).execute()
                 followers_count = len(count_res.data) if count_res.data else 0
                 return jsonify({'success': True, 'isFollowing': True, 'followersCount': followers_count})

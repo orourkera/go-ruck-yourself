@@ -9,6 +9,9 @@ from RuckTracker.services.push_notification_service import PushNotificationServi
 
 logger = logging.getLogger(__name__)
 
+# Initialize push notification service
+push_service = PushNotificationService()
+
 class RuckLikesResource(Resource):
     @auth_required
     def get(self):
@@ -207,36 +210,49 @@ class RuckLikesResource(Resource):
             
             # Send push notification to ruck owner
             try:
+                logger.info(f"🔔 PUSH NOTIFICATION: Starting ruck like push notification for ruck {ruck_id}")
+                
                 # Get ruck owner info
                 ruck_response = supabase.table('ruck_session') \
                     .select('user_id') \
                     .eq('id', ruck_id) \
                     .execute()
                 
+                logger.info(f"🔔 PUSH NOTIFICATION: Ruck owner query result: {ruck_response.data}")
+                
                 if ruck_response.data and ruck_response.data[0]['user_id'] != user_id:
                     ruck_owner_id = ruck_response.data[0]['user_id']
                     
                     # Get liker display name
-                    user_response = supabase.table('users') \
-                        .select('display_name') \
+                    user_response = supabase.table('user') \
+                        .select('username') \
                         .eq('id', user_id) \
                         .execute()
                     
-                    liker_name = user_response.data[0]['display_name'] if user_response.data else 'Someone'
+                    liker_name = user_response.data[0]['username'] if user_response.data else 'Someone'
+                    
+                    logger.info(f"🔔 PUSH NOTIFICATION: Sending to ruck owner {ruck_owner_id}, from liker {liker_name}")
                     
                     # Send push notification
-                    push_notification_service = PushNotificationService()
+                    logger.info(f"🔔 PUSH NOTIFICATION: Using global push service")
                     device_tokens = get_user_device_tokens([ruck_owner_id])
+                    logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens: {device_tokens}")
                     
                     if device_tokens:
-                        push_notification_service.send_ruck_like_notification(
+                        logger.info(f"🔔 PUSH NOTIFICATION: Calling send_ruck_like_notification...")
+                        result = push_service.send_ruck_like_notification(
                             device_tokens=device_tokens,
                             liker_name=liker_name,
                             ruck_id=ruck_id
                         )
+                        logger.info(f"🔔 PUSH NOTIFICATION: Like notification sent successfully, result: {result}")
+                    else:
+                        logger.warning(f"🔔 PUSH NOTIFICATION: No device tokens found for user {ruck_owner_id}")
+                else:
+                    logger.info(f"🔔 PUSH NOTIFICATION: Skipping notification (same user or no ruck owner found)")
                         
             except Exception as e:
-                logger.error(f"Failed to send like notification: {e}")
+                logger.error(f"🔔 PUSH NOTIFICATION: Failed to send like notification: {e}", exc_info=True)
                 # Don't fail the like if notification fails
             
             # Return the created like

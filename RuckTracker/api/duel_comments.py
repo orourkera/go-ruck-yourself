@@ -14,6 +14,9 @@ from RuckTracker.utils.api_response import build_api_response
 
 logger = logging.getLogger(__name__)
 
+# Initialize push notification service
+push_service = PushNotificationService()
+
 def create_duel_comment_notification(duel_id, comment_id, commenter_id, commenter_name):
     """
     Create notifications for all duel participants except the commenter
@@ -95,13 +98,14 @@ def create_duel_comment_notification(duel_id, comment_id, commenter_id, commente
             logger.info(f"Successfully created {len(notifications)} notifications for duel comment {comment_id}")
             
             # Send push notifications
-            push_notification_service = PushNotificationService()
+            logger.info(f"🔔 PUSH NOTIFICATION: Starting duel comment push notification for duel {duel_id}")
             participant_ids = [p['user_id'] for p in participants_response.data if p['user_id'] != commenter_id]
             
             if participant_ids:
                 device_tokens = get_user_device_tokens(participant_ids)
+                logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens for {len(participant_ids)} participants")
                 if device_tokens:
-                    push_notification_service.send_duel_comment_notification(
+                    result = push_service.send_duel_comment_notification(
                         device_tokens=device_tokens,
                         commenter_name=commenter_name,
                         duel_name=duel_name,
@@ -172,10 +176,10 @@ def create_duel_joined_notification(duel_id, joiner_id, joiner_name):
         logger.info(f"Created duel joined notification for creator {creator_id}")
         
         # Send push notification
-        push_notification_service = PushNotificationService()
+        logger.info(f"🔔 PUSH NOTIFICATION: Starting duel joined push notification for duel {duel_id}")
         device_tokens = get_user_device_tokens([creator_id])
         if device_tokens:
-            push_notification_service.send_duel_joined_notification(
+            result = push_service.send_duel_joined_notification(
                 device_tokens=device_tokens,
                 joiner_name=joiner_name,
                 duel_name=duel_name,
@@ -247,10 +251,10 @@ def create_duel_started_notification(duel_id):
             logger.info(f"Created {len(notifications)} duel started notifications")
             
             # Send push notifications
-            push_notification_service = PushNotificationService()
+            logger.info(f"🔔 PUSH NOTIFICATION: Starting duel started push notification for duel {duel_id}")
             device_tokens = get_user_device_tokens(participant_ids)
             if device_tokens:
-                push_notification_service.send_duel_started_notification(
+                result = push_service.send_duel_started_notification(
                     device_tokens=device_tokens,
                     duel_name=duel_name,
                     duel_id=duel_id
@@ -332,10 +336,10 @@ def create_duel_completed_notification(duel_id):
             logger.info(f"Created {len(notifications)} duel completed notifications")
             
             # Send push notifications
-            push_notification_service = PushNotificationService()
+            logger.info(f"🔔 PUSH NOTIFICATION: Starting duel completed push notification for duel {duel_id}")
             device_tokens = get_user_device_tokens(participant_ids)
             if device_tokens:
-                push_notification_service.send_duel_completed_notification(
+                result = push_service.send_duel_completed_notification(
                     device_tokens=device_tokens,
                     duel_name=duel_name,
                     duel_id=duel_id
@@ -410,10 +414,10 @@ def create_duel_progress_notification(duel_id, participant_id, participant_name,
             logger.info(f"Created {len(notifications)} duel progress notifications")
             
             # Send push notifications
-            push_notification_service = PushNotificationService()
+            logger.info(f"🔔 PUSH NOTIFICATION: Starting duel progress push notification for duel {duel_id}")
             device_tokens = get_user_device_tokens(other_participant_ids)
             if device_tokens:
-                push_notification_service.send_duel_progress_notification(
+                result = push_service.send_duel_progress_notification(
                     device_tokens=device_tokens,
                     participant_name=participant_name,
                     duel_name=duel_name,
@@ -499,13 +503,13 @@ def create_duel_deleted_notification(duel_id, deleter_id):
             logger.info(f"Created {len(notifications)} notifications for duel deletion {duel_id}")
             
             # Send push notifications
-            push_notification_service = PushNotificationService()
+            logger.info(f"🔔 PUSH NOTIFICATION: Starting duel deleted push notification for duel {duel_id}")
             participant_ids = [p['user_id'] for p in participants_response.data]
             
             if participant_ids:
                 device_tokens = get_user_device_tokens(participant_ids)
                 if device_tokens:
-                    push_notification_service.send_duel_deleted_notification(
+                    result = push_service.send_duel_deleted_notification(
                         device_tokens=device_tokens,
                         deleter_name=deleter_name,
                         duel_name=duel_name,
@@ -556,10 +560,10 @@ def send_duel_completed_push_notifications(duel_id):
         participant_ids = [p['user_id'] for p in participants_response.data]
         
         # Send push notifications only
-        push_notification_service = PushNotificationService()
+        logger.info(f"🔔 PUSH NOTIFICATION: Starting final duel completed push notification for duel {duel_id}")
         device_tokens = get_user_device_tokens(participant_ids)
         if device_tokens:
-            push_notification_service.send_duel_completed_notification(
+            result = push_service.send_duel_completed_notification(
                 device_tokens=device_tokens,
                 duel_name=duel_name,
                 duel_id=duel_id

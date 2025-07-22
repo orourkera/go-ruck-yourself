@@ -338,6 +338,28 @@ class PushNotificationService:
             notification_data=data
         )
     
+    def send_new_follower_notification(
+        self,
+        device_tokens: List[str],
+        follower_name: str,
+        follower_id: str
+    ) -> bool:
+        """Send new follower notification to the followed user"""
+        title = "New Follower"
+        body = f"{follower_name} started following you"
+        data = {
+            'type': 'new_follower',
+            'follower_id': follower_id,
+            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+        }
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
+    
     def send_duel_joined_notification(
         self,
         device_tokens: List[str],
