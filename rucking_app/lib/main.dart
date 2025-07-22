@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/app.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
@@ -38,6 +39,14 @@ import 'package:sentry/sentry.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 🛡️ CRITICAL: ANR Prevention - Configure Flutter engine for stability
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  
+  // 🛡️ Prevent surface lifecycle issues that cause ANR
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
   
   // Load environment variables
   await dotenv.load(fileName: ".env");
@@ -302,6 +311,30 @@ Future<void> _runApp() async {
       AppLogger.info('[Main] ATT authorization result: $hasPermission');
     } catch (e) {
       AppLogger.error('[Main] Error requesting tracking authorization: $e');
+    }
+  });
+  
+  // 🛡️ ANR Prevention: Initialize heavy services after surface is stable
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    try {
+      // Wait for Flutter surface to be fully rendered
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      // Initialize heavy services in background
+      AppLogger.info('[Main] Starting deferred service initialization...');
+      
+      // These don't block the UI thread
+      unawaited(Future(() async {
+        try {
+          await FirebaseCrashlytics.instance.sendUnsentReports();
+          AppLogger.info('[Main] Crashlytics reports sent');
+        } catch (e) {
+          AppLogger.error('[Main] Error sending crashlytics reports: $e');
+        }
+      }));
+      
+    } catch (e) {
+      AppLogger.error('[Main] Error in deferred initialization: $e');
     }
   });
 }
